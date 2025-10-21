@@ -36,12 +36,14 @@ export default function VerifyEmail({ status }: { status?: string }) {
                             Resend verification email
                         </Button>
 
-                        <TextLink
-                            href={logout()}
-                            className="mx-auto block text-sm"
-                        >
-                            Log out
-                        </TextLink>
+                        <div className='flex justify-center mt-10'>
+                            <TextLink
+                                href={logout()}
+                                className="mx-auto block text-sm"
+                            >
+                                Log out
+                            </TextLink>
+                        </div>
                     </>
                 )}
             </Form>

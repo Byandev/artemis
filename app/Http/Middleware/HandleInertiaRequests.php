@@ -38,6 +38,12 @@ class HandleInertiaRequests extends Middleware
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
+        // Get current workspace from URL route parameter
+        $currentWorkspace = null;
+        if ($request->user() && $request->route('workspace')) {
+            $currentWorkspace = $request->route('workspace');
+        }
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
@@ -45,6 +51,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'currentWorkspace' => $currentWorkspace,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }
