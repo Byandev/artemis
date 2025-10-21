@@ -9,9 +9,22 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
-        return Inertia::render('dashboard');
+        $user = auth()->user();
+
+        // Get user's first workspace (prioritize owned workspaces)
+        $workspace = $user->ownedWorkspaces()->first()
+            ?? $user->workspaces()->first();
+
+        // If user has a workspace, redirect to it
+        if ($workspace) {
+            return redirect()->route('workspace.dashboard', $workspace->slug);
+        }
+
+        // If no workspace, redirect to setup
+        return redirect()->route('workspaces.setup');
     })->name('dashboard');
 });
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
+require __DIR__.'/workspaces.php';

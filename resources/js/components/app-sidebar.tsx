@@ -11,18 +11,11 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import workspace from '@/routes/workspace';
 import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { BookOpen, Folder, LayoutGrid } from 'lucide-react';
 import AppLogo from './app-logo';
-
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
 
 const footerNavItems: NavItem[] = [
     {
@@ -38,13 +31,27 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
+    const { currentWorkspace } = usePage().props;
+
+    const dashboardUrl = currentWorkspace
+        ? workspace.dashboard.url(currentWorkspace.slug)
+        : dashboard().url;
+
+    const mainNavItems: NavItem[] = [
+        {
+            title: 'Dashboard',
+            href: dashboardUrl,
+            icon: LayoutGrid,
+        },
+    ];
+
     return (
-        <Sidebar collapsible="icon" variant="inset">
+        <Sidebar collapsible="icon" variant="sidebar">
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch>
+                            <Link href={dashboardUrl} prefetch>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
