@@ -34,13 +34,18 @@ export function AppSidebar() {
     const { currentWorkspace } = usePage().props;
 
     const dashboardUrl = currentWorkspace
-        ? workspace.dashboard.url(currentWorkspace.slug)
+        ? workspace.dashboard.url((currentWorkspace as { slug: string }).slug)
         : dashboard().url;
 
     const mainNavItems: NavItem[] = [
         {
             title: 'Dashboard',
             href: dashboardUrl,
+            icon: LayoutGrid,
+        },
+        {
+            title: 'Shop and Pages',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
             icon: LayoutGrid,
         },
     ];
