@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Order;
 use App\Models\ParcelJourney;
+use App\Models\ParcelJourneyNotification;
 use App\Models\ShippingAddress;
 use App\Models\Workspace;
 use Carbon\Carbon;
@@ -85,40 +86,6 @@ class SyncOrder implements ShouldQueue
             'returning_at' => $returning_at,
         ]);
 
-        if (isset($order['partner'])) {
-            if (isset($order['partner']['extend_code'])) {
-                $tracking_code = $order['partner']['extend_code'];
-                $parcel_status = $order['partner']['partner_status'];
-
-                if (isset($order['partner']['extend_update'])) {
-                    foreach ($order['partner']['extend_update'] as $update) {
-                        if ($update['status'] == 'On Delivery') {
-                            $deliveryAttempts = $deliveryAttempts + 1;
-
-                            if ($first_delivery_attempt == null) {
-                                $first_delivery_attempt = $update['updated_at'];
-                            }
-                        }
-
-                        ParcelJourney::updateOrCreate([
-                            'order_id' => $savedOrder->id,
-                            'status' => $update['status'],
-                            'note' => $update['note'],
-                        ], [
-                            'created_at' => $update['updated_at'],
-                        ]);
-                    }
-                }
-            }
-        }
-
-        $savedOrder->update([
-            'tracking_code' => $tracking_code,
-            'parcel_status' => $parcel_status,
-            'delivery_attempts' => $deliveryAttempts,
-            'first_delivery_attempt' => $first_delivery_attempt,
-        ]);
-
         if (isset($order['shipping_address'])) {
             ShippingAddress::updateOrCreate([
                 'order_id' => $savedOrder->id,
@@ -132,5 +99,113 @@ class SyncOrder implements ShouldQueue
                 'phone_number' => $order['shipping_address']['phone_number'],
             ]);
         }
+
+        if (isset($order['partner'])) {
+            if (isset($order['partner']['extend_code'])) {
+                $tracking_code = $order['partner']['extend_code'];
+                $parcel_status = $order['partner']['partner_status'];
+
+                $savedOrder->update([
+                    'tracking_code' => $tracking_code,
+                    'parcel_status' => $parcel_status,
+                ]);
+
+                if (isset($order['partner']['extend_update'])) {
+                    $isLatestUpdate = true;
+
+                    foreach ($order['partner']['extend_update'] as $update) {
+                        if ($update['status'] == 'On Delivery') {
+                            $deliveryAttempts = $deliveryAttempts + 1;
+
+                            if ($first_delivery_attempt == null) {
+                                $first_delivery_attempt = $update['updated_at'];
+                            }
+                        }
+
+                        $parcelJourney = ParcelJourney::updateOrCreate([
+                            'order_id' => $savedOrder->id,
+                            'status' => $update['status'],
+                            'note' => $update['note'],
+                        ], [
+                            'created_at' => $update['updated_at'],
+                        ]);
+
+                        if ($isLatestUpdate && in_array($parcelJourney->status, ['On Delivery', 'Departure', 'Arrival']) && Carbon::parse($parcelJourney->created_at)->isToday()) {
+                            $isLatestUpdate = false;
+
+                            if ($parcelJourney->notifications()->doesntExist()) {
+                                $this->sendParcelJourneyNotification($savedOrder, $parcelJourney);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        $savedOrder->update([
+            'delivery_attempts' => $deliveryAttempts,
+            'first_delivery_attempt' => $first_delivery_attempt,
+        ]);
+
+    }
+
+    private function sendParcelJourneyNotification(Order $order, ParcelJourney $parcelJourney): void
+    {
+        $order->loadMissing('shippingAddress');
+        $date = Carbon::parse($parcelJourney->created_at)->format('F d');
+
+        if ($parcelJourney->status === 'Departure') {
+            preg_match_all('/【(.*?)】/', $parcelJourney->note, $matches);
+
+            $nextLocation = $matches[1][1];
+            $message = "{$order->shippingAddress->full_name}, update lang po sa parcel nyo from JNT.\n\nAs of {$date}, papunta na po ito sa {$nextLocation}.\nDadaan muna ito sa warehouse na ito bilang bahagi ng ruta papunta sa inyong address: {$order->shippingAddress->full_address}.\n\nMaraming salamat sa tiwala!\n\n{$order->page->name}";
+
+            ParcelJourneyNotification::create([
+                'order_id' => $order->id,
+                'parcel_journey_id' => $parcelJourney->id,
+                'message' => $message,
+                'type' => 'sms',
+                'receiver_name' => $order->shippingAddress->full_name,
+                'receiver_identity' => $order->shippingAddress->phone_number,
+            ]);
+
+            ParcelJourneyNotification::create([
+                'order_id' => $order->id,
+                'parcel_journey_id' => $parcelJourney->id,
+                'message' => $message,
+                'type' => 'chat',
+                'receiver_name' => $order->shippingAddress->full_name,
+                'receiver_identity' => $order->fb_id,
+            ]);
+        }
+
+        if ($parcelJourney->status === 'Arrival') {
+            preg_match_all('/【(.*?)】/', $parcelJourney->note, $matches);
+            $currentLocation = $matches[1][0];
+            $message = "{$order->shippingAddress->full_name}, update lang po sa parcel nyo from JNT.\n\nAs of {$date}, nakarating na po ito sa {$currentLocation}.\nDadaan muna ito sa warehouse na ito bilang bahagi ng ruta papunta sa inyong address: {$order->shippingAddress->full_address}.\n\nMaraming salamat sa tiwala!\n\n{$order->page->name}";
+
+            ParcelJourneyNotification::create([
+                'order_id' => $order->id,
+                'parcel_journey_id' => $parcelJourney->id,
+                'message' => $message,
+                'type' => 'sms',
+                'receiver_name' => $order->shippingAddress->full_name,
+                'receiver_identity' => $order->shippingAddress->phone_number,
+            ]);
+
+            ParcelJourneyNotification::create([
+                'order_id' => $order->id,
+                'parcel_journey_id' => $parcelJourney->id,
+                'message' => $message,
+                'type' => 'chat',
+                'receiver_name' => $order->shippingAddress->full_name,
+                'receiver_identity' => $order->fb_id,
+            ]);
+        }
+
+        if ($parcelJourney->status === '') {
+
+        }
+
     }
 }

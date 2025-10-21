@@ -18,6 +18,7 @@ class WorkspaceSetupController extends Controller
         if ($request->user()->workspaces()->exists()) {
             $workspace = $request->user()->ownedWorkspaces()->first()
                 ?? $request->user()->workspaces()->first();
+
             return redirect()->route('workspace.dashboard', $workspace->slug);
         }
 
@@ -35,6 +36,7 @@ class WorkspaceSetupController extends Controller
         if ($request->user()->workspaces()->exists()) {
             $workspace = $request->user()->ownedWorkspaces()->first()
                 ?? $request->user()->workspaces()->first();
+
             return redirect()->route('workspace.dashboard', $workspace->slug)
                 ->with('info', 'You already have a workspace.');
         }

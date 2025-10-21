@@ -62,7 +62,7 @@ class PageController extends Controller
         Shop::firstOrCreate([
             'id' => $validated['shop_id'],
             'workspace_id' => $workspace->id,
-        ],[
+        ], [
             'name' => $response['shop']['name'],
             'avatar_url' => isset($response['shop']['avatar_url']) ? $response['shop']['avatar_url'] : null,
         ]);

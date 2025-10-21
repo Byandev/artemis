@@ -18,8 +18,7 @@ class WorkspaceInvitationNotification extends Notification implements ShouldQueu
      */
     public function __construct(
         public WorkspaceInvitation $invitation
-    ) {
-    }
+    ) {}
 
     /**
      * Get the notification's delivery channels.
@@ -42,11 +41,11 @@ class WorkspaceInvitationNotification extends Notification implements ShouldQueu
 
         return (new MailMessage)
             ->subject("You've been invited to join {$workspace->name}")
-            ->greeting("Hello!")
+            ->greeting('Hello!')
             ->line("{$inviter->name} has invited you to join the \"{$workspace->name}\" workspace.")
             ->line("As a {$this->invitation->role}, you'll be able to collaborate with the team.")
             ->action('Accept Invitation', $acceptUrl)
-            ->line('This invitation will expire on ' . $this->invitation->expires_at->format('F j, Y \a\t g:i A') . '.')
+            ->line('This invitation will expire on '.$this->invitation->expires_at->format('F j, Y \a\t g:i A').'.')
             ->line('If you did not expect this invitation, no further action is required.');
     }
 

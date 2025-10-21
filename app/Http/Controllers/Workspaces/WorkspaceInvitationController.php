@@ -20,7 +20,7 @@ class WorkspaceInvitationController extends Controller
     public function store(Request $request, Workspace $workspace)
     {
         // Only admins and owners can invite
-        if (!$request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to invite members.');
         }
 
@@ -69,7 +69,7 @@ class WorkspaceInvitationController extends Controller
         $workspace = $invitation->workspace;
 
         // Only admins and owners can resend invitations
-        if (!$request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to resend invitations.');
         }
 
@@ -100,7 +100,7 @@ class WorkspaceInvitationController extends Controller
             ->firstOrFail();
 
         // Check if invitation is valid
-        if (!$invitation->isValid()) {
+        if (! $invitation->isValid()) {
             return Inertia::render('workspaces/invitation-invalid', [
                 'invitation' => $invitation,
                 'reason' => $invitation->isExpired() ? 'expired' : 'accepted',
@@ -123,12 +123,12 @@ class WorkspaceInvitationController extends Controller
             ->firstOrFail();
 
         // Check if invitation is valid
-        if (!$invitation->isValid()) {
+        if (! $invitation->isValid()) {
             return back()->withErrors(['error' => 'This invitation is no longer valid.']);
         }
 
         // If user is not authenticated, they need to register or login first
-        if (!$request->user()) {
+        if (! $request->user()) {
             return redirect()->route('register', ['invitation' => $token])
                 ->with('info', 'Please create an account or login to accept the invitation.');
         }
@@ -160,7 +160,7 @@ class WorkspaceInvitationController extends Controller
         $workspace = $invitation->workspace;
 
         // Only admins and owners can revoke invitations
-        if (!$request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to revoke invitations.');
         }
 
