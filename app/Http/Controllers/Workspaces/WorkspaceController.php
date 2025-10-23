@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -176,14 +177,36 @@ class WorkspaceController extends Controller
             ->pivot
             ->role;
 
+        $rtsStats = Order::selectRaw('
+            ROUND(
+                (SUM(CASE WHEN status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
+                NULLIF(SUM(CASE WHEN status IN (3,4,5) THEN 1 ELSE 0 END), 0),
+                2
+            ) AS rts_rate_percentage
+        ')
+            ->where('workspace_id', $workspace->id)
+            ->first();
+
+        $tracked_orders = Order::where('workspace_id', $workspace->id)
+            ->has('parcelJourneyNotifications')
+            ->count();
+
         $stats = [
-            'total_members' => $workspace->users()->count(),
-            'pending_invitations' => $workspace->pendingInvitations()->count(),
+            'total_sales' => Order::where('workspace_id', $workspace->id)
+                ->whereNotNull('confirmed_at')
+                ->sum('total_amount'),
+
+            'total_orders' => Order::where('workspace_id', $workspace->id)
+                ->whereNotNull('confirmed_at')
+                ->count(),
+
+            'rts_rate_percentage' => $rtsStats->rts_rate_percentage,
+
+            'tracked_orders' => $tracked_orders
         ];
 
-        return Inertia::render('workspaces/dashboard', [
+        return Inertia::render('workspaces/dashboard/index', [
             'workspace' => $workspace,
-            'userRole' => $userRole,
             'stats' => $stats,
         ]);
     }

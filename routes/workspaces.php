@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\Workspaces\PageController;
+use App\Http\Controllers\Workspaces\Record\RTSController;
+use App\Http\Controllers\Workspaces\Record\SalesController;
+use App\Http\Controllers\Workspaces\RTS\AnalyticController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
@@ -51,6 +54,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/workspaces/{workspace}/pages', [PageController::class, 'index'])->name('workspaces.pages.index');
     Route::post('/workspaces/{workspace}/pages', [PageController::class, 'store'])->name('workspaces.pages.store');
     Route::put('/workspaces/{workspace}/pages/{page}', [PageController::class, 'update'])->name('workspaces.pages.update');
+
+    Route::get('/workspaces/{workspace}/rts/analytics', [AnalyticController::class, 'index'])->name('workspaces.rts.analytics');
+    Route::get('/workspaces/{workspace}/records/sales', [SalesController::class, 'index'])->name('workspaces.records.sales');
+    Route::get('/workspaces/{workspace}/records/rts', [RTSController::class, 'index'])->name('workspaces.records.sales');
 });
 
 // Public invitation routes (guest or authenticated)

@@ -17,4 +17,9 @@ class Order extends Model
     {
         return $this->belongsTo(Page::class);
     }
+
+    public function parcelJourneyNotifications(): Order|\Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ParcelJourneyNotification::class);
+    }
 }
