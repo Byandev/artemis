@@ -25,16 +25,16 @@ export default function SettingsLayout({ children , workspace }: PropsWithChildr
             href: editPassword({workspace: workspace.slug}),
             icon: null,
         },
-        {
-            title: 'Two-Factor Auth',
-            href: show({workspace: workspace.slug}),
-            icon: null,
-        },
-        {
-            title: 'Appearance',
-            href: editAppearance({workspace: workspace.slug}),
-            icon: null,
-        },
+        // {
+        //     title: 'Two-Factor Auth',
+        //     href: show({workspace: workspace.slug}),
+        //     icon: null,
+        // },
+        // {
+        //     title: 'Appearance',
+        //     href: editAppearance({workspace: workspace.slug}),
+        //     icon: null,
+        // },
     ];
 
     // When server-side rendering, we only render the layout on the client...
