@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -63,7 +64,7 @@ class WorkspaceController extends Controller
     public function show(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -92,7 +93,7 @@ class WorkspaceController extends Controller
     public function edit(Request $request, Workspace $workspace)
     {
         // Only owner and admins can edit workspace
-        if (!$request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to edit this workspace.');
         }
 
@@ -107,7 +108,7 @@ class WorkspaceController extends Controller
     public function update(Request $request, Workspace $workspace)
     {
         // Only owner and admins can update workspace
-        if (!$request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to update this workspace.');
         }
 
@@ -128,7 +129,7 @@ class WorkspaceController extends Controller
     public function destroy(Request $request, Workspace $workspace)
     {
         // Only the owner can delete the workspace
-        if (!$request->user()->ownsWorkspace($workspace)) {
+        if (! $request->user()->ownsWorkspace($workspace)) {
             abort(403, 'Only the workspace owner can delete it.');
         }
 
@@ -144,7 +145,7 @@ class WorkspaceController extends Controller
     public function switch(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -161,7 +162,7 @@ class WorkspaceController extends Controller
     public function dashboard(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -176,14 +177,36 @@ class WorkspaceController extends Controller
             ->pivot
             ->role;
 
+        $rtsStats = Order::selectRaw('
+            ROUND(
+                (SUM(CASE WHEN status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
+                NULLIF(SUM(CASE WHEN status IN (3,4,5) THEN 1 ELSE 0 END), 0),
+                2
+            ) AS rts_rate_percentage
+        ')
+            ->where('workspace_id', $workspace->id)
+            ->first();
+
+        $tracked_orders = Order::where('workspace_id', $workspace->id)
+            ->has('parcelJourneyNotifications')
+            ->count();
+
         $stats = [
-            'total_members' => $workspace->users()->count(),
-            'pending_invitations' => $workspace->pendingInvitations()->count(),
+            'total_sales' => Order::where('workspace_id', $workspace->id)
+                ->whereNotNull('confirmed_at')
+                ->sum('total_amount'),
+
+            'total_orders' => Order::where('workspace_id', $workspace->id)
+                ->whereNotNull('confirmed_at')
+                ->count(),
+
+            'rts_rate_percentage' => $rtsStats->rts_rate_percentage,
+
+            'tracked_orders' => $tracked_orders
         ];
 
-        return Inertia::render('workspaces/dashboard', [
+        return Inertia::render('workspaces/dashboard/index', [
             'workspace' => $workspace,
-            'userRole' => $userRole,
             'stats' => $stats,
         ]);
     }

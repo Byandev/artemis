@@ -7,7 +7,6 @@ use Carbon\Carbon;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
 class FetchPageOrders implements ShouldQueue
 {
@@ -42,7 +41,7 @@ class FetchPageOrders implements ShouldQueue
         }
 
         if ($totalPages > $this->page_number) {
-            dispatch(new FetchPageOrders($this->page, $page_number + 1, $this->startTime, $this->endTime))->delay(now()->addSecond(3));
+            dispatch(new FetchPageOrders($this->page, $page_number + 1, $this->startTime, $this->endTime))->delay(now()->addSecond(5));
         } else {
             $this->page->update(['orders_last_synced_at' => Carbon::createFromTimestamp($this->endTime)->addHours(8)]);
         }

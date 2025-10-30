@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Query\Builder;
 
 class Page extends Model
 {
@@ -19,7 +18,6 @@ class Page extends Model
     {
         return $this->belongsTo(Shop::class);
     }
-
 
     public function scopeOfWorkspace($builder, Workspace $workspace)
     {

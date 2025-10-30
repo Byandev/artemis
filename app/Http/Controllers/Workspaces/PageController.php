@@ -62,7 +62,7 @@ class PageController extends Controller
         Shop::firstOrCreate([
             'id' => $validated['shop_id'],
             'workspace_id' => $workspace->id,
-        ],[
+        ], [
             'name' => $response['shop']['name'],
             'avatar_url' => isset($response['shop']['avatar_url']) ? $response['shop']['avatar_url'] : null,
         ]);
@@ -79,7 +79,7 @@ class PageController extends Controller
             'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
         ]);
 
-        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()));
+        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonths(2)->startOfMonth()->unix(), \Carbon\Carbon::now()->unix()));
 
         return redirect()->route('workspaces.pages.index', $workspace)
             ->with('success', 'Page created successfully.');

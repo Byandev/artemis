@@ -9,31 +9,34 @@ import { show } from '@/routes/two-factor';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
+import { Workspace } from '@/types/models/Workspace';
 
-const sidebarNavItems: NavItem[] = [
-    {
-        title: 'Profile',
-        href: edit(),
-        icon: null,
-    },
-    {
-        title: 'Password',
-        href: editPassword(),
-        icon: null,
-    },
-    {
-        title: 'Two-Factor Auth',
-        href: show(),
-        icon: null,
-    },
-    {
-        title: 'Appearance',
-        href: editAppearance(),
-        icon: null,
-    },
-];
 
-export default function SettingsLayout({ children }: PropsWithChildren) {
+
+export default function SettingsLayout({ children , workspace }: PropsWithChildren<{workspace: Workspace}>) {
+    const sidebarNavItems: NavItem[] = [
+        {
+            title: 'Profile',
+            href: edit({workspace: workspace.slug}),
+            icon: null,
+        },
+        {
+            title: 'Password',
+            href: editPassword({workspace: workspace.slug}),
+            icon: null,
+        },
+        // {
+        //     title: 'Two-Factor Auth',
+        //     href: show({workspace: workspace.slug}),
+        //     icon: null,
+        // },
+        // {
+        //     title: 'Appearance',
+        //     href: editAppearance({workspace: workspace.slug}),
+        //     icon: null,
+        // },
+    ];
+
     // When server-side rendering, we only render the layout on the client...
     if (typeof window === 'undefined') {
         return null;
