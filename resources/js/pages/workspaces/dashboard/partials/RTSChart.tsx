@@ -14,7 +14,7 @@ interface RTSData {
 const chartConfig = {
     rts_rate_percentage: {
         label: "RTS RATE",
-        color: "hsl(var(--chart-1))",
+        color: "#2563eb",
     },
 };
 
@@ -40,7 +40,8 @@ const RTSChart = () => {
     }
 
     return (
-        <ChartContainer id={'rts_rate_percentage'} config={chartConfig}>
+        <div className="w-full h-[300px] rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
+        <ChartContainer id={'rts_rate_percentage'} config={chartConfig} className="h-full w-full">
             <LineChart data={salesData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
@@ -75,12 +76,12 @@ const RTSChart = () => {
                 <Line
                     type="monotone"
                     dataKey="rts_rate_percentage"
-                    stroke="var(--color-total_sales)"
                     strokeWidth={2}
                     dot={false}
                 />
             </LineChart>
         </ChartContainer>
+        </div>
     );
 }
 

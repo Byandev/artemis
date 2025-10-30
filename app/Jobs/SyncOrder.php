@@ -128,7 +128,7 @@ class SyncOrder implements ShouldQueue
                             'created_at' => $update['updated_at'],
                         ]);
 
-                        if ($isLatestUpdate && in_array($parcelJourney->status, ['On Delivery', 'Departure', 'Arrival']) && Carbon::parse($parcelJourney->created_at)->isToday()) {
+                        if ($isLatestUpdate && $savedOrder->status == 2 && in_array($parcelJourney->status, ['On Delivery', 'Departure', 'Arrival']) && Carbon::parse($parcelJourney->created_at)->isToday()) {
                             $isLatestUpdate = false;
 
                             if ($parcelJourney->notifications()->doesntExist()) {

@@ -13,28 +13,33 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { edit } from '@/routes/profile';
+import { Workspace } from '@/types/models/Workspace';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Profile settings',
-        href: edit().url,
-    },
-];
+
 
 export default function Profile({
     mustVerifyEmail,
     status,
+    workspace
 }: {
     mustVerifyEmail: boolean;
     status?: string;
+    workspace: Workspace
 }) {
     const { auth } = usePage<SharedData>().props;
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        {
+            title: 'Profile settings',
+            href: edit({ workspace: workspace.slug }).url,
+        },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Profile settings" />
 
-            <SettingsLayout>
+            <SettingsLayout workspace={workspace}>
                 <div className="space-y-6">
                     <HeadingSmall
                         title="Profile information"
@@ -42,7 +47,7 @@ export default function Profile({
                     />
 
                     <Form
-                        {...ProfileController.update.form()}
+                        {...ProfileController.update.form({ workspace: workspace.slug })}
                         options={{
                             preserveScroll: true,
                         }}
@@ -141,7 +146,7 @@ export default function Profile({
                     </Form>
                 </div>
 
-                <DeleteUser />
+                {/*<DeleteUser />*/}
             </SettingsLayout>
         </AppLayout>
     );

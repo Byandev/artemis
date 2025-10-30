@@ -14,7 +14,7 @@ interface SalesData {
 const chartConfig = {
     total_sales: {
         label: "Total Sales",
-        color: "hsl(var(--chart-1))",
+        color: "#2563eb",
     },
 };
 
@@ -39,48 +39,54 @@ const SalesChart = () => {
         return <div>Loading...</div>;
     }
 
+    if (salesData.length === 0) {
+        return <div>No sales data available</div>;
+    }
+
     return (
-        <ChartContainer id={'total_sales'} config={chartConfig}>
-            <LineChart data={salesData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                    dataKey="date"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    tickFormatter={(value) => {
-                        const date = new Date(value);
-                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                    }}
-                />
-                <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    tickFormatter={(value) => `$${value.toLocaleString()}`}
-                />
-                <ChartTooltip
-                    content={
-                        <ChartTooltipContent
-                            labelFormatter={(value) => {
-                                return new Date(value).toLocaleDateString('en-US', {
-                                    month: 'long',
-                                    day: 'numeric',
-                                    year: 'numeric',
-                                });
-                            }}
-                        />
-                    }
-                />
-                <Line
-                    type="monotone"
-                    dataKey="total_sales"
-                    stroke="var(--color-total_sales)"
-                    strokeWidth={2}
-                    dot={false}
-                />
-            </LineChart>
-        </ChartContainer>
+        <div className="w-full h-[300px] rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
+            <ChartContainer id={'total_sales'} config={chartConfig} className="h-full w-full">
+                <LineChart data={salesData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                        dataKey="date"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tickFormatter={(value) => {
+                            const date = new Date(value);
+                            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        }}
+                    />
+                    <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tickFormatter={(value) => `₱${value.toLocaleString()}`}
+                    />
+                    <ChartTooltip
+                        content={
+                            <ChartTooltipContent
+                                labelFormatter={(value) => {
+                                    return new Date(value).toLocaleDateString('en-US', {
+                                        month: 'long',
+                                        day: 'numeric',
+                                        year: 'numeric',
+                                    });
+                                }}
+                            />
+                        }
+                    />
+                    <Line
+                        type="monotone"
+                        dataKey="total_sales"
+                        stroke="var(--color-total_sales)"
+                        strokeWidth={2}
+                        dot={false}
+                    />
+                </LineChart>
+            </ChartContainer>
+        </div>
     );
 }
 

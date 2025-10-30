@@ -12,15 +12,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { edit } from '@/routes/password';
+import { Workspace } from '@/types/models/Workspace';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Password settings',
-        href: edit().url,
-    },
-];
 
-export default function Password() {
+export default function Password({
+                                     workspace
+                                 }: {
+    workspace: Workspace
+}) {
+    console.log(workspace)
+    const breadcrumbs: BreadcrumbItem[] = [
+        {
+            title: 'Password settings',
+            href: edit({ workspace: workspace.slug }).url,
+        },
+    ];
+
     const passwordInput = useRef<HTMLInputElement>(null);
     const currentPasswordInput = useRef<HTMLInputElement>(null);
 
@@ -28,7 +35,7 @@ export default function Password() {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Password settings" />
 
-            <SettingsLayout>
+            <SettingsLayout workspace={workspace}>
                 <div className="space-y-6">
                     <HeadingSmall
                         title="Update password"
@@ -36,7 +43,7 @@ export default function Password() {
                     />
 
                     <Form
-                        {...PasswordController.update.form()}
+                        {...PasswordController.update.form({ workspace: workspace.slug })}
                         options={{
                             preserveScroll: true,
                         }}
