@@ -24,16 +24,27 @@ class SendParcelUpdateNotification implements ShouldQueue
         $this->parcelJourneyNotification->load('order.page');
 
         if ($this->parcelJourneyNotification->type === 'sms') {
-            Http::post('https://api.myinfotxt.com/v2/send.php', [
+            $response = Http::get('https://api.myinfotxt.com/v2/send.php', [
                 'SMS' => $this->parcelJourneyNotification->message,
                 'ApiKey' => $this->parcelJourneyNotification->order->page->infotxt_token,
                 'Mobile' => $this->parcelJourneyNotification->receiver_identity,
                 'UserID' => $this->parcelJourneyNotification->order->page->infotxt_user_id,
-            ])
-                ->throw()
-                ->json();
+            ]);
 
-            $this->parcelJourneyNotification->update(['status' => 'sent', 'sent_at' => now()]);
+            if ($response->successful()) {
+                $response = $response->json();
+
+                if (isset($response['status']) && $response['status'] === '00') {
+                    $this->parcelJourneyNotification->update(['sms_id' => $response['smsid']]);
+
+                    dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5));
+                } else {
+                    $this->parcelJourneyNotification->update(['remarks' => json_encode($response)]);
+                }
+            } else {
+                $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => 'Request failed']);
+            }
+
         } elseif ($this->parcelJourneyNotification->type === 'chat') {
             $pageId = $this->parcelJourneyNotification->order->page->id;
 
@@ -52,14 +63,20 @@ class SendParcelUpdateNotification implements ShouldQueue
                             ],
                         ],
                     ],
-                ])
-                ->throw()
-                ->json();
+                ]);
 
-            if (! $response['success']) {
-                $this->fail('Unable to send chat message');
+            if ($response->ok()) {
+                $response = $response->json();
+
+                if (! $response['success']) {
+                    $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => $response['message']
+                        ?? 'Unable to send chat message'
+                    ]);
+                } else {
+                    $this->parcelJourneyNotification->update(['status' => 'sent']);
+                }
             } else {
-                $this->parcelJourneyNotification->update(['status' => 'sent', 'sent_at' => now()]);
+                $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => 'Request failed']);
             }
         }
     }

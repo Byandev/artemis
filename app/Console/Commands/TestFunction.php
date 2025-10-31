@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Jobs\FetchPageOrders;
 use App\Models\Page;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Http;
 
 class TestFunction extends Command
 {
@@ -27,7 +28,7 @@ class TestFunction extends Command
      */
     public function handle()
     {
-        $page = Page::find(745492068656489);
-        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()));
+        $page = Page::find(541830885691274);
+        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::parse($page->orders_last_synced_at)->unix(), \Carbon\Carbon::now()->unix()));
     }
 }
