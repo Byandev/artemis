@@ -7,20 +7,12 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Support\Facades\Http;
+use DateTime;
+use Illuminate\Queue\Middleware\ThrottlesExceptions;
 
 class SendParcelUpdateNotification implements ShouldQueue
 {
     use Queueable;
-
-    /**
-     * Get the middleware the job should pass through.
-     *
-     * @return array<int, object>
-     */
-    public function middleware(): array
-    {
-        return [new RateLimited('parcel-notification')];
-    }
 
     /**
      * Create a new job instance.
@@ -90,5 +82,23 @@ class SendParcelUpdateNotification implements ShouldQueue
                 $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => 'Request failed']);
             }
         }
+    }
+
+    /**
+     * Get the middleware the job should pass through.
+     *
+     * @return array<int, object>
+     */
+    public function middleware(): array
+    {
+        return [new ThrottlesExceptions(3, 5 * 60)];
+    }
+
+    /**
+     * Determine the time at which the job should timeout.
+     */
+    public function retryUntil(): DateTime
+    {
+        return now()->addHour();
     }
 }
