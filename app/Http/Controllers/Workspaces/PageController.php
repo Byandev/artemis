@@ -17,7 +17,7 @@ class PageController extends Controller
     public function index(Workspace $workspace)
     {
         $pages = Page::ofWorkspace($workspace)
-            ->paginate();
+            ->paginate(1000);
 
         return Inertia::render('workspaces/pages/index', [
             'pages' => $pages,
