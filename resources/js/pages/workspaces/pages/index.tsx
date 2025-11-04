@@ -46,8 +46,11 @@ const Pages = ({ pages, workspace }: PagesProps) => {
             header: "Name",
         },
         {
-            accessorKey: "facebook_url",
-            header: "Facebook URL",
+            accessorKey: "orders_last_synced_at",
+            header: "Orders Last Sync",
+            cell: ({ row }) => {
+                return row.original.orders_last_synced_at
+            }
         },
         {
             id: "actions",

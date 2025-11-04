@@ -202,7 +202,7 @@ class WorkspaceController extends Controller
 
             'rts_rate_percentage' => $rtsStats->rts_rate_percentage,
 
-            'tracked_orders' => $tracked_orders
+            'tracked_orders' => $tracked_orders,
         ];
 
         return Inertia::render('workspaces/dashboard/index', [

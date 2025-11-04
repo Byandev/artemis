@@ -41,8 +41,8 @@ class AnalyticController extends Controller
                 'delivered_count' => $rtsStats->delivered_count,
                 'returned_amount' => $rtsStats->returned_amount,
                 'tracked_orders' => $tracked_orders,
-                'sent_parcel_journey_notifications' => $sent_parcel_journey_notifications
-            ]
+                'sent_parcel_journey_notifications' => $sent_parcel_journey_notifications,
+            ],
         ]);
     }
 }

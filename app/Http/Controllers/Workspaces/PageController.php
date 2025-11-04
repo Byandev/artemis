@@ -17,7 +17,8 @@ class PageController extends Controller
     public function index(Workspace $workspace)
     {
         $pages = Page::ofWorkspace($workspace)
-            ->paginate();
+            ->orderBy('name', 'asc')
+            ->paginate(1000);
 
         return Inertia::render('workspaces/pages/index', [
             'pages' => $pages,
@@ -79,7 +80,7 @@ class PageController extends Controller
             'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
         ]);
 
-        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonths(2)->startOfMonth()->unix(), \Carbon\Carbon::now()->unix()));
+        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonth(2)->startOfMonth()->unix(), \Carbon\Carbon::now()->unix()));
 
         return redirect()->route('workspaces.pages.index', $workspace)
             ->with('success', 'Page created successfully.');

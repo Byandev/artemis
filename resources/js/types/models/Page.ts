@@ -11,6 +11,7 @@ export interface Page {
     botcake_token?: string;
     infotxt_token?: string;
     infotxt_user_id?: string;
+    orders_last_synced_at: string
 
     shop?: Shop
 }
