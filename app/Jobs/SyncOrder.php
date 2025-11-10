@@ -75,7 +75,7 @@ class SyncOrder implements ShouldQueue
             'status' => $order['status'],
             'status_name' => $order['status_name'],
             'total_amount' => $order['total_price'],
-            'ad_id' => $order['ad_id'],
+            'ad_id' => $order['ad_id'] ?: null,
             'inserted_at' => $insertedAt->toDateTimeString(),
             'confirmed_at' => $confirmed_at,
             'fb_id' => $order['conversation_id'],
