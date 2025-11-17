@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Workspaces\AdAccountController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
 // use App\Http\Controllers\Workspaces\ProductController;
@@ -67,6 +68,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/workspaces/{workspace}/records/rts', [RTSController::class, 'index'])->name('workspaces.records.rts');
 
     Route::get('/workspaces/{workspace}/facebook-accounts', [FacebookAccountController::class, 'index'])->name('workspaces.facebook-accounts.index');
+    Route::get('/workspaces/{workspace}/ad-accounts', [AdAccountController::class, 'index'])->name('workspaces.ad-accounts.index');
 });
 
 // Public invitation routes (guest or authenticated)

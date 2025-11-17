@@ -58,6 +58,11 @@ export function AppSidebar() {
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/facebook-accounts`,
             icon: FacebookIcon,
         },
+        {
+            title: 'Ad Accounts',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ad-accounts`,
+            icon: FacebookIcon,
+        },
     ];
 
     return (

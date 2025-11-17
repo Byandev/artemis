@@ -36,13 +36,14 @@ class FetchAdAccounts implements ShouldQueue
             $adAccount = AdAccount::updateOrCreate([
                 'id' => $adAccount['account_id'],
             ], [
-                'facebook_account_id' => $this->facebookAccount->id,
                 'name' => $adAccount['name'],
                 'currency' => $adAccount['currency'],
                 'status' => $adAccount['account_status'],
                 'country_code' => $adAccount['business_country_code']
                     ?? null,
             ]);
+
+            $adAccount->facebook_accounts()->attach($this->facebookAccount->id);
 
             //            dispatch(new FetchCampaigns($adAccount));
             //            dispatch(new FetchAdSets($adAccount));

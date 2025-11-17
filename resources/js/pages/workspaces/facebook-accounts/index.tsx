@@ -30,10 +30,6 @@ const FacebookAccounts = ({
             accessorKey: 'name',
             header: 'Name',
         },
-        {
-            accessorKey: 'status',
-            header: 'Status',
-        },
     ];
 
     const connectFacebookAccount = useCallback(() => {

@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::create('ad_accounts', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->foreignId('facebook_account_id')->constrained('facebook_accounts')->cascadeOnDelete();
             $table->string('currency');
             $table->string('country_code')->nullable();
+            $table->integer('status');
             $table->timestamps();
         });
     }
