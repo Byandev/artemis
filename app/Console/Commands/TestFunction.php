@@ -2,11 +2,15 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\FetchAdRecords;
 use App\Jobs\FetchPageOrders;
 use App\Jobs\GenerateVideoCreative;
+use App\Models\AdAccount;
+use App\Models\FacebookAccount;
 use App\Models\Page;
 use App\Models\Product;
 use App\Models\VideoCreative;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 
 class TestFunction extends Command
@@ -30,6 +34,20 @@ class TestFunction extends Command
      */
     public function handle()
     {
+
+        $start = Carbon::now()->startOfYear();
+        $end = Carbon::now();
+
+        for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
+            echo $date->toDateString() . "\n";
+        }
+
+        $adAccount = AdAccount::find(1400099324628111);
+        $facebookAccount = FacebookAccount::first();
+
+        dispatch(new FetchAdRecords($facebookAccount, $adAccount, Carbon::now()->toDateString()));
+        dd("DONE");
+
         Page::where('created_at', '<=', now()->subDays(3))
             ->get()
             ->each(function (Page $page, $i) {

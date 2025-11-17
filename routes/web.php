@@ -7,7 +7,10 @@ Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
 
+Route::get('/auth/facebook/callback', [\App\Http\Controllers\Integrations\FacebookController::class, 'callback']);
+
 Route::middleware(['auth', 'verified'])->group(function () {
+
     Route::get('dashboard', function () {
         $user = auth()->user();
 
