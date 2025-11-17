@@ -14,7 +14,7 @@ import { dashboard } from '@/routes';
 import workspace from '@/routes/workspace';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, ShoppingBag } from 'lucide-react';
+import { BookOpen, FacebookIcon, Folder, LayoutGrid, LucideFacebook, ShoppingBag } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const footerNavItems: NavItem[] = [
@@ -53,6 +53,11 @@ export function AppSidebar() {
         //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products`,
         //     icon: ShoppingBag,
         // },
+        {
+            title: 'Facebook Accounts',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/facebook-accounts`,
+            icon: FacebookIcon,
+        },
     ];
 
     return (
