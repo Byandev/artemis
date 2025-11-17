@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\AdAccount;
 use App\Models\FacebookAccount;
+use Carbon\Carbon;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Http;
@@ -46,14 +47,16 @@ class FetchAdAccounts implements ShouldQueue
             $adAccount->facebook_accounts()->sync($this->facebookAccount->id);
 
             dispatch(new FetchCampaigns($this->facebookAccount, $adAccount));
+
+            $start = Carbon::now()->subMonths(3);
+            $end = Carbon::now();
+
+            for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
+                dispatch(new FetchAdRecords($this->facebookAccount, $adAccount, $date->toDateString()));
+            }
+
             //            dispatch(new FetchAdSets($adAccount));
             //            dispatch(new FetchAds($adAccount));
-            //
-            //            for ($i = 0; $i <= 29; $i++) {
-            //                $date = \Illuminate\Support\Carbon::now()->subMonth()->startOfMonth()->addDays($i)->toDateString();
-            //
-            //                dispatch(new FetchAdRecords($adAccount, $date));
-            //            }
         }
     }
 }
