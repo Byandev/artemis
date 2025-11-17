@@ -12,6 +12,8 @@ class FetchPageOrders implements ShouldQueue
 {
     use Queueable;
 
+    public int $tries = 5;
+
     /**
      * Create a new job instance.
      */

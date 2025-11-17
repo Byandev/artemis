@@ -3,12 +3,11 @@
 namespace App\Jobs;
 
 use App\Models\ParcelJourneyNotification;
+use DateTime;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Queue\Middleware\RateLimited;
-use Illuminate\Support\Facades\Http;
-use DateTime;
 use Illuminate\Queue\Middleware\ThrottlesExceptions;
+use Illuminate\Support\Facades\Http;
 
 class SendParcelUpdateNotification implements ShouldQueue
 {
@@ -25,6 +24,8 @@ class SendParcelUpdateNotification implements ShouldQueue
     public function handle(): void
     {
         $this->parcelJourneyNotification->load('order.page');
+
+        return;
 
         if ($this->parcelJourneyNotification->type === 'sms') {
             $response = Http::get('https://api.myinfotxt.com/v2/send.php', [
@@ -73,7 +74,7 @@ class SendParcelUpdateNotification implements ShouldQueue
 
                 if (! $response['success']) {
                     $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => $response['message']
-                        ?? 'Unable to send chat message'
+                        ?? 'Unable to send chat message',
                     ]);
                 } else {
                     $this->parcelJourneyNotification->update(['status' => 'sent']);

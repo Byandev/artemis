@@ -5,7 +5,6 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Page } from '@/types/models/Page';
 import { Button } from '@/components/ui/button';
 import { PageFormDialog } from '@/components/pages/page-form-dialog';
-import { usePage } from '@inertiajs/react';
 import { Workspace } from '@/types/models/Workspace';
 import { Edit, MoreHorizontal } from 'lucide-react';
 import {
@@ -14,6 +13,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useForm } from '@inertiajs/react';
+import workspaces from '@/routes/workspaces';
 
 interface PagesProps {
     workspace: Workspace;
@@ -25,11 +26,20 @@ interface PagesProps {
 const Pages = ({ pages, workspace }: PagesProps) => {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [selectedPage, setSelectedPage] = useState<Page | undefined>(undefined);
+    const { post } = useForm({
+
+    })
 
     const handleEdit = (page: Page) => {
         setSelectedPage(page);
         setDialogOpen(true);
     };
+
+    const refresh = (page: Page) => {
+        post(workspaces.pages.refresh.url({ workspace, page }), {
+            onSuccess: () => alert('Refresh Started')
+        })
+    }
 
     const handleCreate = () => {
         setSelectedPage(undefined);
@@ -68,6 +78,11 @@ const Pages = ({ pages, workspace }: PagesProps) => {
                             <DropdownMenuItem onClick={() => handleEdit(page)}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem onClick={() => refresh(page)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Refresh
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>

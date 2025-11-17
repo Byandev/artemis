@@ -116,4 +116,13 @@ class PageController extends Controller
         return redirect()->route('workspaces.pages.index', $workspace)
             ->with('success', 'Page updated successfully.');
     }
+
+    public function refresh(Workspace $workspace, Page $page)
+    {
+        $page->update(['orders_last_synced_at' => null]);
+
+        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonth(2)->startOfMonth()->unix(), \Carbon\Carbon::now()->unix()));
+
+        return redirect()->route('workspaces.pages.index', $workspace);
+    }
 }
