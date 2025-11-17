@@ -43,9 +43,9 @@ class FetchAdAccounts implements ShouldQueue
                     ?? null,
             ]);
 
-            $adAccount->facebook_accounts()->attach($this->facebookAccount->id);
+            $adAccount->facebook_accounts()->sync($this->facebookAccount->id);
 
-            //            dispatch(new FetchCampaigns($adAccount));
+            dispatch(new FetchCampaigns($this->facebookAccount, $adAccount));
             //            dispatch(new FetchAdSets($adAccount));
             //            dispatch(new FetchAds($adAccount));
             //
