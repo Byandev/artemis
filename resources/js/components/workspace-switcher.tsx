@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { ChevronsUpDown, PlusIcon } from "lucide-react";
+import { ChevronsUpDown, PlusIcon, CheckIcon } from "lucide-react";
 import { Workspace } from '@/types/models/Workspace';
 import { Link } from '@inertiajs/react';
 
@@ -40,7 +40,7 @@ const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ workspaces, curre
                     onClick={() => onSwitch(workspace.name)}
                     disabled={workspace.name === currentWorkspace}
                 >
-                    {workspace.name}
+                    {workspace.name} {workspace.name === currentWorkspace && <CheckIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />}
                 </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
