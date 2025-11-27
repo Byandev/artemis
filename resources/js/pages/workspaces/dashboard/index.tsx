@@ -1,23 +1,12 @@
-import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import AppLayout from '@/layouts/app-layout';
-import { dashboard } from '@/routes';
-import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
 import { useMemo } from 'react';
 import { Workspace } from '@/types/models/Workspace';
-import SalesChart from '@/pages/workspaces/dashboard/partials/SalesChart';
-import RTSChart from '@/pages/workspaces/dashboard/partials/RTSChart';
 import { currencyFormatter, numberFormatter, percentageFormatter } from '@/lib/utils';
-
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Index',
-        href: dashboard().url,
-    },
-];
 
 type Props = {
     workspace: Workspace;
+    userWorkspaces: Workspace[];
     stats: {
         total_sales: number;
         total_orders: number;
@@ -26,7 +15,7 @@ type Props = {
     }
 }
 
-export default function Index({ stats }: Props) {
+export default function Index({ workspace, stats, userWorkspaces }: Props) {
     const analytics = useMemo(() => {
         return [
             { title: 'TOTAL SALES', value: currencyFormatter(stats.total_sales) },
@@ -37,7 +26,7 @@ export default function Index({ stats }: Props) {
     }, [stats])
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
+        <AppLayout workspaces={userWorkspaces} currentWorkspace={workspace.name}>
             <Head title="Index" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
                 <div className="grid auto-rows-min gap-4 md:grid-cols-4">

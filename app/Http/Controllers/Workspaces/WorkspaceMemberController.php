@@ -20,7 +20,7 @@ class WorkspaceMemberController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
-        $belongedWorkspaces = $request->user()->workspaces()->get();
+        $userWorkspaces = $request->user()->workspaces()->get();
 
         $members = $workspace->users()
             ->withPivot('role', 'created_at')
@@ -36,7 +36,7 @@ class WorkspaceMemberController extends Controller
 
         return Inertia::render('workspaces/members', [
             'workspace' => $workspace,
-            'belongedWorkspaces' => $belongedWorkspaces,
+            'userWorkspaces' => $userWorkspaces,
             'members' => $members,
             'pendingInvitations' => $pendingInvitations,
             'isAdmin' => $isAdmin,

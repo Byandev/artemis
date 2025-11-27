@@ -18,12 +18,13 @@ import workspaces from '@/routes/workspaces';
 
 interface PagesProps {
     workspace: Workspace;
+    userWorkspaces: Workspace[];
     pages: {
         data: Page[];
     };
 }
 
-const Pages = ({ pages, workspace }: PagesProps) => {
+const Pages = ({ pages, workspace, userWorkspaces }: PagesProps) => {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [selectedPage, setSelectedPage] = useState<Page | undefined>(undefined);
     const { post } = useForm({
@@ -92,7 +93,7 @@ const Pages = ({ pages, workspace }: PagesProps) => {
     ];
 
     return (
-        <AppLayout>
+        <AppLayout workspaces={userWorkspaces} currentWorkspace={workspace.name}>
             <div className='px-4 py-6'>
                 <div className='mb-4'>
                     <Button size='sm' onClick={handleCreate}>Add new page</Button>
