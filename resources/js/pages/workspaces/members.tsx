@@ -66,12 +66,13 @@ interface Invitation {
 
 interface Props {
     workspace: Workspace;
+    belongedWorkspaces: Workspace[];
     members: User[];
     pendingInvitations: Invitation[];
     isAdmin: boolean;
 }
 
-export default function WorkspaceMembers({ workspace, members, pendingInvitations, isAdmin }: Props) {
+export default function WorkspaceMembers({ workspace, belongedWorkspaces, members, pendingInvitations, isAdmin }: Props) {
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
     const [invitationToRevoke, setInvitationToRevoke] = useState<Invitation | null>(null);
@@ -139,7 +140,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
     };
 
     return (
-        <AppLayout workspaces={[workspace]} currentWorkspace={workspace.name}>
+        <AppLayout workspaces={belongedWorkspaces} currentWorkspace={workspace.name}>
             <Head title={`${workspace.name} - Members`} />
 
             <div className="space-y-6 p-4">
