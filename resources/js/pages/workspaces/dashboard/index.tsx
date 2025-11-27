@@ -26,7 +26,7 @@ export default function Index({ workspace, stats, userWorkspaces }: Props) {
     }, [stats])
 
     return (
-        <AppLayout workspaces={userWorkspaces} currentWorkspace={workspace.name}>
+        <AppLayout workspaces={userWorkspaces} currentWorkspace={workspace}>
             <Head title="Index" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
                 <div className="grid auto-rows-min gap-4 md:grid-cols-4">

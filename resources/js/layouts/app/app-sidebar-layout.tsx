@@ -10,7 +10,7 @@ export default function AppSidebarLayout({
     children,
     workspaces = [] as Workspace[],
     currentWorkspace,
-}: PropsWithChildren<{ workspaces?: Workspace[]; currentWorkspace?: string;}>) {
+}: PropsWithChildren<{ workspaces?: Workspace[]; currentWorkspace?: Workspace;}>) {
     return (
         <AppShell variant="sidebar">
             <AppSidebar />

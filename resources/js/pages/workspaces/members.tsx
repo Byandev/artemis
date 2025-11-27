@@ -140,7 +140,7 @@ export default function WorkspaceMembers({ workspace, userWorkspaces, members, p
     };
 
     return (
-        <AppLayout workspaces={userWorkspaces} currentWorkspace={workspace.name}>
+        <AppLayout workspaces={userWorkspaces} currentWorkspace={workspace}>
             <Head title={`${workspace.name} - Members`} />
 
             <div className="space-y-6 p-4">

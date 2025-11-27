@@ -93,7 +93,7 @@ const Pages = ({ pages, workspace, userWorkspaces }: PagesProps) => {
     ];
 
     return (
-        <AppLayout workspaces={userWorkspaces} currentWorkspace={workspace.name}>
+        <AppLayout workspaces={userWorkspaces} currentWorkspace={workspace}>
             <div className='px-4 py-6'>
                 <div className='mb-4'>
                     <Button size='sm' onClick={handleCreate}>Add new page</Button>

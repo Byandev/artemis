@@ -6,7 +6,7 @@ import { type ReactNode } from 'react';
 interface AppLayoutProps {
     children: ReactNode;
     workspaces?: Workspace[];
-    currentWorkspace?: string;
+    currentWorkspace?: Workspace;
 }
 
 export default ({ children, workspaces, currentWorkspace, ...props }: AppLayoutProps) => (

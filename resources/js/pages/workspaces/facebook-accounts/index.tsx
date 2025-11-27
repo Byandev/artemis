@@ -55,7 +55,7 @@ const FacebookAccounts = ({
     }, [auth.user.id, workspace.id]);
 
     return (
-        <AppLayout workspaces={userWorkspaces} currentWorkspace={workspace.name}>
+        <AppLayout workspaces={userWorkspaces} currentWorkspace={workspace}>
             <div className="px-4 py-6">
                 <div className="mb-4">
                     <Button size="sm" onClick={connectFacebookAccount}>

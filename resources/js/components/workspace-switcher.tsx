@@ -14,7 +14,7 @@ import { Link } from '@inertiajs/react';
 
 interface WorkspaceSwitcherProps {
     workspaces?: Workspace[];
-    currentWorkspace?: string;   
+    currentWorkspace?: Workspace;   
     onSwitch: (workspace: string) => void;
 }
 
@@ -27,27 +27,45 @@ const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ workspaces, curre
     <DropdownMenu>
         <DropdownMenuTrigger asChild>
             <Button variant="outline" className="w-full justify-between">
-                {currentWorkspace}
+                {currentWorkspace.name}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-full">
             <DropdownMenuLabel>Switch Workspace</DropdownMenuLabel>
             <DropdownMenuSeparator />
+
+            {/* Workspace list (primary) */}
             {workspaces?.map((workspace) => (
                 <DropdownMenuItem 
                     key={workspace.id} 
                     onClick={() => onSwitch(workspace.name)}
-                    disabled={workspace.name === currentWorkspace}
+                    disabled={workspace.name === currentWorkspace.name}
                 >
-                    {workspace.name} {workspace.name === currentWorkspace && <CheckIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />}
+                    {workspace.name}
+                    {workspace.name === currentWorkspace.name && (
+                        <CheckIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    )}
                 </DropdownMenuItem>
             ))}
+
             <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                    All workspaces
-                </DropdownMenuItem>
+
+            {/* Workspace-specific actions */}
+            <DropdownMenuItem>
+                <Link href={`/workspaces/${currentWorkspace.slug}/members`} className="w-full flex items-center">
+                    Manage members
+                </Link>
+            </DropdownMenuItem>
+
+            {/* Global action */}
+            <DropdownMenuItem>
+                All workspaces
+            </DropdownMenuItem>
+
             <DropdownMenuSeparator />
+
+            {/* CTA */}
             <DropdownMenuItem>
                 <Link href="/workspaces/create" className="w-full flex items-center">
                     <PlusIcon className="mr-2 h-4 w-4" /> New workspace
