@@ -44,6 +44,10 @@ const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ workspaces, curre
                 </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                    All workspaces
+                </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem>
                 <Link href="/workspaces/create" className="w-full flex items-center">
                     <PlusIcon className="mr-2 h-4 w-4" /> New workspace
