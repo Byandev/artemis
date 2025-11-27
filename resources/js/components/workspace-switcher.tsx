@@ -32,7 +32,7 @@ const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ workspaces, curre
             </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-full">
-            <DropdownMenuLabel>Switch Workspace</DropdownMenuLabel>
+            <DropdownMenuLabel>Switch workspace</DropdownMenuLabel>
             <DropdownMenuSeparator />
 
             {/* Workspace list (primary) */}
