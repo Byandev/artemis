@@ -30,7 +30,7 @@ class WorkspaceController extends Controller
     /**
      * Show the form for creating a new workspace.
      */
-    public function create(Request $request)
+    public function create()
     {
         return Inertia::render('workspaces/create');
     }
