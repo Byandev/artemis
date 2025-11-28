@@ -10,9 +10,7 @@ export function AppSidebarHeader() {
             <div className="flex items-center w-full gap-2">
                 <div className="flex items-center gap-2">
                     <SidebarTrigger className="-ml-1" />
-                    <WorkspaceSwitcher
-                        onSwitch={(workspace) => console.log(`Switched to ${workspace}`)}
-                    />
+                    <WorkspaceSwitcher />
                 </div>
             </div>
         </header>

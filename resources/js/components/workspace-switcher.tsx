@@ -1,4 +1,3 @@
-import React from 'react'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -12,11 +11,7 @@ import { ChevronsUpDown, PlusIcon, CheckIcon } from "lucide-react";
 import { Workspace } from '@/types/models/Workspace';
 import { Link, usePage } from '@inertiajs/react';
 
-interface WorkspaceSwitcherProps {  
-    onSwitch: (workspace: string) => void;
-}
-
-const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ onSwitch }) => {
+const WorkspaceSwitcher = () => {
 const { currentWorkspace, workspaces } = usePage<{
     currentWorkspace: Workspace;
     workspaces: Workspace[];
@@ -41,14 +36,17 @@ const { currentWorkspace, workspaces } = usePage<{
             {/* Workspace list (primary) */}
             {workspaces?.map((workspace) => (
                 <DropdownMenuItem 
+                    asChild
                     key={workspace.id} 
-                    onClick={() => onSwitch(workspace.name)}
                     disabled={workspace.name === currentWorkspace.name}
                 >
-                    {workspace.name}
-                    {workspace.name === currentWorkspace.name && (
-                        <CheckIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    )}
+                    <Link href={`/workspaces/${workspace.slug}/switch`} 
+                        method='post'
+                        type='button'
+                        className="w-full flex items-center justify-between">
+                        {workspace.name}
+                        {workspace.name === currentWorkspace.name && <CheckIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />}
+                    </Link>
                 </DropdownMenuItem>
             ))}
 
