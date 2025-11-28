@@ -15,7 +15,6 @@ class FacebookAccountController extends Controller
             ->orderBy('created_at', 'asc')
             ->paginate(1000);
 
-
         return Inertia::render('workspaces/facebook-accounts/index', [
             'facebook_accounts' => $facebook_accounts,
             'workspace' => $workspace,

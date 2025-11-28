@@ -20,7 +20,6 @@ class PageController extends Controller
             ->orderBy('name', 'asc')
             ->paginate(1000);
 
-
         return Inertia::render('workspaces/pages/index', [
             'pages' => $pages,
             'workspace' => $workspace,

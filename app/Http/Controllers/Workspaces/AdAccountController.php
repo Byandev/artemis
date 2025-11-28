@@ -14,8 +14,7 @@ class AdAccountController extends Controller
         $ad_accounts = AdAccount::ofWorkspace($workspace)
             ->with('facebook_accounts')
             ->orderBy('created_at', 'asc')
-            ->paginate(1000);
-        
+            ->paginate(1000);    
 
         return Inertia::render('workspaces/ad-accounts/index', [
             'ad_accounts' => $ad_accounts,
