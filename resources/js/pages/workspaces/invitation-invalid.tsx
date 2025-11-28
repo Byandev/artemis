@@ -4,15 +4,15 @@ import { WorkspaceInvitation } from "@/types/models/WorkspaceInvitation";
 import { Link } from "@inertiajs/react";
 
 type PageProps = {
-    invitation?: WorkspaceInvitation;
-    reason?: "expired" | "accepted";
+    invitation: WorkspaceInvitation;
+    reason: "expired" | "accepted";
 };
 
 export default function InvitationInvalid({
     invitation,
-    reason = "expired",
+    reason,
 }: PageProps) {
-    const workspaceName = invitation?.workspace.name ?? "this workspace";
+    const workspaceName = invitation.workspace.name;
 
     const title =
         reason === "accepted" ? "Invitation Already Accepted" : "Invitation Expired";
