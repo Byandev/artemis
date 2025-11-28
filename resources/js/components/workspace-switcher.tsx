@@ -19,7 +19,7 @@ interface WorkspaceSwitcherProps {
 }
 
 const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ workspaces, currentWorkspace, onSwitch }) => {
-  if (!currentWorkspace) {
+  if (!currentWorkspace || !workspaces || workspaces.length === 0) {
     return null;
   }
 
