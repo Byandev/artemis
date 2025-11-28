@@ -9,8 +9,6 @@ type PageProps = {
 };
 
 export default function InvitationAccept({ invitation, isAuthenticated = false }: PageProps) {
-    console.log({ invitation, isAuthenticated });
-
     return (
         <AuthLayout
             title="Invitation Accepted"

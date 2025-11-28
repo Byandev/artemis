@@ -12,7 +12,6 @@ export default function InvitationInvalid({
     invitation,
     reason = "expired",
 }: PageProps) {
-    console.log({ invitation, reason });
     const workspaceName = invitation?.workspace.name ?? "this workspace";
 
     const title =
