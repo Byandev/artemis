@@ -22,8 +22,7 @@ const { currentWorkspace, workspaces } = usePage<{
     workspaces: Workspace[];
 }>().props;
 
-
-  if (!currentWorkspace) {
+  if (!currentWorkspace || !workspaces || workspaces.length === 0) {
     return null;
   }
 
