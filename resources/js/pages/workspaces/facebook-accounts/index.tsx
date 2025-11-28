@@ -10,7 +10,6 @@ import { SharedData } from '@/types';
 
 interface FacebookAccountsProps {
     workspace: Workspace;
-    userWorkspaces: Workspace[];
     facebook_accounts: {
         data: FacebookAccount[];
     };
@@ -18,7 +17,6 @@ interface FacebookAccountsProps {
 
 const FacebookAccounts = ({
     facebook_accounts,
-    userWorkspaces,
     workspace,
 }: FacebookAccountsProps) => {
     const { auth } = usePage<SharedData>().props;
@@ -55,7 +53,7 @@ const FacebookAccounts = ({
     }, [auth.user.id, workspace.id]);
 
     return (
-        <AppLayout workspaces={userWorkspaces} currentWorkspace={workspace}>
+        <AppLayout>
             <div className="px-4 py-6">
                 <div className="mb-4">
                     <Button size="sm" onClick={connectFacebookAccount}>

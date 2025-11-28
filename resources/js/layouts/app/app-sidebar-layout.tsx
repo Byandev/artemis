@@ -8,14 +8,13 @@ import { type PropsWithChildren } from 'react';
 
 export default function AppSidebarLayout({
     children,
-    workspaces = [] as Workspace[],
-    currentWorkspace,
-}: PropsWithChildren<{ workspaces?: Workspace[]; currentWorkspace?: Workspace;}>) {
+}: PropsWithChildren<{}
+   >) {
     return (
         <AppShell variant="sidebar">
             <AppSidebar />
             <AppContent variant="sidebar" className="overflow-x-hidden bg-gray-50">
-                <AppSidebarHeader workspaces={workspaces} currentWorkspace={currentWorkspace} />
+                <AppSidebarHeader />
                 {children}
             </AppContent>
         </AppShell>

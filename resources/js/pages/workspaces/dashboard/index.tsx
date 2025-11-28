@@ -6,7 +6,6 @@ import { currencyFormatter, numberFormatter, percentageFormatter } from '@/lib/u
 
 type Props = {
     workspace: Workspace;
-    userWorkspaces: Workspace[];
     stats: {
         total_sales: number;
         total_orders: number;
@@ -15,7 +14,7 @@ type Props = {
     }
 }
 
-export default function Index({ workspace, stats, userWorkspaces }: Props) {
+export default function Index({ workspace, stats }: Props) {
     const analytics = useMemo(() => {
         return [
             { title: 'TOTAL SALES', value: currencyFormatter(stats.total_sales) },
@@ -26,7 +25,7 @@ export default function Index({ workspace, stats, userWorkspaces }: Props) {
     }, [stats])
 
     return (
-        <AppLayout workspaces={userWorkspaces} currentWorkspace={workspace}>
+        <AppLayout>
             <Head title="Index" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
                 <div className="grid auto-rows-min gap-4 md:grid-cols-4">

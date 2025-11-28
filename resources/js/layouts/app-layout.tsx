@@ -5,12 +5,10 @@ import { type ReactNode } from 'react';
 
 interface AppLayoutProps {
     children: ReactNode;
-    workspaces?: Workspace[];
-    currentWorkspace?: Workspace;
 }
 
-export default ({ children, workspaces, currentWorkspace, ...props }: AppLayoutProps) => (
-    <AppLayoutTemplate workspaces={workspaces} currentWorkspace={currentWorkspace} {...props}>
+export default ({ children, ...props }: AppLayoutProps) => (
+    <AppLayoutTemplate {...props}>
         {children}
     </AppLayoutTemplate>
 );

@@ -16,12 +16,10 @@ class AdAccountController extends Controller
             ->orderBy('created_at', 'asc')
             ->paginate(1000);
         
-        $userWorkspaces = $workspace->users()->first()->workspaces()->get();
 
         return Inertia::render('workspaces/ad-accounts/index', [
             'ad_accounts' => $ad_accounts,
             'workspace' => $workspace,
-            'userWorkspaces' => $userWorkspaces,
         ]);
     }
 }

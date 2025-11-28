@@ -20,12 +20,10 @@ class PageController extends Controller
             ->orderBy('name', 'asc')
             ->paginate(1000);
 
-        $userWorkspaces = $workspace->users()->first()->workspaces()->get();
 
         return Inertia::render('workspaces/pages/index', [
             'pages' => $pages,
             'workspace' => $workspace,
-            'userWorkspaces' => $userWorkspaces,
         ]);
     }
 

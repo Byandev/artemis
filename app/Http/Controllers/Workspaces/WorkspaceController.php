@@ -171,8 +171,6 @@ class WorkspaceController extends Controller
 
         $workspace->load('owner');
 
-        $userWorkspaces = $request->user()->workspaces()->get();
-
         $userRole = $workspace->users()
             ->where('user_id', $request->user()->id)
             ->first()
@@ -209,7 +207,6 @@ class WorkspaceController extends Controller
 
         return Inertia::render('workspaces/dashboard/index', [
             'workspace' => $workspace,
-            'userWorkspaces' => $userWorkspaces,
             'stats' => $stats,
         ]);
     }
