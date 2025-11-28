@@ -1,4 +1,4 @@
-import { FormEventHandler } from 'react';
+import { FormEventHandler, use } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import AuthLayout from '@/layouts/auth-layout';
 import { Button } from '@/components/ui/button';
@@ -48,6 +48,16 @@ export default function WorkspaceCreate() {
 
                     <Button type="submit" className="w-full" disabled={processing}>
                         {processing ? 'Creating workspace…' : 'Create workspace'}
+                    </Button>
+
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        className="w-full"
+                        disabled={processing}
+                        onClick={() => window.history.back()}
+                    >
+                        Back
                     </Button>
                 </form>
             </div>
