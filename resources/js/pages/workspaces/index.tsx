@@ -1,7 +1,7 @@
 import AuthLayout from '@/layouts/auth-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
-import WorkspaceCard from './partials/WorkspaceCard';
+import WorkspaceCard from '@/components/workspaces/WorkspaceCard';
 
 interface WorkspaceWithCount extends Workspace {
     users_count: number;
