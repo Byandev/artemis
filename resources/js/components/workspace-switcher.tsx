@@ -10,16 +10,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { ChevronsUpDown, PlusIcon, CheckIcon } from "lucide-react";
 import { Workspace } from '@/types/models/Workspace';
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 
-interface WorkspaceSwitcherProps {
-    workspaces?: Workspace[];
-    currentWorkspace?: Workspace;   
+interface WorkspaceSwitcherProps {  
     onSwitch: (workspace: string) => void;
 }
 
-const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ workspaces, currentWorkspace, onSwitch }) => {
-  if (!currentWorkspace || !workspaces || workspaces.length === 0) {
+const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ onSwitch }) => {
+const { currentWorkspace, workspaces } = usePage<{
+    currentWorkspace: Workspace;
+    workspaces: Workspace[];
+}>().props;
+
+
+  if (!currentWorkspace) {
     return null;
   }
 

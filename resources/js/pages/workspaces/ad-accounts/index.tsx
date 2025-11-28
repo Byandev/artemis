@@ -8,7 +8,6 @@ import { AdAccount } from '@/types/models/AdAccount';
 
 interface AdAccountsProps {
     workspace: Workspace;
-    userWorkspaces: Workspace[];
     ad_accounts: {
         data: AdAccount[];
     };
@@ -16,7 +15,6 @@ interface AdAccountsProps {
 
 const FacebookAccounts = ({
     ad_accounts,
-    userWorkspaces,
     workspace,
 }: AdAccountsProps) => {
     const { auth } = usePage<SharedData>().props;
@@ -80,7 +78,7 @@ const FacebookAccounts = ({
 
 
     return (
-        <AppLayout workspaces={userWorkspaces} currentWorkspace={workspace}>
+        <AppLayout>
             <div className="px-4 py-6">
                 <div>
                     <DataTable
