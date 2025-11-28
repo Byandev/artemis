@@ -3,8 +3,12 @@ import { Workspace } from '@/types/models/Workspace'
 import { Link } from '@inertiajs/react';
 import { ArrowRight } from 'lucide-react';
 
+interface WorkspaceWithCount extends Workspace {
+    users_count: number;
+}
+
 interface WorkspaceCardProps {
-    workspace: Workspace;
+    workspace: WorkspaceWithCount;
 }
 
 const WorkspaceCard = ({ workspace }: WorkspaceCardProps) => {
@@ -20,14 +24,19 @@ const WorkspaceCard = ({ workspace }: WorkspaceCardProps) => {
                         {workspace.name ? workspace.name.charAt(0).toUpperCase() : 'W'}
                     </div>
                 </div>
-                <h2 className="text-xl font-semibold">{workspace.name}</h2>
+                <div>
+                    <h2 className="text-xl font-semibold">{workspace.name}</h2>
+                <p className="text-sm text-gray-500">
+                    {workspace.users_count} {workspace.users_count === 1 ? 'member' : 'members'}
+                </p>
+                </div>
             </div>
 
-            <Button variant="outline">
+            <Button asChild variant="outline">
                 <Link
                     href={`/workspaces/${workspace.slug}/switch`}
                     method="post"
-                    as="button"
+                    type='button'
                     className="flex items-center"
                 >
                     Open

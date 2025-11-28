@@ -3,8 +3,12 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
 import WorkspaceCard from './partials/WorkspaceCard';
 
+interface WorkspaceWithCount extends Workspace {
+    users_count: number;
+}
+
 interface WorkSpacesProps {
-  workspaces?: Workspace[];
+  workspaces: WorkspaceWithCount[];
 }
 
 const WorkSpaces = ({ workspaces }: WorkSpacesProps) => {
