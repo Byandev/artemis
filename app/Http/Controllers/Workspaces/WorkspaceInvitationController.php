@@ -148,7 +148,7 @@ class WorkspaceInvitationController extends Controller
             $invitation->markAsAccepted();
         });
 
-        return redirect()->route('workspaces.show', $invitation->workspace_id)
+        return redirect()->route('workspaces.show', $invitation->workspace->slug)
             ->with('success', 'You have successfully joined the workspace!');
     }
 

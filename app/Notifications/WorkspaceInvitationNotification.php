@@ -37,7 +37,7 @@ class WorkspaceInvitationNotification extends Notification implements ShouldQueu
     {
         $workspace = $this->invitation->workspace;
         $inviter = $this->invitation->inviter;
-        $acceptUrl = URL::route('workspaces.invitations.accept', ['token' => $this->invitation->token]);
+        $acceptUrl = URL::route('workspaces.invitations.show', ['token' => $this->invitation->token]);
 
         return (new MailMessage)
             ->subject("You've been invited to join {$workspace->name}")
