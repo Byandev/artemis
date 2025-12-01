@@ -63,7 +63,9 @@ const { currentWorkspace, workspaces } = usePage<{
 
             {/* Global action */}
             <DropdownMenuItem>
-                All workspaces
+                <Link href="/workspaces" className="w-full flex items-center">
+                    All workspaces
+                </Link>
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
