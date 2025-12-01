@@ -437,7 +437,7 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                             onClick={handleDelete} 
                             className="bg-destructive text-white hover:bg-destructive/90"
                         >
-                            Deletes
+                            Delete
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
