@@ -32,6 +32,7 @@ export default function Index({ workspace, stats }: Props) {
                     {
                         analytics.map((data, key) => {
                             return <div
+                                key={key}
                                 className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
                                     {data.title}
@@ -47,7 +48,7 @@ export default function Index({ workspace, stats }: Props) {
                             </div>
 
                             return <div key={key}
-                                        className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                                className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
                                 {/*<PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />*/}
                                 <h3 className="font-bold text-2xl">{data.value}</h3>
                                 <h3>{data.title}</h3>
