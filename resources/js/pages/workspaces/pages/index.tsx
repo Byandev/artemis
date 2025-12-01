@@ -7,23 +7,28 @@ import { Button } from '@/components/ui/button';
 import { PageFormDialog } from '@/components/pages/page-form-dialog';
 import { Workspace } from '@/types/models/Workspace';
 import { Edit, MoreHorizontal } from 'lucide-react';
+import { router } from "@inertiajs/react";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import FiltersDropdown from '@/components/pages/FiltersDropdown';
 import { useForm } from '@inertiajs/react';
 import workspaces from '@/routes/workspaces';
+import { User } from '@/types/models/User';
 
 interface PagesProps {
     workspace: Workspace;
+    owners: User[];
+    filters: Record<string, string>;
     pages: {
         data: Page[];
     };
 }
 
-const Pages = ({ pages, workspace }: PagesProps) => {
+const Pages = ({ pages, workspace, filters, owners }: PagesProps) => {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [selectedPage, setSelectedPage] = useState<Page | undefined>(undefined);
     const { post } = useForm({
@@ -45,6 +50,23 @@ const Pages = ({ pages, workspace }: PagesProps) => {
         setSelectedPage(undefined);
         setDialogOpen(true);
     };
+
+    const [ownerId, setOwnerId] = useState(filters.owner_id || "");
+    const [status, setStatus] = useState(filters.status || "");
+
+    const handleApply = () => {
+        router.get(workspaces.pages.index.url({ workspace }), {
+            owner_id: ownerId,
+            status: status,
+        }, { preserveState: true });
+    };
+
+    const handleClear = () => {
+        setOwnerId("");
+        setStatus("");
+        router.get(workspaces.pages.index.url({ workspace }), {}, { preserveState: true });
+    };
+
 
     const columns: ColumnDef<Page>[] = [
         {
@@ -94,12 +116,22 @@ const Pages = ({ pages, workspace }: PagesProps) => {
     return (
         <AppLayout>
             <div className='px-4 py-6'>
-                <div className='mb-4'>
+                <div className='flex justify-between items-center mb-4'>
                     <Button size='sm' onClick={handleCreate}>Add new page</Button>
+                    {/* Filters dropdown extracted to a separate component */}
+                    <FiltersDropdown
+                        owners={owners}
+                        ownerId={ownerId}
+                        setOwnerId={setOwnerId}
+                        status={status}
+                        setStatus={setStatus}
+                        handleApply={handleApply}
+                        handleClear={handleClear}
+                    />
                 </div>
 
                 <div>
-                    <DataTable columns={columns} data={pages.data || []}/>
+                    <DataTable columns={columns} data={pages.data || []} />
                 </div>
 
                 <PageFormDialog

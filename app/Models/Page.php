@@ -23,4 +23,18 @@ class Page extends Model
     {
         return $builder->where('workspace_id', $workspace->id);
     }
+
+    public function scopeFilter($query, array $filters)
+    {
+        if (!empty($filters['owner_id'])) {
+            $query->where('owner_id', $filters['owner_id']);
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        return $query;
+    }
+
 }

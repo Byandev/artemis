@@ -16,13 +16,20 @@ class PageController extends Controller
 {
     public function index(Workspace $workspace)
     {
+        // Grab filters from request
+        $filters = request()->only(['owner_id', 'status']);
+
         $pages = Page::ofWorkspace($workspace)
+            ->filter($filters)
             ->orderBy('name', 'asc')
-            ->paginate(1000);
+            ->paginate(10)
+            ->withQueryString(); // keeps filters in pagination links
 
         return Inertia::render('workspaces/pages/index', [
             'pages' => $pages,
             'workspace' => $workspace,
+            'filters' => $filters,
+            'owners' => $workspace->users()->select('users.id', 'users.name')->get(), // for owner dropdown
         ]);
     }
 
