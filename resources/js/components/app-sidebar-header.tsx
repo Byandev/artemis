@@ -1,12 +1,9 @@
-import { Breadcrumbs } from '@/components/breadcrumbs';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { NavUser } from '@/components/nav-user';
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Bell } from "lucide-react"
-import { type BreadcrumbItem as BreadcrumbItemType } from '@/types';
 import WorkspaceSwitcher from './workspace-switcher';
-import { Workspace } from '@/types/models/Workspace';
 
 export function AppSidebarHeader() {
     return (
@@ -14,7 +11,11 @@ export function AppSidebarHeader() {
             <div className="flex items-center w-full gap-2">
                 <div className="flex items-center gap-2">
                     <SidebarTrigger className="-ml-1" />
-                    <Breadcrumbs breadcrumbs={breadcrumbs} />
+
+                    <WorkspaceSwitcher
+                        onSwitch={(workspace) => console.log(`Switched to ${workspace}`)}
+                    />
+
                 </div>
 
                 <div className="flex items-center gap-2 ml-auto">
