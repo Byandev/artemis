@@ -44,9 +44,9 @@ class HandleInertiaRequests extends Middleware
             $currentWorkspace = $request->route('workspace');
         }
 
-        // Get all workspaces of the authenticated user
+        // Get first 3 workspaces of the authenticated user
         $workspaces = $request->user()
-            ? $request->user()->workspaces()->get()
+            ? $request->user()->workspaces()->limit(3)->get()
             : collect();
 
 
