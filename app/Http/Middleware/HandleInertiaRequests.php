@@ -44,6 +44,12 @@ class HandleInertiaRequests extends Middleware
             $currentWorkspace = $request->route('workspace');
         }
 
+        // Get all workspaces of the authenticated user
+        $workspaces = $request->user()
+            ? $request->user()->workspaces()->get()
+            : collect();
+
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
@@ -51,6 +57,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'workspaces' => $workspaces,
             'currentWorkspace' => $currentWorkspace,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];

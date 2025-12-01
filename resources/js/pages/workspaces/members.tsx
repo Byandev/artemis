@@ -41,6 +41,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import workspaces from '@/routes/workspaces';
 import { useState } from 'react';
+import { Workspace } from '@/types/models/Workspace';
 
 interface User {
     id: number;
@@ -61,13 +62,6 @@ interface Invitation {
     inviter: {
         name: string;
     };
-}
-
-interface Workspace {
-    id: number;
-    name: string;
-    slug: string;
-    owner_id: number;
 }
 
 interface Props {

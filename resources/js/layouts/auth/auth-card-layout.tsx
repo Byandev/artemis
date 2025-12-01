@@ -37,7 +37,7 @@ export default function AuthCardLayout({
                             <CardTitle className="text-xl">{title}</CardTitle>
                             <CardDescription>{description}</CardDescription>
                         </CardHeader>
-                        <CardContent className="px-10 py-8">
+                        <CardContent className="px-10 pb-8">
                             {children}
                         </CardContent>
                     </Card>

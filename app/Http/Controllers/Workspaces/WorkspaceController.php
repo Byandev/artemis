@@ -81,10 +81,7 @@ class WorkspaceController extends Controller
             ->pivot
             ->role;
 
-        return Inertia::render('workspaces/show', [
-            'workspace' => $workspace,
-            'userRole' => $userRole,
-        ]);
+        return redirect()->route('workspace.dashboard', $workspace->slug);
     }
 
     /**
