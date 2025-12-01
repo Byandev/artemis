@@ -19,6 +19,12 @@ class Page extends Model
         return $this->belongsTo(Shop::class);
     }
 
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
+    }
+
+    
     public function scopeOfWorkspace($builder, Workspace $workspace)
     {
         return $builder->where('workspace_id', $workspace->id);
