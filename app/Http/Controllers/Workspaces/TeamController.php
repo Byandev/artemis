@@ -20,11 +20,26 @@ class TeamController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
-        $teams = Team::ofWorkspace($workspace)
+        $query = Team::ofWorkspace($workspace)
             ->withCount('members')
-            ->with(['members:id,name,email'])
-            ->latest()
-            ->get();
+            ->with(['members:id,name,email']);
+
+        // Search by name
+        if ($request->filled('search')) {
+            $query->where('name', 'like', '%' . $request->get('search') . '%');
+        }
+
+        // Sorting
+        $sortField = $request->get('sort', 'created_at');
+        $sortDirection = $request->get('direction', 'desc');
+        
+        $allowedSortFields = ['name', 'created_at', 'members_count'];
+        if (in_array($sortField, $allowedSortFields)) {
+            $query->orderBy($sortField, $sortDirection === 'desc' ? 'desc' : 'asc');
+        }
+
+        // Pagination
+        $teams = $query->paginate(10)->withQueryString();
 
         // Get workspace members for the dropdown
         $workspaceMembers = $workspace->users()
@@ -38,6 +53,11 @@ class TeamController extends Controller
             'teams' => $teams,
             'workspaceMembers' => $workspaceMembers,
             'isAdmin' => $isAdmin,
+            'filters' => [
+                'search' => $request->get('search', ''),
+                'sort' => $sortField,
+                'direction' => $sortDirection,
+            ],
         ]);
     }
 
