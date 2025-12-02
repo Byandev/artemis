@@ -30,9 +30,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useState, useMemo } from 'react';
-import { X, Search, Users } from 'lucide-react';
+import { useState } from 'react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
 import workspaces from '@/routes/workspaces';
+import { MemberSelector } from '@/components/teams/member-selector';
 
 interface User {
     id: number;
@@ -53,19 +54,42 @@ interface Workspace {
     slug: string;
 }
 
-interface Props {
-    workspace: Workspace;
-    teams: Team[];
-    workspaceMembers: User[];
-    isAdmin: boolean;
+interface Filters {
+    search: string;
+    sort: string;
+    direction: string;
 }
 
-export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin }: Props) {
+interface PaginationLinks {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
+
+interface PaginatedTeams {
+    data: Team[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    links: PaginationLinks[];
+    from: number;
+    to: number;
+}
+
+interface Props {
+    workspace: Workspace;
+    teams: PaginatedTeams;
+    workspaceMembers: User[];
+    isAdmin: boolean;
+    filters: Filters;
+}
+
+export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin, filters }: Props) {
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [editingTeam, setEditingTeam] = useState<Team | null>(null);
     const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [memberSearch, setMemberSearch] = useState('');
+    const [searchValue, setSearchValue] = useState(filters.search);
 
     const createForm = useForm({
         name: '',
@@ -77,29 +101,40 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
         members: [] as number[],
     });
 
-    // Filter teams based on search query
-    const filteredTeams = useMemo(() => {
-        if (!searchQuery.trim()) return teams;
-        return teams.filter(team =>
-            team.name.toLowerCase().includes(searchQuery.toLowerCase())
+    // Backend search handler
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        router.get(
+            `/workspaces/${workspace.slug}/teams`,
+            { ...filters, search: searchValue, page: 1 },
+            { preserveState: true, preserveScroll: true }
         );
-    }, [teams, searchQuery]);
+    };
 
-    // Filter workspace members for dropdown (exclude already selected)
-    const availableMembers = useMemo(() => {
-        const selectedIds = createDialogOpen ? createForm.data.members : editForm.data.members;
-        return workspaceMembers.filter(member => {
-            const matchesSearch = !memberSearch.trim() ||
-                member.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-                member.email.toLowerCase().includes(memberSearch.toLowerCase());
-            const notSelected = !selectedIds.includes(member.id);
-            return matchesSearch && notSelected;
-        });
-    }, [workspaceMembers, memberSearch, createDialogOpen, createForm.data.members, editForm.data.members]);
+    const clearSearch = () => {
+        setSearchValue('');
+        router.get(
+            `/workspaces/${workspace.slug}/teams`,
+            { ...filters, search: '', page: 1 },
+            { preserveState: true, preserveScroll: true }
+        );
+    };
 
-    // Get selected members details
-    const getSelectedMembers = (memberIds: number[]) => {
-        return workspaceMembers.filter(member => memberIds.includes(member.id));
+    // Sorting handler
+    const handleSort = (field: string) => {
+        const newDirection = filters.sort === field && filters.direction === 'asc' ? 'desc' : 'asc';
+        router.get(
+            `/workspaces/${workspace.slug}/teams`,
+            { ...filters, sort: field, direction: newDirection, page: 1 },
+            { preserveState: true, preserveScroll: true }
+        );
+    };
+
+    const getSortIcon = (field: string) => {
+        if (filters.sort !== field) return <ArrowUpDown className="ml-2 h-4 w-4" />;
+        return filters.direction === 'asc' 
+            ? <ArrowUp className="ml-2 h-4 w-4" /> 
+            : <ArrowDown className="ml-2 h-4 w-4" />;
     };
 
     const handleCreate = (e: React.FormEvent) => {
@@ -108,7 +143,6 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
             preserveScroll: true,
             onSuccess: () => {
                 createForm.reset();
-                setMemberSearch('');
                 setCreateDialogOpen(false);
             },
         });
@@ -122,7 +156,6 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
             preserveScroll: true,
             onSuccess: () => {
                 editForm.reset();
-                setMemberSearch('');
                 setEditingTeam(null);
             },
         });
@@ -145,103 +178,6 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
         setEditingTeam(team);
     };
 
-    const addMember = (memberId: number, isCreate: boolean) => {
-        if (isCreate) {
-            createForm.setData('members', [...createForm.data.members, memberId]);
-        } else {
-            editForm.setData('members', [...editForm.data.members, memberId]);
-        }
-        setMemberSearch('');
-    };
-
-    const removeMember = (memberId: number, isCreate: boolean) => {
-        if (isCreate) {
-            createForm.setData('members', createForm.data.members.filter(id => id !== memberId));
-        } else {
-            editForm.setData('members', editForm.data.members.filter(id => id !== memberId));
-        }
-    };
-
-    const MemberSelector = ({ isCreate }: { isCreate: boolean }) => {
-        const form = isCreate ? createForm : editForm;
-        const selectedMembers = getSelectedMembers(form.data.members);
-
-        return (
-            <div className="space-y-3">
-                <Label>Members</Label>
-
-                {/* Search Input */}
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        type="text"
-                        placeholder="Search team members..."
-                        value={memberSearch}
-                        onChange={(e) => setMemberSearch(e.target.value)}
-                        className="pl-9"
-                    />
-                </div>
-
-                {/* Dropdown Results */}
-                {memberSearch.trim() && availableMembers.length > 0 && (
-                    <div className="border rounded-md max-h-40 overflow-y-auto">
-                        {availableMembers.map(member => (
-                            <button
-                                key={member.id}
-                                type="button"
-                                onClick={() => addMember(member.id, isCreate)}
-                                className="w-full px-3 py-2 text-left hover:bg-accent flex items-center gap-3"
-                            >
-                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
-                                    {member.name.charAt(0).toUpperCase()}
-                                </div>
-                                <div>
-                                    <div className="font-medium text-sm">{member.name}</div>
-                                    <div className="text-xs text-muted-foreground">{member.email}</div>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-                )}
-
-                {memberSearch.trim() && availableMembers.length === 0 && (
-                    <div className="text-sm text-muted-foreground py-2">
-                        No members found
-                    </div>
-                )}
-
-                {/* Selected Members */}
-                {selectedMembers.length > 0 && (
-                    <div className="space-y-2">
-                        {selectedMembers.map(member => (
-                            <div
-                                key={member.id}
-                                className="flex items-center justify-between p-2 border rounded-md bg-muted/50"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
-                                        {member.name.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div>
-                                        <div className="font-medium text-sm">{member.name}</div>
-                                        <div className="text-xs text-muted-foreground">{member.email}</div>
-                                    </div>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => removeMember(member.id, isCreate)}
-                                    className="h-6 w-6 rounded-full hover:bg-destructive/10 flex items-center justify-center"
-                                >
-                                    <X className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-        );
-    };
-
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Teams`} />
@@ -259,7 +195,6 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                             setCreateDialogOpen(open);
                             if (!open) {
                                 createForm.reset();
-                                setMemberSearch('');
                             }
                         }}>
                             <DialogTrigger asChild>
@@ -279,7 +214,7 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                                             <Label htmlFor="name">Team Name</Label>
                                             <Input
                                                 id="name"
-                                                placeholder="Search"
+                                                placeholder="Enter team name"
                                                 value={createForm.data.name}
                                                 onChange={(e) => createForm.setData('name', e.target.value)}
                                                 required
@@ -289,7 +224,12 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                                             )}
                                         </div>
 
-                                        <MemberSelector isCreate={true} />
+                                        <MemberSelector
+                                            workspaceMembers={workspaceMembers}
+                                            selectedMemberIds={createForm.data.members}
+                                            onAddMember={(id) => createForm.setData('members', [...createForm.data.members, id])}
+                                            onRemoveMember={(id) => createForm.setData('members', createForm.data.members.filter(m => m !== id))}
+                                        />
                                     </div>
 
                                     <DialogFooter>
@@ -311,34 +251,68 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                 </div>
 
                 {/* Search */}
-                <div className="max-w-sm">
-                    <Input
-                        type="text"
-                        placeholder="Search..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                </div>
+                <form onSubmit={handleSearch} className="flex gap-2 max-w-sm">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            type="text"
+                            placeholder="Search teams..."
+                            value={searchValue}
+                            onChange={(e) => setSearchValue(e.target.value)}
+                            className="pl-8"
+                        />
+                        {searchValue && (
+                            <button
+                                type="button"
+                                onClick={clearSearch}
+                                className="absolute right-2.5 top-2.5"
+                            >
+                                <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                            </button>
+                        )}
+                    </div>
+                    <Button type="submit" size="sm" variant="secondary">
+                        Search
+                    </Button>
+                </form>
 
                 {/* Teams Table */}
                 <div className="border rounded-lg">
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead># Members</TableHead>
+                                <TableHead>
+                                    <Button
+                                        variant="ghost"
+                                        onClick={() => handleSort('name')}
+                                        className="h-8 px-2"
+                                    >
+                                        Name
+                                        {getSortIcon('name')}
+                                    </Button>
+                                </TableHead>
+                                <TableHead>
+                                    <Button
+                                        variant="ghost"
+                                        onClick={() => handleSort('members_count')}
+                                        className="h-8 px-2"
+                                    >
+                                        # Members
+                                        {getSortIcon('members_count')}
+                                    </Button>
+                                </TableHead>
                                 <TableHead className="text-right">Action</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredTeams.length === 0 ? (
+                            {teams.data.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
                                         No results.
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredTeams.map((team) => (
+                                teams.data.map((team) => (
                                     <TableRow key={team.id}>
                                         <TableCell className="font-medium">{team.name}</TableCell>
                                         <TableCell>{team.members_count} Members</TableCell>
@@ -369,6 +343,31 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                         </TableBody>
                     </Table>
                 </div>
+
+                {/* Pagination */}
+                {teams.last_page > 1 && (
+                    <div className="flex items-center justify-between">
+                        <div className="text-sm text-muted-foreground">
+                            Showing {teams.from} to {teams.to} of {teams.total} results
+                        </div>
+                        <div className="flex gap-2">
+                            {teams.links.map((link, index) => (
+                                <Button
+                                    key={index}
+                                    variant={link.active ? 'default' : 'outline'}
+                                    size="sm"
+                                    disabled={!link.url}
+                                    onClick={() => {
+                                        if (link.url) {
+                                            router.get(link.url, {}, { preserveState: true, preserveScroll: true });
+                                        }
+                                    }}
+                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Edit Dialog */}
@@ -376,7 +375,6 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                 if (!open) {
                     setEditingTeam(null);
                     editForm.reset();
-                    setMemberSearch('');
                 }
             }}>
                 <DialogContent className="sm:max-w-md">
@@ -402,7 +400,12 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                                 )}
                             </div>
 
-                            <MemberSelector isCreate={false} />
+                            <MemberSelector
+                                workspaceMembers={workspaceMembers}
+                                selectedMemberIds={editForm.data.members}
+                                onAddMember={(id) => editForm.setData('members', [...editForm.data.members, id])}
+                                onRemoveMember={(id) => editForm.setData('members', editForm.data.members.filter(m => m !== id))}
+                            />
                         </div>
 
                         <DialogFooter>
