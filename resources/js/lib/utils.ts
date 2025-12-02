@@ -60,3 +60,18 @@ export function currencyFormatter(
         ...options,
     }).format(value);
 }
+
+/**
+ * Resolve an Inertia/URL string to a pathname.
+ * If `url` is empty, returns the current `window.location.pathname` when available.
+ * This centralizes the try/new URL parsing used across components.
+ */
+export function extractPathFromUrl(url?: string | null): string {
+    if (!url) return typeof window !== 'undefined' ? window.location.pathname : '/';
+    const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+    try {
+        return new URL(url, base).pathname;
+    } catch {
+        return url;
+    }
+}
