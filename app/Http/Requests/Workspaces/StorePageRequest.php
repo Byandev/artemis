@@ -22,7 +22,7 @@ class StorePageRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'id' => 'required|integer',
+            'id' => 'required|integer|unique:pages,id',
             'shop_id' => 'required|integer',
             'name' => 'required|string|max:255',
             'pos_token' => 'required|string|max:255',
@@ -41,6 +41,7 @@ class StorePageRequest extends FormRequest
     {
         return [
             'id.required' => 'The page ID is required.',
+            'id.unique' => 'This page has already been added to a workspace.',
             'shop_id.required' => 'The shop ID is required.',
             'name.required' => 'The page name is required.',
             'pos_token.required' => 'The POS token is required.',

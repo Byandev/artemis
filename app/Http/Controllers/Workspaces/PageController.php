@@ -19,6 +19,11 @@ class PageController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
+        // Check if user has access to this workspace
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
         $query = Page::ofWorkspace($workspace)
             ->with(['shop', 'owner']);
 
@@ -83,6 +88,11 @@ class PageController extends Controller
 
     public function store(StorePageRequest $request, Workspace $workspace)
     {
+        // Check if user has access to this workspace
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
         $validated = $request->validated();
 
         $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
@@ -118,7 +128,7 @@ class PageController extends Controller
         $page = Page::create([
             'id' => $validated['id'],
             'workspace_id' => $workspace->id,
-            'owner_id' => auth()->id(),
+            'owner_id' => $request->user()->id,
             'shop_id' => $validated['shop_id'],
             'name' => $validated['name'],
             'pos_token' => $validated['pos_token'] ?? null,
@@ -127,7 +137,7 @@ class PageController extends Controller
             'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
         ]);
 
-        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonth(2)->startOfMonth()->unix(), \Carbon\Carbon::now()->unix()));
+        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonths(2)->startOfMonth()->unix(), \Carbon\Carbon::now()->unix()));
 
         return redirect()->route('workspaces.pages.index', $workspace)
             ->with('success', 'Page created successfully.');
@@ -151,17 +161,32 @@ class PageController extends Controller
             ->with('success', 'Page updated successfully.');
     }
 
-    public function refresh(Workspace $workspace, Page $page)
+    public function refresh(Request $request, Workspace $workspace, Page $page)
     {
+        // Check if user has access to this workspace
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        // Ensure the page belongs to the workspace
+        if ($page->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
         $page->update(['orders_last_synced_at' => null]);
 
-        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonth(2)->startOfMonth()->unix(), \Carbon\Carbon::now()->unix()));
+        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonths(2)->startOfMonth()->unix(), \Carbon\Carbon::now()->unix()));
 
         return redirect()->route('workspaces.pages.index', $workspace);
     }
 
-    public function archive(Workspace $workspace, Page $page)
+    public function archive(Request $request, Workspace $workspace, Page $page)
     {
+        // Check if user has access to this workspace
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
         if ($page->workspace_id !== $workspace->id) {
             abort(403);
         }
@@ -172,8 +197,13 @@ class PageController extends Controller
             ->with('success', 'Page archived successfully.');
     }
 
-    public function restore(Workspace $workspace, Page $page)
+    public function restore(Request $request, Workspace $workspace, Page $page)
     {
+        // Check if user has access to this workspace
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
         if ($page->workspace_id !== $workspace->id) {
             abort(403);
         }

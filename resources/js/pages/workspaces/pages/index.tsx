@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Head, router, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
@@ -34,7 +35,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { useForm, router } from '@inertiajs/react';
 import workspaces from '@/routes/workspaces';
 import { Badge } from '@/components/ui/badge';
 
@@ -234,9 +234,12 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
                                         <Edit className="mr-2 h-4 w-4" />
                                         Edit
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => refresh(page)}>
-                                        <RefreshCw className="mr-2 h-4 w-4" />
-                                        Refresh Orders
+                                    <DropdownMenuItem 
+                                        onClick={() => refresh(page)}
+                                        disabled={processing}
+                                    >
+                                        <RefreshCw className={`mr-2 h-4 w-4 ${processing ? 'animate-spin' : ''}`} />
+                                        {processing ? 'Refreshing...' : 'Refresh Orders'}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem 
@@ -265,6 +268,7 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
 
     return (
         <AppLayout>
+            <Head title={`${workspace.name} - Pages`} />
             <div className="px-4 py-6">
                 <div className="mb-6 flex items-center justify-between">
                     <h1 className="text-2xl font-bold">Shop & Pages</h1>
