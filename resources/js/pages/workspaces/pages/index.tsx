@@ -5,6 +5,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Page } from '@/types/models/Page';
 import { Button } from '@/components/ui/button';
 import { PageFormDialog } from '@/components/pages/page-form-dialog';
+import { ArchivePageDialog } from '@/components/pages/archive-page-dialog';
 import { Workspace } from '@/types/models/Workspace';
 import { 
     Edit, 
@@ -36,16 +37,6 @@ import { Input } from '@/components/ui/input';
 import { useForm, router } from '@inertiajs/react';
 import workspaces from '@/routes/workspaces';
 import { Badge } from '@/components/ui/badge';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 interface Owner {
     id: number;
@@ -94,7 +85,6 @@ interface PagesProps {
 const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [selectedPage, setSelectedPage] = useState<Page | undefined>(undefined);
-    const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
     const [pageToArchive, setPageToArchive] = useState<Page | null>(null);
     const [searchValue, setSearchValue] = useState(filters.search);
 
@@ -116,26 +106,13 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
         });
     };
 
-    const handleArchive = (page: Page) => {
-        setPageToArchive(page);
-        setArchiveDialogOpen(true);
-    };
-
-    const confirmArchive = () => {
-        if (pageToArchive) {
-            router.post(`/workspaces/${workspace.slug}/pages/${pageToArchive.id}/archive`, {}, {
-                onSuccess: () => setArchiveDialogOpen(false),
-            });
-        }
-    };
-
     const handleRestore = (page: Page) => {
-        router.post(`/workspaces/${workspace.slug}/pages/${page.id}/restore`);
+        router.post(workspaces.pages.restore.url({ workspace, page }));
     };
 
     const handleFilter = (key: string, value: string) => {
         router.get(
-            `/workspaces/${workspace.slug}/pages`,
+            workspaces.pages.index.url({ workspace }),
             { ...filters, [key]: value, page: 1 },
             { preserveState: true, preserveScroll: true }
         );
@@ -154,14 +131,14 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
     const handleSort = (field: string) => {
         const newDirection = filters.sort === field && filters.direction === 'asc' ? 'desc' : 'asc';
         router.get(
-            `/workspaces/${workspace.slug}/pages`,
+            workspaces.pages.index.url({ workspace }),
             { ...filters, sort: field, direction: newDirection, page: 1 },
             { preserveState: true, preserveScroll: true }
         );
     };
 
     const clearFilters = () => {
-        router.get(`/workspaces/${workspace.slug}/pages`, { status: filters.status });
+        router.get(workspaces.pages.index.url({ workspace }), { status: filters.status });
     };
 
     const getSortIcon = (field: string) => {
@@ -263,7 +240,7 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem 
-                                        onClick={() => handleArchive(page)}
+                                        onClick={() => setPageToArchive(page)}
                                         className="text-destructive focus:text-destructive"
                                     >
                                         <Archive className="mr-2 h-4 w-4" />
@@ -426,23 +403,11 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
                 />
 
                 {/* Archive Confirmation Dialog */}
-                <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Archive Page</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                Are you sure you want to archive "{pageToArchive?.name}"? 
-                                You can restore it later from the Archived tab.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={confirmArchive}>
-                                Archive
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                <ArchivePageDialog
+                    page={pageToArchive}
+                    workspace={workspace}
+                    onClose={() => setPageToArchive(null)}
+                />
             </div>
         </AppLayout>
     );

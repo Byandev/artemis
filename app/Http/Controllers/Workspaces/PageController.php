@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Workspaces\StorePageRequest;
+use App\Http\Requests\Workspaces\UpdatePageRequest;
 use App\Jobs\FetchPageOrders;
 use App\Models\Page;
 use App\Models\Shop;
@@ -79,17 +81,9 @@ class PageController extends Controller
         ]);
     }
 
-    public function store(Request $request, Workspace $workspace)
+    public function store(StorePageRequest $request, Workspace $workspace)
     {
-        $validated = $request->validate([
-            'id' => 'required|integer',
-            'shop_id' => 'required|integer',
-            'name' => 'required|string',
-            'pos_token' => 'required|string',
-            'botcake_token' => 'nullable|string',
-            'infotxt_token' => 'nullable|string',
-            'infotxt_user_id' => 'nullable|string',
-        ]);
+        $validated = $request->validated();
 
         $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
             'api_key' => $validated['pos_token'],
@@ -139,22 +133,9 @@ class PageController extends Controller
             ->with('success', 'Page created successfully.');
     }
 
-    public function update(Request $request, Workspace $workspace, Page $page)
+    public function update(UpdatePageRequest $request, Workspace $workspace, Page $page)
     {
-        // Ensure the page belongs to the workspace
-        if ($page->workspace_id !== $workspace->id) {
-            abort(403);
-        }
-
-        $validated = $request->validate([
-            'shop_id' => 'required|integer|exists:shops,id',
-            'name' => 'required|string|max:255',
-            'facebook_url' => 'nullable|url|max:500',
-            'pos_token' => 'nullable|string|max:255',
-            'botcake_token' => 'nullable|string|max:255',
-            'infotxt_token' => 'nullable|string|max:255',
-            'infotxt_user_id' => 'nullable|string|max:255',
-        ]);
+        $validated = $request->validated();
 
         $page->update([
             'shop_id' => $validated['shop_id'],
