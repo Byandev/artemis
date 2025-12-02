@@ -4,25 +4,40 @@ namespace App\Console\Commands;
 
 use App\Models\Page;
 use App\Models\Shop;
+use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Console\Command;
 
 class SeedMorePages extends Command
 {
-    protected $signature = 'seed:pages {count=25} {--archived=5}';
-    protected $description = 'Seed more pages for testing pagination';
+    protected $signature = 'seed:pages {count=25} {--archived=5} {--teams=0}';
+    protected $description = 'Seed more pages and teams for testing pagination';
 
     public function handle()
     {
         $count = (int) $this->argument('count');
         $archivedCount = (int) $this->option('archived');
+        $teamsCount = (int) $this->option('teams');
         
         $workspace = Workspace::first();
         
         if (!$workspace) {
             $this->error('No workspace found. Run db:seed first.');
             return 1;
+        }
+
+        // Create teams if requested
+        if ($teamsCount > 0) {
+            $this->info("Creating {$teamsCount} teams...");
+            for ($i = 1; $i <= $teamsCount; $i++) {
+                Team::create([
+                    'workspace_id' => $workspace->id,
+                    'name' => 'Team ' . fake()->unique()->company(),
+                ]);
+            }
+            $this->info("Created {$teamsCount} teams. Total: " . Team::where('workspace_id', $workspace->id)->count());
+            return 0;
         }
 
         $shops = Shop::where('workspace_id', $workspace->id)->get();
