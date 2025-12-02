@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\FetchPageOrders;
 use App\Models\Page;
 use App\Models\Shop;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -14,15 +15,67 @@ use Inertia\Inertia;
 
 class PageController extends Controller
 {
-    public function index(Workspace $workspace)
+    public function index(Request $request, Workspace $workspace)
     {
-        $pages = Page::ofWorkspace($workspace)
-            ->orderBy('name', 'asc')
-            ->paginate(1000);
+        $query = Page::ofWorkspace($workspace)
+            ->with(['shop', 'owner']);
+
+        // Filter by archive status
+        if ($request->get('status') === 'archived') {
+            $query->archived();
+        } else {
+            $query->active();
+        }
+
+        // Filter by owner
+        if ($request->filled('owner_id')) {
+            $query->where('owner_id', $request->get('owner_id'));
+        }
+
+        // Filter by shop (product)
+        if ($request->filled('shop_id')) {
+            $query->where('shop_id', $request->get('shop_id'));
+        }
+
+        // Search by name
+        if ($request->filled('search')) {
+            $query->where('name', 'like', '%' . $request->get('search') . '%');
+        }
+
+        // Sorting
+        $sortField = $request->get('sort', 'name');
+        $sortDirection = $request->get('direction', 'asc');
+        
+        $allowedSortFields = ['name', 'shop_id', 'owner_id', 'created_at', 'orders_last_synced_at'];
+        if (in_array($sortField, $allowedSortFields)) {
+            $query->orderBy($sortField, $sortDirection === 'desc' ? 'desc' : 'asc');
+        }
+
+        // Pagination
+        $pages = $query->paginate(10)->withQueryString();
+
+        // Get filter options
+        $owners = User::whereIn('id', Page::ofWorkspace($workspace)->pluck('owner_id')->unique())
+            ->select('id', 'name')
+            ->get();
+
+        $shops = Shop::whereIn('id', Page::ofWorkspace($workspace)->pluck('shop_id')->unique())
+            ->select('id', 'name')
+            ->get();
 
         return Inertia::render('workspaces/pages/index', [
             'pages' => $pages,
             'workspace' => $workspace,
+            'filters' => [
+                'search' => $request->get('search', ''),
+                'owner_id' => $request->get('owner_id', ''),
+                'shop_id' => $request->get('shop_id', ''),
+                'status' => $request->get('status', 'active'),
+                'sort' => $sortField,
+                'direction' => $sortDirection,
+            ],
+            'owners' => $owners,
+            'shops' => $shops,
         ]);
     }
 
@@ -124,5 +177,29 @@ class PageController extends Controller
         dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonth(2)->startOfMonth()->unix(), \Carbon\Carbon::now()->unix()));
 
         return redirect()->route('workspaces.pages.index', $workspace);
+    }
+
+    public function archive(Workspace $workspace, Page $page)
+    {
+        if ($page->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
+        $page->archive();
+
+        return redirect()->route('workspaces.pages.index', $workspace)
+            ->with('success', 'Page archived successfully.');
+    }
+
+    public function restore(Workspace $workspace, Page $page)
+    {
+        if ($page->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
+        $page->restore();
+
+        return redirect()->route('workspaces.pages.index', $workspace)
+            ->with('success', 'Page restored successfully.');
     }
 }
