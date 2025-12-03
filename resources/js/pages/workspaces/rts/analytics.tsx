@@ -171,11 +171,8 @@ const Analytics = ({ workspace, data }: Props) => {
 
                 <div className="grid grid-cols-4 gap-2">
                     {analytics.map((data, key) => {
-                        return <Card key={key} className="p-4 gap-2">
+                        return <Card key={key} className="p-4 gap-5">
                             <CardHeader className="p-0">
-                                <p className="text-sm text-muted-foreground">{data.title}</p>
-                            </CardHeader>
-                            <CardContent className="p-0">
                                 <div>
                                     <span className="text-2xl md:text-3xl font-extrabold">
                                         {typeof data.value === 'number'
@@ -183,6 +180,9 @@ const Analytics = ({ workspace, data }: Props) => {
                                             : data.value}
                                     </span>
                                 </div>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <p className="text-md text-muted-foreground">{data.title}</p>
                             </CardContent>
                         </Card>
                     })}
