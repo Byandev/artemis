@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Workspaces\StorePageRequest;
+use App\Http\Requests\Workspaces\UpdatePageRequest;
 use App\Jobs\FetchPageOrders;
 use App\Models\Page;
 use App\Models\Shop;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -14,29 +17,83 @@ use Inertia\Inertia;
 
 class PageController extends Controller
 {
-    public function index(Workspace $workspace)
+    public function index(Request $request, Workspace $workspace)
     {
-        $pages = Page::ofWorkspace($workspace)
-            ->orderBy('name', 'asc')
-            ->paginate(1000);
+        // Check if user has access to this workspace
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $query = Page::ofWorkspace($workspace)
+            ->with(['shop', 'owner']);
+
+        // Filter by archive status
+        if ($request->get('status') === 'archived') {
+            $query->archived();
+        } else {
+            $query->active();
+        }
+
+        // Filter by owner
+        if ($request->filled('owner_id')) {
+            $query->where('owner_id', $request->get('owner_id'));
+        }
+
+        // Filter by shop (product)
+        if ($request->filled('shop_id')) {
+            $query->where('shop_id', $request->get('shop_id'));
+        }
+
+        // Search by name
+        if ($request->filled('search')) {
+            $query->where('name', 'like', '%' . $request->get('search') . '%');
+        }
+
+        // Sorting
+        $sortField = $request->get('sort', 'name');
+        $sortDirection = $request->get('direction', 'asc');
+        
+        $allowedSortFields = ['name', 'shop_id', 'owner_id', 'created_at', 'orders_last_synced_at'];
+        if (in_array($sortField, $allowedSortFields)) {
+            $query->orderBy($sortField, $sortDirection === 'desc' ? 'desc' : 'asc');
+        }
+
+        // Pagination
+        $pages = $query->paginate(10)->withQueryString();
+
+        // Get filter options
+        $owners = User::whereIn('id', Page::ofWorkspace($workspace)->pluck('owner_id')->unique())
+            ->select('id', 'name')
+            ->get();
+
+        $shops = Shop::whereIn('id', Page::ofWorkspace($workspace)->pluck('shop_id')->unique())
+            ->select('id', 'name')
+            ->get();
 
         return Inertia::render('workspaces/pages/index', [
             'pages' => $pages,
             'workspace' => $workspace,
+            'filters' => [
+                'search' => $request->get('search', ''),
+                'owner_id' => $request->get('owner_id', ''),
+                'shop_id' => $request->get('shop_id', ''),
+                'status' => $request->get('status', 'active'),
+                'sort' => $sortField,
+                'direction' => $sortDirection,
+            ],
+            'owners' => $owners,
+            'shops' => $shops,
         ]);
     }
 
-    public function store(Request $request, Workspace $workspace)
+    public function store(StorePageRequest $request, Workspace $workspace)
     {
-        $validated = $request->validate([
-            'id' => 'required|integer',
-            'shop_id' => 'required|integer',
-            'name' => 'required|string',
-            'pos_token' => 'required|string',
-            'botcake_token' => 'nullable|string',
-            'infotxt_token' => 'nullable|string',
-            'infotxt_user_id' => 'nullable|string',
-        ]);
+        // Check if user has access to this workspace
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $validated = $request->validated();
 
         $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
             'api_key' => $validated['pos_token'],
@@ -71,7 +128,7 @@ class PageController extends Controller
         $page = Page::create([
             'id' => $validated['id'],
             'workspace_id' => $workspace->id,
-            'owner_id' => auth()->id(),
+            'owner_id' => $request->user()->id,
             'shop_id' => $validated['shop_id'],
             'name' => $validated['name'],
             'pos_token' => $validated['pos_token'] ?? null,
@@ -80,28 +137,15 @@ class PageController extends Controller
             'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
         ]);
 
-        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonth(2)->startOfMonth()->unix(), \Carbon\Carbon::now()->unix()));
+        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonths(2)->startOfMonth()->unix(), \Carbon\Carbon::now()->unix()));
 
         return redirect()->route('workspaces.pages.index', $workspace)
             ->with('success', 'Page created successfully.');
     }
 
-    public function update(Request $request, Workspace $workspace, Page $page)
+    public function update(UpdatePageRequest $request, Workspace $workspace, Page $page)
     {
-        // Ensure the page belongs to the workspace
-        if ($page->workspace_id !== $workspace->id) {
-            abort(403);
-        }
-
-        $validated = $request->validate([
-            'shop_id' => 'required|integer|exists:shops,id',
-            'name' => 'required|string|max:255',
-            'facebook_url' => 'nullable|url|max:500',
-            'pos_token' => 'nullable|string|max:255',
-            'botcake_token' => 'nullable|string|max:255',
-            'infotxt_token' => 'nullable|string|max:255',
-            'infotxt_user_id' => 'nullable|string|max:255',
-        ]);
+        $validated = $request->validated();
 
         $page->update([
             'shop_id' => $validated['shop_id'],
@@ -117,12 +161,56 @@ class PageController extends Controller
             ->with('success', 'Page updated successfully.');
     }
 
-    public function refresh(Workspace $workspace, Page $page)
+    public function refresh(Request $request, Workspace $workspace, Page $page)
     {
+        // Check if user has access to this workspace
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        // Ensure the page belongs to the workspace
+        if ($page->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
         $page->update(['orders_last_synced_at' => null]);
 
-        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonth(2)->startOfMonth()->unix(), \Carbon\Carbon::now()->unix()));
+        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonths(2)->startOfMonth()->unix(), \Carbon\Carbon::now()->unix()));
 
         return redirect()->route('workspaces.pages.index', $workspace);
+    }
+
+    public function archive(Request $request, Workspace $workspace, Page $page)
+    {
+        // Check if user has access to this workspace
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        if ($page->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
+        $page->archive();
+
+        return redirect()->route('workspaces.pages.index', $workspace)
+            ->with('success', 'Page archived successfully.');
+    }
+
+    public function restore(Request $request, Workspace $workspace, Page $page)
+    {
+        // Check if user has access to this workspace
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        if ($page->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
+        $page->restore();
+
+        return redirect()->route('workspaces.pages.index', $workspace)
+            ->with('success', 'Page restored successfully.');
     }
 }

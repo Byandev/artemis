@@ -1,4 +1,5 @@
 import { Shop } from '@/types/models/Shop';
+import { User } from '@/types/models/User';
 
 export interface Page {
     id: number;
@@ -11,7 +12,9 @@ export interface Page {
     botcake_token?: string;
     infotxt_token?: string;
     infotxt_user_id?: string;
-    orders_last_synced_at: string
+    orders_last_synced_at: string;
+    archived_at: string | null;
 
-    shop?: Shop
+    shop?: Shop;
+    owner?: User;
 }
