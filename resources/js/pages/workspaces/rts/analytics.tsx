@@ -169,14 +169,20 @@ const Analytics = ({ workspace, data }: Props) => {
             <div className='px-4 py-6'>
                 <RtsNavigation workspace={workspace} />
 
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-4 gap-2">
                     {analytics.map((data, key) => {
-                        return <Card key={key}>
-                            <CardHeader>
-                                <CardTitle>{data.value}</CardTitle>
+                        return <Card key={key} className="p-4 gap-2">
+                            <CardHeader className="p-0">
+                                <p className="text-sm text-muted-foreground">{data.title}</p>
                             </CardHeader>
-                            <CardContent>
-                                <p>{data.title}</p>
+                            <CardContent className="p-0">
+                                <div>
+                                    <span className="text-2xl md:text-3xl font-extrabold text-black">
+                                        {typeof data.value === 'number'
+                                            ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data.value)
+                                            : data.value}
+                                    </span>
+                                </div>
                             </CardContent>
                         </Card>
                     })}
