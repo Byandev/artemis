@@ -33,18 +33,17 @@ class AnalyticController extends Controller
             $query->where('workspace_id', $workspace->id);
         })->count();
 
-        // Grouped by Page (include page name)
+        // Grouped by Page
         $groupedRtsStatsByPage = Order::selectRaw('
-            orders.page_id,
-            pages.name as page_name,
-            ROUND(
-                (SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
-                NULLIF(SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
-                2
-            ) AS rts_rate_percentage,
+            pages.name AS page_name,
+            SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
+            SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
             SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
-            SUM(CASE WHEN orders.status IN (4,5) THEN orders.total_amount ELSE 0 END) AS returned_amount,
-            SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count
+            ROUND(
+            (SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
+            NULLIF(SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
+            2
+            ) AS rts_rate_percentage
         ')
             ->leftJoin('pages', 'pages.id', '=', 'orders.page_id')
             ->where('orders.workspace_id', $workspace->id)

@@ -7,9 +7,9 @@ import { ChartConfig } from '@/components/ui/chart';
 import AnalyticsView from './partials/AnalyticsView';
 import { ColumnDef } from '@tanstack/react-table';
 
-type RTSAnalyticsData = {
-    page_id: number;
+type BreakDownAnalytics = {
     page_name?: string | null;
+    total_orders: number;
     rts_rate_percentage: number;
     returned_count: number;
     delivered_count: number;
@@ -25,7 +25,7 @@ type Props = {
         returned_amount: number;
         tracked_orders: number;
         sent_parcel_journey_notifications: number;
-        grouped_rts_stats_by_page: Array<RTSAnalyticsData>;
+        grouped_rts_stats_by_page: Array<BreakDownAnalytics>;
     }
 }
 
@@ -40,6 +40,10 @@ const Analytics = ({ workspace, data }: Props) => {
     }, [data])
 
     const perPageChartConfig = {
+        total: {
+            label: "Total",
+            color: "#3b82f6",
+        },
         delivered: {
             label: "Delivered",
             color: "#10b981",
@@ -50,22 +54,26 @@ const Analytics = ({ workspace, data }: Props) => {
         },
     } satisfies ChartConfig;
 
-    const perPageColumns: ColumnDef<RTSAnalyticsData>[] = [
+    const perPageColumns: ColumnDef<BreakDownAnalytics>[] = [
         {
             accessorKey: "page_name",
-            header: "Page Name",
+            header: "Page",
+        },
+        {
+            accessorKey: "total_orders",
+            header: "Total Orders",
         },
         {
             accessorKey: "returned_count",
-            header: "Returned Count",
+            header: "Returned",
         },
         {
             accessorKey: "delivered_count",
-            header: "Delivered Count",
+            header: "Delivered",
         },
         {
             accessorKey: "rts_rate_percentage",
-            header: "RTS Rate Percentage",
+            header: "RTS Rate",
             cell: ({ row }) => {
                 return `${row.original.rts_rate_percentage}%`
             }
@@ -90,9 +98,10 @@ const Analytics = ({ workspace, data }: Props) => {
                     })}
 
                     <div className='col-span-4 mt-4 '>
-                        <AnalyticsView<RTSAnalyticsData>
+                        <AnalyticsView<BreakDownAnalytics>
                             columns={perPageColumns}
                             bars={[
+                                { dataKey: 'total_orders', fill: perPageChartConfig.total.color, name: perPageChartConfig.total.label },
                                 { dataKey: 'delivered_count', fill: perPageChartConfig.delivered.color, name: perPageChartConfig.delivered.label },
                                 { dataKey: 'returned_count', fill: perPageChartConfig.returned.color, name: perPageChartConfig.returned.label },
                             ]}
