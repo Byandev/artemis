@@ -38,9 +38,10 @@ class Page extends Model
         return $builder->where('workspace_id', $workspace->id);
     }
 
+    // SoftDeletes automatically excludes trashed records, so scopeActive is just an alias
     public function scopeActive(Builder $builder): Builder
     {
-        return $builder->whereNull('deleted_at');
+        return $builder->withoutTrashed();
     }
 
     public function scopeArchived(Builder $builder): Builder
