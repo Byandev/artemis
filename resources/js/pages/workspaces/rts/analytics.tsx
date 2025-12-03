@@ -8,13 +8,19 @@ import AnalyticsView from './partials/AnalyticsView';
 import { ColumnDef } from '@tanstack/react-table';
 
 type BreakDownAnalytics = {
-    page_name?: string | null;
     total_orders: number;
     rts_rate_percentage: number;
     returned_count: number;
     delivered_count: number;
 }
 
+interface PerPageBreakDownAnalytics extends BreakDownAnalytics {
+    page_name: string;
+}
+
+interface PerUserBreakDownAnalytics extends BreakDownAnalytics {
+    user_name: string;
+}
 
 type Props = {
     workspace: Workspace;
@@ -25,7 +31,8 @@ type Props = {
         returned_amount: number;
         tracked_orders: number;
         sent_parcel_journey_notifications: number;
-        grouped_rts_stats_by_page: Array<BreakDownAnalytics>;
+        grouped_rts_stats_by_page: Array<PerPageBreakDownAnalytics>;
+        grouped_rts_stats_by_users: Array<PerUserBreakDownAnalytics>;
     }
 }
 
@@ -54,10 +61,36 @@ const Analytics = ({ workspace, data }: Props) => {
         },
     } satisfies ChartConfig;
 
-    const perPageColumns: ColumnDef<BreakDownAnalytics>[] = [
+    const perPageColumns: ColumnDef<PerPageBreakDownAnalytics>[] = [
         {
             accessorKey: "page_name",
             header: "Page",
+        },
+        {
+            accessorKey: "total_orders",
+            header: "Total Orders",
+        },
+        {
+            accessorKey: "returned_count",
+            header: "Returned",
+        },
+        {
+            accessorKey: "delivered_count",
+            header: "Delivered",
+        },
+        {
+            accessorKey: "rts_rate_percentage",
+            header: "RTS Rate",
+            cell: ({ row }) => {
+                return `${row.original.rts_rate_percentage}%`
+            }
+        },
+    ];
+
+    const perUserColumns: ColumnDef<PerUserBreakDownAnalytics>[] = [
+        {
+            accessorKey: "user_name",
+            header: "User",
         },
         {
             accessorKey: "total_orders",
@@ -97,8 +130,8 @@ const Analytics = ({ workspace, data }: Props) => {
                         </Card>
                     })}
 
-                    <div className='col-span-4 mt-4 '>
-                        <AnalyticsView<BreakDownAnalytics>
+                    <div className='col-span-4 mt-4 space-y-6'>
+                        <AnalyticsView<PerPageBreakDownAnalytics>
                             columns={perPageColumns}
                             bars={[
                                 { dataKey: 'total_orders', fill: perPageChartConfig.total.color, name: perPageChartConfig.total.label },
@@ -110,6 +143,20 @@ const Analytics = ({ workspace, data }: Props) => {
                             data={data.grouped_rts_stats_by_page}
                             chartConfig={perPageChartConfig}
                             title="Breakdown per Pages"
+                        />
+
+                        <AnalyticsView<PerUserBreakDownAnalytics>
+                            columns={perUserColumns}
+                            bars={[
+                                { dataKey: 'total_orders', fill: perPageChartConfig.total.color, name: perPageChartConfig.total.label },
+                                { dataKey: 'delivered_count', fill: perPageChartConfig.delivered.color, name: perPageChartConfig.delivered.label },
+                                { dataKey: 'returned_count', fill: perPageChartConfig.returned.color, name: perPageChartConfig.returned.label },
+                            ]}
+                            xKey="user_name"
+                            className="max-h-[400px] w-full"
+                            data={data.grouped_rts_stats_by_users}
+                            chartConfig={perPageChartConfig}
+                            title="Breakdown per Users"
                         />
                     </div>
                 </div>
