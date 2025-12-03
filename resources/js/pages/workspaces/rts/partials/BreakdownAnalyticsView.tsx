@@ -41,6 +41,12 @@ const BreakdownAnalyticsView = <T,>({
 
     const [currentView, setCurrentView] = React.useState<typeof views[number]>(views[0]);
 
+    if (data.length === 0) {
+        return (
+            <NoDataView title={title} />
+        );
+    }
+
     return (
         <div className='border rounded-xl p-6 shadow-sm'>
             <div className='flex justify-between items-center mb-4'>
@@ -89,15 +95,28 @@ const BreakdownAnalyticsView = <T,>({
                 </ChartContainer>
             ) : currentView === 'heatmap' ? (
                 <>
-                    {heatmapPoints ? (
+                    {heatmapPoints && heatmapPoints.length > 0 ? (
                         <HeatmapMap points={heatmapPoints} />
                     ) : (
-                        <p>No heatmap data available.</p>
+                        <NoDataView title={title} />
                     )}
                 </>
             ) : (
                 <DataTable columns={columns} data={data} />
             )}
+        </div>
+    );
+}
+
+const NoDataView = ({ title }: { title: string }) => {
+    return (
+        <div className='border rounded-xl p-6 shadow-sm w-full'>
+            <div className='flex justify-between items-center mb-4'>
+                <h2 className='text-lg font-medium mb-2'>{title}</h2>
+            </div>
+            <div className='flex justify-center items-center h-32'>
+                <p className='text-center text-sm text-gray-500'>No data available.</p>
+            </div>
         </div>
     );
 }
