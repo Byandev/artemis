@@ -78,8 +78,8 @@ class PageSeeder extends Seeder
 
         // Summary
         $totalPages = Page::where('workspace_id', $workspace->id)->count();
-        $activePages = Page::where('workspace_id', $workspace->id)->active()->count();
-        $archivedPages = Page::where('workspace_id', $workspace->id)->archived()->count();
+        $activePages = Page::where('workspace_id', $workspace->id)->withoutTrashed()->count();
+        $archivedPages = Page::where('workspace_id', $workspace->id)->onlyTrashed()->count();
 
         $this->command->info("---");
         $this->command->info("Summary for workspace '{$workspace->name}':");

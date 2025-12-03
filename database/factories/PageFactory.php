@@ -33,7 +33,6 @@ class PageFactory extends Factory
             'infotxt_token' => fake()->optional()->uuid(),
             'infotxt_user_id' => fake()->optional()->numerify('######'),
             'orders_last_synced_at' => fake()->optional()->dateTimeBetween('-1 month', 'now'),
-            'archived_at' => null,
         ];
     }
 
@@ -69,12 +68,12 @@ class PageFactory extends Factory
     }
 
     /**
-     * Mark the page as archived.
+     * Mark the page as archived (soft deleted).
      */
     public function archived(): static
     {
         return $this->state(fn (array $attributes) => [
-            'archived_at' => now(),
+            'deleted_at' => now(),
         ]);
     }
 
