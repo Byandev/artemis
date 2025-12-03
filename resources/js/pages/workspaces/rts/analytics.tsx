@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import RtsNavigation from '@/pages/workspaces/rts/partials/RtsNavigation';
 import { Workspace } from '@/types/models/Workspace';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { useMemo } from 'react';
 import { ChartConfig } from '@/components/ui/chart';
 import BreakdownAnalyticsView from './partials/BreakdownAnalyticsView';
@@ -74,15 +74,15 @@ const Analytics = ({ workspace, data }: Props) => {
     const chartConfig = {
         total: {
             label: "Total",
-            color: "#3b82f6",
+            color: "#1f2937",
         },
         delivered: {
             label: "Delivered",
-            color: "#10b981",
+            color: "#4b5563",
         },
         returned: {
             label: "Returned",
-            color: "#ef4444",
+            color: "#9ca3af",
         },
     } satisfies ChartConfig;
 
