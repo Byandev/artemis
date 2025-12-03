@@ -20,9 +20,25 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
     useEffect(() => {
         const map = new maplibregl.Map({
             container: mapRef.current!,
-            style: "https://demotiles.maplibre.org/style.json",
+            style: {
+                version: 8,
+                sources: {
+                    osm: {
+                        type: "raster",
+                        tiles: ["https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                        tileSize: 256,
+                    },
+                },
+                layers: [
+                    {
+                        id: "osm",
+                        type: "raster",
+                        source: "osm",
+                    },
+                ],
+            },
             center: [120.9842, 14.5995],
-            zoom: 5,
+            zoom: 6,
         });
 
         map.on("load", () => {
