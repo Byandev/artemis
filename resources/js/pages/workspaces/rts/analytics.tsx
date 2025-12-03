@@ -4,7 +4,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useMemo } from 'react';
 import { ChartConfig } from '@/components/ui/chart';
-import AnalyticsView from './partials/AnalyticsView';
+import BreakdownAnalyticsView from './partials/BreakdownAnalyticsView';
 import { ColumnDef } from '@tanstack/react-table';
 
 type BreakDownAnalytics = {
@@ -162,7 +162,7 @@ const Analytics = ({ workspace, data }: Props) => {
                     })}
 
                     <div className='col-span-4 mt-4 space-y-6'>
-                        <AnalyticsView<PerPageBreakDownAnalytics>
+                        <BreakdownAnalyticsView<PerPageBreakDownAnalytics>
                             columns={perPageColumns}
                             bars={[
                                 { dataKey: 'total_orders', fill: chartConfig.total.color, name: chartConfig.total.label },
@@ -176,7 +176,7 @@ const Analytics = ({ workspace, data }: Props) => {
                             title="Breakdown per Pages"
                         />
 
-                        <AnalyticsView<PerUserBreakDownAnalytics>
+                        <BreakdownAnalyticsView<PerUserBreakDownAnalytics>
                             columns={perUserColumns}
                             bars={[
                                 { dataKey: 'total_orders', fill: chartConfig.total.color, name: chartConfig.total.label },
@@ -190,17 +190,11 @@ const Analytics = ({ workspace, data }: Props) => {
                             title="Breakdown per Users"
                         />
 
-                        <AnalyticsView<PerCityBreakDownAnalytics>
+                        <BreakdownAnalyticsView<PerCityBreakDownAnalytics>
                             columns={perCityColumns}
-                            bars={[
-                                { dataKey: 'total_orders', fill: chartConfig.total.color, name: chartConfig.total.label },
-                                { dataKey: 'delivered_count', fill: chartConfig.delivered.color, name: chartConfig.delivered.label },
-                                { dataKey: 'returned_count', fill: chartConfig.returned.color, name: chartConfig.returned.label },
-                            ]}
-                            xKey="city_name"
+                            availableViews={['heatmap', 'table']}
                             className="max-h-[400px] w-full"
                             data={data.grouped_rts_stats_by_cities}
-                            chartConfig={chartConfig}
                             title="Breakdown per Cities"
                         />
                     </div>

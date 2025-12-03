@@ -14,15 +14,17 @@ type BarSpec<T> = {
 
 type Props<T> = {
     data: Array<T>;
-    chartConfig: ChartConfig;
+    chartConfig?: ChartConfig;
     columns: ColumnDef<T>[];
     className?: string;
     title: string;
-    xKey: Extract<keyof T, string>;
-    bars: BarSpec<T>[];
+    xKey?: Extract<keyof T, string>;
+    bars?: BarSpec<T>[];
+    availableViews?: Array<'graph' | 'table' | 'heatmap'>;
+    renderHeatmap?: (data: T[]) => React.ReactNode;
 }
 
-const AnalyticsView = <T,>({
+const BreakdownAnalyticsView = <T,>({
     data,
     chartConfig,
     columns,
@@ -30,9 +32,12 @@ const AnalyticsView = <T,>({
     title,
     xKey,
     bars,
-
+    availableViews,
+    renderHeatmap,
 }: Props<T>) => {
-    const [currentView, setCurrentView] = React.useState<'graph' | 'table'>('graph');
+    const views = React.useMemo(() => (availableViews && availableViews.length ? availableViews : (['graph', 'table'] as const)), [availableViews]) as Array<'graph' | 'table' | 'heatmap'>;
+
+    const [currentView, setCurrentView] = React.useState<typeof views[number]>(views[0]);
 
     return (
         <div className='border rounded-xl p-6 shadow-sm'>
@@ -42,7 +47,7 @@ const AnalyticsView = <T,>({
                     <Button>Export</Button>
 
                     <div className='flex flex-row gap-2 mb-2 bg-gray-100 p-1 rounded-md w-fit'>
-                        {(['graph', 'table'] as const).map((view) => (
+                        {views.map((view) => (
                             <Button
                                 key={view}
                                 variant="ghost"
@@ -58,7 +63,7 @@ const AnalyticsView = <T,>({
             </div>
 
             {currentView === 'graph' ? (
-                <ChartContainer config={chartConfig} className={className}>
+                <ChartContainer config={chartConfig ?? {}} className={className}>
                     <BarChart accessibilityLayer data={data} height={100}>
                         <XAxis
                             dataKey={xKey}
@@ -69,7 +74,7 @@ const AnalyticsView = <T,>({
                         />
                         <ChartTooltip content={<ChartTooltipContent />} />
 
-                        {bars.map((b) => (
+                        {bars?.map((b) => (
                             <Bar
                                 key={b.dataKey}
                                 dataKey={b.dataKey}
@@ -80,6 +85,12 @@ const AnalyticsView = <T,>({
                         ))}
                     </BarChart>
                 </ChartContainer>
+            ) : currentView === 'heatmap' ? (
+                renderHeatmap ? (
+                    <div className={className}>{renderHeatmap(data)}</div>
+                ) : (
+                    <div className='text-sm text-muted-foreground p-4'>No heatmap renderer provided.</div>
+                )
             ) : (
                 <DataTable columns={columns} data={data} />
             )}
@@ -87,4 +98,4 @@ const AnalyticsView = <T,>({
     );
 }
 
-export default AnalyticsView;
+export default BreakdownAnalyticsView;
