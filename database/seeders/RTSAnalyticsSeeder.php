@@ -104,12 +104,17 @@ class RTSAnalyticsSeeder extends Seeder
                 'parcel_status' => $status === 3 ? 'delivered' : ($status === 4 ? 'returned' : 'rts'),
             ]);
 
+            $cities = [
+                'Manila', 'Valenzuela', 'Tondo', 'Sampaloc', 'Malabon',
+                'Payatas', 'Poblacion', 'Rosario', 'Bagong Silangan', 'Malate',
+            ];
+
             // Create a shipping address for the order
             ShippingAddress::firstOrCreate([
                 'order_id' => $order->id,
             ], [
                 'province_name' => 'Province '.rand(1, 10),
-                'district_name' => 'District '.rand(1, 20),
+                'district_name' => $cities[array_rand($cities)],
                 'commune_name' => 'Commune '.rand(1, 50),
                 'address' => 'Street '.rand(1, 200),
                 'full_address' => 'Street '.rand(1, 200).', District '.rand(1, 20).', Province '.rand(1, 10),
