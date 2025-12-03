@@ -15,30 +15,32 @@ class PageSeeder extends Seeder
      */
     public function run(): void
     {
-        // Get or create the test user
-        $testUser = User::where('email', 'test@example.com')->first();
+        // Get the first workspace (Default Workspace) or any existing workspace
+        $workspace = Workspace::first();
 
-        if (!$testUser) {
-            $this->command->warn('Test user not found. Please run DatabaseSeeder first.');
+        if (!$workspace) {
+            $this->command->warn('No workspace found. Please create a workspace first.');
             return;
         }
 
-        // Get the first workspace for the test user, or create one
-        $workspace = Workspace::where('owner_id', $testUser->id)->first();
+        $this->command->info("Using workspace: {$workspace->name} (ID: {$workspace->id})");
 
-        if (!$workspace) {
-            $workspace = Workspace::factory()->forOwner($testUser)->create();
-            $this->command->info("Created workspace: {$workspace->name}");
-        }
-
-        // Create additional users to be page owners
-        $owners = User::factory(3)->create();
+        // Get existing workspace members or create new ones
+        $existingMembers = $workspace->users()->get();
         
-        // Add owners to the workspace as members
-        foreach ($owners as $owner) {
-            $workspace->addMember($owner, 'member');
+        if ($existingMembers->count() < 2) {
+            // Create additional users to be page owners
+            $owners = User::factory(3)->create();
+            
+            // Add owners to the workspace as members
+            foreach ($owners as $owner) {
+                $workspace->addMember($owner, 'member');
+            }
+            $this->command->info("Created 3 additional users as workspace members");
+        } else {
+            $owners = $existingMembers;
+            $this->command->info("Using {$owners->count()} existing workspace members");
         }
-        $this->command->info("Created 3 additional users as workspace members");
 
         // Create shops for the workspace
         $shops = Shop::factory(3)->forWorkspace($workspace)->create();
