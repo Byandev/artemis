@@ -262,6 +262,7 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
                 );
             },
         },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     ], [filters.sort, filters.direction]);
 
     const hasActiveFilters = filters.search || filters.owner_id || filters.shop_id;
