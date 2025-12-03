@@ -51,7 +51,7 @@ const Analytics = ({ workspace, data }: Props) => {
         ]
     }, [data])
 
-    const perPageChartConfig = {
+    const chartConfig = {
         total: {
             label: "Total",
             color: "#3b82f6",
@@ -165,42 +165,42 @@ const Analytics = ({ workspace, data }: Props) => {
                         <AnalyticsView<PerPageBreakDownAnalytics>
                             columns={perPageColumns}
                             bars={[
-                                { dataKey: 'total_orders', fill: perPageChartConfig.total.color, name: perPageChartConfig.total.label },
-                                { dataKey: 'delivered_count', fill: perPageChartConfig.delivered.color, name: perPageChartConfig.delivered.label },
-                                { dataKey: 'returned_count', fill: perPageChartConfig.returned.color, name: perPageChartConfig.returned.label },
+                                { dataKey: 'total_orders', fill: chartConfig.total.color, name: chartConfig.total.label },
+                                { dataKey: 'delivered_count', fill: chartConfig.delivered.color, name: chartConfig.delivered.label },
+                                { dataKey: 'returned_count', fill: chartConfig.returned.color, name: chartConfig.returned.label },
                             ]}
                             xKey="page_name"
                             className="max-h-[400px] w-full"
                             data={data.grouped_rts_stats_by_page}
-                            chartConfig={perPageChartConfig}
+                            chartConfig={chartConfig}
                             title="Breakdown per Pages"
                         />
 
                         <AnalyticsView<PerUserBreakDownAnalytics>
                             columns={perUserColumns}
                             bars={[
-                                { dataKey: 'total_orders', fill: perPageChartConfig.total.color, name: perPageChartConfig.total.label },
-                                { dataKey: 'delivered_count', fill: perPageChartConfig.delivered.color, name: perPageChartConfig.delivered.label },
-                                { dataKey: 'returned_count', fill: perPageChartConfig.returned.color, name: perPageChartConfig.returned.label },
+                                { dataKey: 'total_orders', fill: chartConfig.total.color, name: chartConfig.total.label },
+                                { dataKey: 'delivered_count', fill: chartConfig.delivered.color, name: chartConfig.delivered.label },
+                                { dataKey: 'returned_count', fill: chartConfig.returned.color, name: chartConfig.returned.label },
                             ]}
                             xKey="user_name"
                             className="max-h-[400px] w-full"
                             data={data.grouped_rts_stats_by_users}
-                            chartConfig={perPageChartConfig}
+                            chartConfig={chartConfig}
                             title="Breakdown per Users"
                         />
 
                         <AnalyticsView<PerCityBreakDownAnalytics>
                             columns={perCityColumns}
                             bars={[
-                                { dataKey: 'total_orders', fill: perPageChartConfig.total.color, name: perPageChartConfig.total.label },
-                                { dataKey: 'delivered_count', fill: perPageChartConfig.delivered.color, name: perPageChartConfig.delivered.label },
-                                { dataKey: 'returned_count', fill: perPageChartConfig.returned.color, name: perPageChartConfig.returned.label },
+                                { dataKey: 'total_orders', fill: chartConfig.total.color, name: chartConfig.total.label },
+                                { dataKey: 'delivered_count', fill: chartConfig.delivered.color, name: chartConfig.delivered.label },
+                                { dataKey: 'returned_count', fill: chartConfig.returned.color, name: chartConfig.returned.label },
                             ]}
                             xKey="city_name"
                             className="max-h-[400px] w-full"
                             data={data.grouped_rts_stats_by_cities}
-                            chartConfig={perPageChartConfig}
+                            chartConfig={chartConfig}
                             title="Breakdown per Cities"
                         />
                     </div>
