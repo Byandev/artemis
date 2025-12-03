@@ -54,5 +54,5 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
         return () => map.remove();
     }, [points]);
 
-    return <div ref={mapRef} style={{ height: "400px" }} />;
+    return <div ref={mapRef} style={{ height: "600px" }} />;
 }
