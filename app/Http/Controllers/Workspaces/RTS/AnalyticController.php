@@ -68,9 +68,9 @@ class AnalyticController extends Controller
             ->groupBy('pages.owner_id', 'users.name')
             ->get();
 
-        // Grouped by Cities (uses shipping_addresses.province_name as city)
+        // Grouped by Cities (uses shipping_addresses.district_name as city)
         $groupedRtsStatsByCities = Order::selectRaw('
-            shipping_addresses.province_name AS city_name,
+            shipping_addresses.district_name AS city_name,
             SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
             SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
             SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
@@ -82,7 +82,7 @@ class AnalyticController extends Controller
         ')
             ->leftJoin('shipping_addresses', 'shipping_addresses.order_id', '=', 'orders.id')
             ->where('orders.workspace_id', $workspace->id)
-            ->groupBy('shipping_addresses.province_name')
+            ->groupBy('shipping_addresses.district_name')
             ->get();
 
         return Inertia::render('workspaces/rts/analytics', [

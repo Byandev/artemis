@@ -4,6 +4,7 @@ import { Bar, BarChart, XAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
+import HeatmapMap, { HeatPoint } from './HeatmapMap';
 
 type BarSpec<T> = {
     dataKey: Extract<keyof T, string>;
@@ -21,7 +22,7 @@ type Props<T> = {
     xKey?: Extract<keyof T, string>;
     bars?: BarSpec<T>[];
     availableViews?: Array<'graph' | 'table' | 'heatmap'>;
-    renderHeatmap?: (data: T[]) => React.ReactNode;
+    heatmapPoints?: HeatPoint[];
 }
 
 const BreakdownAnalyticsView = <T,>({
@@ -33,8 +34,9 @@ const BreakdownAnalyticsView = <T,>({
     xKey,
     bars,
     availableViews,
-    renderHeatmap,
+    heatmapPoints,
 }: Props<T>) => {
+    console.log(heatmapPoints);
     const views = React.useMemo(() => (availableViews && availableViews.length ? availableViews : (['graph', 'table'] as const)), [availableViews]) as Array<'graph' | 'table' | 'heatmap'>;
 
     const [currentView, setCurrentView] = React.useState<typeof views[number]>(views[0]);
@@ -86,11 +88,13 @@ const BreakdownAnalyticsView = <T,>({
                     </BarChart>
                 </ChartContainer>
             ) : currentView === 'heatmap' ? (
-                renderHeatmap ? (
-                    <div className={className}>{renderHeatmap(data)}</div>
-                ) : (
-                    <div className='text-sm text-muted-foreground p-4'>No heatmap renderer provided.</div>
-                )
+                <>
+                    {heatmapPoints ? (
+                        <HeatmapMap points={heatmapPoints} />
+                    ) : (
+                        <p>No heatmap data available.</p>
+                    )}
+                </>
             ) : (
                 <DataTable columns={columns} data={data} />
             )}

@@ -6,6 +6,8 @@ import { useMemo } from 'react';
 import { ChartConfig } from '@/components/ui/chart';
 import BreakdownAnalyticsView from './partials/BreakdownAnalyticsView';
 import { ColumnDef } from '@tanstack/react-table';
+import { getLatLng } from '@/lib/cities';
+import { HeatPoint } from './partials/HeatmapMap';
 
 type BreakDownAnalytics = {
     total_orders: number;
@@ -35,13 +37,31 @@ type Props = {
         returned_amount: number;
         tracked_orders: number;
         sent_parcel_journey_notifications: number;
-        grouped_rts_stats_by_page: Array<PerPageBreakDownAnalytics>;
-        grouped_rts_stats_by_users: Array<PerUserBreakDownAnalytics>;
-        grouped_rts_stats_by_cities: Array<PerCityBreakDownAnalytics>;
+        grouped_rts_stats_by_page: PerPageBreakDownAnalytics[];
+        grouped_rts_stats_by_users: PerUserBreakDownAnalytics[];
+        grouped_rts_stats_by_cities: PerCityBreakDownAnalytics[];
     }
 }
 
 const Analytics = ({ workspace, data }: Props) => {
+    const heatmapPoints: HeatPoint[] = useMemo(() => {
+        return data.grouped_rts_stats_by_cities
+            .map((city) => {
+                const latLng = getLatLng(city.city_name);
+                if (!latLng) return null;
+                const coordinates = {
+                    lat: latLng.lat,
+                    lng: latLng.lng,
+                };
+                return {
+                    coordinates,
+                    value: city.rts_rate_percentage,
+                };
+            })
+            .filter((p): p is HeatPoint => p !== null);
+    }, [data.grouped_rts_stats_by_cities]);
+
+
     const analytics = useMemo(() => {
         return [
             { title: 'RTS Rate', value: `${data.rts_rate_percentage}%` },
@@ -196,6 +216,7 @@ const Analytics = ({ workspace, data }: Props) => {
                             className="max-h-[400px] w-full"
                             data={data.grouped_rts_stats_by_cities}
                             title="Breakdown per Cities"
+                            heatmapPoints={heatmapPoints}
                         />
                     </div>
                 </div>
