@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
 import { Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
-import { CreateTeamDialog } from '@/components/teams/create-team-dialog';
-import { EditTeamDialog } from '@/components/teams/edit-team-dialog';
+import { TeamFormDialog } from '@/components/teams/team-form-dialog';
 import { DeleteTeamDialog } from '@/components/teams/delete-team-dialog';
 
 interface User {
@@ -176,7 +175,7 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                     </div>
 
                     {isAdmin && (
-                        <CreateTeamDialog
+                        <TeamFormDialog
                             workspaceSlug={workspace.slug}
                             workspaceMembers={workspaceMembers}
                             open={createDialogOpen}
@@ -240,12 +239,13 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                 )}
             </div>
 
-            {/* Edit Dialog */}
-            <EditTeamDialog
+            {/* Edit Dialog - uses same TeamFormDialog with team prop */}
+            <TeamFormDialog
                 workspaceSlug={workspace.slug}
                 workspaceMembers={workspaceMembers}
+                open={!!editingTeam}
+                onOpenChange={(open) => !open && setEditingTeam(null)}
                 team={editingTeam}
-                onClose={() => setEditingTeam(null)}
             />
 
             {/* Delete Confirmation Dialog */}
