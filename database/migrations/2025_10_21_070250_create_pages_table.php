@@ -23,7 +23,6 @@ return new class extends Migration
             $table->text('infotxt_token')->nullable();
             $table->string('infotxt_user_id')->nullable();
             $table->dateTime('orders_last_synced_at')->nullable();
-             $table->timestamp('archived_at')->nullable()->after('orders_last_synced_at');
             $table->timestamps();
 
             $table->foreign('workspace_id')
