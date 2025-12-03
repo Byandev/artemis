@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\Page;
 use App\Models\ParcelJourney;
 use App\Models\ParcelJourneyNotification;
+use App\Models\ShippingAddress;
 use App\Models\Shop;
 use App\Models\User;
 use App\Models\Workspace;
@@ -101,6 +102,19 @@ class RTSAnalyticsSeeder extends Seeder
                 'shipped_at' => now()->subDays(rand(11, 25)),
                 'tracking_code' => $status === 3 ? 'TRK'.Str::upper(Str::random(8)) : null,
                 'parcel_status' => $status === 3 ? 'delivered' : ($status === 4 ? 'returned' : 'rts'),
+            ]);
+
+            // Create a shipping address for the order
+            ShippingAddress::firstOrCreate([
+                'order_id' => $order->id,
+            ], [
+                'province_name' => 'Province '.rand(1, 10),
+                'district_name' => 'District '.rand(1, 20),
+                'commune_name' => 'Commune '.rand(1, 50),
+                'address' => 'Street '.rand(1, 200),
+                'full_address' => 'Street '.rand(1, 200).', District '.rand(1, 20).', Province '.rand(1, 10),
+                'full_name' => 'Customer '.$i,
+                'phone_number' => '080'.rand(10000000, 99999999),
             ]);
 
             $orders[] = $order;

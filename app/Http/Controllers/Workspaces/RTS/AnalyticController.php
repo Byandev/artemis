@@ -50,6 +50,7 @@ class AnalyticController extends Controller
             ->groupBy('orders.page_id', 'pages.name')
             ->get();
 
+        // Grouped by Users
         $groupedRtsStatsByUsers = Order::selectRaw('
             users.name AS user_name,
             SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
@@ -67,6 +68,23 @@ class AnalyticController extends Controller
             ->groupBy('pages.owner_id', 'users.name')
             ->get();
 
+        // Grouped by Cities (uses shipping_addresses.province_name as city)
+        $groupedRtsStatsByCities = Order::selectRaw('
+            shipping_addresses.province_name AS city_name,
+            SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
+            SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
+            SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
+            ROUND(
+                (SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
+                NULLIF(SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
+                2
+            ) AS rts_rate_percentage
+        ')
+            ->leftJoin('shipping_addresses', 'shipping_addresses.order_id', '=', 'orders.id')
+            ->where('orders.workspace_id', $workspace->id)
+            ->groupBy('shipping_addresses.province_name')
+            ->get();
+
         return Inertia::render('workspaces/rts/analytics', [
             'workspace' => $workspace,
             'data' => [
@@ -78,6 +96,7 @@ class AnalyticController extends Controller
                 'sent_parcel_journey_notifications' => $sent_parcel_journey_notifications,
                 'grouped_rts_stats_by_page' => $groupedRtsStatsByPage,
                 'grouped_rts_stats_by_users' => $groupedRtsStatsByUsers,
+                'grouped_rts_stats_by_cities' => $groupedRtsStatsByCities,
             ],
         ]);
     }
