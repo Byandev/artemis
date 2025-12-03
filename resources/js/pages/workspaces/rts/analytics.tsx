@@ -177,7 +177,7 @@ const Analytics = ({ workspace, data }: Props) => {
                             </CardHeader>
                             <CardContent className="p-0">
                                 <div>
-                                    <span className="text-2xl md:text-3xl font-extrabold text-black">
+                                    <span className="text-2xl md:text-3xl font-extrabold">
                                         {typeof data.value === 'number'
                                             ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data.value)
                                             : data.value}

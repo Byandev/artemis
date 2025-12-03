@@ -50,7 +50,7 @@ const BreakdownAnalyticsView = <T,>({
     return (
         <div className='border rounded-xl p-6 shadow-sm'>
             <div className='flex justify-between items-center mb-4'>
-                <h2 className='text-lg font-medium mb-2'>{title}</h2>
+                <h2 className='text-xl md:text-2xl font-bold'>{title}</h2>
                 <div className='flex gap-2'>
                     <Button>Export</Button>
 
