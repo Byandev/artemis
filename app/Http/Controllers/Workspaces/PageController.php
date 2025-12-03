@@ -25,29 +25,25 @@ class PageController extends Controller
         }
 
         $query = Page::ofWorkspace($workspace)
-            ->with(['shop', 'owner']);
-
-        // Filter by archive status
-        if ($request->get('status') === 'archived') {
-            $query->archived();
-        } else {
-            $query->active();
-        }
-
-        // Filter by owner
-        if ($request->filled('owner_id')) {
-            $query->where('owner_id', $request->get('owner_id'));
-        }
-
-        // Filter by shop (product)
-        if ($request->filled('shop_id')) {
-            $query->where('shop_id', $request->get('shop_id'));
-        }
-
-        // Search by name
-        if ($request->filled('search')) {
-            $query->where('name', 'like', '%' . $request->get('search') . '%');
-        }
+            ->with(['shop', 'owner'])
+            // Filter by archive status
+            ->when($request->get('status') === 'archived', function ($q) {
+                $q->archived();
+            }, function ($q) {
+                $q->active();
+            })
+            // Filter by owner
+            ->when($request->filled('owner_id'), function ($q) use ($request) {
+                $q->where('owner_id', $request->get('owner_id'));
+            })
+            // Filter by shop (product)
+            ->when($request->filled('shop_id'), function ($q) use ($request) {
+                $q->where('shop_id', $request->get('shop_id'));
+            })
+            // Search by name
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->get('search') . '%');
+            });
 
         // Sorting
         $sortField = $request->get('sort', 'name');

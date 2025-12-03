@@ -6,15 +6,15 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Page extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     public $guarded = [];
 
     protected $casts = [
-        'archived_at' => 'datetime',
         'orders_last_synced_at' => 'datetime',
     ];
 
@@ -40,26 +40,21 @@ class Page extends Model
 
     public function scopeActive(Builder $builder): Builder
     {
-        return $builder->whereNull('archived_at');
+        return $builder->whereNull('deleted_at');
     }
 
     public function scopeArchived(Builder $builder): Builder
     {
-        return $builder->whereNotNull('archived_at');
+        return $builder->onlyTrashed();
     }
 
     public function isArchived(): bool
     {
-        return $this->archived_at !== null;
+        return $this->trashed();
     }
 
     public function archive(): void
     {
-        $this->update(['archived_at' => now()]);
-    }
-
-    public function restore(): void
-    {
-        $this->update(['archived_at' => null]);
+        $this->delete();
     }
 }
