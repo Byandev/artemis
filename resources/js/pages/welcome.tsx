@@ -45,7 +45,7 @@ export default function Welcome() {
                         <img 
                             src="/img/logo/artemis.png" 
                             alt="Artemis Logo" 
-                            className="w-48 h-48 object-contain"
+                            className="w-70 h-70 object-contain"
                         />
                     </div>
 
