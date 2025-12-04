@@ -2,15 +2,19 @@ import AppLayout from '@/layouts/app-layout';
 import RtsNavigation from '@/pages/workspaces/rts/partials/RtsNavigation';
 import { Workspace } from '@/types/models/Workspace';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChartConfig } from '@/components/ui/chart';
 import BreakdownAnalyticsView from './partials/BreakdownAnalyticsView';
 import { ColumnDef } from '@tanstack/react-table';
 import { getLatLng } from '@/lib/cities';
 import { HeatPoint } from './partials/HeatmapMap';
-import { FilterIcon, Ghost } from 'lucide-react';
+import { FilterIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import SearchSelect from './partials/SearchSelect';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { router } from '@inertiajs/react';
+import workspaces from '@/routes/workspaces';
 
 type BreakDownAnalytics = {
     rts_rate_percentage_orders: number;
@@ -47,6 +51,20 @@ type Props = {
 }
 
 const Analytics = ({ workspace, data }: Props) => {
+    const [selectedPagesFilter, setSelectedPagesFilter] = useState<string[]>([]);
+
+    useEffect(() => {
+        // Don't trigger a request when there are no selected pages
+        if (selectedPagesFilter.length === 0) return;
+
+        // Use mergeQuery so other existing query params are preserved
+        const options = { mergeQuery: { pages: selectedPagesFilter } } as const;
+
+        const url = workspaces.rts.analytics.url(workspace, options as any);
+
+        router.get(url, { preserveState: true, preserveScroll: true, replace: true });
+    }, [selectedPagesFilter, workspace, workspace.slug]);
+
     const heatmapPoints: HeatPoint[] = useMemo(() => {
         return data.grouped_rts_stats_by_cities
             .map((city) => {
@@ -177,7 +195,51 @@ const Analytics = ({ workspace, data }: Props) => {
                                         Filter</Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-72 p-3">
-
+                                    <Accordion
+                                        type="single"
+                                        collapsible
+                                        className="w-full"
+                                        defaultValue="item-1"
+                                    >
+                                        <AccordionItem value="item-1">
+                                            <AccordionTrigger>Page</AccordionTrigger>
+                                            <AccordionContent className="flex flex-col gap-4 text-balance">
+                                                <SearchSelect
+                                                    items={data.grouped_rts_stats_by_page.map((p) => p.page_name)}
+                                                    selected={selectedPagesFilter}
+                                                    setSelected={setSelectedPagesFilter}
+                                                />
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                        <AccordionItem value="item-2">
+                                            <AccordionTrigger>User</AccordionTrigger>
+                                            <AccordionContent className="flex flex-col gap-4 text-balance">
+                                                <p>
+                                                    We offer worldwide shipping through trusted courier partners.
+                                                    Standard delivery takes 3-5 business days, while express shipping
+                                                    ensures delivery within 1-2 business days.
+                                                </p>
+                                                <p>
+                                                    All orders are carefully packaged and fully insured. Track your
+                                                    shipment in real-time through our dedicated tracking portal.
+                                                </p>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                        <AccordionItem value="item-2">
+                                            <AccordionTrigger>Shop</AccordionTrigger>
+                                            <AccordionContent className="flex flex-col gap-4 text-balance">
+                                                <p>
+                                                    We offer worldwide shipping through trusted courier partners.
+                                                    Standard delivery takes 3-5 business days, while express shipping
+                                                    ensures delivery within 1-2 business days.
+                                                </p>
+                                                <p>
+                                                    All orders are carefully packaged and fully insured. Track your
+                                                    shipment in real-time through our dedicated tracking portal.
+                                                </p>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                    </Accordion>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
