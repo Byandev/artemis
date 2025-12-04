@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Head, router, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { DataTable } from '@/components/ui/data-table';
@@ -18,7 +18,8 @@ import {
     ArrowUpDown,
     ArrowUp,
     ArrowDown,
-    X
+    X,
+    Loader2
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -87,8 +88,35 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
     const [selectedPage, setSelectedPage] = useState<Page | undefined>(undefined);
     const [pageToArchive, setPageToArchive] = useState<Page | null>(null);
     const [searchValue, setSearchValue] = useState(filters.search);
+    const [isSearching, setIsSearching] = useState(false);
 
     const { post, processing } = useForm({});
+
+    // Debounced search - automatically search after user stops typing
+    const debouncedSearch = useCallback((value: string) => {
+        setIsSearching(true);
+        router.get(
+            workspaces.pages.index.url({ workspace }),
+            { ...filters, search: value, page: 1 },
+            { 
+                preserveState: true, 
+                preserveScroll: true,
+                onFinish: () => setIsSearching(false),
+            }
+        );
+    }, [filters, workspace]);
+
+    useEffect(() => {
+        // Don't search on initial mount if search value matches filter
+        if (searchValue === filters.search) return;
+
+        const timer = setTimeout(() => {
+            debouncedSearch(searchValue);
+        }, 300);
+
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchValue]);
 
     const handleEdit = (page: Page) => {
         setSelectedPage(page);
@@ -118,14 +146,14 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
         );
     };
 
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        handleFilter('search', searchValue);
-    };
-
     const clearSearch = () => {
         setSearchValue('');
-        handleFilter('search', '');
+        // Immediately trigger search with empty value
+        router.get(
+            workspaces.pages.index.url({ workspace }),
+            { ...filters, search: '', page: 1 },
+            { preserveState: true, preserveScroll: true }
+        );
     };
 
     const handleSort = (field: string) => {
@@ -206,7 +234,8 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
             accessorKey: 'status',
             header: 'Status',
             cell: ({ row }) => {
-                const isArchived = row.original.archived_at !== null;
+                // When using SoftDeletes, trashed records have deleted_at set
+                const isArchived = row.original.deleted_at !== null;
                 return (
                     <Badge variant={isArchived ? 'secondary' : 'default'}>
                         {isArchived ? 'Archived' : 'Active'}
@@ -218,7 +247,8 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
             id: 'actions',
             cell: ({ row }) => {
                 const page = row.original;
-                const isArchived = page.archived_at !== null;
+                // When using SoftDeletes, trashed records have deleted_at set
+                const isArchived = page.deleted_at !== null;
 
                 return (
                     <DropdownMenu>
@@ -299,30 +329,30 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
                 {/* Filters */}
                 <div className="mb-4 flex flex-wrap gap-4">
                     {/* Search */}
-                    <form onSubmit={handleSearch} className="flex gap-2">
-                        <div className="relative">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                type="text"
-                                placeholder="Search by name..."
-                                value={searchValue}
-                                onChange={(e) => setSearchValue(e.target.value)}
-                                className="pl-8 w-[200px]"
-                            />
-                            {searchValue && (
-                                <button
-                                    type="button"
-                                    onClick={clearSearch}
-                                    className="absolute right-2.5 top-2.5"
-                                >
-                                    <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                                </button>
-                            )}
-                        </div>
-                        <Button type="submit" size="sm" variant="secondary">
-                            Search
-                        </Button>
-                    </form>
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            type="text"
+                            placeholder="Search by name..."
+                            value={searchValue}
+                            onChange={(e) => setSearchValue(e.target.value)}
+                            className="pl-8 w-[200px]"
+                        />
+                        {(searchValue || isSearching) && (
+                            <span className="absolute right-2.5 top-2.5">
+                                {isSearching ? (
+                                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={clearSearch}
+                                    >
+                                        <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                                    </button>
+                                )}
+                            </span>
+                        )}
+                    </div>
 
                     {/* Filter by Owner */}
                     <Select
@@ -374,12 +404,16 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
                     <DataTable columns={columns} data={pages.data || []} />
                 </div>
 
-                {/* Pagination */}
-                {pages.last_page > 1 && (
-                    <div className="mt-4 flex items-center justify-between">
-                        <div className="text-sm text-muted-foreground">
-                            Showing {pages.from} to {pages.to} of {pages.total} results
-                        </div>
+                {/* Pagination - always show results count */}
+                <div className="mt-4 flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">
+                        {pages.total > 0 ? (
+                            <>Showing {pages.from} to {pages.to} of {pages.total} results</>
+                        ) : (
+                            <>No results found</>
+                        )}
+                    </div>
+                    {pages.last_page > 1 && (
                         <div className="flex gap-2">
                             {pages.links.map((link, index) => (
                                 <Button
@@ -396,8 +430,8 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
                                 />
                             ))}
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
 
                 {/* Page Form Dialog */}
                 <PageFormDialog

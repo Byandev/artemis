@@ -13,7 +13,7 @@ export interface Page {
     infotxt_token?: string;
     infotxt_user_id?: string;
     orders_last_synced_at: string;
-    archived_at: string | null;
+    deleted_at: string | null; // SoftDeletes column
 
     shop?: Shop;
     owner?: User;
