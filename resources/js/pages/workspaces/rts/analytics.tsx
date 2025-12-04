@@ -71,7 +71,7 @@ const Analytics = ({ workspace, data }: Props) => {
 
     const [open, setOpen] = useState(false)
     const [date, setDate] = useState<Date | undefined>(
-        new Date("2025-06-01")
+        new Date()
     )
     const [month, setMonth] = useState<Date | undefined>(date)
     const [value, setValue] = useState(formatDate(date))
@@ -250,13 +250,13 @@ const Analytics = ({ workspace, data }: Props) => {
                                         <FilterIcon className='mr-2 h-4 w-4' />
                                         Filter</Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-72 p-3">
+                                <DropdownMenuContent align="end" className="w-54 p-3">
                                     <Accordion
                                         type="multiple"
                                         className="w-full"
                                     >
                                         <AccordionItem value="item-1">
-                                            <AccordionTrigger>Page</AccordionTrigger>
+                                            <AccordionTrigger className='py-2'>Page</AccordionTrigger>
                                             <AccordionContent className="flex flex-col gap-4 text-balance">
                                                 <SearchSelect
                                                     items={data.grouped_rts_stats_by_page.map((page) => ({
@@ -269,7 +269,7 @@ const Analytics = ({ workspace, data }: Props) => {
                                             </AccordionContent>
                                         </AccordionItem>
                                         <AccordionItem value="item-2">
-                                            <AccordionTrigger>User</AccordionTrigger>
+                                            <AccordionTrigger className='py-2'>User</AccordionTrigger>
                                             <AccordionContent className="flex flex-col gap-4 text-balance">
                                                 <SearchSelect
                                                     items={data.grouped_rts_stats_by_users.map((user) => ({
@@ -282,7 +282,7 @@ const Analytics = ({ workspace, data }: Props) => {
                                             </AccordionContent>
                                         </AccordionItem>
                                         <AccordionItem value="item-3">
-                                            <AccordionTrigger>Shop</AccordionTrigger>
+                                            <AccordionTrigger className='py-2'>Shop</AccordionTrigger>
                                             <AccordionContent className="flex flex-col gap-4 text-balance">
                                                 <SearchSelect
                                                     items={data.grouped_rts_stats_by_cities.map((city) => ({
@@ -297,7 +297,6 @@ const Analytics = ({ workspace, data }: Props) => {
                                     </Accordion>
                                 </DropdownMenuContent>
                             </DropdownMenu>
-
 
                             <div className="flex flex-col gap-3">
                                 <div className="relative flex gap-2">
