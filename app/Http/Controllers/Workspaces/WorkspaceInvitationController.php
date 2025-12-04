@@ -101,6 +101,17 @@ class WorkspaceInvitationController extends Controller
 
         // Check if invitation is valid
         if (! $invitation->isValid()) {
+            // If the invitation was accepted but the current authenticated user
+            // is the invitee, show the acceptance page (with an `accepted` flag)
+            // so they can see the success state after accepting.
+            if ($invitation->isAccepted() && $request->user() && $request->user()->email === $invitation->email) {
+                return Inertia::render('workspaces/invitation-accept', [
+                    'invitation' => $invitation,
+                    'isAuthenticated' => true,
+                    'accepted' => true,
+                ]);
+            }
+
             return Inertia::render('workspaces/invitation-invalid', [
                 'invitation' => $invitation,
                 'reason' => $invitation->isExpired() ? 'expired' : 'accepted',
@@ -124,6 +135,13 @@ class WorkspaceInvitationController extends Controller
 
         // Check if invitation is valid
         if (! $invitation->isValid()) {
+            // If invitation was already accepted by the current authenticated user,
+            // send them to the invitation page so they can see the accepted state.
+            if ($invitation->isAccepted() && $request->user() && strcasecmp($request->user()->email, $invitation->email) === 0) {
+                return redirect()->to("/workspaces/invitations/{$token}")
+                    ->with('success', 'You have already joined the workspace!');
+            }
+
             return back()->withErrors(['error' => 'This invitation is no longer valid.']);
         }
 
@@ -133,8 +151,8 @@ class WorkspaceInvitationController extends Controller
                 ->with('info', 'Please create an account or login to accept the invitation.');
         }
 
-        // Check if the authenticated user's email matches the invitation
-        if ($request->user()->email !== $invitation->email) {
+        // Check if the authenticated user's email matches the invitation (case-insensitive)
+        if (strcasecmp($request->user()->email, $invitation->email) !== 0) {
             return back()->withErrors(['error' => 'This invitation was sent to a different email address.']);
         }
 
@@ -148,7 +166,7 @@ class WorkspaceInvitationController extends Controller
             $invitation->markAsAccepted();
         });
 
-        return redirect()->route('workspaces.show', $invitation->workspace_id)
+        return redirect()->to("/workspaces/invitations/{$token}")
             ->with('success', 'You have successfully joined the workspace!');
     }
 

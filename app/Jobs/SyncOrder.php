@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Order;
 use App\Models\ParcelJourney;
 use App\Models\ParcelJourneyNotification;
+use App\Models\ParcelJourneyNotificationTemplate;
 use App\Models\ShippingAddress;
 use App\Models\Workspace;
 use Carbon\Carbon;
@@ -144,26 +145,31 @@ class SyncOrder implements ShouldQueue
             'delivery_attempts' => $deliveryAttempts,
             'first_delivery_attempt' => $first_delivery_attempt,
         ]);
-
     }
 
     private function sendParcelJourneyNotification(Order $order, ParcelJourney $parcelJourney): void
     {
         $order->loadMissing(['shippingAddress', 'page']);
         [$page, $psid] = explode('_', $order->fb_id);
-
         $date = Carbon::parse($parcelJourney->created_at)->format('F d');
+
+        $data = [
+            'date' => $date,
+            'page_name' => $order->page->name,
+            'customer_name' => $order->shippingAddress->full_name,
+            'tracking_code' => $order->tracking_code,
+            'shipping_address' => $order->shippingAddress->full_address,
+        ];
 
         if ($parcelJourney->status === 'Departure') {
             preg_match_all('/【(.*?)】/', $parcelJourney->note, $matches);
 
             $nextLocation = $matches[1][1];
-            $message = "{$order->shippingAddress->full_name}, update lang po sa parcel nyo from JNT.\n\nAs of {$date}, papunta na po ito sa {$nextLocation}.\nDadaan muna ito sa warehouse na ito bilang bahagi ng ruta papunta sa inyong address: {$order->shippingAddress->full_address}.\n\nMaraming salamat sa tiwala!\n\n{$order->page->name}";
-
+            $data['next_location'] = $nextLocation;
             ParcelJourneyNotification::create([
                 'order_id' => $order->id,
                 'parcel_journey_id' => $parcelJourney->id,
-                'message' => $message,
+                'message' => $this->renderMessage('sms', 'departure', 'customer', $data),
                 'type' => 'sms',
                 'receiver_name' => $order->shippingAddress->full_name,
                 'receiver_identity' => $order->shippingAddress->phone_number,
@@ -172,7 +178,7 @@ class SyncOrder implements ShouldQueue
             ParcelJourneyNotification::create([
                 'order_id' => $order->id,
                 'parcel_journey_id' => $parcelJourney->id,
-                'message' => $message,
+                'message' => $this->renderMessage('chat', 'departure', 'customer', $data),
                 'type' => 'chat',
                 'receiver_name' => $order->shippingAddress->full_name,
                 'receiver_identity' => $psid,
@@ -182,12 +188,12 @@ class SyncOrder implements ShouldQueue
         if ($parcelJourney->status === 'Arrival') {
             preg_match_all('/【(.*?)】/', $parcelJourney->note, $matches);
             $currentLocation = $matches[1][0];
-            $message = "{$order->shippingAddress->full_name}, update lang po sa parcel nyo from JNT.\n\nAs of {$date}, nakarating na po ito sa {$currentLocation}.\nDadaan muna ito sa warehouse na ito bilang bahagi ng ruta papunta sa inyong address: {$order->shippingAddress->full_address}.\n\nMaraming salamat sa tiwala!\n\n{$order->page->name}";
+            $data['current_location'] = $currentLocation;
 
             ParcelJourneyNotification::create([
                 'order_id' => $order->id,
                 'parcel_journey_id' => $parcelJourney->id,
-                'message' => $message,
+                'message' => $this->renderMessage('sms', 'arrival', 'customer', $data),
                 'type' => 'sms',
                 'receiver_name' => $order->shippingAddress->full_name,
                 'receiver_identity' => $order->shippingAddress->phone_number,
@@ -196,7 +202,7 @@ class SyncOrder implements ShouldQueue
             ParcelJourneyNotification::create([
                 'order_id' => $order->id,
                 'parcel_journey_id' => $parcelJourney->id,
-                'message' => $message,
+                'message' => $this->renderMessage('chat', 'arrival', 'customer', $data),
                 'type' => 'chat',
                 'receiver_name' => $order->shippingAddress->full_name,
                 'receiver_identity' => $psid,
@@ -214,13 +220,13 @@ class SyncOrder implements ShouldQueue
                 $last10 = substr(preg_replace('/\D/', '', $mobile), -10);
 
                 $rider_mobile = "0{$last10}";
-                $rider_message = "Boss $rider_name, Ito po ang seller ng parcel na may tracking no. {$order->tracking_code}.\nPakiusap po, ingatan at siguraduhing maideliver agad ito kay {$order->shippingAddress->full_name}.\nMatagal na pong hinihintay ito at kailangan na kailangan na po talaga ngayon.\n\nNabanggit din po ng customer na mahina ang signal sa kanilang lugar, kaya kung hindi po matawagan, pakideliver na lang po direkta — siguradong tatanggapin daw po nila.\nNakahanda na rin po ang bayad.\n\nSalamat po sa inyong pag-unawa at ingat po kayo palagi sa biyahe!";
-                $receiver_message = "{$order->shippingAddress->full_name}. Padating na po ang order nyo mula sa {$order->page->name}. Siguraduhing matatawagan po ang cp nyo ng rider. Paki-ready nalang po ng pang bayad.\n Parcel Tracking No. {$order->tracking_code}\n Rider Name: $rider_name\nRider No: $rider_mobile";
+                $data['rider_name'] = $rider_name;
+                $data['rider_mobile'] = $rider_mobile;
 
                 ParcelJourneyNotification::create([
                     'order_id' => $order->id,
                     'parcel_journey_id' => $parcelJourney->id,
-                    'message' => $rider_message,
+                    'message' => $this->renderMessage('sms', 'for-delivery', 'rider', $data),
                     'type' => 'sms',
                     'receiver_name' => $rider_name,
                     'receiver_identity' => $rider_mobile,
@@ -231,7 +237,7 @@ class SyncOrder implements ShouldQueue
                 ParcelJourneyNotification::create([
                     'order_id' => $order->id,
                     'parcel_journey_id' => $parcelJourney->id,
-                    'message' => $receiver_message,
+                    'message' => $this->renderMessage('sms', 'for-delivery', 'customer', $data),
                     'type' => 'sms',
                     'receiver_name' => $order->shippingAddress->full_name,
                     'receiver_identity' => $order->shippingAddress->phone_number,
@@ -240,12 +246,43 @@ class SyncOrder implements ShouldQueue
                 ParcelJourneyNotification::create([
                     'order_id' => $order->id,
                     'parcel_journey_id' => $parcelJourney->id,
-                    'message' => $message,
+                    'message' => $this->renderMessage('chat', 'for-delivery', 'customer', $data),
                     'type' => 'chat',
                     'receiver_name' => $order->shippingAddress->full_name,
                     'receiver_identity' => $psid,
                 ]);
             }
         }
+    }
+
+    protected function getTemplateFor($type, $activity, $receiver)
+    {
+        $savedTemplate = $this->workspace->parcelJourneyNotificationTemplates()
+            ->where('type', $type)
+            ->where('receiver', $receiver)
+            ->where('activity', $activity)
+            ->first();
+
+        if ($savedTemplate) {
+            return $savedTemplate->message;
+        }
+
+        return ParcelJourneyNotificationTemplate::defaults()->where('type', $type)->where('type', $type)
+            ->where('receiver', $receiver)
+            ->where('activity', $activity)
+            ->first()
+            ?->message ?? '';
+    }
+
+    protected function renderMessage($type, $activity, $receiver, array $data): string
+    {
+        $template = $this->getTemplateFor($type, $activity, $receiver);
+
+        return preg_replace_callback('/{{\s*(\w+)\s*}}/', function ($matches) use ($data) {
+            $key = $matches[1]; // the variable name inside {{}}
+
+            // Return the value if it exists, otherwise keep the original {{variable}}
+            return array_key_exists($key, $data) ? (string) $data[$key] : $matches[0];
+        }, $template);
     }
 }

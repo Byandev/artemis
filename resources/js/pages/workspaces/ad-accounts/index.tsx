@@ -18,7 +18,6 @@ const FacebookAccounts = ({
     workspace,
 }: AdAccountsProps) => {
     const { auth } = usePage<SharedData>().props;
-    console.log(ad_accounts.data[0])
 
     const columns: ColumnDef<AdAccount>[] = [
         {
