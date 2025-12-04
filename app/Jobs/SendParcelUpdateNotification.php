@@ -23,9 +23,11 @@ class SendParcelUpdateNotification implements ShouldQueue
      */
     public function handle(): void
     {
-        $this->parcelJourneyNotification->load('order.page');
+        if (! app()->environment('production')) {
+            return;
+        }
 
-        return;
+        $this->parcelJourneyNotification->load('order.page');
 
         if ($this->parcelJourneyNotification->type === 'sms') {
             $response = Http::get('https://api.myinfotxt.com/v2/send.php', [
@@ -51,23 +53,35 @@ class SendParcelUpdateNotification implements ShouldQueue
 
         } elseif ($this->parcelJourneyNotification->type === 'chat') {
             $pageId = $this->parcelJourneyNotification->order->page->id;
+            $convoId = $this->parcelJourneyNotification->order->fb_id;
 
-            $response = Http::withHeaders(['access-token' => $this->parcelJourneyNotification->order->page->botcake_token])
-                ->post("https://botcake.io/api/public_api/v1/pages/$pageId/flows/send_content", [
-                    'psid' => $this->parcelJourneyNotification->receiver_identity,
-                    'message_tag' => 'POST_PURCHASE_UPDATE',
-                    'data' => [
-                        'version' => 'v2',
-                        'content' => [
-                            'messages' => [
-                                [
-                                    'type' => 'text',
-                                    'text' => $this->parcelJourneyNotification->message,
+            $usingPancake = (bool) $this->parcelJourneyNotification->order->page->pancake_token;
+
+            if ($usingPancake) {
+                $pancakeToken = $this->parcelJourneyNotification->order->page->pancake_token;
+
+                $response = Http::post("https://pages.fm/api/public_api/v1/pages/$pageId/conversations/$convoId/messages?page_access_token=$pancakeToken", [
+                    'action' => 'reply_inbox',
+                    'message' => $this->parcelJourneyNotification->message,
+                ]);
+            } else {
+                $response = Http::withHeaders(['access-token' => $this->parcelJourneyNotification->order->page->botcake_token])
+                    ->post("https://botcake.io/api/public_api/v1/pages/$pageId/flows/send_content", [
+                        'psid' => $this->parcelJourneyNotification->receiver_identity,
+                        'message_tag' => 'POST_PURCHASE_UPDATE',
+                        'data' => [
+                            'version' => 'v2',
+                            'content' => [
+                                'messages' => [
+                                    [
+                                        'type' => 'text',
+                                        'text' => $this->parcelJourneyNotification->message,
+                                    ],
                                 ],
                             ],
                         ],
-                    ],
-                ]);
+                    ]);
+            }
 
             if ($response->ok()) {
                 $response = $response->json();

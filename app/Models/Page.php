@@ -2,12 +2,21 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Page extends Model
 {
+    use HasFactory, SoftDeletes;
+
     public $guarded = [];
+
+    protected $casts = [
+        'orders_last_synced_at' => 'datetime',
+    ];
 
     public function workspace(): BelongsTo
     {
@@ -19,8 +28,34 @@ class Page extends Model
         return $this->belongsTo(Shop::class);
     }
 
-    public function scopeOfWorkspace($builder, Workspace $workspace)
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    public function scopeOfWorkspace(Builder $builder, Workspace $workspace): Builder
     {
         return $builder->where('workspace_id', $workspace->id);
+    }
+
+    // SoftDeletes automatically excludes trashed records, so scopeActive is just an alias
+    public function scopeActive(Builder $builder): Builder
+    {
+        return $builder->withoutTrashed();
+    }
+
+    public function scopeArchived(Builder $builder): Builder
+    {
+        return $builder->onlyTrashed();
+    }
+
+    public function isArchived(): bool
+    {
+        return $this->trashed();
+    }
+
+    public function archive(): void
+    {
+        $this->delete();
     }
 }
