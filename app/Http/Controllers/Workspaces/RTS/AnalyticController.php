@@ -12,7 +12,7 @@ class AnalyticController extends Controller
 {
     public function index(Workspace $workspace)
     {
-        $pageNames = request()->query('pages', []);
+
         $rtsStats = Order::selectRaw('
             ROUND(
                 (SUM(CASE WHEN status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
@@ -24,9 +24,6 @@ class AnalyticController extends Controller
             SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) AS delivered_count
         ')
             ->where('workspace_id', $workspace->id)
-            ->when($pageNames, fn ($q) => $q->whereHas('page', fn ($p) => $p->whereIn('name', $pageNames)
-            )
-            )
             ->first();
 
         $tracked_orders = Order::where('workspace_id', $workspace->id)
@@ -39,7 +36,8 @@ class AnalyticController extends Controller
 
         // Grouped by Page
         $groupedRtsStatsByPage = Order::selectRaw('
-            pages.name AS page_name,
+            pages.id AS id,
+            pages.name AS name,
             SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
             SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
             SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
@@ -51,12 +49,13 @@ class AnalyticController extends Controller
         ')
             ->leftJoin('pages', 'pages.id', '=', 'orders.page_id')
             ->where('orders.workspace_id', $workspace->id)
-            ->groupBy('orders.page_id', 'pages.name')
+            ->groupBy('orders.page_id', 'pages.name', 'pages.id')
             ->get();
 
         // Grouped by Users
         $groupedRtsStatsByUsers = Order::selectRaw('
-            users.name AS user_name,
+            users.id AS id,
+            users.name AS name,
             SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
             SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
             SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
@@ -69,12 +68,13 @@ class AnalyticController extends Controller
             ->leftJoin('pages', 'pages.id', '=', 'orders.page_id')
             ->leftJoin('users', 'users.id', '=', 'pages.owner_id')
             ->where('orders.workspace_id', $workspace->id)
-            ->groupBy('pages.owner_id', 'users.name')
+            ->groupBy('pages.owner_id', 'users.name', 'users.id')
             ->get();
 
-        // Grouped by Cities (uses shipping_addresses.district_name as city)
+        // Grouped by Cities
         $groupedRtsStatsByCities = Order::selectRaw('
-            shipping_addresses.district_name AS city_name,
+            shipping_addresses.id AS id,
+            shipping_addresses.district_name AS name,
             SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
             SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
             SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
@@ -86,7 +86,7 @@ class AnalyticController extends Controller
         ')
             ->leftJoin('shipping_addresses', 'shipping_addresses.order_id', '=', 'orders.id')
             ->where('orders.workspace_id', $workspace->id)
-            ->groupBy('shipping_addresses.district_name')
+            ->groupBy('shipping_addresses.district_name', 'shipping_addresses.id')
             ->get();
 
         return Inertia::render('workspaces/rts/analytics', [
@@ -101,7 +101,6 @@ class AnalyticController extends Controller
                 'grouped_rts_stats_by_page' => $groupedRtsStatsByPage,
                 'grouped_rts_stats_by_users' => $groupedRtsStatsByUsers,
                 'grouped_rts_stats_by_cities' => $groupedRtsStatsByCities,
-                'page_names' => $pageNames,
             ],
         ]);
     }

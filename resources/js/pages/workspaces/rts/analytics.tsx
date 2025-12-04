@@ -17,22 +17,12 @@ import { router } from '@inertiajs/react';
 import workspaces from '@/routes/workspaces';
 
 type BreakDownAnalytics = {
+    id: number;
+    name: string;
     rts_rate_percentage_orders: number;
     rts_rate_percentage: number;
     returned_count: number;
     delivered_count: number;
-}
-
-interface PerPageBreakDownAnalytics extends BreakDownAnalytics {
-    page_name: string;
-}
-
-interface PerUserBreakDownAnalytics extends BreakDownAnalytics {
-    user_name: string;
-}
-
-interface PerCityBreakDownAnalytics extends BreakDownAnalytics {
-    city_name: string;
 }
 
 type Props = {
@@ -44,34 +34,40 @@ type Props = {
         returned_amount: number;
         tracked_orders: number;
         sent_parcel_journey_notifications: number;
-        grouped_rts_stats_by_page: PerPageBreakDownAnalytics[];
-        grouped_rts_stats_by_users: PerUserBreakDownAnalytics[];
-        grouped_rts_stats_by_cities: PerCityBreakDownAnalytics[];
+        grouped_rts_stats_by_page: BreakDownAnalytics[];
+        grouped_rts_stats_by_users: BreakDownAnalytics[];
+        grouped_rts_stats_by_cities: BreakDownAnalytics[];
     }
 }
 
 const Analytics = ({ workspace, data }: Props) => {
-    const [selectedPagesFilter, setSelectedPagesFilter] = useState<string[]>([]);
+    const [selectedPagesFilter, setSelectedPagesFilter] = useState<number[]>([]);
+    const [selectedUsersFilter, setSelectedUsersFilter] = useState<number[]>([]);
+    const [selectedCitiesFilter, setSelectedCitiesFilter] = useState<number[]>([]);
 
-    useEffect(() => {
-        if (selectedPagesFilter.length === 0) return;
+    // useEffect(() => {
+    //     if (selectedPagesFilter.length === 0) return;
 
-        router.get(
-            workspaces.rts.analytics.url(workspace),
-            {
-                pages: selectedPagesFilter,
-                preserveState: true,
-                preserveScroll: true,
-                replace: true
-            }
-        );
-    }, [selectedPagesFilter, workspace]);
+    //     router.get(
+    //         workspaces.rts.analytics.url(workspace),
+    //         {
+    //             page_ids: selectedPagesFilter,
+    //             user_ids: selectedUsersFilter,
+    //             city_ids: selectedCitiesFilter,
+    //         },
+    //         {
+    //             preserveState: true,
+    //             preserveScroll: true,
+    //             replace: true
+    //         }
+    //     );
+    // }, [selectedPagesFilter, workspace, data.grouped_rts_stats_by_page, selectedUsersFilter, selectedCitiesFilter]);
 
 
     const heatmapPoints: HeatPoint[] = useMemo(() => {
         return data.grouped_rts_stats_by_cities
             .map((city) => {
-                const latLng = getLatLng(city.city_name);
+                const latLng = getLatLng(city.name);
                 if (!latLng) return null;
                 const coordinates = {
                     lat: latLng.lat,
@@ -102,9 +98,9 @@ const Analytics = ({ workspace, data }: Props) => {
         },
     } satisfies ChartConfig;
 
-    const perPageColumns: ColumnDef<PerPageBreakDownAnalytics>[] = [
+    const perPageColumns: ColumnDef<BreakDownAnalytics>[] = [
         {
-            accessorKey: "page_name",
+            accessorKey: "name",
             header: "Page",
         },
         {
@@ -128,9 +124,9 @@ const Analytics = ({ workspace, data }: Props) => {
         },
     ];
 
-    const perUserColumns: ColumnDef<PerUserBreakDownAnalytics>[] = [
+    const perUserColumns: ColumnDef<BreakDownAnalytics>[] = [
         {
-            accessorKey: "user_name",
+            accessorKey: "name",
             header: "User",
         },
         {
@@ -154,9 +150,9 @@ const Analytics = ({ workspace, data }: Props) => {
         },
     ];
 
-    const perCityColumns: ColumnDef<PerCityBreakDownAnalytics>[] = [
+    const perCityColumns: ColumnDef<BreakDownAnalytics>[] = [
         {
-            accessorKey: "city_name",
+            accessorKey: "name",
             header: "City",
         },
         {
@@ -199,16 +195,17 @@ const Analytics = ({ workspace, data }: Props) => {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-72 p-3">
                                     <Accordion
-                                        type="single"
-                                        collapsible
+                                        type="multiple"
                                         className="w-full"
-                                        defaultValue="item-1"
                                     >
                                         <AccordionItem value="item-1">
                                             <AccordionTrigger>Page</AccordionTrigger>
                                             <AccordionContent className="flex flex-col gap-4 text-balance">
                                                 <SearchSelect
-                                                    items={data.grouped_rts_stats_by_page.map((p) => p.page_name)}
+                                                    items={data.grouped_rts_stats_by_page.map((page) => ({
+                                                        id: page.id,
+                                                        name: page.name,
+                                                    }))}
                                                     selected={selectedPagesFilter}
                                                     setSelected={setSelectedPagesFilter}
                                                 />
@@ -217,29 +214,27 @@ const Analytics = ({ workspace, data }: Props) => {
                                         <AccordionItem value="item-2">
                                             <AccordionTrigger>User</AccordionTrigger>
                                             <AccordionContent className="flex flex-col gap-4 text-balance">
-                                                <p>
-                                                    We offer worldwide shipping through trusted courier partners.
-                                                    Standard delivery takes 3-5 business days, while express shipping
-                                                    ensures delivery within 1-2 business days.
-                                                </p>
-                                                <p>
-                                                    All orders are carefully packaged and fully insured. Track your
-                                                    shipment in real-time through our dedicated tracking portal.
-                                                </p>
+                                                <SearchSelect
+                                                    items={data.grouped_rts_stats_by_users.map((user) => ({
+                                                        id: user.id,
+                                                        name: user.name,
+                                                    }))}
+                                                    selected={selectedUsersFilter}
+                                                    setSelected={setSelectedUsersFilter}
+                                                />
                                             </AccordionContent>
                                         </AccordionItem>
                                         <AccordionItem value="item-2">
                                             <AccordionTrigger>Shop</AccordionTrigger>
                                             <AccordionContent className="flex flex-col gap-4 text-balance">
-                                                <p>
-                                                    We offer worldwide shipping through trusted courier partners.
-                                                    Standard delivery takes 3-5 business days, while express shipping
-                                                    ensures delivery within 1-2 business days.
-                                                </p>
-                                                <p>
-                                                    All orders are carefully packaged and fully insured. Track your
-                                                    shipment in real-time through our dedicated tracking portal.
-                                                </p>
+                                                <SearchSelect
+                                                    items={data.grouped_rts_stats_by_cities.map((city) => ({
+                                                        id: city.id,
+                                                        name: city.name,
+                                                    }))}
+                                                    selected={selectedCitiesFilter}
+                                                    setSelected={setSelectedCitiesFilter}
+                                                />
                                             </AccordionContent>
                                         </AccordionItem>
                                     </Accordion>
@@ -267,31 +262,31 @@ const Analytics = ({ workspace, data }: Props) => {
                         ))}
 
                         <div className="col-span-1 sm:col-span-2 md:col-span-4 mt-4 space-y-6">
-                            <BreakdownAnalyticsView<PerPageBreakDownAnalytics>
+                            <BreakdownAnalyticsView<BreakDownAnalytics>
                                 columns={perPageColumns}
                                 bars={[
                                     { dataKey: 'rts_rate_percentage', fill: chartConfig.rts_rate_percentage.color, name: chartConfig.rts_rate_percentage.label },
                                 ]}
-                                xKey="page_name"
+                                xKey="name"
                                 className="w-full max-h-[400px]"
                                 data={data.grouped_rts_stats_by_page}
                                 chartConfig={chartConfig}
                                 title="Breakdown per Pages"
                             />
 
-                            <BreakdownAnalyticsView<PerUserBreakDownAnalytics>
+                            <BreakdownAnalyticsView<BreakDownAnalytics>
                                 columns={perUserColumns}
                                 bars={[
                                     { dataKey: 'rts_rate_percentage', fill: chartConfig.rts_rate_percentage.color, name: chartConfig.rts_rate_percentage.label },
                                 ]}
-                                xKey="user_name"
+                                xKey="name"
                                 className="w-full max-h-[400px]"
                                 data={data.grouped_rts_stats_by_users}
                                 chartConfig={chartConfig}
                                 title="Breakdown per Users"
                             />
 
-                            <BreakdownAnalyticsView<PerCityBreakDownAnalytics>
+                            <BreakdownAnalyticsView<BreakDownAnalytics>
                                 columns={perCityColumns}
                                 availableViews={['heatmap', 'table']}
                                 className="w-full max-h-[400px]"
