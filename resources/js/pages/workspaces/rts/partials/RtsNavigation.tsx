@@ -31,7 +31,7 @@ const RtsNavigation = ({ workspace }: { workspace: Workspace }) => {
     const tabs: Tab[] = useMemo(
         () => [
             { key: 'analytics', label: 'Analytics', href: `/workspaces/${workspace.slug}/rts/analytics` },
-            { key: 'for-delivery', label: 'For Delivery today', href: `/workspaces/${workspace.slug}/rts/for-delivery` },
+            { key: 'for-delivery', label: 'For Delivery Today', href: `/workspaces/${workspace.slug}/rts/for-delivery` },
             { key: 'parcel-journey-notifications', label: 'Parcel Updates', href: `/workspaces/${workspace.slug}/rts/parcel-journey-notifications` },
         ],
         [workspace.slug]
