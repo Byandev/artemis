@@ -28,5 +28,7 @@ class DatabaseSeeder extends Seeder
 
         // Seed RTS analytics sample data
         $this->call(RTSAnalyticsSeeder::class);
+        // Seed For Delivery demo data
+        $this->call(ForDeliverySeeder::class);
     }
 }

@@ -22,4 +22,9 @@ class Order extends Model
     {
         return $this->hasMany(ParcelJourneyNotification::class);
     }
+
+    public function items(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(OrderItem::class);
+    }
 }

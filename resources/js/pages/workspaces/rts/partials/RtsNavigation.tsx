@@ -31,7 +31,7 @@ const RtsNavigation = ({ workspace }: { workspace: Workspace }) => {
     const tabs: Tab[] = useMemo(
         () => [
             { key: 'analytics', label: 'Analytics', href: `/workspaces/${workspace.slug}/rts/analytics` },
-            { key: 'for-delivery-today', label: 'For Delivery today', href: `/workspaces/${workspace.slug}/rts/for-delivery-today` },
+            { key: 'for-delivery', label: 'For Delivery today', href: `/workspaces/${workspace.slug}/rts/for-delivery` },
             { key: 'parcel-journey-notifications', label: 'Parcel Updates', href: `/workspaces/${workspace.slug}/rts/parcel-journey-notifications` },
         ],
         [workspace.slug]
@@ -39,7 +39,7 @@ const RtsNavigation = ({ workspace }: { workspace: Workspace }) => {
 
     const activeKey = useMemo(() => {
         if (currentPath.includes('/rts/analytics')) return 'analytics';
-        if (currentPath.includes('/rts/for-delivery-today')) return 'for-delivery-today';
+        if (currentPath.includes('/rts/for-delivery')) return 'for-delivery';
         if (currentPath.includes('/rts/parcel-journey-notifications')) return 'parcel-journey-notifications';
         return 'analytics';
     }, [currentPath]);

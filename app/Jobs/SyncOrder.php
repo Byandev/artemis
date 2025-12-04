@@ -3,8 +3,10 @@
 namespace App\Jobs;
 
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\ParcelJourney;
 use App\Models\ParcelJourneyNotification;
+use App\Models\Rider;
 use App\Models\ShippingAddress;
 use App\Models\Workspace;
 use Carbon\Carbon;
@@ -128,6 +130,33 @@ class SyncOrder implements ShouldQueue
                             'created_at' => $update['updated_at'],
                         ]);
 
+                        // Persist rider info if provided explicitly in the partner update payload
+                        // (Do NOT extract rider from the free-form note)
+                        if (! empty($update['rider_name']) || ! empty($update['rider_mobile'])) {
+                            $rider_name = $update['rider_name'] ?? null;
+                            $mobile = $update['rider_mobile'] ?? $update['rider_phone'] ?? null;
+
+                            if ($mobile) {
+                                $last10 = substr(preg_replace('/\D/', '', $mobile), -10);
+                                $rider_mobile = $last10 ? "0{$last10}" : $mobile;
+                            } else {
+                                $rider_mobile = null;
+                            }
+
+                            $rider = Rider::firstOrCreate([
+                                'mobile' => $rider_mobile,
+                            ], [
+                                'name' => $rider_name,
+                                'mobile' => $rider_mobile,
+                            ]);
+
+                            $parcelJourney->update([
+                                'rider_name' => $rider_name,
+                                'rider_mobile' => $rider_mobile,
+                                'rider_id' => $rider->id,
+                            ]);
+                        }
+
                         if ($isLatestUpdate && $savedOrder->status == 2 && in_array($parcelJourney->status, ['On Delivery', 'Departure', 'Arrival']) && Carbon::parse($parcelJourney->created_at)->isToday()) {
                             $isLatestUpdate = false;
 
@@ -137,6 +166,23 @@ class SyncOrder implements ShouldQueue
                         }
                     }
                 }
+            }
+        }
+
+        // Persist order items if provided in payload
+        if (isset($order['items']) && is_array($order['items'])) {
+            foreach ($order['items'] as $item) {
+                $productId = $item['product_id'] ?? ($item['id'] ?? null);
+                $productName = $item['name'] ?? $item['product_name'] ?? null;
+                $quantity = $item['quantity'] ?? 1;
+
+                OrderItem::updateOrCreate([
+                    'order_id' => $savedOrder->id,
+                    'product_id' => $productId,
+                    'product_name' => $productName,
+                ], [
+                    'quantity' => $quantity,
+                ]);
             }
         }
 
@@ -204,16 +250,22 @@ class SyncOrder implements ShouldQueue
         }
 
         if ($parcelJourney->status === 'On Delivery') {
-            $message = $parcelJourney->note;
+            // Prefer explicit rider relation or rider fields; do NOT extract from note
+            $rider_name = null;
+            $rider_mobile = null;
 
-            if (preg_match_all('/【(.*?)】/', $message, $matches) && isset($matches[1][1])) {
-                $sprinterInfo = $matches[1][1]; // Second 【...】
+            if ($parcelJourney->rider) {
+                $rider_name = $parcelJourney->rider->name;
+                $rider_mobile = $parcelJourney->rider->mobile;
+            } elseif (! empty($parcelJourney->rider_name) || ! empty($parcelJourney->rider_mobile)) {
+                $rider_name = $parcelJourney->rider_name ?? null;
+                $rider_mobile = $parcelJourney->rider_mobile ?? null;
+            }
 
-                // Split name and mobile
-                [$rider_name, $mobile] = array_map('trim', explode(':', $sprinterInfo));
-                $last10 = substr(preg_replace('/\D/', '', $mobile), -10);
+            if ($rider_name && $rider_mobile) {
+                $last10 = substr(preg_replace('/\D/', '', $rider_mobile), -10);
+                $rider_mobile = $last10 ? "0{$last10}" : $rider_mobile;
 
-                $rider_mobile = "0{$last10}";
                 $rider_message = "Boss $rider_name, Ito po ang seller ng parcel na may tracking no. {$order->tracking_code}.\nPakiusap po, ingatan at siguraduhing maideliver agad ito kay {$order->shippingAddress->full_name}.\nMatagal na pong hinihintay ito at kailangan na kailangan na po talaga ngayon.\n\nNabanggit din po ng customer na mahina ang signal sa kanilang lugar, kaya kung hindi po matawagan, pakideliver na lang po direkta — siguradong tatanggapin daw po nila.\nNakahanda na rin po ang bayad.\n\nSalamat po sa inyong pag-unawa at ingat po kayo palagi sa biyahe!";
                 $receiver_message = "{$order->shippingAddress->full_name}. Padating na po ang order nyo mula sa {$order->page->name}. Siguraduhing matatawagan po ang cp nyo ng rider. Paki-ready nalang po ng pang bayad.\n Parcel Tracking No. {$order->tracking_code}\n Rider Name: $rider_name\nRider No: $rider_mobile";
 

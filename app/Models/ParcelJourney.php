@@ -12,4 +12,14 @@ class ParcelJourney extends Model
     {
         return $this->hasMany(ParcelJourneyNotification::class);
     }
+
+    public function order(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Order::class);
+    }
+
+    public function rider(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Rider::class);
+    }
 }
