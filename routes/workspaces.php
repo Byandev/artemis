@@ -3,7 +3,6 @@
 use App\Http\Controllers\Workspaces\AdAccountController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
-// use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\Record\RTSController;
 use App\Http\Controllers\Workspaces\Record\SalesController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
