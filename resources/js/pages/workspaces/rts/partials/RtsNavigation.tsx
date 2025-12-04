@@ -45,10 +45,17 @@ const RtsNavigation = ({ workspace }: { workspace: Workspace }) => {
     }, [currentPath]);
 
     return (
-        <div className="flex flex-row gap-2 mb-2 bg-gray-100 p-1 rounded-md w-fit" role="tablist" aria-label="RTS navigation">
-            {tabs.map((t) => (
-                <TabItem key={t.key} href={t.href} label={t.label} isActive={t.key === activeKey} />
-            ))}
+        <div className="mb-2 w-full md:w-fit" role="tablist" aria-label="RTS navigation">
+            <div className="flex gap-2 bg-gray-100 p-1 rounded-md
+                            w-full sm:w-auto
+                            overflow-x-auto md:overflow-visible
+                            whitespace-nowrap">
+                {tabs.map((t) => (
+                    <div key={t.key} className="flex-shrink-0">
+                        <TabItem href={t.href} label={t.label} isActive={t.key === activeKey} />
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };

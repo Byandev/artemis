@@ -49,12 +49,12 @@ const BreakdownAnalyticsView = <T,>({
 
     return (
         <div className='border rounded-xl p-6 shadow-sm'>
-            <div className='flex justify-between items-center mb-4'>
+            <div className='flex flex-col md:flex-row justify-between items-center mb-4 gap-5'>
                 <h2 className='text-xl md:text-2xl font-bold'>{title}</h2>
-                <div className='flex gap-2'>
+                <div className='flex gap-2 items-center'>
                     <Button>Export</Button>
 
-                    <div className='flex flex-row gap-2 mb-2 bg-gray-100 p-1 rounded-md w-fit'>
+                    <div className='flex flex-row gap-2 bg-gray-100 p-1 rounded-md w-fit'>
                         {views.map((view) => (
                             <Button
                                 key={view}

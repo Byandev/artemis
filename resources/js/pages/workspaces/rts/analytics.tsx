@@ -8,6 +8,9 @@ import BreakdownAnalyticsView from './partials/BreakdownAnalyticsView';
 import { ColumnDef } from '@tanstack/react-table';
 import { getLatLng } from '@/lib/cities';
 import { HeatPoint } from './partials/HeatmapMap';
+import { FilterIcon, Ghost } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 type BreakDownAnalytics = {
     rts_rate_percentage_orders: number;
@@ -161,61 +164,81 @@ const Analytics = ({ workspace, data }: Props) => {
             <div className='px-4 py-6'>
                 <RtsNavigation workspace={workspace} />
 
-                <div className="grid grid-cols-4 gap-2">
-                    {analytics.map((data, key) => {
-                        return <Card key={key} className="p-4 gap-5">
-                            <CardHeader className="p-0">
-                                <div>
-                                    <span className="text-2xl md:text-3xl font-extrabold">
-                                        {typeof data.value === 'number'
-                                            ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data.value)
-                                            : data.value}
-                                    </span>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <p className="text-md text-muted-foreground">{data.title}</p>
-                            </CardContent>
-                        </Card>
-                    })}
+                <div className='border p-5 border rounded-md'>
+                    <div className='flex items-center justify-between mb-8'>
+                        <h1 className="scroll-m-20 text-center text-3xl font-extrabold tracking-tight text-balance">
+                            Analytics
+                        </h1>
+                        <div className='flex'>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline">
+                                        <FilterIcon className='mr-2 h-4 w-4' />
+                                        Filter</Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-72 p-3">
 
-                    <div className='col-span-4 mt-4 space-y-6'>
-                        <BreakdownAnalyticsView<PerPageBreakDownAnalytics>
-                            columns={perPageColumns}
-                            bars={[
-                                { dataKey: 'rts_rate_percentage', fill: chartConfig.rts_rate_percentage.color, name: chartConfig.rts_rate_percentage.label },
-                            ]}
-                            xKey="page_name"
-                            className="max-h-[400px] w-full"
-                            data={data.grouped_rts_stats_by_page}
-                            chartConfig={chartConfig}
-                            title="Breakdown per Pages"
-                        />
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    </div>
 
-                        <BreakdownAnalyticsView<PerUserBreakDownAnalytics>
-                            columns={perUserColumns}
-                            bars={[
-                                { dataKey: 'rts_rate_percentage', fill: chartConfig.rts_rate_percentage.color, name: chartConfig.rts_rate_percentage.label },
-                            ]}
-                            xKey="user_name"
-                            className="max-h-[400px] w-full"
-                            data={data.grouped_rts_stats_by_users}
-                            chartConfig={chartConfig}
-                            title="Breakdown per Users"
-                        />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                        {analytics.map((data, key) => (
+                            <Card key={key} className="p-4 gap-5 flex flex-col col-span-1">
+                                <CardHeader className="p-0">
+                                    <div>
+                                        <span className="text-xl sm:text-2xl md:text-3xl font-extrabold">
+                                            {typeof data.value === 'number'
+                                                ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data.value)
+                                                : data.value}
+                                        </span>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="p-0">
+                                    <p className="text-sm sm:text-md text-muted-foreground">{data.title}</p>
+                                </CardContent>
+                            </Card>
+                        ))}
 
-                        <BreakdownAnalyticsView<PerCityBreakDownAnalytics>
-                            columns={perCityColumns}
-                            availableViews={['heatmap', 'table']}
-                            className="max-h-[400px] w-full"
-                            data={data.grouped_rts_stats_by_cities}
-                            title="Breakdown per Cities"
-                            heatmapPoints={heatmapPoints}
-                        />
+                        <div className="col-span-1 sm:col-span-2 md:col-span-4 mt-4 space-y-6">
+                            <BreakdownAnalyticsView<PerPageBreakDownAnalytics>
+                                columns={perPageColumns}
+                                bars={[
+                                    { dataKey: 'rts_rate_percentage', fill: chartConfig.rts_rate_percentage.color, name: chartConfig.rts_rate_percentage.label },
+                                ]}
+                                xKey="page_name"
+                                className="w-full max-h-[400px]"
+                                data={data.grouped_rts_stats_by_page}
+                                chartConfig={chartConfig}
+                                title="Breakdown per Pages"
+                            />
+
+                            <BreakdownAnalyticsView<PerUserBreakDownAnalytics>
+                                columns={perUserColumns}
+                                bars={[
+                                    { dataKey: 'rts_rate_percentage', fill: chartConfig.rts_rate_percentage.color, name: chartConfig.rts_rate_percentage.label },
+                                ]}
+                                xKey="user_name"
+                                className="w-full max-h-[400px]"
+                                data={data.grouped_rts_stats_by_users}
+                                chartConfig={chartConfig}
+                                title="Breakdown per Users"
+                            />
+
+                            <BreakdownAnalyticsView<PerCityBreakDownAnalytics>
+                                columns={perCityColumns}
+                                availableViews={['heatmap', 'table']}
+                                className="w-full max-h-[400px]"
+                                data={data.grouped_rts_stats_by_cities}
+                                title="Breakdown per Cities"
+                                heatmapPoints={heatmapPoints}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
-        </AppLayout>
+        </AppLayout >
     );
 }
 
