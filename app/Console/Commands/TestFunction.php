@@ -39,14 +39,14 @@ class TestFunction extends Command
         $end = Carbon::now();
 
         for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
-            echo $date->toDateString()."\n";
+            echo $date->toDateString() . "\n";
         }
 
         $adAccount = AdAccount::find(1400099324628111);
         $facebookAccount = FacebookAccount::first();
 
         dispatch(new FetchAdRecords($facebookAccount, $adAccount, Carbon::now()->toDateString()));
-        dd('DONE');
+        dd("DONE");
 
         Page::where('created_at', '<=', now()->subDays(3))
             ->get()

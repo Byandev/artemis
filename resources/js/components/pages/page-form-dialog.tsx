@@ -28,7 +28,6 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
         infotxt_user_id: page?.infotxt_user_id || '',
     });
 
-    // setData and reset from useForm are stable references
     useEffect(() => {
         if (page) {
             setData({
@@ -43,7 +42,6 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
         } else {
             reset();
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, open]);
 
     const handleSubmit = (e: React.FormEvent) => {

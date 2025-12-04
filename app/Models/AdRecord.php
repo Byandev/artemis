@@ -11,6 +11,5 @@ class AdRecord extends Model
     protected $guarded = [];
 
     public $incrementing = false;
-
     public $timestamps = false;
 }

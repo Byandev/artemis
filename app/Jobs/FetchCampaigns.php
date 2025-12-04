@@ -55,7 +55,7 @@ class FetchCampaigns implements ShouldQueue
                     'ad_account_id' => $campaign['account_id'],
                     'name' => $campaign['name'],
                     'status' => $campaign['status'],
-                    'start_time' => isset($campaign['start_time']) ? Carbon::parse($campaign['start_time'])
+                    'start_time' => isset( $campaign['start_time']) ? Carbon::parse($campaign['start_time'])
                         ->setTimezone('Asia/Manila')
                         ->format('Y-m-d H:i:s') : null,
                     'end_time' => isset($campaign['end_time']) ? Carbon::parse($campaign['end_time'])

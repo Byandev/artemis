@@ -148,9 +148,4 @@ class Workspace extends Model
     {
         $this->users()->updateExistingPivot($user->id, ['role' => $role]);
     }
-
-    public function parcelJourneyNotificationTemplates(): HasMany
-    {
-        return $this->hasMany(ParcelJourneyNotificationTemplate::class);
-    }
 }
