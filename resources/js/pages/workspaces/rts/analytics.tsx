@@ -54,16 +54,19 @@ const Analytics = ({ workspace, data }: Props) => {
     const [selectedPagesFilter, setSelectedPagesFilter] = useState<string[]>([]);
 
     useEffect(() => {
-        // Don't trigger a request when there are no selected pages
         if (selectedPagesFilter.length === 0) return;
 
-        // Use mergeQuery so other existing query params are preserved
-        const options = { mergeQuery: { pages: selectedPagesFilter } } as const;
+        router.get(
+            workspaces.rts.analytics.url(workspace),
+            {
+                pages: selectedPagesFilter,
+                preserveState: true,
+                preserveScroll: true,
+                replace: true
+            }
+        );
+    }, [selectedPagesFilter, workspace]);
 
-        const url = workspaces.rts.analytics.url(workspace, options as any);
-
-        router.get(url, { preserveState: true, preserveScroll: true, replace: true });
-    }, [selectedPagesFilter, workspace, workspace.slug]);
 
     const heatmapPoints: HeatPoint[] = useMemo(() => {
         return data.grouped_rts_stats_by_cities

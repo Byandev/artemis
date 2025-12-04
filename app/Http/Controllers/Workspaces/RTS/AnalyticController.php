@@ -12,6 +12,7 @@ class AnalyticController extends Controller
 {
     public function index(Workspace $workspace)
     {
+        $pageNames = request()->query('pages', []);
         $rtsStats = Order::selectRaw('
             ROUND(
                 (SUM(CASE WHEN status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
@@ -23,6 +24,9 @@ class AnalyticController extends Controller
             SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) AS delivered_count
         ')
             ->where('workspace_id', $workspace->id)
+            ->when($pageNames, fn ($q) => $q->whereHas('page', fn ($p) => $p->whereIn('name', $pageNames)
+            )
+            )
             ->first();
 
         $tracked_orders = Order::where('workspace_id', $workspace->id)
@@ -97,6 +101,7 @@ class AnalyticController extends Controller
                 'grouped_rts_stats_by_page' => $groupedRtsStatsByPage,
                 'grouped_rts_stats_by_users' => $groupedRtsStatsByUsers,
                 'grouped_rts_stats_by_cities' => $groupedRtsStatsByCities,
+                'page_names' => $pageNames,
             ],
         ]);
     }
