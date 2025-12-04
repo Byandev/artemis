@@ -42,16 +42,11 @@ export default function Welcome() {
                 <main className="flex flex-col items-center text-center">
                     {/* Logo */}
                     <div className="mb-8">
-                        <div className="flex items-center justify-center w-24 h-24 rounded-2xl bg-[#00D9A5] mb-6">
-                            <svg
-                                className="w-14 h-14 text-white"
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
-                                xmlns="http://www.w3.org/2000/svg"
-                            >
-                                <path d="M12 2L4 10h5v10h6V10h5L12 2z" />
-                            </svg>
-                        </div>
+                        <img 
+                            src="/img/logo/artemis.png" 
+                            alt="Artemis Logo" 
+                            className="w-48 h-48 object-contain"
+                        />
                     </div>
 
                     {/* Title */}
