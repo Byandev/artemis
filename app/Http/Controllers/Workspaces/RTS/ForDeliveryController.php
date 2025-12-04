@@ -14,11 +14,9 @@ class ForDeliveryController extends Controller
      */
     public function index(Workspace $workspace)
     {
-        $today = now()->toDateString();
-
         $parcelJourneys = ParcelJourney::with(['order.page', 'order.shippingAddress', 'rider', 'order.items.product'])
             ->whereIn('status', ['On Delivery', 'Departure', 'Arrival'])
-            ->whereDate('created_at', $today)
+            ->whereDate('created_at', now()->toDateString())
             ->whereHas('order', function ($q) use ($workspace) {
                 $q->where('workspace_id', $workspace->id)
                     ->where('status', 2);
@@ -35,14 +33,14 @@ class ForDeliveryController extends Controller
             // Rider: prefer related Rider model, fallback to parsed note or rider_name field
             $rider = null;
             if ($pj->rider) {
-                $rider = trim($pj->rider->name ?? '') . ' ' . trim($pj->rider->mobile ?? '');
+                $rider = trim($pj->rider->name ?? '').' '.trim($pj->rider->mobile ?? '');
             } else {
-                if (!empty($pj->rider_name) || !empty($pj->rider_mobile)) {
-                    $rider = trim(($pj->rider_name ?? '') . ' ' . ($pj->rider_mobile ?? ''));
+                if (! empty($pj->rider_name) || ! empty($pj->rider_mobile)) {
+                    $rider = trim(($pj->rider_name ?? '').' '.($pj->rider_mobile ?? ''));
                 } elseif (preg_match_all('/【(.*?)】/', $pj->note, $matches) && isset($matches[1][1])) {
                     $sprinterInfo = $matches[1][1];
                     [$rider_name, $mobile] = array_map('trim', explode(':', $sprinterInfo));
-                    $rider = trim($rider_name) . ' ' . trim($mobile);
+                    $rider = trim($rider_name).' '.trim($mobile);
                 }
             }
 
