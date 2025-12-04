@@ -49,21 +49,21 @@ class FetchAdRecords implements ShouldQueue
                     if (count($record['insights']['data']) > 0) {
                         $item = $record['insights']['data'][0];
 
-                       if (isset($item['impressions'])) {
-                           AdRecord::updateOrCreate([
-                               'ad_id' => $record['id'],
-                               'date' => $this->date,
-                           ], [
-                               'spend' => $item['spend'],
-                               'impressions' => $item['impressions'],
-                               'clicks' => $item['clicks'],
-                               'reach' => $item['reach'],
-                               'sales' => isset($item['action_values']) && count($item['action_values']) ? $item['action_values'][0]['value'] : 0,
-                               'ad_account_id' => $record['account_id'],
-                               'campaign_id' => $record['campaign_id'],
-                               'ad_set_id' => $record['adset_id'],
-                           ]);
-                       }
+                        if (isset($item['impressions'])) {
+                            AdRecord::updateOrCreate([
+                                'ad_id' => $record['id'],
+                                'date' => $this->date,
+                            ], [
+                                'spend' => $item['spend'],
+                                'impressions' => $item['impressions'],
+                                'clicks' => $item['clicks'],
+                                'reach' => $item['reach'],
+                                'sales' => isset($item['action_values']) && count($item['action_values']) ? $item['action_values'][0]['value'] : 0,
+                                'ad_account_id' => $record['account_id'],
+                                'campaign_id' => $record['campaign_id'],
+                                'ad_set_id' => $record['adset_id'],
+                            ]);
+                        }
                     }
                 }
             }
