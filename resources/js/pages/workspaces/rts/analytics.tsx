@@ -10,22 +10,8 @@ import { getLatLng } from '@/lib/cities';
 import { HeatPoint } from './partials/HeatmapMap';
 
 type BreakDownAnalytics = {
-    total_orders: number;
+    name: string;
     rts_rate_percentage: number;
-    returned_count: number;
-    delivered_count: number;
-}
-
-interface PerPageBreakDownAnalytics extends BreakDownAnalytics {
-    page_name: string;
-}
-
-interface PerUserBreakDownAnalytics extends BreakDownAnalytics {
-    user_name: string;
-}
-
-interface PerCityBreakDownAnalytics extends BreakDownAnalytics {
-    city_name: string;
 }
 
 type Props = {
@@ -37,9 +23,9 @@ type Props = {
         returned_amount: number;
         tracked_orders: number;
         sent_parcel_journey_notifications: number;
-        grouped_rts_stats_by_page: PerPageBreakDownAnalytics[];
-        grouped_rts_stats_by_users: PerUserBreakDownAnalytics[];
-        grouped_rts_stats_by_cities: PerCityBreakDownAnalytics[];
+        grouped_rts_stats_by_page: BreakDownAnalytics[];
+        grouped_rts_stats_by_users: BreakDownAnalytics[];
+        grouped_rts_stats_by_cities: BreakDownAnalytics[];
     }
 }
 
@@ -47,7 +33,7 @@ const Analytics = ({ workspace, data }: Props) => {
     const heatmapPoints: HeatPoint[] = useMemo(() => {
         return data.grouped_rts_stats_by_cities
             .map((city) => {
-                const latLng = getLatLng(city.city_name);
+                const latLng = getLatLng(city.name);
                 if (!latLng) return null;
                 const coordinates = {
                     lat: latLng.lat,
@@ -72,38 +58,18 @@ const Analytics = ({ workspace, data }: Props) => {
     }, [data])
 
     const chartConfig = {
-        total: {
-            label: "Total",
+        rts_rate_percentage: {
+            label: "RTS Rate: ",
             color: "#1f2937",
-        },
-        delivered: {
-            label: "Delivered",
-            color: "#4b5563",
-        },
-        returned: {
-            label: "Returned",
-            color: "#9ca3af",
         },
     } satisfies ChartConfig;
 
-    const perPageColumns: ColumnDef<PerPageBreakDownAnalytics>[] = [
+    const perPageColumns: ColumnDef<BreakDownAnalytics>[] = [
         {
-            accessorKey: "page_name",
+            accessorKey: "name",
             header: "Page",
         },
         {
-            accessorKey: "total_orders",
-            header: "Total Orders",
-        },
-        {
-            accessorKey: "returned_count",
-            header: "Returned",
-        },
-        {
-            accessorKey: "delivered_count",
-            header: "Delivered",
-        },
-        {
             accessorKey: "rts_rate_percentage",
             header: "RTS Rate",
             cell: ({ row }) => {
@@ -112,24 +78,12 @@ const Analytics = ({ workspace, data }: Props) => {
         },
     ];
 
-    const perUserColumns: ColumnDef<PerUserBreakDownAnalytics>[] = [
+    const perUserColumns: ColumnDef<BreakDownAnalytics>[] = [
         {
-            accessorKey: "user_name",
+            accessorKey: "name",
             header: "User",
         },
         {
-            accessorKey: "total_orders",
-            header: "Total Orders",
-        },
-        {
-            accessorKey: "returned_count",
-            header: "Returned",
-        },
-        {
-            accessorKey: "delivered_count",
-            header: "Delivered",
-        },
-        {
             accessorKey: "rts_rate_percentage",
             header: "RTS Rate",
             cell: ({ row }) => {
@@ -138,22 +92,10 @@ const Analytics = ({ workspace, data }: Props) => {
         },
     ];
 
-    const perCityColumns: ColumnDef<PerCityBreakDownAnalytics>[] = [
+    const perCityColumns: ColumnDef<BreakDownAnalytics>[] = [
         {
-            accessorKey: "city_name",
+            accessorKey: "name",
             header: "City",
-        },
-        {
-            accessorKey: "total_orders",
-            header: "Total Orders",
-        },
-        {
-            accessorKey: "returned_count",
-            header: "Returned",
-        },
-        {
-            accessorKey: "delivered_count",
-            header: "Delivered",
         },
         {
             accessorKey: "rts_rate_percentage",
@@ -188,35 +130,31 @@ const Analytics = ({ workspace, data }: Props) => {
                     })}
 
                     <div className='col-span-4 mt-4 space-y-6'>
-                        <BreakdownAnalyticsView<PerPageBreakDownAnalytics>
+                        <BreakdownAnalyticsView<BreakDownAnalytics>
                             columns={perPageColumns}
                             bars={[
-                                { dataKey: 'total_orders', fill: chartConfig.total.color, name: chartConfig.total.label },
-                                { dataKey: 'delivered_count', fill: chartConfig.delivered.color, name: chartConfig.delivered.label },
-                                { dataKey: 'returned_count', fill: chartConfig.returned.color, name: chartConfig.returned.label },
+                                { dataKey: 'rts_rate_percentage', fill: chartConfig.rts_rate_percentage.color, name: chartConfig.rts_rate_percentage.label },
                             ]}
-                            xKey="page_name"
+                            xKey="name"
                             className="max-h-[400px] w-full"
                             data={data.grouped_rts_stats_by_page}
                             chartConfig={chartConfig}
                             title="Breakdown per Pages"
                         />
 
-                        <BreakdownAnalyticsView<PerUserBreakDownAnalytics>
+                        <BreakdownAnalyticsView<BreakDownAnalytics>
                             columns={perUserColumns}
                             bars={[
-                                { dataKey: 'total_orders', fill: chartConfig.total.color, name: chartConfig.total.label },
-                                { dataKey: 'delivered_count', fill: chartConfig.delivered.color, name: chartConfig.delivered.label },
-                                { dataKey: 'returned_count', fill: chartConfig.returned.color, name: chartConfig.returned.label },
+                                { dataKey: 'rts_rate_percentage', fill: chartConfig.rts_rate_percentage.color, name: chartConfig.rts_rate_percentage.label },
                             ]}
-                            xKey="user_name"
+                            xKey="name"
                             className="max-h-[400px] w-full"
                             data={data.grouped_rts_stats_by_users}
                             chartConfig={chartConfig}
                             title="Breakdown per Users"
                         />
 
-                        <BreakdownAnalyticsView<PerCityBreakDownAnalytics>
+                        <BreakdownAnalyticsView<BreakDownAnalytics>
                             columns={perCityColumns}
                             availableViews={['heatmap', 'table']}
                             className="max-h-[400px] w-full"

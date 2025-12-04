@@ -35,10 +35,7 @@ class AnalyticController extends Controller
 
         // Grouped by Page
         $groupedRtsStatsByPage = Order::selectRaw('
-            pages.name AS page_name,
-            SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
-            SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
-            SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
+            pages.name AS name,
             ROUND(
             (SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
             NULLIF(SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
@@ -52,10 +49,7 @@ class AnalyticController extends Controller
 
         // Grouped by Users
         $groupedRtsStatsByUsers = Order::selectRaw('
-            users.name AS user_name,
-            SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
-            SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
-            SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
+            users.name AS name,
             ROUND(
                 (SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
                 NULLIF(SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
@@ -68,12 +62,9 @@ class AnalyticController extends Controller
             ->groupBy('pages.owner_id', 'users.name')
             ->get();
 
-        // Grouped by Cities (uses shipping_addresses.district_name as city)
+        // Grouped by Cities
         $groupedRtsStatsByCities = Order::selectRaw('
-            shipping_addresses.district_name AS city_name,
-            SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
-            SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
-            SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
+            shipping_addresses.district_name AS name,
             ROUND(
                 (SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
                 NULLIF(SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
