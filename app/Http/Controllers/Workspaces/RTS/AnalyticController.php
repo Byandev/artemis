@@ -52,6 +52,24 @@ class AnalyticController extends Controller
             ->groupBy('orders.page_id', 'pages.name', 'pages.id')
             ->get();
 
+        // Grouped by Shops
+        $groupedRtsStatsByShops = Order::selectRaw('
+            shops.id AS id,
+            shops.name AS name,
+            SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
+            SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
+            SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
+            ROUND(
+                (SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
+                NULLIF(SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
+                2
+            ) AS rts_rate_percentage
+        ')
+            ->leftJoin('shops', 'shops.id', '=', 'orders.shop_id')
+            ->where('orders.workspace_id', $workspace->id)
+            ->groupBy('orders.shop_id', 'shops.name', 'shops.id')
+            ->get();
+
         // Grouped by Users
         $groupedRtsStatsByUsers = Order::selectRaw('
             users.id AS id,
@@ -99,6 +117,7 @@ class AnalyticController extends Controller
                 'tracked_orders' => $tracked_orders,
                 'sent_parcel_journey_notifications' => $sent_parcel_journey_notifications,
                 'grouped_rts_stats_by_page' => $groupedRtsStatsByPage,
+                'grouped_rts_stats_by_shops' => $groupedRtsStatsByShops,
                 'grouped_rts_stats_by_users' => $groupedRtsStatsByUsers,
                 'grouped_rts_stats_by_cities' => $groupedRtsStatsByCities,
             ],

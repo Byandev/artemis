@@ -8,13 +8,16 @@ import BreakdownAnalyticsView from './partials/BreakdownAnalyticsView';
 import { ColumnDef } from '@tanstack/react-table';
 import { getLatLng } from '@/lib/cities';
 import { HeatPoint } from './partials/HeatmapMap';
-import { FilterIcon } from 'lucide-react';
+import { CalendarIcon, FilterIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SearchSelect from './partials/SearchSelect';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { router } from '@inertiajs/react';
 import workspaces from '@/routes/workspaces';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 type BreakDownAnalytics = {
     id: number;
@@ -35,15 +38,43 @@ type Props = {
         tracked_orders: number;
         sent_parcel_journey_notifications: number;
         grouped_rts_stats_by_page: BreakDownAnalytics[];
+        grouped_rts_stats_by_shops: BreakDownAnalytics[];
         grouped_rts_stats_by_users: BreakDownAnalytics[];
         grouped_rts_stats_by_cities: BreakDownAnalytics[];
     }
 }
 
+function formatDate(date: Date | undefined) {
+    if (!date) {
+        return ""
+    }
+
+    return date.toLocaleDateString("en-US", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+    })
+}
+
+function isValidDate(date: Date | undefined) {
+    if (!date) {
+        return false
+    }
+    return !isNaN(date.getTime())
+}
+
+
 const Analytics = ({ workspace, data }: Props) => {
     const [selectedPagesFilter, setSelectedPagesFilter] = useState<number[]>([]);
     const [selectedUsersFilter, setSelectedUsersFilter] = useState<number[]>([]);
-    const [selectedCitiesFilter, setSelectedCitiesFilter] = useState<number[]>([]);
+    const [selectedShopFilter, setSelectedShopFilter] = useState<number[]>([]);
+
+    const [open, setOpen] = useState(false)
+    const [date, setDate] = useState<Date | undefined>(
+        new Date("2025-06-01")
+    )
+    const [month, setMonth] = useState<Date | undefined>(date)
+    const [value, setValue] = useState(formatDate(date))
 
     // useEffect(() => {
     //     if (selectedPagesFilter.length === 0) return;
@@ -176,6 +207,32 @@ const Analytics = ({ workspace, data }: Props) => {
         },
     ];
 
+    const perShopColumns: ColumnDef<BreakDownAnalytics>[] = [
+        {
+            accessorKey: "name",
+            header: "Shop",
+        },
+        {
+            accessorKey: "total_orders",
+            header: "Total Orders",
+        },
+        {
+            accessorKey: "returned_count",
+            header: "Returned",
+        },
+        {
+            accessorKey: "delivered_count",
+            header: "Delivered",
+        },
+        {
+            accessorKey: "rts_rate_percentage",
+            header: "RTS Rate",
+            cell: ({ row }) => {
+                return `${row.original.rts_rate_percentage}%`
+            }
+        },
+    ];
+
     return (
         <AppLayout>
             <div className='px-4 py-6'>
@@ -186,7 +243,7 @@ const Analytics = ({ workspace, data }: Props) => {
                         <h1 className="scroll-m-20 text-center text-3xl font-extrabold tracking-tight text-balance">
                             Analytics
                         </h1>
-                        <div className='flex'>
+                        <div className='flex gap-2'>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="outline">
@@ -224,7 +281,7 @@ const Analytics = ({ workspace, data }: Props) => {
                                                 />
                                             </AccordionContent>
                                         </AccordionItem>
-                                        <AccordionItem value="item-2">
+                                        <AccordionItem value="item-3">
                                             <AccordionTrigger>Shop</AccordionTrigger>
                                             <AccordionContent className="flex flex-col gap-4 text-balance">
                                                 <SearchSelect
@@ -232,14 +289,71 @@ const Analytics = ({ workspace, data }: Props) => {
                                                         id: city.id,
                                                         name: city.name,
                                                     }))}
-                                                    selected={selectedCitiesFilter}
-                                                    setSelected={setSelectedCitiesFilter}
+                                                    selected={selectedShopFilter}
+                                                    setSelected={setSelectedShopFilter}
                                                 />
                                             </AccordionContent>
                                         </AccordionItem>
                                     </Accordion>
                                 </DropdownMenuContent>
                             </DropdownMenu>
+
+
+                            <div className="flex flex-col gap-3">
+                                <div className="relative flex gap-2">
+                                    <Input
+                                        id="date"
+                                        value={value}
+                                        placeholder="June 01, 2025"
+                                        className="bg-background pr-10"
+                                        onChange={(e) => {
+                                            const date = new Date(e.target.value)
+                                            setValue(e.target.value)
+                                            if (isValidDate(date)) {
+                                                setDate(date)
+                                                setMonth(date)
+                                            }
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "ArrowDown") {
+                                                e.preventDefault()
+                                                setOpen(true)
+                                            }
+                                        }}
+                                    />
+                                    <Popover open={open} onOpenChange={setOpen}>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                id="date-picker"
+                                                variant="ghost"
+                                                className="absolute top-1/2 right-2 size-6 -translate-y-1/2"
+                                            >
+                                                <CalendarIcon className="size-3.5" />
+                                                <span className="sr-only">Select date</span>
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent
+                                            className="w-auto overflow-hidden p-0"
+                                            align="end"
+                                            alignOffset={-8}
+                                            sideOffset={10}
+                                        >
+                                            <Calendar
+                                                mode="single"
+                                                selected={date}
+                                                captionLayout="dropdown"
+                                                month={month}
+                                                onMonthChange={setMonth}
+                                                onSelect={(date) => {
+                                                    setDate(date)
+                                                    setValue(formatDate(date))
+                                                    setOpen(false)
+                                                }}
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -272,6 +386,18 @@ const Analytics = ({ workspace, data }: Props) => {
                                 data={data.grouped_rts_stats_by_page}
                                 chartConfig={chartConfig}
                                 title="Breakdown per Pages"
+                            />
+
+                            <BreakdownAnalyticsView<BreakDownAnalytics>
+                                columns={perShopColumns}
+                                bars={[
+                                    { dataKey: 'rts_rate_percentage', fill: chartConfig.rts_rate_percentage.color, name: chartConfig.rts_rate_percentage.label },
+                                ]}
+                                xKey="name"
+                                className="w-full max-h-[400px]"
+                                data={data.grouped_rts_stats_by_shops}
+                                chartConfig={chartConfig}
+                                title="Breakdown per Shops"
                             />
 
                             <BreakdownAnalyticsView<BreakDownAnalytics>
