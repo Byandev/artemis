@@ -17,6 +17,7 @@ import { router } from '@inertiajs/react';
 import workspaces from '@/routes/workspaces';
 
 type BreakDownAnalytics = {
+    id: number;
     rts_rate_percentage_orders: number;
     rts_rate_percentage: number;
     returned_count: number;
@@ -47,11 +48,12 @@ type Props = {
         grouped_rts_stats_by_page: PerPageBreakDownAnalytics[];
         grouped_rts_stats_by_users: PerUserBreakDownAnalytics[];
         grouped_rts_stats_by_cities: PerCityBreakDownAnalytics[];
-    }
+    },
+    page_ids: string[];
 }
 
-const Analytics = ({ workspace, data }: Props) => {
-    const [selectedPagesFilter, setSelectedPagesFilter] = useState<string[]>([]);
+const Analytics = ({ workspace, data, page_ids }: Props) => {
+    const [selectedPagesFilter, setSelectedPagesFilter] = useState<string[]>(page_ids || []);
 
     useEffect(() => {
         if (selectedPagesFilter.length === 0) return;
@@ -59,13 +61,17 @@ const Analytics = ({ workspace, data }: Props) => {
         router.get(
             workspaces.rts.analytics.url(workspace),
             {
-                pages: selectedPagesFilter,
+                page_ids: data.grouped_rts_stats_by_page
+                    .filter((p) => selectedPagesFilter.includes(p.page_name))
+                    .map((p) => p.id),
+            },
+            {
                 preserveState: true,
                 preserveScroll: true,
                 replace: true
             }
         );
-    }, [selectedPagesFilter, workspace]);
+    }, [selectedPagesFilter, workspace, data.grouped_rts_stats_by_page]);
 
 
     const heatmapPoints: HeatPoint[] = useMemo(() => {
