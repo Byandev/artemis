@@ -29,8 +29,7 @@ class Team extends Model
      */
     public function members(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'team_user')
-            ->withTimestamps();
+        return $this->belongsToMany(User::class, 'team_user');
     }
 
     /**

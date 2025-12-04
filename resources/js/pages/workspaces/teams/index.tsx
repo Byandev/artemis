@@ -1,11 +1,11 @@
 import { Head, router } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, X, Loader2 } from 'lucide-react';
 import { TeamFormDialog } from '@/components/teams/team-form-dialog';
 import { DeleteTeamDialog } from '@/components/teams/delete-team-dialog';
 
@@ -64,19 +64,37 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
     const [editingTeam, setEditingTeam] = useState<Team | null>(null);
     const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
     const [searchValue, setSearchValue] = useState(filters.search);
+    const [isSearching, setIsSearching] = useState(false);
 
-    // Backend search handler
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
+    // Debounced search - automatically search after user stops typing
+    const debouncedSearch = useCallback((value: string) => {
+        setIsSearching(true);
         router.get(
             `/workspaces/${workspace.slug}/teams`,
-            { ...filters, search: searchValue, page: 1 },
-            { preserveState: true, preserveScroll: true }
+            { ...filters, search: value, page: 1 },
+            { 
+                preserveState: true, 
+                preserveScroll: true,
+                onFinish: () => setIsSearching(false),
+            }
         );
-    };
+    }, [filters, workspace.slug]);
+
+    useEffect(() => {
+        // Don't search on initial mount if search value matches filter
+        if (searchValue === filters.search) return;
+
+        const timer = setTimeout(() => {
+            debouncedSearch(searchValue);
+        }, 300);
+
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchValue]);
 
     const clearSearch = () => {
         setSearchValue('');
+        // Immediately trigger search with empty value
         router.get(
             `/workspaces/${workspace.slug}/teams`,
             { ...filters, search: '', page: 1 },
@@ -180,45 +198,50 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                             workspaceMembers={workspaceMembers}
                             open={createDialogOpen}
                             onOpenChange={setCreateDialogOpen}
+                            showTrigger={true}
                         />
                     )}
                 </div>
 
                 {/* Search */}
-                <form onSubmit={handleSearch} className="flex gap-2 max-w-sm">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            type="text"
-                            placeholder="Search teams..."
-                            value={searchValue}
-                            onChange={(e) => setSearchValue(e.target.value)}
-                            className="pl-8"
-                        />
-                        {searchValue && (
-                            <button
-                                type="button"
-                                onClick={clearSearch}
-                                className="absolute right-2.5 top-2.5"
-                            >
-                                <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                            </button>
-                        )}
-                    </div>
-                    <Button type="submit" size="sm" variant="secondary">
-                        Search
-                    </Button>
-                </form>
+                <div className="relative max-w-sm">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        type="text"
+                        placeholder="Search teams..."
+                        value={searchValue}
+                        onChange={(e) => setSearchValue(e.target.value)}
+                        className="pl-8"
+                    />
+                    {(searchValue || isSearching) && (
+                        <span className="absolute right-2.5 top-2.5">
+                            {isSearching ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={clearSearch}
+                                >
+                                    <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                                </button>
+                            )}
+                        </span>
+                    )}
+                </div>
 
                 {/* Teams Table using DataTable */}
                 <DataTable columns={columns} data={teams.data} />
 
-                {/* Pagination */}
-                {teams.last_page > 1 && (
-                    <div className="flex items-center justify-between">
-                        <div className="text-sm text-muted-foreground">
-                            Showing {teams.from} to {teams.to} of {teams.total} results
-                        </div>
+                {/* Pagination - always show results count */}
+                <div className="flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">
+                        {teams.total > 0 ? (
+                            <>Showing {teams.from} to {teams.to} of {teams.total} results</>
+                        ) : (
+                            <>No results found</>
+                        )}
+                    </div>
+                    {teams.last_page > 1 && (
                         <div className="flex gap-2">
                             {teams.links.map((link, index) => (
                                 <Button
@@ -235,8 +258,8 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                                 />
                             ))}
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
             {/* Edit Dialog - uses same TeamFormDialog with team prop */}
@@ -246,6 +269,7 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                 open={!!editingTeam}
                 onOpenChange={(open) => !open && setEditingTeam(null)}
                 team={editingTeam}
+                showTrigger={false}
             />
 
             {/* Delete Confirmation Dialog */}

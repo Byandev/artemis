@@ -33,6 +33,7 @@ interface TeamFormDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     team?: Team | null; // Optional: pass team for editing, omit for creating
+    showTrigger?: boolean; // Control whether to show the trigger button
 }
 
 export function TeamFormDialog({
@@ -41,6 +42,7 @@ export function TeamFormDialog({
     open,
     onOpenChange,
     team,
+    showTrigger = false,
 }: TeamFormDialogProps) {
     const isEditing = !!team;
 
@@ -93,7 +95,7 @@ export function TeamFormDialog({
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            {!isEditing && (
+            {showTrigger && (
                 <DialogTrigger asChild>
                     <Button>Create new Team</Button>
                 </DialogTrigger>
