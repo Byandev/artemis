@@ -49,7 +49,6 @@ class HandleInertiaRequests extends Middleware
             ? $request->user()->workspaces()->limit(3)->get()
             : collect();
 
-
         return [
             ...parent::share($request),
             'name' => config('app.name'),
