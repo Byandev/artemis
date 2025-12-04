@@ -23,9 +23,11 @@ class SendParcelUpdateNotification implements ShouldQueue
      */
     public function handle(): void
     {
-        $this->parcelJourneyNotification->load('order.page');
+        if (! app()->environment('production')) {
+            return;
+        }
 
-        return;
+        $this->parcelJourneyNotification->load('order.page');
 
         if ($this->parcelJourneyNotification->type === 'sms') {
             $response = Http::get('https://api.myinfotxt.com/v2/send.php', [
