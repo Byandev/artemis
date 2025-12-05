@@ -13,8 +13,6 @@ import { Button } from '@/components/ui/button';
 import SearchSelect from './partials/SearchSelect';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { router } from '@inertiajs/react';
-import workspaces from '@/routes/workspaces';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -76,32 +74,10 @@ const Analytics = ({ workspace, data }: Props) => {
     const [loadingGrouped, setLoadingGrouped] = useState<boolean>(true);
 
     const [open, setOpen] = useState(false)
-    const [date, setDate] = useState<Date | undefined>(
-        new Date()
-    )
-    const [month, setMonth] = useState<Date | undefined>(date)
-    const [value, setValue] = useState(formatDate(date))
+    const [date, setDate] = useState<Date | undefined>()
+    const [month, setMonth] = useState<Date | undefined>(undefined)
+    const [value, setValue] = useState(formatDate(undefined))
 
-    // useEffect(() => {
-    //     if (selectedPagesFilter.length === 0) return;
-
-    //     router.get(
-    //         workspaces.rts.analytics.url(workspace),
-    //         {
-    //             page_ids: selectedPagesFilter,
-    //             user_ids: selectedUsersFilter,
-    //             city_ids: selectedCitiesFilter,
-    //         },
-    //         {
-    //             preserveState: true,
-    //             preserveScroll: true,
-    //             replace: true
-    //         }
-    //     );
-    // }, [selectedPagesFilter, workspace, data.grouped_rts_stats_by_page, selectedUsersFilter, selectedCitiesFilter]);
-
-
-    // fetch grouped datasets from API endpoints (use workspace id)
     useEffect(() => {
         const base = `/workspaces/${workspace.slug}/rts/analytics/group-by`;
 
@@ -111,14 +87,29 @@ const Analytics = ({ workspace, data }: Props) => {
             return res.json();
         };
 
+        const buildQuery = () => {
+            const params = new URLSearchParams();
+            selectedPagesFilter.forEach((id) => params.append('page_ids[]', String(id)));
+            selectedUsersFilter.forEach((id) => params.append('user_ids[]', String(id)));
+            selectedShopFilter.forEach((id) => params.append('shop_ids[]', String(id)));
+            if (date) {
+                // format YYYY-MM-DD
+                const d = new Date(date);
+                const iso = d.toISOString().slice(0, 10);
+                params.append('date', iso);
+            }
+            return params.toString();
+        };
+
         (async () => {
             setLoadingGrouped(true);
             try {
+                const qs = buildQuery();
                 const [pages, shops, users, cities] = await Promise.all([
-                    fetchJson(`${base}/page`),
-                    fetchJson(`${base}/shops`),
-                    fetchJson(`${base}/users`),
-                    fetchJson(`${base}/cities`),
+                    fetchJson(`${base}/page${qs ? `?${qs}` : ''}`),
+                    fetchJson(`${base}/shops${qs ? `?${qs}` : ''}`),
+                    fetchJson(`${base}/users${qs ? `?${qs}` : ''}`),
+                    fetchJson(`${base}/cities${qs ? `?${qs}` : ''}`),
                 ]);
 
                 setGroupedByPage(pages ?? []);
@@ -131,7 +122,7 @@ const Analytics = ({ workspace, data }: Props) => {
                 setLoadingGrouped(false);
             }
         })();
-    }, [workspace.id, workspace.slug]);
+    }, [workspace.slug, selectedPagesFilter, selectedUsersFilter, selectedShopFilter, date]);
 
     const heatmapPoints: HeatPoint[] = useMemo(() => {
         return groupedByCities
@@ -356,11 +347,17 @@ const Analytics = ({ workspace, data }: Props) => {
                                         placeholder="June 01, 2025"
                                         className="bg-background pr-10"
                                         onChange={(e) => {
-                                            const date = new Date(e.target.value)
-                                            setValue(e.target.value)
-                                            if (isValidDate(date)) {
-                                                setDate(date)
-                                                setMonth(date)
+                                            const val = e.target.value;
+                                            setValue(val);
+                                            if (!val) {
+                                                setDate(undefined);
+                                                setMonth(undefined);
+                                                return;
+                                            }
+                                            const parsed = new Date(val);
+                                            if (isValidDate(parsed)) {
+                                                setDate(parsed);
+                                                setMonth(parsed);
                                             }
                                         }}
                                         onKeyDown={(e) => {

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\ParcelJourneyNotification;
 use App\Models\Workspace;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class AnalyticController extends Controller
@@ -49,9 +50,9 @@ class AnalyticController extends Controller
     }
 
     // API endpoints for grouped stats
-    public function groupByPage(Workspace $workspace)
+    public function groupByPage(Request $request, Workspace $workspace)
     {
-        $grouped = Order::selectRaw('
+        $groupedQuery = Order::selectRaw('
             pages.id AS id,
             pages.name AS name,
             SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
@@ -64,16 +65,26 @@ class AnalyticController extends Controller
             ) AS rts_rate_percentage
         ')
             ->leftJoin('pages', 'pages.id', '=', 'orders.page_id')
-            ->ofWorkspace($workspace)
-            ->groupBy('orders.page_id', 'pages.name', 'pages.id')
-            ->get();
+            ->ofWorkspace($workspace);
+
+        if ($request->filled('page_ids')) {
+            $ids = (array) $request->input('page_ids');
+            $groupedQuery->whereIn('orders.page_id', $ids);
+        }
+
+        // Date filtering: support `date` (single day) or `start_date`/`end_date` range
+        if ($request->filled('date')) {
+            $groupedQuery->whereDate('orders.confirmed_at', $request->input('date'));
+        }
+
+        $grouped = $groupedQuery->groupBy('orders.page_id', 'pages.name', 'pages.id')->get();
 
         return response()->json($grouped);
     }
 
-    public function groupByShops(Workspace $workspace)
+    public function groupByShops(Request $request, Workspace $workspace)
     {
-        $grouped = Order::selectRaw('
+        $groupedQuery = Order::selectRaw('
             shops.id AS id,
             shops.name AS name,
             SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
@@ -86,16 +97,25 @@ class AnalyticController extends Controller
             ) AS rts_rate_percentage
         ')
             ->leftJoin('shops', 'shops.id', '=', 'orders.shop_id')
-            ->ofWorkspace($workspace)
-            ->groupBy('orders.shop_id', 'shops.name', 'shops.id')
-            ->get();
+            ->ofWorkspace($workspace);
+
+        if ($request->filled('shop_ids')) {
+            $ids = (array) $request->input('shop_ids');
+            $groupedQuery->whereIn('orders.shop_id', $ids);
+        }
+
+        if ($request->filled('date')) {
+            $groupedQuery->whereDate('orders.confirmed_at', $request->input('date'));
+        }
+
+        $grouped = $groupedQuery->groupBy('orders.shop_id', 'shops.name', 'shops.id')->get();
 
         return response()->json($grouped);
     }
 
-    public function groupByUsers(Workspace $workspace)
+    public function groupByUsers(Request $request, Workspace $workspace)
     {
-        $grouped = Order::selectRaw('
+        $groupedQuery = Order::selectRaw('
             users.id AS id,
             users.name AS name,
             SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
@@ -109,16 +129,25 @@ class AnalyticController extends Controller
         ')
             ->leftJoin('pages', 'pages.id', '=', 'orders.page_id')
             ->leftJoin('users', 'users.id', '=', 'pages.owner_id')
-            ->ofWorkspace($workspace)
-            ->groupBy('pages.owner_id', 'users.name', 'users.id')
-            ->get();
+            ->ofWorkspace($workspace);
+
+        if ($request->filled('user_ids')) {
+            $ids = (array) $request->input('user_ids');
+            $groupedQuery->whereIn('pages.owner_id', $ids);
+        }
+
+        if ($request->filled('date')) {
+            $groupedQuery->whereDate('orders.confirmed_at', $request->input('date'));
+        }
+
+        $grouped = $groupedQuery->groupBy('pages.owner_id', 'users.name', 'users.id')->get();
 
         return response()->json($grouped);
     }
 
-    public function groupByCities(Workspace $workspace)
+    public function groupByCities(Request $request, Workspace $workspace)
     {
-        $grouped = Order::selectRaw('
+        $groupedQuery = Order::selectRaw('
             shipping_addresses.id AS id,
             shipping_addresses.district_name AS name,
             SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
@@ -131,9 +160,18 @@ class AnalyticController extends Controller
             ) AS rts_rate_percentage
         ')
             ->leftJoin('shipping_addresses', 'shipping_addresses.order_id', '=', 'orders.id')
-            ->ofWorkspace($workspace)
-            ->groupBy('shipping_addresses.district_name', 'shipping_addresses.id')
-            ->get();
+            ->ofWorkspace($workspace);
+
+        if ($request->filled('city_ids')) {
+            $ids = (array) $request->input('city_ids');
+            $groupedQuery->whereIn('shipping_addresses.id', $ids);
+        }
+
+        if ($request->filled('date')) {
+            $groupedQuery->whereDate('orders.confirmed_at', $request->input('date'));
+        }
+
+        $grouped = $groupedQuery->groupBy('shipping_addresses.district_name', 'shipping_addresses.id')->get();
 
         return response()->json($grouped);
     }
