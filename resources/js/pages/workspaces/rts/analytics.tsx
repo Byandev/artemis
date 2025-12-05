@@ -30,10 +30,6 @@ type Props = {
         returned_amount: number;
         tracked_orders: number;
         sent_parcel_journey_notifications: number;
-        grouped_rts_stats_by_page?: BreakDownAnalytics[];
-        grouped_rts_stats_by_shops?: BreakDownAnalytics[];
-        grouped_rts_stats_by_users?: BreakDownAnalytics[];
-        grouped_rts_stats_by_cities?: BreakDownAnalytics[];
     }
 }
 
@@ -43,10 +39,14 @@ const Analytics = ({ workspace, data }: Props) => {
     const [selectedUsersFilter, setSelectedUsersFilter] = useState<number[]>([]);
     const [selectedShopFilter, setSelectedShopFilter] = useState<number[]>([]);
 
-    const [groupedByPage, setGroupedByPage] = useState<BreakDownAnalytics[]>(data.grouped_rts_stats_by_page ?? []);
-    const [groupedByShops, setGroupedByShops] = useState<BreakDownAnalytics[]>(data.grouped_rts_stats_by_shops ?? []);
-    const [groupedByUsers, setGroupedByUsers] = useState<BreakDownAnalytics[]>(data.grouped_rts_stats_by_users ?? []);
-    const [groupedByCities, setGroupedByCities] = useState<BreakDownAnalytics[]>(data.grouped_rts_stats_by_cities ?? []);
+    const [allGroupedByPage, setAllGroupedByPage] = useState<BreakDownAnalytics[]>([]);
+    const [allGroupedByShops, setAllGroupedByShops] = useState<BreakDownAnalytics[]>([]);
+    const [allGroupedByUsers, setAllGroupedByUsers] = useState<BreakDownAnalytics[]>([]);
+
+    const [groupedByPage, setGroupedByPage] = useState<BreakDownAnalytics[]>([]);
+    const [groupedByShops, setGroupedByShops] = useState<BreakDownAnalytics[]>([]);
+    const [groupedByUsers, setGroupedByUsers] = useState<BreakDownAnalytics[]>([]);
+    const [groupedByCities, setGroupedByCities] = useState<BreakDownAnalytics[]>([]);
     const [loadingGrouped, setLoadingGrouped] = useState<boolean>(true);
 
     const [open, setOpen] = useState(false)
@@ -87,6 +87,16 @@ const Analytics = ({ workspace, data }: Props) => {
                     fetchJson(`${base}/users${qs ? `?${qs}` : ''}`),
                     fetchJson(`${base}/cities${qs ? `?${qs}` : ''}`),
                 ]);
+
+                if (allGroupedByPage.length === 0) {
+                    setAllGroupedByPage(pages ?? []);
+                }
+                if (allGroupedByShops.length === 0) {
+                    setAllGroupedByShops(shops ?? []);
+                }
+                if (allGroupedByUsers.length === 0) {
+                    setAllGroupedByUsers(users ?? []);
+                }
 
                 setGroupedByPage(pages ?? []);
                 setGroupedByShops(shops ?? []);
@@ -250,9 +260,9 @@ const Analytics = ({ workspace, data }: Props) => {
                         </h1>
                         <div className='flex gap-2'>
                             <AnalyticsFilters
-                                groupedByPage={groupedByPage}
-                                groupedByUsers={groupedByUsers}
-                                groupedByShops={groupedByShops}
+                                groupedByPage={allGroupedByPage}
+                                groupedByUsers={allGroupedByUsers}
+                                groupedByShops={allGroupedByShops}
                                 selectedPagesFilter={selectedPagesFilter}
                                 setSelectedPagesFilter={setSelectedPagesFilter}
                                 selectedUsersFilter={selectedUsersFilter}
