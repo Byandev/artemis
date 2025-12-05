@@ -1,21 +1,16 @@
 import AppLayout from '@/layouts/app-layout';
 import RtsNavigation from '@/pages/workspaces/rts/partials/RtsNavigation';
 import { Workspace } from '@/types/models/Workspace';
-import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { useEffect, useMemo, useState } from 'react';
 import { ChartConfig } from '@/components/ui/chart';
 import BreakdownAnalyticsView from './partials/BreakdownAnalyticsView';
 import { ColumnDef } from '@tanstack/react-table';
 import { getLatLng } from '@/lib/cities';
 import { HeatPoint } from './partials/HeatmapMap';
-import { CalendarIcon, FilterIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import SearchSelect from './partials/SearchSelect';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import AnalyticsFilters from './partials/AnalyticsFilters';
+import DateFilter from './partials/DateFilter';
+import AnalyticsStatCard from './partials/AnalyticsStatCard';
+import { formatDate } from '@/lib/utils';
 
 type BreakDownAnalytics = {
     id: number;
@@ -40,25 +35,6 @@ type Props = {
         grouped_rts_stats_by_users?: BreakDownAnalytics[];
         grouped_rts_stats_by_cities?: BreakDownAnalytics[];
     }
-}
-
-function formatDate(date: Date | undefined) {
-    if (!date) {
-        return ""
-    }
-
-    return date.toLocaleDateString("en-US", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-    })
-}
-
-function isValidDate(date: Date | undefined) {
-    if (!date) {
-        return false
-    }
-    return !isNaN(date.getTime())
 }
 
 
@@ -273,152 +249,37 @@ const Analytics = ({ workspace, data }: Props) => {
                             Analytics
                         </h1>
                         <div className='flex gap-2'>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline">
-                                        <FilterIcon className='mr-2 h-4 w-4' />
-                                        Filter</Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-54 p-3">
-                                    <Accordion
-                                        type="multiple"
-                                        className="w-full"
-                                    >
-                                        <AccordionItem value="item-1">
-                                            <AccordionTrigger className='py-2'>Page</AccordionTrigger>
-                                            <AccordionContent className="flex flex-col gap-4 text-balance">
-                                                {loadingGrouped ? (
-                                                    <div>Loading...</div>
-                                                ) : (
-                                                    <SearchSelect
-                                                        items={groupedByPage.map((page) => ({
-                                                            id: page.id,
-                                                            name: page.name,
-                                                        }))}
-                                                        selected={selectedPagesFilter}
-                                                        setSelected={setSelectedPagesFilter}
-                                                    />
-                                                )}
-                                            </AccordionContent>
-                                        </AccordionItem>
-                                        <AccordionItem value="item-2">
-                                            <AccordionTrigger className='py-2'>User</AccordionTrigger>
-                                            <AccordionContent className="flex flex-col gap-4 text-balance">
-                                                {loadingGrouped ? (
-                                                    <div>Loading...</div>
-                                                ) : (
-                                                    <SearchSelect
-                                                        items={groupedByUsers.map((user) => ({
-                                                            id: user.id,
-                                                            name: user.name,
-                                                        }))}
-                                                        selected={selectedUsersFilter}
-                                                        setSelected={setSelectedUsersFilter}
-                                                    />
-                                                )}
-                                            </AccordionContent>
-                                        </AccordionItem>
-                                        <AccordionItem value="item-3">
-                                            <AccordionTrigger className='py-2'>Shop</AccordionTrigger>
-                                            <AccordionContent className="flex flex-col gap-4 text-balance">
-                                                {loadingGrouped ? (
-                                                    <div>Loading...</div>
-                                                ) : (
-                                                    <SearchSelect
-                                                        items={groupedByShops.map((shop) => ({
-                                                            id: shop.id,
-                                                            name: shop.name,
-                                                        }))}
-                                                        selected={selectedShopFilter}
-                                                        setSelected={setSelectedShopFilter}
-                                                    />
-                                                )}
-                                            </AccordionContent>
-                                        </AccordionItem>
-                                    </Accordion>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                            <AnalyticsFilters
+                                groupedByPage={groupedByPage}
+                                groupedByUsers={groupedByUsers}
+                                groupedByShops={groupedByShops}
+                                selectedPagesFilter={selectedPagesFilter}
+                                setSelectedPagesFilter={setSelectedPagesFilter}
+                                selectedUsersFilter={selectedUsersFilter}
+                                setSelectedUsersFilter={setSelectedUsersFilter}
+                                selectedShopFilter={selectedShopFilter}
+                                setSelectedShopFilter={setSelectedShopFilter}
+                                loadingGrouped={loadingGrouped}
+                            />
 
-                            <div className="flex flex-col gap-3">
-                                <div className="relative flex gap-2">
-                                    <Input
-                                        id="date"
-                                        value={value}
-                                        placeholder="June 01, 2025"
-                                        className="bg-background pr-10"
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            setValue(val);
-                                            if (!val) {
-                                                setDate(undefined);
-                                                setMonth(undefined);
-                                                return;
-                                            }
-                                            const parsed = new Date(val);
-                                            if (isValidDate(parsed)) {
-                                                setDate(parsed);
-                                                setMonth(parsed);
-                                            }
-                                        }}
-                                        onKeyDown={(e) => {
-                                            if (e.key === "ArrowDown") {
-                                                e.preventDefault()
-                                                setOpen(true)
-                                            }
-                                        }}
-                                    />
-                                    <Popover open={open} onOpenChange={setOpen}>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                id="date-picker"
-                                                variant="ghost"
-                                                className="absolute top-1/2 right-2 size-6 -translate-y-1/2"
-                                            >
-                                                <CalendarIcon className="size-3.5" />
-                                                <span className="sr-only">Select date</span>
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent
-                                            className="w-auto overflow-hidden p-0"
-                                            align="end"
-                                            alignOffset={-8}
-                                            sideOffset={10}
-                                        >
-                                            <Calendar
-                                                mode="single"
-                                                selected={date}
-                                                captionLayout="dropdown"
-                                                month={month}
-                                                onMonthChange={setMonth}
-                                                onSelect={(date) => {
-                                                    setDate(date)
-                                                    setValue(formatDate(date))
-                                                    setOpen(false)
-                                                }}
-                                            />
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
-                            </div>
+                            <DateFilter
+                                open={open}
+                                setOpen={setOpen}
+                                date={date}
+                                setDate={setDate}
+                                month={month}
+                                setMonth={setMonth}
+                                value={value}
+                                setValue={setValue}
+                            />
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                         {analytics.map((data, key) => (
-                            <Card key={key} className="p-4 gap-5 flex flex-col col-span-1">
-                                <CardHeader className="p-0">
-                                    <div>
-                                        <span className="text-xl sm:text-2xl md:text-3xl font-extrabold">
-                                            {typeof data.value === 'number'
-                                                ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data.value)
-                                                : data.value}
-                                        </span>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <p className="text-sm sm:text-md text-muted-foreground">{data.title}</p>
-                                </CardContent>
-                            </Card>
+                            <div className='col-span-1' key={key}>
+                                <AnalyticsStatCard title={data.title} value={data.value} />
+                            </div>
                         ))}
 
                         <div className="col-span-1 sm:col-span-2 md:col-span-4 mt-4 space-y-6">
