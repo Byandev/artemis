@@ -251,6 +251,12 @@ const Analytics = ({ workspace, data }: Props) => {
     return (
         <AppLayout>
             <div className='px-4 py-6'>
+                <div className="mb-6 flex items-center justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold">RTS Management</h1>
+                        <p className="text-muted-foreground">Manage RTS analytics and reports</p>
+                    </div>
+                </div>
                 <RtsNavigation workspace={workspace} />
 
                 <div className='border p-5 rounded-md'>
