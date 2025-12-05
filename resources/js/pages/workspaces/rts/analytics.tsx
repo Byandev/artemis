@@ -22,7 +22,7 @@ import { Calendar } from '@/components/ui/calendar';
 type BreakDownAnalytics = {
     id: number;
     name: string;
-    rts_rate_percentage_orders: number;
+    total_orders: number;
     rts_rate_percentage: number;
     returned_count: number;
     delivered_count: number;
@@ -37,10 +37,10 @@ type Props = {
         returned_amount: number;
         tracked_orders: number;
         sent_parcel_journey_notifications: number;
-        grouped_rts_stats_by_page: BreakDownAnalytics[];
-        grouped_rts_stats_by_shops: BreakDownAnalytics[];
-        grouped_rts_stats_by_users: BreakDownAnalytics[];
-        grouped_rts_stats_by_cities: BreakDownAnalytics[];
+        grouped_rts_stats_by_page?: BreakDownAnalytics[];
+        grouped_rts_stats_by_shops?: BreakDownAnalytics[];
+        grouped_rts_stats_by_users?: BreakDownAnalytics[];
+        grouped_rts_stats_by_cities?: BreakDownAnalytics[];
     }
 }
 
@@ -69,6 +69,12 @@ const Analytics = ({ workspace, data }: Props) => {
     const [selectedUsersFilter, setSelectedUsersFilter] = useState<number[]>([]);
     const [selectedShopFilter, setSelectedShopFilter] = useState<number[]>([]);
 
+    const [groupedByPage, setGroupedByPage] = useState<BreakDownAnalytics[]>(data.grouped_rts_stats_by_page ?? []);
+    const [groupedByShops, setGroupedByShops] = useState<BreakDownAnalytics[]>(data.grouped_rts_stats_by_shops ?? []);
+    const [groupedByUsers, setGroupedByUsers] = useState<BreakDownAnalytics[]>(data.grouped_rts_stats_by_users ?? []);
+    const [groupedByCities, setGroupedByCities] = useState<BreakDownAnalytics[]>(data.grouped_rts_stats_by_cities ?? []);
+    const [loadingGrouped, setLoadingGrouped] = useState<boolean>(true);
+
     const [open, setOpen] = useState(false)
     const [date, setDate] = useState<Date | undefined>(
         new Date()
@@ -95,8 +101,40 @@ const Analytics = ({ workspace, data }: Props) => {
     // }, [selectedPagesFilter, workspace, data.grouped_rts_stats_by_page, selectedUsersFilter, selectedCitiesFilter]);
 
 
+    // fetch grouped datasets from API endpoints (use workspace id)
+    useEffect(() => {
+        const base = `/workspaces/${workspace.slug}/rts/analytics/group-by`;
+
+        const fetchJson = async (path: string) => {
+            const res = await fetch(path, { credentials: 'same-origin' });
+            if (!res.ok) return [];
+            return res.json();
+        };
+
+        (async () => {
+            setLoadingGrouped(true);
+            try {
+                const [pages, shops, users, cities] = await Promise.all([
+                    fetchJson(`${base}/page`),
+                    fetchJson(`${base}/shops`),
+                    fetchJson(`${base}/users`),
+                    fetchJson(`${base}/cities`),
+                ]);
+
+                setGroupedByPage(pages ?? []);
+                setGroupedByShops(shops ?? []);
+                setGroupedByUsers(users ?? []);
+                setGroupedByCities(cities ?? []);
+            } catch (e) {
+                console.error('Failed to load grouped analytics', e);
+            } finally {
+                setLoadingGrouped(false);
+            }
+        })();
+    }, [workspace.id, workspace.slug]);
+
     const heatmapPoints: HeatPoint[] = useMemo(() => {
-        return data.grouped_rts_stats_by_cities
+        return groupedByCities
             .map((city) => {
                 const latLng = getLatLng(city.name);
                 if (!latLng) return null;
@@ -110,7 +148,7 @@ const Analytics = ({ workspace, data }: Props) => {
                 };
             })
             .filter((p): p is HeatPoint => p !== null);
-    }, [data.grouped_rts_stats_by_cities]);
+    }, [groupedByCities]);
 
 
     const analytics = useMemo(() => {
@@ -238,7 +276,7 @@ const Analytics = ({ workspace, data }: Props) => {
             <div className='px-4 py-6'>
                 <RtsNavigation workspace={workspace} />
 
-                <div className='border p-5 border rounded-md'>
+                <div className='border p-5 rounded-md'>
                     <div className='flex items-center justify-between mb-8'>
                         <h1 className="scroll-m-20 text-center text-3xl font-extrabold tracking-tight text-balance">
                             Analytics
@@ -258,40 +296,52 @@ const Analytics = ({ workspace, data }: Props) => {
                                         <AccordionItem value="item-1">
                                             <AccordionTrigger className='py-2'>Page</AccordionTrigger>
                                             <AccordionContent className="flex flex-col gap-4 text-balance">
-                                                <SearchSelect
-                                                    items={data.grouped_rts_stats_by_page.map((page) => ({
-                                                        id: page.id,
-                                                        name: page.name,
-                                                    }))}
-                                                    selected={selectedPagesFilter}
-                                                    setSelected={setSelectedPagesFilter}
-                                                />
+                                                {loadingGrouped ? (
+                                                    <div>Loading...</div>
+                                                ) : (
+                                                    <SearchSelect
+                                                        items={groupedByPage.map((page) => ({
+                                                            id: page.id,
+                                                            name: page.name,
+                                                        }))}
+                                                        selected={selectedPagesFilter}
+                                                        setSelected={setSelectedPagesFilter}
+                                                    />
+                                                )}
                                             </AccordionContent>
                                         </AccordionItem>
                                         <AccordionItem value="item-2">
                                             <AccordionTrigger className='py-2'>User</AccordionTrigger>
                                             <AccordionContent className="flex flex-col gap-4 text-balance">
-                                                <SearchSelect
-                                                    items={data.grouped_rts_stats_by_users.map((user) => ({
-                                                        id: user.id,
-                                                        name: user.name,
-                                                    }))}
-                                                    selected={selectedUsersFilter}
-                                                    setSelected={setSelectedUsersFilter}
-                                                />
+                                                {loadingGrouped ? (
+                                                    <div>Loading...</div>
+                                                ) : (
+                                                    <SearchSelect
+                                                        items={groupedByUsers.map((user) => ({
+                                                            id: user.id,
+                                                            name: user.name,
+                                                        }))}
+                                                        selected={selectedUsersFilter}
+                                                        setSelected={setSelectedUsersFilter}
+                                                    />
+                                                )}
                                             </AccordionContent>
                                         </AccordionItem>
                                         <AccordionItem value="item-3">
                                             <AccordionTrigger className='py-2'>Shop</AccordionTrigger>
                                             <AccordionContent className="flex flex-col gap-4 text-balance">
-                                                <SearchSelect
-                                                    items={data.grouped_rts_stats_by_cities.map((city) => ({
-                                                        id: city.id,
-                                                        name: city.name,
-                                                    }))}
-                                                    selected={selectedShopFilter}
-                                                    setSelected={setSelectedShopFilter}
-                                                />
+                                                {loadingGrouped ? (
+                                                    <div>Loading...</div>
+                                                ) : (
+                                                    <SearchSelect
+                                                        items={groupedByShops.map((shop) => ({
+                                                            id: shop.id,
+                                                            name: shop.name,
+                                                        }))}
+                                                        selected={selectedShopFilter}
+                                                        setSelected={setSelectedShopFilter}
+                                                    />
+                                                )}
                                             </AccordionContent>
                                         </AccordionItem>
                                     </Accordion>
@@ -382,9 +432,10 @@ const Analytics = ({ workspace, data }: Props) => {
                                 ]}
                                 xKey="name"
                                 className="w-full max-h-[400px]"
-                                data={data.grouped_rts_stats_by_page}
+                                data={groupedByPage}
                                 chartConfig={chartConfig}
                                 title="Breakdown per Pages"
+                                loading={loadingGrouped}
                             />
 
                             <BreakdownAnalyticsView<BreakDownAnalytics>
@@ -394,9 +445,10 @@ const Analytics = ({ workspace, data }: Props) => {
                                 ]}
                                 xKey="name"
                                 className="w-full max-h-[400px]"
-                                data={data.grouped_rts_stats_by_shops}
+                                data={groupedByShops}
                                 chartConfig={chartConfig}
                                 title="Breakdown per Shops"
+                                loading={loadingGrouped}
                             />
 
                             <BreakdownAnalyticsView<BreakDownAnalytics>
@@ -406,18 +458,20 @@ const Analytics = ({ workspace, data }: Props) => {
                                 ]}
                                 xKey="name"
                                 className="w-full max-h-[400px]"
-                                data={data.grouped_rts_stats_by_users}
+                                data={groupedByUsers}
                                 chartConfig={chartConfig}
                                 title="Breakdown per Users"
+                                loading={loadingGrouped}
                             />
 
                             <BreakdownAnalyticsView<BreakDownAnalytics>
                                 columns={perCityColumns}
                                 availableViews={['heatmap', 'table']}
                                 className="w-full max-h-[400px]"
-                                data={data.grouped_rts_stats_by_cities}
+                                data={groupedByCities}
                                 title="Breakdown per Cities"
                                 heatmapPoints={heatmapPoints}
+                                loading={loadingGrouped}
                             />
                         </div>
                     </div>
