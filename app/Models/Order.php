@@ -13,6 +13,11 @@ class Order extends Model
         return $this->hasOne(ShippingAddress::class);
     }
 
+    public function parcelJourney(): \Illuminate\Database\Eloquent\Relations\HasOne|Order
+    {
+        return $this->hasOne(ParcelJourney::class);
+    }
+
     public function page(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Page::class);
