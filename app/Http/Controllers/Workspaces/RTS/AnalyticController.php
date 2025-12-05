@@ -73,7 +73,9 @@ class AnalyticController extends Controller
         }
 
         if ($request->filled('date')) {
-            $groupedQuery->whereDate('orders.confirmed_at', $request->input('date'));
+            $endDate = $request->input('date');
+            $startDate = \Carbon\Carbon::parse($endDate)->startOfMonth();
+            $groupedQuery->whereBetween('orders.confirmed_at', [$startDate, $endDate]);
         }
 
         $grouped = $groupedQuery->groupBy('orders.page_id', 'pages.name', 'pages.id')->get();
@@ -104,7 +106,9 @@ class AnalyticController extends Controller
         }
 
         if ($request->filled('date')) {
-            $groupedQuery->whereDate('orders.confirmed_at', $request->input('date'));
+            $endDate = $request->input('date');
+            $startDate = \Carbon\Carbon::parse($endDate)->startOfMonth();
+            $groupedQuery->whereBetween('orders.confirmed_at', [$startDate, $endDate]);
         }
 
         $grouped = $groupedQuery->groupBy('orders.shop_id', 'shops.name', 'shops.id')->get();
@@ -136,7 +140,9 @@ class AnalyticController extends Controller
         }
 
         if ($request->filled('date')) {
-            $groupedQuery->whereDate('orders.confirmed_at', $request->input('date'));
+            $endDate = $request->input('date');
+            $startDate = \Carbon\Carbon::parse($endDate)->startOfMonth();
+            $groupedQuery->whereBetween('orders.confirmed_at', [$startDate, $endDate]);
         }
 
         $grouped = $groupedQuery->groupBy('pages.owner_id', 'users.name', 'users.id')->get();
@@ -167,7 +173,9 @@ class AnalyticController extends Controller
         }
 
         if ($request->filled('date')) {
-            $groupedQuery->whereDate('orders.confirmed_at', $request->input('date'));
+            $endDate = $request->input('date');
+            $startDate = \Carbon\Carbon::parse($endDate)->startOfMonth();
+            $groupedQuery->whereBetween('orders.confirmed_at', [$startDate, $endDate]);
         }
 
         $grouped = $groupedQuery->groupBy('shipping_addresses.district_name', 'shipping_addresses.id')->get();
