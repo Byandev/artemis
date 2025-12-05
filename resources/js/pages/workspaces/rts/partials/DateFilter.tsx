@@ -9,15 +9,17 @@ import { formatDate, isValidDate } from '@/lib/utils';
 type Props = {
     open: boolean;
     setOpen: (v: boolean) => void;
-    date: Date | undefined;
-    setDate: (d: Date | undefined) => void;
+    startDate: Date | undefined;
+    setStartDate: (d: Date | undefined) => void;
+    endDate: Date | undefined;
+    setEndDate: (d: Date | undefined) => void;
     month: Date | undefined;
     setMonth: (d: Date | undefined) => void;
     value: string;
     setValue: (v: string) => void;
 }
 
-const DateFilter = ({ open, setOpen, date, setDate, month, setMonth, value, setValue }: Props) => {
+const DateFilter = ({ open, setOpen, startDate, setStartDate, endDate, setEndDate, month, setMonth, value, setValue }: Props) => {
     return (
         <div className="flex flex-col gap-3">
             <div className="relative flex gap-2">
@@ -30,13 +32,30 @@ const DateFilter = ({ open, setOpen, date, setDate, month, setMonth, value, setV
                         const val = e.target.value;
                         setValue(val);
                         if (!val) {
-                            setDate(undefined);
+                            setStartDate(undefined);
+                            setEndDate(undefined);
                             setMonth(undefined);
                             return;
                         }
+
+                        // Try parsing a range like "Jun 01, 2025 - Jun 30, 2025"
+                        const parts = val.split(/\s*(?:—|-|–)\s*/);
+                        if (parts.length === 2) {
+                            const p0 = new Date(parts[0]);
+                            const p1 = new Date(parts[1]);
+                            const valid0 = isValidDate(p0);
+                            const valid1 = isValidDate(p1);
+                            if (valid0) setStartDate(p0);
+                            if (valid1) setEndDate(p1);
+                            if (valid0) setMonth(p0);
+                            return;
+                        }
+
+                        // Fallback: try parse single date
                         const parsed = new Date(val);
                         if (isValidDate(parsed)) {
-                            setDate(parsed);
+                            setStartDate(parsed);
+                            setEndDate(undefined);
                             setMonth(parsed);
                         }
                     }}
@@ -65,15 +84,38 @@ const DateFilter = ({ open, setOpen, date, setDate, month, setMonth, value, setV
                         sideOffset={10}
                     >
                         <Calendar
-                            mode="single"
-                            selected={date}
+                            mode="range"
+                            selected={{ from: startDate, to: endDate }}
                             captionLayout="dropdown"
                             month={month}
                             onMonthChange={setMonth}
-                            onSelect={(d) => {
-                                setDate(d);
-                                setValue(formatDate(d));
-                                setOpen(false);
+                            onSelect={(rangeOrDate: any) => {
+                                // rangeOrDate may be undefined, a Date, or a Range { from?, to? }
+                                if (!rangeOrDate) {
+                                    setStartDate(undefined);
+                                    setEndDate(undefined);
+                                    setValue('');
+                                    return;
+                                }
+
+                                // If it's a single Date (user clicked one date), set start only
+                                if (rangeOrDate instanceof Date) {
+                                    setStartDate(rangeOrDate);
+                                    setEndDate(undefined);
+                                    setValue(formatDate(rangeOrDate));
+                                    return;
+                                }
+
+                                const from: Date | undefined = rangeOrDate?.from;
+                                const to: Date | undefined = rangeOrDate?.to;
+                                setStartDate(from);
+                                setEndDate(to);
+                                if (from && to) {
+                                    setValue(`${formatDate(from)} — ${formatDate(to)}`);
+                                    setOpen(false);
+                                } else if (from) {
+                                    setValue(formatDate(from));
+                                }
                             }}
                         />
                     </PopoverContent>

@@ -52,6 +52,9 @@ class AnalyticController extends Controller
     // API endpoints for grouped stats
     public function groupByPages(Request $request, Workspace $workspace)
     {
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
         $groupedQuery = Order::selectRaw('
             pages.id AS id,
             pages.name AS name,
@@ -72,9 +75,7 @@ class AnalyticController extends Controller
             $groupedQuery->whereIn('orders.page_id', $ids);
         }
 
-        if ($request->filled('date')) {
-            $endDate = $request->input('date');
-            $startDate = \Carbon\Carbon::parse($endDate)->startOfMonth();
+        if ($request->filled('start_date') && $request->filled('end_date')) {
             $groupedQuery->whereBetween('orders.confirmed_at', [$startDate, $endDate]);
         }
 
@@ -85,6 +86,9 @@ class AnalyticController extends Controller
 
     public function groupByShops(Request $request, Workspace $workspace)
     {
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
         $groupedQuery = Order::selectRaw('
             shops.id AS id,
             shops.name AS name,
@@ -105,9 +109,7 @@ class AnalyticController extends Controller
             $groupedQuery->whereIn('orders.shop_id', $ids);
         }
 
-        if ($request->filled('date')) {
-            $endDate = $request->input('date');
-            $startDate = \Carbon\Carbon::parse($endDate)->startOfMonth();
+        if ($request->filled('start_date') && $request->filled('end_date')) {
             $groupedQuery->whereBetween('orders.confirmed_at', [$startDate, $endDate]);
         }
 
@@ -118,6 +120,9 @@ class AnalyticController extends Controller
 
     public function groupByUsers(Request $request, Workspace $workspace)
     {
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
         $groupedQuery = Order::selectRaw('
             users.id AS id,
             users.name AS name,
@@ -139,9 +144,7 @@ class AnalyticController extends Controller
             $groupedQuery->whereIn('pages.owner_id', $ids);
         }
 
-        if ($request->filled('date')) {
-            $endDate = $request->input('date');
-            $startDate = \Carbon\Carbon::parse($endDate)->startOfMonth();
+        if ($request->filled('start_date') && $request->filled('end_date')) {
             $groupedQuery->whereBetween('orders.confirmed_at', [$startDate, $endDate]);
         }
 
@@ -152,6 +155,9 @@ class AnalyticController extends Controller
 
     public function groupByCities(Request $request, Workspace $workspace)
     {
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
         $groupedQuery = Order::selectRaw('
             shipping_addresses.id AS id,
             shipping_addresses.district_name AS name,
@@ -172,9 +178,7 @@ class AnalyticController extends Controller
             $groupedQuery->whereIn('shipping_addresses.id', $ids);
         }
 
-        if ($request->filled('date')) {
-            $endDate = $request->input('date');
-            $startDate = \Carbon\Carbon::parse($endDate)->startOfMonth();
+        if ($request->filled('start_date') && $request->filled('end_date')) {
             $groupedQuery->whereBetween('orders.confirmed_at', [$startDate, $endDate]);
         }
 

@@ -10,7 +10,6 @@ import { HeatPoint } from './partials/HeatmapMap';
 import AnalyticsFilters from './partials/AnalyticsFilters';
 import DateFilter from './partials/DateFilter';
 import AnalyticsStatCard from './partials/AnalyticsStatCard';
-import { formatDate } from '@/lib/utils';
 
 type BreakDownAnalytics = {
     id: number;
@@ -50,9 +49,10 @@ const Analytics = ({ workspace, data }: Props) => {
     const [loadingGrouped, setLoadingGrouped] = useState<boolean>(true);
 
     const [open, setOpen] = useState(false)
-    const [date, setDate] = useState<Date | undefined>()
+    const [startDate, setStartDate] = useState<Date | undefined>()
+    const [endDate, setEndDate] = useState<Date | undefined>()
     const [month, setMonth] = useState<Date | undefined>(undefined)
-    const [value, setValue] = useState(formatDate(undefined))
+    const [value, setValue] = useState<string>('')
 
     useEffect(() => {
         const base = `/workspaces/${workspace.slug}/rts/analytics/group-by`;
@@ -68,12 +68,17 @@ const Analytics = ({ workspace, data }: Props) => {
             selectedPagesFilter.forEach((id) => params.append('page_ids[]', String(id)));
             selectedUsersFilter.forEach((id) => params.append('user_ids[]', String(id)));
             selectedShopFilter.forEach((id) => params.append('shop_ids[]', String(id)));
-            if (date) {
-                // format YYYY-MM-DD
-                const d = new Date(date);
-                const iso = d.toISOString().slice(0, 10);
-                params.append('date', iso);
+            if (startDate) {
+                const s = new Date(startDate);
+                params.append('start_date', s.toISOString().slice(0, 10));
             }
+
+            if (endDate) {
+                const e = new Date(endDate);
+                params.append('end_date', e.toISOString().slice(0, 10));
+            }
+
+            console.log(startDate, endDate, params.toString());
             return params.toString();
         };
 
@@ -108,7 +113,7 @@ const Analytics = ({ workspace, data }: Props) => {
                 setLoadingGrouped(false);
             }
         })();
-    }, [workspace.slug, selectedPagesFilter, selectedUsersFilter, selectedShopFilter, date, allGroupedByPage.length, allGroupedByShops.length, allGroupedByUsers.length]);
+    }, [workspace.slug, selectedPagesFilter, selectedUsersFilter, selectedShopFilter, startDate, endDate, allGroupedByPage.length, allGroupedByShops.length, allGroupedByUsers.length]);
 
     const heatmapPoints: HeatPoint[] = useMemo(() => {
         return groupedByCities
@@ -282,15 +287,15 @@ const Analytics = ({ workspace, data }: Props) => {
                                 <DateFilter
                                     open={open}
                                     setOpen={setOpen}
-                                    date={date}
-                                    setDate={setDate}
+                                    startDate={startDate}
+                                    setStartDate={setStartDate}
+                                    endDate={endDate}
+                                    setEndDate={setEndDate}
                                     month={month}
                                     setMonth={setMonth}
                                     value={value}
                                     setValue={setValue}
                                 />
-                                <div className="text-[10px] text-gray-500 mt-1">Note: Start date auto-sets to the month's first day</div>
-
                             </div>
                         </div>
                     </div>
