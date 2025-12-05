@@ -33,8 +33,8 @@ export function DataTable<TData, TValue>({
         data,
         columns,
         getCoreRowModel: getCoreRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
-
+        getPaginationRowModel: enableInternalPagination ? getPaginationRowModel() : undefined,
+        initialState: enableInternalPagination ? { pagination: { pageSize: 5 } } : undefined,
     })
 
     return (
@@ -102,7 +102,7 @@ export function DataTable<TData, TValue>({
                     >
                         Next
                     </Button>
-                </div>
+                </div >
             )}
         </>
     )
