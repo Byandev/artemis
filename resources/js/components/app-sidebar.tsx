@@ -67,7 +67,7 @@ export function AppSidebar() {
         },
         {
             title: 'RTS Management',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/analytics`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
             icon: RotateCwIcon,
         },
     ];
