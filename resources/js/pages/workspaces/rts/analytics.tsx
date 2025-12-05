@@ -272,16 +272,20 @@ const Analytics = ({ workspace, data }: Props) => {
                                 loadingGrouped={loadingGrouped}
                             />
 
-                            <DateFilter
-                                open={open}
-                                setOpen={setOpen}
-                                date={date}
-                                setDate={setDate}
-                                month={month}
-                                setMonth={setMonth}
-                                value={value}
-                                setValue={setValue}
-                            />
+                            <div className="flex flex-col">
+                                <DateFilter
+                                    open={open}
+                                    setOpen={setOpen}
+                                    date={date}
+                                    setDate={setDate}
+                                    month={month}
+                                    setMonth={setMonth}
+                                    value={value}
+                                    setValue={setValue}
+                                />
+                                <div className="text-[10px] text-gray-500 mt-1">Note: Start date auto-sets to the month's first day</div>
+
+                            </div>
                         </div>
                     </div>
 
