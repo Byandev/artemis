@@ -8,8 +8,8 @@ import { ColumnDef } from '@tanstack/react-table';
 import { getLatLng } from '@/lib/cities';
 import { HeatPoint } from './partials/HeatmapMap';
 import AnalyticsFilters from './partials/AnalyticsFilters';
-import DateFilter from './partials/DateFilter';
 import AnalyticsStatCard from './partials/AnalyticsStatCard';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 
 type BreakDownAnalytics = {
     id: number;
@@ -48,11 +48,8 @@ const Analytics = ({ workspace, data }: Props) => {
     const [groupedByCities, setGroupedByCities] = useState<BreakDownAnalytics[]>([]);
     const [loadingGrouped, setLoadingGrouped] = useState<boolean>(true);
 
-    const [open, setOpen] = useState(false)
     const [startDate, setStartDate] = useState<Date | undefined>()
     const [endDate, setEndDate] = useState<Date | undefined>()
-    const [month, setMonth] = useState<Date | undefined>(undefined)
-    const [value, setValue] = useState<string>('')
 
     useEffect(() => {
         const base = `/workspaces/${workspace.slug}/rts/analytics/group-by`;
@@ -284,17 +281,12 @@ const Analytics = ({ workspace, data }: Props) => {
                             />
 
                             <div className="flex flex-col">
-                                <DateFilter
-                                    open={open}
-                                    setOpen={setOpen}
-                                    startDate={startDate}
-                                    setStartDate={setStartDate}
-                                    endDate={endDate}
-                                    setEndDate={setEndDate}
-                                    month={month}
-                                    setMonth={setMonth}
-                                    value={value}
-                                    setValue={setValue}
+                                <DateRangePicker
+                                    onUpdate={(values) => {
+                                        setStartDate(values.range.from ?? undefined);
+                                        setEndDate(values.range.to ?? undefined);
+                                    }}
+                                    align="start"
                                 />
                             </div>
                         </div>
