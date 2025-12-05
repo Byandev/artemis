@@ -72,7 +72,6 @@ class AnalyticController extends Controller
             $groupedQuery->whereIn('orders.page_id', $ids);
         }
 
-        // Date filtering: support `date` (single day) or `start_date`/`end_date` range
         if ($request->filled('date')) {
             $groupedQuery->whereDate('orders.confirmed_at', $request->input('date'));
         }

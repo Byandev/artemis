@@ -108,7 +108,7 @@ const Analytics = ({ workspace, data }: Props) => {
                 setLoadingGrouped(false);
             }
         })();
-    }, [workspace.slug, selectedPagesFilter, selectedUsersFilter, selectedShopFilter, date]);
+    }, [workspace.slug, selectedPagesFilter, selectedUsersFilter, selectedShopFilter, date, allGroupedByPage, allGroupedByShops, allGroupedByUsers]);
 
     const heatmapPoints: HeatPoint[] = useMemo(() => {
         return groupedByCities
