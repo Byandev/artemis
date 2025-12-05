@@ -207,7 +207,6 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders }: ForDeliveryT
                         <div className='col-span-4'>
                             <DataTable columns={orderColumns} data={orders.data} />
 
-                            {/* Pagination - always show results count */}
                             <Pagination data={orders} />
                         </div>
                     </div>
