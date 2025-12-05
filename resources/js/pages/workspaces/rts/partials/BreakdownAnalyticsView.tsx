@@ -116,7 +116,7 @@ const BreakdownAnalyticsView = <T,>({
                     )}
                 </>
             ) : (
-                <DataTable columns={columns} data={data} />
+                <DataTable columns={columns} data={data} enableInternalPagination />
             )}
         </div>
     );
