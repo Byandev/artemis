@@ -82,7 +82,7 @@ const Analytics = ({ workspace, data }: Props) => {
             try {
                 const qs = buildQuery();
                 const [pages, shops, users, cities] = await Promise.all([
-                    fetchJson(`${base}/page${qs ? `?${qs}` : ''}`),
+                    fetchJson(`${base}/pages${qs ? `?${qs}` : ''}`),
                     fetchJson(`${base}/shops${qs ? `?${qs}` : ''}`),
                     fetchJson(`${base}/users${qs ? `?${qs}` : ''}`),
                     fetchJson(`${base}/cities${qs ? `?${qs}` : ''}`),
@@ -108,7 +108,7 @@ const Analytics = ({ workspace, data }: Props) => {
                 setLoadingGrouped(false);
             }
         })();
-    }, [workspace.slug, selectedPagesFilter, selectedUsersFilter, selectedShopFilter, date, allGroupedByPage, allGroupedByShops, allGroupedByUsers]);
+    }, [workspace.slug, selectedPagesFilter, selectedUsersFilter, selectedShopFilter, date, allGroupedByPage.length, allGroupedByShops.length, allGroupedByUsers.length]);
 
     const heatmapPoints: HeatPoint[] = useMemo(() => {
         return groupedByCities

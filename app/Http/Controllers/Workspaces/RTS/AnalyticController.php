@@ -50,7 +50,7 @@ class AnalyticController extends Controller
     }
 
     // API endpoints for grouped stats
-    public function groupByPage(Request $request, Workspace $workspace)
+    public function groupByPages(Request $request, Workspace $workspace)
     {
         $groupedQuery = Order::selectRaw('
             pages.id AS id,

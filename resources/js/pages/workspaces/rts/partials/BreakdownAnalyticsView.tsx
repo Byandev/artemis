@@ -38,7 +38,6 @@ const BreakdownAnalyticsView = <T,>({
     heatmapPoints,
     loading
 }: Props<T>) => {
-    console.log(heatmapPoints);
     const views = React.useMemo(() => (availableViews && availableViews.length ? availableViews : (['graph', 'table'] as const)), [availableViews]) as Array<'graph' | 'table' | 'heatmap'>;
 
     const [currentView, setCurrentView] = React.useState<typeof views[number]>(views[0]);
