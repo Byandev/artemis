@@ -79,7 +79,6 @@ class ProductController extends Controller
             'name' => $request->name,
             'code' => $request->code,
             'category' => $request->category,
-            'ad_budget_today' => 0, // Default to 0, will be fetched from Facebook
             'status' => $request->status,
             'description' => $request->description,
         ]);

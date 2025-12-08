@@ -6,7 +6,6 @@ export interface Product {
     name: string;
     code: string;
     category: string;
-    ad_budget_today: number;
     status: 'Scaling' | 'Testing' | 'Failed' | 'Inactive';
     description: string | null;
     created_at: string;

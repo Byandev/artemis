@@ -20,13 +20,8 @@ class Product extends Model implements HasMedia
         'name',
         'code',
         'category',
-        'ad_budget_today',
         'status',
         'description',
-    ];
-
-    protected $casts = [
-        'ad_budget_today' => 'decimal:2',
     ];
 
     public function workspace(): BelongsTo
