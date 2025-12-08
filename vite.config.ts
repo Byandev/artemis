@@ -15,9 +15,19 @@ export default defineConfig({
         tailwindcss(),
         wayfinder({
             formVariants: true,
-        }),
+        })
     ],
+    optimizeDeps: {
+        include: ['maplibre-gl'],
+    },
     esbuild: {
         jsx: 'automatic',
     },
+    // server: {
+    //     host: 'localhost',
+    //     hmr: {
+    //         host: 'localhost',
+    //     },
+    //     cors: true,
+    // },
 });
