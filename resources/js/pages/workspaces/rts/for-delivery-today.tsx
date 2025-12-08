@@ -175,20 +175,21 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders }: ForDeliveryT
     return (
         <AppLayout>
             <Head title={`${workspace.name} - For Delivery Today`} />
-            <div className="px-4 py-6">
-                <div className="mb-6 flex items-center justify-between">
+            <div className="flex flex-col gap-6 p-6">
+                <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold">RTS Management</h1>
-                        <p className="text-muted-foreground">Manage RTS analytics and reports</p>
+                        <h1 className="text-3xl font-bold tracking-tight">RTS Management</h1>
+                        <p className="text-muted-foreground mt-1">Manage RTS analytics and reports</p>
                     </div>
                 </div>
                 <RtsNavigation workspace={workspace} />
 
-                <div className='border p-5 rounded-md'>
-                    <div className='flex items-start gap-5 flex-col mb-8'>
-                        <h1 className="scroll-m-20 text-center text-xl font-extrabold tracking-tight text-balance">
-                            For Delivery Today
-                        </h1>
+                <div className='rounded-xl border bg-card p-6 shadow-sm'>
+                    <div className='flex flex-col items-start justify-between gap-4 mb-8'>
+                        <div>
+                            <h2 className="text-2xl font-bold tracking-tight">For Delivery Today</h2>
+                            <p className="text-sm text-muted-foreground mt-1">View all orders scheduled for delivery today</p>
+                        </div>
 
                         <ForDeliveryFilters
                             pageName={pageName}
