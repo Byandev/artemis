@@ -42,7 +42,6 @@ export function ProductFormDialog({
             name: product?.name || '',
             code: product?.code || '',
             category: product?.category || '',
-            ad_budget_today: product?.ad_budget_today || 0,
             status: product?.status || 'Testing',
             description: product?.description || '',
         });
@@ -53,7 +52,6 @@ export function ProductFormDialog({
                 name: product.name,
                 code: product.code,
                 category: product.category,
-                ad_budget_today: product.ad_budget_today,
                 status: product.status,
                 description: product.description || '',
             });
@@ -146,24 +144,6 @@ export function ProductFormDialog({
                                 placeholder="e.g., Health And Wellness"
                             />
                             <InputError message={errors.category} />
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label htmlFor="ad_budget_today">
-                                Ad Budget Today (₱) <span className="text-destructive">*</span>
-                            </Label>
-                            <Input
-                                id="ad_budget_today"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={data.ad_budget_today}
-                                onChange={(e) =>
-                                    setData('ad_budget_today', parseFloat(e.target.value))
-                                }
-                                placeholder="2000"
-                            />
-                            <InputError message={errors.ad_budget_today} />
                         </div>
 
                         <div className="grid gap-2">

@@ -167,12 +167,9 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
             {
                 accessorKey: 'ad_budget_today',
                 header: 'Ad Budget Today',
-                cell: ({ row }) => {
-                    const amount = row.original.ad_budget_today;
-                    return `₱${Number(amount).toLocaleString('en-PH', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                    })}`;
+                cell: () => {
+                    // Placeholder - will be fetched from Facebook API
+                    return <span className="text-muted-foreground">-</span>;
                 },
             },
             {

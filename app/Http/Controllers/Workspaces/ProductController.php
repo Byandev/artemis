@@ -67,7 +67,6 @@ class ProductController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:10|unique:products,code',
             'category' => 'required|string|max:255',
-            'ad_budget_today' => 'required|numeric|min:0',
             'status' => 'required|in:Scaling,Testing,Failed,Inactive',
             'description' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
@@ -80,7 +79,7 @@ class ProductController extends Controller
             'name' => $request->name,
             'code' => $request->code,
             'category' => $request->category,
-            'ad_budget_today' => $request->ad_budget_today,
+            'ad_budget_today' => 0, // Default to 0, will be fetched from Facebook
             'status' => $request->status,
             'description' => $request->description,
         ]);
@@ -99,7 +98,6 @@ class ProductController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:10|unique:products,code,' . $product->id,
             'category' => 'required|string|max:255',
-            'ad_budget_today' => 'required|numeric|min:0',
             'status' => 'required|in:Scaling,Testing,Failed,Inactive',
             'description' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
@@ -110,7 +108,7 @@ class ProductController extends Controller
             'name' => $request->name,
             'code' => $request->code,
             'category' => $request->category,
-            'ad_budget_today' => $request->ad_budget_today,
+            // ad_budget_today not updated manually, will be synced from Facebook
             'status' => $request->status,
             'description' => $request->description,
         ]);
