@@ -31,7 +31,7 @@ const RtsNavigation = ({ workspace }: { workspace: Workspace }) => {
     const tabs: Tab[] = useMemo(
         () => [
             { key: 'analytics', label: 'Analytics', href: `/workspaces/${workspace.slug}/rts/analytics` },
-            { key: 'for-delivery-today', label: 'For Delivery today', href: `/workspaces/${workspace.slug}/rts/for-delivery-today` },
+            { key: 'for-delivery-today', label: 'For Delivery Today', href: `/workspaces/${workspace.slug}/rts/for-delivery-today` },
             { key: 'parcel-journey-notifications', label: 'Parcel Updates', href: `/workspaces/${workspace.slug}/rts/parcel-journey-notifications` },
         ],
         [workspace.slug]
@@ -51,7 +51,7 @@ const RtsNavigation = ({ workspace }: { workspace: Workspace }) => {
                             overflow-x-auto md:overflow-visible
                             whitespace-nowrap">
                 {tabs.map((t) => (
-                    <div key={t.key} className="flex-shrink-0">
+                    <div key={t.key} className="shrink-0">
                         <TabItem href={t.href} label={t.label} isActive={t.key === activeKey} />
                     </div>
                 ))}
