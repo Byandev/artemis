@@ -283,21 +283,23 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
                         {/* Filter by Category */}
                         {categories.length > 0 && (
                             <Select
-                                value={filters.category || 'all'}
+                                value={filters.category || '__all__'}
                                 onValueChange={(value) =>
-                                    handleFilter('category', value === 'all' ? '' : value)
+                                    handleFilter('category', value === '__all__' ? '' : value)
                                 }
                             >
                                 <SelectTrigger className="w-[180px]">
                                     <SelectValue placeholder="Filter by category" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Categories</SelectItem>
-                                    {categories.map((category) => (
-                                        <SelectItem key={category} value={category}>
-                                            {category}
-                                        </SelectItem>
-                                    ))}
+                                    <SelectItem value="__all__">All Categories</SelectItem>
+                                    {categories
+                                        .filter((category) => category && category.trim() !== '')
+                                        .map((category) => (
+                                            <SelectItem key={category} value={category}>
+                                                {category}
+                                            </SelectItem>
+                                        ))}
                                 </SelectContent>
                             </Select>
                         )}

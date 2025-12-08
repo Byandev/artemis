@@ -41,9 +41,11 @@ class ProductController extends Controller
 
         $products = $query->paginate(10)->withQueryString();
 
-        // Get unique categories for filter dropdown
+        // Get unique categories for filter dropdown (exclude null/empty values)
         $categories = Product::ofWorkspace($workspace)
             ->select('category')
+            ->whereNotNull('category')
+            ->where('category', '!=', '')
             ->distinct()
             ->pluck('category');
 
