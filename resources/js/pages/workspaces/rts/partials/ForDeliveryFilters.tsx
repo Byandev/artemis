@@ -33,7 +33,6 @@ export default function ForDeliveryFilters({ pageName, setPageName, filters, set
                     value={pageName}
                     onChange={(e) => setPageName(e.target.value)}
                     className="pl-8 w-[200px]"
-                    disabled={isLoading}
                 />
 
                 {/* show spinner when loading and there's a search value, otherwise show clear button when pageName exists */}
