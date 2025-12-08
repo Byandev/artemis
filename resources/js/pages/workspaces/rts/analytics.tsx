@@ -141,8 +141,8 @@ const Analytics = ({ workspace, data }: Props) => {
 
     const chartConfig = {
         rts_rate_percentage: {
-            label: "Rts Rate %",
-            color: "#1f2937",
+            label: "RTS Rate %",
+            color: "hsl(var(--primary))",
         },
     } satisfies ChartConfig;
 
@@ -252,21 +252,22 @@ const Analytics = ({ workspace, data }: Props) => {
 
     return (
         <AppLayout>
-            <div className='px-4 py-6'>
-                <div className="mb-6 flex items-center justify-between">
+            <div className='flex flex-col gap-6 p-6'>
+                <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold">RTS Management</h1>
-                        <p className="text-muted-foreground">Manage RTS analytics and reports</p>
+                        <h1 className="text-3xl font-bold tracking-tight">RTS Management</h1>
+                        <p className="text-muted-foreground mt-1">Manage RTS analytics and reports</p>
                     </div>
                 </div>
                 <RtsNavigation workspace={workspace} />
 
-                <div className='border p-5 rounded-md'>
-                    <div className='flex items-center justify-between mb-8'>
-                        <h1 className="scroll-m-20 text-center text-3xl font-extrabold tracking-tight text-balance">
-                            Analytics
-                        </h1>
-                        <div className='flex gap-2'>
+                <div className='rounded-xl border bg-card p-6 shadow-sm'>
+                    <div className='flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8'>
+                        <div>
+                            <h2 className="text-2xl font-bold tracking-tight">Analytics</h2>
+                            <p className="text-sm text-muted-foreground mt-1">Track your RTS performance metrics</p>
+                        </div>
+                        <div className='flex flex-wrap gap-2'>
                             <AnalyticsFilters
                                 groupedByPage={allGroupedByPage}
                                 groupedByUsers={allGroupedByUsers}
@@ -280,26 +281,22 @@ const Analytics = ({ workspace, data }: Props) => {
                                 loadingGrouped={loadingGrouped}
                             />
 
-                            <div className="flex flex-col">
-                                <DateRangePicker
-                                    onUpdate={(values) => {
-                                        setStartDate(values.range.from ?? undefined);
-                                        setEndDate(values.range.to ?? undefined);
-                                    }}
-                                    align="start"
-                                />
-                            </div>
+                            <DateRangePicker
+                                onUpdate={(values) => {
+                                    setStartDate(values.range.from ?? undefined);
+                                    setEndDate(values.range.to ?? undefined);
+                                }}
+                                align="start"
+                            />
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                         {analytics.map((data, key) => (
-                            <div className='col-span-1' key={key}>
-                                <AnalyticsStatCard title={data.title} value={data.value} />
-                            </div>
+                            <AnalyticsStatCard key={key} title={data.title} value={data.value} />
                         ))}
 
-                        <div className="col-span-1 sm:col-span-2 md:col-span-4 mt-4 space-y-6">
+                        <div className="col-span-1 sm:col-span-2 md:col-span-4 mt-6 space-y-6">
                             <BreakdownAnalyticsView<BreakDownAnalytics>
                                 columns={perPageColumns}
                                 bars={[

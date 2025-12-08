@@ -172,4 +172,31 @@
     .table-minimalist tbody tr:hover {
         @apply bg-muted/30;
     }
+
+    /* Data visualization enhancements */
+    .stat-card {
+        @apply relative overflow-hidden rounded-xl border bg-card p-6 shadow-sm transition-all hover:shadow-md;
+    }
+
+    .stat-card-label {
+        @apply text-sm font-medium text-muted-foreground uppercase tracking-wide;
+    }
+
+    .stat-card-value {
+        @apply text-3xl font-bold tracking-tight;
+    }
+
+    /* Chart container improvements */
+    .chart-wrapper {
+        @apply rounded-xl border bg-card p-6 shadow-sm;
+    }
+
+    /* Section headers */
+    .section-header {
+        @apply text-3xl font-bold tracking-tight;
+    }
+
+    .section-description {
+        @apply text-muted-foreground mt-1;
+    }
 }

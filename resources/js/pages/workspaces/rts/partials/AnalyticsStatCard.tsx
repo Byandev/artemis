@@ -1,5 +1,4 @@
 import React from 'react';
-import { Card, CardHeader, CardContent } from '@/components/ui/card';
 
 type Props = {
     title: string;
@@ -9,20 +8,18 @@ type Props = {
 
 const AnalyticsStatCard = ({ title, value, className = '' }: Props) => {
     return (
-        <Card className={`p-4 gap-5 flex flex-col ${className}`}>
-            <CardHeader className="p-0">
-                <div>
-                    <span className="text-xl sm:text-2xl md:text-3xl font-extrabold">
-                        {typeof value === 'number'
-                            ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PHP' }).format(value)
-                            : value}
-                    </span>
-                </div>
-            </CardHeader>
-            <CardContent className="p-0">
-                <p className="text-sm sm:text-md text-muted-foreground">{title}</p>
-            </CardContent>
-        </Card>
+        <div className={`relative overflow-hidden rounded-xl border bg-card p-6 shadow-sm transition-all hover:shadow-md ${className}`}>
+            <div className="flex flex-col gap-3">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                    {title}
+                </p>
+                <h4 className="text-3xl font-bold tracking-tight">
+                    {typeof value === 'number'
+                        ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PHP' }).format(value)
+                        : value}
+                </h4>
+            </div>
+        </div>
     )
 }
 

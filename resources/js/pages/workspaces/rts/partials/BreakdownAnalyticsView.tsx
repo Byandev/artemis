@@ -44,12 +44,12 @@ const BreakdownAnalyticsView = <T,>({
 
     if (loading) {
         return (
-            <div className='border rounded-xl p-6 shadow-sm w-full'>
+            <div className='rounded-xl border bg-card p-6 shadow-sm w-full'>
                 <div className='flex justify-between items-center mb-4'>
-                    <h2 className='text-xl md:text-2xl font-bold'>{title}</h2>
+                    <h3 className='text-lg font-semibold tracking-tight'>{title}</h3>
                 </div>
                 <div className='flex justify-center items-center h-32'>
-                    <p className='text-center text-sm text-gray-500'>Loading...</p>
+                    <p className='text-center text-sm text-muted-foreground'>Loading...</p>
                 </div>
             </div>
         );
@@ -62,19 +62,19 @@ const BreakdownAnalyticsView = <T,>({
     }
 
     return (
-        <div className='border rounded-xl p-6 shadow-sm'>
-            <div className='flex flex-col md:flex-row justify-between items-center mb-4 gap-5'>
-                <h2 className='text-xl md:text-2xl font-bold'>{title}</h2>
+        <div className='rounded-xl border bg-card p-6 shadow-sm'>
+            <div className='flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4'>
+                <h3 className='text-lg font-semibold tracking-tight'>{title}</h3>
                 <div className='flex gap-2 items-center'>
-                    <Button>Export</Button>
+                    <Button size="sm" variant="outline">Export</Button>
 
-                    <div className='flex flex-row gap-2 bg-gray-100 p-1 rounded-md w-fit'>
+                    <div className='flex flex-row gap-1 bg-muted p-1 rounded-lg w-fit'>
                         {views.map((view) => (
                             <Button
                                 key={view}
                                 variant="ghost"
                                 size="sm"
-                                className={`px-3 py-1 rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-offset-1 ${currentView === view ? 'bg-white shadow-sm' : 'hover:bg-white/50'}`}
+                                className={`px-3 py-1.5 h-auto rounded-md text-xs font-medium transition-all ${currentView === view ? 'bg-background shadow-sm' : 'hover:bg-background/50'}`}
                                 onClick={() => setCurrentView(view)}
                             >
                                 {view[0].toUpperCase() + view.slice(1)}
@@ -100,8 +100,8 @@ const BreakdownAnalyticsView = <T,>({
                             <Bar
                                 key={b.dataKey}
                                 dataKey={b.dataKey}
-                                fill={b.fill ?? 'var(--color-primary)'}
-                                radius={b.radius ?? 4}
+                                fill={b.fill ?? 'hsl(var(--primary))'}
+                                radius={b.radius ?? 8}
                                 name={b.name}
                             />
                         ))}
@@ -124,12 +124,12 @@ const BreakdownAnalyticsView = <T,>({
 
 const NoDataView = ({ title }: { title: string }) => {
     return (
-        <div className='border rounded-xl p-6 shadow-sm w-full'>
+        <div className='rounded-xl border bg-card p-6 shadow-sm w-full'>
             <div className='flex justify-between items-center mb-4'>
-                <h2 className='text-lg font-medium mb-2'>{title}</h2>
+                <h3 className='text-lg font-semibold tracking-tight'>{title}</h3>
             </div>
             <div className='flex justify-center items-center h-32'>
-                <p className='text-center text-sm text-gray-500'>No data available.</p>
+                <p className='text-center text-sm text-muted-foreground'>No data available.</p>
             </div>
         </div>
     );
