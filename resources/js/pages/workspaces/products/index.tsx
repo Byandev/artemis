@@ -232,7 +232,7 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
                     <h1 className="text-2xl font-bold">Products</h1>
                 </div>
 
-                {/* Tabs - Analytics, Products, Testing Products */
+                {/* Tabs - Analytics, Products, Testing Products */}
                 <div className="mb-4 flex gap-2">
                     <Button
                         variant={activeTab === 'analytics' ? 'default' : 'outline'}
