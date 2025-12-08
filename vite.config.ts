@@ -15,8 +15,11 @@ export default defineConfig({
         tailwindcss(),
         wayfinder({
             formVariants: true,
-        }),
+        })
     ],
+    optimizeDeps: {
+        include: ['maplibre-gl'],
+    },
     esbuild: {
         jsx: 'automatic',
     },
