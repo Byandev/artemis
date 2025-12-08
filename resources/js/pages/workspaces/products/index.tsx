@@ -228,11 +228,11 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
         <AppLayout>
             <Head title={`${workspace.name} - Products`} />
             <div className="px-4 py-6">
-                <div className="mb-6 flex items-center justify-between">
+                <div className="mb-6">
                     <h1 className="text-2xl font-bold">Products</h1>
                 </div>
 
-                {/* Tabs - Analytics, Products, Testing Products */}
+                {/* Tabs - Analytics, Products, Testing Products */
                 <div className="mb-4 flex gap-2">
                     <Button
                         variant={activeTab === 'analytics' ? 'default' : 'outline'}
@@ -314,10 +314,17 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
                         )}
                     </div>
 
-                    {/* Filter Button */}
-                    <Button size="sm" variant="outline">
-                        Filter ▼
-                    </Button>
+                    <div className="flex gap-2">
+                        {/* Filter Button */}
+                        <Button size="sm" variant="outline">
+                            Filter ▼
+                        </Button>
+                        
+                        {/* Add new Product Button */}
+                        <Button size="sm" onClick={handleCreate}>
+                            Add new Product
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Data Table */}
