@@ -16,6 +16,9 @@ import {
     X,
     Loader2,
     Eye,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -122,6 +125,40 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
         );
     };
 
+    const handleSort = (column: string) => {
+        const newDirection = 
+            filters.sort === column && filters.direction === 'asc' ? 'desc' : 'asc';
+        
+        router.get(
+            workspaces.products.index.url({ workspace }),
+            { ...filters, sort: column, direction: newDirection, page: 1 },
+            { preserveState: true, preserveScroll: true }
+        );
+    };
+
+    const SortableHeader = ({ column, children }: { column: string; children: React.ReactNode }) => {
+        const isSorted = filters.sort === column;
+        const direction = filters.direction;
+        
+        return (
+            <button
+                onClick={() => handleSort(column)}
+                className="flex items-center gap-2 hover:text-foreground transition-colors"
+            >
+                {children}
+                {isSorted ? (
+                    direction === 'asc' ? (
+                        <ArrowUp className="h-4 w-4" />
+                    ) : (
+                        <ArrowDown className="h-4 w-4" />
+                    )
+                ) : (
+                    <ArrowUpDown className="h-4 w-4 opacity-50" />
+                )}
+            </button>
+        );
+    };
+
     const clearSearch = () => {
         setSearchValue('');
         router.get(
@@ -154,19 +191,19 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
         () => [
             {
                 accessorKey: 'name',
-                header: 'Name',
+                header: () => <SortableHeader column="name">Name</SortableHeader>,
             },
             {
                 accessorKey: 'code',
-                header: 'Code',
+                header: () => <SortableHeader column="code">Code</SortableHeader>,
             },
             {
                 accessorKey: 'category',
-                header: 'Category',
+                header: () => <SortableHeader column="category">Category</SortableHeader>,
             },
             {
                 accessorKey: 'ad_budget_today',
-                header: 'Ad Budget Today',
+                header: () => <SortableHeader column="ad_budget_today">Ad Budget Today</SortableHeader>,
                 cell: () => {
                     // Placeholder - will be fetched from Facebook API
                     return <span className="text-muted-foreground">-</span>;
@@ -174,7 +211,7 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
             },
             {
                 accessorKey: 'status',
-                header: 'Status',
+                header: () => <SortableHeader column="status">Status</SortableHeader>,
                 cell: ({ row }) => {
                     const status = row.original.status;
                     return (
@@ -216,10 +253,10 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
                 },
             },
         ],
-        []
+        [filters.sort, filters.direction]
     );
 
-    const hasActiveFilters = filters.search || filters.category;
+    const hasActiveFilters = filters.search || filters.category || filters.status;
 
     return (
         <AppLayout>
@@ -304,6 +341,25 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
                             </Select>
                         )}
 
+                        {/* Filter by Status */}
+                        <Select
+                            value={filters.status || '__all__'}
+                            onValueChange={(value) =>
+                                handleFilter('status', value === '__all__' ? '' : value)
+                            }
+                        >
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Filter by status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="__all__">All Status</SelectItem>
+                                <SelectItem value="Scaling">Scaling</SelectItem>
+                                <SelectItem value="Testing">Testing</SelectItem>
+                                <SelectItem value="Failed">Failed</SelectItem>
+                                <SelectItem value="Inactive">Inactive</SelectItem>
+                            </SelectContent>
+                        </Select>
+
                         {/* Clear Filters */}
                         {hasActiveFilters && (
                             <Button variant="ghost" size="sm" onClick={clearFilters}>
@@ -314,11 +370,6 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
                     </div>
 
                     <div className="flex gap-2">
-                        {/* Filter Button */}
-                        <Button size="sm" variant="outline">
-                            Filter ▼
-                        </Button>
-                        
                         {/* Add new Product Button */}
                         <Button size="sm" onClick={handleCreate}>
                             Add new Product

@@ -14,13 +14,12 @@ class ProductController extends Controller
     {
         $query = Product::ofWorkspace($workspace)->with('owner');
 
-        // Search filter
+        // Search filter (search by name and code only)
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%")
-                  ->orWhere('category', 'like', "%{$search}%");
+                  ->orWhere('code', 'like', "%{$search}%");
             });
         }
 
