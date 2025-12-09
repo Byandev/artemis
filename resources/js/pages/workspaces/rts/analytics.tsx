@@ -240,20 +240,21 @@ const Analytics = ({ workspace, filters, data }: Props) => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                         {analytics.map((item, key) => (
-                            <AnalyticsStatCard key={key} title={item.title} value={item.value} />
+                            <AnalyticsStatCard key={key} title={item.title} value={item.value} className='col-span-2 md:col-span-1' />
                         ))}
 
-                        <div className="col-span-1 sm:col-span-2 md:col-span-4 mt-6 space-y-6">
+                        <div className='col-span-2 flex flex-col gap-5'>
                             <BreakdownAnalyticsView<BreakDownAnalytics>
                                 columns={buildColumns('Page')}
                                 bars={[{ dataKey: 'rts_rate_percentage', fill: chartConfig.rts_rate_percentage.color, name: chartConfig.rts_rate_percentage.label }]}
                                 xKey="name"
-                                className="w-full max-h-[400px]"
+                                className="w-full max-h-[300px]"
                                 data={groupedByPage.data}
                                 chartConfig={chartConfig}
                                 title="Breakdown per Pages"
+                                subtitle='View RTS rate performance across all pages'
                                 loading={loadingGrouped}
                             />
 
@@ -261,10 +262,11 @@ const Analytics = ({ workspace, filters, data }: Props) => {
                                 columns={buildColumns('Shop')}
                                 bars={[{ dataKey: 'rts_rate_percentage', fill: chartConfig.rts_rate_percentage.color, name: chartConfig.rts_rate_percentage.label }]}
                                 xKey="name"
-                                className="w-full max-h-[400px]"
+                                className="w-full max-h-[300px]"
                                 data={groupedByShops.data}
                                 chartConfig={chartConfig}
                                 title="Breakdown per Shops"
+                                subtitle='Analyze RTS rates for different shops'
                                 loading={loadingGrouped}
                             />
 
@@ -272,19 +274,23 @@ const Analytics = ({ workspace, filters, data }: Props) => {
                                 columns={buildColumns('User')}
                                 bars={[{ dataKey: 'rts_rate_percentage', fill: chartConfig.rts_rate_percentage.color, name: chartConfig.rts_rate_percentage.label }]}
                                 xKey="name"
-                                className="w-full max-h-[400px]"
+                                className="w-full max-h-[300px]"
                                 data={groupedByUsers.data}
                                 chartConfig={chartConfig}
                                 title="Breakdown per Users"
+                                subtitle='Monitor RTS performance by user'
                                 loading={loadingGrouped}
                             />
+                        </div>
 
+                        <div className='col-span-2'>
                             <BreakdownAnalyticsView<BreakDownAnalytics>
                                 columns={buildColumns('City')}
                                 availableViews={['heatmap', 'table']}
-                                className="w-full max-h-[400px]"
+                                className="w-full h-12"
                                 data={groupedByCities.data}
                                 title="Breakdown per Cities"
+                                subtitle='Geographical RTS rate distribution'
                                 heatmapPoints={heatmapPoints}
                                 loading={loadingGrouped}
                             />

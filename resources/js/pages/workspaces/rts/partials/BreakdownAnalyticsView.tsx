@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { Bar, BarChart, XAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
@@ -19,6 +19,7 @@ type Props<T> = {
     columns: ColumnDef<T>[];
     className?: string;
     title: string;
+    subtitle?: string;
     xKey?: Extract<keyof T, string>;
     bars?: BarSpec<T>[];
     availableViews?: Array<'graph' | 'table' | 'heatmap'>;
@@ -32,6 +33,7 @@ const BreakdownAnalyticsView = <T,>({
     columns,
     className,
     title,
+    subtitle,
     xKey,
     bars,
     availableViews,
@@ -62,9 +64,12 @@ const BreakdownAnalyticsView = <T,>({
     }
 
     return (
-        <div className='rounded-xl border bg-card p-6 shadow-sm'>
+        <div className='rounded-xl border bg-card p-6 shadow-sm h-fit'>
             <div className='flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4'>
-                <h3 className='text-lg font-semibold tracking-tight'>{title}</h3>
+                <div>
+                    <h3 className='text-lg font-semibold tracking-tight'>{title}</h3>
+                    <p className='text-sm text-muted-foreground'>{subtitle}</p>
+                </div>
                 <div className='flex gap-2 items-center'>
                     <Button size="sm" variant="outline">Export</Button>
 
@@ -86,11 +91,12 @@ const BreakdownAnalyticsView = <T,>({
 
             {currentView === 'graph' ? (
                 <ChartContainer config={chartConfig ?? {}} className={className}>
-                    <BarChart accessibilityLayer data={data} height={100}>
+                    <BarChart accessibilityLayer data={data}>
+                        <CartesianGrid vertical={false} />
                         <XAxis
                             dataKey={xKey}
                             tickLine={false}
-                            tickMargin={10}
+                            tickMargin={20}
                             axisLine={false}
                             tickFormatter={(value) => String(value)}
                         />
