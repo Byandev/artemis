@@ -17,10 +17,10 @@ type Props = {
 export default function Index({ workspace, stats }: Props) {
     const analytics = useMemo(() => {
         return [
-            { title: 'TOTAL SALES', value: currencyFormatter(stats.total_sales) },
-            { title: 'TOTAL ORDERS', value: numberFormatter(stats.total_orders) },
+            { title: 'Total Sales', value: currencyFormatter(stats.total_sales) },
+            { title: 'Total Orders', value: numberFormatter(stats.total_orders) },
             { title: 'RTS Rate', value: percentageFormatter(stats.rts_rate_percentage / 100) },
-            { title: 'TRACKED ORDERS', value: numberFormatter(stats.tracked_orders) },
+            { title: 'Tracked Orders', value: numberFormatter(stats.tracked_orders) },
         ]
     }, [stats])
 
