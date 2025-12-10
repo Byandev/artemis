@@ -161,7 +161,8 @@ class AnalyticController extends Controller
     {
         $groupedQuery = Order::selectRaw('
             shipping_addresses.id AS id,
-            shipping_addresses.district_name AS name,
+            shipping_addresses.district_name AS city_name,
+            shipping_addresses.province_name AS province_name,
             SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
             SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
             SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
@@ -176,7 +177,7 @@ class AnalyticController extends Controller
             ->applyRtsFilters($request);
 
         $grouped = $groupedQuery
-            ->groupBy('shipping_addresses.district_name', 'shipping_addresses.id')
+            ->groupBy('shipping_addresses.district_name', 'shipping_addresses.id', 'shipping_addresses.province_name')
             ->get();
 
         return response()->json([

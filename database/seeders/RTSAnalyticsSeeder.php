@@ -104,20 +104,38 @@ class RTSAnalyticsSeeder extends Seeder
                 'parcel_status' => $status === 3 ? 'delivered' : ($status === 4 ? 'returned' : 'rts'),
             ]);
 
-            $cities = [
-                'Manila', 'Valenzuela', 'Tondo', 'Sampaloc', 'Malabon',
-                'Payatas', 'Poblacion', 'Rosario', 'Bagong Silangan', 'Malate',
+            // Using exact city names from ph_geojson.json (NAME_2 and NAME_1 fields)
+            $locations = [
+                ['city' => 'Manila', 'province' => 'Manila'],
+                ['city' => 'Valenzuela', 'province' => 'Manila'],
+                ['city' => 'Malabon', 'province' => 'Manila'],
+                ['city' => 'Quezon City', 'province' => 'Manila'],
+                ['city' => 'Kalookan City', 'province' => 'Manila'],
+                ['city' => 'Makati City', 'province' => 'Manila'],
+                ['city' => 'Pasig City', 'province' => 'Manila'],
+                ['city' => 'Taguig City', 'province' => 'Manila'],
+                ['city' => 'Mandaluyong', 'province' => 'Manila'],
+                ['city' => 'Marikina', 'province' => 'Manila'],
+                ['city' => 'Muntinlupa', 'province' => 'Manila'],
+                ['city' => 'Las Piñas', 'province' => 'Manila'],
+                ['city' => 'Parañaque', 'province' => 'Manila'],
+                ['city' => 'Pasay City', 'province' => 'Manila'],
+                ['city' => 'Navotas', 'province' => 'Manila'],
+                ['city' => 'Pateros', 'province' => 'Manila'],
+                ['city' => 'San Juan', 'province' => 'Manila'],
             ];
+
+            $location = $locations[array_rand($locations)];
 
             // Create a shipping address for the order
             ShippingAddress::firstOrCreate([
                 'order_id' => $order->id,
             ], [
-                'province_name' => 'Province '.rand(1, 10),
-                'district_name' => $cities[array_rand($cities)],
+                'province_name' => $location['province'],
+                'district_name' => $location['city'],
                 'commune_name' => 'Commune '.rand(1, 50),
                 'address' => 'Street '.rand(1, 200),
-                'full_address' => 'Street '.rand(1, 200).', District '.rand(1, 20).', Province '.rand(1, 10),
+                'full_address' => 'Street '.rand(1, 200).', '.$location['city'].', '.$location['province'],
                 'full_name' => 'Customer '.$i,
                 'phone_number' => '080'.rand(10000000, 99999999),
             ]);
