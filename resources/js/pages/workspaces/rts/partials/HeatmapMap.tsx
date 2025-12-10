@@ -66,11 +66,14 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
     // Function to get fill color based on city and province value
     const getFillColor = (cityName: string, provinceName: string): string => {
         const data = getCityData(cityName, provinceName);
+
         if (!data) {
             return "#d1d5db"; // default gray for cities without data
         }
+
         return data.value < 18 ? "#22c55e" : "#ef4444"; // green if < 18, red if >= 18
     };
+
 
     return (
         <>
@@ -79,8 +82,8 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
                     <Geographies geography={geoUrl}>
                         {({ geographies }) =>
                             geographies.map((geo) => {
-                                const cityName = geo.properties.NAME_2; // GADM field
-                                const provinceName = geo.properties.NAME_1;
+                                const cityName = geo.properties.NAME_2; // GADM field for city/municipality name
+                                const provinceName = geo.properties.NAME_1; // GADM field for province name
                                 const fillColor = getFillColor(cityName, provinceName);
                                 const cityData = getCityData(cityName, provinceName);
 
@@ -88,9 +91,6 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
                                     <Geography
                                         key={geo.rsmKey}
                                         geography={geo}
-                                        onMouseEnter={() => {
-                                            console.log("Hover:", cityName, provinceName);
-                                        }}
                                         onClick={() => {
                                             if (cityData) {
                                                 alert(

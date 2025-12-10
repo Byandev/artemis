@@ -175,6 +175,7 @@ class AnalyticController extends Controller
             ->ofWorkspace($workspace)
             ->applyRtsFilters($request)
             ->groupBy('shipping_addresses.district_name', 'shipping_addresses.province_name')
+            ->havingRaw('SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) > 0') // Only include cities with orders
             ->orderBy('total_orders', 'DESC')
             ->get();
 
