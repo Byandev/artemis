@@ -27,8 +27,8 @@ const SearchSelect: React.FC<Props> = ({ items, selected, setSelected }) => {
             item.name.toLowerCase().includes(query.trim().toLowerCase())
         );
 
-        setResults(r);
-    }, [query, items]);
+        setResults(r.filter((item) => !selected.includes(item.id)));
+    }, [query, items, selected]);
 
     return (
         <div className="max-h-[200px]">
@@ -48,7 +48,7 @@ const SearchSelect: React.FC<Props> = ({ items, selected, setSelected }) => {
                 </InputGroup>
 
                 {query.trim() !== '' && (
-                    <div className="absolute left-0 right-0 mt-1 z-50 bg-white dark:bg-slate-800 border rounded-md shadow-lg max-h-48 overflow-auto">
+                    <div className="absolute left-0 right-0 mt-1 z-50 bg-white dark:bg-slate-800 border rounded-md shadow-lg max-h-16 overflow-auto">
                         {(() => {
                             const filtered = results.filter((p) => !selected.includes(p.id));
 
@@ -85,7 +85,7 @@ const SearchSelect: React.FC<Props> = ({ items, selected, setSelected }) => {
 
             {selected.length === 0 ? (
                 <p className="text-sm text-muted-foreground mt-2 text-center py-5">
-                    No item selected.
+                    No filter selected.
                 </p>
             ) : (
                 <div className="mt-2 max-h-[160px] overflow-auto space-y-3">
