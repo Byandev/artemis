@@ -259,28 +259,48 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
                 </div>
 
                 {/* Tabs - Analytics, Products, Testing Products */}
-                <div className="mb-4 flex gap-2">
-                    <Button
-                        variant={activeTab === 'analytics' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setActiveTab('analytics')}
-                    >
-                        Analytics
-                    </Button>
-                    <Button
-                        variant={activeTab === 'products' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setActiveTab('products')}
-                    >
-                        Products
-                    </Button>
-                    <Button
-                        variant={activeTab === 'testing_products' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setActiveTab('testing_products')}
-                    >
-                        Testing Products
-                    </Button>
+                <div className="mb-6 border-b border-border">
+                    <div className="flex gap-1">
+                        <button
+                            onClick={() => setActiveTab('analytics')}
+                            className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
+                                activeTab === 'analytics'
+                                    ? 'text-foreground'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            Analytics
+                            {activeTab === 'analytics' && (
+                                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('products')}
+                            className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
+                                activeTab === 'products'
+                                    ? 'text-foreground'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            Products
+                            {activeTab === 'products' && (
+                                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('testing_products')}
+                            className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
+                                activeTab === 'testing_products'
+                                    ? 'text-foreground'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            Testing Products
+                            {activeTab === 'testing_products' && (
+                                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                            )}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Filters and Search */}
