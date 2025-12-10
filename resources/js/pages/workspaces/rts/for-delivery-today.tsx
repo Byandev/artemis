@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout'
 import { Workspace } from '@/types/models/Workspace'
-import { Head } from '@inertiajs/react'
+import { Head, usePage } from '@inertiajs/react'
 import RtsNavigation from './partials/RtsNavigation'
 import { useState, useEffect } from 'react'
 import { Order } from '@/types/models/Orders'
@@ -30,12 +30,21 @@ interface ForDeliveryTodayProps {
 }
 
 const ForDeliveryToday = ({ workspace, orders, customers, riders }: ForDeliveryTodayProps) => {
-    const [filters, setFilters] = useState<Filters>({ page_name: '', customer: '', rider: '' });
-    const [pageName, setPageName] = useState<string>(filters.page_name);
-    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const { url } = usePage();
+    const params = new URLSearchParams(url.split('?')[1] || '');
 
-    const [sortField, setSortField] = useState<string>('');
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | ''>('');
+    const [filters, setFilters] = useState<Filters>({
+        page_name: params.get('page_name') || '',
+        customer: params.get('customer') || '',
+        rider: params.get('rider') || ''
+    });
+    const [pageName, setPageName] = useState<string>(filters.page_name);
+
+    const [sortField, setSortField] = useState<string>(params.get('sort_by') || '');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | ''>(
+        (params.get('sort_dir') as 'asc' | 'desc' | '') || ''
+    );
+    const [isLoading, setIsLoading] = useState<boolean>(false);
 
     const applyFilters = (newFilters: Filters, sortOverride?: { field?: string; dir?: string }) => {
         const params: Record<string, string> = {};
