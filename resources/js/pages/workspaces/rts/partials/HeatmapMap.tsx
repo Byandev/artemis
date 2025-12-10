@@ -22,40 +22,54 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
     };
 
     // Create a map of city to their data for quick lookup
-    const cityDataMap = new Map<string, { value: number; province: string }>();
+    const cityDataMap = new Map<string, { value: number; province: string; cityName: string; provinceName: string }>();
     points.forEach(point => {
         if (point.value !== null && point.value !== undefined) {
             const numValue = typeof point.value === 'string' ? parseFloat(point.value) : point.value;
             if (!isNaN(numValue)) {
                 const normalizedCity = normalize(point.city_name);
                 const normalizedProvince = normalize(point.province_name);
-                cityDataMap.set(normalizedCity, { value: numValue, province: normalizedProvince });
+                cityDataMap.set(normalizedCity, {
+                    value: numValue,
+                    province: normalizedProvince,
+                    cityName: point.city_name,
+                    provinceName: point.province_name
+                });
             }
         }
     });
 
-    // Function to get fill color based on city and province value
-    const getFillColor = (cityName: string, provinceName: string): string => {
+    // Function to get city data based on city and province
+    const getCityData = (cityName: string, provinceName: string) => {
         const normalizedCity = normalize(cityName);
         const normalizedProvince = normalize(provinceName);
 
         // First, try exact match
         const exactData = cityDataMap.get(normalizedCity);
         if (exactData && exactData.province === normalizedProvince) {
-            return exactData.value < 18 ? "#22c55e" : "#ef4444";
+            return exactData;
         }
 
         // Second, try partial match (e.g., "manila" in "metropolitanmanila")
         if (exactData && normalizedProvince.includes(exactData.province)) {
-            return exactData.value < 18 ? "#22c55e" : "#ef4444";
+            return exactData;
         }
 
         // Third, try reverse partial match (e.g., data has "metropolitanmanila", geo has "manila")
         if (exactData && exactData.province.includes(normalizedProvince)) {
-            return exactData.value < 18 ? "#22c55e" : "#ef4444";
+            return exactData;
         }
 
-        return "#d1d5db"; // default gray for cities without data
+        return null;
+    };
+
+    // Function to get fill color based on city and province value
+    const getFillColor = (cityName: string, provinceName: string): string => {
+        const data = getCityData(cityName, provinceName);
+        if (!data) {
+            return "#d1d5db"; // default gray for cities without data
+        }
+        return data.value < 18 ? "#22c55e" : "#ef4444"; // green if < 18, red if >= 18
     };
 
     return (
@@ -68,6 +82,7 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
                                 const cityName = geo.properties.NAME_2; // GADM field
                                 const provinceName = geo.properties.NAME_1;
                                 const fillColor = getFillColor(cityName, provinceName);
+                                const cityData = getCityData(cityName, provinceName);
 
                                 return (
                                     <Geography
@@ -77,7 +92,15 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
                                             console.log("Hover:", cityName, provinceName);
                                         }}
                                         onClick={() => {
-                                            alert(`${cityName}, ${provinceName}`);
+                                            if (cityData) {
+                                                alert(
+                                                    `City: ${cityData.cityName}\n` +
+                                                    `Province: ${cityData.provinceName}\n` +
+                                                    `RTS Rate: ${cityData.value} %`
+                                                );
+                                            } else {
+                                                alert(`${cityName}, ${provinceName}\nNo data available`);
+                                            }
                                         }}
                                         style={{
                                             default: {
