@@ -1,4 +1,5 @@
-﻿import { Workspace } from '@/types/models/Workspace';
+import { Workspace } from '@/types/models/Workspace';
+import { Product } from '@/types/models/Product';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import { Label } from '@/components/ui/label';
@@ -17,25 +18,26 @@ import workspaces from '@/routes/workspaces';
 
 interface PageProps {
     workspace: Workspace;
+    product: Product;
 }
 
-const Create = ({ workspace }: PageProps) => {
-    const { data, setData, post, processing, errors } = useForm({
-        name: '',
-        code: '',
-        category: '',
-        status: 'Testing' as 'Scaling' | 'Testing' | 'Failed' | 'Inactive',
-        description: '',
+const Edit = ({ workspace, product }: PageProps) => {
+    const { data, setData, put, processing, errors } = useForm({
+        name: product.name || '',
+        code: product.code || '',
+        category: product.category || '',
+        status: product.status as 'Scaling' | 'Testing' | 'Failed' | 'Inactive',
+        description: product.description || '',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(workspaces.products.store.url({ workspace }));
+        put(workspaces.products.update.url({ workspace, product }));
     };
 
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - Create Product`} />
+            <Head title={`${workspace.name} - Edit Product`} />
             <div className="px-4 py-6">
                 <div className="mb-6 flex items-center gap-4">
                     <Button
@@ -46,7 +48,7 @@ const Create = ({ workspace }: PageProps) => {
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Back
                     </Button>
-                    <h1 className="text-2xl font-bold">Create Product</h1>
+                    <h1 className="text-2xl font-bold">Edit Product</h1>
                 </div>
 
                 <div className="max-w-2xl">
@@ -134,7 +136,7 @@ const Create = ({ workspace }: PageProps) => {
 
                         <div className="flex gap-3">
                             <Button type="submit" disabled={processing}>
-                                {processing ? 'Creating...' : 'Create Product'}
+                                {processing ? 'Updating...' : 'Update Product'}
                             </Button>
                             <Button
                                 type="button"
@@ -151,4 +153,4 @@ const Create = ({ workspace }: PageProps) => {
     );
 };
 
-export default Create;
+export default Edit;

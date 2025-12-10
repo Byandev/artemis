@@ -5,17 +5,15 @@ import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Product } from '@/types/models/Product';
 import { Button } from '@/components/ui/button';
-import { ProductFormDialog } from '@/components/products/product-form-dialog';
 import { DeleteProductDialog } from '@/components/products/delete-product-dialog';
 import { Workspace } from '@/types/models/Workspace';
 import {
-    Edit,
     MoreHorizontal,
     Trash2,
     Search,
     X,
     Loader2,
-    Eye,
+    Edit,
     ArrowUpDown,
     ArrowUp,
     ArrowDown,
@@ -71,10 +69,6 @@ interface ProductsProps {
 }
 
 const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(
-        undefined
-    );
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     const [searchValue, setSearchValue] = useState(filters.search);
     const [isSearching, setIsSearching] = useState(false);
@@ -108,13 +102,11 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
     }, [searchValue]);
 
     const handleEdit = (product: Product) => {
-        setSelectedProduct(product);
-        setDialogOpen(true);
+        router.visit(workspaces.products.edit.url({ workspace, product }));
     };
 
     const handleCreate = () => {
-        setSelectedProduct(undefined);
-        setDialogOpen(true);
+        router.visit(workspaces.products.create.url({ workspace }));
     };
 
     const handleFilter = (key: string, value: string) => {
@@ -236,8 +228,8 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={() => handleEdit(product)}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    View
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
@@ -417,14 +409,6 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
                         </div>
                     )}
                 </div>
-
-                {/* Product Form Dialog */}
-                <ProductFormDialog
-                    open={dialogOpen}
-                    onOpenChange={setDialogOpen}
-                    product={selectedProduct}
-                    workspace={workspace}
-                />
 
                 {/* Delete Confirmation Dialog */}
                 <DeleteProductDialog

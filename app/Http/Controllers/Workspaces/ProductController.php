@@ -62,6 +62,13 @@ class ProductController extends Controller
         ]);
     }
 
+    public function create(Workspace $workspace)
+    {
+        return Inertia::render('workspaces/products/create', [
+            'workspace' => $workspace,
+        ]);
+    }
+
     public function store(Request $request, Workspace $workspace)
     {
         $request->validate([
@@ -90,6 +97,14 @@ class ProductController extends Controller
         }
 
         return redirect()->route('workspaces.products.index', $workspace->slug);
+    }
+
+    public function edit(Workspace $workspace, Product $product)
+    {
+        return Inertia::render('workspaces/products/edit', [
+            'workspace' => $workspace,
+            'product' => $product,
+        ]);
     }
 
     public function update(Request $request, Workspace $workspace, Product $product)
