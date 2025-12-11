@@ -26,41 +26,29 @@ export default function Index({ workspace, stats }: Props) {
 
     return (
         <AppLayout>
-            <Head title="Index" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <Head title="Dashboard" />
+            <div className="flex h-full flex-1 flex-col gap-6 p-6">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+                    <p className="text-muted-foreground mt-1">Welcome back! Here's your workspace overview.</p>
+                </div>
+
                 <div className="grid auto-rows-min gap-4 md:grid-cols-4">
-                    {
-                        analytics.map((data, key) => {
-                            return <div
-                                key={key}
-                                className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {analytics.map((data, key) => (
+                        <div
+                            key={key}
+                            className="relative overflow-hidden rounded-xl border bg-card p-6 shadow-sm transition-all hover:shadow-md">
+                            <div className="flex flex-col gap-3">
+                                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
                                     {data.title}
                                 </p>
-
-                                <div className="mt-3 flex items-end justify-between">
-                                    <div>
-                                        <h4 className="text-2xl font-bold text-gray-800 dark:text-white/90">
-                                            {data.value}
-                                        </h4>
-                                    </div>
-                                </div>
+                                <h4 className="text-3xl font-bold tracking-tight">
+                                    {data.value}
+                                </h4>
                             </div>
-
-                            return <div key={key}
-                                className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-                                {/*<PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />*/}
-                                <h3 className="font-bold text-2xl">{data.value}</h3>
-                                <h3>{data.title}</h3>
-                            </div>
-                        })
-                    }
+                        </div>
+                    ))}
                 </div>
-                {/*<div className="relative min-h-[100vh] flex-1 space-y-6">*/}
-                {/*    <SalesChart />*/}
-
-                {/*    <RTSChart />*/}
-                {/*</div>*/}
             </div>
         </AppLayout>
     );
