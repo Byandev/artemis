@@ -145,10 +145,8 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
                                         onClick={() => {
                                             if (cityData) {
                                                 alert(
-                                                    `City: ${cityData.gadmCity}\n` +
-                                                    `Province: ${cityData.gadmProvince}\n` +
-                                                    `Pancake City: ${cityData.pancakeCity}\n` +
-                                                    `Pancake Province: ${cityData.pancakeProvince}\n` +
+                                                    `City: ${cityData.pancakeCity}\n` +
+                                                    `Province: ${cityData.pancakeProvince}\n` +
                                                     `RTS Rate: ${cityData.value} %`
                                                 );
                                             } else {
