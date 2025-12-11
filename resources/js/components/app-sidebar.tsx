@@ -11,7 +11,7 @@ import { dashboard } from '@/routes';
 import workspace from '@/routes/workspace';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, FacebookIcon, Folder, LayoutGrid, Package, Users } from 'lucide-react';
+import { BookOpen, FacebookIcon, Folder, LayoutGrid, Package, RotateCwIcon, Users } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const footerNavItems: NavItem[] = [
@@ -64,6 +64,11 @@ export function AppSidebar() {
             title: 'Teams',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
             icon: Users,
+        },
+        {
+            title: 'RTS Management',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
+            icon: RotateCwIcon,
         },
     ];
 

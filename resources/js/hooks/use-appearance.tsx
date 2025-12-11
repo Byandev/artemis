@@ -41,8 +41,10 @@ const handleSystemThemeChange = () => {
 };
 
 export function initializeTheme() {
-    const savedAppearance =
-        (localStorage.getItem('appearance') as Appearance) || 'system';
+    // const savedAppearance =
+    //     (localStorage.getItem('appearance') as Appearance) || 'system';
+
+    const savedAppearance = 'light';
 
     applyTheme(savedAppearance);
 
