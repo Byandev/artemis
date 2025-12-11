@@ -28,7 +28,6 @@ const AnalyticsFilters = ({
     selectedShopFilter,
     setSelectedShopFilter,
 }: Props) => {
-    console.log(selectedPagesFilter, selectedUsersFilter, selectedShopFilter);
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
