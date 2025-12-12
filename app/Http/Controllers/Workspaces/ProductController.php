@@ -91,7 +91,7 @@ class ProductController extends Controller
         $product = Product::create([
             'workspace_id' => $workspace->id,
             'owner_id' => $request->user()->id,
-            'title' => $request->name, // Keep title for backward compatibility
+            'title' => $request->name,
             'name' => $request->name,
             'code' => $request->code,
             'category' => $request->category,
@@ -104,9 +104,10 @@ class ProductController extends Controller
                 ->toMediaCollection('PRODUCT_IMAGE');
         }
 
-        // Sync pages to product
-        if ($request->has('page_ids')) {
+        // Assign pages to this product
+        if ($request->filled('page_ids') && is_array($request->page_ids) && count($request->page_ids) > 0) {
             \App\Models\Page::whereIn('id', $request->page_ids)
+                ->where('workspace_id', $workspace->id)
                 ->update(['product_id' => $product->id]);
         }
 
@@ -143,11 +144,10 @@ class ProductController extends Controller
         ]);
 
         $product->update([
-            'title' => $request->name, // Keep title for backward compatibility
+            'title' => $request->name,
             'name' => $request->name,
             'code' => $request->code,
             'category' => $request->category,
-            // ad_budget_today not updated manually, will be synced from Facebook
             'status' => $request->status,
             'description' => $request->description,
         ]);
@@ -158,13 +158,15 @@ class ProductController extends Controller
                 ->toMediaCollection('PRODUCT_IMAGE');
         }
 
-        // First, remove product_id from all pages that were previously connected
+        // Remove all existing page connections for this product
         \App\Models\Page::where('product_id', $product->id)
+            ->where('workspace_id', $workspace->id)
             ->update(['product_id' => null]);
 
-        // Then, assign selected pages to this product
-        if ($request->has('page_ids') && !empty($request->page_ids)) {
+        // Assign new page selections
+        if ($request->filled('page_ids') && is_array($request->page_ids) && count($request->page_ids) > 0) {
             \App\Models\Page::whereIn('id', $request->page_ids)
+                ->where('workspace_id', $workspace->id)
                 ->update(['product_id' => $product->id]);
         }
 
