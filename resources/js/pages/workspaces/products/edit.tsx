@@ -37,7 +37,11 @@ const Edit = ({ workspace, product, pages }: PageProps) => {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(workspaces.products.update.url({ workspace, product }));
+        console.log('Form data before submit:', data);
+        put(workspaces.products.update.url({ workspace, product }), {
+            onSuccess: () => console.log('Product updated successfully'),
+            onError: (errors) => console.error('Form errors:', errors),
+        });
     };
 
     return (

@@ -72,13 +72,21 @@ export function MultiSelect({
                         return (
                             <Badge key={value} variant="secondary" className="gap-1">
                                 {option?.label || value}
-                                <X
-                                    className="h-3 w-3 cursor-pointer hover:text-destructive"
+                                <button
+                                    type="button"
+                                    className="ml-1 hover:text-destructive"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                    }}
                                     onClick={(e) => {
+                                        e.preventDefault();
                                         e.stopPropagation();
                                         handleRemove(value);
                                     }}
-                                />
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
                             </Badge>
                         );
                     })}

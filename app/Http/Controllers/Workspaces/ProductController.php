@@ -77,6 +77,13 @@ class ProductController extends Controller
 
     public function store(Request $request, Workspace $workspace)
     {
+        // Debug logging
+        \Log::info('Product Store Request', [
+            'all_data' => $request->all(),
+            'page_ids' => $request->page_ids,
+            'filled' => $request->filled('page_ids'),
+        ]);
+
         $request->validate([
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:10|unique:products,code',
@@ -106,6 +113,7 @@ class ProductController extends Controller
 
         // Assign pages to this product
         if ($request->filled('page_ids') && is_array($request->page_ids) && count($request->page_ids) > 0) {
+            \Log::info('Assigning pages to product', ['product_id' => $product->id, 'page_ids' => $request->page_ids]);
             \App\Models\Page::whereIn('id', $request->page_ids)
                 ->where('workspace_id', $workspace->id)
                 ->update(['product_id' => $product->id]);

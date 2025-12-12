@@ -35,7 +35,11 @@ const Create = ({ workspace, pages }: PageProps) => {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(workspaces.products.store.url({ workspace }));
+        console.log('Form data before submit:', data);
+        post(workspaces.products.store.url({ workspace }), {
+            onSuccess: () => console.log('Product created successfully'),
+            onError: (errors) => console.error('Form errors:', errors),
+        });
     };
 
     return (
