@@ -1,5 +1,10 @@
 import React from 'react';
-import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import {
+    ChartConfig,
+    ChartContainer,
+    ChartTooltip,
+    ChartTooltipContent
+} from '@/components/ui/chart';
 import { Bar, BarChart, CartesianGrid, XAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
@@ -25,7 +30,7 @@ type Props<T> = {
     availableViews?: Array<'graph' | 'table' | 'heatmap'>;
     heatmapPoints?: HeatPoint[];
     loading?: boolean;
-}
+};
 
 const BreakdownAnalyticsView = <T,>({
     data,
@@ -40,46 +45,59 @@ const BreakdownAnalyticsView = <T,>({
     heatmapPoints,
     loading
 }: Props<T>) => {
-    const views = React.useMemo(() => (availableViews && availableViews.length ? availableViews : (['graph', 'table'] as const)), [availableViews]) as Array<'graph' | 'table' | 'heatmap'>;
 
-    const [currentView, setCurrentView] = React.useState<typeof views[number]>(views[0]);
+    const views = React.useMemo(
+        () =>
+            availableViews && availableViews.length
+                ? availableViews
+                : (['graph', 'table'] as const),
+        [availableViews]
+    ) as Array<'graph' | 'table' | 'heatmap'>;
+
+    const [currentView, setCurrentView] = React.useState<typeof views[number]>(
+        views[0]
+    );
 
     if (loading) {
         return (
-            <div className='rounded-xl border bg-card p-6 shadow-sm w-full'>
-                <div className='flex justify-between items-center mb-4'>
-                    <h3 className='text-lg font-semibold tracking-tight'>{title}</h3>
+            <div className="rounded-xl border bg-card p-6 shadow-sm w-full">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
                 </div>
-                <div className='flex justify-center items-center h-32'>
-                    <p className='text-center text-sm text-muted-foreground'>Loading...</p>
+                <div className="flex justify-center items-center h-32">
+                    <p className="text-center text-sm text-muted-foreground">
+                        Loading...
+                    </p>
                 </div>
             </div>
         );
     }
 
     if (data.length === 0) {
-        return (
-            <NoDataView title={title} />
-        );
+        return <NoDataView title={title} />;
     }
 
     return (
-        <div className='rounded-xl border bg-card p-6 shadow-sm h-fit'>
-            <div className='flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4'>
+        <div className="rounded-xl border bg-card p-6 shadow-sm h-fit">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
-                    <h3 className='text-lg font-semibold tracking-tight'>{title}</h3>
-                    <p className='text-sm text-muted-foreground'>{subtitle}</p>
+                    <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
+                    <p className="text-sm text-muted-foreground">{subtitle}</p>
                 </div>
-                <div className='flex gap-2 items-center'>
+
+                <div className="flex gap-2 items-center">
                     <Button size="sm" variant="outline">Export</Button>
 
-                    <div className='flex flex-row gap-1 bg-muted p-1 rounded-lg w-fit'>
+                    <div className="flex flex-row gap-1 bg-muted p-1 rounded-lg w-fit">
                         {views.map((view) => (
                             <Button
                                 key={view}
                                 variant="ghost"
                                 size="sm"
-                                className={`px-3 py-1.5 h-auto rounded-md text-xs font-medium transition-all ${currentView === view ? 'bg-background shadow-sm' : 'hover:bg-background/50'}`}
+                                className={`px-3 py-1.5 h-auto rounded-md text-xs font-medium transition-all ${currentView === view
+                                    ? 'bg-background shadow-sm'
+                                    : 'hover:bg-background/50'
+                                    }`}
                                 onClick={() => setCurrentView(view)}
                             >
                                 {view[0].toUpperCase() + view.slice(1)}
@@ -89,7 +107,8 @@ const BreakdownAnalyticsView = <T,>({
                 </div>
             </div>
 
-            {currentView === 'graph' ? (
+            {/* --- GRAPH VIEW (Always Mounted) --- */}
+            <div className={currentView === 'graph' ? 'block' : 'hidden'}>
                 <ChartContainer config={chartConfig ?? {}} className={className}>
                     <BarChart accessibilityLayer data={data}>
                         <CartesianGrid vertical={false} />
@@ -113,32 +132,36 @@ const BreakdownAnalyticsView = <T,>({
                         ))}
                     </BarChart>
                 </ChartContainer>
-            ) : currentView === 'heatmap' ? (
-                <>
-                    {heatmapPoints && heatmapPoints.length > 0 ? (
-                        <HeatmapMap points={heatmapPoints} />
-                    ) : (
-                        <NoDataView title={title} />
-                    )}
-                </>
-            ) : (
+            </div>
+
+            {/* --- HEATMAP VIEW (Always Mounted) --- */}
+            <div className={currentView === 'heatmap' ? 'block' : 'hidden'}>
+                {heatmapPoints && heatmapPoints.length > 0 ? (
+                    <HeatmapMap points={heatmapPoints} />
+                ) : (
+                    <NoDataView title={title} />
+                )}
+            </div>
+
+            {/* --- TABLE VIEW (Always Mounted) --- */}
+            <div className={currentView === 'table' ? 'block' : 'hidden'}>
                 <DataTable columns={columns} data={data} enableInternalPagination />
-            )}
+            </div>
         </div>
     );
-}
+};
 
 const NoDataView = ({ title }: { title: string }) => {
     return (
-        <div className='rounded-xl border bg-card p-6 shadow-sm w-full'>
-            <div className='flex justify-between items-center mb-4'>
-                <h3 className='text-lg font-semibold tracking-tight'>{title}</h3>
+        <div className="rounded-xl border bg-card p-6 shadow-sm w-full">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
             </div>
-            <div className='flex justify-center items-center h-32'>
-                <p className='text-center text-sm text-muted-foreground'>No data available.</p>
+            <div className="flex justify-center items-center h-32">
+                <p className="text-center text-sm text-muted-foreground">No data available.</p>
             </div>
         </div>
     );
-}
+};
 
 export default BreakdownAnalyticsView;
