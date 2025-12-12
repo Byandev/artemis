@@ -112,11 +112,15 @@ export function MultiSelect({
                                             e.preventDefault();
                                             e.stopPropagation();
                                         }}
-                                        onSelect={() => {
+                                        onClick={() => {
                                             setInputValue('');
                                             onChange([...selected, option.value]);
                                         }}
-                                        className="cursor-pointer"
+                                        onSelect={(value) => {
+                                            setInputValue('');
+                                            onChange([...selected, option.value]);
+                                        }}
+                                        className="cursor-pointer hover:bg-accent"
                                     >
                                         {option.label}
                                     </CommandItem>
