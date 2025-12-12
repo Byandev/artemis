@@ -64,8 +64,14 @@ class ProductController extends Controller
 
     public function create(Workspace $workspace)
     {
+        $pages = \App\Models\Page::ofWorkspace($workspace)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('workspaces/products/create', [
             'workspace' => $workspace,
+            'pages' => $pages,
         ]);
     }
 
@@ -78,11 +84,13 @@ class ProductController extends Controller
             'status' => 'required|in:Scaling,Testing,Failed,Inactive',
             'description' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'page_ids' => 'nullable|array',
+            'page_ids.*' => 'exists:pages,id',
         ]);
 
         $product = Product::create([
             'workspace_id' => $workspace->id,
-            'owner_id' => auth()->user()->id,
+            'owner_id' => $request->user()->id,
             'title' => $request->name, // Keep title for backward compatibility
             'name' => $request->name,
             'code' => $request->code,
@@ -96,14 +104,28 @@ class ProductController extends Controller
                 ->toMediaCollection('PRODUCT_IMAGE');
         }
 
+        // Sync pages to product
+        if ($request->has('page_ids')) {
+            \App\Models\Page::whereIn('id', $request->page_ids)
+                ->update(['product_id' => $product->id]);
+        }
+
         return redirect()->route('workspaces.products.index', $workspace->slug);
     }
 
     public function edit(Workspace $workspace, Product $product)
     {
+        $pages = \App\Models\Page::ofWorkspace($workspace)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
+        $product->load('pages:id,name');
+
         return Inertia::render('workspaces/products/edit', [
             'workspace' => $workspace,
             'product' => $product,
+            'pages' => $pages,
         ]);
     }
 
@@ -116,6 +138,8 @@ class ProductController extends Controller
             'status' => 'required|in:Scaling,Testing,Failed,Inactive',
             'description' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'page_ids' => 'nullable|array',
+            'page_ids.*' => 'exists:pages,id',
         ]);
 
         $product->update([
@@ -132,6 +156,16 @@ class ProductController extends Controller
             $product->clearMediaCollection('PRODUCT_IMAGE');
             $product->addMediaFromRequest('image')
                 ->toMediaCollection('PRODUCT_IMAGE');
+        }
+
+        // First, remove product_id from all pages that were previously connected
+        \App\Models\Page::where('product_id', $product->id)
+            ->update(['product_id' => null]);
+
+        // Then, assign selected pages to this product
+        if ($request->has('page_ids') && !empty($request->page_ids)) {
+            \App\Models\Page::whereIn('id', $request->page_ids)
+                ->update(['product_id' => $product->id]);
         }
 
         return redirect()->route('workspaces.products.index', $workspace->slug);

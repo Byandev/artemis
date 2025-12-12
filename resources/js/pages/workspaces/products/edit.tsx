@@ -1,5 +1,6 @@
 import { Workspace } from '@/types/models/Workspace';
 import { Product } from '@/types/models/Product';
+import { Page } from '@/types/models/Page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import { Label } from '@/components/ui/label';
@@ -14,21 +15,24 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { ArrowLeft } from 'lucide-react';
 import workspaces from '@/routes/workspaces';
 
 interface PageProps {
     workspace: Workspace;
-    product: Product;
+    product: Product & { pages?: Page[] };
+    pages: Page[];
 }
 
-const Edit = ({ workspace, product }: PageProps) => {
+const Edit = ({ workspace, product, pages }: PageProps) => {
     const { data, setData, put, processing, errors } = useForm({
         name: product.name || '',
         code: product.code || '',
         category: product.category || '',
         status: product.status as 'Scaling' | 'Testing' | 'Failed' | 'Inactive',
         description: product.description || '',
+        page_ids: product.pages?.map(p => p.id) || [] as number[],
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -141,6 +145,22 @@ const Edit = ({ workspace, product }: PageProps) => {
                                 />
                                 {errors.description && (
                                     <p className="text-sm text-destructive">{errors.description}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="pages">Pages (Optional)</Label>
+                                <MultiSelect
+                                    options={pages.map(page => ({
+                                        value: page.id.toString(),
+                                        label: page.name,
+                                    }))}
+                                    selected={data.page_ids.map(String)}
+                                    onChange={(selected) => setData('page_ids', selected.map(Number))}
+                                    placeholder="Select pages for this product..."
+                                />
+                                {errors.page_ids && (
+                                    <p className="text-sm text-destructive">{errors.page_ids}</p>
                                 )}
                             </div>
 

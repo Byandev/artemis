@@ -1,4 +1,5 @@
 ﻿import { Workspace } from '@/types/models/Workspace';
+import { Page } from '@/types/models/Page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import { Label } from '@/components/ui/label';
@@ -13,20 +14,23 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { ArrowLeft } from 'lucide-react';
 import workspaces from '@/routes/workspaces';
 
 interface PageProps {
     workspace: Workspace;
+    pages: Page[];
 }
 
-const Create = ({ workspace }: PageProps) => {
+const Create = ({ workspace, pages }: PageProps) => {
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         code: '',
         category: '',
         status: 'Testing' as 'Scaling' | 'Testing' | 'Failed' | 'Inactive',
         description: '',
+        page_ids: [] as number[],
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -139,6 +143,22 @@ const Create = ({ workspace }: PageProps) => {
                                 />
                                 {errors.description && (
                                     <p className="text-sm text-destructive">{errors.description}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="pages">Pages (Optional)</Label>
+                                <MultiSelect
+                                    options={pages.map(page => ({
+                                        value: page.id.toString(),
+                                        label: page.name,
+                                    }))}
+                                    selected={data.page_ids.map(String)}
+                                    onChange={(selected) => setData('page_ids', selected.map(Number))}
+                                    placeholder="Select pages for this product..."
+                                />
+                                {errors.page_ids && (
+                                    <p className="text-sm text-destructive">{errors.page_ids}</p>
                                 )}
                             </div>
 
