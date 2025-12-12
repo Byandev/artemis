@@ -129,7 +129,10 @@ class ProductController extends Controller
             ->orderBy('name')
             ->get();
 
-        $product->load('pages:id,name');
+        // Load pages with the necessary columns (id, name, and product_id for the relationship)
+        $product->load(['pages' => function ($query) {
+            $query->select('id', 'name', 'product_id');
+        }]);
 
         return Inertia::render('workspaces/products/edit', [
             'workspace' => $workspace,
