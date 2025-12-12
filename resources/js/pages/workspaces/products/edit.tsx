@@ -26,6 +26,14 @@ interface PageProps {
 }
 
 const Edit = ({ workspace, product, pages }: PageProps) => {
+    // Debug: Log props to see what we're receiving
+    console.log('Edit Product Props:', {
+        product,
+        productPages: product.pages,
+        allPages: pages,
+        pageIds: product.pages?.map(p => p.id),
+    });
+
     const { data, setData, put, processing, errors } = useForm({
         name: product.name || '',
         code: product.code || '',
@@ -34,6 +42,8 @@ const Edit = ({ workspace, product, pages }: PageProps) => {
         description: product.description || '',
         page_ids: product.pages?.map(p => p.id) || [] as number[],
     });
+
+    console.log('Form data:', data);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
