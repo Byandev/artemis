@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout'
 import { Workspace } from '@/types/models/Workspace'
-import { Head } from '@inertiajs/react'
+import { Head, usePage } from '@inertiajs/react'
 import RtsNavigation from './partials/RtsNavigation'
 import { useState, useEffect } from 'react'
 import { Order } from '@/types/models/Orders'
@@ -30,12 +30,21 @@ interface ForDeliveryTodayProps {
 }
 
 const ForDeliveryToday = ({ workspace, orders, customers, riders }: ForDeliveryTodayProps) => {
-    const [filters, setFilters] = useState<Filters>({ page_name: '', customer: '', rider: '' });
-    const [pageName, setPageName] = useState<string>(filters.page_name);
-    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const { url } = usePage();
+    const params = new URLSearchParams(url.split('?')[1] || '');
 
-    const [sortField, setSortField] = useState<string>('');
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | ''>('');
+    const [filters, setFilters] = useState<Filters>({
+        page_name: params.get('page_name') || '',
+        customer: params.get('customer') || '',
+        rider: params.get('rider') || ''
+    });
+    const [pageName, setPageName] = useState<string>(filters.page_name);
+
+    const [sortField, setSortField] = useState<string>(params.get('sort_by') || '');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | ''>(
+        (params.get('sort_dir') as 'asc' | 'desc' | '') || ''
+    );
+    const [isLoading, setIsLoading] = useState<boolean>(false);
 
     const applyFilters = (newFilters: Filters, sortOverride?: { field?: string; dir?: string }) => {
         const params: Record<string, string> = {};
@@ -175,20 +184,21 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders }: ForDeliveryT
     return (
         <AppLayout>
             <Head title={`${workspace.name} - For Delivery Today`} />
-            <div className="px-4 py-6">
-                <div className="mb-6 flex items-center justify-between">
+            <div className="flex flex-col gap-6 p-6">
+                <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold">RTS Management</h1>
-                        <p className="text-muted-foreground">Manage RTS analytics and reports</p>
+                        <h1 className="text-3xl font-bold tracking-tight">RTS Management</h1>
+                        <p className="text-muted-foreground mt-1">Manage RTS analytics and reports</p>
                     </div>
                 </div>
                 <RtsNavigation workspace={workspace} />
 
-                <div className='border p-5 rounded-md'>
-                    <div className='flex items-start gap-5 flex-col mb-8'>
-                        <h1 className="scroll-m-20 text-center text-xl font-extrabold tracking-tight text-balance">
-                            For Delivery Today
-                        </h1>
+                <div className='rounded-xl border bg-card p-6 shadow-sm'>
+                    <div className='flex flex-col items-start justify-between gap-4 mb-8'>
+                        <div>
+                            <h2 className="text-2xl font-bold tracking-tight">For Delivery Today</h2>
+                            <p className="text-sm text-muted-foreground mt-1">View all orders scheduled for delivery today</p>
+                        </div>
 
                         <ForDeliveryFilters
                             pageName={pageName}

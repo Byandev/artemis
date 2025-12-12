@@ -14,7 +14,7 @@ const AnalyticsStatCard = ({ title, value, className = '' }: Props) => {
                     {title}
                 </p>
                 <h4 className="text-3xl font-bold tracking-tight">
-                    {typeof value === 'number'
+                    {typeof value === 'number' && title.toLowerCase().includes('amount')
                         ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PHP' }).format(value)
                         : value}
                 </h4>
