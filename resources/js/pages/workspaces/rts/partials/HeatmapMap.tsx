@@ -83,6 +83,9 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
 
         const dataMap = new Map();
 
+        //let matchedCount = 0;
+        //let unmatchedCount = 0;
+
         points.forEach((point) => {
             const numValue =
                 typeof point.value === "string" ? parseFloat(point.value) : point.value;
@@ -110,12 +113,23 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
                         pancakeCity: point.city_name,
                         pancakeProvince: point.province_name,
                     });
+                    //matchedCount++;
+                } else {
+                    //unmatchedCount++;
+                    console.log(
+                        `Unmatched point: ${point.city_name}, ${point.province_name}`
+                    );
                 }
             }
         });
 
         setCityDataMap(dataMap);
+
+        //Logs to help view matching accuracy
+        //console.log(`Matched points: ${matchedCount}`);
+        //console.log(`Unmatched points: ${unmatchedCount}`);
     }, [points, mappingData, findPartialMatch]);
+
 
     const getCityData = (gadmCityName: string, gadmProvinceName: string) => {
         const key = `${gadmCityName}_${gadmProvinceName}`;
