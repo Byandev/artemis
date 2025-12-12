@@ -21,7 +21,7 @@ class ForDeliveryController extends Controller
         // Prepare lists of customers and riders for the dropdowns
         $baseResults = Order::forDeliveryToday()
             ->with([
-                'parcelJourney:id,order_id,rider_name',
+                'parcelJourney:id,order_id,rider_name,note',
                 'shippingAddress:id,order_id,full_name',
             ])
             ->get();
@@ -32,7 +32,9 @@ class ForDeliveryController extends Controller
             ->values()
             ->all();
 
-        $riders = $baseResults->pluck('parcelJourney.rider_name')
+        $riders = $baseResults->map(function ($order) {
+                return $order->parcelJourney?->rider_name;
+            })
             ->filter()
             ->unique()
             ->values()
@@ -46,7 +48,7 @@ class ForDeliveryController extends Controller
             ->sortByColumn($sortBy, $sortDir)
             ->with([
                 'page:id,name',
-                'parcelJourney:id,order_id,status,rider_name,rider_mobile,created_at',
+                'parcelJourney:id,order_id,note,status,rider_name,rider_mobile,created_at',
                 'shippingAddress:id,order_id,full_name,phone_number',
             ])
             ->paginate(10)

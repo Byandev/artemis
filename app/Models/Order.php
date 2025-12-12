@@ -83,7 +83,8 @@ class Order extends Model
         }
 
         return $builder->whereHas('parcelJourney', function ($q) use ($rider) {
-            $q->where('rider_name', 'like', "%{$rider}%");
+            $q->where('rider_name', 'like', "%{$rider}%")
+                ->orWhere('note', 'like', "%{$rider}%");
         });
     }
 
