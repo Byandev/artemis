@@ -1,6 +1,7 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { useEffect, useState, useCallback } from "react";
+import _ from "lodash";
 
 export interface HeatPoint {
     city_name: string;
@@ -145,10 +146,14 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
                                         onClick={() => {
                                             if (cityData) {
                                                 alert(
-                                                    `City: ${cityData.pancakeCity}\n` +
-                                                    `Province: ${cityData.pancakeProvince}\n` +
-                                                    `RTS Rate: ${cityData.value} %`
+                                                    [
+                                                        `📍 City:     ${_.startCase(_.toLower(cityData.pancakeCity))}`,
+                                                        `🏛️ Province: ${_.startCase(_.toLower(cityData.pancakeProvince))}`,
+                                                        `📊 RTS Rate: ${cityData.value}%`
+                                                    ].join("\n")
                                                 );
+
+
                                             } else {
                                                 alert(`${gadmCityName}, ${gadmProvinceName}\nNo data available`);
                                             }
