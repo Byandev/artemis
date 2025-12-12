@@ -3,6 +3,8 @@ import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simp
 import { useEffect, useState, useCallback } from "react";
 import _ from "lodash";
 
+import CityInformationDialog from "./CityInformationDialog";
+
 export interface HeatPoint {
     city_name: string;
     province_name: string;
@@ -21,88 +23,93 @@ interface GadmMapping {
 }
 
 export default function HeatmapMap({ points }: HeatmapMapProps) {
-    const geoUrl = "/ph_geojson.json"; // accurate city/municipality boundaries
+    const geoUrl = "/ph_geojson.json";
+
     const [mappingData, setMappingData] = useState<GadmMapping[]>([]);
-    const [cityDataMap, setCityDataMap] = useState<Map<string, { value: number; gadmCity: string; gadmProvince: string; pancakeCity: string; pancakeProvince: string }>>(new Map());
+    const [cityDataMap, setCityDataMap] = useState<
+        Map<string, { value: number; gadmCity: string; gadmProvince: string; pancakeCity: string; pancakeProvince: string }>
+    >(new Map());
 
-    // Normalize pancake names (convert hyphens to spaces for matching)
-    const normalizePancakeName = (name: string): string => {
-        return name.toLowerCase().replace(/-/g, ' ').trim();
-    };
+    // Dialog State
+    const [open, setOpen] = useState(false);
+    const [selectedCity, setSelectedCity] = useState<{
+        city: string;
+        province: string;
+        value: number;
+        hasData: boolean;
+    } | null>(null);
 
-    // Perform partial matching - useful for "Metro-manila" matching "Manila"
-    const findPartialMatch = useCallback((normalizedCity: string, normalizedProvince: string) => {
-        return mappingData.find(m => {
-            const mappedCity = m.pancake_district_name.toLowerCase();
-            const mappedProvince = m.pancake_province_name.toLowerCase();
+    // Normalize pancake names
+    const normalizePancakeName = (name: string): string =>
+        name.toLowerCase().replace(/-/g, " ").trim();
 
-            // Check if city names match (exact or partial)
-            const cityMatches = mappedCity === normalizedCity ||
-                mappedCity.includes(normalizedCity) ||
-                normalizedCity.includes(mappedCity);
+    const findPartialMatch = useCallback(
+        (normalizedCity: string, normalizedProvince: string) => {
+            return mappingData.find((m) => {
+                const mappedCity = m.pancake_district_name.toLowerCase();
+                const mappedProvince = m.pancake_province_name.toLowerCase();
 
-            // Check if province names match (exact or partial)
-            // Handle "metro manila" vs "manila" case
-            let provinceMatches = mappedProvince === normalizedProvince;
-            if (!provinceMatches) {
-                // Check if "metro" prefix is the only difference
-                const provinceVariants = [
-                    normalizedProvince.replace(/^metro\s+/, ''),
-                    'metro ' + normalizedProvince
-                ];
-                provinceMatches = provinceVariants.some(variant => variant === mappedProvince);
-            }
+                const cityMatches =
+                    mappedCity === normalizedCity ||
+                    mappedCity.includes(normalizedCity) ||
+                    normalizedCity.includes(mappedCity);
 
-            return cityMatches && provinceMatches;
-        });
-    }, [mappingData]);
+                let provinceMatches = mappedProvince === normalizedProvince;
+                if (!provinceMatches) {
+                    const variants = [
+                        normalizedProvince.replace(/^metro\s+/, ""),
+                        "metro " + normalizedProvince,
+                    ];
+                    provinceMatches = variants.some((v) => v === mappedProvince);
+                }
 
-    // Load the pancake to GADM mapping
+                return cityMatches && provinceMatches;
+            });
+        },
+        [mappingData]
+    );
+
+    // Load mapping file
     useEffect(() => {
-        fetch('/pancake_to_gadm.json')
-            .then(res => res.json())
-            .then(data => {
-                setMappingData(data);
-            })
-            .catch(err => console.error('Error loading GADM mapping:', err));
+        fetch("/pancake_to_gadm.json")
+            .then((res) => res.json())
+            .then(setMappingData)
+            .catch((err) => console.error("Error loading GADM mapping:", err));
     }, []);
 
-    // Create a map using GADM names from the pancake API data
+    // Build data map
     useEffect(() => {
         if (mappingData.length === 0) return;
 
-        const dataMap = new Map<string, { value: number; gadmCity: string; gadmProvince: string; pancakeCity: string; pancakeProvince: string }>();
+        const dataMap = new Map();
 
-        points.forEach(point => {
-            if (point.value !== null && point.value !== undefined) {
-                const numValue = typeof point.value === 'string' ? parseFloat(point.value) : point.value;
-                if (!isNaN(numValue)) {
-                    // Normalize the pancake names for matching
-                    const normalizedCity = normalizePancakeName(point.city_name);
-                    const normalizedProvince = normalizePancakeName(point.province_name);
+        points.forEach((point) => {
+            const numValue =
+                typeof point.value === "string" ? parseFloat(point.value) : point.value;
 
-                    // Try exact match first, then fall back to partial match
-                    let mapping = mappingData.find(m =>
+            if (!isNaN(numValue)) {
+                const normalizedCity = normalizePancakeName(point.city_name);
+                const normalizedProvince = normalizePancakeName(point.province_name);
+
+                let mapping = mappingData.find(
+                    (m) =>
                         m.pancake_province_name.toLowerCase() === normalizedProvince &&
                         m.pancake_district_name.toLowerCase() === normalizedCity
-                    );
+                );
 
-                    // If no exact match, try partial/fuzzy matching
-                    if (!mapping) {
-                        mapping = findPartialMatch(normalizedCity, normalizedProvince);
-                    }
+                if (!mapping) {
+                    mapping = findPartialMatch(normalizedCity, normalizedProvince);
+                }
 
-                    if (mapping) {
-                        // Use GADM names as the key
-                        const key = `${mapping.gadm_district_name}_${mapping.gadm_province_name}`;
-                        dataMap.set(key, {
-                            value: numValue,
-                            gadmCity: mapping.gadm_district_name,
-                            gadmProvince: mapping.gadm_province_name,
-                            pancakeCity: point.city_name,
-                            pancakeProvince: point.province_name
-                        });
-                    }
+                if (mapping) {
+                    const key = `${mapping.gadm_district_name}_${mapping.gadm_province_name}`;
+                    dataMap.set(key, {
+                        value: numValue,
+                        gadmCity: mapping.gadm_district_name,
+                        gadmProvince: mapping.gadm_province_name,
+                        pancakeCity: point.city_name,
+                        pancakeProvince: point.province_name,
+                    });
                 }
             }
         });
@@ -110,21 +117,14 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
         setCityDataMap(dataMap);
     }, [points, mappingData, findPartialMatch]);
 
-    // Function to get city data using GADM names
     const getCityData = (gadmCityName: string, gadmProvinceName: string) => {
         const key = `${gadmCityName}_${gadmProvinceName}`;
         return cityDataMap.get(key) || null;
     };
 
-    // Function to get fill color based on GADM city and province
     const getFillColor = (gadmCityName: string, gadmProvinceName: string): string => {
         const data = getCityData(gadmCityName, gadmProvinceName);
-
-        if (!data) {
-            return "#d1d5db"; // default gray for cities without data
-        }
-
-        return data.value < 18 ? "#22c55e" : "#ef4444"; // green if < 18, red if >= 18
+        return !data ? "#d1d5db" : data.value < 18 ? "#22c55e" : "#ef4444";
     };
 
     return (
@@ -134,10 +134,10 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
                     <Geographies geography={geoUrl}>
                         {({ geographies }) =>
                             geographies.map((geo) => {
-                                const gadmCityName = geo.properties.NAME_2; // GADM field for city/municipality name
-                                const gadmProvinceName = geo.properties.NAME_1; // GADM field for province name
-                                const fillColor = getFillColor(gadmCityName, gadmProvinceName);
-                                const cityData = getCityData(gadmCityName, gadmProvinceName);
+                                const city = geo.properties.NAME_2;
+                                const province = geo.properties.NAME_1;
+                                const color = getFillColor(city, province);
+                                const cityData = getCityData(city, province);
 
                                 return (
                                     <Geography
@@ -145,41 +145,45 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
                                         geography={geo}
                                         onClick={() => {
                                             if (cityData) {
-                                                alert(
-                                                    [
-                                                        `📍 City:     ${_.startCase(_.toLower(cityData.pancakeCity))}`,
-                                                        `🏛️ Province: ${_.startCase(_.toLower(cityData.pancakeProvince))}`,
-                                                        `📊 RTS Rate: ${cityData.value}%`
-                                                    ].join("\n")
-                                                );
-
-
+                                                setSelectedCity({
+                                                    city: _.startCase(_.toLower(cityData.pancakeCity)),
+                                                    province: _.startCase(_.toLower(cityData.pancakeProvince)),
+                                                    value: cityData.value,
+                                                    hasData: true,
+                                                });
                                             } else {
-                                                alert(`${gadmCityName}, ${gadmProvinceName}\nNo data available`);
+                                                setSelectedCity({
+                                                    city,
+                                                    province,
+                                                    value: -1,
+                                                    hasData: false,
+                                                });
                                             }
+
+                                            setOpen(true);
                                         }}
                                         style={{
                                             default: {
-                                                fill: fillColor,
+                                                fill: color,
                                                 stroke: "#374151",
                                                 strokeWidth: 0.4,
                                             },
-                                            hover: {
-                                                fill: "#60a5fa",
-                                                cursor: "pointer",
-                                            },
-                                            pressed: {
-                                                fill: "#2563eb",
-                                            },
+                                            hover: { fill: "#60a5fa", cursor: "pointer" },
+                                            pressed: { fill: "#2563eb" },
                                         }}
                                     />
                                 );
                             })
                         }
                     </Geographies>
-
                 </ZoomableGroup>
             </ComposableMap>
+
+            <CityInformationDialog
+                open={open}
+                onOpenChange={setOpen}
+                selectedCity={selectedCity}
+            />
         </>
     );
 }
