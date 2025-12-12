@@ -9,7 +9,7 @@ import { HeatPoint } from './partials/HeatmapMap';
 import AnalyticsFilters from './partials/AnalyticsFilters';
 import AnalyticsStatCard from './partials/AnalyticsStatCard';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-import { router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import workspaces from '@/routes/workspaces';
 import { Button } from '@/components/ui/button';
 
@@ -203,6 +203,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
 
     return (
         <AppLayout>
+            <Head title={`${workspace.name} - Analytics`} />
             <div className="flex flex-col gap-6 p-6">
                 <div className="flex items-center justify-between">
                     <div>
