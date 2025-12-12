@@ -178,6 +178,9 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders }: ForDeliveryT
                     {getSortIcon('status_name', sortField, sortDirection)}
                 </Button>
             ),
+            cell: ({ row }) => (
+                <span>{_.capitalize(row.original.status_name)}</span>
+            )
         },
     ];
 
