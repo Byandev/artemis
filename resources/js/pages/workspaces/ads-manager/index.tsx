@@ -101,40 +101,6 @@ const AdsManager = ({ workspace }: PageProps) => {
         <h2 className="text-3xl font-bold tracking-tight">Ads Manager</h2>
       </div>
 
-      {/* Search and Actions Bar */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex-1 max-w-sm">
-          <Input
-            type="text"
-            placeholder="Search campaigns..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => fetchCampaigns(pagination.current_page)}
-            disabled={loading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filters
-          </Button>
-          <Button variant="outline" size="icon">
-            <Grid3x3 className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon">
-            <List className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
       {/* Tabs */}
       <div className="border-b">
         <div className="flex gap-6">
@@ -188,6 +154,40 @@ const AdsManager = ({ workspace }: PageProps) => {
           >
             Optimization Logs
           </button>
+        </div>
+      </div>
+
+      {/* Search and Actions Bar */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1 max-w-sm">
+          <Input
+            type="text"
+            placeholder="Search campaigns..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => fetchCampaigns(pagination.current_page)}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button variant="outline" size="sm">
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+          </Button>
+          <Button variant="outline" size="icon">
+            <Grid3x3 className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon">
+            <List className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
