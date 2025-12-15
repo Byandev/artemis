@@ -11,7 +11,19 @@ import { dashboard } from '@/routes';
 import workspace from '@/routes/workspace';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, FacebookIcon, Folder, LayoutGrid, Package, RotateCwIcon, Users } from 'lucide-react';
+import { 
+    BookOpen, 
+    Folder, 
+    LayoutDashboard, 
+    Package, 
+    Users,
+    Store,
+    Target,
+    UserCircle,
+    CreditCard,
+    FacebookIcon,
+    TrendingUp
+} from 'lucide-react';
 import AppLogo from './app-logo';
 
 const footerNavItems: NavItem[] = [
@@ -38,17 +50,17 @@ export function AppSidebar() {
         {
             title: 'Dashboard',
             href: dashboardUrl,
-            icon: LayoutGrid,
+            icon: LayoutDashboard,
         },
           {
             title: 'Ads Manager',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ads-manager`,
-            icon: FacebookIcon,
+            icon: Target,
         },
         {
             title: 'Shop and Pages',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
-            icon: LayoutGrid,
+            icon: Store,
         },
         {
             title: 'Products',
@@ -63,7 +75,7 @@ export function AppSidebar() {
         {
             title: 'Ad Accounts',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ad-accounts`,
-            icon: FacebookIcon,
+            icon: CreditCard,
         },
         {
             title: 'Teams',
@@ -73,7 +85,7 @@ export function AppSidebar() {
         {
             title: 'RTS Management',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
-            icon: RotateCwIcon,
+            icon: TrendingUp,
         },
     ];
 
