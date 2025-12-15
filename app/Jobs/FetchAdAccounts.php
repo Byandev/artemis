@@ -48,7 +48,7 @@ class FetchAdAccounts implements ShouldQueue
 
             dispatch(new FetchCampaigns($this->facebookAccount, $adAccount));
 
-            $start = Carbon::now()->subMonths(3);
+            $start = Carbon::now()->subMonths(2);
             $end = Carbon::now();
 
             for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
