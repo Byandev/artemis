@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
 @import 'tailwindcss';
 @plugin 'tailwindcss-animate';
 
@@ -9,12 +10,12 @@
 
 @theme {
     --font-sans:
-        'Inter', ui-sans-serif, system-ui, sans-serif,
+        'Outfit', ui-sans-serif, system-ui, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
     
     --font-heading:
-        'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+        'Outfit', ui-sans-serif, system-ui, sans-serif;
 
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
@@ -71,7 +72,7 @@
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.696 0.17 162.48); /* Emerald green from logo */
+    --primary: oklch(0.205 0 0);
     --primary-foreground: oklch(0.985 0 0);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
@@ -83,32 +84,32 @@
     --destructive-foreground: oklch(0.577 0.245 27.325);
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
-    --ring: oklch(0.696 0.17 162.48); /* Emerald green */
-    --chart-1: oklch(0.696 0.17 162.48); /* Emerald green */
+    --ring: oklch(0.87 0 0);
+    --chart-1: oklch(0.646 0.222 41.116);
     --chart-2: oklch(0.6 0.118 184.704);
     --chart-3: oklch(0.398 0.07 227.392);
     --chart-4: oklch(0.828 0.189 84.429);
     --chart-5: oklch(0.769 0.188 70.08);
     --radius: 0.625rem;
-    --sidebar: oklch(0.165 0.006 285.82); /* Dark charcoal for sidebar */
-    --sidebar-foreground: oklch(0.75 0 0); /* Muted gray text */
+    --sidebar: oklch(1 0 0); /* White sidebar */
+    --sidebar-foreground: oklch(0.4 0 0); /* Dark gray text */
     --sidebar-primary: oklch(0.696 0.17 162.48); /* Emerald green for active */
     --sidebar-primary-foreground: oklch(0.985 0 0); /* White text on active */
-    --sidebar-accent: oklch(0.22 0.006 285.82); /* Slightly lighter for hover */
-    --sidebar-accent-foreground: oklch(0.985 0 0); /* White text on hover */
-    --sidebar-border: oklch(0.28 0 0); /* Subtle border */
+    --sidebar-accent: oklch(0.97 0 0); /* Light gray for hover */
+    --sidebar-accent-foreground: oklch(0.145 0 0); /* Dark text on hover */
+    --sidebar-border: oklch(0.922 0 0); /* Subtle border */
     --sidebar-ring: oklch(0.696 0.17 162.48); /* Emerald green */
 }
 
 .dark {
-    --background: oklch(0.205 0.006 285.82); /* Dark charcoal #2D2D2D */
+    --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0.006 285.82);
+    --card: oklch(0.145 0 0);
     --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0.006 285.82);
+    --popover: oklch(0.145 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.696 0.17 162.48); /* Emerald green from logo */
-    --primary-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.985 0 0);
+    --primary-foreground: oklch(0.205 0 0);
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.269 0 0);
@@ -117,22 +118,22 @@
     --accent-foreground: oklch(0.985 0 0);
     --destructive: oklch(0.396 0.141 25.723);
     --destructive-foreground: oklch(0.637 0.237 25.331);
-    --border: oklch(0.35 0 0);
-    --input: oklch(0.35 0 0);
-    --ring: oklch(0.696 0.17 162.48); /* Emerald green */
-    --chart-1: oklch(0.696 0.17 162.48); /* Emerald green */
+    --border: oklch(0.269 0 0);
+    --input: oklch(0.269 0 0);
+    --ring: oklch(0.439 0 0);
+    --chart-1: oklch(0.488 0.243 264.376);
     --chart-2: oklch(0.696 0.17 162.48);
     --chart-3: oklch(0.769 0.188 70.08);
     --chart-4: oklch(0.627 0.265 303.9);
     --chart-5: oklch(0.645 0.246 16.439);
-    --sidebar: oklch(0.145 0 0); /* Even darker sidebar in dark mode */
-    --sidebar-foreground: oklch(0.7 0 0); /* Muted gray text */
-    --sidebar-primary: oklch(0.696 0.17 162.48); /* Emerald green for active */
-    --sidebar-primary-foreground: oklch(0.985 0 0); /* White text on active */
-    --sidebar-accent: oklch(0.2 0 0); /* Slightly lighter for hover */
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.985 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
     --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.25 0 0);
-    --sidebar-ring: oklch(0.696 0.17 162.48); /* Emerald green */
+    --sidebar-border: oklch(0.269 0 0);
+    --sidebar-ring: oklch(0.439 0 0);
 }
 
 @layer base {
@@ -141,12 +142,22 @@
     }
 
     body {
-        @apply bg-background text-foreground;
+        @apply bg-background text-foreground antialiased;
+        font-weight: 400;
+        letter-spacing: -0.01em;
     }
 
     /* Heading font styles */
     h1, h2, h3, h4, h5, h6 {
         font-family: var(--font-heading);
+        font-weight: 600;
+        letter-spacing: -0.02em;
+    }
+    
+    /* Button and interactive elements */
+    button {
+        font-weight: 500;
+        letter-spacing: -0.01em;
     }
 }
 
@@ -159,10 +170,12 @@
     .table-minimalist thead th {
         @apply font-semibold text-muted-foreground text-xs uppercase tracking-wider py-3 px-4 text-left border-b border-border/50;
         font-family: var(--font-heading);
+        font-weight: 600;
     }
 
     .table-minimalist tbody td {
         @apply py-4 px-4 border-b border-border/30;
+        font-weight: 400;
     }
 
     .table-minimalist tbody tr:last-child td {
@@ -171,6 +184,12 @@
 
     .table-minimalist tbody tr:hover {
         @apply bg-muted/30;
+    }
+    
+    /* Sidebar text styling to match reference */
+    [data-sidebar] {
+        font-weight: 500;
+        letter-spacing: -0.01em;
     }
 
     /* Data visualization enhancements */

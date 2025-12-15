@@ -11,10 +11,9 @@ use Inertia\Inertia;
 
 class AnalyticController extends Controller
 {
-    public function index(Workspace $workspace)
+    public function index(Request $request, Workspace $workspace)
     {
-        // Compute summary widgets on the index so the page can pre-render
-        // essential KPI cards while still supporting the detailed endpoints.
+        // Apply filters to summary stats
         $rtsStats = Order::selectRaw('
             ROUND(
                 (SUM(CASE WHEN status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
@@ -26,18 +25,29 @@ class AnalyticController extends Controller
             SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) AS delivered_count
         ')
             ->ofWorkspace($workspace)
+            ->applyRtsFilters($request)
             ->first();
 
+        // Count tracked orders (also filtered)
         $tracked_orders = Order::ofWorkspace($workspace)
+            ->applyRtsFilters($request)
             ->has('parcelJourneyNotifications')
             ->count();
 
-        $sent_parcel_journey_notifications = ParcelJourneyNotification::whereHas('order', function ($query) use ($workspace) {
-            $query->ofWorkspace($workspace);
+        // Count sent PJN (also filtered)
+        $sent_parcel_journey_notifications = ParcelJourneyNotification::whereHas('order', function ($query) use ($workspace, $request) {
+            $query->ofWorkspace($workspace)->applyRtsFilters($request);
         })->count();
 
         return Inertia::render('workspaces/rts/analytics', [
             'workspace' => $workspace,
+            'filters' => [
+                'page_ids' => array_map('intval', (array) $request->input('page_ids', [])),
+                'shop_ids' => array_map('intval', (array) $request->input('shop_ids', [])),
+                'user_ids' => array_map('intval', (array) $request->input('user_ids', [])),
+                'start_date' => $request->input('start_date', null),
+                'end_date' => $request->input('end_date', null),
+            ],
             'data' => [
                 'rts_rate_percentage' => optional($rtsStats)->rts_rate_percentage ?? 0,
                 'returned_count' => optional($rtsStats)->returned_count ?? 0,
@@ -49,12 +59,9 @@ class AnalyticController extends Controller
         ]);
     }
 
-    // API endpoints for grouped stats
+    // Grouped endpoints reuse the same filter logic below
     public function groupByPages(Request $request, Workspace $workspace)
     {
-        $startDate = $request->input('start_date');
-        $endDate = $request->input('end_date');
-
         $groupedQuery = Order::selectRaw('
             pages.id AS id,
             pages.name AS name,
@@ -62,33 +69,31 @@ class AnalyticController extends Controller
             SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
             SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
             ROUND(
-            (SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
-            NULLIF(SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
-            2
+                (SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
+                NULLIF(SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
+                2
             ) AS rts_rate_percentage
         ')
             ->leftJoin('pages', 'pages.id', '=', 'orders.page_id')
             ->ofWorkspace($workspace);
 
-        if ($request->filled('page_ids')) {
-            $ids = (array) $request->input('page_ids');
-            $groupedQuery->whereIn('orders.page_id', $ids);
-        }
+        $filtered = (clone $groupedQuery)
+            ->applyRtsFilters($request)
+            ->groupBy('orders.page_id', 'pages.name', 'pages.id')
+            ->get();
 
-        if ($request->filled('start_date') && $request->filled('end_date')) {
-            $groupedQuery->whereBetween('orders.confirmed_at', [$startDate, $endDate]);
-        }
+        $filterOptions = (clone $groupedQuery)
+            ->groupBy('orders.page_id', 'pages.name', 'pages.id')
+            ->get(['pages.id', 'pages.name']);
 
-        $grouped = $groupedQuery->groupBy('orders.page_id', 'pages.name', 'pages.id')->get();
-
-        return response()->json($grouped);
+        return response()->json([
+            'data' => $filtered,
+            'filter_options' => $filterOptions,
+        ]);
     }
 
     public function groupByShops(Request $request, Workspace $workspace)
     {
-        $startDate = $request->input('start_date');
-        $endDate = $request->input('end_date');
-
         $groupedQuery = Order::selectRaw('
             shops.id AS id,
             shops.name AS name,
@@ -104,25 +109,23 @@ class AnalyticController extends Controller
             ->leftJoin('shops', 'shops.id', '=', 'orders.shop_id')
             ->ofWorkspace($workspace);
 
-        if ($request->filled('shop_ids')) {
-            $ids = (array) $request->input('shop_ids');
-            $groupedQuery->whereIn('orders.shop_id', $ids);
-        }
+        $filtered = $groupedQuery
+            ->applyRtsFilters($request)
+            ->groupBy('orders.shop_id', 'shops.name', 'shops.id')
+            ->get();
 
-        if ($request->filled('start_date') && $request->filled('end_date')) {
-            $groupedQuery->whereBetween('orders.confirmed_at', [$startDate, $endDate]);
-        }
+        $filterOptions = (clone $groupedQuery)
+            ->groupBy('orders.shop_id', 'shops.name', 'shops.id')
+            ->get(['shops.id', 'shops.name']);
 
-        $grouped = $groupedQuery->groupBy('orders.shop_id', 'shops.name', 'shops.id')->get();
-
-        return response()->json($grouped);
+        return response()->json([
+            'data' => $filtered,
+            'filter_options' => $filterOptions,
+        ]);
     }
 
     public function groupByUsers(Request $request, Workspace $workspace)
     {
-        $startDate = $request->input('start_date');
-        $endDate = $request->input('end_date');
-
         $groupedQuery = Order::selectRaw('
             users.id AS id,
             users.name AS name,
@@ -139,28 +142,26 @@ class AnalyticController extends Controller
             ->leftJoin('users', 'users.id', '=', 'pages.owner_id')
             ->ofWorkspace($workspace);
 
-        if ($request->filled('user_ids')) {
-            $ids = (array) $request->input('user_ids');
-            $groupedQuery->whereIn('pages.owner_id', $ids);
-        }
+        $filtered = (clone $groupedQuery)
+            ->applyRtsFilters($request)
+            ->groupBy('pages.owner_id', 'users.name', 'users.id')
+            ->get();
 
-        if ($request->filled('start_date') && $request->filled('end_date')) {
-            $groupedQuery->whereBetween('orders.confirmed_at', [$startDate, $endDate]);
-        }
+        $filterOptions = (clone $groupedQuery)
+            ->groupBy('pages.owner_id', 'users.name', 'users.id')
+            ->get(['users.id', 'users.name']);
 
-        $grouped = $groupedQuery->groupBy('pages.owner_id', 'users.name', 'users.id')->get();
-
-        return response()->json($grouped);
+        return response()->json([
+            'data' => $filtered,
+            'filter_options' => $filterOptions,
+        ]);
     }
 
     public function groupByCities(Request $request, Workspace $workspace)
     {
-        $startDate = $request->input('start_date');
-        $endDate = $request->input('end_date');
-
-        $groupedQuery = Order::selectRaw('
-            shipping_addresses.id AS id,
-            shipping_addresses.district_name AS name,
+        $grouped = Order::selectRaw('
+            shipping_addresses.district_name AS city_name,
+            shipping_addresses.province_name AS province_name,
             SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
             SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
             SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
@@ -171,19 +172,15 @@ class AnalyticController extends Controller
             ) AS rts_rate_percentage
         ')
             ->leftJoin('shipping_addresses', 'shipping_addresses.order_id', '=', 'orders.id')
-            ->ofWorkspace($workspace);
+            ->ofWorkspace($workspace)
+            ->applyRtsFilters($request)
+            ->groupBy('shipping_addresses.district_name', 'shipping_addresses.province_name')
+            ->havingRaw('SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) > 0') // Only include cities with orders
+            ->orderBy('total_orders', 'DESC')
+            ->get();
 
-        if ($request->filled('city_ids')) {
-            $ids = (array) $request->input('city_ids');
-            $groupedQuery->whereIn('shipping_addresses.id', $ids);
-        }
-
-        if ($request->filled('start_date') && $request->filled('end_date')) {
-            $groupedQuery->whereBetween('orders.confirmed_at', [$startDate, $endDate]);
-        }
-
-        $grouped = $groupedQuery->groupBy('shipping_addresses.district_name', 'shipping_addresses.id')->get();
-
-        return response()->json($grouped);
+        return response()->json([
+            'data' => $grouped,
+        ]);
     }
 }

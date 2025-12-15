@@ -5,39 +5,28 @@ import SearchSelect from './SearchSelect';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
-type BreakDownAnalytics = {
-    id: number;
-    name: string;
-    total_orders: number;
-    rts_rate_percentage: number;
-    returned_count: number;
-    delivered_count: number;
-}
-
 type Props = {
-    groupedByPage: BreakDownAnalytics[];
-    groupedByUsers: BreakDownAnalytics[];
-    groupedByShops: BreakDownAnalytics[];
+    availablePages: { id: number; name: string }[];
+    availableUsers: { id: number; name: string }[];
+    availableShops: { id: number; name: string }[];
     selectedPagesFilter: number[];
     setSelectedPagesFilter: React.Dispatch<React.SetStateAction<number[]>>;
     selectedUsersFilter: number[];
     setSelectedUsersFilter: React.Dispatch<React.SetStateAction<number[]>>;
     selectedShopFilter: number[];
     setSelectedShopFilter: React.Dispatch<React.SetStateAction<number[]>>;
-    loadingGrouped: boolean;
 }
 
 const AnalyticsFilters = ({
-    groupedByPage,
-    groupedByUsers,
-    groupedByShops,
+    availablePages,
+    availableUsers,
+    availableShops,
     selectedPagesFilter,
     setSelectedPagesFilter,
     selectedUsersFilter,
     setSelectedUsersFilter,
     selectedShopFilter,
     setSelectedShopFilter,
-    loadingGrouped,
 }: Props) => {
     return (
         <DropdownMenu>
@@ -55,52 +44,40 @@ const AnalyticsFilters = ({
                     <AccordionItem value="item-1">
                         <AccordionTrigger className='py-2'>Page</AccordionTrigger>
                         <AccordionContent className="flex flex-col gap-4 text-balance">
-                            {loadingGrouped ? (
-                                <div>Loading...</div>
-                            ) : (
-                                <SearchSelect
-                                    items={groupedByPage.map((page) => ({
-                                        id: page.id,
-                                        name: page.name,
-                                    }))}
-                                    selected={selectedPagesFilter}
-                                    setSelected={setSelectedPagesFilter}
-                                />
-                            )}
+                            <SearchSelect
+                                items={availablePages.map((page) => ({
+                                    id: page.id,
+                                    name: page.name,
+                                }))}
+                                selected={selectedPagesFilter}
+                                setSelected={setSelectedPagesFilter}
+                            />
                         </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-2">
                         <AccordionTrigger className='py-2'>User</AccordionTrigger>
                         <AccordionContent className="flex flex-col gap-4 text-balance">
-                            {loadingGrouped ? (
-                                <div>Loading...</div>
-                            ) : (
-                                <SearchSelect
-                                    items={groupedByUsers.map((user) => ({
-                                        id: user.id,
-                                        name: user.name,
-                                    }))}
-                                    selected={selectedUsersFilter}
-                                    setSelected={setSelectedUsersFilter}
-                                />
-                            )}
+                            <SearchSelect
+                                items={availableUsers.map((user) => ({
+                                    id: user.id,
+                                    name: user.name,
+                                }))}
+                                selected={selectedUsersFilter}
+                                setSelected={setSelectedUsersFilter}
+                            />
                         </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-3">
                         <AccordionTrigger className='py-2'>Shop</AccordionTrigger>
                         <AccordionContent className="flex flex-col gap-4 text-balance">
-                            {loadingGrouped ? (
-                                <div>Loading...</div>
-                            ) : (
-                                <SearchSelect
-                                    items={groupedByShops.map((shop) => ({
-                                        id: shop.id,
-                                        name: shop.name,
-                                    }))}
-                                    selected={selectedShopFilter}
-                                    setSelected={setSelectedShopFilter}
-                                />
-                            )}
+                            <SearchSelect
+                                items={availableShops.map((shop) => ({
+                                    id: shop.id,
+                                    name: shop.name,
+                                }))}
+                                selected={selectedShopFilter}
+                                setSelected={setSelectedShopFilter}
+                            />
                         </AccordionContent>
                     </AccordionItem>
                 </Accordion>

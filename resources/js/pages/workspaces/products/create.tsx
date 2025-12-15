@@ -1,92 +1,190 @@
-import { Workspace } from '@/types/models/Workspace';
+﻿import { Workspace } from '@/types/models/Workspace';
+import { Page } from '@/types/models/Page';
 import AppLayout from '@/layouts/app-layout';
-import { useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
+import { ArrowLeft } from 'lucide-react';
 import workspaces from '@/routes/workspaces';
 
 interface PageProps {
     workspace: Workspace;
+    pages: Page[];
 }
 
-const Create = ({ workspace}: PageProps) => {
-    const { data, setData, post, put, processing, errors, reset } = useForm({
-        title: '',
+const Create = ({ workspace, pages }: PageProps) => {
+    const { data, setData, post, processing, errors } = useForm({
+        name: '',
+        code: '',
+        category: '',
+        status: 'Testing' as 'Scaling' | 'Testing' | 'Failed' | 'Inactive',
         description: '',
-        image: null
+        page_ids: [] as number[],
     });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-
+        console.log('Form data before submit:', data);
         post(workspaces.products.store.url({ workspace }), {
-            onSuccess: () => {
-                reset();
-            },
+            onSuccess: () => console.log('Product created successfully'),
+            onError: (errors) => console.error('Form errors:', errors),
         });
     };
 
     return (
         <AppLayout>
-            <div className='px-4 py-6'>
-                <form className="space-y-4" onSubmit={handleSubmit}>
-                    <div className="grid gap-2">
-                        <Label htmlFor="image">Image</Label>
-                        <Input
-                            id="image"
-                            type="file"
-                            onChange={(e) => {
-                                if (e.target?.files?.length) {
-                                    setData('image', e.target.files[0])
-                                }
-                            }}
-                            placeholder="Product Title"
-                            aria-invalid={!!errors.title}
-                        />
-                        {errors.title && (
-                            <p className="text-sm text-destructive">{errors.title}</p>
-                        )}
-                    </div>
-
-                    <div className="grid gap-2">
-                        <Label htmlFor="title">Title</Label>
-                        <Input
-                            id="title"
-                            type="text"
-                            value={data.title}
-                            onChange={(e) => setData('title', e.target.value)}
-                            placeholder="Product Title"
-                            aria-invalid={!!errors.title}
-                        />
-                        {errors.title && (
-                            <p className="text-sm text-destructive">{errors.title}</p>
-                        )}
-                    </div>
-
-                    <div className="grid gap-2">
-                        <Label htmlFor="description">Description</Label>
-                        <Textarea
-                            id="description"
-                            rows={100}
-                            value={data.description}
-                            onChange={(e) => setData('description', e.target.value)}
-                            placeholder="Description"
-                            aria-invalid={!!errors.description}
-                        />
-                        {errors.description && (
-                            <p className="text-sm text-destructive">{errors.description}</p>
-                        )}
-                    </div>
-
-                    <Button type="submit" disabled={processing}>
-                        {processing ? 'Saving Product...' : 'Save Product'}
+            <Head title={`${workspace.name} - Create Product`} />
+            <div className="container max-w-5xl mx-auto py-8 px-4">
+                <div className="mb-8">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => window.history.back()}
+                        className="mb-4"
+                    >
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Back
                     </Button>
-                </form>
+                    <h1 className="text-3xl font-bold tracking-tight">Create Product</h1>
+                    <p className="text-muted-foreground mt-2">Add a new product to your workspace</p>
+                </div>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Product Information</CardTitle>
+                        <CardDescription>Enter the details for your new product</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <Label htmlFor="name">Product Name *</Label>
+                                    <Input
+                                        id="name"
+                                        value={data.name}
+                                        onChange={(e) => setData('name', e.target.value)}
+                                        placeholder="Enter product name"
+                                        className={errors.name ? 'border-destructive' : ''}
+                                    />
+                                    {errors.name && (
+                                        <p className="text-sm text-destructive">{errors.name}</p>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="code">Product Code *</Label>
+                                    <Input
+                                        id="code"
+                                        value={data.code}
+                                        onChange={(e) => setData('code', e.target.value)}
+                                        placeholder="Enter product code"
+                                        maxLength={10}
+                                        className={errors.code ? 'border-destructive' : ''}
+                                    />
+                                    {errors.code && (
+                                        <p className="text-sm text-destructive">{errors.code}</p>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="category">Category *</Label>
+                                    <Input
+                                        id="category"
+                                        value={data.category}
+                                        onChange={(e) => setData('category', e.target.value)}
+                                        placeholder="Enter category"
+                                        className={errors.category ? 'border-destructive' : ''}
+                                    />
+                                    {errors.category && (
+                                        <p className="text-sm text-destructive">{errors.category}</p>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="status">Status *</Label>
+                                    <Select
+                                        value={data.status}
+                                        onValueChange={(value: 'Scaling' | 'Testing' | 'Failed' | 'Inactive') =>
+                                            setData('status', value)
+                                        }
+                                    >
+                                        <SelectTrigger className={errors.status ? 'border-destructive' : ''}>
+                                            <SelectValue placeholder="Select status" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Testing">Testing</SelectItem>
+                                            <SelectItem value="Scaling">Scaling</SelectItem>
+                                            <SelectItem value="Failed">Failed</SelectItem>
+                                            <SelectItem value="Inactive">Inactive</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.status && (
+                                        <p className="text-sm text-destructive">{errors.status}</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="description">Description</Label>
+                                <Textarea
+                                    id="description"
+                                    value={data.description}
+                                    onChange={(e) => setData('description', e.target.value)}
+                                    placeholder="Enter product description (optional)"
+                                    rows={4}
+                                    className={errors.description ? 'border-destructive' : ''}
+                                />
+                                {errors.description && (
+                                    <p className="text-sm text-destructive">{errors.description}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="pages">Pages (Optional)</Label>
+                                <MultiSelect
+                                    options={pages.map(page => ({
+                                        value: page.id.toString(),
+                                        label: page.name,
+                                    }))}
+                                    selected={data.page_ids.map(String)}
+                                    onChange={(selected) => setData('page_ids', selected.map(Number))}
+                                    placeholder="Select pages for this product..."
+                                />
+                                {errors.page_ids && (
+                                    <p className="text-sm text-destructive">{errors.page_ids}</p>
+                                )}
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-4 border-t">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => window.history.back()}
+                                    disabled={processing}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={processing}>
+                                    {processing ? 'Creating...' : 'Create Product'}
+                                </Button>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
             </div>
         </AppLayout>
     );
-}
+};
 
 export default Create;
