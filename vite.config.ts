@@ -19,7 +19,7 @@ export default defineConfig({
         })
     ],
     optimizeDeps: {
-        include: ['maplibre-gl'],
+        include: ['maplibre-gl', '@vnedyalk0v/react19-simple-maps'],
     },
     esbuild: {
         jsx: 'automatic',
