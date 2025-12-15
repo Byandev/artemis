@@ -1,12 +1,11 @@
 import React from 'react';
-
 type Props = {
     title: string;
     value: string | number;
     className?: string;
 }
 
-const AnalyticsStatCard = ({ title, value, className = '' }: Props) => {
+const MetricsCard = ({ title, value, className = '' }: Props) => {
     return (
         <div className={`relative overflow-hidden rounded-xl border bg-card p-6 shadow-sm transition-all hover:shadow-md ${className}`}>
             <div className="flex flex-col gap-3">
@@ -23,4 +22,4 @@ const AnalyticsStatCard = ({ title, value, className = '' }: Props) => {
     )
 }
 
-export default AnalyticsStatCard;
+export default MetricsCard;

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AdRecord extends Model
 {
@@ -13,4 +14,22 @@ class AdRecord extends Model
     public $incrementing = false;
 
     public $timestamps = false;
+
+    /**
+     * Get the ad account that this record belongs to.
+     */
+    public function adAccount(): BelongsTo
+    {
+        return $this->belongsTo(AdAccount::class);
+    }
+
+    /**
+     * Get all ad records for a specific workspace.
+     */
+    public function scopeOfWorkspace($builder, Workspace $workspace)
+    {
+        return $builder->whereHas('adAccount.facebook_accounts.workspaces', function ($query) use ($workspace) {
+            return $query->where('workspace_id', $workspace->id);
+        });
+    }
 }

@@ -7,7 +7,7 @@ import BreakdownAnalyticsView from './partials/BreakdownAnalyticsView';
 import { ColumnDef } from '@tanstack/react-table';
 import { HeatPoint } from './partials/HeatmapMap';
 import AnalyticsFilters from './partials/AnalyticsFilters';
-import AnalyticsStatCard from './partials/AnalyticsStatCard';
+import MetricsCard from '@/components/workspaces/MetricsCard';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { Head, router } from '@inertiajs/react';
 import workspaces from '@/routes/workspaces';
@@ -258,7 +258,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
 
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                         {analytics.map((item, key) => (
-                            <AnalyticsStatCard key={key} title={item.title} value={item.value} className='col-span-2 md:col-span-1' />
+                            <MetricsCard key={key} title={item.title} value={item.value} className='col-span-2 md:col-span-1' />
                         ))}
 
                         <div className='col-span-2 flex flex-col gap-5'>
