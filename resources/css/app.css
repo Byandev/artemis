@@ -1,4 +1,5 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
 @import 'tailwindcss';
 @plugin 'tailwindcss-animate';
 
@@ -12,6 +13,9 @@
         'Outfit', ui-sans-serif, system-ui, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
+    
+    --font-heading:
+        'Outfit', ui-sans-serif, system-ui, sans-serif;
 
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
@@ -87,14 +91,14 @@
     --chart-4: oklch(0.828 0.189 84.429);
     --chart-5: oklch(0.769 0.188 70.08);
     --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.87 0 0);
+    --sidebar: oklch(1 0 0); /* White sidebar */
+    --sidebar-foreground: oklch(0.4 0 0); /* Dark gray text */
+    --sidebar-primary: oklch(0.696 0.17 162.48); /* Emerald green for active */
+    --sidebar-primary-foreground: oklch(0.985 0 0); /* White text on active */
+    --sidebar-accent: oklch(0.97 0 0); /* Light gray for hover */
+    --sidebar-accent-foreground: oklch(0.145 0 0); /* Dark text on hover */
+    --sidebar-border: oklch(0.922 0 0); /* Subtle border */
+    --sidebar-ring: oklch(0.696 0.17 162.48); /* Emerald green */
 }
 
 .dark {
@@ -138,6 +142,80 @@
     }
 
     body {
-        @apply bg-background text-foreground;
+        @apply bg-background text-foreground antialiased;
+        font-weight: 400;
+        letter-spacing: -0.01em;
+    }
+
+    /* Heading font styles */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: var(--font-heading);
+        font-weight: 600;
+        letter-spacing: -0.02em;
+    }
+    
+    /* Button and interactive elements */
+    button {
+        font-weight: 500;
+        letter-spacing: -0.01em;
+    }
+}
+
+/* Minimalist table styles */
+@layer components {
+    .table-minimalist {
+        @apply w-full text-sm;
+    }
+
+    .table-minimalist thead th {
+        @apply font-semibold text-muted-foreground text-xs uppercase tracking-wider py-3 px-4 text-left border-b border-border/50;
+        font-family: var(--font-heading);
+        font-weight: 600;
+    }
+
+    .table-minimalist tbody td {
+        @apply py-4 px-4 border-b border-border/30;
+        font-weight: 400;
+    }
+
+    .table-minimalist tbody tr:last-child td {
+        @apply border-b-0;
+    }
+
+    .table-minimalist tbody tr:hover {
+        @apply bg-muted/30;
+    }
+    
+    /* Sidebar text styling to match reference */
+    [data-sidebar] {
+        font-weight: 500;
+        letter-spacing: -0.01em;
+    }
+
+    /* Data visualization enhancements */
+    .stat-card {
+        @apply relative overflow-hidden rounded-xl border bg-card p-6 shadow-sm transition-all hover:shadow-md;
+    }
+
+    .stat-card-label {
+        @apply text-sm font-medium text-muted-foreground uppercase tracking-wide;
+    }
+
+    .stat-card-value {
+        @apply text-3xl font-bold tracking-tight;
+    }
+
+    /* Chart container improvements */
+    .chart-wrapper {
+        @apply rounded-xl border bg-card p-6 shadow-sm;
+    }
+
+    /* Section headers */
+    .section-header {
+        @apply text-3xl font-bold tracking-tight;
+    }
+
+    .section-description {
+        @apply text-muted-foreground mt-1;
     }
 }
