@@ -42,7 +42,7 @@ export default function Index({ workspace, stats }: Props) {
                     <p className="text-muted-foreground mt-1">Welcome back! Here's your workspace overview.</p>
                 </div>
 
-                <div className="grid auto-rows-min gap-4 md:grid-cols-4">
+                <div className="grid auto-rows-min gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                     {analytics.map((data, key) => (
                         <MetricsCard key={key} title={data.title} value={data.value} />
                     ))}
