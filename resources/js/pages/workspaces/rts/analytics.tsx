@@ -1,16 +1,15 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import RtsNavigation from '@/pages/workspaces/rts/partials/RtsNavigation';
 import { Workspace } from '@/types/models/Workspace';
 import { ChartConfig } from '@/components/ui/chart';
 import BreakdownAnalyticsView from './partials/BreakdownAnalyticsView';
 import { ColumnDef } from '@tanstack/react-table';
-import { getLatLng } from '@/lib/cities';
 import { HeatPoint } from './partials/HeatmapMap';
 import AnalyticsFilters from './partials/AnalyticsFilters';
 import AnalyticsStatCard from './partials/AnalyticsStatCard';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-import { router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import workspaces from '@/routes/workspaces';
 import { Button } from '@/components/ui/button';
 
@@ -22,6 +21,11 @@ type BreakDownAnalytics = {
     returned_count: number;
     delivered_count: number;
 };
+
+interface PerCityBreakdownAnalytics extends BreakDownAnalytics {
+    city_name: string;
+    province_name: string;
+}
 
 type Props = {
     workspace: Workspace;
@@ -68,7 +72,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
         filter_options: { id: number; name: string }[];
     }>({ data: [], filter_options: [] });
     const [groupedByCities, setGroupedByCities] = useState<{
-        data: BreakDownAnalytics[];
+        data: PerCityBreakdownAnalytics[];
         filter_options: { id: number; name: string }[];
     }>({ data: [], filter_options: [] });
 
@@ -141,9 +145,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
     const heatmapPoints: HeatPoint[] = useMemo(() => {
         return groupedByCities.data
             .map((city) => {
-                const latLng = getLatLng(city.name);
-                if (!latLng) return null;
-                return { coordinates: latLng, value: city.rts_rate_percentage };
+                return { city_name: city.city_name, province_name: city.province_name, value: city.rts_rate_percentage };
             })
             .filter((p): p is HeatPoint => p !== null);
     }, [groupedByCities]);
@@ -173,6 +175,19 @@ const Analytics = ({ workspace, filters, data }: Props) => {
         },
     ], []);
 
+    const buildCCityColumns = useCallback((label: string): ColumnDef<PerCityBreakdownAnalytics>[] => [
+        { accessorKey: 'city_name', header: label },
+        { accessorKey: 'province_name', header: 'Province Name' },
+        { accessorKey: 'total_orders', header: 'Total Orders' },
+        { accessorKey: 'returned_count', header: 'Returned' },
+        { accessorKey: 'delivered_count', header: 'Delivered' },
+        {
+            accessorKey: 'rts_rate_percentage',
+            header: 'RTS Rate',
+            cell: ({ row }) => `${row.original.rts_rate_percentage}%`,
+        },
+    ], []);
+
     const clearFilters = () => {
         setSelectedPagesFilter([]);
         setSelectedUsersFilter([]);
@@ -188,6 +203,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
 
     return (
         <AppLayout>
+            <Head title={`${workspace.name} - Analytics`} />
             <div className="flex flex-col gap-6 p-6">
                 <div className="flex items-center justify-between">
                     <div>
@@ -284,10 +300,10 @@ const Analytics = ({ workspace, filters, data }: Props) => {
                         </div>
 
                         <div className='col-span-2'>
-                            <BreakdownAnalyticsView<BreakDownAnalytics>
-                                columns={buildColumns('City')}
+                            <BreakdownAnalyticsView<PerCityBreakdownAnalytics>
+                                columns={buildCCityColumns('City Name')}
                                 availableViews={['heatmap', 'table']}
-                                className="w-full h-12"
+                                className="w-full"
                                 data={groupedByCities.data}
                                 title="Breakdown per Cities"
                                 subtitle='Geographical RTS rate distribution'

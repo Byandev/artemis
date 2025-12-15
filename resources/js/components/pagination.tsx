@@ -22,9 +22,7 @@ export default function Pagination({ data }: { data: Props }) {
             <div className="text-sm text-muted-foreground">
                 {data.total > 0 ? (
                     <>Showing {data.from} to {data.to} of {data.total} results</>
-                ) : (
-                    <>No results found</>
-                )}
+                ) : null}
             </div>
 
             {data.last_page > 1 && (
