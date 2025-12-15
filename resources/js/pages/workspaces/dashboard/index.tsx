@@ -37,12 +37,12 @@ export default function Index({ workspace, stats }: Props) {
                     {analytics.map((data, key) => (
                         <div
                             key={key}
-                            className="relative overflow-hidden rounded-xl border bg-card p-6 shadow-sm transition-all hover:shadow-md">
+                            className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                             <div className="flex flex-col gap-3">
                                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
                                     {data.title}
                                 </p>
-                                <h4 className="text-3xl font-bold tracking-tight">
+                                <h4 className="text-3xl font-bold tracking-tight break-words">
                                     {data.value}
                                 </h4>
                             </div>
