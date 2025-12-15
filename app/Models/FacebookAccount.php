@@ -22,4 +22,9 @@ class FacebookAccount extends Model
     {
         return $this->belongsToMany(Workspace::class, 'workspace_facebook_account');
     }
+
+    public function adAccounts(): BelongsToMany
+    {
+        return $this->belongsToMany(AdAccount::class, 'facebook_account_ad_account');
+    }
 }

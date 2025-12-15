@@ -13,6 +13,7 @@ use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -80,6 +81,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/workspaces/{workspace}/facebook-accounts', [FacebookAccountController::class, 'index'])->name('workspaces.facebook-accounts.index');
     Route::get('/workspaces/{workspace}/ad-accounts', [AdAccountController::class, 'index'])->name('workspaces.ad-accounts.index');
+    Route::get('/workspaces/{workspace}/ads-manager', function (Workspace $workspace) {
+        return inertia('workspaces/ads-manager/index', [
+            'workspace' => $workspace,
+        ]);
+    })->name('workspaces.ads-manager');
+
+    // Ads Manager API routes
+    Route::get('/workspaces/{workspace}/api/campaigns', [\App\Http\Controllers\Workspaces\CampaignController::class, 'index'])->name('workspaces.api.campaigns.index');
 
     // Team routes
     Route::get('/workspaces/{workspace}/teams', [TeamController::class, 'index'])->name('workspaces.teams.index');
