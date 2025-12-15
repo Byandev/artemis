@@ -13,9 +13,11 @@ return new class extends Migration
     {
         Schema::table('products', function (Blueprint $table) {
             $table->string('name')->after('owner_id'); // Product Name (Product 1, Product 2, etc.)
-            $table->string('code')->unique()->after('name'); // Product Code (ABC, ABD, ABE)
+            $table->string('code')->after('name'); // Product Code (ABC, ABD, ABE)
             $table->string('category')->after('code'); // Category (Health And Wellness, etc.)
             $table->enum('status', ['Scaling', 'Testing', 'Failed', 'Inactive'])->default('Testing')->after('category'); // Status
+
+            $table->unique(['workspace_id', 'code']);
         });
     }
 
@@ -26,6 +28,8 @@ return new class extends Migration
     {
         Schema::table('products', function (Blueprint $table) {
             $table->dropColumn(['name', 'code', 'category', 'status']);
+
+            $table->dropUnique(['workspace_id', 'code']);
         });
     }
 };
