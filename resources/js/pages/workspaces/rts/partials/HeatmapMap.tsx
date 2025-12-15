@@ -1,8 +1,7 @@
 import "maplibre-gl/dist/maplibre-gl.css";
-import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
+import { ComposableMap, createCoordinates, Geographies, Geography, ZoomableGroup } from "@vnedyalk0v/react19-simple-maps";
 import { useEffect, useState, useCallback } from "react";
 import _ from "lodash";
-
 import CityInformationDialog from "./CityInformationDialog";
 
 export interface HeatPoint {
@@ -23,7 +22,13 @@ interface GadmMapping {
 }
 
 export default function HeatmapMap({ points }: HeatmapMapProps) {
-    const geoUrl = "/ph_geojson.json";
+    const [geoData, setGeoData] = useState(null);
+
+    useEffect(() => {
+        fetch("/ph_geojson.json")  // fetch from public folder
+            .then(res => res.json())
+            .then(data => setGeoData(data));
+    }, []);
 
     const [mappingData, setMappingData] = useState<GadmMapping[]>([]);
     const [cityDataMap, setCityDataMap] = useState<
@@ -143,19 +148,19 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
 
     return (
         <>
-            <ComposableMap projection="geoMercator" projectionConfig={{ scale: 4200, center: [122, 11] }}>
-                <ZoomableGroup center={[122, 15]} zoom={0.8}>
-                    <Geographies geography={geoUrl}>
+            <ComposableMap projection="geoMercator" projectionConfig={{ scale: 4200, center: createCoordinates(122, 12) }}>
+                <ZoomableGroup center={createCoordinates(122, 15)} zoom={0.8}>
+                    <Geographies geography={geoData}>
                         {({ geographies }) =>
-                            geographies.map((geo) => {
-                                const city = geo.properties.NAME_2;
-                                const province = geo.properties.NAME_1;
+                            geographies.map((geo, index) => {
+                                const city = geo?.properties?.NAME_2;
+                                const province = geo?.properties?.NAME_1;
                                 const color = getFillColor(city, province);
                                 const cityData = getCityData(city, province);
 
                                 return (
                                     <Geography
-                                        key={geo.rsmKey}
+                                        key={`${geo?.properties?.NAME_1}_${geo?.properties?.NAME_2}_${index}`}
                                         geography={geo}
                                         onClick={() => {
                                             if (cityData) {
