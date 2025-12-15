@@ -9,7 +9,7 @@ type Props = {
     workspace: Workspace;
     stats: {
         total_sales: number;
-        total_add_spend: number;
+        total_ad_spend: number;
         total_orders: number;
         roas: number;
         rts_rate_percentage: number;
@@ -23,9 +23,9 @@ export default function Index({ workspace, stats }: Props) {
     const analytics = useMemo(() => {
         return [
             { title: 'Total Sales', value: currencyFormatter(stats.total_sales) },
-            { title: 'Total Add Spend', value: currencyFormatter(stats.total_add_spend) },
+            { title: 'Total Add Spend', value: currencyFormatter(stats.total_ad_spend) },
             { title: 'Total Orders', value: numberFormatter(stats.total_orders) },
-            { title: 'ROAS', value: stats.roas.toFixed(2) + 'x' },
+            { title: 'ROAS', value: stats.roas },
             { title: 'RTS Rate', value: percentageFormatter(stats.rts_rate_percentage / 100) },
             { title: 'Delivered Orders', value: numberFormatter(stats.delivered_orders) },
             { title: 'SMS Sent', value: numberFormatter(stats.sms_sent) },
