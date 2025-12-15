@@ -1,4 +1,5 @@
-﻿import { Workspace } from '@/types/models/Workspace';
+import { Workspace } from '@/types/models/Workspace';
+import { Product } from '@/types/models/Product';
 import { Page } from '@/types/models/Page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
@@ -20,31 +21,42 @@ import workspaces from '@/routes/workspaces';
 
 interface PageProps {
     workspace: Workspace;
+    product: Product & { pages?: Page[] };
     pages: Page[];
 }
 
-const Create = ({ workspace, pages }: PageProps) => {
-    const { data, setData, post, processing, errors } = useForm({
-        name: '',
-        code: '',
-        category: '',
-        status: 'Testing' as 'Scaling' | 'Testing' | 'Failed' | 'Inactive',
-        description: '',
-        page_ids: [] as number[],
+const Edit = ({ workspace, product, pages }: PageProps) => {
+    // Debug: Log props to see what we're receiving
+    console.log('Edit Product Props:', {
+        product,
+        productPages: product.pages,
+        allPages: pages,
+        pageIds: product.pages?.map(p => p.id),
     });
+
+    const { data, setData, put, processing, errors } = useForm({
+        name: product.name || '',
+        code: product.code || '',
+        category: product.category || '',
+        status: product.status as 'Scaling' | 'Testing' | 'Failed' | 'Inactive',
+        description: product.description || '',
+        page_ids: product.pages?.map(p => p.id) || [] as number[],
+    });
+
+    console.log('Form data:', data);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         console.log('Form data before submit:', data);
-        post(workspaces.products.store.url({ workspace }), {
-            onSuccess: () => console.log('Product created successfully'),
+        put(workspaces.products.update.url({ workspace, product }), {
+            onSuccess: () => console.log('Product updated successfully'),
             onError: (errors) => console.error('Form errors:', errors),
         });
     };
 
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - Create Product`} />
+            <Head title={`${workspace.name} - Edit Product`} />
             <div className="container max-w-5xl mx-auto py-8 px-4">
                 <div className="mb-8">
                     <Button
@@ -56,14 +68,14 @@ const Create = ({ workspace, pages }: PageProps) => {
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Back
                     </Button>
-                    <h1 className="text-3xl font-bold tracking-tight">Create Product</h1>
-                    <p className="text-muted-foreground mt-2">Add a new product to your workspace</p>
+                    <h1 className="text-3xl font-bold tracking-tight">Edit Product</h1>
+                    <p className="text-muted-foreground mt-2">Update product information</p>
                 </div>
 
                 <Card>
                     <CardHeader>
                         <CardTitle>Product Information</CardTitle>
-                        <CardDescription>Enter the details for your new product</CardDescription>
+                        <CardDescription>Update the details for this product</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmit} className="space-y-6">
@@ -176,7 +188,7 @@ const Create = ({ workspace, pages }: PageProps) => {
                                     Cancel
                                 </Button>
                                 <Button type="submit" disabled={processing}>
-                                    {processing ? 'Creating...' : 'Create Product'}
+                                    {processing ? 'Updating...' : 'Update Product'}
                                 </Button>
                             </div>
                         </form>
@@ -187,4 +199,4 @@ const Create = ({ workspace, pages }: PageProps) => {
     );
 };
 
-export default Create;
+export default Edit;
