@@ -40,6 +40,11 @@ export function AppSidebar() {
             href: dashboardUrl,
             icon: LayoutGrid,
         },
+          {
+            title: 'Ads Manager',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ads-manager`,
+            icon: FacebookIcon,
+        },
         {
             title: 'Shop and Pages',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
