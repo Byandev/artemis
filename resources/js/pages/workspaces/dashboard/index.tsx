@@ -1,11 +1,14 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
-import { useMemo, useState, useEffect } from 'react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Workspace } from '@/types/models/Workspace';
 import { currencyFormatter, numberFormatter, percentageFormatter } from '@/lib/utils';
 import MetricsCard from '@/components/workspaces/MetricsCard';
 import LineComparisonChart from '@/components/charts/LineComparisonChart';
 import SingleLineChart from '@/components/charts/SingleLineChart';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { Button } from '@/components/ui/button';
+import { format, parse } from 'date-fns';
 
 interface ChartDataPoint {
     date: string;
@@ -14,7 +17,6 @@ interface ChartDataPoint {
     roas: number;
     rts_rate: number;
 }
-
 
 type Props = {
     workspace: Workspace;
@@ -28,9 +30,22 @@ type Props = {
         sms_sent: number;
         chat_msg_sent: number;
     }
+    filters?: {
+        start_date?: string;
+        end_date?: string;
+    }
 }
 
-export default function Index({ workspace, stats }: Props) {
+export default function Index({ workspace, stats, filters }: Props) {
+    const { url } = usePage();
+
+    // Initialize dates from URL filters
+    const [startDate, setStartDate] = useState<Date | undefined>(
+        filters?.start_date ? parse(filters.start_date, 'yyyy-MM-dd', new Date()) : undefined
+    );
+    const [endDate, setEndDate] = useState<Date | undefined>(
+        filters?.end_date ? parse(filters.end_date, 'yyyy-MM-dd', new Date()) : undefined
+    );
     const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -48,12 +63,25 @@ export default function Index({ workspace, stats }: Props) {
         ]
     }, [stats])
 
+
+    // Build query string for chart data
+    const queryString = useMemo(() => {
+        const params = new URLSearchParams();
+        if (startDate) {
+            params.append('start_date', format(startDate, 'yyyy-MM-dd'));
+        }
+        if (endDate) {
+            params.append('end_date', format(endDate, 'yyyy-MM-dd'));
+        }
+        return params.toString();
+    }, [startDate, endDate]);
+
     useEffect(() => {
         const fetchChartData = async () => {
             try {
                 setLoading(true);
                 const response = await fetch(
-                    `/workspaces/${workspace.slug}/api/chart-data?days=30`
+                    `/workspaces/${workspace.slug}/api/chart-data?${queryString}`
                 );
 
                 if (!response.ok) {
@@ -73,15 +101,54 @@ export default function Index({ workspace, stats }: Props) {
         };
 
         fetchChartData();
-    }, [workspace.slug]);
+    }, [workspace.slug, queryString]);
+
+    const clearFilters = useCallback(() => {
+        setStartDate(undefined);
+        setEndDate(undefined);
+        router.get(url.split('?')[0], {}, { preserveState: true, preserveScroll: true });
+    }, [url]);
+
+    const handleDateRangeChange = useCallback((values: any) => {
+        const start = values.range.from ?? undefined;
+        const end = values.range.to ?? undefined;
+
+        setStartDate(start);
+        setEndDate(end);
+
+        // Update URL with new filters
+        const params: Record<string, any> = {};
+        if (start) params.start_date = format(start, 'yyyy-MM-dd');
+        if (end) params.end_date = format(end, 'yyyy-MM-dd');
+
+        router.get(url, params, { preserveState: true, preserveScroll: true });
+    }, [url]);
 
     return (
         <AppLayout>
             <Head title="Dashboard" />
             <div className="flex h-full flex-1 flex-col gap-6 p-6">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-                    <p className="text-muted-foreground mt-1">Welcome back! Here's your workspace overview.</p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+                        <p className="text-muted-foreground mt-1">Welcome back! Here's your workspace overview.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {(startDate || endDate) && (
+                            <Button
+                                variant="outline"
+                                onClick={clearFilters}
+                            >
+                                Clear Filters
+                            </Button>
+                        )}
+                        <DateRangePicker
+                            onUpdate={handleDateRangeChange}
+                            align="end"
+                            initialDateTo={endDate}
+                            initialDateFrom={startDate}
+                        />
+                    </div>
                 </div>
 
                 <div className="grid auto-rows-min gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">

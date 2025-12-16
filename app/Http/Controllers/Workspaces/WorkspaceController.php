@@ -175,6 +175,20 @@ class WorkspaceController extends Controller
             ->pivot
             ->role;
 
+        // Get date filters from query
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+
+        // Build date range condition
+        $dateCondition = function ($query, $dateColumn) use ($startDate, $endDate) {
+            if ($startDate && $endDate) {
+                return $query->whereRaw("DATE($dateColumn) >= ? AND DATE($dateColumn) <= ?", [$startDate, $endDate]);
+            }
+
+            return $query;
+        };
+
+        // RTS Stats with date filter
         $rtsStats = Order::selectRaw('
             ROUND(
                 (SUM(CASE WHEN status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
@@ -183,51 +197,67 @@ class WorkspaceController extends Controller
             ) AS rts_rate_percentage
         ')
             ->where('workspace_id', $workspace->id)
-            ->first();
+            ->whereNotNull('confirmed_at');
+        $rtsStats = $dateCondition($rtsStats, 'confirmed_at');
+        $rtsStats = $rtsStats->first();
 
+        // Delivered orders with date filter
         $delivered_orders = Order::where('workspace_id', $workspace->id)
             ->whereNotNull('delivered_at')
-            ->count();
+            ->whereNotNull('confirmed_at');
+        $delivered_orders = $dateCondition($delivered_orders, 'confirmed_at');
+        $delivered_orders = $delivered_orders->count();
 
+        // SMS sent with date filter
         $sms_sent = Order::where('workspace_id', $workspace->id)
+            ->whereNotNull('confirmed_at')
             ->whereHas('parcelJourneyNotifications', function ($q) {
                 $q->where('type', 'sms')
                     ->where('status', 'sent');
-            })
-            ->count();
+            });
+        $sms_sent = $dateCondition($sms_sent, 'orders.confirmed_at');
+        $sms_sent = $sms_sent->count();
 
+        // Chat messages sent with date filter
         $chat_msg_sent = Order::where('workspace_id', $workspace->id)
+            ->whereNotNull('confirmed_at')
             ->whereHas('parcelJourneyNotifications', function ($q) {
                 $q->where('type', 'chat')
                     ->where('status', 'sent');
-            })
-            ->count();
+            });
+        $chat_msg_sent = $dateCondition($chat_msg_sent, 'orders.confirmed_at');
+        $chat_msg_sent = $chat_msg_sent->count();
 
-        $total_ad_spend = AdRecord::ofWorkspace($workspace)
-            ->sum('spend');
+        // Total ad spend with date filter
+        $total_ad_spend = AdRecord::ofWorkspace($workspace);
+        $total_ad_spend = $dateCondition($total_ad_spend, 'date');
+        $total_ad_spend = $total_ad_spend->sum('spend');
 
-        $total_ad_sales = AdRecord::ofWorkspace($workspace)
-            ->sum('sales');
+        // Total ad sales with date filter
+        $total_ad_sales = AdRecord::ofWorkspace($workspace);
+        $total_ad_sales = $dateCondition($total_ad_sales, 'date');
+        $total_ad_sales = $total_ad_sales->sum('sales');
+
+        // Total sales with date filter
+        $total_sales = Order::where('workspace_id', $workspace->id)
+            ->whereNotNull('confirmed_at');
+        $total_sales = $dateCondition($total_sales, 'confirmed_at');
+        $total_sales = $total_sales->sum('total_amount');
+
+        // Total orders with date filter
+        $total_orders = Order::where('workspace_id', $workspace->id)
+            ->whereNotNull('confirmed_at');
+        $total_orders = $dateCondition($total_orders, 'confirmed_at');
+        $total_orders = $total_orders->count();
 
         $stats = [
-            'total_sales' => Order::where('workspace_id', $workspace->id)
-                ->whereNotNull('confirmed_at')
-                ->sum('total_amount'),
-
-            'total_orders' => Order::where('workspace_id', $workspace->id)
-                ->whereNotNull('confirmed_at')
-                ->count(),
-
+            'total_sales' => $total_sales,
+            'total_orders' => $total_orders,
             'total_ad_spend' => $total_ad_spend,
-
-            'rts_rate_percentage' => $rtsStats->rts_rate_percentage,
-
+            'rts_rate_percentage' => $rtsStats->rts_rate_percentage ?? 0,
             'delivered_orders' => $delivered_orders,
-
             'sms_sent' => $sms_sent,
-
             'chat_msg_sent' => $chat_msg_sent,
-
         ];
 
         $stats['roas'] = $total_ad_spend > 0
@@ -237,6 +267,10 @@ class WorkspaceController extends Controller
         return Inertia::render('workspaces/dashboard/index', [
             'workspace' => $workspace,
             'stats' => $stats,
+            'filters' => [
+                'start_date' => $request->query('start_date'),
+                'end_date' => $request->query('end_date'),
+            ],
         ]);
     }
 
@@ -252,22 +286,35 @@ class WorkspaceController extends Controller
 
         // Get the number of days to fetch (default: last 30 days)
         $days = $request->query('days', 30);
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+
+        // Build date range condition
+        $dateCondition = function ($query, $dateColumn) use ($days, $startDate, $endDate) {
+            if ($startDate && $endDate) {
+                // Use specific date range
+                return $query->whereRaw("DATE($dateColumn) >= ? AND DATE($dateColumn) <= ?", [$startDate, $endDate]);
+            } else {
+                // Use days offset
+                return $query->whereRaw("$dateColumn >= DATE_SUB(CURDATE(), INTERVAL ? DAY)", [$days]);
+            }
+        };
 
         // Get sales data by date
         $salesData = Order::where('workspace_id', $workspace->id)
             ->whereNotNull('confirmed_at')
-            ->selectRaw('DATE(confirmed_at) as date, SUM(total_amount) as total_sales')
-            ->whereRaw('confirmed_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)', [$days])
-            ->groupBy('date')
+            ->selectRaw('DATE(confirmed_at) as date, SUM(total_amount) as total_sales');
+        $salesData = $dateCondition($salesData, 'confirmed_at');
+        $salesData = $salesData->groupBy('date')
             ->orderBy('date')
             ->get()
             ->pluck('total_sales', 'date');
 
         // Get ad spend data by date
         $adSpendData = AdRecord::ofWorkspace($workspace)
-            ->selectRaw('date, SUM(spend) as total_spend')
-            ->whereRaw('date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)', [$days])
-            ->groupBy('date')
+            ->selectRaw('date, SUM(spend) as total_spend');
+        $adSpendData = $dateCondition($adSpendData, 'date');
+        $adSpendData = $adSpendData->groupBy('date')
             ->orderBy('date')
             ->get()
             ->pluck('total_spend', 'date');
@@ -285,9 +332,9 @@ class WorkspaceController extends Controller
                     2
                 ) AS rts_rate_percentage
             ')
-            ->whereNotNull('confirmed_at')
-            ->whereRaw('confirmed_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)', [$days])
-            ->groupBy('date')
+            ->whereNotNull('confirmed_at');
+        $rtsData = $dateCondition($rtsData, 'confirmed_at');
+        $rtsData = $rtsData->groupBy('date')
             ->orderBy('date')
             ->get()
             ->keyBy('date');
