@@ -33,6 +33,58 @@ class Order extends Model
         return $builder->where("{$table}.workspace_id", $workspace->id);
     }
 
+    /**
+     * Apply entity filters (teams, products, pages, shops) to the query.
+     */
+    public function scopeApplyEntityFilters($query, $filters)
+    {
+        // Normalize filters to arrays
+        $pageIds = $filters['page_ids'] ?? null;
+        $shopIds = $filters['shop_ids'] ?? null;
+        $productIds = $filters['product_ids'] ?? null;
+        $teamIds = $filters['team_ids'] ?? null;
+
+        // Filter by page IDs
+        if ($pageIds) {
+            $query->whereIn('orders.page_id', is_array($pageIds) ? $pageIds : explode(',', $pageIds));
+        }
+
+        // Filter by shop IDs
+        if ($shopIds) {
+            $query->whereIn('orders.shop_id', is_array($shopIds) ? $shopIds : explode(',', $shopIds));
+        }
+
+        // Filter by product IDs (via pages)
+        if ($productIds) {
+            $productIdsArray = is_array($productIds) ? $productIds : explode(',', $productIds);
+            $query->whereHas('page', function ($q) use ($productIdsArray) {
+                $q->whereIn('product_id', $productIdsArray);
+            });
+        }
+
+        // Filter by team IDs (via page owner's teams)
+        if ($teamIds) {
+            $teamIdsArray = is_array($teamIds) ? $teamIds : explode(',', $teamIds);
+            $query->whereHas('page.owner.teams', function ($q) use ($teamIdsArray) {
+                $q->whereIn('teams.id', $teamIdsArray);
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * Apply date range filter to the query.
+     */
+    public function scopeApplyDateFilter($query, $startDate, $endDate, $dateColumn = 'confirmed_at')
+    {
+        if ($startDate && $endDate) {
+            $query->whereRaw("DATE($dateColumn) >= ? AND DATE($dateColumn) <= ?", [$startDate, $endDate]);
+        }
+
+        return $query;
+    }
+
     public function scopeApplyRtsFilters($query, $request)
     {
         // Filter by Page IDs
