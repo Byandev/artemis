@@ -80,11 +80,11 @@ const AdsManager = ({ workspace }: PageProps) => {
     if (activeTab === 'campaigns') {
       const timeoutId = setTimeout(() => {
         fetchCampaigns(1);
-      }, 300); // Debounce search, dateRange]); // Add dateRange
+      }, 300); // Debounce search
       
       return () => clearTimeout(timeoutId);
     }
-  }, [activeTab, searchQuery, statusFilter]); // Add statusFilter to dependencies
+  }, [activeTab, searchQuery, statusFilter, dateRange]); // Trigger refetch when date changes
 
   const fetchCampaigns = async (page: number = 1) => {
     setLoading(true);
@@ -109,7 +109,7 @@ const AdsManager = ({ workspace }: PageProps) => {
 
   return (
     <AppLayout>
-      <div className="px-4 py-6 space-y-4">
+      <div className="px-4 py-6 pb-20 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Ads Manager</h2>
       </div>
@@ -171,7 +171,7 @@ const AdsManager = ({ workspace }: PageProps) => {
       </div>
 
       {/* Search and Actions Bar */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 relative">
         <div className="flex-1 max-w-sm">
           <Input
             type="text"
@@ -181,7 +181,7 @@ const AdsManager = ({ workspace }: PageProps) => {
             className="w-full"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 relative z-50">
           <Button 
             variant="outline" 
             size="sm"
