@@ -159,7 +159,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
     ], [data]);
 
     const chartConfig = useMemo(() => ({
-        rts_rate_percentage: { label: 'RTS Rate %', color: 'hsl(var(--primary))' }
+        rts_rate_percentage: { label: 'RTS Rate %', color: 'var(--chart-2)' }
     } satisfies ChartConfig), []);
 
     // Table columns
