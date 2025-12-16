@@ -6,6 +6,8 @@ import {
     getCoreRowModel,
     getPaginationRowModel,
     useReactTable,
+    SortingState,
+    getSortedRowModel, HeaderContext, Column
 } from "@tanstack/react-table"
 
 import {
@@ -17,36 +19,57 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Button } from "./button"
+import { useMemo, useState } from 'react';
+import { toBackendSort } from '@/lib/sort';
+import { TriangleDownIcon, TriangleUpIcon } from '@radix-ui/react-icons';
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
     data: TData[]
+    initialSorting?: SortingState,
     enableInternalPagination?: boolean
+    onFetch?: (params?: { sort?: string }) => void
 }
+
+
 
 export function DataTable<TData, TValue>({
     columns,
     data,
     enableInternalPagination = false,
+    onFetch,
+    initialSorting
 }: DataTableProps<TData, TValue>) {
+    const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
+
     const table = useReactTable({
         data,
         columns,
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: enableInternalPagination ? getPaginationRowModel() : undefined,
         initialState: enableInternalPagination ? { pagination: { pageSize: 5 } } : undefined,
+        onSortingChange: (updater) => {
+            const next = typeof updater === "function" ? updater(sorting) : updater
+            setSorting(next)
+
+            if (onFetch) onFetch({ sort: toBackendSort(next) })
+        },
+        getSortedRowModel: getSortedRowModel(),
+        state: { sorting },
+        manualSorting: true,
     })
+
 
     return (
         <>
-            <div className="overflow-hidden rounded-md border">
+            <div className="max-w-full overflow-x-auto custom-scrollbar">
                 <Table>
-                    <TableHeader>
+                    <TableHeader className="border-t border-gray-100 dark:border-white/[0.05]">
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
                                     return (
-                                        <TableHead key={header.id}>
+                                        <TableHead key={header.id} className="px-4 py-3 border border-gray-100 dark:border-white/[0.05]">
                                             {header.isPlaceholder
                                                 ? null
                                                 : flexRender(
@@ -67,7 +90,7 @@ export function DataTable<TData, TValue>({
                                     data-state={row.getIsSelected() && "selected"}
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id}>
+                                        <TableCell key={cell.id} className='px-4 py-3 border border-gray-100 dark:border-white/[0.05]text-gray-700 text-theme-xs dark:text-gray-400'>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}
@@ -105,5 +128,30 @@ export function DataTable<TData, TValue>({
                 </div >
             )}
         </>
+    )
+}
+
+
+type SortableHeaderProps<TData> = {
+    column: Column<TData, unknown>
+    title: string
+}
+
+export function SortableHeader<TData>({ column, title }: SortableHeaderProps<TData>) {
+    const sorted = useMemo(() => column.getIsSorted(), [column])
+
+    return (
+        <div
+            className="flex items-center justify-between cursor-pointer"
+            onClick={() => column.toggleSorting(sorted === 'asc')}
+        >
+            <p className="font-medium text-gray-700 text-theme-xs dark:text-gray-400">
+                {title}
+            </p>
+            <button className="flex flex-col">
+                <TriangleUpIcon className={`-mb-1 ${sorted === 'asc' ? 'text-brand-500': 'text-gray-300'}`}/>
+                <TriangleDownIcon className={`-mt-1 ${sorted === 'desc' ? 'text-brand-500': 'text-gray-300'}`}/>
+            </button>
+        </div>
     )
 }
