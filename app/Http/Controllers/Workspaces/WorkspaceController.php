@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdRecord;
 use App\Models\Order;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
@@ -184,9 +185,29 @@ class WorkspaceController extends Controller
             ->where('workspace_id', $workspace->id)
             ->first();
 
-        $tracked_orders = Order::where('workspace_id', $workspace->id)
-            ->has('parcelJourneyNotifications')
+        $delivered_orders = Order::where('workspace_id', $workspace->id)
+            ->whereNotNull('delivered_at')
             ->count();
+
+        $sms_sent = Order::where('workspace_id', $workspace->id)
+            ->whereHas('parcelJourneyNotifications', function ($q) {
+                $q->where('type', 'sms')
+                    ->where('status', 'sent');
+            })
+            ->count();
+
+        $chat_msg_sent = Order::where('workspace_id', $workspace->id)
+            ->whereHas('parcelJourneyNotifications', function ($q) {
+                $q->where('type', 'chat')
+                    ->where('status', 'sent');
+            })
+            ->count();
+
+        $total_ad_spend = AdRecord::ofWorkspace($workspace)
+            ->sum('spend');
+
+        $total_ad_sales = AdRecord::ofWorkspace($workspace)
+            ->sum('sales');
 
         $stats = [
             'total_sales' => Order::where('workspace_id', $workspace->id)
@@ -197,10 +218,21 @@ class WorkspaceController extends Controller
                 ->whereNotNull('confirmed_at')
                 ->count(),
 
+            'total_ad_spend' => $total_ad_spend,
+
             'rts_rate_percentage' => $rtsStats->rts_rate_percentage,
 
-            'tracked_orders' => $tracked_orders,
+            'delivered_orders' => $delivered_orders,
+
+            'sms_sent' => $sms_sent,
+
+            'chat_msg_sent' => $chat_msg_sent,
+
         ];
+
+        $stats['roas'] = $total_ad_spend > 0
+            ? round(($total_ad_sales / $total_ad_spend))
+            : 0.0;
 
         return Inertia::render('workspaces/dashboard/index', [
             'workspace' => $workspace,
