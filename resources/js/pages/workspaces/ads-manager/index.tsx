@@ -199,7 +199,9 @@ const AdsManager = ({ workspace }: PageProps) => {
             <option value="">All Status</option>
             <option value="ACTIVE">Active</option>
             <option value="PAUSED">Paused</option>
-           DateRangePicker
+            <option value="ARCHIVED">Archived</option>
+          </select>
+          <DateRangePicker
             initialDateFrom={dateRange.from}
             initialDateTo={dateRange.to}
             onUpdate={(values) => {
@@ -213,8 +215,6 @@ const AdsManager = ({ workspace }: PageProps) => {
             align="end"
             showCompare={false}
           />
-          < <option value="ARCHIVED">Archived</option>
-          </select>
           <Button variant="outline" size="icon">
             <Grid3x3 className="h-4 w-4" />
           </Button>
