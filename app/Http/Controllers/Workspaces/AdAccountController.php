@@ -8,6 +8,7 @@ use App\Models\AdAccount;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -17,6 +18,9 @@ class AdAccountController extends Controller
     {
         $ad_accounts = QueryBuilder::for(AdAccount::ofWorkspace($workspace))
             ->with('facebook_accounts')
+            ->allowedFilters([
+                AllowedFilter::partial('search', 'name'),
+            ])
             ->allowedSorts([
                 'id',
                 'name',
@@ -31,7 +35,10 @@ class AdAccountController extends Controller
         return Inertia::render('workspaces/ad-accounts/index', [
             'ad_accounts' => $ad_accounts,
             'workspace' => $workspace,
-            'query' => $request->only(['sort', 'perPage', 'page']),
+            'query' => [
+                ...$request->only(['sort', 'perPage', 'page']),
+                'filter' => $request->input('filter', []),
+            ],
         ]);
     }
 }

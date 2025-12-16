@@ -7,7 +7,8 @@ import {
     getPaginationRowModel,
     useReactTable,
     SortingState,
-    getSortedRowModel, HeaderContext, Column
+    getSortedRowModel,
+    Column
 } from "@tanstack/react-table"
 
 import {
@@ -18,27 +19,29 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Button } from "./button"
 import { useMemo, useState } from 'react';
 import { toBackendSort } from '@/lib/sort';
 import { TriangleDownIcon, TriangleUpIcon } from '@radix-ui/react-icons';
+import { PaginatedData } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Link } from '@inertiajs/react';
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
     data: TData[]
     initialSorting?: SortingState,
     enableInternalPagination?: boolean
-    onFetch?: (params?: { sort?: string }) => void
+    onFetch?: (params?: { sort?: string }) => void,
+    meta?: Omit<PaginatedData<TData>, 'data'>
 }
-
-
 
 export function DataTable<TData, TValue>({
     columns,
     data,
     enableInternalPagination = false,
     onFetch,
-    initialSorting
+    initialSorting,
+    meta
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
 
@@ -107,26 +110,72 @@ export function DataTable<TData, TValue>({
                 </Table>
             </div>
 
-            {enableInternalPagination && (
-                <div className="flex items-center justify-end space-x-2 py-4">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => table.previousPage()}
-                        disabled={!table.getCanPreviousPage()}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => table.nextPage()}
-                        disabled={!table.getCanNextPage()}
-                    >
-                        Next
-                    </Button>
-                </div >
-            )}
+            {
+                enableInternalPagination &&
+                <div className="border border-t-0 rounded-b-xl border-gray-100 py-4 pl-[18px] pr-4 dark:border-white/[0.05]">
+                    <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
+                        <div className="pb-3 xl:pb-0">
+                            <p className="pb-3 text-sm font-medium text-center text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
+                                Showing {meta?.from} to {meta?.to} of {meta?.total} entries
+                            </p>
+                        </div>
+
+                        <div className="flex gap-x-2">
+
+                            <div className="flex flex-wrap gap-2 justify-end">
+                                {(meta?.links ?? []).map((link, idx) => {
+                                    // Laravel labels can be "Previous", "Next", or page numbers (sometimes with HTML entities)
+                                    const label = link.label
+                                        .replace("&laquo;", "«")
+                                        .replace("&raquo;", "»")
+                                        .replace("Previous", "Prev")
+                                        .replace("Next", "Next")
+
+                                    return (
+                                        <Button
+                                            key={idx}
+                                            asChild
+                                            variant={link.active ? "default" : "outline"}
+                                            disabled={!link.url}
+                                            className="h-8 px-3 text-sm"
+                                        >
+                                            {link.url ? (
+                                                <Link href={link.url} preserveState preserveScroll>
+                                                    <span dangerouslySetInnerHTML={{ __html: label }} />
+                                                </Link>
+                                            ) : (
+                                                <span dangerouslySetInnerHTML={{ __html: label }} />
+                                            )}
+                                        </Button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            }
+
+            {/*{enableInternalPagination && (*/}
+            {/*    <div className="flex items-center justify-end space-x-2 py-4">*/}
+            {/*        <Button*/}
+            {/*            variant="outline"*/}
+            {/*            size="sm"*/}
+            {/*            onClick={() => table.previousPage()}*/}
+            {/*            disabled={!table.getCanPreviousPage()}*/}
+            {/*        >*/}
+            {/*            Previous*/}
+            {/*        </Button>*/}
+            {/*        <Button*/}
+            {/*            variant="outline"*/}
+            {/*            size="sm"*/}
+            {/*            onClick={() => table.nextPage()}*/}
+            {/*            disabled={!table.getCanNextPage()}*/}
+            {/*        >*/}
+            {/*            Next*/}
+            {/*        </Button>*/}
+            {/*    </div >*/}
+            {/*)}*/}
         </>
     )
 }

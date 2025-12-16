@@ -7,18 +7,21 @@ import ComponentCard from '@/components/common/ComponentCard';
 import { router } from "@inertiajs/react"
 import workspaces from '@/routes/workspaces';
 import { toFrontendSort } from '@/lib/sort';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import clsx from "clsx";
+import { PaginatedData } from '@/types';
+import { omit  } from 'lodash'
 
 interface AdAccountsProps {
     workspace: Workspace;
-    ad_accounts: {
-        data: AdAccount[];
-    };
+    ad_accounts: PaginatedData<AdAccount>;
     query?: {
         sort?: string | null
         perPage?: number | string
         page?: number | string
+        filter?: {
+            search?: string
+        }
     }
 }
 
@@ -63,6 +66,28 @@ const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
+
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            router.get(
+                workspaces.adAccounts.index({ workspace }),
+                {
+                    sort: query?.sort,
+                    'filter[search]': searchValue || undefined,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['ad_accounts'],
+                },
+            );
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [query?.sort, searchValue, workspace]);
 
     const columns: ColumnDef<AdAccount>[] = [
         {
@@ -126,18 +151,26 @@ const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
                     <ComponentCard desc="List of ad accounts of connected facebook accounts">
                         <div>
                             <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.05]">
-                                <input className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900  dark:placeholder:text-white/30  bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800" placeholder="Search ad account name"/>
+                                <input
+                                    className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900  dark:placeholder:text-white/30  bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800"
+                                    placeholder="Search ad account name"
+                                    value={searchValue}
+                                    onChange={(e) => setSearchValue(e.target.value)}
+                                />
                             </div>
 
                             <DataTable
                                 columns={columns}
+                                enableInternalPagination={true}
                                 data={ad_accounts.data || []}
                                 initialSorting={initialSorting}
+                                meta={{ ...omit(ad_accounts, ['data'])  }}
                                 onFetch={(params) => {
                                     router.get(
                                         workspaces.adAccounts.index({ workspace }),
                                         {
                                             sort: params?.sort,
+                                            'filter[search]': searchValue || undefined,
                                         },
                                         {
                                             preserveState: false,
