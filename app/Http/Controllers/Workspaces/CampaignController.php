@@ -22,6 +22,9 @@ class CampaignController extends Controller
             ->when($request->status, function ($query, $status) {
                 $query->where('status', $status);
             })
+            ->when($request->start_date && $request->end_date, function ($query) use ($request) {
+                $query->whereBetween('start_time', [$request->start_date, $request->end_date]);
+            })
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 

@@ -14,6 +14,8 @@ import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { addDays } from 'date-fns';
 
 type TabType = 'campaigns' | 'adSets' | 'ads' | 'optimizationRules' | 'optimizationLogs';
 
@@ -56,6 +58,11 @@ interface PageProps {
 const AdsManager = ({ workspace }: PageProps) => {
   const [activeTab, setActiveTab] = useState<TabType>('campaigns');
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>(''); // Add status filter
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: addDays(new Date(), -30), // Last 30 days by default
+    to: new Date(),
+  });
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginatedCampaigns>({
@@ -73,17 +80,23 @@ const AdsManager = ({ workspace }: PageProps) => {
     if (activeTab === 'campaigns') {
       const timeoutId = setTimeout(() => {
         fetchCampaigns(1);
-      }, 300); // Debounce search
+      }, 300); // Debounce search, dateRange]); // Add dateRange
       
       return () => clearTimeout(timeoutId);
     }
-  }, [activeTab, searchQuery]);
+  }, [activeTab, searchQuery, statusFilter]); // Add statusFilter to dependencies
 
   const fetchCampaigns = async (page: number = 1) => {
     setLoading(true);
     try {
       const response = await axios.get(`/workspaces/${workspace.slug}/api/campaigns`, {
-        params: { search: searchQuery, page }
+        params: { 
+          search: searchQuery, 
+          status: statusFilter || undefined,
+          start_date: dateRange.from.toISOString().split('T')[0], // Format: YYYY-MM-DD
+          end_date: dateRange.to.toISOString().split('T')[0],
+          page 
+        }
       });
       setCampaigns(response.data.data);
       setPagination(response.data);
@@ -178,10 +191,30 @@ const AdsManager = ({ workspace }: PageProps) => {
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filters
-          </Button>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2"
+          >
+            <option value="">All Status</option>
+            <option value="ACTIVE">Active</option>
+            <option value="PAUSED">Paused</option>
+           DateRangePicker
+            initialDateFrom={dateRange.from}
+            initialDateTo={dateRange.to}
+            onUpdate={(values) => {
+              if (values.range.from && values.range.to) {
+                setDateRange({
+                  from: values.range.from,
+                  to: values.range.to,
+                });
+              }
+            }}
+            align="end"
+            showCompare={false}
+          />
+          < <option value="ARCHIVED">Archived</option>
+          </select>
           <Button variant="outline" size="icon">
             <Grid3x3 className="h-4 w-4" />
           </Button>
