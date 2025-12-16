@@ -28,4 +28,9 @@ class AdAccount extends Model
             });
         });
     }
+
+    public function adRecords(): HasMany
+    {
+        return $this->hasMany(AdRecord::class);
+    }
 }

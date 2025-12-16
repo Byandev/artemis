@@ -15,11 +15,11 @@ export default defineConfig({
         tailwindcss(),
         wayfinder({
             formVariants: true,
-            command: 'docker compose exec -T laravel.test php artisan wayfinder:generate --with-form',
+            // command: 'docker compose exec -T laravel.test php artisan wayfinder:generate --with-form',
         })
     ],
     optimizeDeps: {
-        include: ['maplibre-gl'],
+        include: ['maplibre-gl', '@vnedyalk0v/react19-simple-maps'],
     },
     esbuild: {
         jsx: 'automatic',

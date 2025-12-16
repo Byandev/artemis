@@ -3,14 +3,19 @@ import { Head } from '@inertiajs/react';
 import { useMemo } from 'react';
 import { Workspace } from '@/types/models/Workspace';
 import { currencyFormatter, numberFormatter, percentageFormatter } from '@/lib/utils';
+import MetricsCard from '@/components/workspaces/MetricsCard';
 
 type Props = {
     workspace: Workspace;
     stats: {
         total_sales: number;
+        total_ad_spend: number;
         total_orders: number;
+        roas: number;
         rts_rate_percentage: number;
-        tracked_orders: number;
+        delivered_orders: number;
+        sms_sent: number;
+        chat_msg_sent: number;
     }
 }
 
@@ -18,9 +23,13 @@ export default function Index({ workspace, stats }: Props) {
     const analytics = useMemo(() => {
         return [
             { title: 'Total Sales', value: currencyFormatter(stats.total_sales) },
+            { title: 'Total Add Spend', value: currencyFormatter(stats.total_ad_spend) },
             { title: 'Total Orders', value: numberFormatter(stats.total_orders) },
+            { title: 'ROAS', value: stats.roas },
             { title: 'RTS Rate', value: percentageFormatter(stats.rts_rate_percentage / 100) },
-            { title: 'Tracked Orders', value: numberFormatter(stats.tracked_orders) },
+            { title: 'Delivered Orders', value: numberFormatter(stats.delivered_orders) },
+            { title: 'SMS Sent', value: numberFormatter(stats.sms_sent) },
+            { title: 'Chat Messages Sent', value: numberFormatter(stats.chat_msg_sent) },
         ]
     }, [stats])
 
@@ -33,20 +42,9 @@ export default function Index({ workspace, stats }: Props) {
                     <p className="text-muted-foreground mt-1">Welcome back! Here's your workspace overview.</p>
                 </div>
 
-                <div className="grid auto-rows-min gap-4 md:grid-cols-4">
+                <div className="grid auto-rows-min gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                     {analytics.map((data, key) => (
-                        <div
-                            key={key}
-                            className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
-                            <div className="flex flex-col gap-3">
-                                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                                    {data.title}
-                                </p>
-                                <h4 className="text-3xl font-bold tracking-tight break-words">
-                                    {data.value}
-                                </h4>
-                            </div>
-                        </div>
+                        <MetricsCard key={key} title={data.title} value={data.value} />
                     ))}
                 </div>
             </div>
