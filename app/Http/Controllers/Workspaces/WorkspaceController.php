@@ -178,6 +178,12 @@ class WorkspaceController extends Controller
         // Get date filters from query
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
+        
+        // Get entity filters from query
+        $teamIds = $request->query('team_ids');
+        $productIds = $request->query('product_ids');
+        $pageIds = $request->query('page_ids');
+        $shopIds = $request->query('shop_ids');
 
         // Build date range condition
         $dateCondition = function ($query, $dateColumn) use ($startDate, $endDate) {
@@ -185,6 +191,35 @@ class WorkspaceController extends Controller
                 return $query->whereRaw("DATE($dateColumn) >= ? AND DATE($dateColumn) <= ?", [$startDate, $endDate]);
             }
 
+            return $query;
+        };
+        
+        // Build entity filters condition for orders
+        $entityFilters = function ($query) use ($teamIds, $productIds, $pageIds, $shopIds) {
+            // Filter by page IDs
+            if ($pageIds) {
+                $query->whereIn('orders.page_id', is_array($pageIds) ? $pageIds : explode(',', $pageIds));
+            }
+            
+            // Filter by shop IDs
+            if ($shopIds) {
+                $query->whereIn('orders.shop_id', is_array($shopIds) ? $shopIds : explode(',', $shopIds));
+            }
+            
+            // Filter by product IDs (via pages)
+            if ($productIds) {
+                $query->whereHas('page', function ($q) use ($productIds) {
+                    $q->whereIn('product_id', is_array($productIds) ? $productIds : explode(',', $productIds));
+                });
+            }
+            
+            // Filter by team IDs (via page owner's teams)
+            if ($teamIds) {
+                $query->whereHas('page.owner.teams', function ($q) use ($teamIds) {
+                    $q->whereIn('teams.id', is_array($teamIds) ? $teamIds : explode(',', $teamIds));
+                });
+            }
+            
             return $query;
         };
 
@@ -199,6 +234,7 @@ class WorkspaceController extends Controller
             ->where('workspace_id', $workspace->id)
             ->whereNotNull('confirmed_at');
         $rtsStats = $dateCondition($rtsStats, 'confirmed_at');
+        $rtsStats = $entityFilters($rtsStats);
         $rtsStats = $rtsStats->first();
 
         // Delivered orders with date filter
@@ -206,6 +242,7 @@ class WorkspaceController extends Controller
             ->whereNotNull('delivered_at')
             ->whereNotNull('confirmed_at');
         $delivered_orders = $dateCondition($delivered_orders, 'confirmed_at');
+        $delivered_orders = $entityFilters($delivered_orders);
         $delivered_orders = $delivered_orders->count();
 
         // SMS sent with date filter
@@ -216,6 +253,7 @@ class WorkspaceController extends Controller
                     ->where('status', 'sent');
             });
         $sms_sent = $dateCondition($sms_sent, 'orders.confirmed_at');
+        $sms_sent = $entityFilters($sms_sent);
         $sms_sent = $sms_sent->count();
 
         // Chat messages sent with date filter
@@ -226,6 +264,7 @@ class WorkspaceController extends Controller
                     ->where('status', 'sent');
             });
         $chat_msg_sent = $dateCondition($chat_msg_sent, 'orders.confirmed_at');
+        $chat_msg_sent = $entityFilters($chat_msg_sent);
         $chat_msg_sent = $chat_msg_sent->count();
 
         // Total ad spend with date filter
@@ -242,12 +281,14 @@ class WorkspaceController extends Controller
         $total_sales = Order::where('workspace_id', $workspace->id)
             ->whereNotNull('confirmed_at');
         $total_sales = $dateCondition($total_sales, 'confirmed_at');
+        $total_sales = $entityFilters($total_sales);
         $total_sales = $total_sales->sum('total_amount');
 
         // Total orders with date filter
         $total_orders = Order::where('workspace_id', $workspace->id)
             ->whereNotNull('confirmed_at');
         $total_orders = $dateCondition($total_orders, 'confirmed_at');
+        $total_orders = $entityFilters($total_orders);
         $total_orders = $total_orders->count();
 
         $stats = [
@@ -264,13 +305,42 @@ class WorkspaceController extends Controller
             ? round(($total_ad_sales / $total_ad_spend))
             : 0.0;
 
+        // Fetch available filter options
+        $availableTeams = \App\Models\Team::ofWorkspace($workspace)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+            
+        $availableProducts = \App\Models\Product::ofWorkspace($workspace)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+            
+        $availablePages = \App\Models\Page::ofWorkspace($workspace)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+            
+        $availableShops = \App\Models\Shop::where('workspace_id', $workspace->id)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('workspaces/dashboard/index', [
             'workspace' => $workspace,
             'stats' => $stats,
             'filters' => [
                 'start_date' => $request->query('start_date'),
                 'end_date' => $request->query('end_date'),
+                'team_ids' => $request->query('team_ids'),
+                'product_ids' => $request->query('product_ids'),
+                'page_ids' => $request->query('page_ids'),
+                'shop_ids' => $request->query('shop_ids'),
             ],
+            'availableTeams' => $availableTeams,
+            'availableProducts' => $availableProducts,
+            'availablePages' => $availablePages,
+            'availableShops' => $availableShops,
         ]);
     }
 
@@ -288,6 +358,12 @@ class WorkspaceController extends Controller
         $days = $request->query('days', 30);
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
+        
+        // Get entity filters from query
+        $teamIds = $request->query('team_ids');
+        $productIds = $request->query('product_ids');
+        $pageIds = $request->query('page_ids');
+        $shopIds = $request->query('shop_ids');
 
         // Build date range condition
         $dateCondition = function ($query, $dateColumn) use ($days, $startDate, $endDate) {
@@ -299,12 +375,42 @@ class WorkspaceController extends Controller
                 return $query->whereRaw("$dateColumn >= DATE_SUB(CURDATE(), INTERVAL ? DAY)", [$days]);
             }
         };
+        
+        // Build entity filters condition for orders
+        $entityFilters = function ($query) use ($teamIds, $productIds, $pageIds, $shopIds) {
+            // Filter by page IDs
+            if ($pageIds) {
+                $query->whereIn('orders.page_id', is_array($pageIds) ? $pageIds : explode(',', $pageIds));
+            }
+            
+            // Filter by shop IDs
+            if ($shopIds) {
+                $query->whereIn('orders.shop_id', is_array($shopIds) ? $shopIds : explode(',', $shopIds));
+            }
+            
+            // Filter by product IDs (via pages)
+            if ($productIds) {
+                $query->whereHas('page', function ($q) use ($productIds) {
+                    $q->whereIn('product_id', is_array($productIds) ? $productIds : explode(',', $productIds));
+                });
+            }
+            
+            // Filter by team IDs (via page owner's teams)
+            if ($teamIds) {
+                $query->whereHas('page.owner.teams', function ($q) use ($teamIds) {
+                    $q->whereIn('teams.id', is_array($teamIds) ? $teamIds : explode(',', $teamIds));
+                });
+            }
+            
+            return $query;
+        };
 
         // Get sales data by date
         $salesData = Order::where('workspace_id', $workspace->id)
             ->whereNotNull('confirmed_at')
             ->selectRaw('DATE(confirmed_at) as date, SUM(total_amount) as total_sales');
         $salesData = $dateCondition($salesData, 'confirmed_at');
+        $salesData = $entityFilters($salesData);
         $salesData = $salesData->groupBy('date')
             ->orderBy('date')
             ->get()
@@ -334,6 +440,7 @@ class WorkspaceController extends Controller
             ')
             ->whereNotNull('confirmed_at');
         $rtsData = $dateCondition($rtsData, 'confirmed_at');
+        $rtsData = $entityFilters($rtsData);
         $rtsData = $rtsData->groupBy('date')
             ->orderBy('date')
             ->get()

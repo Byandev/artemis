@@ -9,6 +9,7 @@ import SingleLineChart from '@/components/charts/SingleLineChart';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { Button } from '@/components/ui/button';
 import { format, parse } from 'date-fns';
+import DashboardFilters from '@/components/workspaces/DashboardFilters';
 
 interface ChartDataPoint {
     date: string;
@@ -33,10 +34,18 @@ type Props = {
     filters?: {
         start_date?: string;
         end_date?: string;
+        team_ids?: string;
+        product_ids?: string;
+        page_ids?: string;
+        shop_ids?: string;
     }
+    availableTeams: { id: number; name: string }[];
+    availableProducts: { id: number; name: string }[];
+    availablePages: { id: number; name: string }[];
+    availableShops: { id: number; name: string }[];
 }
 
-export default function Index({ workspace, stats, filters }: Props) {
+export default function Index({ workspace, stats, filters, availableTeams, availableProducts, availablePages, availableShops }: Props) {
     const { url } = usePage();
 
     // Initialize dates from URL filters
@@ -46,6 +55,21 @@ export default function Index({ workspace, stats, filters }: Props) {
     const [endDate, setEndDate] = useState<Date | undefined>(
         filters?.end_date ? parse(filters.end_date, 'yyyy-MM-dd', new Date()) : undefined
     );
+
+    // Initialize entity filters from URL
+    const [selectedTeams, setSelectedTeams] = useState<number[]>(
+        filters?.team_ids ? filters.team_ids.split(',').map(Number) : []
+    );
+    const [selectedProducts, setSelectedProducts] = useState<number[]>(
+        filters?.product_ids ? filters.product_ids.split(',').map(Number) : []
+    );
+    const [selectedPages, setSelectedPages] = useState<number[]>(
+        filters?.page_ids ? filters.page_ids.split(',').map(Number) : []
+    );
+    const [selectedShops, setSelectedShops] = useState<number[]>(
+        filters?.shop_ids ? filters.shop_ids.split(',').map(Number) : []
+    );
+
     const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -73,8 +97,20 @@ export default function Index({ workspace, stats, filters }: Props) {
         if (endDate) {
             params.append('end_date', format(endDate, 'yyyy-MM-dd'));
         }
+        if (selectedTeams.length > 0) {
+            params.append('team_ids', selectedTeams.join(','));
+        }
+        if (selectedProducts.length > 0) {
+            params.append('product_ids', selectedProducts.join(','));
+        }
+        if (selectedPages.length > 0) {
+            params.append('page_ids', selectedPages.join(','));
+        }
+        if (selectedShops.length > 0) {
+            params.append('shop_ids', selectedShops.join(','));
+        }
         return params.toString();
-    }, [startDate, endDate]);
+    }, [startDate, endDate, selectedTeams, selectedProducts, selectedPages, selectedShops]);
 
     useEffect(() => {
         const fetchChartData = async () => {
@@ -106,6 +142,10 @@ export default function Index({ workspace, stats, filters }: Props) {
     const clearFilters = useCallback(() => {
         setStartDate(undefined);
         setEndDate(undefined);
+        setSelectedTeams([]);
+        setSelectedProducts([]);
+        setSelectedPages([]);
+        setSelectedShops([]);
         router.get(url.split('?')[0], {}, { preserveState: true, preserveScroll: true });
     }, [url]);
 
@@ -116,13 +156,35 @@ export default function Index({ workspace, stats, filters }: Props) {
         setStartDate(start);
         setEndDate(end);
 
-        // Update URL with new filters
+        // Update URL with all filters
         const params: Record<string, any> = {};
         if (start) params.start_date = format(start, 'yyyy-MM-dd');
         if (end) params.end_date = format(end, 'yyyy-MM-dd');
+        if (selectedTeams.length > 0) params.team_ids = selectedTeams.join(',');
+        if (selectedProducts.length > 0) params.product_ids = selectedProducts.join(',');
+        if (selectedPages.length > 0) params.page_ids = selectedPages.join(',');
+        if (selectedShops.length > 0) params.shop_ids = selectedShops.join(',');
 
-        router.get(url, params, { preserveState: true, preserveScroll: true });
-    }, [url]);
+        router.get(url.split('?')[0], params, { preserveState: true, preserveScroll: true });
+    }, [url, selectedTeams, selectedProducts, selectedPages, selectedShops]);
+
+    // Debounced effect to update URL when entity filters change
+    useEffect(() => {
+        // Don't run on initial mount
+        const timer = setTimeout(() => {
+            const params: Record<string, any> = {};
+            if (startDate) params.start_date = format(startDate, 'yyyy-MM-dd');
+            if (endDate) params.end_date = format(endDate, 'yyyy-MM-dd');
+            if (selectedTeams.length > 0) params.team_ids = selectedTeams.join(',');
+            if (selectedProducts.length > 0) params.product_ids = selectedProducts.join(',');
+            if (selectedPages.length > 0) params.page_ids = selectedPages.join(',');
+            if (selectedShops.length > 0) params.shop_ids = selectedShops.join(',');
+
+            router.get(url.split('?')[0], params, { preserveState: true, preserveScroll: true, replace: true });
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [selectedTeams, selectedProducts, selectedPages, selectedShops]);
 
     return (
         <AppLayout>
@@ -134,7 +196,7 @@ export default function Index({ workspace, stats, filters }: Props) {
                         <p className="text-muted-foreground mt-1">Welcome back! Here's your workspace overview.</p>
                     </div>
                     <div className="flex items-center gap-2">
-                        {(startDate || endDate) && (
+                        {(startDate || endDate || selectedTeams.length > 0 || selectedProducts.length > 0 || selectedPages.length > 0 || selectedShops.length > 0) && (
                             <Button
                                 variant="outline"
                                 onClick={clearFilters}
@@ -142,12 +204,29 @@ export default function Index({ workspace, stats, filters }: Props) {
                                 Clear Filters
                             </Button>
                         )}
-                        <DateRangePicker
-                            onUpdate={handleDateRangeChange}
-                            align="end"
-                            initialDateTo={endDate}
-                            initialDateFrom={startDate}
+                        <DashboardFilters
+                            availableTeams={availableTeams}
+                            availableProducts={availableProducts}
+                            availablePages={availablePages}
+                            availableShops={availableShops}
+                            selectedTeams={selectedTeams}
+                            setSelectedTeams={setSelectedTeams}
+                            selectedProducts={selectedProducts}
+                            setSelectedProducts={setSelectedProducts}
+                            selectedPages={selectedPages}
+                            setSelectedPages={setSelectedPages}
+                            selectedShops={selectedShops}
+                            setSelectedShops={setSelectedShops}
                         />
+                        <div>
+
+                            <DateRangePicker
+                                onUpdate={handleDateRangeChange}
+                                align="end"
+                                initialDateTo={endDate}
+                                initialDateFrom={startDate}
+                            />
+                        </div>
                     </div>
                 </div>
 
