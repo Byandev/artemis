@@ -21,6 +21,7 @@ interface LineComparisonChartProps<T> {
     error: string | null;
     title?: string;
     description?: string;
+    footerDescription?: string;
     dataKeyLeft?: string;
     dataKeyRight?: string;
     labelLeft?: string;
@@ -37,6 +38,7 @@ export default function LineComparisonChart<T>({
     error,
     title = "Total Sales vs. Total Ad Spent",
     description = "Last 30 days comparison",
+    footerDescription = "Showing data for the last 30 days",
     dataKeyLeft = "sales",
     dataKeyRight = "spend",
     labelLeft = "Total Sales",
@@ -124,7 +126,7 @@ export default function LineComparisonChart<T>({
                             Line comparison chart <TrendingUp className="h-4 w-4" />
                         </div>
                         <div className="text-muted-foreground flex items-center gap-2 leading-none">
-                            Showing data for the last 30 days
+                            {footerDescription}
                         </div>
                     </div>
                 </div>

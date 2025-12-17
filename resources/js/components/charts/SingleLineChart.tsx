@@ -20,6 +20,7 @@ interface SingleLineChartProps<T extends Record<string, any>> {
     error: string | null;
     title: string;
     description: string;
+    footerDescription?: string;
     dataKey: string;
     label: string;
     color?: string;
@@ -32,6 +33,7 @@ export default function SingleLineChart<T extends Record<string, any>>({
     error,
     title,
     description,
+    footerDescription = "Showing data for the last 30 days",
     dataKey,
     label,
     color = "var(--chart-1)",
@@ -107,7 +109,7 @@ export default function SingleLineChart<T extends Record<string, any>>({
                             {label} <TrendingUp className="h-4 w-4" />
                         </div>
                         <div className="text-muted-foreground flex items-center gap-2 leading-none">
-                            Showing data for the last 30 days
+                            {footerDescription}
                         </div>
                     </div>
                 </div>

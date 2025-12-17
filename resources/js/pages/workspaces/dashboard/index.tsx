@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { Workspace } from '@/types/models/Workspace';
 import { currencyFormatter, numberFormatter, percentageFormatter } from '@/lib/utils';
 import MetricsCard from '@/components/workspaces/MetricsCard';
@@ -8,7 +8,7 @@ import LineComparisonChart from '@/components/charts/LineComparisonChart';
 import SingleLineChart from '@/components/charts/SingleLineChart';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { Button } from '@/components/ui/button';
-import { format, parse } from 'date-fns';
+import { format, parse, differenceInDays } from 'date-fns';
 import DashboardFilters from '@/components/workspaces/DashboardFilters';
 
 interface ChartDataPoint {
@@ -47,6 +47,8 @@ type Props = {
 
 export default function Index({ workspace, stats, filters, availableTeams, availableProducts, availablePages, availableShops }: Props) {
     const { url } = usePage();
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const isInitialMount = useRef(true);
 
     // Initialize dates from URL filters
     const [startDate, setStartDate] = useState<Date | undefined>(
@@ -87,6 +89,32 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
         ]
     }, [stats])
 
+    // Calculate dynamic chart description based on date range
+    const chartDescription = useMemo(() => {
+        if (startDate && endDate) {
+            const days = differenceInDays(endDate, startDate) + 1;
+            return `${format(startDate, 'MMM d, yyyy')} - ${format(endDate, 'MMM d, yyyy')}`;
+        } else if (startDate) {
+            return `From ${format(startDate, 'MMM d, yyyy')}`;
+        } else if (endDate) {
+            return `Until ${format(endDate, 'MMM d, yyyy')}`;
+        }
+        return 'Last 30 days';
+    }, [startDate, endDate]);
+
+    // Calculate dynamic chart footer description
+    const chartFooterDescription = useMemo(() => {
+        if (startDate && endDate) {
+            const days = differenceInDays(endDate, startDate) + 1;
+            return `Showing ${days} ${days === 1 ? 'day' : 'days'} of data`;
+        } else if (startDate) {
+            return `Showing data from ${format(startDate, 'MMM d, yyyy')}`;
+        } else if (endDate) {
+            return `Showing data until ${format(endDate, 'MMM d, yyyy')}`;
+        }
+        return 'Showing last 30 days of data';
+    }, [startDate, endDate]);
+
 
     // Build query string for chart data
     const queryString = useMemo(() => {
@@ -96,6 +124,10 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
         }
         if (endDate) {
             params.append('end_date', format(endDate, 'yyyy-MM-dd'));
+        }
+        // If no date range is set, default to last 30 days
+        if (!startDate && !endDate) {
+            params.append('days', '30');
         }
         if (selectedTeams.length > 0) {
             params.append('team_ids', selectedTeams.join(','));
@@ -113,11 +145,19 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
     }, [startDate, endDate, selectedTeams, selectedProducts, selectedPages, selectedShops]);
 
     useEffect(() => {
+        // Cancel previous request if it exists
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+
         const fetchChartData = async () => {
             try {
                 setLoading(true);
+                abortControllerRef.current = new AbortController();
+
                 const response = await fetch(
-                    `/workspaces/${workspace.slug}/api/chart-data?${queryString}`
+                    `/workspaces/${workspace.slug}/api/chart-data?${queryString}`,
+                    { signal: abortControllerRef.current.signal }
                 );
 
                 if (!response.ok) {
@@ -125,10 +165,13 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                 }
 
                 const data = await response.json();
-                console.log('Fetched chart data:', data);
                 setChartData(data.chartData);
                 setError(null);
             } catch (err) {
+                // Ignore abort errors
+                if (err instanceof Error && err.name === 'AbortError') {
+                    return;
+                }
                 setError(err instanceof Error ? err.message : 'An error occurred');
                 console.error('Error fetching chart data:', err);
             } finally {
@@ -137,6 +180,13 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
         };
 
         fetchChartData();
+
+        // Cleanup function
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
     }, [workspace.slug, queryString]);
 
     const clearFilters = useCallback(() => {
@@ -149,15 +199,27 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
         router.get(url.split('?')[0], {}, { preserveState: true, preserveScroll: true });
     }, [url]);
 
-    const handleDateRangeChange = useCallback((values: any) => {
+    // Build params object - memoize to avoid recreating on every render
+    const buildParams = useCallback(() => {
+        const params: Record<string, string> = {};
+        if (startDate) params.start_date = format(startDate, 'yyyy-MM-dd');
+        if (endDate) params.end_date = format(endDate, 'yyyy-MM-dd');
+        if (selectedTeams.length > 0) params.team_ids = selectedTeams.join(',');
+        if (selectedProducts.length > 0) params.product_ids = selectedProducts.join(',');
+        if (selectedPages.length > 0) params.page_ids = selectedPages.join(',');
+        if (selectedShops.length > 0) params.shop_ids = selectedShops.join(',');
+        return params;
+    }, [startDate, endDate, selectedTeams, selectedProducts, selectedPages, selectedShops]);
+
+    const handleDateRangeChange = useCallback((values: { range: { from?: Date; to?: Date } }) => {
         const start = values.range.from ?? undefined;
         const end = values.range.to ?? undefined;
 
         setStartDate(start);
         setEndDate(end);
 
-        // Update URL with all filters
-        const params: Record<string, any> = {};
+        // Build params with new dates
+        const params: Record<string, string> = {};
         if (start) params.start_date = format(start, 'yyyy-MM-dd');
         if (end) params.end_date = format(end, 'yyyy-MM-dd');
         if (selectedTeams.length > 0) params.team_ids = selectedTeams.join(',');
@@ -170,21 +232,19 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
 
     // Debounced effect to update URL when entity filters change
     useEffect(() => {
-        // Don't run on initial mount
-        const timer = setTimeout(() => {
-            const params: Record<string, any> = {};
-            if (startDate) params.start_date = format(startDate, 'yyyy-MM-dd');
-            if (endDate) params.end_date = format(endDate, 'yyyy-MM-dd');
-            if (selectedTeams.length > 0) params.team_ids = selectedTeams.join(',');
-            if (selectedProducts.length > 0) params.product_ids = selectedProducts.join(',');
-            if (selectedPages.length > 0) params.page_ids = selectedPages.join(',');
-            if (selectedShops.length > 0) params.shop_ids = selectedShops.join(',');
+        // Skip on initial mount
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
 
+        const timer = setTimeout(() => {
+            const params = buildParams();
             router.get(url.split('?')[0], params, { preserveState: true, preserveScroll: true, replace: true });
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [selectedTeams, selectedProducts, selectedPages, selectedShops]);
+    }, [selectedTeams, selectedProducts, selectedPages, selectedShops, buildParams, url]);
 
     return (
         <AppLayout>
@@ -242,7 +302,8 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                         loading={loading}
                         error={error}
                         title="Total Sales vs. Total Ad Spent"
-                        description="Last 30 days comparison"
+                        description={chartDescription}
+                        footerDescription={chartFooterDescription}
                         dataKeyLeft="sales"
                         dataKeyRight="spend"
                         labelLeft="Total Sales"
@@ -256,7 +317,8 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                         loading={loading}
                         error={error}
                         title="Total Sales"
-                        description="Last 30 days"
+                        description={chartDescription}
+                        footerDescription={chartFooterDescription}
                         dataKey="sales"
                         label="Total Sales"
                         color="var(--chart-1)"
@@ -266,7 +328,8 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                         loading={loading}
                         error={error}
                         title="Total Ad Spend"
-                        description="Last 30 days"
+                        description={chartDescription}
+                        footerDescription={chartFooterDescription}
                         dataKey="spend"
                         label="Ad Spend"
                         color="var(--chart-2)"
@@ -279,7 +342,8 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                         loading={loading}
                         error={error}
                         title="ROAS (Return on Ad Spend)"
-                        description="Last 30 days"
+                        description={chartDescription}
+                        footerDescription={chartFooterDescription}
                         dataKey="roas"
                         label="ROAS"
                         color="var(--chart-3)"
@@ -290,7 +354,8 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                         loading={loading}
                         error={error}
                         title="RTS Rate (Return to Sender)"
-                        description="Last 30 days"
+                        description={chartDescription}
+                        footerDescription={chartFooterDescription}
                         dataKey="rts_rate"
                         label="RTS Rate"
                         color="var(--chart-4)"

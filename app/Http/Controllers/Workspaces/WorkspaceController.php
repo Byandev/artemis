@@ -305,6 +305,12 @@ class WorkspaceController extends Controller
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
 
+        // If no date range provided, default to last N days
+        if (! $startDate && ! $endDate) {
+            $endDate = now()->format('Y-m-d');
+            $startDate = now()->subDays($days)->format('Y-m-d');
+        }
+
         // Get entity filters from query
         $filters = [
             'team_ids' => $request->query('team_ids'),
