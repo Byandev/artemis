@@ -33,7 +33,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Workspace dashboard
     Route::get('/workspaces/{workspace}/dashboard', [WorkspaceController::class, 'dashboard'])->name('workspace.dashboard');
-    Route::get('/workspaces/{workspace}/api/chart-data', [WorkspaceController::class, 'getChartData'])->name('workspace.api.chart-data');
+    Route::get('/workspaces/{workspace}/chart-data', [WorkspaceController::class, 'getChartData'])->name('workspace.chart-data');
 
     // Workspace CRUD routes
     Route::get('/workspaces', [WorkspaceController::class, 'index'])->name('workspaces.index');

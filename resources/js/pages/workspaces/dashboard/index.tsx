@@ -156,7 +156,7 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                 abortControllerRef.current = new AbortController();
 
                 const response = await fetch(
-                    `/workspaces/${workspace.slug}/api/chart-data?${queryString}`,
+                    `/workspaces/${workspace.slug}/chart-data?${queryString}`,
                     { signal: abortControllerRef.current.signal }
                 );
 
