@@ -226,11 +226,10 @@ class WorkspaceController extends Controller
             ->first();
 
         // Ad spend and sales in one query
-        // Note: Ad records don't have direct relationships to pages/products/shops,
-        // so they are only filtered by workspace and date range, not by entity filters.
-        // This means ad stats represent workspace-wide totals for the selected date range.
+        // Ad records are filtered through their relationship to orders
         $adStats = AdRecord::ofWorkspace($workspace)
             ->applyDateFilter($startDate, $endDate, 'date')
+            ->applyEntityFilters($filters)
             ->selectRaw('SUM(spend) as total_ad_spend, SUM(sales) as total_ad_sales')
             ->first();
 
@@ -323,6 +322,7 @@ class WorkspaceController extends Controller
         // Get ad spend data by date
         $adSpendData = AdRecord::ofWorkspace($workspace)
             ->applyDateFilter($startDate, $endDate, 'date')
+            ->applyEntityFilters($filters)
             ->selectRaw('date, SUM(spend) as total_spend')
             ->groupBy('date')
             ->orderBy('date')
