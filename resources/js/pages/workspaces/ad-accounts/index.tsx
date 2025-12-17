@@ -70,12 +70,19 @@ const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
     useEffect(() => {
+        const currentSearchParam = query?.filter?.search ?? '';
+
+        if (searchValue === currentSearchParam) {
+            return;
+        }
+
         const timer = setTimeout(() => {
             router.get(
                 workspaces.adAccounts.index({ workspace }),
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
+                    page: 1,
                 },
                 {
                     preserveState: true,
@@ -87,7 +94,7 @@ const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [query?.sort, searchValue, workspace]);
+    }, [searchValue, query?.filter?.search, query?.sort, workspace]);
 
     const columns: ColumnDef<AdAccount>[] = [
         {
@@ -161,7 +168,7 @@ const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
 
                             <DataTable
                                 columns={columns}
-                                enableInternalPagination={true}
+                                enableInternalPagination={false}
                                 data={ad_accounts.data || []}
                                 initialSorting={initialSorting}
                                 meta={{ ...omit(ad_accounts, ['data'])  }}
@@ -171,6 +178,7 @@ const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
                                         {
                                             sort: params?.sort,
                                             'filter[search]': searchValue || undefined,
+                                            page: params?.page ?? 1
                                         },
                                         {
                                             preserveState: false,
