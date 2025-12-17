@@ -27,7 +27,7 @@ class AdAccountController extends Controller
                 'currency',
                 'country_code',
                 'status',
-                AllowedSort::custom('facebook_accounts', new FacebookAccountsSort()),
+                AllowedSort::custom('facebook_accounts', new FacebookAccountsSort),
             ])
             ->paginate(10)
             ->withQueryString();
