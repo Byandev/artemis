@@ -12,6 +12,7 @@ import { omit } from 'lodash';
 import workspaces from '@/routes/workspaces';
 import { toFrontendSort } from '@/lib/sort';
 import moment from 'moment';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface FacebookAccountsProps {
     workspace: Workspace;
@@ -72,6 +73,15 @@ const FacebookAccounts = ({
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Name'} />
             ),
+            cell: ({ row }) => {
+                return <div className="flex items-center gap-2">
+                    <Avatar>
+                        <AvatarImage src={row.original.picture_url} alt={row.original.name} />
+                        <AvatarFallback className="bg-brand-500 text-white">{row.original.name[0]}</AvatarFallback>
+                    </Avatar>
+                    <span>{row.original.name}</span>
+                </div>
+            }
         },
         {
             accessorKey: 'created_at',
