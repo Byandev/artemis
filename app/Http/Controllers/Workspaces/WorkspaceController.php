@@ -233,12 +233,17 @@ class WorkspaceController extends Controller
             ->selectRaw('SUM(spend) as total_ad_spend, SUM(sales) as total_ad_sales')
             ->first();
 
-        $total_ad_spend = $adStats->total_ad_spend ?? 0;
-        $total_ad_sales = $adStats->total_ad_sales ?? 0;
+        $total_sales = Order::where('workspace_id', $workspace->id)
+            ->whereNotNull('confirmed_at')
+            ->sum('total_amount');
 
         $stats = [
-            'total_sales' => $orderStats->total_sales ?? 0,
-            'total_orders' => $orderStats->total_orders ?? 0,
+            'total_sales' => $total_sales,
+
+            'total_orders' => Order::where('workspace_id', $workspace->id)
+                ->whereNotNull('confirmed_at')
+                ->count(),
+
             'total_ad_spend' => $total_ad_spend,
             'rts_rate_percentage' => $orderStats->rts_rate_percentage ?? 0,
             'delivered_orders' => $orderStats->delivered_orders ?? 0,
@@ -266,6 +271,10 @@ class WorkspaceController extends Controller
                 ->orderBy('name')
                 ->get(),
         ];
+
+        $stats['roas'] = $total_ad_spend > 0
+            ? round(($total_sales / $total_ad_spend))
+            : 0.0;
 
         return Inertia::render('workspaces/dashboard/index', [
             'workspace' => $workspace,
@@ -366,7 +375,7 @@ class WorkspaceController extends Controller
             $rtsRate = $rtsRecord ? (float) $rtsRecord->rts_rate_percentage : 0.0;
 
             // Calculate ROAS: Return on Ad Spend = Sales / Spend
-            $roas = $spend > 0 ? $sales / $spend : 0;
+            $roas = $spend > 0 ? round($sales / $spend) : 0;
 
             return [
                 'date' => $date,
