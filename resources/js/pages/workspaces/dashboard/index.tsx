@@ -1,9 +1,20 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Workspace } from '@/types/models/Workspace';
 import { currencyFormatter, numberFormatter, percentageFormatter } from '@/lib/utils';
 import MetricsCard from '@/components/workspaces/MetricsCard';
+import LineComparisonChart from '@/components/charts/LineComparisonChart';
+import SingleLineChart from '@/components/charts/SingleLineChart';
+
+interface ChartDataPoint {
+    date: string;
+    sales: number;
+    spend: number;
+    roas: number;
+    rts_rate: number;
+}
+
 
 type Props = {
     workspace: Workspace;
@@ -20,6 +31,10 @@ type Props = {
 }
 
 export default function Index({ workspace, stats }: Props) {
+    const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
     const analytics = useMemo(() => {
         return [
             { title: 'Total Sales', value: currencyFormatter(stats.total_sales) },
@@ -32,6 +47,33 @@ export default function Index({ workspace, stats }: Props) {
             { title: 'Chat Messages Sent', value: numberFormatter(stats.chat_msg_sent) },
         ]
     }, [stats])
+
+    useEffect(() => {
+        const fetchChartData = async () => {
+            try {
+                setLoading(true);
+                const response = await fetch(
+                    `/workspaces/${workspace.slug}/api/chart-data?days=30`
+                );
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch chart data');
+                }
+
+                const data = await response.json();
+                console.log('Fetched chart data:', data);
+                setChartData(data.chartData);
+                setError(null);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'An error occurred');
+                console.error('Error fetching chart data:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchChartData();
+    }, [workspace.slug]);
 
     return (
         <AppLayout>
@@ -46,6 +88,68 @@ export default function Index({ workspace, stats }: Props) {
                     {analytics.map((data, key) => (
                         <MetricsCard key={key} title={data.title} value={data.value} />
                     ))}
+                </div>
+
+                <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+                    <LineComparisonChart<ChartDataPoint>
+                        chartData={chartData}
+                        loading={loading}
+                        error={error}
+                        title="Total Sales vs. Total Ad Spent"
+                        description="Last 30 days comparison"
+                        dataKeyLeft="sales"
+                        dataKeyRight="spend"
+                        labelLeft="Total Sales"
+                        labelRight="Ad Spend"
+                    />
+                </div>
+
+                <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+                    <SingleLineChart<ChartDataPoint>
+                        chartData={chartData}
+                        loading={loading}
+                        error={error}
+                        title="Total Sales"
+                        description="Last 30 days"
+                        dataKey="sales"
+                        label="Total Sales"
+                        color="var(--chart-1)"
+                    />
+                    <SingleLineChart<ChartDataPoint>
+                        chartData={chartData}
+                        loading={loading}
+                        error={error}
+                        title="Total Ad Spend"
+                        description="Last 30 days"
+                        dataKey="spend"
+                        label="Ad Spend"
+                        color="var(--chart-2)"
+                    />
+                </div>
+
+                <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+                    <SingleLineChart<ChartDataPoint>
+                        chartData={chartData}
+                        loading={loading}
+                        error={error}
+                        title="ROAS (Return on Ad Spend)"
+                        description="Last 30 days"
+                        dataKey="roas"
+                        label="ROAS"
+                        color="var(--chart-3)"
+                        formatter={(value: number) => value.toFixed(2)}
+                    />
+                    <SingleLineChart<ChartDataPoint>
+                        chartData={chartData}
+                        loading={loading}
+                        error={error}
+                        title="RTS Rate (Return to Sender)"
+                        description="Last 30 days"
+                        dataKey="rts_rate"
+                        label="RTS Rate"
+                        color="var(--chart-4)"
+                        formatter={(value: number) => value.toFixed(2) + '%'}
+                    />
                 </div>
             </div>
         </AppLayout>
