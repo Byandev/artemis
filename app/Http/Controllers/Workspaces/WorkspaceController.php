@@ -230,26 +230,22 @@ class WorkspaceController extends Controller
         $adStats = AdRecord::ofWorkspace($workspace)
             ->applyDateFilter($startDate, $endDate, 'date')
             ->applyEntityFilters($filters)
-            ->selectRaw('SUM(spend) as total_ad_spend, SUM(sales) as total_ad_sales')
+            ->selectRaw('SUM(spend) as total_ad_spend')
             ->first();
 
-        $total_sales = Order::where('workspace_id', $workspace->id)
-            ->whereNotNull('confirmed_at')
-            ->sum('total_amount');
+        $total_sales = $orderStats->total_sales ?? 0;
+        $total_orders = $orderStats->total_orders ?? 0;
+        $total_ad_spend = $adStats->total_ad_spend ?? 0;
 
         $stats = [
             'total_sales' => $total_sales,
-
-            'total_orders' => Order::where('workspace_id', $workspace->id)
-                ->whereNotNull('confirmed_at')
-                ->count(),
-
+            'total_orders' => $total_orders,
             'total_ad_spend' => $total_ad_spend,
             'rts_rate_percentage' => $orderStats->rts_rate_percentage ?? 0,
             'delivered_orders' => $orderStats->delivered_orders ?? 0,
             'sms_sent' => $notificationStats->sms_sent ?? 0,
             'chat_msg_sent' => $notificationStats->chat_msg_sent ?? 0,
-            'roas' => $total_ad_spend > 0 ? round($total_ad_sales / $total_ad_spend, 2) : 0.0,
+            'roas' => $total_ad_spend > 0 ? round($total_sales / $total_ad_spend, 2) : 0.0,
         ];
 
         // Fetch available filter options
@@ -271,10 +267,6 @@ class WorkspaceController extends Controller
                 ->orderBy('name')
                 ->get(),
         ];
-
-        $stats['roas'] = $total_ad_spend > 0
-            ? round(($total_sales / $total_ad_spend))
-            : 0.0;
 
         return Inertia::render('workspaces/dashboard/index', [
             'workspace' => $workspace,
@@ -375,7 +367,7 @@ class WorkspaceController extends Controller
             $rtsRate = $rtsRecord ? (float) $rtsRecord->rts_rate_percentage : 0.0;
 
             // Calculate ROAS: Return on Ad Spend = Sales / Spend
-            $roas = $spend > 0 ? round($sales / $spend) : 0;
+            $roas = $spend > 0 ? round($sales / $spend, 2) : 0;
 
             return [
                 'date' => $date,
