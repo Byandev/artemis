@@ -4,6 +4,7 @@ import ProductLayout from '@/pages/workspaces/products/partials/layout';
 import { Workspace } from '@/types/models/Workspace';
 import { sum } from 'lodash';
 import { useMemo } from 'react';
+import TopProducts from '@/pages/workspaces/products/partials/analytics/TopProducts';
 
 interface Props {
     workspace: Workspace;
@@ -45,6 +46,11 @@ const Analytics = ({ workspace, summary }: Props) => {
                             </div>
                         </div>
                     ))}
+                </div>
+
+
+                <div className="grid lg:grid-cols-2 gap-4">
+                    <TopProducts workspace={workspace}/>
                 </div>
             </div>
         </ProductLayout>

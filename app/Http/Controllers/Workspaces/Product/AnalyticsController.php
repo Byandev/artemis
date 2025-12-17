@@ -38,9 +38,9 @@ class AnalyticsController extends Controller
         ]);
     }
 
-    public function topSales(Workspace $workspace, Request $request)
+    public function topAdvertisingSales(Workspace $workspace, Request $request)
     {
-        $products = Product::where('workspace_id', $workspace->id)
+        return Product::where('workspace_id', $workspace->id)
             ->select('products.*')
             ->selectSub(function ($q) {
                 $q->from('ad_records')
@@ -48,7 +48,34 @@ class AnalyticsController extends Controller
                     ->join('pages', 'pages.id', '=', 'ads.page_id')
                     ->whereColumn('pages.product_id', 'products.id')
                     ->selectRaw('COALESCE(SUM(ad_records.sales), 0)');
+            }, 'advertising_sales')
+            ->orderByDesc(function ($q) {
+                $q->from('ad_records')
+                    ->join('ads', 'ads.id', '=', 'ad_records.ad_id')
+                    ->join('pages', 'pages.id', '=', 'ads.page_id')
+                    ->whereColumn('pages.product_id', 'products.id')
+                    ->selectRaw('COALESCE(SUM(ad_records.sales), 0)');
+            })
+            ->limit(10)
+            ->get();
+    }
+
+    public function topSales(Workspace $workspace, Request $request)
+    {
+        return Product::where('workspace_id', $workspace->id)
+            ->select('products.*')
+            ->selectSub(function ($q) {
+                $q->from('orders')
+                    ->join('pages', 'pages.id', '=', 'orders.page_id')
+                    ->whereColumn('pages.product_id', 'products.id')
+                    ->selectRaw('COALESCE(SUM(orders.total_amount), 0)');
             }, 'sales')
+            ->orderByDesc(function ($q) {
+                $q->from('orders')
+                    ->join('pages', 'pages.id', '=', 'orders.page_id')
+                    ->whereColumn('pages.product_id', 'products.id')
+                    ->selectRaw('COALESCE(SUM(orders.total_amount), 0)');
+            })
             ->limit(10)
             ->get();
     }

@@ -72,7 +72,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Product routes
     Route::get('/workspaces/{workspace}/products/list', [ProductController::class, 'index'])->name('workspaces.products.index');
     Route::get('/workspaces/{workspace}/products/analytics', [\App\Http\Controllers\Workspaces\Product\AnalyticsController::class, 'index'])->name('workspaces.products.analytics');
-    Route::get('/workspaces/{workspace}/products/analytics/top/sales', [\App\Http\Controllers\Workspaces\Product\AnalyticsController::class, 'topSales'])->name('workspaces.products.analytics.top.sales');
+    Route::get('/workspaces/{workspace}/products/analytics/top/advertising-sales', [\App\Http\Controllers\Workspaces\Product\AnalyticsController::class, 'topAdvertisingSales'])->name('workspaces-workspace.products.analytics.top.advertising-sales');
+    Route::get('/workspaces/{workspace}/products/analytics/top/sales', [\App\Http\Controllers\Workspaces\Product\AnalyticsController::class, 'topSales'])->name('workspaces-workspace.products.analytics.top.advertising-sales');
     Route::get('/workspaces/{workspace}/products/create', [ProductController::class, 'create'])->name('workspaces.products.create');
     Route::post('/workspaces/{workspace}/products', [ProductController::class, 'store'])->name('workspaces.products.store');
     Route::get('/workspaces/{workspace}/products/{product}/edit', [ProductController::class, 'edit'])->name('workspaces.products.edit');
