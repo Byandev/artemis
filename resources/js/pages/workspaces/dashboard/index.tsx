@@ -77,7 +77,7 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
     const analytics = useMemo(() => {
         return [
             { title: 'Total Sales', value: currencyFormatter(stats.total_sales) },
-            { title: 'Total Add Spend', value: currencyFormatter(stats.total_ad_spend) },
+            { title: 'Total Ad Spend', value: currencyFormatter(stats.total_ad_spend) },
             { title: 'Total Orders', value: numberFormatter(stats.total_orders) },
             { title: 'ROAS', value: stats.roas },
             { title: 'RTS Rate', value: percentageFormatter(stats.rts_rate_percentage / 100) },
