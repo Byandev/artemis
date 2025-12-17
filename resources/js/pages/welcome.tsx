@@ -9,7 +9,7 @@ export default function Welcome() {
         <>
             <Head title="Welcome to Artemis" />
             <div className="flex min-h-screen flex-col items-center justify-center bg-[#FDFDFC] p-6 text-[#1b1b18] dark:bg-[#2D2D2D]">
-                {/* Header Navigation */}
+                {/* Header Layout */}
                 <header className="absolute top-0 left-0 right-0 p-6">
                     <nav className="flex items-center justify-end gap-4">
                         {auth.user ? (
@@ -42,9 +42,9 @@ export default function Welcome() {
                 <main className="flex flex-col items-center text-center">
                     {/* Logo */}
                     <div className="mb-8">
-                        <img 
-                            src="/img/logo/artemis.png" 
-                            alt="Artemis Logo" 
+                        <img
+                            src="/img/logo/artemis.png"
+                            alt="Artemis Logo"
                             className="w-70 h-70 object-contain"
                         />
                     </div>
