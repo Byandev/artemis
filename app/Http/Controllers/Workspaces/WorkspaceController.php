@@ -226,10 +226,11 @@ class WorkspaceController extends Controller
             ->first();
 
         // Ad spend and sales in one query
+        // Note: Ad records don't have direct relationships to pages/products/shops,
+        // so they are only filtered by workspace and date range, not by entity filters.
+        // This means ad stats represent workspace-wide totals for the selected date range.
         $adStats = AdRecord::ofWorkspace($workspace)
-            ->when($startDate && $endDate, function ($q) use ($startDate, $endDate) {
-                $q->whereRaw('DATE(date) >= ? AND DATE(date) <= ?', [$startDate, $endDate]);
-            })
+            ->applyDateFilter($startDate, $endDate, 'date')
             ->selectRaw('SUM(spend) as total_ad_spend, SUM(sales) as total_ad_sales')
             ->first();
 
@@ -308,20 +309,11 @@ class WorkspaceController extends Controller
             'shop_ids' => $request->query('shop_ids'),
         ];
 
-        // Determine date condition
-        $applyDateCondition = function ($query, $dateColumn) use ($days, $startDate, $endDate) {
-            if ($startDate && $endDate) {
-                return $query->whereRaw("DATE($dateColumn) >= ? AND DATE($dateColumn) <= ?", [$startDate, $endDate]);
-            } else {
-                return $query->whereRaw("$dateColumn >= DATE_SUB(CURDATE(), INTERVAL ? DAY)", [$days]);
-            }
-        };
-
         // Get sales data by date
         $salesData = Order::where('workspace_id', $workspace->id)
             ->whereNotNull('confirmed_at')
             ->applyEntityFilters($filters)
-            ->when(true, fn ($q) => $applyDateCondition($q, 'confirmed_at'))
+            ->applyDateFilter($startDate, $endDate, 'confirmed_at')
             ->selectRaw('DATE(confirmed_at) as date, SUM(total_amount) as total_sales')
             ->groupBy('date')
             ->orderBy('date')
@@ -330,7 +322,7 @@ class WorkspaceController extends Controller
 
         // Get ad spend data by date
         $adSpendData = AdRecord::ofWorkspace($workspace)
-            ->when(true, fn ($q) => $applyDateCondition($q, 'date'))
+            ->applyDateFilter($startDate, $endDate, 'date')
             ->selectRaw('date, SUM(spend) as total_spend')
             ->groupBy('date')
             ->orderBy('date')
@@ -341,7 +333,7 @@ class WorkspaceController extends Controller
         $rtsData = Order::where('workspace_id', $workspace->id)
             ->whereNotNull('confirmed_at')
             ->applyEntityFilters($filters)
-            ->when(true, fn ($q) => $applyDateCondition($q, 'confirmed_at'))
+            ->applyDateFilter($startDate, $endDate, 'confirmed_at')
             ->selectRaw('
                 DATE(confirmed_at) as date,
                 SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) AS delivered_count,

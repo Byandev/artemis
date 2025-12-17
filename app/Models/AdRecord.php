@@ -32,4 +32,16 @@ class AdRecord extends Model
             return $query->where('workspace_id', $workspace->id);
         });
     }
+
+    /**
+     * Apply date range filter to the query.
+     */
+    public function scopeApplyDateFilter($query, $startDate, $endDate, $dateColumn = 'date')
+    {
+        if ($startDate && $endDate) {
+            $query->whereRaw("DATE($dateColumn) >= ? AND DATE($dateColumn) <= ?", [$startDate, $endDate]);
+        }
+
+        return $query;
+    }
 }
