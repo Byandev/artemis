@@ -5,6 +5,10 @@ namespace App\Http\Controllers\Workspaces;
 use App\Http\Controllers\Controller;
 use App\Models\AdRecord;
 use App\Models\Order;
+use App\Models\Page;
+use App\Models\Product;
+use App\Models\Shop;
+use App\Models\Team;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -250,19 +254,19 @@ class WorkspaceController extends Controller
 
         // Fetch available filter options
         $availableFilters = [
-            'teams' => \App\Models\Team::ofWorkspace($workspace)
+            'teams' => Team::ofWorkspace($workspace)
                 ->select('id', 'name')
                 ->orderBy('name')
                 ->get(),
-            'products' => \App\Models\Product::ofWorkspace($workspace)
+            'products' => Product::ofWorkspace($workspace)
                 ->select('id', 'name')
                 ->orderBy('name')
                 ->get(),
-            'pages' => \App\Models\Page::ofWorkspace($workspace)
+            'pages' => Page::ofWorkspace($workspace)
                 ->select('id', 'name')
                 ->orderBy('name')
                 ->get(),
-            'shops' => \App\Models\Shop::where('workspace_id', $workspace->id)
+            'shops' => Shop::where('workspace_id', $workspace->id)
                 ->select('id', 'name')
                 ->orderBy('name')
                 ->get(),
