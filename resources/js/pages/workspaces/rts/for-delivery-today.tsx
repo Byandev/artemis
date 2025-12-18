@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout'
 import { Workspace } from '@/types/models/Workspace'
 import { Head } from '@inertiajs/react'
 import RTSManagementLayout from './partials/Layout'
+import OrderFilters from './partials/OrderFilters'
 import { useState, useEffect, useMemo } from 'react'
 import { Order } from '@/types/models/Orders'
 import { ColumnDef } from '@tanstack/react-table'
@@ -12,9 +13,6 @@ import _ from 'lodash'
 import { PaginatedData } from '@/types'
 import { toFrontendSort } from '@/lib/sort'
 import { omit } from 'lodash'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
 import ComponentCard from '@/components/common/ComponentCard'
 
 interface ForDeliveryTodayProps {
@@ -164,61 +162,18 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders, query }: ForDe
         <AppLayout>
             <Head title={`${workspace.name} - For Delivery Today`} />
             <RTSManagementLayout workspace={workspace}>
-                <ComponentCard title="Orders For Delivery Today" >
+                <ComponentCard title="For Delivery Today" >
                     <div>
-                        <div className='flex flex-col items-start justify-between gap-4 mb-8'>
-                            <div className="flex flex-col gap-4 w-full sm:flex-row sm:items-end">
-                                <div className="flex-1 space-y-2">
-                                    <label className="text-sm font-medium">Search Page Name</label>
-                                    <Input
-                                        placeholder="Search by page name..."
-                                        value={pageNameSearch}
-                                        onChange={(e) => setPageNameSearch(e.target.value)}
-                                    />
-                                </div>
-                                <div className="flex-1 space-y-2">
-                                    <label className="text-sm font-medium">Customer</label>
-                                    <Select
-                                        value={customerFilter || undefined}
-                                        onValueChange={(value) => handleFilterChange('customer', value)}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="All customers" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {customers.map((customer) => (
-                                                <SelectItem key={customer} value={customer}>
-                                                    {customer}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="flex-1 space-y-2">
-                                    <label className="text-sm font-medium">Rider</label>
-                                    <Select
-                                        value={riderFilter || undefined}
-                                        onValueChange={(value) => handleFilterChange('rider', value)}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="All riders" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {riders.map((rider) => (
-                                                <SelectItem key={rider} value={rider}>
-                                                    {rider}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                {(pageNameSearch || customerFilter || riderFilter) && (
-                                    <Button onClick={clearFilters} variant="outline">
-                                        Clear Filters
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
+                        <OrderFilters
+                            pageNameSearch={pageNameSearch}
+                            customerFilter={customerFilter}
+                            riderFilter={riderFilter}
+                            customers={customers}
+                            riders={riders}
+                            onPageNameChange={setPageNameSearch}
+                            onFilterChange={handleFilterChange}
+                            onClearFilters={clearFilters}
+                        />
 
                         <div className="grid grid-cols-1 gap-4">
                             <DataTable
