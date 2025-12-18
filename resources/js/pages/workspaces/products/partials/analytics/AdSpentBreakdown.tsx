@@ -9,10 +9,12 @@ import { currencyFormatter, formatCompactCurrency } from '@/lib/utils';
 import { chartOptions } from '@/pages/workspaces/products/partials/analytics/chart';
 
 type Props  = {
-    workspace: Workspace
+    workspace: Workspace,
+    startDate: string,
+    endDate: string,
 }
 
-const AdSpentBreakdown = ({ workspace }: Props) => {
+const AdSpentBreakdown = ({ workspace, startDate, endDate }: Props) => {
     const [products, setProducts] = useState<Product[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -21,7 +23,9 @@ const AdSpentBreakdown = ({ workspace }: Props) => {
         axios.get(`/workspaces/${workspace.slug}/products/analytics/metrics`, {
             params: {
                 metric: 'ad_spent',
-                per_page: 1000
+                per_page: 1000,
+                start_date: startDate,
+                end_date: endDate
             }
         })
             .then((response) => {
@@ -29,7 +33,7 @@ const AdSpentBreakdown = ({ workspace }: Props) => {
                 setLoading(false)
             })
             .finally(() => setLoading(false))
-    }, [workspace.slug]);
+    }, [workspace.slug, startDate, endDate]);
 
     return <ComponentCard title='Ad Spent Breakdown'>
         <div className="max-w-full overflow-x-auto custom-scrollbar">

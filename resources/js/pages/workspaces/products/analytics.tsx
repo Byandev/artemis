@@ -77,13 +77,13 @@ const Analytics = ({ workspace, summary }: Props) => {
                         testing_product_count={summary.testing_product_count}
                     />
 
-                    <SalesBreakdown workspace={workspace}/>
+                    <SalesBreakdown workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to}/>
 
-                    <AdSpentBreakdown workspace={workspace} />
+                    <AdSpentBreakdown workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to}/>
 
-                    <RoasBreakdown workspace={workspace} />
+                    <RoasBreakdown workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to}/>
 
-                    <RtsBreakdown workspace={workspace} />
+                    <RtsBreakdown workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to}/>
                 </div>
             </div>
         </ProductLayout>

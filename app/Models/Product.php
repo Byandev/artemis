@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -46,126 +47,123 @@ class Product extends Model implements HasMedia
             ->where('collection_name', 'PRODUCT_IMAGE');
     }
 
-    public function scopeOfWorkspace($builder, Workspace $workspace)
+    public function scopeOfWorkspace(Builder $builder, Workspace $workspace): Builder
     {
         return $builder->where('workspace_id', $workspace->id);
     }
-
-    public function scopeWithAdvertisingSales($query)
+    public function scopeWithAdvertisingSales(Builder $query, ?string $start_date = null, ?string $end_date = null): Builder
     {
-        return $query->selectSub(function ($q) {
+        return $query->selectSub(function ($q) use ($start_date, $end_date) {
             $q->from('ad_records')
                 ->join('ads', 'ads.id', '=', 'ad_records.ad_id')
                 ->join('pages', 'pages.id', '=', 'ads.page_id')
                 ->whereColumn('pages.product_id', 'products.id')
-                ->when(request()->has('start_date'), function ($q1) {
-                    $q1->whereDate('ad_records.date', '>=', request()->start_date);
-                })
-                ->when(request()->has('end_date'), function ($q1) {
-                    $q1->whereDate('ad_records.date', '<=', request()->end_date);
-                })
                 ->selectRaw('COALESCE(SUM(ad_records.sales), 0)');
         }, 'advertising_sales');
     }
 
-    public function scopeWithAdSpent($query)
+    public function scopeWithAdSpent(Builder $query, ?string $start_date = null, ?string $end_date = null): Builder
     {
-        return $query->selectSub(function ($q) {
+        return $query->selectSub(function ($q) use ($start_date, $end_date) {
             $q->from('ad_records')
                 ->join('ads', 'ads.id', '=', 'ad_records.ad_id')
                 ->join('pages', 'pages.id', '=', 'ads.page_id')
                 ->whereColumn('pages.product_id', 'products.id')
-                ->when(request()->has('start_date'), function ($q1) {
-                    $q1->whereDate('ad_records.date', '>=', request()->start_date);
+                ->when($start_date, function ($q1) use ($start_date) {
+                    $q1->whereDate('ad_records.date', '>=', $start_date);
                 })
-                ->when(request()->has('end_date'), function ($q1) {
-                    $q1->whereDate('ad_records.date', '<=', request()->end_date);
+                ->when($end_date, function ($q1) use ($end_date) {
+                    $q1->whereDate('ad_records.date', '<=', $end_date);
                 })
                 ->selectRaw('COALESCE(SUM(ad_records.spend), 0)');
         }, 'ad_spent');
     }
 
-    public function scopeWithSales($query)
+    public function scopeWithSales(Builder $query, ?string $start_date = null, ?string $end_date = null): Builder
     {
-        return $query->selectSub(function ($q) {
+        return $query->selectSub(function ($q) use ($start_date, $end_date) {
             $q->from('orders')
                 ->join('pages', 'pages.id', '=', 'orders.page_id')
                 ->whereColumn('pages.product_id', 'products.id')
-                ->when(request()->has('start_date'), function ($q1) {
-                    $q1->whereDate('orders.confirmed_at', '>=', request()->start_date);
+                ->when($start_date, function ($q1) use ($start_date) {
+                    $q1->whereDate('orders.confirmed_at', '>=', $start_date);
                 })
-                ->when(request()->has('end_date'), function ($q1) {
-                    $q1->whereDate('orders.confirmed_at', '<=', request()->end_date);
+                ->when($end_date, function ($q1) use ($end_date) {
+                    $q1->whereDate('orders.confirmed_at', '<=', $end_date);
                 })
                 ->selectRaw('COALESCE(SUM(orders.total_amount), 0)');
         }, 'sales');
     }
 
-    public function scopeWithRoas($query)
+    public function scopeWithRoas(Builder $query, ?string $start_date = null, ?string $end_date = null): Builder
     {
-        return $query->selectRaw("
+        $base = (clone $query)
+            ->select('products.*')
+            ->withSales($start_date, $end_date)
+            ->withAdSpent($start_date, $end_date);
+
+        return $query
+            ->fromSub($base, 'p')
+            ->select('p.*')
+            ->selectRaw("
             CASE
-                WHEN (
-                    SELECT COALESCE(SUM(ar.spend), 0)
-                    FROM ad_records ar
-                    JOIN ads a ON a.id = ar.ad_id
-                    JOIN pages p ON p.id = a.page_id
-                    WHERE p.product_id = products.id
-                ) = 0
-                THEN 0
-                ELSE (
-                    (
-                        SELECT COALESCE(SUM(o.total_amount), 0)
-                        FROM orders o
-                        JOIN pages p2 ON p2.id = o.page_id
-                        WHERE p2.product_id = products.id
-                    ) / (
-                        SELECT COALESCE(SUM(ar2.spend), 0)
-                        FROM ad_records ar2
-                        JOIN ads a2 ON a2.id = ar2.ad_id
-                        JOIN pages p3 ON p3.id = a2.page_id
-                        WHERE p3.product_id = products.id
-                    )
-                )
+                WHEN COALESCE(p.ad_spent, 0) = 0 THEN 0
+                ELSE COALESCE(p.sales, 0) / p.ad_spent
             END AS roas
         ");
     }
 
-    public function scopeWithRts($query)
+    public function scopeWithDeliveredCount(Builder $query, ?string $start_date = null, ?string $end_date = null): Builder
     {
-        return $query->selectSub(function ($q) {
-            $q->selectRaw("
-                COALESCE(
-                    (
-                        (SELECT COUNT(*)
-                         FROM orders o
-                         JOIN pages p2 ON p2.id = o.page_id
-                         WHERE p2.product_id = products.id
-                           AND o.confirmed_at IS NOT NULL
-                           AND o.returning_at IS NOT NULL)
-                        /
-                        NULLIF(
-                            (
-                                (SELECT COUNT(*)
-                                 FROM orders o2
-                                 JOIN pages p3 ON p3.id = o2.page_id
-                                 WHERE p3.product_id = products.id
-                                   AND o2.confirmed_at IS NOT NULL
-                                   AND o2.returning_at IS NOT NULL)
-                                +
-                                (SELECT COUNT(*)
-                                 FROM orders o3
-                                 JOIN pages p4 ON p4.id = o3.page_id
-                                 WHERE p4.product_id = products.id
-                                   AND o3.confirmed_at IS NOT NULL
-                                   AND o3.delivered_at IS NOT NULL)
-                            ),
-                            0
-                        )
-                    ),
-                    0
-                )
-            ");
-        }, 'rts');
+        return $query->selectSub(function ($q) use ($start_date, $end_date) {
+            $q->from('orders')
+                ->join('pages', 'pages.id', '=', 'orders.page_id')
+                ->whereColumn('pages.product_id', 'products.id')
+                ->whereNotNull('orders.confirmed_at')
+                ->whereNotNull('orders.delivered_at')
+                ->when($start_date, function ($q1) use ($start_date) {
+                    $q1->whereDate('orders.confirmed_at', '>=', $start_date);
+                })
+                ->when($end_date, function ($q1) use ($end_date) {
+                    $q1->whereDate('orders.confirmed_at', '<=', $end_date);
+                })
+                ->selectRaw('COUNT(*)');
+        }, 'delivered_count');
+    }
+
+    public function scopeWithReturningCount(Builder $query, ?string $start_date = null, ?string $end_date = null): Builder
+    {
+        return $query->selectSub(function ($q) use ($start_date, $end_date) {
+            $q->from('orders')
+                ->join('pages', 'pages.id', '=', 'orders.page_id')
+                ->whereColumn('pages.product_id', 'products.id')
+                ->whereNotNull('orders.confirmed_at')
+                ->whereNotNull('orders.returning_at')
+                ->when($start_date, function ($q1) use ($start_date) {
+                    $q1->whereDate('orders.confirmed_at', '>=', $start_date);
+                })
+                ->when($end_date, function ($q1) use ($end_date) {
+                    $q1->whereDate('orders.confirmed_at', '<=', $end_date);
+                })
+                ->selectRaw('COUNT(*)');
+        }, 'returning_count');
+    }
+
+    public function scopeWithRts(Builder $query, ?string $start_date = null, ?string $end_date = null): Builder
+    {
+        $base = (clone $query)
+            ->select('products.*')
+            ->withDeliveredCount($start_date, $end_date)
+            ->withReturningCount($start_date, $end_date);
+
+        return $query
+            ->fromSub($base, 'p')
+            ->select('p.*')
+            ->selectRaw("
+            COALESCE(
+                p.returning_count / NULLIF((p.returning_count + p.delivered_count), 0),
+                0
+            ) AS rts
+        ");
     }
 }

@@ -51,7 +51,7 @@ const TopProducts = ({ workspace, startDate, endDate }: Props) => {
                 setLoading(false)
             })
             .finally(() => setLoading(false))
-    }, [workspace.slug, metric.key]);
+    }, [workspace.slug, metric.key, startDate, endDate]);
 
     return <div
         className={`rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]`}
