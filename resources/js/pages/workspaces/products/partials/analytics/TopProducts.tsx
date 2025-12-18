@@ -36,13 +36,13 @@ const TopProducts = ({ workspace }: Props) => {
 
     useEffect(() => {
         setLoading(true)
-        axios.get(`/workspaces/${workspace.slug}/products/analytics/top/${metric.name}`)
+        axios.get(`/workspaces/${workspace.slug}/products/analytics/metrics`)
             .then((response) => {
-                setProducts(response.data)
+                setProducts(response.data.data)
                 setLoading(false)
             })
-            .catch(() => setLoading(false))
-    }, [workspace.slug, metric.name]);
+            .finally(() => setLoading(false))
+    }, [workspace.slug]);
 
     return <div
         className={`rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]`}

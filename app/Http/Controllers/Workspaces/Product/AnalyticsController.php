@@ -38,7 +38,7 @@ class AnalyticsController extends Controller
         ]);
     }
 
-    public function topAdvertisingSales(Workspace $workspace, Request $request)
+    public function metrics(Workspace $workspace, Request $request)
     {
         return Product::where('workspace_id', $workspace->id)
             ->select('products.*')
@@ -49,41 +49,6 @@ class AnalyticsController extends Controller
                     ->whereColumn('pages.product_id', 'products.id')
                     ->selectRaw('COALESCE(SUM(ad_records.sales), 0)');
             }, 'advertising_sales')
-            ->orderByDesc(function ($q) {
-                $q->from('ad_records')
-                    ->join('ads', 'ads.id', '=', 'ad_records.ad_id')
-                    ->join('pages', 'pages.id', '=', 'ads.page_id')
-                    ->whereColumn('pages.product_id', 'products.id')
-                    ->selectRaw('COALESCE(SUM(ad_records.sales), 0)');
-            })
-            ->limit(10)
-            ->get();
-    }
-
-    public function topSales(Workspace $workspace, Request $request)
-    {
-        return Product::where('workspace_id', $workspace->id)
-            ->select('products.*')
-            ->selectSub(function ($q) {
-                $q->from('orders')
-                    ->join('pages', 'pages.id', '=', 'orders.page_id')
-                    ->whereColumn('pages.product_id', 'products.id')
-                    ->selectRaw('COALESCE(SUM(orders.total_amount), 0)');
-            }, 'sales')
-            ->orderByDesc(function ($q) {
-                $q->from('orders')
-                    ->join('pages', 'pages.id', '=', 'orders.page_id')
-                    ->whereColumn('pages.product_id', 'products.id')
-                    ->selectRaw('COALESCE(SUM(orders.total_amount), 0)');
-            })
-            ->limit(10)
-            ->get();
-    }
-
-    public function topAdSpent(Workspace $workspace, Request $request)
-    {
-        return Product::where('workspace_id', $workspace->id)
-            ->select('products.*')
             ->selectSub(function ($q) {
                 $q->from('ad_records')
                     ->join('ads', 'ads.id', '=', 'ad_records.ad_id')
@@ -91,57 +56,38 @@ class AnalyticsController extends Controller
                     ->whereColumn('pages.product_id', 'products.id')
                     ->selectRaw('COALESCE(SUM(ad_records.spend), 0)');
             }, 'ad_spent')
-            ->orderByDesc(function ($q) {
-                $q->from('ad_records')
-                    ->join('ads', 'ads.id', '=', 'ad_records.ad_id')
-                    ->join('pages', 'pages.id', '=', 'ads.page_id')
+            ->selectSub(function ($q) {
+                $q->from('orders')
+                    ->join('pages', 'pages.id', '=', 'orders.page_id')
                     ->whereColumn('pages.product_id', 'products.id')
-                    ->selectRaw('COALESCE(SUM(ad_records.spend), 0)');
-            })
-            ->limit(10)
-            ->get();
-    }
-
-    public function topRoas(Workspace $workspace, Request $request)
-    {
-        return Product::where('workspace_id', $workspace->id)
-            ->select('products.*')
+                    ->selectRaw('COALESCE(SUM(orders.total_amount), 0)');
+            }, 'sales')
             ->selectRaw("
-            CASE
-                WHEN (
-                    SELECT COALESCE(SUM(ar.spend), 0)
-                    FROM ad_records ar
-                    JOIN ads a ON a.id = ar.ad_id
-                    JOIN pages p ON p.id = a.page_id
-                    WHERE p.product_id = products.id
-                ) = 0
-                THEN 0
-                ELSE (
-                    (
-                        SELECT COALESCE(SUM(o.total_amount), 0)
-                        FROM orders o
-                        JOIN pages p2 ON p2.id = o.page_id
-                        WHERE p2.product_id = products.id
-                    ) / (
-                        SELECT COALESCE(SUM(ar2.spend), 0)
-                        FROM ad_records ar2
-                        JOIN ads a2 ON a2.id = ar2.ad_id
-                        JOIN pages p3 ON p3.id = a2.page_id
-                        WHERE p3.product_id = products.id
+                CASE
+                    WHEN (
+                        SELECT COALESCE(SUM(ar.spend), 0)
+                        FROM ad_records ar
+                        JOIN ads a ON a.id = ar.ad_id
+                        JOIN pages p ON p.id = a.page_id
+                        WHERE p.product_id = products.id
+                    ) = 0
+                    THEN 0
+                    ELSE (
+                        (
+                            SELECT COALESCE(SUM(o.total_amount), 0)
+                            FROM orders o
+                            JOIN pages p2 ON p2.id = o.page_id
+                            WHERE p2.product_id = products.id
+                        ) / (
+                            SELECT COALESCE(SUM(ar2.spend), 0)
+                            FROM ad_records ar2
+                            JOIN ads a2 ON a2.id = ar2.ad_id
+                            JOIN pages p3 ON p3.id = a2.page_id
+                            WHERE p3.product_id = products.id
+                        )
                     )
-                )
-            END AS roas
-        ")
-
-            ->orderByDesc('roas')
-            ->limit(10)
-            ->get();
-    }
-
-    public function topRts(Workspace $workspace, Request $request)
-    {
-        return Product::where('workspace_id', $workspace->id)
-            ->select('products.*')
+                END AS roas
+            ")
             ->selectSub(function ($q) {
                 $q->selectRaw("
                 COALESCE(
@@ -176,8 +122,7 @@ class AnalyticsController extends Controller
                 )
             ");
             }, 'rts')
-            ->orderBy('rts', 'asc')
-            ->limit(10)
-            ->get();
+            ->orderBy('advertising_sales', 'asc')
+            ->paginate();
     }
 }
