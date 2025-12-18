@@ -122,7 +122,7 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                 const memberNames = row.original.members?.map(m => m.name).join(', ') || 'No members';
                 return (
                     <div>
-                        <span className="font-medium">{count} {count === 1 ? 'member' : 'members'}</span>
+                        <span className="font-medium">{count} {count === 0 || count === 1 ? 'member' : 'members'}</span>
                         {count > 0 && <span className="text-xs text-muted-foreground ml-2">({memberNames.length > 50 ? memberNames.substring(0, 50) + '...' : memberNames})</span>}
                     </div>
                 );
