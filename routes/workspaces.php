@@ -73,7 +73,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/workspaces/{workspace}/products/list', [ProductController::class, 'index'])->name('workspaces.products.index');
     Route::get('/workspaces/{workspace}/products/analytics', [\App\Http\Controllers\Workspaces\Product\AnalyticsController::class, 'index'])->name('workspaces.products.analytics');
     Route::get('/workspaces/{workspace}/products/analytics/top/advertising-sales', [\App\Http\Controllers\Workspaces\Product\AnalyticsController::class, 'topAdvertisingSales'])->name('workspaces-workspace.products.analytics.top.advertising-sales');
-    Route::get('/workspaces/{workspace}/products/analytics/top/sales', [\App\Http\Controllers\Workspaces\Product\AnalyticsController::class, 'topSales'])->name('workspaces-workspace.products.analytics.top.advertising-sales');
+    Route::get('/workspaces/{workspace}/products/analytics/top/sales', [\App\Http\Controllers\Workspaces\Product\AnalyticsController::class, 'topSales'])->name('workspaces-workspace.products.analytics.top.sales');
+    Route::get('/workspaces/{workspace}/products/analytics/top/roas', [\App\Http\Controllers\Workspaces\Product\AnalyticsController::class, 'topRoas'])->name('workspaces-workspace.products.analytics.top.roas');
+    Route::get('/workspaces/{workspace}/products/analytics/top/ad-spent', [\App\Http\Controllers\Workspaces\Product\AnalyticsController::class, 'topAdSpent'])->name('workspaces-workspace.products.analytics.top.ad-spent');
+    Route::get('/workspaces/{workspace}/products/analytics/top/rts', [\App\Http\Controllers\Workspaces\Product\AnalyticsController::class, 'topRts'])->name('workspaces-workspace.products.analytics.top.rts');
     Route::get('/workspaces/{workspace}/products/create', [ProductController::class, 'create'])->name('workspaces.products.create');
     Route::post('/workspaces/{workspace}/products', [ProductController::class, 'store'])->name('workspaces.products.store');
     Route::get('/workspaces/{workspace}/products/{product}/edit', [ProductController::class, 'edit'])->name('workspaces.products.edit');
