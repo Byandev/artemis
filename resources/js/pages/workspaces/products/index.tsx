@@ -21,8 +21,6 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import workspaces from '@/routes/workspaces';
-import { Badge } from '@/components/ui/badge';
-import Layout from '@/pages/workspaces/products/partials/layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { omit } from 'lodash';
@@ -181,7 +179,7 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
     ];
 
     return (
-        <Layout workspace={workspace}>
+        <AppLayout>
             <Head title={`${workspace.name} - Products`} />
             <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -244,7 +242,7 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
                     onClose={() => setProductToDelete(null)}
                 />
             </div>
-        </Layout>
+        </AppLayout>
     );
 };
 
