@@ -45,8 +45,7 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders, query }: ForDe
     useEffect(() => {
         const currentSearchParam = query?.filter?.page_name ?? '';
 
-        // Only trigger search if the value has actually changed or if the search is empty
-        if (pageNameSearch === currentSearchParam && pageNameSearch !== '') {
+        if (pageNameSearch === currentSearchParam) {
             return;
         }
 
