@@ -267,7 +267,7 @@ const AdsManager = ({ workspace }: PageProps) => {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {campaign.daily_budget ? `$${(campaign.daily_budget / 100).toFixed(2)}` : 'N/A'}
+                    {campaign.daily_budget ? `₱${(campaign.daily_budget / 100).toFixed(2)}` : 'N/A'}
                   </TableCell>
                   <TableCell>
                     {new Date(campaign.start_time).toLocaleDateString()}
