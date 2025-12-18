@@ -1,34 +1,94 @@
 import AppLayout from '@/layouts/app-layout';
-import { DataTable } from '@/components/ui/data-table';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import { Workspace } from '@/types/models/Workspace';
 import { FacebookAccount } from '@/types/models/FacebookAccount';
-import { useCallback } from 'react';
-import { usePage } from '@inertiajs/react';
-import { SharedData } from '@/types';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { router, usePage } from '@inertiajs/react';
+import { PaginatedData, SharedData } from '@/types';
+import ComponentCard from '@/components/common/ComponentCard';
+import { omit } from 'lodash';
+import workspaces from '@/routes/workspaces';
+import { toFrontendSort } from '@/lib/sort';
+import moment from 'moment';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface FacebookAccountsProps {
     workspace: Workspace;
-    facebook_accounts: {
-        data: FacebookAccount[];
-    };
+    facebook_accounts: PaginatedData<FacebookAccount>,
+    query?: {
+        sort?: string | null
+        perPage?: number | string
+        page?: number | string
+        filter?: {
+            search?: string
+        }
+    }
 }
 
 const FacebookAccounts = ({
     facebook_accounts,
     workspace,
+    query
 }: FacebookAccountsProps) => {
     const { auth } = usePage<SharedData>().props;
 
+    const initialSorting = useMemo(() => {
+        return toFrontendSort(query?.sort ?? null);
+    }, [query?.sort]);
+
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+
+    useEffect(() => {
+        const currentSearchParam = query?.filter?.search ?? '';
+
+        if (searchValue === currentSearchParam) {
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            router.get(
+                workspaces.facebookAccounts.index({ workspace }),
+                {
+                    sort: query?.sort,
+                    'filter[search]': searchValue || undefined,
+                    page: 1,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['facebook_accounts'],
+                },
+            );
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchValue, query?.filter?.search, query?.sort, workspace]);
+
     const columns: ColumnDef<FacebookAccount>[] = [
         {
-            accessorKey: 'id',
-            header: 'ID',
+            accessorKey: 'name',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Name'} />
+            ),
+            cell: ({ row }) => {
+                return <div className="flex items-center gap-2">
+                    <Avatar>
+                        <AvatarImage src={row.original.picture_url} alt={row.original.name} />
+                        <AvatarFallback className="bg-brand-500 text-white">{row.original.name[0]}</AvatarFallback>
+                    </Avatar>
+                    <span>{row.original.name}</span>
+                </div>
+            }
         },
         {
-            accessorKey: 'name',
-            header: 'Name',
+            accessorKey: 'created_at',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Connected At'} />
+            ),
+            cell: ({ row }) => moment(row.original.created_at).format('MMM D, YYYY h:mm:ss A'),
         },
     ];
 
@@ -52,20 +112,58 @@ const FacebookAccounts = ({
         window.location.href = `https://www.facebook.com/v22.0/dialog/oauth?${query}`;
     }, [auth.user.id, workspace.id]);
 
-    return (
+    return  (
         <AppLayout>
-            <div className="px-4 py-6">
-                <div className="mb-4">
-                    <Button size="sm" onClick={connectFacebookAccount}>
+            <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                    <h2
+                        className="text-xl font-semibold text-gray-800 dark:text-white/90"
+                        x-text="pageName"
+                    >
+                        Facebook Accounts
+                    </h2>
+
+                    <button onClick={connectFacebookAccount} className="bg-brand-500 text-white px-4 py-2 rounded-xl font-medium text-theme-sm">
                         Connect Facebook Account
-                    </Button>
+                    </button>
                 </div>
 
-                <div>
-                    <DataTable
-                        columns={columns}
-                        data={facebook_accounts.data || []}
-                    />
+                <div className="space-y-5 sm:space-y-6">
+                    <ComponentCard desc="List of  connected facebook accounts">
+                        <div>
+                            <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.05]">
+                                <input
+                                    className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900  dark:placeholder:text-white/30  bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800"
+                                    placeholder="Search facebook account name"
+                                    value={searchValue}
+                                    onChange={(e) => setSearchValue(e.target.value)}
+                                />
+                            </div>
+
+                            <DataTable
+                                columns={columns}
+                                enableInternalPagination={false}
+                                data={facebook_accounts.data || []}
+                                initialSorting={initialSorting}
+                                meta={{ ...omit(facebook_accounts, ['data'])  }}
+                                onFetch={(params) => {
+                                    router.get(
+                                        workspaces.facebookAccounts.index({ workspace }),
+                                        {
+                                            sort: params?.sort,
+                                            'filter[search]': searchValue || undefined,
+                                            page: params?.page ?? 1
+                                        },
+                                        {
+                                            preserveState: false,
+                                            replace: true,
+                                            preserveScroll: true,
+                                        },
+                                    );
+                                }}
+                            />
+                        </div>
+                    </ComponentCard>
                 </div>
             </div>
         </AppLayout>

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Workspaces\AdAccountController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
+use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\Record\RTSController;
 use App\Http\Controllers\Workspaces\Record\SalesController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
@@ -13,7 +14,6 @@ use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
-use App\Http\Controllers\Workspaces\ProductController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -33,6 +33,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Workspace dashboard
     Route::get('/workspaces/{workspace}/dashboard', [WorkspaceController::class, 'dashboard'])->name('workspace.dashboard');
+    Route::get('/workspaces/{workspace}/api/chart-data', [WorkspaceController::class, 'getChartData'])->name('workspace.api.chart-data');
 
     // Workspace CRUD routes
     Route::get('/workspaces', [WorkspaceController::class, 'index'])->name('workspaces.index');
@@ -69,7 +70,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/workspaces/{workspace}/pages/{page}/restore', [PageController::class, 'restore'])->name('workspaces.pages.restore');
 
     // Product routes
-    Route::get('/workspaces/{workspace}/products', [ProductController::class, 'index'])->name('workspaces.products.index');
+    Route::get('/workspaces/{workspace}/products/list', [ProductController::class, 'index'])->name('workspaces.products.index');
+    Route::get('/workspaces/{workspace}/products/analytics', [\App\Http\Controllers\Workspaces\Product\AnalyticsController::class, 'index'])->name('workspaces.products.analytics');
+    Route::get('/workspaces/{workspace}/products/analytics/metrics', [\App\Http\Controllers\Workspaces\Product\AnalyticsController::class, 'metrics'])->name('workspaces-workspace.products.analytics.metrics');
     Route::get('/workspaces/{workspace}/products/create', [ProductController::class, 'create'])->name('workspaces.products.create');
     Route::post('/workspaces/{workspace}/products', [ProductController::class, 'store'])->name('workspaces.products.store');
     Route::get('/workspaces/{workspace}/products/{product}/edit', [ProductController::class, 'edit'])->name('workspaces.products.edit');

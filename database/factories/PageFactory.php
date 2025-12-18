@@ -26,7 +26,7 @@ class PageFactory extends Factory
             'workspace_id' => Workspace::factory(),
             'shop_id' => Shop::factory(),
             'owner_id' => User::factory(),
-            'name' => fake()->company() . ' Page',
+            'name' => fake()->company().' Page',
             'facebook_url' => fake()->optional()->url(),
             'pos_token' => fake()->optional()->uuid(),
             'botcake_token' => fake()->optional()->uuid(),
