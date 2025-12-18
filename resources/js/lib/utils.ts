@@ -93,3 +93,20 @@ export function isValidDate(date: Date | undefined) {
     }
     return !isNaN(date.getTime())
 }
+
+
+export function formatCompactCurrency(value: number){
+    const n = Number(value) || 0;
+    const abs = Math.abs(n);
+
+    const fmt = (v: number, suffix: string) => {
+        // show 1 decimal only when needed (e.g., 1.2M), but 1M stays 1M
+        const rounded = v % 1 === 0 ? v.toFixed(0) : v.toFixed(1);
+        return `${n < 0 ? "-" : ""}${rounded}${suffix}`;
+    };
+
+    if (abs >= 1_000_000) return `₱ ${fmt(abs / 1_000_000, "M")}`;
+    if (abs >= 1_000)     return `₱ ${fmt(abs / 1_000_000, "M")}`;
+
+    return `₱ ${n}`;
+}

@@ -22,7 +22,7 @@ type Metric = {
 }
 
 const METRICS: Metric[] = [
-    {  display: 'Sales', name: 'sales', key: 'sales', formatter: currencyFormatter },
+    { display: 'Sales', name: 'sales', key: 'sales', formatter: currencyFormatter },
     { display: 'Advertising Sales', name: 'advertising-sales', key: 'advertising_sales', formatter: currencyFormatter },
     { display: 'Ad Spent',  name: 'ad-spent', key: 'ad_spent', formatter: currencyFormatter },
     { display: 'ROAS', name: 'roas', key: 'roas', formatter: numberFormatter },
@@ -36,13 +36,18 @@ const TopProducts = ({ workspace }: Props) => {
 
     useEffect(() => {
         setLoading(true)
-        axios.get(`/workspaces/${workspace.slug}/products/analytics/metrics`)
+        axios.get(`/workspaces/${workspace.slug}/products/analytics/metrics`, {
+            params: {
+                metric: metric.key,
+                sort: metric.key === 'rts'? metric.key : `-${metric.key}`
+            }
+        })
             .then((response) => {
                 setProducts(response.data.data)
                 setLoading(false)
             })
             .finally(() => setLoading(false))
-    }, [workspace.slug]);
+    }, [workspace.slug, metric.key]);
 
     return <div
         className={`rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]`}
