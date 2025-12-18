@@ -226,7 +226,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                         Shop & Pages
                     </h2>
                     <Button size="sm" onClick={handleCreate}>
-                        Add new page
+                        Add New Page
                     </Button>
                 </div>
 
