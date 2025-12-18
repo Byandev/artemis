@@ -10,10 +10,12 @@ import {
 import { chartOptions } from '@/pages/workspaces/products/partials/analytics/chart';
 
 type Props  = {
-    workspace: Workspace
+    workspace: Workspace,
+    startDate: string,
+    endDate: string,
 }
 
-const RtsBreakdown = ({ workspace }: Props) => {
+const RtsBreakdown = ({ workspace, startDate, endDate }: Props) => {
     const [products, setProducts] = useState<Product[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -22,7 +24,9 @@ const RtsBreakdown = ({ workspace }: Props) => {
         axios.get(`/workspaces/${workspace.slug}/products/analytics/metrics`, {
             params: {
                 metric: 'rts',
-                per_page: 1000
+                per_page: 1000,
+                start_date: startDate,
+                end_date: endDate
             }
         })
             .then((response) => {
@@ -30,7 +34,7 @@ const RtsBreakdown = ({ workspace }: Props) => {
                 setLoading(false)
             })
             .finally(() => setLoading(false))
-    }, [workspace.slug]);
+    }, [workspace.slug, startDate, endDate]);
 
     return <ComponentCard title='RTS Breakdown'>
         <div className="max-w-full overflow-x-auto custom-scrollbar">

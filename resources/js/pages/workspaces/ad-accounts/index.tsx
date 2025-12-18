@@ -144,7 +144,7 @@ const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
 
     return (
         <AppLayout>
-            <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                     <h2
                         className="text-xl font-semibold text-gray-800 dark:text-white/90"

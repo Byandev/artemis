@@ -1,25 +1,20 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Head, router, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
-import { DataTable } from '@/components/ui/data-table';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Page } from '@/types/models/Page';
 import { Button } from '@/components/ui/button';
 import { PageFormDialog } from '@/components/pages/page-form-dialog';
 import { ArchivePageDialog } from '@/components/pages/archive-page-dialog';
 import { Workspace } from '@/types/models/Workspace';
-import { 
-    Edit, 
-    MoreHorizontal, 
-    Archive, 
-    RotateCcw, 
-    RefreshCw,
-    Search,
-    ArrowUpDown,
-    ArrowUp,
-    ArrowDown,
-    X,
-    Loader2
+import ComponentCard from '@/components/common/ComponentCard';
+import {
+    Edit,
+    MoreHorizontal,
+    Archive,
+    RotateCcw,
+    RefreshCw
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -28,95 +23,78 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import workspaces from '@/routes/workspaces';
-import { Badge } from '@/components/ui/badge';
-
-interface Owner {
-    id: number;
-    name: string;
-}
-
-interface Shop {
-    id: number;
-    name: string;
-}
-
-interface Filters {
-    search: string;
-    owner_id: string;
-    shop_id: string;
-    status: string;
-    sort: string;
-    direction: string;
-}
-
-interface PaginationLinks {
-    url: string | null;
-    label: string;
-    active: boolean;
-}
-
-interface PaginatedPages {
-    data: Page[];
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-    links: PaginationLinks[];
-    from: number;
-    to: number;
-}
+import { toFrontendSort } from '@/lib/sort';
+import { PaginatedData } from '@/types';
+import { omit } from 'lodash';
+import clsx from 'clsx';
 
 interface PagesProps {
     workspace: Workspace;
-    pages: PaginatedPages;
-    filters: Filters;
-    owners: Owner[];
-    shops: Shop[];
+    pages: PaginatedData<Page>;
+    query?: {
+        sort?: string | null;
+        perPage?: number | string;
+        page?: number | string;
+        filter?: {
+            search?: string;
+        };
+    };
 }
 
-const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
+const StatusBadge = ({ isArchived }: { isArchived: boolean }) => {
+    return (
+        <span
+            className={clsx(
+                "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset",
+                isArchived
+                    ? "bg-slate-50 text-slate-700 ring-slate-200"
+                    : "bg-emerald-50 text-emerald-700 ring-emerald-200"
+            )}
+        >
+            {isArchived ? "ARCHIVED" : "ACTIVE"}
+        </span>
+    );
+};
+
+const Pages = ({ pages, workspace, query }: PagesProps) => {
+    const initialSorting = useMemo(() => {
+        return toFrontendSort(query?.sort ?? null);
+    }, [query?.sort]);
+
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [dialogOpen, setDialogOpen] = useState(false);
     const [selectedPage, setSelectedPage] = useState<Page | undefined>(undefined);
     const [pageToArchive, setPageToArchive] = useState<Page | null>(null);
-    const [searchValue, setSearchValue] = useState(filters.search);
-    const [isSearching, setIsSearching] = useState(false);
 
     const { post, processing } = useForm({});
 
-    // Debounced search - automatically search after user stops typing
-    const debouncedSearch = useCallback((value: string) => {
-        setIsSearching(true);
-        router.get(
-            workspaces.pages.index.url({ workspace }),
-            { ...filters, search: value, page: 1 },
-            { 
-                preserveState: true, 
-                preserveScroll: true,
-                onFinish: () => setIsSearching(false),
-            }
-        );
-    }, [filters, workspace]);
-
     useEffect(() => {
-        // Don't search on initial mount if search value matches filter
-        if (searchValue === filters.search) return;
+        const currentSearchParam = query?.filter?.search ?? '';
+
+        if (searchValue === currentSearchParam) {
+            return;
+        }
 
         const timer = setTimeout(() => {
-            debouncedSearch(searchValue);
-        }, 300);
+            router.get(
+                workspaces.pages.index({ workspace }),
+                {
+                    sort: query?.sort,
+                    'filter[search]': searchValue || undefined,
+                    page: 1,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['pages'],
+                },
+            );
+        }, 500);
 
         return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchValue]);
+    }, [searchValue, query?.filter?.search, query?.sort, workspace]);
 
     const handleEdit = (page: Page) => {
         setSelectedPage(page);
@@ -138,93 +116,39 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
         router.post(workspaces.pages.restore.url({ workspace, page }));
     };
 
-    const handleFilter = (key: string, value: string) => {
-        router.get(
-            workspaces.pages.index.url({ workspace }),
-            { ...filters, [key]: value, page: 1 },
-            { preserveState: true, preserveScroll: true }
-        );
-    };
-
-    const clearSearch = () => {
-        setSearchValue('');
-        // Immediately trigger search with empty value
-        router.get(
-            workspaces.pages.index.url({ workspace }),
-            { ...filters, search: '', page: 1 },
-            { preserveState: true, preserveScroll: true }
-        );
-    };
-
-    const handleSort = (field: string) => {
-        const newDirection = filters.sort === field && filters.direction === 'asc' ? 'desc' : 'asc';
-        router.get(
-            workspaces.pages.index.url({ workspace }),
-            { ...filters, sort: field, direction: newDirection, page: 1 },
-            { preserveState: true, preserveScroll: true }
-        );
-    };
-
-    const clearFilters = () => {
-        router.get(workspaces.pages.index.url({ workspace }), { status: filters.status });
-    };
-
-    const getSortIcon = (field: string) => {
-        if (filters.sort !== field) return <ArrowUpDown className="ml-2 h-4 w-4" />;
-        return filters.direction === 'asc' 
-            ? <ArrowUp className="ml-2 h-4 w-4" /> 
-            : <ArrowDown className="ml-2 h-4 w-4" />;
-    };
-
-    const columns: ColumnDef<Page>[] = useMemo(() => [
+    const columns: ColumnDef<Page>[] = [
         {
             accessorKey: 'id',
-            header: 'ID',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'ID'} />
+            ),
         },
         {
             accessorKey: 'name',
-            header: () => (
-                <Button
-                    variant="ghost"
-                    onClick={() => handleSort('name')}
-                    className="h-8 px-2 lg:px-3"
-                >
-                    Name
-                    {getSortIcon('name')}
-                </Button>
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Name'} />
             ),
         },
         {
             accessorKey: 'shop',
-            header: () => (
-                <Button
-                    variant="ghost"
-                    onClick={() => handleSort('shop_id')}
-                    className="h-8 px-2 lg:px-3"
-                >
-                    Shop
-                    {getSortIcon('shop_id')}
-                </Button>
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Shop'} />
             ),
             cell: ({ row }) => row.original.shop?.name || '-',
         },
         {
             accessorKey: 'owner',
-            header: () => (
-                <Button
-                    variant="ghost"
-                    onClick={() => handleSort('owner_id')}
-                    className="h-8 px-2 lg:px-3"
-                >
-                    Owner
-                    {getSortIcon('owner_id')}
-                </Button>
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Owner'} />
             ),
             cell: ({ row }) => row.original.owner?.name || '-',
         },
         {
             accessorKey: 'orders_last_synced_at',
-            header: 'Last Sync',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Last Sync'} />
+            ),
             cell: ({ row }) => {
                 const date = row.original.orders_last_synced_at;
                 return date ? new Date(date).toLocaleString() : 'Never';
@@ -232,22 +156,18 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
         },
         {
             accessorKey: 'status',
-            header: 'Status',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Status'} />
+            ),
             cell: ({ row }) => {
-                // When using SoftDeletes, trashed records have deleted_at set
                 const isArchived = row.original.deleted_at !== null;
-                return (
-                    <Badge variant={isArchived ? 'secondary' : 'default'}>
-                        {isArchived ? 'Archived' : 'Active'}
-                    </Badge>
-                );
+                return <StatusBadge isArchived={isArchived} />;
             },
         },
         {
             id: 'actions',
             cell: ({ row }) => {
                 const page = row.original;
-                // When using SoftDeletes, trashed records have deleted_at set
                 const isArchived = page.deleted_at !== null;
 
                 return (
@@ -264,7 +184,7 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
                                         <Edit className="mr-2 h-4 w-4" />
                                         Edit
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem 
+                                    <DropdownMenuItem
                                         onClick={() => refresh(page)}
                                         disabled={processing}
                                     >
@@ -272,7 +192,7 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
                                         {processing ? 'Refreshing...' : 'Refresh Orders'}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem 
+                                    <DropdownMenuItem
                                         onClick={() => setPageToArchive(page)}
                                         className="text-destructive focus:text-destructive"
                                     >
@@ -292,145 +212,60 @@ const Pages = ({ pages, workspace, filters, owners, shops }: PagesProps) => {
                 );
             },
         },
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    ], [filters.sort, filters.direction]);
-
-    const hasActiveFilters = filters.search || filters.owner_id || filters.shop_id;
+    ];
 
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - Pages`} />
-            <div className="px-4 py-6">
-                <div className="mb-6 flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Shop & Pages</h1>
+            <Head title={`${workspace.name} - Shop & Pages`} />
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                    <h2
+                        className="text-xl font-semibold text-gray-800 dark:text-white/90"
+                        x-text="pageName"
+                    >
+                        Shop & Pages
+                    </h2>
                     <Button size="sm" onClick={handleCreate}>
                         Add new page
                     </Button>
                 </div>
 
-                {/* Status Tabs */}
-                <div className="mb-4 flex gap-2">
-                    <Button
-                        variant={filters.status === 'active' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => handleFilter('status', 'active')}
-                    >
-                        Active
-                    </Button>
-                    <Button
-                        variant={filters.status === 'archived' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => handleFilter('status', 'archived')}
-                    >
-                        Archived
-                    </Button>
-                </div>
-
-                {/* Filters */}
-                <div className="mb-4 flex flex-wrap gap-4">
-                    {/* Search */}
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            type="text"
-                            placeholder="Search by name..."
-                            value={searchValue}
-                            onChange={(e) => setSearchValue(e.target.value)}
-                            className="pl-8 w-[200px]"
-                        />
-                        {(searchValue || isSearching) && (
-                            <span className="absolute right-2.5 top-2.5">
-                                {isSearching ? (
-                                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={clearSearch}
-                                    >
-                                        <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                                    </button>
-                                )}
-                            </span>
-                        )}
-                    </div>
-
-                    {/* Filter by Owner */}
-                    <Select
-                        value={filters.owner_id || 'all'}
-                        onValueChange={(value) => handleFilter('owner_id', value === 'all' ? '' : value)}
-                    >
-                        <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Filter by owner" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Owners</SelectItem>
-                            {owners.map((owner) => (
-                                <SelectItem key={owner.id} value={String(owner.id)}>
-                                    {owner.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-
-                    {/* Filter by Shop */}
-                    <Select
-                        value={filters.shop_id || 'all'}
-                        onValueChange={(value) => handleFilter('shop_id', value === 'all' ? '' : value)}
-                    >
-                        <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Filter by shop" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Shops</SelectItem>
-                            {shops.map((shop) => (
-                                <SelectItem key={shop.id} value={String(shop.id)}>
-                                    {shop.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-
-                    {/* Clear Filters */}
-                    {hasActiveFilters && (
-                        <Button variant="ghost" size="sm" onClick={clearFilters}>
-                            <X className="mr-2 h-4 w-4" />
-                            Clear filters
-                        </Button>
-                    )}
-                </div>
-
-                {/* Data Table */}
-                <div className="rounded-md border">
-                    <DataTable columns={columns} data={pages.data || []} />
-                </div>
-
-                {/* Pagination - always show results count */}
-                <div className="mt-4 flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                        {pages.total > 0 ? (
-                            <>Showing {pages.from} to {pages.to} of {pages.total} results</>
-                        ) : (
-                            <>No results found</>
-                        )}
-                    </div>
-                    {pages.last_page > 1 && (
-                        <div className="flex gap-2">
-                            {pages.links.map((link, index) => (
-                                <Button
-                                    key={index}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => {
-                                        if (link.url) {
-                                            router.get(link.url, {}, { preserveState: true, preserveScroll: true });
-                                        }
-                                    }}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                <div className="space-y-5 sm:space-y-6">
+                    <ComponentCard desc="List of shop pages and their connected stores">
+                        <div>
+                            <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.05]">
+                                <input
+                                    className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900  dark:placeholder:text-white/30  bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800"
+                                    placeholder="Search page name"
+                                    value={searchValue}
+                                    onChange={(e) => setSearchValue(e.target.value)}
                                 />
-                            ))}
+                            </div>
+
+                            <DataTable
+                                columns={columns}
+                                enableInternalPagination={false}
+                                data={pages.data || []}
+                                initialSorting={initialSorting}
+                                meta={{ ...omit(pages, ['data']) }}
+                                onFetch={(params) => {
+                                    router.get(
+                                        workspaces.pages.index({ workspace }),
+                                        {
+                                            sort: params?.sort,
+                                            'filter[search]': searchValue || undefined,
+                                            page: params?.page ?? 1
+                                        },
+                                        {
+                                            preserveState: false,
+                                            replace: true,
+                                            preserveScroll: true,
+                                        },
+                                    );
+                                }}
+                            />
                         </div>
-                    )}
+                    </ComponentCard>
                 </div>
 
                 {/* Page Form Dialog */}
