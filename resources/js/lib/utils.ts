@@ -43,18 +43,16 @@ export function percentageFormatter(
 /**
  * Format a number as currency (default: Philippine Peso)
  * @param value - The number to format
- * @param currency - Currency code (default: 'PHP')
  * @param options - Intl.NumberFormat options
  * @returns Formatted currency string
  */
 export function currencyFormatter(
     value: number,
-    currency: string = 'PHP',
     options?: Intl.NumberFormatOptions
 ): string {
     return new Intl.NumberFormat('en-PH', {
         style: 'currency',
-        currency,
+        currency: 'PHP',
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
         ...options,

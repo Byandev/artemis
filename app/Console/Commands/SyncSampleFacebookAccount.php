@@ -28,6 +28,13 @@ class SyncSampleFacebookAccount extends Command
      */
     public function handle()
     {
+        FacebookAccount::get()
+            ->each(function (FacebookAccount $account) {
+                dispatch(new FetchAdAccounts($account));
+            });
+
+        dd('Done');
+
         $userId = $this->argument('user');
         $workspaceId = $this->argument('workspace');
 

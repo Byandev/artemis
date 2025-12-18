@@ -35,6 +35,7 @@ import {
 import { Input } from '@/components/ui/input';
 import workspaces from '@/routes/workspaces';
 import { Badge } from '@/components/ui/badge';
+import Layout from '@/pages/workspaces/products/partials/layout';
 
 interface Filters {
     search: string;
@@ -118,9 +119,9 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
     };
 
     const handleSort = (column: string) => {
-        const newDirection = 
+        const newDirection =
             filters.sort === column && filters.direction === 'asc' ? 'desc' : 'asc';
-        
+
         router.get(
             workspaces.products.index.url({ workspace }),
             { ...filters, sort: column, direction: newDirection, page: 1 },
@@ -131,7 +132,7 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
     const SortableHeader = ({ column, children }: { column: string; children: React.ReactNode }) => {
         const isSorted = filters.sort === column;
         const direction = filters.direction;
-        
+
         return (
             <button
                 onClick={() => handleSort(column)}
@@ -251,57 +252,9 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
     const hasActiveFilters = filters.search || filters.category || filters.status;
 
     return (
-        <AppLayout>
+        <Layout workspace={workspace}>
             <Head title={`${workspace.name} - Products`} />
-            <div className="px-4 py-6">
-                <div className="mb-6">
-                    <h1 className="text-2xl font-bold">Products</h1>
-                </div>
-
-                {/* Tabs - Analytics, Products, Testing Products */}
-                <div className="mb-6 border-b border-border">
-                    <div className="flex gap-1">
-                        <button
-                            onClick={() => setActiveTab('analytics')}
-                            className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
-                                activeTab === 'analytics'
-                                    ? 'text-foreground'
-                                    : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                        >
-                            Analytics
-                            {activeTab === 'analytics' && (
-                                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-                            )}
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('products')}
-                            className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
-                                activeTab === 'products'
-                                    ? 'text-foreground'
-                                    : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                        >
-                            Products
-                            {activeTab === 'products' && (
-                                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-                            )}
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('testing_products')}
-                            className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
-                                activeTab === 'testing_products'
-                                    ? 'text-foreground'
-                                    : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                        >
-                            Testing Products
-                            {activeTab === 'testing_products' && (
-                                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-                            )}
-                        </button>
-                    </div>
-                </div>
+            <div className="">
 
                 {/* Filters and Search */}
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
@@ -437,7 +390,7 @@ const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
                     onClose={() => setProductToDelete(null)}
                 />
             </div>
-        </AppLayout>
+        </Layout>
     );
 };
 
