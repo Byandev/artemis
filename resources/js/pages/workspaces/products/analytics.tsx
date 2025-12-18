@@ -1,5 +1,5 @@
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import ProductLayout from '@/pages/workspaces/products/partials/layout';
 import { Workspace } from '@/types/models/Workspace';
 import TopProducts from '@/pages/workspaces/products/partials/analytics/TopProducts';
@@ -8,7 +8,9 @@ import AdSpentBreakdown from '@/pages/workspaces/products/partials/analytics/AdS
 import RoasBreakdown from '@/pages/workspaces/products/partials/analytics/RoasBreakdown';
 import RtsBreakdown from '@/pages/workspaces/products/partials/analytics/RtsBreakdown';
 import StatusBreakdown from '@/pages/workspaces/products/partials/analytics/StatusBreakdown';
-import { sum } from 'lodash';
+import { type DateRange } from "react-day-picker"
+import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
+import moment from 'moment';
 
 interface Props {
     workspace: Workspace;
@@ -32,9 +34,23 @@ const Analytics = ({ workspace, summary }: Props) => {
         ];
     }, [summary]);
 
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({
+        from: moment().startOf('month').toDate(),
+        to: moment().toDate()
+    })
+
+    const dateRangeStr = useMemo(() => ({
+        to: moment(dateRange?.to).format('YYYY-MM-DD'),
+        from: moment(dateRange?.from).format('YYYY-MM-DD'),
+    }), [dateRange])
+
     return (
         <ProductLayout workspace={workspace}>
             <div className="space-y-5 sm:space-y-6">
+                <div>
+                    <SimpleDateRangePicker value={dateRange} onChange={setDateRange}/>
+                </div>
+
                 <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4'>
                     {items.map((item) => (
                         <div key={item.title} className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -52,9 +68,8 @@ const Analytics = ({ workspace, summary }: Props) => {
                     ))}
                 </div>
 
-
                 <div className="grid lg:grid-cols-2 gap-4">
-                    <TopProducts workspace={workspace}/>
+                    <TopProducts workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to}/>
 
                     <StatusBreakdown
                         scaling_product_count={summary.scaling_product_count}

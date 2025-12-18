@@ -9,11 +9,11 @@ import { PageFormDialog } from '@/components/pages/page-form-dialog';
 import { ArchivePageDialog } from '@/components/pages/archive-page-dialog';
 import { Workspace } from '@/types/models/Workspace';
 import ComponentCard from '@/components/common/ComponentCard';
-import { 
-    Edit, 
-    MoreHorizontal, 
-    Archive, 
-    RotateCcw, 
+import {
+    Edit,
+    MoreHorizontal,
+    Archive,
+    RotateCcw,
     RefreshCw
 } from 'lucide-react';
 import {
@@ -184,7 +184,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                                         <Edit className="mr-2 h-4 w-4" />
                                         Edit
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem 
+                                    <DropdownMenuItem
                                         onClick={() => refresh(page)}
                                         disabled={processing}
                                     >
@@ -192,7 +192,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                                         {processing ? 'Refreshing...' : 'Refresh Orders'}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem 
+                                    <DropdownMenuItem
                                         onClick={() => setPageToArchive(page)}
                                         className="text-destructive focus:text-destructive"
                                     >
@@ -217,7 +217,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Shop & Pages`} />
-            <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                     <h2
                         className="text-xl font-semibold text-gray-800 dark:text-white/90"

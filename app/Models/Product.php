@@ -58,6 +58,12 @@ class Product extends Model implements HasMedia
                 ->join('ads', 'ads.id', '=', 'ad_records.ad_id')
                 ->join('pages', 'pages.id', '=', 'ads.page_id')
                 ->whereColumn('pages.product_id', 'products.id')
+                ->when(request()->has('start_date'), function ($q1) {
+                    $q1->whereDate('ad_records.date', '>=', request()->start_date);
+                })
+                ->when(request()->has('end_date'), function ($q1) {
+                    $q1->whereDate('ad_records.date', '<=', request()->end_date);
+                })
                 ->selectRaw('COALESCE(SUM(ad_records.sales), 0)');
         }, 'advertising_sales');
     }
@@ -69,6 +75,12 @@ class Product extends Model implements HasMedia
                 ->join('ads', 'ads.id', '=', 'ad_records.ad_id')
                 ->join('pages', 'pages.id', '=', 'ads.page_id')
                 ->whereColumn('pages.product_id', 'products.id')
+                ->when(request()->has('start_date'), function ($q1) {
+                    $q1->whereDate('ad_records.date', '>=', request()->start_date);
+                })
+                ->when(request()->has('end_date'), function ($q1) {
+                    $q1->whereDate('ad_records.date', '<=', request()->end_date);
+                })
                 ->selectRaw('COALESCE(SUM(ad_records.spend), 0)');
         }, 'ad_spent');
     }
@@ -79,6 +91,12 @@ class Product extends Model implements HasMedia
             $q->from('orders')
                 ->join('pages', 'pages.id', '=', 'orders.page_id')
                 ->whereColumn('pages.product_id', 'products.id')
+                ->when(request()->has('start_date'), function ($q1) {
+                    $q1->whereDate('orders.confirmed_at', '>=', request()->start_date);
+                })
+                ->when(request()->has('end_date'), function ($q1) {
+                    $q1->whereDate('orders.confirmed_at', '<=', request()->end_date);
+                })
                 ->selectRaw('COALESCE(SUM(orders.total_amount), 0)');
         }, 'sales');
     }
