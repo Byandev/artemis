@@ -10,6 +10,14 @@ import { DeleteTeamDialog } from '@/components/teams/delete-team-dialog';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { omit } from 'lodash';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 
 interface User {
     id: number;
@@ -113,9 +121,9 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                 const count = row.original.members_count;
                 const memberNames = row.original.members?.map(m => m.name).join(', ') || 'No members';
                 return (
-                    <div className="flex flex-col">
+                    <div>
                         <span className="font-medium">{count} {count === 1 ? 'member' : 'members'}</span>
-                        <span className="text-xs text-muted-foreground truncate max-w-md">{memberNames}</span>
+                        {count > 0 && <span className="text-xs text-muted-foreground ml-2">({memberNames.length > 50 ? memberNames.substring(0, 50) + '...' : memberNames})</span>}
                     </div>
                 );
             },
@@ -128,22 +136,27 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                 if (!isAdmin) return null;
 
                 return (
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(team)}
-                        >
-                            Edit
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDelete(team)}
-                        >
-                            Delete
-                        </Button>
-                    </div>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEdit(team)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                onClick={() => handleDelete(team)}
+                                className="text-destructive focus:text-destructive"
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 );
             },
         },
@@ -152,7 +165,7 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Teams`} />
-            <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                     <h2
                         className="text-xl font-semibold text-gray-800 dark:text-white/90"
