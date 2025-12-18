@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Head, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import { ColumnDef } from '@tantml:function_calls>
+import { ColumnDef } from '@tanstack/react-table';
 import { Product } from '@/types/models/Product';
 import { Button } from '@/components/ui/button';
 import { DeleteProductDialog } from '@/components/products/delete-product-dialog';
