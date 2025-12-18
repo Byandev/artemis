@@ -11,7 +11,9 @@ import {
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from '@/components/ui/select';
 
 type Props  = {
-    workspace: Workspace
+    workspace: Workspace,
+    startDate: string,
+    endDate: string,
 }
 
 type Metric = {
@@ -29,7 +31,7 @@ const METRICS: Metric[] = [
     { display: 'RTS', name: 'rts', key: 'rts', formatter: percentageFormatter },
 ]
 
-const TopProducts = ({ workspace }: Props) => {
+const TopProducts = ({ workspace, startDate, endDate }: Props) => {
     const [products, setProducts] = useState<Product[]>([])
     const [metric, setMetric] = useState<Metric>(METRICS[0])
     const [loading, setLoading] = useState(true)
@@ -39,7 +41,9 @@ const TopProducts = ({ workspace }: Props) => {
         axios.get(`/workspaces/${workspace.slug}/products/analytics/metrics`, {
             params: {
                 metric: metric.key,
-                sort: metric.key === 'rts'? metric.key : `-${metric.key}`
+                sort: metric.key === 'rts'? metric.key : `-${metric.key}`,
+                start_date: startDate,
+                end_date: endDate
             }
         })
             .then((response) => {
@@ -47,7 +51,7 @@ const TopProducts = ({ workspace }: Props) => {
                 setLoading(false)
             })
             .finally(() => setLoading(false))
-    }, [workspace.slug, metric.key]);
+    }, [workspace.slug, metric.key, startDate, endDate]);
 
     return <div
         className={`rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]`}

@@ -183,6 +183,18 @@
 }
 
 
+/*--color-brand-25:  #f6f9f8;*/
+/*--color-brand-50:  #ecf3f1;*/
+/*--color-brand-100: #d7eae5;*/
+/*--color-brand-200: #b8e0d6;*/
+/*--color-brand-300: #8cd9c5;*/
+/*--color-brand-400: #5cd6b7;*/
+/*--color-brand-500: #10d3a1;*/
+/*--color-brand-600: #0eaa82;*/
+/*--color-brand-700: #0d8264;*/
+/*--color-brand-800: #0c644d;*/
+/*--color-brand-900: #0b4b3b;*/
+/*--color-brand-950: #093429;*/
 :root {
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
@@ -190,7 +202,7 @@
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
+    --primary: #10d3a1;
     --primary-foreground: oklch(0.985 0 0);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
