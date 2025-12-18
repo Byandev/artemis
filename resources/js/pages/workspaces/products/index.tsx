@@ -1,22 +1,17 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Head, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
-import { DataTable } from '@/components/ui/data-table';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Product } from '@/types/models/Product';
 import { Button } from '@/components/ui/button';
 import { DeleteProductDialog } from '@/components/products/delete-product-dialog';
 import { Workspace } from '@/types/models/Workspace';
+import ComponentCard from '@/components/common/ComponentCard';
 import {
     MoreHorizontal,
     Trash2,
-    Search,
-    X,
-    Loader2,
     Edit,
-    ArrowUpDown,
-    ArrowUp,
-    ArrowDown,
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -25,362 +20,221 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import workspaces from '@/routes/workspaces';
 import { Badge } from '@/components/ui/badge';
 import Layout from '@/pages/workspaces/products/partials/layout';
-
-interface Filters {
-    search: string;
-    category: string;
-    status: string;
-    sort: string;
-    direction: string;
-}
-
-interface PaginationLinks {
-    url: string | null;
-    label: string;
-    active: boolean;
-}
-
-interface PaginatedProducts {
-    data: Product[];
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-    links: PaginationLinks[];
-    from: number;
-    to: number;
-}
+import { toFrontendSort } from '@/lib/sort';
+import { PaginatedData } from '@/types';
+import { omit } from 'lodash';
+import clsx from 'clsx';
 
 interface ProductsProps {
     workspace: Workspace;
-    products: PaginatedProducts;
-    filters: Filters;
-    categories: string[];
+    products: PaginatedData<Product>;
+    query?: {
+        sort?: string | null;
+        perPage?: number | string;
+        page?: number | string;
+        filter?: {
+            search?: string;
+        };
+    };
 }
 
-const Index = ({ products, workspace, filters, categories }: ProductsProps) => {
-    const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-    const [searchValue, setSearchValue] = useState(filters.search);
-    const [isSearching, setIsSearching] = useState(false);
-    const [activeTab, setActiveTab] = useState('products'); // analytics, products, testing_products
-
-    // Debounced search
-    const debouncedSearch = useCallback(
-        (value: string) => {
-            setIsSearching(true);
-            router.get(
-                workspaces.products.index.url({ workspace }),
-                { ...filters, search: value, page: 1 },
-                {
-                    preserveState: true,
-                    preserveScroll: true,
-                    onFinish: () => setIsSearching(false),
-                }
-            );
-        },
-        [filters, workspace]
+const StatusBadge = ({ status }: { status: string }) => {
+    const isActive = status === 'active';
+    return (
+        <span
+            className={clsx(
+                "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset",
+                isActive
+                    ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                    : "bg-slate-50 text-slate-700 ring-slate-200"
+            )}
+        >
+            {status.toUpperCase()}
+        </span>
     );
+};
+
+const Index = ({ products, workspace, query }: ProductsProps) => {
+    const initialSorting = useMemo(() => {
+        return toFrontendSort(query?.sort ?? null);
+    }, [query?.sort]);
+
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
     useEffect(() => {
-        if (searchValue === filters.search) return;
+        const currentSearchParam = query?.filter?.search ?? '';
+
+        if (searchValue === currentSearchParam) {
+            return;
+        }
 
         const timer = setTimeout(() => {
-            debouncedSearch(searchValue);
-        }, 300);
+            router.get(
+                workspaces.products.index({ workspace }),
+                {
+                    sort: query?.sort,
+                    'filter[search]': searchValue || undefined,
+                    page: 1,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['products'],
+                },
+            );
+        }, 500);
 
         return () => clearTimeout(timer);
-    }, [searchValue]);
+    }, [searchValue, query?.filter?.search, query?.sort, workspace]);
 
     const handleEdit = (product: Product) => {
-        router.visit(workspaces.products.edit.url({ workspace, product }));
+        router.get(workspaces.products.edit({ workspace, product }));
     };
 
-    const handleCreate = () => {
-        router.visit(workspaces.products.create.url({ workspace }));
-    };
-
-    const handleFilter = (key: string, value: string) => {
-        router.get(
-            workspaces.products.index.url({ workspace }),
-            { ...filters, [key]: value, page: 1 },
-            { preserveState: true, preserveScroll: true }
-        );
-    };
-
-    const handleSort = (column: string) => {
-        const newDirection =
-            filters.sort === column && filters.direction === 'asc' ? 'desc' : 'asc';
-
-        router.get(
-            workspaces.products.index.url({ workspace }),
-            { ...filters, sort: column, direction: newDirection, page: 1 },
-            { preserveState: true, preserveScroll: true }
-        );
-    };
-
-    const SortableHeader = ({ column, children }: { column: string; children: React.ReactNode }) => {
-        const isSorted = filters.sort === column;
-        const direction = filters.direction;
-
-        return (
-            <button
-                onClick={() => handleSort(column)}
-                className="flex items-center gap-2 hover:text-foreground transition-colors"
-            >
-                {children}
-                {isSorted ? (
-                    direction === 'asc' ? (
-                        <ArrowUp className="h-4 w-4" />
-                    ) : (
-                        <ArrowDown className="h-4 w-4" />
-                    )
-                ) : (
-                    <ArrowUpDown className="h-4 w-4 opacity-50" />
-                )}
-            </button>
-        );
-    };
-
-    const clearSearch = () => {
-        setSearchValue('');
-        router.get(
-            workspaces.products.index.url({ workspace }),
-            { ...filters, search: '', page: 1 },
-            { preserveState: true, preserveScroll: true }
-        );
-    };
-
-    const clearFilters = () => {
-        router.get(workspaces.products.index.url({ workspace }));
-    };
-
-    const getStatusBadgeVariant = (status: string) => {
-        switch (status) {
-            case 'Scaling':
-                return 'default';
-            case 'Testing':
-                return 'secondary';
-            case 'Failed':
-                return 'destructive';
-            case 'Inactive':
-                return 'outline';
-            default:
-                return 'default';
-        }
-    };
-
-    const columns: ColumnDef<Product>[] = useMemo(
-        () => [
-            {
-                accessorKey: 'name',
-                header: () => <SortableHeader column="name">Name</SortableHeader>,
+    const columns: ColumnDef<Product>[] = [
+        {
+            accessorKey: 'id',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'ID'} />
+            ),
+        },
+        {
+            accessorKey: 'sku',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'SKU'} />
+            ),
+        },
+        {
+            accessorKey: 'name',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Name'} />
+            ),
+        },
+        {
+            accessorKey: 'category',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Category'} />
+            ),
+            cell: ({ row }) => row.original.category || '-',
+        },
+        {
+            accessorKey: 'price',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Price'} />
+            ),
+            cell: ({ row }) => {
+                const price = row.original.price;
+                return price ? `₱${Number(price).toFixed(2)}` : '-';
             },
-            {
-                accessorKey: 'code',
-                header: () => <SortableHeader column="code">Code</SortableHeader>,
-            },
-            {
-                accessorKey: 'category',
-                header: () => <SortableHeader column="category">Category</SortableHeader>,
-            },
-            {
-                accessorKey: 'ad_budget_today',
-                header: () => <SortableHeader column="ad_budget_today">Ad Budget Today</SortableHeader>,
-                cell: () => {
-                    // Placeholder - will be fetched from Facebook API
-                    return <span className="text-muted-foreground">-</span>;
-                },
-            },
-            {
-                accessorKey: 'status',
-                header: () => <SortableHeader column="status">Status</SortableHeader>,
-                cell: ({ row }) => {
-                    const status = row.original.status;
-                    return (
-                        <Badge variant={getStatusBadgeVariant(status)}>
-                            {status}
-                        </Badge>
-                    );
-                },
-            },
-            {
-                id: 'actions',
-                header: 'Action',
-                cell: ({ row }) => {
-                    const product = row.original;
+        },
+        {
+            accessorKey: 'stock',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Stock'} />
+            ),
+            cell: ({ row }) => row.original.stock ?? '-',
+        },
+        {
+            accessorKey: 'status',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Status'} />
+            ),
+            cell: ({ row }) => <StatusBadge status={row.original.status || 'inactive'} />,
+        },
+        {
+            id: 'actions',
+            cell: ({ row }) => {
+                const product = row.original;
 
-                    return (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEdit(product)}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                    onClick={() => setProductToDelete(product)}
-                                    className="text-destructive focus:text-destructive"
-                                >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    );
-                },
+                return (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEdit(product)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                onClick={() => setProductToDelete(product)}
+                                className="text-destructive focus:text-destructive"
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                );
             },
-        ],
-        [filters.sort, filters.direction]
-    );
-
-    const hasActiveFilters = filters.search || filters.category || filters.status;
+        },
+    ];
 
     return (
         <Layout workspace={workspace}>
             <Head title={`${workspace.name} - Products`} />
-            <div className="">
-
-                {/* Filters and Search */}
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex flex-wrap gap-4">
-                        {/* Search */}
-                        <div className="relative">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                type="text"
-                                placeholder="Search..."
-                                value={searchValue}
-                                onChange={(e) => setSearchValue(e.target.value)}
-                                className="w-[200px] pl-8"
-                            />
-                            {(searchValue || isSearching) && (
-                                <span className="absolute right-2.5 top-2.5">
-                                    {isSearching ? (
-                                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                    ) : (
-                                        <button type="button" onClick={clearSearch}>
-                                            <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                                        </button>
-                                    )}
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Filter by Category */}
-                        {categories.length > 0 && (
-                            <Select
-                                value={filters.category || '__all__'}
-                                onValueChange={(value) =>
-                                    handleFilter('category', value === '__all__' ? '' : value)
-                                }
-                            >
-                                <SelectTrigger className="w-[180px]">
-                                    <SelectValue placeholder="Filter by category" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="__all__">All Categories</SelectItem>
-                                    {categories
-                                        .filter((category) => category && category.trim() !== '')
-                                        .map((category) => (
-                                            <SelectItem key={category} value={category}>
-                                                {category}
-                                            </SelectItem>
-                                        ))}
-                                </SelectContent>
-                            </Select>
-                        )}
-
-                        {/* Filter by Status */}
-                        <Select
-                            value={filters.status || '__all__'}
-                            onValueChange={(value) =>
-                                handleFilter('status', value === '__all__' ? '' : value)
-                            }
-                        >
-                            <SelectTrigger className="w-[180px]">
-                                <SelectValue placeholder="Filter by status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="__all__">All Status</SelectItem>
-                                <SelectItem value="Scaling">Scaling</SelectItem>
-                                <SelectItem value="Testing">Testing</SelectItem>
-                                <SelectItem value="Failed">Failed</SelectItem>
-                                <SelectItem value="Inactive">Inactive</SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        {/* Clear Filters */}
-                        {hasActiveFilters && (
-                            <Button variant="ghost" size="sm" onClick={clearFilters}>
-                                <X className="mr-2 h-4 w-4" />
-                                Clear filters
-                            </Button>
-                        )}
-                    </div>
-
-                    <div className="flex gap-2">
-                        {/* Add new Product Button */}
-                        <Button size="sm" onClick={handleCreate}>
-                            Add new Product
-                        </Button>
-                    </div>
+            <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                    <h2
+                        className="text-xl font-semibold text-gray-800 dark:text-white/90"
+                        x-text="pageName"
+                    >
+                        Products
+                    </h2>
+                    <Button 
+                        size="sm" 
+                        onClick={() => router.get(workspaces.products.create({ workspace }))}
+                    >
+                        Add Product
+                    </Button>
                 </div>
 
-                {/* Data Table */}
-                <div className="rounded-md border">
-                    <DataTable columns={columns} data={products.data || []} />
-                </div>
-
-                {/* Pagination */}
-                <div className="mt-4 flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                        {products.total > 0 ? (
-                            <>
-                                Showing {products.from} to {products.to} of {products.total}{' '}
-                                results
-                            </>
-                        ) : (
-                            <>No results found</>
-                        )}
-                    </div>
-                    {products.last_page > 1 && (
-                        <div className="flex gap-2">
-                            {products.links.map((link, index) => (
-                                <Button
-                                    key={index}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => {
-                                        if (link.url) {
-                                            router.get(
-                                                link.url,
-                                                {},
-                                                { preserveState: true, preserveScroll: true }
-                                            );
-                                        }
-                                    }}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                <div className="space-y-5 sm:space-y-6">
+                    <ComponentCard desc="Manage your product inventory and pricing">
+                        <div>
+                            <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.05]">
+                                <input
+                                    className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900  dark:placeholder:text-white/30  bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800"
+                                    placeholder="Search product name or SKU"
+                                    value={searchValue}
+                                    onChange={(e) => setSearchValue(e.target.value)}
                                 />
-                            ))}
+                            </div>
+
+                            <DataTable
+                                columns={columns}
+                                enableInternalPagination={false}
+                                data={products.data || []}
+                                initialSorting={initialSorting}
+                                meta={{ ...omit(products, ['data']) }}
+                                onFetch={(params) => {
+                                    router.get(
+                                        workspaces.products.index({ workspace }),
+                                        {
+                                            sort: params?.sort,
+                                            'filter[search]': searchValue || undefined,
+                                            page: params?.page ?? 1
+                                        },
+                                        {
+                                            preserveState: false,
+                                            replace: true,
+                                            preserveScroll: true,
+                                        },
+                                    );
+                                }}
+                            />
                         </div>
-                    )}
+                    </ComponentCard>
                 </div>
 
                 {/* Delete Confirmation Dialog */}
