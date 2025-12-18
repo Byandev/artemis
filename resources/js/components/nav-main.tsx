@@ -13,26 +13,29 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
     return (
         <SidebarGroup className="px-2 py-0">
             <SidebarGroupLabel>Platform</SidebarGroupLabel>
-            <SidebarMenu>
+            <ul>
                 {items.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton
-                            asChild
-                            isActive={page.url.startsWith(
+                    <li key={item.title}>
+                        <Link
+                            href={item.href} prefetch
+                            className={`group menu-item ${page.url.startsWith(
                                 typeof item.href === 'string'
                                     ? item.href
                                     : item.href.url,
-                            )}
-                            tooltip={{ children: item.title }}
+                            ) ? 'menu-item-active': 'menu-item-inactive'}`}
                         >
-                            <Link href={item.href} prefetch>
-                                {item.icon && <item.icon />}
-                                <span>{item.title}</span>
-                            </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
+                                {item.icon && (
+                                    <item.icon
+                                        className={'menu-item-icon-size'}
+                                    />
+                                )}
+                                <span className="menu-item-text">
+                                    {item.title}
+                                </span>
+                        </Link>
+                    </li>
                 ))}
-            </SidebarMenu>
+            </ul>
         </SidebarGroup>
     );
 }

@@ -45,12 +45,12 @@ class WorkspaceUserSeeder extends Seeder
         );
 
         // Add Admin to workspace as owner
-        if (!$workspace->users()->where('user_id', $admin->id)->exists()) {
+        if (! $workspace->users()->where('user_id', $admin->id)->exists()) {
             $workspace->users()->attach($admin->id, ['role' => 'owner']);
         }
 
         // Add Member to workspace as member
-        if (!$workspace->users()->where('user_id', $member->id)->exists()) {
+        if (! $workspace->users()->where('user_id', $member->id)->exists()) {
             $workspace->users()->attach($member->id, ['role' => 'member']);
         }
 

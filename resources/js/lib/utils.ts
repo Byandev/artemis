@@ -43,18 +43,16 @@ export function percentageFormatter(
 /**
  * Format a number as currency (default: Philippine Peso)
  * @param value - The number to format
- * @param currency - Currency code (default: 'PHP')
  * @param options - Intl.NumberFormat options
  * @returns Formatted currency string
  */
 export function currencyFormatter(
     value: number,
-    currency: string = 'PHP',
     options?: Intl.NumberFormatOptions
 ): string {
     return new Intl.NumberFormat('en-PH', {
         style: 'currency',
-        currency,
+        currency: 'PHP',
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
         ...options,
@@ -94,4 +92,21 @@ export function isValidDate(date: Date | undefined) {
         return false
     }
     return !isNaN(date.getTime())
+}
+
+
+export function formatCompactCurrency(value: number){
+    const n = Number(value) || 0;
+    const abs = Math.abs(n);
+
+    const fmt = (v: number, suffix: string) => {
+        // show 1 decimal only when needed (e.g., 1.2M), but 1M stays 1M
+        const rounded = v % 1 === 0 ? v.toFixed(0) : v.toFixed(1);
+        return `${n < 0 ? "-" : ""}${rounded}${suffix}`;
+    };
+
+    if (abs >= 1_000_000) return `₱ ${fmt(abs / 1_000_000, "M")}`;
+    if (abs >= 1_000)     return `₱ ${fmt(abs / 1_000_000, "M")}`;
+
+    return `₱ ${n}`;
 }

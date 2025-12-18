@@ -64,7 +64,7 @@ export function AppSidebar() {
         },
         {
             title: 'Products',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products/analytics`,
             icon: Package,
         },
         {

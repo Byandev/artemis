@@ -33,8 +33,8 @@ class ForDeliveryController extends Controller
             ->all();
 
         $riders = $baseResults->map(function ($order) {
-                return $order->parcelJourney?->rider_name;
-            })
+            return $order->parcelJourney?->rider_name;
+        })
             ->filter()
             ->unique()
             ->values()

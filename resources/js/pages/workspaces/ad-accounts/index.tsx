@@ -1,93 +1,199 @@
 import AppLayout from '@/layouts/app-layout';
-import { DataTable } from '@/components/ui/data-table';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Workspace } from '@/types/models/Workspace';
-import { usePage } from '@inertiajs/react';
-import { SharedData } from '@/types';
 import { AdAccount } from '@/types/models/AdAccount';
+import ComponentCard from '@/components/common/ComponentCard';
+import { router } from "@inertiajs/react"
+import workspaces from '@/routes/workspaces';
+import { toFrontendSort } from '@/lib/sort';
+import { useMemo, useState, useEffect } from 'react';
+import clsx from "clsx";
+import { PaginatedData } from '@/types';
+import { omit  } from 'lodash'
 
 interface AdAccountsProps {
     workspace: Workspace;
-    ad_accounts: {
-        data: AdAccount[];
-    };
+    ad_accounts: PaginatedData<AdAccount>;
+    query?: {
+        sort?: string | null
+        perPage?: number | string
+        page?: number | string
+        filter?: {
+            search?: string
+        }
+    }
 }
 
-const FacebookAccounts = ({
-    ad_accounts,
-    workspace,
-}: AdAccountsProps) => {
-    const { auth } = usePage<SharedData>().props;
+
+
+type AdAccountStatus = {
+    label: string;
+    className: string;
+};
+
+const AD_ACCOUNT_STATUS: Record<number, AdAccountStatus> = {
+    1:   { label: "ACTIVE",               className: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+    2:   { label: "DISABLED",             className: "bg-zinc-50 text-zinc-700 ring-zinc-200" },
+    3:   { label: "UNSETTLED",            className: "bg-amber-50 text-amber-800 ring-amber-200" },
+    7:   { label: "PENDING_RISK_REVIEW",  className: "bg-rose-50 text-rose-700 ring-rose-200" },
+    8:   { label: "PENDING_SETTLEMENT",   className: "bg-sky-50 text-sky-700 ring-sky-200" },
+    9:   { label: "IN_GRACE_PERIOD",      className: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
+    100: { label: "PENDING_CLOSURE",      className: "bg-orange-50 text-orange-700 ring-orange-200" },
+    101: { label: "CLOSED",               className: "bg-slate-50 text-slate-700 ring-slate-200" },
+    201: { label: "ANY_ACTIVE",           className: "bg-teal-50 text-teal-700 ring-teal-200" },
+    202: { label: "ANY_CLOSED",           className: "bg-gray-50 text-gray-700 ring-gray-200" },
+};
+
+const StatusBadge = ({ status }: { status: number }) => {
+    const item =
+        AD_ACCOUNT_STATUS[status] ??
+        { label: `UNKNOWN (${status})`, className: "bg-red-50 text-red-700 ring-red-200" };
+
+    return (
+        <span
+            className={clsx(
+                "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset",
+                item.className
+            )}
+        >
+      {item.label}
+    </span>
+    );
+}
+
+const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
+    const initialSorting = useMemo(() => {
+        return toFrontendSort(query?.sort ?? null);
+    }, [query?.sort]);
+
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+
+    useEffect(() => {
+        const currentSearchParam = query?.filter?.search ?? '';
+
+        if (searchValue === currentSearchParam) {
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            router.get(
+                workspaces.adAccounts.index({ workspace }),
+                {
+                    sort: query?.sort,
+                    'filter[search]': searchValue || undefined,
+                    page: 1,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['ad_accounts'],
+                },
+            );
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchValue, query?.filter?.search, query?.sort, workspace]);
 
     const columns: ColumnDef<AdAccount>[] = [
         {
             accessorKey: 'id',
-            header: 'ID',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'ID'} />
+            ),
         },
         {
             accessorKey: 'facebook_accounts',
-            header: 'Facebook',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Facebook'} />
+            ),
             cell: ({ row }) => {
-                return row.original.facebook_accounts.map(f => f.name).join(", ")
-            }
+                return row.original.facebook_accounts
+                    .map((f) => f.name)
+                    .join(', ');
+            },
         },
         {
             accessorKey: 'name',
-            header: 'Name',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Name'} />
+            ),
         },
         {
             accessorKey: 'currency',
-            header: 'Currency',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Currency'} />
+            ),
         },
         {
             accessorKey: 'country_code',
-            header: 'Country',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Country'} />
+            ),
         },
         {
             accessorKey: 'status',
-            header: 'Status',
-            cell: ({ row }) => {
-                switch (row.original.status) {
-                    case 1:
-                        return 'ACTIVE'
-                    case 2:
-                        return 'DISABLED'
-                    case 3:
-                        return 'UNSETTLED'
-                    case 7:
-                        return 'PENDING_RISK_REVIEW'
-                    case 8:
-                        return 'PENDING_SETTLEMENT'
-                    case 9:
-                        return 'IN_GRACE_PERIOD'
-                    case 100:
-                        return 'PENDING_CLOSURE'
-                    case 101:
-                        return 'CLOSED'
-                    case 201:
-                        return 'ANY_ACTIVE'
-                    case 202:
-                        return 'ANY_CLOSED'
-                }
-
-                return row.original.status
-            }
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Status'} />
+            ),
+            cell: ({ row }) => <StatusBadge status={row.original.status} />,
         },
     ];
 
-
     return (
         <AppLayout>
-            <div className="px-4 py-6">
-                <div>
-                    <DataTable
-                        columns={columns}
-                        data={ad_accounts.data || []}
-                    />
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                    <h2
+                        className="text-xl font-semibold text-gray-800 dark:text-white/90"
+                        x-text="pageName"
+                    >
+                        Ad Accounts
+                    </h2>
+                </div>
+
+                <div className="space-y-5 sm:space-y-6">
+                    <ComponentCard desc="List of ad accounts of connected facebook accounts">
+                        <div>
+                            <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.05]">
+                                <input
+                                    className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900  dark:placeholder:text-white/30  bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800"
+                                    placeholder="Search ad account name"
+                                    value={searchValue}
+                                    onChange={(e) => setSearchValue(e.target.value)}
+                                />
+                            </div>
+
+                            <DataTable
+                                columns={columns}
+                                enableInternalPagination={false}
+                                data={ad_accounts.data || []}
+                                initialSorting={initialSorting}
+                                meta={{ ...omit(ad_accounts, ['data'])  }}
+                                onFetch={(params) => {
+                                    router.get(
+                                        workspaces.adAccounts.index({ workspace }),
+                                        {
+                                            sort: params?.sort,
+                                            'filter[search]': searchValue || undefined,
+                                            page: params?.page ?? 1
+                                        },
+                                        {
+                                            preserveState: false,
+                                            replace: true,
+                                            preserveScroll: true,
+                                        },
+                                    );
+                                }}
+                            />
+                        </div>
+                    </ComponentCard>
                 </div>
             </div>
         </AppLayout>
     );
 };
 
-export default FacebookAccounts;
+export default AdAccounts;

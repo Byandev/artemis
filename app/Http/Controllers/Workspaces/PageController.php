@@ -42,13 +42,13 @@ class PageController extends Controller
             })
             // Search by name
             ->when($request->filled('search'), function ($q) use ($request) {
-                $q->where('name', 'like', '%' . $request->get('search') . '%');
+                $q->where('name', 'like', '%'.$request->get('search').'%');
             });
 
         // Sorting
         $sortField = $request->get('sort', 'name');
         $sortDirection = $request->get('direction', 'asc');
-        
+
         $allowedSortFields = ['name', 'shop_id', 'owner_id', 'created_at', 'orders_last_synced_at'];
         if (in_array($sortField, $allowedSortFields)) {
             $query->orderBy($sortField, $sortDirection === 'desc' ? 'desc' : 'asc');
