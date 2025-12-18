@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout'
 import { Workspace } from '@/types/models/Workspace'
 import { Head } from '@inertiajs/react'
-import RtsNavigation from './partials/RtsNavigation'
+import RTSManagementLayout from './partials/Layout'
 import { useState, useEffect, useMemo } from 'react'
 import { Order } from '@/types/models/Orders'
 import { ColumnDef } from '@tanstack/react-table'
@@ -45,6 +45,13 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders, query }: ForDe
 
     // Debounce page name search
     useEffect(() => {
+        const currentSearchParam = query?.filter?.page_name ?? '';
+
+        // Only trigger search if the value has actually changed or if the search is empty
+        if (pageNameSearch === currentSearchParam && pageNameSearch !== '') {
+            return;
+        }
+
         const timer = setTimeout(() => {
             router.get(
                 workspaces.rts.forDeliveryToday(workspace.slug),
@@ -65,7 +72,7 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders, query }: ForDe
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [pageNameSearch]);
+    }, [pageNameSearch, query?.filter?.page_name]);
 
     const handleFilterChange = (filterType: 'customer' | 'rider', value: string) => {
         const filters = {
@@ -156,15 +163,7 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders, query }: ForDe
     return (
         <AppLayout>
             <Head title={`${workspace.name} - For Delivery Today`} />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight">RTS Management</h1>
-                        <p className="text-muted-foreground mt-1">Manage RTS analytics and reports</p>
-                    </div>
-                </div>
-                <RtsNavigation workspace={workspace} />
-
+            <RTSManagementLayout workspace={workspace}>
                 <ComponentCard title="Orders For Delivery Today" >
                     <div>
                         <div className='flex flex-col items-start justify-between gap-4 mb-8'>
@@ -249,7 +248,7 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders, query }: ForDe
                         </div>
                     </div>
                 </ComponentCard>
-            </div>
+            </RTSManagementLayout>
         </AppLayout>
     );
 };
