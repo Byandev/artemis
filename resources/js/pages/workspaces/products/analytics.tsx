@@ -1,10 +1,14 @@
 
-import ComponentCard from '@/components/common/ComponentCard';
+import { useMemo } from 'react';
 import ProductLayout from '@/pages/workspaces/products/partials/layout';
 import { Workspace } from '@/types/models/Workspace';
-import { sum } from 'lodash';
-import { useMemo } from 'react';
 import TopProducts from '@/pages/workspaces/products/partials/analytics/TopProducts';
+import SalesBreakdown from '@/pages/workspaces/products/partials/analytics/SalesBreakdown';
+import AdSpentBreakdown from '@/pages/workspaces/products/partials/analytics/AdSpentBreakdown';
+import RoasBreakdown from '@/pages/workspaces/products/partials/analytics/RoasBreakdown';
+import RtsBreakdown from '@/pages/workspaces/products/partials/analytics/RtsBreakdown';
+import StatusBreakdown from '@/pages/workspaces/products/partials/analytics/StatusBreakdown';
+import { sum } from 'lodash';
 
 interface Props {
     workspace: Workspace;
@@ -51,6 +55,20 @@ const Analytics = ({ workspace, summary }: Props) => {
 
                 <div className="grid lg:grid-cols-2 gap-4">
                     <TopProducts workspace={workspace}/>
+
+                    <StatusBreakdown
+                        scaling_product_count={summary.scaling_product_count}
+                        inactive_product_count={summary.inactive_product_count}
+                        testing_product_count={summary.testing_product_count}
+                    />
+
+                    <SalesBreakdown workspace={workspace}/>
+
+                    <AdSpentBreakdown workspace={workspace} />
+
+                    <RoasBreakdown workspace={workspace} />
+
+                    <RtsBreakdown workspace={workspace} />
                 </div>
             </div>
         </ProductLayout>
