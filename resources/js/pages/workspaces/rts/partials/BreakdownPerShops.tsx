@@ -5,6 +5,8 @@ import { ColumnDef } from '@tanstack/react-table';
 import Chart from "react-apexcharts";
 import { ApexOptions } from "apexcharts";
 import { Workspace } from '@/types/models/Workspace';
+import { PaginatedData } from '@/types';
+import { omit } from 'lodash';
 
 type BreakDownAnalytics = {
     id: number;
@@ -21,31 +23,38 @@ type Props = {
 };
 
 const BreakdownPerShops = ({ workspace, queryString }: Props) => {
-    const [data, setData] = useState<BreakDownAnalytics[]>([]);
+    const [paginatedData, setPaginatedData] = useState<PaginatedData<BreakDownAnalytics> | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [currentView, setCurrentView] = useState<'graph' | 'table'>('graph');
+    const [currentPage, setCurrentPage] = useState<number>(1);
+
+    const fetchData = useCallback(async (page: number = 1) => {
+        setLoading(true);
+        try {
+            const params = new URLSearchParams(queryString);
+            params.append('page', String(page));
+
+            const res = await fetch(
+                `/workspaces/${workspace.slug}/rts/analytics/group-by/shops?${params.toString()}`,
+                { credentials: 'same-origin' }
+            );
+            if (res.ok) {
+                const result = await res.json();
+                setPaginatedData(result);
+            }
+        } catch (error) {
+            console.error('Error fetching shops breakdown:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [workspace.slug, queryString]);
 
     useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                const res = await fetch(
-                    `/workspaces/${workspace.slug}/rts/analytics/group-by/shops${queryString ? `?${queryString}` : ''}`,
-                    { credentials: 'same-origin' }
-                );
-                if (res.ok) {
-                    const result = await res.json();
-                    setData(result.data ?? []);
-                }
-            } catch (error) {
-                console.error('Error fetching shops breakdown:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
+        setCurrentPage(1);
+        fetchData(1);
+    }, [fetchData]);
 
-        fetchData();
-    }, [workspace.slug, queryString]);
+    const data = paginatedData?.data ?? [];
 
     const percentageFormatter = useCallback((value: number) => `${value.toFixed(2)}%`, []);
 
@@ -213,7 +222,17 @@ const BreakdownPerShops = ({ workspace, queryString }: Props) => {
             </div>
 
             <div className={currentView === 'table' ? 'block' : 'hidden'}>
-                <DataTable columns={columns} data={data} enableInternalPagination />
+                <DataTable
+                    columns={columns}
+                    data={data}
+                    enableInternalPagination={false}
+                    meta={paginatedData ? { ...omit(paginatedData, ['data']) } : undefined}
+                    onFetch={(params) => {
+                        const page = params?.page ?? 1;
+                        setCurrentPage(page);
+                        fetchData(page);
+                    }}
+                />
             </div>
         </div>
     );

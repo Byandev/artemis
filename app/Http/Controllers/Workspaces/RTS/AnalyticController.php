@@ -80,16 +80,17 @@ class AnalyticController extends Controller
         $filtered = (clone $groupedQuery)
             ->applyRtsFilters($request)
             ->groupBy('orders.page_id', 'pages.name', 'pages.id')
-            ->get();
+            ->orderBy('total_orders', 'DESC')
+            ->paginate($request->input('per_page', 15));
 
         $filterOptions = (clone $groupedQuery)
             ->groupBy('orders.page_id', 'pages.name', 'pages.id')
             ->get(['pages.id', 'pages.name']);
 
-        return response()->json([
-            'data' => $filtered,
-            'filter_options' => $filterOptions,
-        ]);
+        return response()->json(array_merge(
+            $filtered->toArray(),
+            ['filter_options' => $filterOptions]
+        ));
     }
 
     public function groupByShops(Request $request, Workspace $workspace)
@@ -109,19 +110,20 @@ class AnalyticController extends Controller
             ->leftJoin('shops', 'shops.id', '=', 'orders.shop_id')
             ->ofWorkspace($workspace);
 
-        $filtered = $groupedQuery
+        $filtered = (clone $groupedQuery)
             ->applyRtsFilters($request)
             ->groupBy('orders.shop_id', 'shops.name', 'shops.id')
-            ->get();
+            ->orderBy('total_orders', 'DESC')
+            ->paginate($request->input('per_page', 15));
 
         $filterOptions = (clone $groupedQuery)
             ->groupBy('orders.shop_id', 'shops.name', 'shops.id')
             ->get(['shops.id', 'shops.name']);
 
-        return response()->json([
-            'data' => $filtered,
-            'filter_options' => $filterOptions,
-        ]);
+        return response()->json(array_merge(
+            $filtered->toArray(),
+            ['filter_options' => $filterOptions]
+        ));
     }
 
     public function groupByUsers(Request $request, Workspace $workspace)
@@ -145,16 +147,17 @@ class AnalyticController extends Controller
         $filtered = (clone $groupedQuery)
             ->applyRtsFilters($request)
             ->groupBy('pages.owner_id', 'users.name', 'users.id')
-            ->get();
+            ->orderBy('total_orders', 'DESC')
+            ->paginate($request->input('per_page', 15));
 
         $filterOptions = (clone $groupedQuery)
             ->groupBy('pages.owner_id', 'users.name', 'users.id')
             ->get(['users.id', 'users.name']);
 
-        return response()->json([
-            'data' => $filtered,
-            'filter_options' => $filterOptions,
-        ]);
+        return response()->json(array_merge(
+            $filtered->toArray(),
+            ['filter_options' => $filterOptions]
+        ));
     }
 
     public function groupByCities(Request $request, Workspace $workspace)
@@ -177,10 +180,8 @@ class AnalyticController extends Controller
             ->groupBy('shipping_addresses.district_name', 'shipping_addresses.province_name')
             ->havingRaw('SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) > 0') // Only include cities with orders
             ->orderBy('total_orders', 'DESC')
-            ->get();
+            ->paginate($request->input('per_page', 15));
 
-        return response()->json([
-            'data' => $grouped,
-        ]);
+        return response()->json($grouped);
     }
 }

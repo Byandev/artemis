@@ -1,9 +1,11 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Workspace } from '@/types/models/Workspace';
 import HeatmapMap, { HeatPoint } from './HeatmapMap';
+import { PaginatedData } from '@/types';
+import { omit } from 'lodash';
 
 type PerCityBreakdownAnalytics = {
     id: number;
@@ -22,31 +24,38 @@ type Props = {
 };
 
 const BreakdownPerCities = ({ workspace, queryString }: Props) => {
-    const [data, setData] = useState<PerCityBreakdownAnalytics[]>([]);
+    const [paginatedData, setPaginatedData] = useState<PaginatedData<PerCityBreakdownAnalytics> | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [currentView, setCurrentView] = useState<'heatmap' | 'table'>('heatmap');
+    const [currentPage, setCurrentPage] = useState<number>(1);
+
+    const fetchData = useCallback(async (page: number = 1) => {
+        setLoading(true);
+        try {
+            const params = new URLSearchParams(queryString);
+            params.append('page', String(page));
+
+            const res = await fetch(
+                `/workspaces/${workspace.slug}/rts/analytics/group-by/cities?${params.toString()}`,
+                { credentials: 'same-origin' }
+            );
+            if (res.ok) {
+                const result = await res.json();
+                setPaginatedData(result);
+            }
+        } catch (error) {
+            console.error('Error fetching cities breakdown:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [workspace.slug, queryString]);
 
     useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                const res = await fetch(
-                    `/workspaces/${workspace.slug}/rts/analytics/group-by/cities${queryString ? `?${queryString}` : ''}`,
-                    { credentials: 'same-origin' }
-                );
-                if (res.ok) {
-                    const result = await res.json();
-                    setData(result.data ?? []);
-                }
-            } catch (error) {
-                console.error('Error fetching cities breakdown:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
+        setCurrentPage(1);
+        fetchData(1);
+    }, [fetchData]);
 
-        fetchData();
-    }, [workspace.slug, queryString]);
+    const data = paginatedData?.data ?? [];
 
     const heatmapPoints: HeatPoint[] = useMemo(() => {
         return data
@@ -146,7 +155,17 @@ const BreakdownPerCities = ({ workspace, queryString }: Props) => {
             </div>
 
             <div className={currentView === 'table' ? 'block' : 'hidden'}>
-                <DataTable columns={columns} data={data} enableInternalPagination />
+                <DataTable
+                    columns={columns}
+                    data={data}
+                    enableInternalPagination={false}
+                    meta={paginatedData ? { ...omit(paginatedData, ['data']) } : undefined}
+                    onFetch={(params) => {
+                        const page = params?.page ?? 1;
+                        setCurrentPage(page);
+                        fetchData(page);
+                    }}
+                />
             </div>
         </div>
     );
