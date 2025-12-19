@@ -1,21 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { Head } from '@inertiajs/react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Filter, Grid3x3, List, RefreshCw } from 'lucide-react';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import { ColumnDef } from '@tanstack/react-table';
+import { Grid3x3, List, RefreshCw } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
+import ComponentCard from '@/components/common/ComponentCard';
 import { Workspace } from '@/types/models/Workspace';
-import { router } from '@inertiajs/react';
 import axios from 'axios';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { addDays } from 'date-fns';
+import clsx from 'clsx';
 
 type TabType = 'campaigns' | 'adSets' | 'ads' | 'optimizationRules' | 'optimizationLogs';
 
@@ -55,12 +51,29 @@ interface PageProps {
   workspace: Workspace;
 }
 
+const StatusBadge = ({ status }: { status: string }) => {
+  return (
+    <span
+      className={clsx(
+        "inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset",
+        status === 'ACTIVE'
+          ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+          : status === 'PAUSED'
+          ? "bg-yellow-50 text-yellow-700 ring-yellow-200"
+          : "bg-slate-50 text-slate-700 ring-slate-200"
+      )}
+    >
+      {status}
+    </span>
+  );
+};
+
 const AdsManager = ({ workspace }: PageProps) => {
   const [activeTab, setActiveTab] = useState<TabType>('campaigns');
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>(''); // Add status filter
+  const [statusFilter, setStatusFilter] = useState<string>('');
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: addDays(new Date(), -30), // Last 30 days by default
+    from: addDays(new Date(), -30),
     to: new Date(),
   });
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -80,11 +93,11 @@ const AdsManager = ({ workspace }: PageProps) => {
     if (activeTab === 'campaigns') {
       const timeoutId = setTimeout(() => {
         fetchCampaigns(1);
-      }, 300); // Debounce search
+      }, 300);
       
       return () => clearTimeout(timeoutId);
     }
-  }, [activeTab, searchQuery, statusFilter, dateRange]); // Trigger refetch when date changes
+  }, [activeTab, searchQuery, statusFilter, dateRange]);
 
   const fetchCampaigns = async (page: number = 1) => {
     setLoading(true);
@@ -93,7 +106,7 @@ const AdsManager = ({ workspace }: PageProps) => {
         params: { 
           search: searchQuery, 
           status: statusFilter || undefined,
-          start_date: dateRange.from.toISOString().split('T')[0], // Format: YYYY-MM-DD
+          start_date: dateRange.from.toISOString().split('T')[0],
           end_date: dateRange.to.toISOString().split('T')[0],
           page 
         }
@@ -107,213 +120,185 @@ const AdsManager = ({ workspace }: PageProps) => {
     }
   };
 
+  const columns: ColumnDef<Campaign>[] = [
+    {
+      accessorKey: 'name',
+      header: ({ column }) => <SortableHeader column={column} title="Campaign Name" />,
+      cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
+    },
+    {
+      accessorKey: 'ad_account',
+      header: ({ column }) => <SortableHeader column={column} title="Ad Account" />,
+      cell: ({ row }) => <div className="font-medium">{row.original.ad_account?.name || 'N/A'}</div>,
+    },
+    {
+      accessorKey: 'status',
+     header: ({ column }) => <SortableHeader column={column} title="Status" />,
+      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    },
+    {
+      accessorKey: 'daily_budget',
+         header: ({ column }) => <SortableHeader column={column} title="Daily Budget" />,
+      cell: ({ row }) => 
+        row.original.daily_budget 
+          ? `₱${(row.original.daily_budget / 100).toFixed(2)}` 
+          : 'N/A',
+    },
+    {
+      accessorKey: 'start_time',
+      header: ({ column }) => <SortableHeader column={column} title="Start Time" />,
+      cell: ({ row }) => new Date(row.original.start_time).toLocaleDateString(),
+    },
+    {
+      accessorKey: 'end_time',
+      header: ({ column }) => <SortableHeader column={column} title="End Time" />,
+      cell: ({ row }) => 
+        row.original.end_time 
+          ? new Date(row.original.end_time).toLocaleDateString() 
+          : 'Ongoing',
+    },
+  ];
+
   return (
     <AppLayout>
-      <div className="px-4 py-6 pb-20 space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">Ads Manager</h2>
-      </div>
-
-      {/* Tabs */}
-      <div className="border-b">
-        <div className="flex gap-6">
-          <button
-            onClick={() => setActiveTab('campaigns')}
-            className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'campaigns'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Campaigns
-          </button>
-          <button
-            onClick={() => setActiveTab('adSets')}
-            className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'adSets'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Ad Sets
-          </button>
-          <button
-            onClick={() => setActiveTab('ads')}
-            className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'ads'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Ads
-          </button>
-          <button
-            onClick={() => setActiveTab('optimizationRules')}
-            className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'optimizationRules'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Optimization Rules
-          </button>
-          <button
-            onClick={() => setActiveTab('optimizationLogs')}
-            className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'optimizationLogs'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Optimization Logs
-          </button>
+      <Head title={`${workspace.name} - Ads Manager`} />
+      <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white/90">
+            Ads Manager
+          </h2>
         </div>
-      </div>
 
-      {/* Search and Actions Bar */}
-      <div className="flex items-center justify-between gap-4 relative">
-        <div className="flex-1 max-w-sm">
-          <Input
-            type="text"
-            placeholder="Search campaigns..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full"
-          />
+        {/* Tabs */}
+        <div className="border-b border-gray-200 dark:border-white/[0.05]">
+          <div className="flex gap-6">
+            <button
+              onClick={() => setActiveTab('campaigns')}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'campaigns'
+                  ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              Campaigns
+            </button>
+            <button
+              onClick={() => setActiveTab('adSets')}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'adSets'
+                  ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              Ad Sets
+            </button>
+            <button
+              onClick={() => setActiveTab('ads')}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'ads'
+                  ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              Ads
+            </button>
+            <button
+              onClick={() => setActiveTab('optimizationRules')}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'optimizationRules'
+                  ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              Optimization Rules
+            </button>
+            <button
+              onClick={() => setActiveTab('optimizationLogs')}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'optimizationLogs'
+                  ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              Optimization Logs
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2 relative z-50">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => fetchCampaigns(pagination.current_page)}
-            disabled={loading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-9 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2"
-          >
-            <option value="">All Status</option>
-            <option value="ACTIVE">Active</option>
-            <option value="PAUSED">Paused</option>
-            <option value="ARCHIVED">Archived</option>
-          </select>
-          <DateRangePicker
-            initialDateFrom={dateRange.from}
-            initialDateTo={dateRange.to}
-            onUpdate={(values) => {
-              if (values.range.from && values.range.to) {
-                setDateRange({
-                  from: values.range.from,
-                  to: values.range.to,
-                });
-              }
-            }}
-            align="end"
-            showCompare={false}
-          />
-          <Button variant="outline" size="icon">
-            <Grid3x3 className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon">
-            <List className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
 
-      {/* Table */}
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Campaign Name</TableHead>
-              <TableHead>Ad Account</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Daily Budget</TableHead>
-              <TableHead>Start Time</TableHead>
-              <TableHead>End Time</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
-                  Loading campaigns...
-                </TableCell>
-              </TableRow>
-            ) : campaigns.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  No campaigns found
-                </TableCell>
-              </TableRow>
-            ) : (
-              campaigns.map((campaign) => (
-                <TableRow key={campaign.id}>
-                  <TableCell className="font-medium">{campaign.name}</TableCell>
-                  <TableCell>{campaign.ad_account?.name || 'N/A'}</TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      campaign.status === 'ACTIVE' 
-                        ? 'bg-green-100 text-green-800' 
-                        : campaign.status === 'PAUSED'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {campaign.status}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {campaign.daily_budget ? `₱${(campaign.daily_budget / 100).toFixed(2)}` : 'N/A'}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(campaign.start_time).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    {campaign.end_time ? new Date(campaign.end_time).toLocaleDateString() : 'Ongoing'}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+        <div className="space-y-5 sm:space-y-6">
+          <ComponentCard desc="Manage your advertising campaigns and ad sets">
+            <div>
+              <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.05]">
+                <input
+                  className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3 dark:bg-gray-900 dark:placeholder:text-white/30 bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90 dark:focus:border-brand-800"
+                  placeholder="Search campaigns..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <div className="flex items-center gap-2 relative z-50">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => fetchCampaigns(pagination.current_page)}
+                    disabled={loading}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 dark:focus:border-brand-800"
+                  >
+                    <option value="">All Status</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="PAUSED">Paused</option>
+                    <option value="ARCHIVED">Archived</option>
+                  </select>
+                  <DateRangePicker
+                    initialDateFrom={dateRange.from}
+                    initialDateTo={dateRange.to}
+                    onUpdate={(values) => {
+                      if (values.range.from && values.range.to) {
+                        setDateRange({
+                          from: values.range.from,
+                          to: values.range.to,
+                        });
+                      }
+                    }}
+                    align="end"
+                    showCompare={false}
+                  />
+                  <Button variant="outline" size="icon">
+                    <Grid3x3 className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="icon">
+                    <List className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
 
-      {/* Pagination */}
-      <div className="mt-4 flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          {pagination.total > 0 ? (
-            <>Showing {pagination.from} to {pagination.to} of {pagination.total} campaigns</>
-          ) : (
-            <>No campaigns found</>
-          )}
-        </div>
-        {pagination.last_page > 1 && (
-          <div className="flex gap-2">
-            {pagination.links.map((link, index) => (
-              <Button
-                key={index}
-                variant={link.active ? 'default' : 'outline'}
-                size="sm"
-                disabled={!link.url || loading}
-                onClick={() => {
-                  if (link.url) {
-                    const url = new URL(link.url);
-                    const page = url.searchParams.get('page');
-                    if (page) {
-                      fetchCampaigns(parseInt(page));
-                    }
+              <DataTable
+                columns={columns}
+                data={campaigns}
+                enableInternalPagination={false}
+                meta={{
+                  current_page: pagination.current_page,
+                  last_page: pagination.last_page,
+                  per_page: pagination.per_page,
+                  total: pagination.total,
+                  from: pagination.from,
+                  to: pagination.to,
+                }}
+                onFetch={(params) => {
+                  if (params?.page) {
+                    fetchCampaigns(params.page);
                   }
                 }}
-                dangerouslySetInnerHTML={{ __html: link.label }}
               />
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
+          </ComponentCard>
+        </div>
       </div>
     </AppLayout>
   );

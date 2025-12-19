@@ -14,6 +14,7 @@ use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 
 /*
