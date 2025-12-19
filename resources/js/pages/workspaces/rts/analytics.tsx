@@ -4,7 +4,7 @@ import RTSManagementLayout from './partials/Layout';
 import { Workspace } from '@/types/models/Workspace';
 import AnalyticsFilters from './partials/AnalyticsFilters';
 import MetricsCard from '@/components/workspaces/MetricsCard';
-import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
 import { Head, router } from '@inertiajs/react';
 import workspaces from '@/routes/workspaces';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,8 @@ import BreakdownPerShops from './partials/BreakdownPerShops';
 import BreakdownPerUsers from './partials/BreakdownPerUsers';
 import BreakdownPerCities from './partials/BreakdownPerCities';
 import ComponentCard from '@/components/common/ComponentCard';
+import { type DateRange } from "react-day-picker"
+import moment from 'moment';
 
 type Props = {
     workspace: Workspace;
@@ -38,12 +40,15 @@ const Analytics = ({ workspace, filters, data }: Props) => {
     const [selectedPagesFilter, setSelectedPagesFilter] = useState<number[]>(filters.page_ids ?? []);
     const [selectedUsersFilter, setSelectedUsersFilter] = useState<number[]>(filters.user_ids ?? []);
     const [selectedShopFilter, setSelectedShopFilter] = useState<number[]>(filters.shop_ids ?? []);
-    const [startDate, setStartDate] = useState<Date | undefined>(
-        filters.start_date ? new Date(filters.start_date) : undefined
-    );
-    const [endDate, setEndDate] = useState<Date | undefined>(
-        filters.end_date ? new Date(filters.end_date) : undefined
-    );
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({
+        from: filters.start_date ? new Date(filters.start_date) : moment().startOf('month').toDate(),
+        to: filters.end_date ? new Date(filters.end_date) : moment().toDate()
+    });
+
+    const dateRangeStr = useMemo(() => ({
+        to: moment(dateRange?.to).format('YYYY-MM-DD'),
+        from: moment(dateRange?.from).format('YYYY-MM-DD'),
+    }), [dateRange])
 
     // Build query string
     const queryString = useMemo(() => {
@@ -51,10 +56,10 @@ const Analytics = ({ workspace, filters, data }: Props) => {
         selectedPagesFilter.forEach((id) => params.append('page_ids[]', String(id)));
         selectedUsersFilter.forEach((id) => params.append('user_ids[]', String(id)));
         selectedShopFilter.forEach((id) => params.append('shop_ids[]', String(id)));
-        if (startDate) params.append('start_date', startDate.toISOString().slice(0, 10));
-        if (endDate) params.append('end_date', endDate.toISOString().slice(0, 10));
+        if (dateRange?.from) params.append('start_date', dateRangeStr.from);
+        if (dateRange?.to) params.append('end_date', dateRangeStr.to);
         return params.toString();
-    }, [selectedPagesFilter, selectedUsersFilter, selectedShopFilter, startDate, endDate]);
+    }, [selectedPagesFilter, selectedUsersFilter, selectedShopFilter, dateRange, dateRangeStr]);
 
     // Update URL and refetch data when filters change
     useEffect(() => {
@@ -64,8 +69,8 @@ const Analytics = ({ workspace, filters, data }: Props) => {
                 page_ids: selectedPagesFilter.length > 0 ? selectedPagesFilter : undefined,
                 user_ids: selectedUsersFilter.length > 0 ? selectedUsersFilter : undefined,
                 shop_ids: selectedShopFilter.length > 0 ? selectedShopFilter : undefined,
-                start_date: startDate ? startDate.toISOString().slice(0, 10) : undefined,
-                end_date: endDate ? endDate.toISOString().slice(0, 10) : undefined,
+                start_date: dateRange?.from ? dateRangeStr.from : undefined,
+                end_date: dateRange?.to ? dateRangeStr.to : undefined,
             },
             {
                 preserveState: true,
@@ -73,7 +78,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
                 only: ['data'] // Only reload the data prop
             }
         );
-    }, [workspace.slug, selectedPagesFilter, selectedUsersFilter, selectedShopFilter, startDate, endDate]);
+    }, [workspace.slug, selectedPagesFilter, selectedUsersFilter, selectedShopFilter, dateRange, dateRangeStr]);
 
     // Analytics stat cards
     const analytics = useMemo(() => [
@@ -87,8 +92,10 @@ const Analytics = ({ workspace, filters, data }: Props) => {
         setSelectedPagesFilter([]);
         setSelectedUsersFilter([]);
         setSelectedShopFilter([]);
-        setStartDate(undefined);
-        setEndDate(undefined);
+        setDateRange({
+            from: moment().startOf('month').toDate(),
+            to: moment().toDate()
+        });
         router.get(
             workspaces.rts.analytics(workspace.slug),
             {},
@@ -104,7 +111,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
                         <div className="flex items-center justify-end w-full flex-wrap gap-2">
 
-                            {(selectedPagesFilter.length > 0 || selectedUsersFilter.length > 0 || selectedShopFilter.length > 0 || startDate || endDate) && (
+                            {(selectedPagesFilter.length > 0 || selectedUsersFilter.length > 0 || selectedShopFilter.length > 0) && (
                                 <Button
                                     variant="outline"
                                     onClick={clearFilters}
@@ -123,15 +130,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
                                 setSelectedShopFilter={setSelectedShopFilter}
                             />
 
-                            <DateRangePicker
-                                onUpdate={(values) => {
-                                    setStartDate(values.range.from ?? undefined);
-                                    setEndDate(values.range.to ?? undefined);
-                                }}
-                                align="start"
-                                initialDateTo={endDate}
-                                initialDateFrom={startDate}
-                            />
+                            <SimpleDateRangePicker value={dateRange} onChange={setDateRange} />
                         </div>
                     </div>
 
