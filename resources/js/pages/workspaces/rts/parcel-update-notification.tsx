@@ -114,6 +114,16 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
             },
         },
         {
+            id: 'order.page.product.name',
+            accessorKey: 'order.page.product.name',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Product'} />
+            ),
+            cell: ({ row }) => {
+                return row.original.order?.page?.product?.name || '-';
+            },
+        },
+        {
             id: 'order.order_number',
             accessorKey: 'order.order_number',
             header: ({ column }) => (
