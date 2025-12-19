@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Workspaces\AdAccountController;
+use App\Http\Controllers\Workspaces\AdSetController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\ProductController;
@@ -101,6 +102,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Ads Manager API routes
     Route::get('/workspaces/{workspace}/api/campaigns', [\App\Http\Controllers\Workspaces\CampaignController::class, 'index'])->name('workspaces.api.campaigns.index');
+    Route::get('/workspaces/{workspace}/api/ad-sets', [\App\Http\Controllers\Workspaces\AdSetController::class, 'index'])->name('workspaces.api.ad-sets.index');
 
     // Team routes
     Route::get('/workspaces/{workspace}/teams', [TeamController::class, 'index'])->name('workspaces.teams.index');
