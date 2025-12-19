@@ -26,8 +26,7 @@ export default function ParcelUpdateNotificationFilters({
     return (
         <div className='flex flex-col items-start justify-between gap-4 mb-8'>
             <div className="flex flex-col gap-4 w-1/2 sm:flex-row sm:items-end">
-                <div className="flex-1 space-y-2">
-                    <label className="text-sm font-medium">Search Page Name</label>
+                <div className="flex-1">
                     <div className="relative">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -49,8 +48,7 @@ export default function ParcelUpdateNotificationFilters({
                     </div>
                 </div>
 
-                <div className="flex-1 space-y-2">
-                    <label className="text-sm font-medium">Type</label>
+                <div className="flex-1">
                     <Select
                         value={typeFilter === '' ? 'all' : typeFilter}
                         onValueChange={(value) => onTypeFilterChange(value === 'all' ? '' : value)}

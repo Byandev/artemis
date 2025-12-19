@@ -26,16 +26,14 @@ const OrderFilters = ({
     return (
         <div className='flex flex-col items-start justify-between gap-4 mb-8'>
             <div className="flex flex-col gap-4 w-1/2 sm:flex-row sm:items-end">
-                <div className="flex-1 space-y-2">
-                    <label className="text-sm font-medium">Search Page Name</label>
+                <div className="flex-1">
                     <Input
                         placeholder="Search by page name..."
                         value={pageNameSearch}
                         onChange={(e) => onPageNameChange(e.target.value)}
                     />
                 </div>
-                <div className="flex-1 space-y-2">
-                    <label className="text-sm font-medium">Customer</label>
+                <div className="flex-1">
                     <Select
                         value={customerFilter || undefined}
                         onValueChange={(value) => onFilterChange('customer', value)}
@@ -52,8 +50,7 @@ const OrderFilters = ({
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="flex-1 space-y-2">
-                    <label className="text-sm font-medium">Rider</label>
+                <div className="flex-1">
                     <Select
                         value={riderFilter || undefined}
                         onValueChange={(value) => onFilterChange('rider', value)}
