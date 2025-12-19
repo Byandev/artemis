@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Jobs\SendParcelUpdateNotification;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class ParcelJourneyNotification extends Model
 {
@@ -21,7 +21,7 @@ class ParcelJourneyNotification extends Model
     public function scopeFilterByPageName(Builder $query, string $pageName): Builder
     {
         return $query->whereHas('order.page', function ($q) use ($pageName) {
-            $q->where('name', 'like', '%' . $pageName . '%');
+            $q->where('name', 'like', '%'.$pageName.'%');
         });
     }
 
