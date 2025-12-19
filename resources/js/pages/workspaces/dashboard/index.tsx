@@ -2,13 +2,12 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { useMemo, useState, useEffect } from 'react';
 import { Workspace } from '@/types/models/Workspace';
-import { currencyFormatter, numberFormatter, percentageFormatter } from '@/lib/utils';
+import { currencyFormatter, numberFormatter, percentageFormatter, getDateRangeDescription } from '@/lib/utils';
 import MetricsCard from '@/components/workspaces/MetricsCard';
 import LineComparisonChart from '@/components/charts/LineComparisonChart';
 import SingleLineChart from '@/components/charts/SingleLineChart';
 import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
 import { Button } from '@/components/ui/button';
-import { format, parse, differenceInDays } from 'date-fns';
 import DashboardFilters from '@/components/workspaces/DashboardFilters';
 import { type DateRange } from "react-day-picker";
 import moment from 'moment';
@@ -93,17 +92,7 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
     }, [stats])
 
     // Calculate dynamic chart description based on date range
-    const chartDescription = useMemo(() => {
-        if (dateRange?.from && dateRange?.to) {
-            const days = differenceInDays(dateRange.to, dateRange.from) + 1;
-            return `${format(dateRange.from, 'MMM d, yyyy')} - ${format(dateRange.to, 'MMM d, yyyy')}`;
-        } else if (dateRange?.from) {
-            return `From ${format(dateRange.from, 'MMM d, yyyy')}`;
-        } else if (dateRange?.to) {
-            return `Until ${format(dateRange.to, 'MMM d, yyyy')}`;
-        }
-        return 'Last 30 days';
-    }, [dateRange]);
+    const chartDescription = useMemo(() => getDateRangeDescription(dateRange), [dateRange]);
 
     // Build query string for chart data
     const queryString = useMemo(() => {
@@ -288,7 +277,6 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                         dataKey="roas"
                         label="ROAS"
                         color="#10B981"
-                        formatter={(value: number) => value.toFixed(2)}
                     />
                     <SingleLineChart<ChartDataPoint>
                         chartData={chartData}
@@ -299,7 +287,6 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                         dataKey="rts_rate"
                         label="RTS Rate"
                         color="#EF4444"
-                        formatter={(value: number) => value.toFixed(2) + '%'}
                         yAxisFormatter={(value: number) => value.toFixed(0) + '%'}
                     />
                 </div>
