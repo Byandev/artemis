@@ -189,7 +189,7 @@ const AdsManager = ({ workspace }: PageProps) => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
                 <div className="flex items-center gap-2 relative z-50">
-                  <Button 
+                  {/* <Button 
                     variant="outline" 
                     size="sm"
                     onClick={handleRefresh}
@@ -197,7 +197,7 @@ const AdsManager = ({ workspace }: PageProps) => {
                   >
                     <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                     Refresh
-                  </Button>
+                  </Button> */}
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
