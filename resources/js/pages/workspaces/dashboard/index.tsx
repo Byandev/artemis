@@ -149,6 +149,7 @@ export default function Index({ workspace, stats }: Props) {
                         label="RTS Rate"
                         color="#EF4444"
                         formatter={(value: number) => value.toFixed(2) + '%'}
+                        yAxisFormatter={(value: number) => value.toFixed(0) + '%'}
                     />
                 </div>
             </div>

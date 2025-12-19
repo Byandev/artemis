@@ -111,7 +111,7 @@ export default function LineComparisonChart<T extends Record<string, any>>({
                     fontSize: "12px",
                     colors: ["#6B7280"],
                 },
-                formatter: function(value: number) {
+                formatter: function (value: number) {
                     if (value >= 1000000) {
                         return (value / 1000000).toFixed(1) + 'M';
                     } else if (value >= 1000) {

@@ -19,6 +19,7 @@ interface SingleLineChartProps<T extends Record<string, any>> {
     label: string;
     color?: string;
     formatter?: (value: number) => string | number;
+    yAxisFormatter?: (value: number) => string;
 }
 
 export default function SingleLineChart<T extends Record<string, any>>({
@@ -31,6 +32,7 @@ export default function SingleLineChart<T extends Record<string, any>>({
     label,
     color = "#465FFF",
     formatter = currencyFormatter,
+    yAxisFormatter,
 }: SingleLineChartProps<T>) {
 
     const options: ApexOptions = {
@@ -110,7 +112,7 @@ export default function SingleLineChart<T extends Record<string, any>>({
                     fontSize: "12px",
                     colors: ["#6B7280"],
                 },
-                formatter: function(value: number) {
+                formatter: yAxisFormatter || function (value: number) {
                     if (value >= 1000000) {
                         return (value / 1000000).toFixed(1) + 'M';
                     } else if (value >= 1000) {
