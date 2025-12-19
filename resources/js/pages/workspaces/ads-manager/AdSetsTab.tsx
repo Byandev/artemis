@@ -91,15 +91,17 @@ const AdSetsTab = forwardRef(({
   const fetchAdSets = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`/workspaces/${workspace.slug}/api/ad-sets`, {
-        params: {
-          search: searchQuery,
-          status: statusFilter || undefined,
-          start_date: dateRange.from.toISOString().split('T')[0],
-          end_date: dateRange.to.toISOString().split('T')[0],
-          page: pagination.current_page,
-        }
-      });
+      const params: any = {
+        search: searchQuery,
+        status: statusFilter || undefined,
+        page: pagination.current_page,
+      };
+
+      // Only add date filters if they're explicitly set (not the default 30-day range)
+      // For now, we'll skip date filtering for ad sets since they don't have start_time/end_time
+      // and created_at would filter based on when we synced them, not the actual ad set dates
+      
+      const response = await axios.get(`/workspaces/${workspace.slug}/api/ad-sets`, { params });
       setAdSets(response.data.data);
       setPagination(response.data);
     } catch (error) {
