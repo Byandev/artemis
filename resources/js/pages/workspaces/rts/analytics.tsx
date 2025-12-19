@@ -109,16 +109,8 @@ const Analytics = ({ workspace, filters, data }: Props) => {
             <RTSManagementLayout workspace={workspace}>
                 <ComponentCard title="Track your RTS performance metrics">
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
-                        <div className="flex items-center justify-end w-full flex-wrap gap-2">
-
-                            {(selectedPagesFilter.length > 0 || selectedUsersFilter.length > 0 || selectedShopFilter.length > 0) && (
-                                <Button
-                                    variant="outline"
-                                    onClick={clearFilters}
-                                >
-                                    Clear Filters
-                                </Button>
-                            )}
+                        <div className="flex items-center justify-start w-full flex-wrap gap-2">
+                            <SimpleDateRangePicker value={dateRange} onChange={setDateRange} />
 
                             <AnalyticsFilters
                                 workspace={workspace}
@@ -130,7 +122,14 @@ const Analytics = ({ workspace, filters, data }: Props) => {
                                 setSelectedShopFilter={setSelectedShopFilter}
                             />
 
-                            <SimpleDateRangePicker value={dateRange} onChange={setDateRange} />
+                            {(selectedPagesFilter.length > 0 || selectedUsersFilter.length > 0 || selectedShopFilter.length > 0) && (
+                                <Button
+                                    variant="outline"
+                                    onClick={clearFilters}
+                                >
+                                    Clear Filters
+                                </Button>
+                            )}
                         </div>
                     </div>
 
