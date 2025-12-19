@@ -1,6 +1,5 @@
 import Chart from "react-apexcharts";
 import { ApexOptions } from "apexcharts";
-import { currencyFormatter } from '@/lib/utils';
 import {
     Card,
     CardContent,
@@ -15,11 +14,9 @@ interface SingleLineChartProps<T extends Record<string, any>> {
     error: string | null;
     title: string;
     description: string;
-    footerDescription?: string;
     dataKey: string;
     label: string;
     color?: string;
-    formatter?: (value: number) => string | number;
     yAxisFormatter?: (value: number) => string;
 }
 
@@ -29,11 +26,9 @@ export default function SingleLineChart<T extends Record<string, any>>({
     error,
     title,
     description,
-    footerDescription = "Showing data for the last 30 days",
     dataKey,
     label,
     color = "#465FFF",
-    formatter = currencyFormatter,
     yAxisFormatter,
 }: SingleLineChartProps<T>) {
 
