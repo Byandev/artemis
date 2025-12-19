@@ -8,15 +8,23 @@ interface RTSManagementLayoutProps {
 
 const RTSManagementLayout = ({ workspace, children }: PropsWithChildren<RTSManagementLayoutProps>) => {
     return (
-        <div className="flex flex-col gap-6 p-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">RTS Management</h1>
-                    <p className="text-muted-foreground mt-1">Manage RTS analytics and reports</p>
+        <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                <h2
+                    className="text-xl font-semibold text-gray-800 dark:text-white/90"
+                    x-text="pageName"
+                >
+                    RTS Management
+                </h2>
+            </div>
+
+            <div className="">
+                <RtsNavigation workspace={workspace} />
+
+                <div className="pt-4 dark:border-gray-800">
+                    {children}
                 </div>
             </div>
-            <RtsNavigation workspace={workspace} />
-            {children}
         </div>
     )
 }

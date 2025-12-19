@@ -1,4 +1,4 @@
-import AppLayout from '@/layouts/app-layout';
+import DashboardLayout from './partials/Layout';
 import { Head, router } from '@inertiajs/react';
 import { useMemo, useState, useEffect } from 'react';
 import { Workspace } from '@/types/models/Workspace';
@@ -186,51 +186,43 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
     };
 
     return (
-        <AppLayout>
+        <DashboardLayout workspace={workspace}>
             <Head title="Dashboard" />
-            <div className="flex h-full flex-1 flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-                        <p className="text-muted-foreground mt-1">Welcome back! Here's your workspace overview.</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {(selectedTeams.length > 0 || selectedProducts.length > 0 || selectedPages.length > 0 || selectedShops.length > 0 || dateRangeStr.from !== moment().startOf('month').format('YYYY-MM-DD') || dateRangeStr.to !== moment().format('YYYY-MM-DD')) && (
-                            <Button
-                                variant="outline"
-                                onClick={clearFilters}
-                            >
-                                Clear Filters
-                            </Button>
-                        )}
-                        <DashboardFilters
-                            availableTeams={availableTeams}
-                            availableProducts={availableProducts}
-                            availablePages={availablePages}
-                            availableShops={availableShops}
-                            selectedTeams={selectedTeams}
-                            setSelectedTeams={setSelectedTeams}
-                            selectedProducts={selectedProducts}
-                            setSelectedProducts={setSelectedProducts}
-                            selectedPages={selectedPages}
-                            setSelectedPages={setSelectedPages}
-                            selectedShops={selectedShops}
-                            setSelectedShops={setSelectedShops}
-                        />
-                        <SimpleDateRangePicker
-                            value={dateRange}
-                            onChange={setDateRange}
-                        />
-                    </div>
-                </div>
+            <div className="flex items-center justify-end gap-2 mb-6">
+                {(selectedTeams.length > 0 || selectedProducts.length > 0 || selectedPages.length > 0 || selectedShops.length > 0 || dateRangeStr.from !== moment().startOf('month').format('YYYY-MM-DD') || dateRangeStr.to !== moment().format('YYYY-MM-DD')) && (
+                    <Button
+                        variant="outline"
+                        onClick={clearFilters}
+                    >
+                        Clear Filters
+                    </Button>
+                )}
+                <DashboardFilters
+                    availableTeams={availableTeams}
+                    availableProducts={availableProducts}
+                    availablePages={availablePages}
+                    availableShops={availableShops}
+                    selectedTeams={selectedTeams}
+                    setSelectedTeams={setSelectedTeams}
+                    selectedProducts={selectedProducts}
+                    setSelectedProducts={setSelectedProducts}
+                    selectedPages={selectedPages}
+                    setSelectedPages={setSelectedPages}
+                    selectedShops={selectedShops}
+                    setSelectedShops={setSelectedShops}
+                />
+                <SimpleDateRangePicker
+                    value={dateRange}
+                    onChange={setDateRange}
+                />
+            </div>
 
+            <div className="space-y-5 sm:space-y-6">
                 <div className="grid auto-rows-min gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                     {analytics.map((data, key) => (
                         <MetricsCard key={key} title={data.title} value={data.value} />
                     ))}
-                </div>
-
-                <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+                </div>                    <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
                     <LineComparisonChart<ChartDataPoint>
                         chartData={chartData}
                         loading={loading}
@@ -291,6 +283,6 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                     />
                 </div>
             </div>
-        </AppLayout>
+        </DashboardLayout>
     );
 }
