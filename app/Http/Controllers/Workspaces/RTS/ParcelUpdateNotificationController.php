@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Workspaces\RTS;
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\ParcelJourneyNotification\OrderNumberSort;
 use App\Http\Sorts\ParcelJourneyNotification\PageNameSort;
+use App\Http\Sorts\ParcelJourneyNotification\ProductNameSort;
 use App\Models\ParcelJourneyNotification;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
@@ -22,7 +23,7 @@ class ParcelUpdateNotificationController extends Controller
             ->whereHas('order', function ($query) use ($workspace) {
                 $query->where('workspace_id', $workspace->id);
             })
-            ->with(['order.page'])
+            ->with(['order.page.product'])
             ->get();
 
         $pages = $baseResults->pluck('order.page.name')
@@ -44,7 +45,7 @@ class ParcelUpdateNotificationController extends Controller
                     $query->where('workspace_id', $workspace->id);
                 })
         )
-            ->with(['order.page'])
+            ->with(['order.page.product'])
             ->allowedFilters([
                 AllowedFilter::scope('page_name', 'filterByPageName'),
                 AllowedFilter::exact('type'),
@@ -55,6 +56,7 @@ class ParcelUpdateNotificationController extends Controller
                 'created_at',
                 AllowedSort::custom('order.order_number', new OrderNumberSort),
                 AllowedSort::custom('order.page.name', new PageNameSort),
+                AllowedSort::custom('order.page.product.name', new ProductNameSort),
             ])
             ->defaultSort('-created_at')
             ->paginate(10)
