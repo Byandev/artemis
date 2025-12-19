@@ -1,6 +1,7 @@
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { Search, X } from 'lucide-react'
 
 interface OrderFiltersProps {
     pageNameSearch: string;
@@ -27,11 +28,25 @@ const OrderFilters = ({
         <div className='flex flex-col items-start justify-between gap-4 mb-8'>
             <div className="flex flex-col gap-4 w-1/2 sm:flex-row sm:items-end">
                 <div className="flex-1">
-                    <Input
-                        placeholder="Search by page name..."
-                        value={pageNameSearch}
-                        onChange={(e) => onPageNameChange(e.target.value)}
-                    />
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            type="text"
+                            placeholder="Search page..."
+                            value={pageNameSearch}
+                            onChange={(e) => onPageNameChange(e.target.value)}
+                            className="pl-8"
+                        />
+                        {pageNameSearch !== '' && (
+                            <button
+                                onClick={() => onPageNameChange('')}
+                                className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground"
+                                aria-label="Clear search"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        )}
+                    </div>
                 </div>
                 <div className="flex-1">
                     <Select
