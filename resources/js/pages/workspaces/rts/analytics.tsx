@@ -122,7 +122,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
                                 setSelectedShopFilter={setSelectedShopFilter}
                             />
 
-                            {(selectedPagesFilter.length > 0 || selectedUsersFilter.length > 0 || selectedShopFilter.length > 0) && (
+                            {(selectedPagesFilter.length > 0 || selectedUsersFilter.length > 0 || selectedShopFilter.length > 0 || dateRangeStr.from !== moment().startOf('month').format('YYYY-MM-DD') || dateRangeStr.to !== moment().format('YYYY-MM-DD')) && (
                                 <Button
                                     variant="outline"
                                     onClick={clearFilters}
