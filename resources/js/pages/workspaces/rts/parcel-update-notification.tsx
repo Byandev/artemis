@@ -38,6 +38,12 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
     const [pageNameSearch, setPageNameSearch] = useState(query?.filter?.page_name ?? '');
     const [typeFilter, setTypeFilter] = useState(query?.filter?.type ?? '');
 
+    // Sync local state with query params when they change (e.g., from navigation/pagination)
+    useEffect(() => {
+        setPageNameSearch(query?.filter?.page_name ?? '');
+        setTypeFilter(query?.filter?.type ?? '');
+    }, [query?.filter?.page_name, query?.filter?.type]);
+
     // Debounce page name search
     useEffect(() => {
         const currentSearchParam = query?.filter?.page_name ?? '';
@@ -59,13 +65,13 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                     preserveState: true,
                     replace: true,
                     preserveScroll: true,
-                    only: ['notifications'],
+                    only: ['notifications', 'query'],
                 },
             );
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [pageNameSearch, query?.filter?.page_name]);
+    }, [pageNameSearch, typeFilter, query?.filter?.page_name, query?.sort, workspace.slug]);
 
     const handleTypeFilterChange = (value: string) => {
         setTypeFilter(value);
@@ -82,7 +88,7 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                 preserveState: true,
                 replace: true,
                 preserveScroll: true,
-                only: ['notifications'],
+                only: ['notifications', 'query'],
             },
         );
     };
@@ -97,7 +103,7 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                 preserveState: false,
                 replace: true,
                 preserveScroll: true,
-                only: ['notifications'],
+                only: ['notifications', 'query'],
             }
         );
     };
@@ -210,6 +216,7 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                                             preserveState: false,
                                             replace: true,
                                             preserveScroll: true,
+                                            only: ['notifications', 'query'],
                                         },
                                     );
                                 }}

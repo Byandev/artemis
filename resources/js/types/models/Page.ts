@@ -1,5 +1,6 @@
 import { Shop } from '@/types/models/Shop';
 import { User } from '@/types/models/User';
+import { Product } from '@/types/models/Product';
 
 export interface Page {
     id: number;
@@ -17,4 +18,5 @@ export interface Page {
 
     shop?: Shop;
     owner?: User;
+    product?: Product;
 }
