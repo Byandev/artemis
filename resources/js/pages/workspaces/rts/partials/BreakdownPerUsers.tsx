@@ -24,6 +24,7 @@ type Props = {
 
 const BreakdownPerUsers = ({ workspace, queryString }: Props) => {
     const [paginatedData, setPaginatedData] = useState<PaginatedData<BreakDownAnalytics> | null>(null);
+    const [allData, setAllData] = useState<BreakDownAnalytics[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [currentView, setCurrentView] = useState<'graph' | 'table'>('graph');
     const [currentPage, setCurrentPage] = useState<number>(1);
@@ -49,10 +50,30 @@ const BreakdownPerUsers = ({ workspace, queryString }: Props) => {
         }
     }, [workspace.slug, queryString]);
 
+    // Fetch all data for graph (without pagination)
+    const fetchAllData = useCallback(async () => {
+        try {
+            const params = new URLSearchParams(queryString);
+            params.append('all', '1');
+
+            const res = await fetch(
+                `/workspaces/${workspace.slug}/rts/analytics/group-by/users?${params.toString()}`,
+                { credentials: 'same-origin' }
+            );
+            if (res.ok) {
+                const result = await res.json();
+                setAllData(result.data ?? result);
+            }
+        } catch (error) {
+            console.error('Error fetching all users data:', error);
+        }
+    }, [workspace.slug, queryString]);
+
     useEffect(() => {
         setCurrentPage(1);
         fetchData(1);
-    }, [fetchData]);
+        fetchAllData();
+    }, [fetchData, fetchAllData]);
 
     const data = paginatedData?.data ?? [];
 
@@ -85,7 +106,7 @@ const BreakdownPerUsers = ({ workspace, queryString }: Props) => {
             colors: ["transparent"],
         },
         xaxis: {
-            categories: data.map((item) => item.name),
+            categories: allData.map((item) => item.name),
             axisBorder: {
                 show: false,
             },
@@ -125,12 +146,12 @@ const BreakdownPerUsers = ({ workspace, queryString }: Props) => {
                 formatter: percentageFormatter,
             },
         },
-    }), [data, percentageFormatter]);
+    }), [allData, percentageFormatter]);
 
     const chartSeries = useMemo(() => [{
         name: 'RTS Rate %',
-        data: data.map((item) => item.rts_rate_percentage),
-    }], [data]);
+        data: allData.map((item) => item.rts_rate_percentage),
+    }], [allData]);
 
     const columns: ColumnDef<BreakDownAnalytics>[] = useMemo(() => [
         { accessorKey: 'name', header: 'User' },

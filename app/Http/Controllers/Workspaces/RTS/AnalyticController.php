@@ -62,7 +62,7 @@ class AnalyticController extends Controller
     // Grouped endpoints reuse the same filter logic below
     public function groupByPages(Request $request, Workspace $workspace)
     {
-        $groupedQuery = Order::selectRaw('
+        $query = Order::selectRaw('
             pages.id AS id,
             pages.name AS name,
             SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
@@ -75,17 +75,26 @@ class AnalyticController extends Controller
             ) AS rts_rate_percentage
         ')
             ->leftJoin('pages', 'pages.id', '=', 'orders.page_id')
-            ->ofWorkspace($workspace);
-
-        $filtered = (clone $groupedQuery)
+            ->ofWorkspace($workspace)
             ->applyRtsFilters($request)
             ->groupBy('orders.page_id', 'pages.name', 'pages.id')
-            ->orderBy('total_orders', 'DESC')
-            ->paginate($request->input('per_page', 15));
+            ->orderBy('total_orders', 'DESC');
 
-        $filterOptions = (clone $groupedQuery)
-            ->groupBy('orders.page_id', 'pages.name', 'pages.id')
+        $filterOptions = (clone $query)
             ->get(['pages.id', 'pages.name']);
+
+        // If 'all' parameter is present, return all data without pagination (for graph)
+        if ($request->has('all')) {
+            $filtered = $query->get();
+
+            return response()->json([
+                'data' => $filtered,
+                'filter_options' => $filterOptions,
+            ]);
+        }
+
+        // Otherwise, return paginated data (for table view)
+        $filtered = $query->paginate($request->input('per_page', 15));
 
         return response()->json(array_merge(
             $filtered->toArray(),
@@ -95,7 +104,7 @@ class AnalyticController extends Controller
 
     public function groupByShops(Request $request, Workspace $workspace)
     {
-        $groupedQuery = Order::selectRaw('
+        $query = Order::selectRaw('
             shops.id AS id,
             shops.name AS name,
             SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
@@ -108,17 +117,26 @@ class AnalyticController extends Controller
             ) AS rts_rate_percentage
         ')
             ->leftJoin('shops', 'shops.id', '=', 'orders.shop_id')
-            ->ofWorkspace($workspace);
-
-        $filtered = (clone $groupedQuery)
+            ->ofWorkspace($workspace)
             ->applyRtsFilters($request)
             ->groupBy('orders.shop_id', 'shops.name', 'shops.id')
-            ->orderBy('total_orders', 'DESC')
-            ->paginate($request->input('per_page', 15));
+            ->orderBy('total_orders', 'DESC');
 
-        $filterOptions = (clone $groupedQuery)
-            ->groupBy('orders.shop_id', 'shops.name', 'shops.id')
+        $filterOptions = (clone $query)
             ->get(['shops.id', 'shops.name']);
+
+        // If 'all' parameter is present, return all data without pagination (for graph)
+        if ($request->has('all')) {
+            $filtered = $query->get();
+
+            return response()->json([
+                'data' => $filtered,
+                'filter_options' => $filterOptions,
+            ]);
+        }
+
+        // Otherwise, return paginated data (for table view)
+        $filtered = $query->paginate($request->input('per_page', 15));
 
         return response()->json(array_merge(
             $filtered->toArray(),
@@ -128,7 +146,7 @@ class AnalyticController extends Controller
 
     public function groupByUsers(Request $request, Workspace $workspace)
     {
-        $groupedQuery = Order::selectRaw('
+        $query = Order::selectRaw('
             users.id AS id,
             users.name AS name,
             SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
@@ -142,17 +160,26 @@ class AnalyticController extends Controller
         ')
             ->leftJoin('pages', 'pages.id', '=', 'orders.page_id')
             ->leftJoin('users', 'users.id', '=', 'pages.owner_id')
-            ->ofWorkspace($workspace);
-
-        $filtered = (clone $groupedQuery)
+            ->ofWorkspace($workspace)
             ->applyRtsFilters($request)
             ->groupBy('pages.owner_id', 'users.name', 'users.id')
-            ->orderBy('total_orders', 'DESC')
-            ->paginate($request->input('per_page', 15));
+            ->orderBy('total_orders', 'DESC');
 
-        $filterOptions = (clone $groupedQuery)
-            ->groupBy('pages.owner_id', 'users.name', 'users.id')
+        $filterOptions = (clone $query)
             ->get(['users.id', 'users.name']);
+
+        // If 'all' parameter is present, return all data without pagination (for graph)
+        if ($request->has('all')) {
+            $filtered = $query->get();
+
+            return response()->json([
+                'data' => $filtered,
+                'filter_options' => $filterOptions,
+            ]);
+        }
+
+        // Otherwise, return paginated data (for table view)
+        $filtered = $query->paginate($request->input('per_page', 15));
 
         return response()->json(array_merge(
             $filtered->toArray(),
@@ -162,7 +189,7 @@ class AnalyticController extends Controller
 
     public function groupByCities(Request $request, Workspace $workspace)
     {
-        $grouped = Order::selectRaw('
+        $query = Order::selectRaw('
             shipping_addresses.district_name AS city_name,
             shipping_addresses.province_name AS province_name,
             SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
@@ -179,8 +206,17 @@ class AnalyticController extends Controller
             ->applyRtsFilters($request)
             ->groupBy('shipping_addresses.district_name', 'shipping_addresses.province_name')
             ->havingRaw('SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) > 0') // Only include cities with orders
-            ->orderBy('total_orders', 'DESC')
-            ->paginate($request->input('per_page', 15));
+            ->orderBy('total_orders', 'DESC');
+
+        // If 'all' parameter is present, return all data without pagination (for heatmap)
+        if ($request->has('all')) {
+            $grouped = $query->get();
+
+            return response()->json(['data' => $grouped]);
+        }
+
+        // Otherwise, return paginated data (for table view)
+        $grouped = $query->paginate($request->input('per_page', 15));
 
         return response()->json($grouped);
     }

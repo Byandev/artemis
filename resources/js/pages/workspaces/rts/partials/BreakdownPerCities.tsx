@@ -25,6 +25,7 @@ type Props = {
 
 const BreakdownPerCities = ({ workspace, queryString }: Props) => {
     const [paginatedData, setPaginatedData] = useState<PaginatedData<PerCityBreakdownAnalytics> | null>(null);
+    const [allCitiesData, setAllCitiesData] = useState<PerCityBreakdownAnalytics[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [currentView, setCurrentView] = useState<'heatmap' | 'table'>('heatmap');
     const [currentPage, setCurrentPage] = useState<number>(1);
@@ -50,22 +51,42 @@ const BreakdownPerCities = ({ workspace, queryString }: Props) => {
         }
     }, [workspace.slug, queryString]);
 
+    // Fetch all cities data for heatmap (without pagination)
+    const fetchAllCitiesData = useCallback(async () => {
+        try {
+            const params = new URLSearchParams(queryString);
+            params.append('all', '1'); // Flag to get all data
+
+            const res = await fetch(
+                `/workspaces/${workspace.slug}/rts/analytics/group-by/cities?${params.toString()}`,
+                { credentials: 'same-origin' }
+            );
+            if (res.ok) {
+                const result = await res.json();
+                setAllCitiesData(result.data ?? result);
+            }
+        } catch (error) {
+            console.error('Error fetching all cities data:', error);
+        }
+    }, [workspace.slug, queryString]);
+
     useEffect(() => {
         setCurrentPage(1);
         fetchData(1);
-    }, [fetchData]);
+        fetchAllCitiesData();
+    }, [fetchData, fetchAllCitiesData]);
 
     const data = paginatedData?.data ?? [];
 
     const heatmapPoints: HeatPoint[] = useMemo(() => {
-        return data
+        return allCitiesData
             .map((city) => ({
                 city_name: city.city_name,
                 province_name: city.province_name,
                 value: city.rts_rate_percentage
             }))
             .filter((p): p is HeatPoint => p !== null);
-    }, [data]);
+    }, [allCitiesData]);
 
     const columns: ColumnDef<PerCityBreakdownAnalytics>[] = useMemo(() => [
         { accessorKey: 'city_name', header: 'City Name' },
