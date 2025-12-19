@@ -321,7 +321,7 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                         footerDescription={chartFooterDescription}
                         dataKey="sales"
                         label="Total Sales"
-                        color="var(--chart-1)"
+                        color="#465FFF"
                     />
                     <SingleLineChart<ChartDataPoint>
                         chartData={chartData}
@@ -332,7 +332,7 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                         footerDescription={chartFooterDescription}
                         dataKey="spend"
                         label="Ad Spend"
-                        color="var(--chart-2)"
+                        color="#9CB9FF"
                     />
                 </div>
 
@@ -346,7 +346,7 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                         footerDescription={chartFooterDescription}
                         dataKey="roas"
                         label="ROAS"
-                        color="var(--chart-3)"
+                        color="#10B981"
                         formatter={(value: number) => value.toFixed(2)}
                     />
                     <SingleLineChart<ChartDataPoint>
@@ -358,8 +358,9 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                         footerDescription={chartFooterDescription}
                         dataKey="rts_rate"
                         label="RTS Rate"
-                        color="var(--chart-4)"
+                        color="#EF4444"
                         formatter={(value: number) => value.toFixed(2) + '%'}
+                        yAxisFormatter={(value: number) => value.toFixed(0) + '%'}
                     />
                 </div>
             </div>

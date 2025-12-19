@@ -22,7 +22,7 @@ class ShopFactory extends Factory
     {
         return [
             'workspace_id' => Workspace::factory(),
-            'name' => fake()->company() . ' Shop',
+            'name' => fake()->company().' Shop',
             'avatar_url' => fake()->optional()->imageUrl(200, 200, 'business'),
         ];
     }

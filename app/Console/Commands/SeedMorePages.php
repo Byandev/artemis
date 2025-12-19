@@ -12,6 +12,7 @@ use Illuminate\Console\Command;
 class SeedMorePages extends Command
 {
     protected $signature = 'seed:pages {count=25} {--archived=5} {--teams=0}';
+
     protected $description = 'Seed more pages and teams for testing pagination';
 
     public function handle()
@@ -19,11 +20,12 @@ class SeedMorePages extends Command
         $count = (int) $this->argument('count');
         $archivedCount = (int) $this->option('archived');
         $teamsCount = (int) $this->option('teams');
-        
+
         $workspace = Workspace::first();
-        
-        if (!$workspace) {
+
+        if (! $workspace) {
             $this->error('No workspace found. Run db:seed first.');
+
             return 1;
         }
 
@@ -33,22 +35,23 @@ class SeedMorePages extends Command
             for ($i = 1; $i <= $teamsCount; $i++) {
                 Team::create([
                     'workspace_id' => $workspace->id,
-                    'name' => 'Team ' . fake()->unique()->company(),
+                    'name' => 'Team '.fake()->unique()->company(),
                 ]);
             }
-            $this->info("Created {$teamsCount} teams. Total: " . Team::where('workspace_id', $workspace->id)->count());
+            $this->info("Created {$teamsCount} teams. Total: ".Team::where('workspace_id', $workspace->id)->count());
+
             return 0;
         }
 
         $shops = Shop::where('workspace_id', $workspace->id)->get();
-        
+
         if ($shops->isEmpty()) {
             $this->info('Creating shops...');
             $shops = Shop::factory(3)->forWorkspace($workspace)->create();
         }
 
         $owners = User::whereIn('id', $workspace->users()->pluck('user_id'))->get();
-        
+
         if ($owners->isEmpty()) {
             $this->info('Creating owners...');
             $owners = User::factory(3)->create();
@@ -58,7 +61,7 @@ class SeedMorePages extends Command
         }
 
         $this->info("Creating {$count} active pages...");
-        
+
         for ($i = 0; $i < $count; $i++) {
             Page::factory()
                 ->forWorkspace($workspace)
@@ -68,7 +71,7 @@ class SeedMorePages extends Command
         }
 
         $this->info("Creating {$archivedCount} archived pages...");
-        
+
         for ($i = 0; $i < $archivedCount; $i++) {
             Page::factory()
                 ->forWorkspace($workspace)
@@ -84,7 +87,7 @@ class SeedMorePages extends Command
         $this->info('---');
         $this->info("Total Active Pages: {$activeCount}");
         $this->info("Total Archived Pages: {$totalArchived}");
-        $this->info("Pagination will show at: 10+ items per tab");
+        $this->info('Pagination will show at: 10+ items per tab');
 
         return 0;
     }

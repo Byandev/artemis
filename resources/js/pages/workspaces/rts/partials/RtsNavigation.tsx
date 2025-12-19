@@ -13,7 +13,9 @@ const TabItem = ({ href, label, isActive }: { href: string; label: React.ReactNo
     return (
         <Link
             href={href}
-            className={`px-3 py-1 rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-offset-1 ${isActive ? 'bg-white shadow-sm' : 'hover:bg-white/50'
+            className={`inline-flex items-center border-b-2 px-2.5 py-2 text-sm font-medium transition-colors duration-200 ease-in-out ${isActive
+                    ? 'text-brand-500 dark:text-brand-400 border-brand-500 dark:border-brand-400'
+                    : 'bg-transparent text-gray-500 border-transparent hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
                 }`}
             aria-current={isActive ? 'page' : undefined}
             role="tab"
@@ -45,17 +47,12 @@ const RtsNavigation = ({ workspace }: { workspace: Workspace }) => {
     }, [currentPath]);
 
     return (
-        <div className="mb-2 w-full md:w-fit" role="tablist" aria-label="RTS navigation">
-            <div className="flex gap-2 bg-gray-100 p-1 rounded-md
-                            w-full sm:w-auto
-                            overflow-x-auto md:overflow-visible
-                            whitespace-nowrap">
+        <div className="border-b border-gray-200 dark:border-gray-800">
+            <nav className="-mb-px flex space-x-2 overflow-x-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-200 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600 dark:[&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:h-1.5" role="tablist" aria-label="RTS navigation">
                 {tabs.map((t) => (
-                    <div key={t.key} className="shrink-0">
-                        <TabItem href={t.href} label={t.label} isActive={t.key === activeKey} />
-                    </div>
+                    <TabItem key={t.key} href={t.href} label={t.label} isActive={t.key === activeKey} />
                 ))}
-            </div>
+            </nav>
         </div>
     );
 };

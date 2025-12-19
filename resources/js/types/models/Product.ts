@@ -14,4 +14,9 @@ export interface Product {
         id: number;
         name: string;
     };
+    advertising_sales?: number;
+    sales?: number;
+    ad_spent?: number;
+    roas?: number;
+    rts?: number
 }

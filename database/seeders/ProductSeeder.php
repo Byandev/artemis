@@ -17,16 +17,18 @@ class ProductSeeder extends Seeder
         // Get the first workspace or create one if none exists
         $workspace = Workspace::first();
 
-        if (!$workspace) {
+        if (! $workspace) {
             $this->command->warn('No workspace found. Please create a workspace first.');
+
             return;
         }
 
         // Get the workspace owner
         $owner = User::find($workspace->owner_id);
 
-        if (!$owner) {
+        if (! $owner) {
             $this->command->warn('No workspace owner found.');
+
             return;
         }
 

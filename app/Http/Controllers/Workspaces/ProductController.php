@@ -19,7 +19,7 @@ class ProductController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
+                    ->orWhere('code', 'like', "%{$search}%");
             });
         }
 
@@ -145,7 +145,7 @@ class ProductController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:10|unique:products,code,' . $product->id,
+            'code' => 'required|string|max:10|unique:products,code,'.$product->id,
             'category' => 'required|string|max:255',
             'status' => 'required|in:Scaling,Testing,Failed,Inactive',
             'description' => 'nullable|string',
