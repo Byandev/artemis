@@ -51,9 +51,10 @@ class Product extends Model implements HasMedia
     {
         return $builder->where('workspace_id', $workspace->id);
     }
+
     public function scopeWithAdvertisingSales(Builder $query, ?string $start_date = null, ?string $end_date = null): Builder
     {
-        return $query->selectSub(function ($q) use ($start_date, $end_date) {
+        return $query->selectSub(function ($q) {
             $q->from('ad_records')
                 ->join('ads', 'ads.id', '=', 'ad_records.ad_id')
                 ->join('pages', 'pages.id', '=', 'ads.page_id')
@@ -105,12 +106,12 @@ class Product extends Model implements HasMedia
         return $query
             ->fromSub($base, 'p')
             ->select('p.*')
-            ->selectRaw("
+            ->selectRaw('
             CASE
                 WHEN COALESCE(p.ad_spent, 0) = 0 THEN 0
                 ELSE COALESCE(p.sales, 0) / p.ad_spent
             END AS roas
-        ");
+        ');
     }
 
     public function scopeWithDeliveredCount(Builder $query, ?string $start_date = null, ?string $end_date = null): Builder
@@ -159,11 +160,11 @@ class Product extends Model implements HasMedia
         return $query
             ->fromSub($base, 'p')
             ->select('p.*')
-            ->selectRaw("
+            ->selectRaw('
             COALESCE(
                 p.returning_count / NULLIF((p.returning_count + p.delivered_count), 0),
                 0
             ) AS rts
-        ");
+        ');
     }
 }

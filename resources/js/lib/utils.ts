@@ -1,5 +1,7 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { format, differenceInDays } from 'date-fns';
+import { type DateRange } from 'react-day-picker';
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -58,6 +60,27 @@ export function currencyFormatter(
         ...options,
     }).format(value);
 }
+
+/**
+ * Generate a description for a date range
+ * @param dateRange - The date range object with from/to dates
+ * @param fallback - Fallback text when no date range is provided (default: 'Last 30 days')
+ * @returns Formatted description string
+ */
+export function getDateRangeDescription(
+    dateRange: DateRange | undefined,
+    fallback: string = 'Last 30 days'
+): string {
+    if (dateRange?.from && dateRange?.to) {
+        return `${format(dateRange.from, 'MMM d, yyyy')} - ${format(dateRange.to, 'MMM d, yyyy')}`;
+    } else if (dateRange?.from) {
+        return `From ${format(dateRange.from, 'MMM d, yyyy')}`;
+    } else if (dateRange?.to) {
+        return `Until ${format(dateRange.to, 'MMM d, yyyy')}`;
+    }
+    return fallback;
+}
+
 
 /**
  * Resolve an Inertia/URL string to a pathname.

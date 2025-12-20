@@ -1,14 +1,13 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { FilterIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SearchSelect from './SearchSelect';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Workspace } from '@/types/models/Workspace';
 
 type Props = {
-    availablePages: { id: number; name: string }[];
-    availableUsers: { id: number; name: string }[];
-    availableShops: { id: number; name: string }[];
+    workspace: Workspace;
     selectedPagesFilter: number[];
     setSelectedPagesFilter: React.Dispatch<React.SetStateAction<number[]>>;
     selectedUsersFilter: number[];
@@ -18,9 +17,7 @@ type Props = {
 }
 
 const AnalyticsFilters = ({
-    availablePages,
-    availableUsers,
-    availableShops,
+    workspace,
     selectedPagesFilter,
     setSelectedPagesFilter,
     selectedUsersFilter,
@@ -28,6 +25,58 @@ const AnalyticsFilters = ({
     selectedShopFilter,
     setSelectedShopFilter,
 }: Props) => {
+    const [filterOptions, setFilterOptions] = useState<{
+        pages: { id: number; name: string }[];
+        users: { id: number; name: string }[];
+        shops: { id: number; name: string }[];
+    }>({ pages: [], users: [], shops: [] });
+
+    // Fetch filter options on mount
+    useEffect(() => {
+        const fetchFilterOptions = async () => {
+            try {
+                const res = await fetch(
+                    `/workspaces/${workspace.slug}/rts/analytics/group-by/pages`,
+                    { credentials: 'same-origin' }
+                );
+                if (res.ok) {
+                    const result = await res.json();
+                    setFilterOptions(prev => ({ ...prev, pages: result.filter_options ?? [] }));
+                }
+            } catch (error) {
+                console.error('Error fetching page filter options:', error);
+            }
+
+            try {
+                const res = await fetch(
+                    `/workspaces/${workspace.slug}/rts/analytics/group-by/users`,
+                    { credentials: 'same-origin' }
+                );
+                if (res.ok) {
+                    const result = await res.json();
+                    setFilterOptions(prev => ({ ...prev, users: result.filter_options ?? [] }));
+                }
+            } catch (error) {
+                console.error('Error fetching user filter options:', error);
+            }
+
+            try {
+                const res = await fetch(
+                    `/workspaces/${workspace.slug}/rts/analytics/group-by/shops`,
+                    { credentials: 'same-origin' }
+                );
+                if (res.ok) {
+                    const result = await res.json();
+                    setFilterOptions(prev => ({ ...prev, shops: result.filter_options ?? [] }));
+                }
+            } catch (error) {
+                console.error('Error fetching shop filter options:', error);
+            }
+        };
+
+        fetchFilterOptions();
+    }, [workspace.slug]);
+
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -45,7 +94,7 @@ const AnalyticsFilters = ({
                         <AccordionTrigger className='py-2'>Page</AccordionTrigger>
                         <AccordionContent className="flex flex-col gap-4 text-balance">
                             <SearchSelect
-                                items={availablePages.map((page) => ({
+                                items={filterOptions.pages.map((page) => ({
                                     id: page.id,
                                     name: page.name,
                                 }))}
@@ -58,7 +107,7 @@ const AnalyticsFilters = ({
                         <AccordionTrigger className='py-2'>User</AccordionTrigger>
                         <AccordionContent className="flex flex-col gap-4 text-balance">
                             <SearchSelect
-                                items={availableUsers.map((user) => ({
+                                items={filterOptions.users.map((user) => ({
                                     id: user.id,
                                     name: user.name,
                                 }))}
@@ -71,7 +120,7 @@ const AnalyticsFilters = ({
                         <AccordionTrigger className='py-2'>Shop</AccordionTrigger>
                         <AccordionContent className="flex flex-col gap-4 text-balance">
                             <SearchSelect
-                                items={availableShops.map((shop) => ({
+                                items={filterOptions.shops.map((shop) => ({
                                     id: shop.id,
                                     name: shop.name,
                                 }))}
