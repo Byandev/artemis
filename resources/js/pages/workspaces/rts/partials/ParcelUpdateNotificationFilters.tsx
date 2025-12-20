@@ -1,29 +1,28 @@
+import React from 'react'
+import { Search, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { Search, X } from 'lucide-react'
 
-interface OrderFiltersProps {
+interface ParcelUpdateNotificationFiltersProps {
     pageNameSearch: string;
-    customerFilter: string;
-    riderFilter: string;
-    customers: string[];
-    riders: string[];
+    typeFilter: string;
+    types: string[];
     onPageNameChange: (value: string) => void;
-    onFilterChange: (filterType: 'customer' | 'rider', value: string) => void;
+    onTypeFilterChange: (value: string) => void;
     onClearFilters: () => void;
 }
 
-const OrderFilters = ({
+export default function ParcelUpdateNotificationFilters({
     pageNameSearch,
-    customerFilter,
-    riderFilter,
-    customers,
-    riders,
+    typeFilter,
+    types,
     onPageNameChange,
-    onFilterChange,
+    onTypeFilterChange,
     onClearFilters
-}: OrderFiltersProps) => {
+}: ParcelUpdateNotificationFiltersProps) {
+    const hasActiveFilters = pageNameSearch !== '' || typeFilter !== '';
+
     return (
         <div className='flex flex-col items-start justify-between gap-4 mb-8'>
             <div className="flex flex-col gap-4 w-1/2 sm:flex-row sm:items-end">
@@ -48,48 +47,32 @@ const OrderFilters = ({
                         )}
                     </div>
                 </div>
+
                 <div className="flex-1">
                     <Select
-                        value={customerFilter || undefined}
-                        onValueChange={(value) => onFilterChange('customer', value)}
+                        value={typeFilter === '' ? 'all' : typeFilter}
+                        onValueChange={(value) => onTypeFilterChange(value === 'all' ? '' : value)}
                     >
                         <SelectTrigger>
-                            <SelectValue placeholder="All customers" />
+                            <SelectValue placeholder="All Types" />
                         </SelectTrigger>
                         <SelectContent>
-                            {customers.map((customer) => (
-                                <SelectItem key={customer} value={customer}>
-                                    {customer}
+                            <SelectItem value="all">All Types</SelectItem>
+                            {types.map((type) => (
+                                <SelectItem key={type} value={type}>
+                                    <span className="capitalize">{type}</span>
                                 </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="flex-1">
-                    <Select
-                        value={riderFilter || undefined}
-                        onValueChange={(value) => onFilterChange('rider', value)}
-                    >
-                        <SelectTrigger>
-                            <SelectValue placeholder="All riders" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {riders.map((rider) => (
-                                <SelectItem key={rider} value={rider}>
-                                    {rider}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                {(pageNameSearch || customerFilter || riderFilter) && (
-                    <Button onClick={onClearFilters} variant="outline">
+
+                {hasActiveFilters && (
+                    <Button variant="outline" onClick={onClearFilters}>
                         Clear Filters
                     </Button>
                 )}
             </div>
         </div>
-    );
-};
-
-export default OrderFilters;
+    )
+}

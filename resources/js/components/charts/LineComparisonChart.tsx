@@ -16,6 +16,7 @@ interface LineComparisonChartProps<T> {
     error: string | null;
     title?: string;
     description?: string;
+    footerDescription?: string;
     dataKeyLeft?: string;
     dataKeyRight?: string;
     labelLeft?: string;

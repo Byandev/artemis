@@ -1,6 +1,5 @@
 import Chart from "react-apexcharts";
 import { ApexOptions } from "apexcharts";
-import { currencyFormatter } from '@/lib/utils';
 import {
     Card,
     CardContent,
@@ -18,7 +17,6 @@ interface SingleLineChartProps<T extends Record<string, any>> {
     dataKey: string;
     label: string;
     color?: string;
-    formatter?: (value: number) => string | number;
     yAxisFormatter?: (value: number) => string;
 }
 
@@ -31,7 +29,6 @@ export default function SingleLineChart<T extends Record<string, any>>({
     dataKey,
     label,
     color = "#465FFF",
-    formatter = currencyFormatter,
     yAxisFormatter,
 }: SingleLineChartProps<T>) {
 
