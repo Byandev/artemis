@@ -25,8 +25,6 @@ class SendParcelUpdateNotification implements ShouldQueue
     {
         $this->parcelJourneyNotification->load('order.page');
 
-        return;
-
         if ($this->parcelJourneyNotification->type === 'sms') {
             $response = Http::get('https://api.myinfotxt.com/v2/send.php', [
                 'SMS' => $this->parcelJourneyNotification->message,
