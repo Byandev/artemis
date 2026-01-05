@@ -9,6 +9,7 @@ import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { addDays } from 'date-fns';
 import CampaignsTab from './CampaignsTab';
 import AdSetsTab from './AdSetsTab';
+import AdsTab from './AdsTab';
 
 type TabType = 'campaigns' | 'adSets' | 'ads' | 'optimizationRules' | 'optimizationLogs';
 
@@ -29,6 +30,7 @@ const AdsManager = ({ workspace }: PageProps) => {
   // Refs to trigger fetch from child components
   const campaignsTabRef = useRef<any>(null);
   const adSetsTabRef = useRef<any>(null);
+  const adsTabRef = useRef<any>(null);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -43,6 +45,8 @@ const AdsManager = ({ workspace }: PageProps) => {
       campaignsTabRef.current.fetchCampaigns(1);
     } else if (activeTab === 'adSets' && adSetsTabRef.current) {
       adSetsTabRef.current.fetchAdSets();
+    } else if (activeTab === 'ads' && adsTabRef.current) {
+      adsTabRef.current.fetchAds();
     }
   };
 
@@ -74,9 +78,15 @@ const AdsManager = ({ workspace }: PageProps) => {
         );
       case 'ads':
         return (
-          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-            Ads feature coming soon...
-          </div>
+          <AdsTab
+            ref={adsTabRef}
+            workspace={workspace}
+            searchQuery={searchQuery}
+            statusFilter={statusFilter}
+            dateRange={dateRange}
+            loading={loading}
+            setLoading={setLoading}
+          />
         );
       case 'optimizationRules':
         return (
