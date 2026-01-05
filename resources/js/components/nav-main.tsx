@@ -16,7 +16,8 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
             <SidebarMenu>
                 {items.map((item) => {
                     const itemHref = typeof item.href === 'string' ? item.href : item.href.url;
-                    const isActive = page.url === itemHref || page.url.startsWith(itemHref + '/');
+                    const currentPath = page.url.split('?')[0];
+                    const isActive = currentPath === itemHref || currentPath.startsWith(itemHref + '/');
 
                     return (
                         <SidebarMenuItem key={item.title}>
@@ -24,6 +25,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                                 asChild
                                 isActive={isActive}
                                 tooltip={{ children: item.title }}
+                                className={isActive ? ' bg-gray-200 text-primary' : ''}
                             >
                                 <Link href={item.href} prefetch>
                                     {item.icon && <item.icon />}
