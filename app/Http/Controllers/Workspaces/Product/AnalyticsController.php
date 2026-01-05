@@ -50,7 +50,7 @@ class AnalyticsController extends Controller
         foreach ($requestedMetrics as $metric) {
             $query->when(
                 in_array($metric, $allowedMetrics),
-                fn($q) => $q->{'with' . str($metric)->studly()}(request('start_date'), request('end_date'))
+                fn ($q) => $q->{'with'.str($metric)->studly()}(request('start_date'), request('end_date'))
             );
         }
 

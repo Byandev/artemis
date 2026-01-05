@@ -68,6 +68,14 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Get all teams the user belongs to.
+     */
+    public function teams()
+    {
+        return $this->belongsToMany(Team::class, 'team_user');
+    }
+
+    /**
      * Get all workspace invitations sent to this user's email.
      */
     public function workspaceInvitations()
