@@ -13,29 +13,27 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
     return (
         <SidebarGroup className="px-2 py-0">
             <SidebarGroupLabel>Platform</SidebarGroupLabel>
-            <ul>
-                {items.map((item) => (
-                    <li key={item.title}>
-                        <Link
-                            href={item.href} prefetch
-                            className={`group menu-item ${page.url.startsWith(
-                                typeof item.href === 'string'
-                                    ? item.href
-                                    : item.href.url,
-                            ) ? 'menu-item-active': 'menu-item-inactive'}`}
-                        >
-                                {item.icon && (
-                                    <item.icon
-                                        className={'menu-item-icon-size'}
-                                    />
-                                )}
-                                <span className="menu-item-text">
-                                    {item.title}
-                                </span>
-                        </Link>
-                    </li>
-                ))}
-            </ul>
+            <SidebarMenu>
+                {items.map((item) => {
+                    const itemHref = typeof item.href === 'string' ? item.href : item.href.url;
+                    const isActive = page.url === itemHref || page.url.startsWith(itemHref + '/');
+
+                    return (
+                        <SidebarMenuItem key={item.title}>
+                            <SidebarMenuButton
+                                asChild
+                                isActive={isActive}
+                                tooltip={{ children: item.title }}
+                            >
+                                <Link href={item.href} prefetch>
+                                    {item.icon && <item.icon />}
+                                    <span>{item.title}</span>
+                                </Link>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    );
+                })}
+            </SidebarMenu>
         </SidebarGroup>
     );
 }
