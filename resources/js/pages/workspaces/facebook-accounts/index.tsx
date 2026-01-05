@@ -112,9 +112,9 @@ const FacebookAccounts = ({
         window.location.href = `https://www.facebook.com/v22.0/dialog/oauth?${query}`;
     }, [auth.user.id, workspace.id]);
 
-    return  (
+    return (
         <AppLayout>
-            <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                     <h2
                         className="text-xl font-semibold text-gray-800 dark:text-white/90"
@@ -145,7 +145,7 @@ const FacebookAccounts = ({
                                 enableInternalPagination={false}
                                 data={facebook_accounts.data || []}
                                 initialSorting={initialSorting}
-                                meta={{ ...omit(facebook_accounts, ['data'])  }}
+                                meta={{ ...omit(facebook_accounts, ['data']) }}
                                 onFetch={(params) => {
                                     router.get(
                                         workspaces.facebookAccounts.index({ workspace }),
