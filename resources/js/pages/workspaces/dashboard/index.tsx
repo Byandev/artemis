@@ -1,18 +1,17 @@
-import DashboardLayout from './partials/Layout';
-import { Head, router } from '@inertiajs/react';
-import { useMemo, useState, useEffect } from 'react';
-import { Workspace } from '@/types/models/Workspace';
-import { currencyFormatter, numberFormatter, percentageFormatter, getDateRangeDescription } from '@/lib/utils';
-import MetricsCard from '@/components/workspaces/MetricsCard';
 import LineComparisonChart from '@/components/charts/LineComparisonChart';
 import SingleLineChart from '@/components/charts/SingleLineChart';
-import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
 import { Button } from '@/components/ui/button';
+import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
 import DashboardFilters from '@/components/workspaces/DashboardFilters';
-import { type DateRange } from "react-day-picker";
-import moment from 'moment';
-import workspaces from '@/routes/workspace';
+import MetricsCard from '@/components/workspaces/MetricsCard';
 import { useDateRange } from '@/hooks/use-date-range';
+import { currencyFormatter, getDateRangeDescription, numberFormatter, percentageFormatter } from '@/lib/utils';
+import workspaces from '@/routes/workspace';
+import { Workspace } from '@/types/models/Workspace';
+import { Head, router } from '@inertiajs/react';
+import moment from 'moment';
+import { useEffect, useMemo, useState } from 'react';
+import DashboardLayout from './partials/Layout';
 
 interface ChartDataPoint {
     date: string;

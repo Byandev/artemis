@@ -1,21 +1,20 @@
-import { useMemo, useState, useEffect } from 'react';
-import AppLayout from '@/layouts/app-layout';
-import RTSManagementLayout from './partials/Layout';
-import { Workspace } from '@/types/models/Workspace';
-import AnalyticsFilters from './partials/AnalyticsFilters';
-import MetricsCard from '@/components/workspaces/MetricsCard';
-import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
-import { Head, router } from '@inertiajs/react';
-import workspaces from '@/routes/workspaces';
+import ComponentCard from '@/components/common/ComponentCard';
 import { Button } from '@/components/ui/button';
+import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
+import MetricsCard from '@/components/workspaces/MetricsCard';
+import { useDateRange } from '@/hooks/use-date-range';
+import AppLayout from '@/layouts/app-layout';
+import workspaces from '@/routes/workspaces';
+import { Workspace } from '@/types/models/Workspace';
+import { Head, router } from '@inertiajs/react';
+import moment from 'moment';
+import { useEffect, useMemo, useState } from 'react';
+import AnalyticsFilters from './partials/AnalyticsFilters';
+import BreakdownPerCities from './partials/BreakdownPerCities';
 import BreakdownPerPages from './partials/BreakdownPerPages';
 import BreakdownPerShops from './partials/BreakdownPerShops';
 import BreakdownPerUsers from './partials/BreakdownPerUsers';
-import BreakdownPerCities from './partials/BreakdownPerCities';
-import ComponentCard from '@/components/common/ComponentCard';
-import { type DateRange } from "react-day-picker"
-import moment from 'moment';
-import { useDateRange } from '@/hooks/use-date-range';
+import RTSManagementLayout from './partials/Layout';
 
 type Props = {
     workspace: Workspace;
