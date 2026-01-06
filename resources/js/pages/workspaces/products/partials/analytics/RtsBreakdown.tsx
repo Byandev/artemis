@@ -43,7 +43,7 @@ const RtsBreakdown = ({ workspace, startDate, endDate }: Props) => {
                     {
                         name: "RTS",
                         data: products.map(product => ({
-                            x: product.name,
+                            x: product.code,
                             y: product.rts
                         })),
                     },
