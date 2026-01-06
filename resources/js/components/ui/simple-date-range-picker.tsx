@@ -1,12 +1,14 @@
 import * as React from "react"
 import { CalendarIcon } from "lucide-react"
-import { format } from "date-fns"
+import { format, parse, isValid } from "date-fns"
 import { DateRange } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 interface SimpleDateRangePickerProps {
   value?: DateRange
@@ -23,11 +25,27 @@ export function SimpleDateRangePicker({
 }: SimpleDateRangePickerProps) {
   const [open, setOpen] = React.useState(false)
   const [tempValue, setTempValue] = React.useState<DateRange | undefined>(value)
+  const [fromInput, setFromInput] = React.useState("")
+  const [toInput, setToInput] = React.useState("")
+  const [isMobile, setIsMobile] = React.useState(false)
+
+  // Check for mobile viewport
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Update temp value when popover opens
   React.useEffect(() => {
     if (open) {
       setTempValue(value)
+      setFromInput(value?.from ? format(value.from, "MM/dd/yyyy") : "")
+      setToInput(value?.to ? format(value.to, "MM/dd/yyyy") : "")
     }
   }, [open, value])
 
@@ -41,6 +59,36 @@ export function SimpleDateRangePicker({
     }
 
     return format(dateRange.from, "MMM dd, yyyy")
+  }
+
+  const handleFromInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value
+    setFromInput(input)
+
+    const parsedDate = parse(input, "MM/dd/yyyy", new Date())
+    if (isValid(parsedDate)) {
+      setTempValue(prev => ({ from: parsedDate, to: prev?.to }))
+    }
+  }
+
+  const handleToInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value
+    setToInput(input)
+
+    const parsedDate = parse(input, "MM/dd/yyyy", new Date())
+    if (isValid(parsedDate)) {
+      setTempValue(prev => ({ from: prev?.from, to: parsedDate }))
+    }
+  }
+
+  const handleCalendarSelect = (range: DateRange | undefined) => {
+    setTempValue(range)
+    if (range?.from) {
+      setFromInput(format(range.from, "MM/dd/yyyy"))
+    }
+    if (range?.to) {
+      setToInput(format(range.to, "MM/dd/yyyy"))
+    }
   }
 
   const handleApply = () => {
@@ -68,17 +116,42 @@ export function SimpleDateRangePicker({
           <span className='text-theme-sm text-gray-500 dark:text-gray-400'>{formatDateRange(value)}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className={cn("w-auto p-0", isMobile && "w-[calc(100vw-2rem)]")} align={isMobile ? "center" : "start"}>
         <div className="flex flex-col">
-          <Calendar
-            mode="range"
-            selected={tempValue}
-            onSelect={setTempValue}
-            numberOfMonths={2}
-            defaultMonth={tempValue?.from || value?.from}
-            className="border-b text-xs p-2"
+          <div className="flex gap-2 p-3 border-b mt-7">
+            <div className="flex flex-col gap-1.5 flex-1">
+              <Label htmlFor="from-date" className="text-xs">From</Label>
+              <Input
+                id="from-date"
+                type="text"
+                value={fromInput}
+                onChange={handleFromInputChange}
+                placeholder="MM/DD/YYYY"
+                className="h-8 text-xs w-full min-w-[100px]"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5 flex-1">
+              <Label htmlFor="to-date" className="text-xs">To</Label>
+              <Input
+                id="to-date"
+                type="text"
+                value={toInput}
+                onChange={handleToInputChange}
+                placeholder="MM/DD/YYYY"
+                className="h-8 text-xs w-full min-w-[100px]"
+              />
+            </div>
+          </div>
+          <div className="flex justify-center">
+            <Calendar
+              mode="range"
+              selected={tempValue}
+              onSelect={handleCalendarSelect}
+              numberOfMonths={isMobile ? 1 : 2}
+              defaultMonth={tempValue?.from || value?.from}
+              className="border-b text-xs p-2"
             classNames={{
-              months: "flex gap-2",
+              months: cn("flex", isMobile ? "flex-col gap-2" : "flex-row gap-2"),
               month: "gap-2",
               caption: "flex justify-center pt-1 pb-2 relative items-center text-xs",
               caption_label: "text-xs font-medium",
@@ -100,6 +173,7 @@ export function SimpleDateRangePicker({
               day_hidden: "invisible",
             }}
           />
+          </div>
           <div className="flex items-center justify-end gap-2 p-2">
             <Button
               variant="ghost"
