@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Jobs\FetchAdAccounts;
 use App\Models\FacebookAccount;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Console\Command;
 
@@ -21,37 +22,83 @@ class SyncSampleFacebookAccount extends Command
      *
      * @var string
      */
-    protected $description = 'Command description';
+    protected $description = 'Sync sample Facebook account data for testing. Fetches ad accounts, campaigns, and 2 months of ad records.';
 
     /**
      * Execute the console command.
      */
     public function handle()
     {
-        FacebookAccount::get()
-            ->each(function (FacebookAccount $account) {
-                dispatch(new FetchAdAccounts($account));
-            });
+        // Get the token from env
+        $token = env('FACEBOOK_SAMPLE_ACCOUNT_TOKEN');
+        
+        if (!$token) {
+            $this->error('❌ FACEBOOK_SAMPLE_ACCOUNT_TOKEN not found in .env file!');
+            $this->info('Please add it to your .env file:');
+            $this->info('FACEBOOK_SAMPLE_ACCOUNT_TOKEN=your_token_here');
+            return 1;
+        }
 
-        dd('Done');
-
+        // Get user
         $userId = $this->argument('user');
-        $workspaceId = $this->argument('workspace');
+        $user = User::find($userId);
+        
+        if (!$user) {
+            $this->error("❌ User with ID {$userId} not found!");
+            return 1;
+        }
 
-        $facebookAccount = FacebookAccount::updateOrCreate([
-            'id' => '599663289850440',
-        ], [
-            'user_id' => $userId,
-            'name' => 'JM Mulingbayan',
-            'email' => 'bmulingbayan.ecomm.meta@gmail.com',
-            'picture_url' => 'https://platform-lookaside.fbsbx.com/platform/profilepic/?asid=599663289850440&height=50&width=50&ext=1768394268&hash=AT9DbSgfJVRmiRxNjo6i-NnQ',
-            'access_token' => config('services.facebook.sample_account_token'),
-        ]);
+        // Get workspace
+        $workspaceSlug = $this->argument('workspace');
+        $workspace = Workspace::where('slug', $workspaceSlug)->first();
+        
+        if (!$workspace) {
+            $this->error("❌ Workspace '{$workspaceSlug}' not found!");
+            return 1;
+        }
 
-        $workspace = Workspace::find($workspaceId);
+        $this->info("👤 User: {$user->name} (ID: {$user->id})");
+        $this->info("🏢 Workspace: {$workspace->name} ({$workspace->slug})");
+        $this->newLine();
 
-        $facebookAccount->workspaces()->sync($workspace->id);
+        // Create or update Facebook Account
+        $this->info('🔄 Creating/Updating Facebook Account...');
+        
+        $facebookAccount = FacebookAccount::updateOrCreate(
+            ['user_id' => $user->id, 'email' => 'sample@facebook.com'],
+            [
+                'name' => 'Sample Facebook Account',
+                'access_token' => $token,
+                'picture_url' => 'https://via.placeholder.com/150',
+            ]
+        );
 
+        $this->info("✅ Facebook Account created/updated: {$facebookAccount->name}");
+
+        // Attach to workspace if not already attached
+        if (!$workspace->facebookAccounts()->where('facebook_account_id', $facebookAccount->id)->exists()) {
+            $workspace->facebookAccounts()->attach($facebookAccount->id);
+            $this->info("✅ Attached Facebook Account to workspace");
+        }
+
+        // Dispatch the job to fetch ad accounts (which will trigger campaigns and ad records)
+        $this->newLine();
+        $this->info('🚀 Dispatching job to fetch Ad Accounts...');
+        $this->info('📊 This will fetch:');
+        $this->info('   - Ad Accounts');
+        $this->info('   - Campaigns');
+        $this->info('   - Ad Records (2 months of data)');
+        $this->newLine();
+        
         dispatch(new FetchAdAccounts($facebookAccount));
+
+        $this->info('✅ Job dispatched successfully!');
+        $this->newLine();
+        $this->warn('⏳ Make sure Horizon is running to process the jobs:');
+        $this->info('   php artisan horizon');
+        $this->newLine();
+        $this->info('📈 You can monitor the job progress in Horizon dashboard.');
+
+        return 0;
     }
 }
