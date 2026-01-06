@@ -2,9 +2,11 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\FetchAdSets;
+
+use App\Jobs\AdsManager\FetchAdSets;
 use App\Models\FacebookAccount;
 use Illuminate\Console\Command;
+use Symfony\Component\Console\Command\Command as CommandAlias;
 
 class FetchAdSetsCommand extends Command
 {
@@ -42,6 +44,6 @@ class FetchAdSetsCommand extends Command
         $this->info("Dispatched {$jobsDispatched} jobs to fetch ad sets.");
         $this->info('Jobs are processing in the queue. Check Laravel Horizon for progress.');
 
-        return Command::SUCCESS;
+        return CommandAlias::SUCCESS;
     }
 }
