@@ -12,6 +12,7 @@ import DashboardFilters from '@/components/workspaces/DashboardFilters';
 import { type DateRange } from "react-day-picker";
 import moment from 'moment';
 import workspaces from '@/routes/workspace';
+import { useDateRange } from '@/hooks/use-date-range';
 
 interface ChartDataPoint {
     date: string;
@@ -49,11 +50,24 @@ type Props = {
 
 export default function Index({ workspace, stats, filters, availableTeams, availableProducts, availablePages, availableShops }: Props) {
 
-    // Initialize dates from URL filters
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: filters?.start_date ? new Date(filters.start_date) : moment().startOf('month').toDate(),
-        to: filters?.end_date ? new Date(filters.end_date) : moment().toDate()
-    });
+    // Use global date range state
+    const { dateRange, setDateRange } = useDateRange();
+
+    // Initialize date range from URL filters if global state is empty
+    useEffect(() => {
+        if (!dateRange && (filters?.start_date || filters?.end_date)) {
+            setDateRange({
+                from: filters?.start_date ? new Date(filters.start_date) : moment().startOf('month').toDate(),
+                to: filters?.end_date ? new Date(filters.end_date) : moment().toDate()
+            });
+        } else if (!dateRange) {
+            // Default to current month if no filters and no global state
+            setDateRange({
+                from: moment().startOf('month').toDate(),
+                to: moment().toDate()
+            });
+        }
+    }, []); // Only run on mount
 
     const dateRangeStr = useMemo(() => ({
         to: moment(dateRange?.to).format('YYYY-MM-DD'),
@@ -211,10 +225,7 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                     selectedShops={selectedShops}
                     setSelectedShops={setSelectedShops}
                 />
-                <SimpleDateRangePicker
-                    value={dateRange}
-                    onChange={setDateRange}
-                />
+                <SimpleDateRangePicker useGlobalState />
             </div>
 
             <div className="space-y-5 sm:space-y-6">

@@ -9,12 +9,19 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useDateRange } from "@/hooks/use-date-range"
 
 interface SimpleDateRangePickerProps {
   value?: DateRange
   onChange?: (value: DateRange | undefined) => void
   placeholder?: string
   className?: string
+  /**
+   * If true, uses global state management for date range persistence across the application.
+   * When enabled, the date range will be stored in localStorage and shared across all pages.
+   * If false or undefined, uses local state (controlled by value/onChange props).
+   */
+  useGlobalState?: boolean
 }
 
 export function SimpleDateRangePicker({
@@ -22,9 +29,16 @@ export function SimpleDateRangePicker({
   onChange,
   placeholder = "Select date range",
   className,
+  useGlobalState = false,
 }: SimpleDateRangePickerProps) {
+  // Use global state if enabled, otherwise use local props
+  const globalState = useDateRange()
+  
+  const actualValue = useGlobalState ? globalState.dateRange : value
+  const actualOnChange = useGlobalState ? globalState.setDateRange : onChange
+
   const [open, setOpen] = React.useState(false)
-  const [tempValue, setTempValue] = React.useState<DateRange | undefined>(value)
+  const [tempValue, setTempValue] = React.useState<DateRange | undefined>(actualValue)
   const [fromInput, setFromInput] = React.useState("")
   const [toInput, setToInput] = React.useState("")
   const [isMobile, setIsMobile] = React.useState(false)
@@ -43,11 +57,11 @@ export function SimpleDateRangePicker({
   // Update temp value when popover opens
   React.useEffect(() => {
     if (open) {
-      setTempValue(value)
-      setFromInput(value?.from ? format(value.from, "MM/dd/yyyy") : "")
-      setToInput(value?.to ? format(value.to, "MM/dd/yyyy") : "")
+      setTempValue(actualValue)
+      setFromInput(actualValue?.from ? format(actualValue.from, "MM/dd/yyyy") : "")
+      setToInput(actualValue?.to ? format(actualValue.to, "MM/dd/yyyy") : "")
     }
-  }, [open, value])
+  }, [open, actualValue])
 
   const formatDateRange = (dateRange?: DateRange): string => {
     if (!dateRange?.from) {
@@ -92,12 +106,12 @@ export function SimpleDateRangePicker({
   }
 
   const handleApply = () => {
-    onChange?.(tempValue)
+    actualOnChange?.(tempValue)
     setOpen(false)
   }
 
   const handleCancel = () => {
-    setTempValue(value)
+    setTempValue(actualValue)
     setOpen(false)
   }
 
@@ -108,12 +122,12 @@ export function SimpleDateRangePicker({
           variant="outline"
           className={cn(
             "justify-start text-left font-normal bg-white",
-            !value?.from && "text-muted-foreground",
+            !actualValue?.from && "text-muted-foreground",
             className
           )}
         >
           <CalendarIcon className="h-4 w-4" />
-          <span className='text-theme-sm text-gray-500 dark:text-gray-400'>{formatDateRange(value)}</span>
+          <span className='text-theme-sm text-gray-500 dark:text-gray-400'>{formatDateRange(actualValue)}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className={cn("w-auto p-0", isMobile && "w-[calc(100vw-2rem)]")} align={isMobile ? "center" : "start"}>
@@ -148,7 +162,7 @@ export function SimpleDateRangePicker({
               selected={tempValue}
               onSelect={handleCalendarSelect}
               numberOfMonths={isMobile ? 1 : 2}
-              defaultMonth={tempValue?.from || value?.from}
+              defaultMonth={tempValue?.from || actualValue?.from}
               className="border-b text-xs p-2"
             classNames={{
               months: cn("flex", isMobile ? "flex-col gap-2" : "flex-row gap-2"),

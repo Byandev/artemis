@@ -15,6 +15,7 @@ import BreakdownPerCities from './partials/BreakdownPerCities';
 import ComponentCard from '@/components/common/ComponentCard';
 import { type DateRange } from "react-day-picker"
 import moment from 'moment';
+import { useDateRange } from '@/hooks/use-date-range';
 
 type Props = {
     workspace: Workspace;
@@ -40,10 +41,25 @@ const Analytics = ({ workspace, filters, data }: Props) => {
     const [selectedPagesFilter, setSelectedPagesFilter] = useState<number[]>(filters.page_ids ?? []);
     const [selectedUsersFilter, setSelectedUsersFilter] = useState<number[]>(filters.user_ids ?? []);
     const [selectedShopFilter, setSelectedShopFilter] = useState<number[]>(filters.shop_ids ?? []);
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: filters.start_date ? new Date(filters.start_date) : moment().startOf('month').toDate(),
-        to: filters.end_date ? new Date(filters.end_date) : moment().toDate()
-    });
+
+    // Use global date range state
+    const { dateRange, setDateRange } = useDateRange();
+
+    // Initialize date range from URL filters if global state is empty
+    useEffect(() => {
+        if (!dateRange && (filters.start_date || filters.end_date)) {
+            setDateRange({
+                from: filters.start_date ? new Date(filters.start_date) : moment().startOf('month').toDate(),
+                to: filters.end_date ? new Date(filters.end_date) : moment().toDate()
+            });
+        } else if (!dateRange) {
+            // Default to current month if no filters and no global state
+            setDateRange({
+                from: moment().startOf('month').toDate(),
+                to: moment().toDate()
+            });
+        }
+    }, []); // Only run on mount
 
     const dateRangeStr = useMemo(() => ({
         to: moment(dateRange?.to).format('YYYY-MM-DD'),
@@ -110,7 +126,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
                 <ComponentCard title="Track your RTS performance metrics">
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
                         <div className="flex items-center justify-start w-full flex-wrap gap-2">
-                            <SimpleDateRangePicker value={dateRange} onChange={setDateRange} />
+                            <SimpleDateRangePicker useGlobalState />
 
                             <AnalyticsFilters
                                 workspace={workspace}
