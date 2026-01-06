@@ -1,10 +1,7 @@
-import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
-import { NavUser } from '@/components/nav-user';
 import {
     Sidebar,
     SidebarContent,
-    SidebarFooter,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
@@ -14,7 +11,19 @@ import { dashboard } from '@/routes';
 import workspace from '@/routes/workspace';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, FacebookIcon, Folder, LayoutGrid, LucideFacebook, ShoppingBag } from 'lucide-react';
+import { 
+    BookOpen, 
+    Folder, 
+    LayoutDashboard, 
+    Package, 
+    Users,
+    Store,
+    Target,
+    UserCircle,
+    CreditCard,
+    FacebookIcon,
+    TrendingUp
+} from 'lucide-react';
 import AppLogo from './app-logo';
 
 const footerNavItems: NavItem[] = [
@@ -41,18 +50,23 @@ export function AppSidebar() {
         {
             title: 'Dashboard',
             href: dashboardUrl,
-            icon: LayoutGrid,
+            icon: LayoutDashboard,
+        },
+          {
+            title: 'Ads Manager',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ads-manager`,
+            icon: Target,
         },
         {
             title: 'Shop and Pages',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
-            icon: LayoutGrid,
+            icon: Store,
         },
-        // {
-        //     title: 'Products',
-        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products`,
-        //     icon: ShoppingBag,
-        // },
+        {
+            title: 'Products',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products/analytics`,
+            icon: Package,
+        },
         {
             title: 'Facebook Accounts',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/facebook-accounts`,
@@ -61,7 +75,17 @@ export function AppSidebar() {
         {
             title: 'Ad Accounts',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ad-accounts`,
-            icon: FacebookIcon,
+            icon: CreditCard,
+        },
+        {
+            title: 'Teams',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
+            icon: Users,
+        },
+        {
+            title: 'RTS Management',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
+            icon: TrendingUp,
         },
     ];
 
@@ -83,9 +107,8 @@ export function AppSidebar() {
                 <NavMain items={mainNavItems} />
             </SidebarContent>
 
-            <SidebarFooter>
-                <NavUser />
-            </SidebarFooter>
+            {/* <SidebarFooter>
+            </SidebarFooter> */}
         </Sidebar>
     );
 }

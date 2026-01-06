@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Jobs\AdsManager\FetchAds;
+use App\Jobs\AdsManager\FetchAdSets;
 use App\Models\AdAccount;
 use App\Models\FacebookAccount;
 use Carbon\Carbon;
@@ -47,16 +49,15 @@ class FetchAdAccounts implements ShouldQueue
             $adAccount->facebook_accounts()->sync($this->facebookAccount->id);
 
             dispatch(new FetchCampaigns($this->facebookAccount, $adAccount));
+            dispatch(new FetchAdSets($this->facebookAccount, $adAccount));
+            dispatch(new FetchAds($this->facebookAccount, $adAccount));
 
-            $start = Carbon::now()->subMonths(3);
+            $start = Carbon::now()->subMonths(2);
             $end = Carbon::now();
 
             for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
                 dispatch(new FetchAdRecords($this->facebookAccount, $adAccount, $date->toDateString()));
             }
-
-            //            dispatch(new FetchAdSets($adAccount));
-            //            dispatch(new FetchAds($adAccount));
         }
     }
 }

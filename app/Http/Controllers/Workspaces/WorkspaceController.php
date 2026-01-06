@@ -3,7 +3,12 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdRecord;
 use App\Models\Order;
+use App\Models\Page;
+use App\Models\Product;
+use App\Models\Shop;
+use App\Models\Team;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -81,10 +86,7 @@ class WorkspaceController extends Controller
             ->pivot
             ->role;
 
-        return Inertia::render('workspaces/show', [
-            'workspace' => $workspace,
-            'userRole' => $userRole,
-        ]);
+        return redirect()->route('workspace.dashboard', $workspace->slug);
     }
 
     /**
@@ -177,37 +179,217 @@ class WorkspaceController extends Controller
             ->pivot
             ->role;
 
-        $rtsStats = Order::selectRaw('
-            ROUND(
-                (SUM(CASE WHEN status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
-                NULLIF(SUM(CASE WHEN status IN (3,4,5) THEN 1 ELSE 0 END), 0),
-                2
-            ) AS rts_rate_percentage
-        ')
-            ->where('workspace_id', $workspace->id)
+        // Get date filters from query
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+
+        // Get entity filters from query
+        $filters = [
+            'team_ids' => $request->query('team_ids'),
+            'product_ids' => $request->query('product_ids'),
+            'page_ids' => $request->query('page_ids'),
+            'shop_ids' => $request->query('shop_ids'),
+        ];
+
+        // Consolidated query for all order-based stats
+        $orderStats = Order::where('workspace_id', $workspace->id)
+            ->whereNotNull('confirmed_at')
+            ->applyDateFilter($startDate, $endDate, 'confirmed_at')
+            ->applyEntityFilters($filters)
+            ->selectRaw('
+                COUNT(*) as total_orders,
+                SUM(total_amount) as total_sales,
+                SUM(CASE WHEN delivered_at IS NOT NULL THEN 1 ELSE 0 END) as delivered_orders,
+                ROUND(
+                    (SUM(CASE WHEN status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
+                    NULLIF(SUM(CASE WHEN status IN (3,4,5) THEN 1 ELSE 0 END), 0),
+                    2
+                ) as rts_rate_percentage
+            ')
             ->first();
 
-        $tracked_orders = Order::where('workspace_id', $workspace->id)
-            ->has('parcelJourneyNotifications')
-            ->count();
+        // Notification counts (SMS and Chat) - using subquery in a single query
+        $notificationStats = Order::where('workspace_id', $workspace->id)
+            ->whereNotNull('confirmed_at')
+            ->applyDateFilter($startDate, $endDate, 'confirmed_at')
+            ->applyEntityFilters($filters)
+            ->selectRaw('
+                SUM(CASE WHEN EXISTS(
+                    SELECT 1 FROM parcel_journey_notifications pjn
+                    WHERE pjn.order_id = orders.id
+                    AND pjn.type = "sms"
+                    AND pjn.status = "sent"
+                ) THEN 1 ELSE 0 END) as sms_sent,
+                SUM(CASE WHEN EXISTS(
+                    SELECT 1 FROM parcel_journey_notifications pjn
+                    WHERE pjn.order_id = orders.id
+                    AND pjn.type = "chat"
+                    AND pjn.status = "sent"
+                ) THEN 1 ELSE 0 END) as chat_msg_sent
+            ')
+            ->first();
+
+        // Ad spend and sales in one query
+        // Ad records are filtered through their relationship to orders
+        $adStats = AdRecord::ofWorkspace($workspace)
+            ->applyDateFilter($startDate, $endDate, 'date')
+            ->applyEntityFilters($filters)
+            ->selectRaw('SUM(spend) as total_ad_spend')
+            ->first();
+
+        $total_sales = $orderStats->total_sales ?? 0;
+        $total_orders = $orderStats->total_orders ?? 0;
+        $total_ad_spend = $adStats->total_ad_spend ?? 0;
 
         $stats = [
-            'total_sales' => Order::where('workspace_id', $workspace->id)
-                ->whereNotNull('confirmed_at')
-                ->sum('total_amount'),
+            'total_sales' => $total_sales,
+            'total_orders' => $total_orders,
+            'total_ad_spend' => $total_ad_spend,
+            'rts_rate_percentage' => $orderStats->rts_rate_percentage ?? 0,
+            'delivered_orders' => $orderStats->delivered_orders ?? 0,
+            'sms_sent' => $notificationStats->sms_sent ?? 0,
+            'chat_msg_sent' => $notificationStats->chat_msg_sent ?? 0,
+            'roas' => $total_ad_spend > 0 ? round($total_sales / $total_ad_spend, 2) : 0.0,
+        ];
 
-            'total_orders' => Order::where('workspace_id', $workspace->id)
-                ->whereNotNull('confirmed_at')
-                ->count(),
-
-            'rts_rate_percentage' => $rtsStats->rts_rate_percentage,
-
-            'tracked_orders' => $tracked_orders,
+        // Fetch available filter options
+        $availableFilters = [
+            'teams' => Team::ofWorkspace($workspace)
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get(),
+            'products' => Product::ofWorkspace($workspace)
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get(),
+            'pages' => Page::ofWorkspace($workspace)
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get(),
+            'shops' => Shop::where('workspace_id', $workspace->id)
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get(),
         ];
 
         return Inertia::render('workspaces/dashboard/index', [
             'workspace' => $workspace,
             'stats' => $stats,
+            'filters' => [
+                'start_date' => $request->query('start_date'),
+                'end_date' => $request->query('end_date'),
+                'team_ids' => $request->query('team_ids'),
+                'product_ids' => $request->query('product_ids'),
+                'page_ids' => $request->query('page_ids'),
+                'shop_ids' => $request->query('shop_ids'),
+            ],
+            'availableTeams' => $availableFilters['teams'],
+            'availableProducts' => $availableFilters['products'],
+            'availablePages' => $availableFilters['pages'],
+            'availableShops' => $availableFilters['shops'],
+        ]);
+    }
+
+    /**
+     * Get historical sales vs ad spend data for charts.
+     */
+    public function getChartData(Request $request, Workspace $workspace)
+    {
+        // Check if user has access to this workspace
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        // Get the number of days to fetch (default: last 30 days)
+        $days = $request->query('days', 30);
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+
+        // If no date range provided, default to last N days
+        if (! $startDate && ! $endDate) {
+            $endDate = now()->format('Y-m-d');
+            $startDate = now()->subDays($days)->format('Y-m-d');
+        }
+
+        // Get entity filters from query
+        $filters = [
+            'team_ids' => $request->query('team_ids'),
+            'product_ids' => $request->query('product_ids'),
+            'page_ids' => $request->query('page_ids'),
+            'shop_ids' => $request->query('shop_ids'),
+        ];
+
+        // Get sales data by date
+        $salesData = Order::where('workspace_id', $workspace->id)
+            ->whereNotNull('confirmed_at')
+            ->applyEntityFilters($filters)
+            ->applyDateFilter($startDate, $endDate, 'confirmed_at')
+            ->selectRaw('DATE(confirmed_at) as date, SUM(total_amount) as total_sales')
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get()
+            ->pluck('total_sales', 'date');
+
+        // Get ad spend data by date
+        $adSpendData = AdRecord::ofWorkspace($workspace)
+            ->applyDateFilter($startDate, $endDate, 'date')
+            ->applyEntityFilters($filters)
+            ->selectRaw('date, SUM(spend) as total_spend')
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get()
+            ->pluck('total_spend', 'date');
+
+        // Get RTS data by date using order status (3=delivered, 4,5=returned)
+        $rtsData = Order::where('workspace_id', $workspace->id)
+            ->whereNotNull('confirmed_at')
+            ->applyEntityFilters($filters)
+            ->applyDateFilter($startDate, $endDate, 'confirmed_at')
+            ->selectRaw('
+                DATE(confirmed_at) as date,
+                SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) AS delivered_count,
+                SUM(CASE WHEN status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
+                SUM(CASE WHEN status IN (3,4,5) THEN 1 ELSE 0 END) AS total_shipped_count,
+                ROUND(
+                    (SUM(CASE WHEN status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
+                    NULLIF(SUM(CASE WHEN status IN (3,4,5) THEN 1 ELSE 0 END), 0),
+                    2
+                ) AS rts_rate_percentage
+            ')
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get()
+            ->keyBy('date');
+
+        // Merge data and create chart data
+        $allDates = collect(array_unique(array_merge(
+            $salesData->keys()->toArray(),
+            $adSpendData->keys()->toArray(),
+            $rtsData->keys()->toArray()
+        )))->sort()->values();
+
+        $chartData = $allDates->map(function ($date) use ($salesData, $adSpendData, $rtsData) {
+            $sales = $salesData->get($date, 0);
+            $spend = $adSpendData->get($date, 0);
+
+            // Get RTS data for this date
+            $rtsRecord = $rtsData->get($date);
+            $rtsRate = $rtsRecord ? (float) $rtsRecord->rts_rate_percentage : 0.0;
+
+            // Calculate ROAS: Return on Ad Spend = Sales / Spend
+            $roas = $spend > 0 ? round($sales / $spend, 2) : 0;
+
+            return [
+                'date' => $date,
+                'sales' => (float) $sales,
+                'spend' => (float) $spend,
+                'roas' => (float) $roas,
+                'rts_rate' => $rtsRate,
+            ];
+        })->values()->all();
+
+        return response()->json([
+            'chartData' => $chartData,
         ]);
     }
 }

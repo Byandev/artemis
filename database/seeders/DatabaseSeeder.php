@@ -24,5 +24,11 @@ class DatabaseSeeder extends Seeder
                 'email_verified_at' => now(),
             ]
         );
+
+        // Seed RTS analytics sample data
+        $this->call(RTSAnalyticsSeeder::class);
+
+        // Seed Ads Manager sample data (commented out - use sync command instead)
+        // $this->call(AdsManagerSeeder::class);
     }
 }
