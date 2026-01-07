@@ -123,23 +123,6 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
             cell: ({ row }) => row.original.category || '-',
         },
         {
-            accessorKey: 'price',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Price'} />
-            ),
-            cell: ({ row }) => {
-                const price = row.original.price;
-                return price ? `₱${Number(price).toFixed(2)}` : '-';
-            },
-        },
-        {
-            accessorKey: 'stock',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Stock'} />
-            ),
-            cell: ({ row }) => row.original.stock ?? '-',
-        },
-        {
             accessorKey: 'status',
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Status'} />
@@ -189,8 +172,8 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
                     >
                         Products
                     </h2>
-                    <Button 
-                        size="sm" 
+                    <Button
+                        size="sm"
                         onClick={() => router.get(workspaces.products.create({ workspace }))}
                     >
                         Add Product
