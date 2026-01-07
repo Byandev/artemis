@@ -17,7 +17,7 @@ return new class extends Migration
 
             $table->primary([
                 'page_id',
-                'customer_service_representative_id'
+                'customer_service_representative_id',
             ]);
 
             $table->foreign('page_id', 'p_csr_workspace_fk')

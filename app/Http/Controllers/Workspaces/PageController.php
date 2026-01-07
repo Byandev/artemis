@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Workspaces;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Workspaces\StorePageRequest;
 use App\Http\Requests\Workspaces\UpdatePageRequest;
+use App\Http\Sorts\Page\OwnerNameSort;
+use App\Http\Sorts\Page\ShopNameSort;
 use App\Jobs\FetchPageOrders;
 use App\Models\Page;
 use App\Models\Shop;
@@ -14,6 +16,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class PageController extends Controller
 {
@@ -24,61 +29,29 @@ class PageController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
-        $query = Page::ofWorkspace($workspace)
+        $pages = QueryBuilder::for(Page::where('pages.workspace_id', $workspace->id))
+            ->allowedFilters([
+                AllowedFilter::partial('search', 'name'),
+            ])
+            ->allowedSorts([
+                'name',
+                'created_at',
+                'orders_last_synced_at',
+                'deleted_at',
+                AllowedSort::custom('shop_name', new ShopNameSort),
+                AllowedSort::custom('owner_name', new OwnerNameSort),
+            ])
             ->with(['shop', 'owner'])
-            // Filter by archive status
-            ->when($request->get('status') === 'archived', function ($q) {
-                $q->archived();
-            }, function ($q) {
-                $q->active();
-            })
-            // Filter by owner
-            ->when($request->filled('owner_id'), function ($q) use ($request) {
-                $q->where('owner_id', $request->get('owner_id'));
-            })
-            // Filter by shop (product)
-            ->when($request->filled('shop_id'), function ($q) use ($request) {
-                $q->where('shop_id', $request->get('shop_id'));
-            })
-            // Search by name
-            ->when($request->filled('search'), function ($q) use ($request) {
-                $q->where('name', 'like', '%'.$request->get('search').'%');
-            });
-
-        // Sorting
-        $sortField = $request->get('sort', 'name');
-        $sortDirection = $request->get('direction', 'asc');
-
-        $allowedSortFields = ['name', 'shop_id', 'owner_id', 'created_at', 'orders_last_synced_at'];
-        if (in_array($sortField, $allowedSortFields)) {
-            $query->orderBy($sortField, $sortDirection === 'desc' ? 'desc' : 'asc');
-        }
-
-        // Pagination
-        $pages = $query->paginate(10)->withQueryString();
-
-        // Get filter options
-        $owners = User::whereIn('id', Page::ofWorkspace($workspace)->pluck('owner_id')->unique())
-            ->select('id', 'name')
-            ->get();
-
-        $shops = Shop::whereIn('id', Page::ofWorkspace($workspace)->pluck('shop_id')->unique())
-            ->select('id', 'name')
-            ->get();
+            ->paginate(10)
+            ->withQueryString();
 
         return Inertia::render('workspaces/pages/index', [
             'pages' => $pages,
             'workspace' => $workspace,
-            'filters' => [
-                'search' => $request->get('search', ''),
-                'owner_id' => $request->get('owner_id', ''),
-                'shop_id' => $request->get('shop_id', ''),
-                'status' => $request->get('status', 'active'),
-                'sort' => $sortField,
-                'direction' => $sortDirection,
+            'query' => [
+                ...$request->only(['sort', 'perPage', 'page']),
+                'filter' => $request->input('filter', []),
             ],
-            'owners' => $owners,
-            'shops' => $shops,
         ]);
     }
 

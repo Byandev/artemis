@@ -17,7 +17,7 @@ class CampaignController extends Controller
             })
             ->with(['adAccount'])
             ->when($request->search, function ($query, $search) {
-                $query->where('name', 'like', '%' . $search . '%');
+                $query->where('name', 'like', '%'.$search.'%');
             })
             ->when($request->status, function ($query, $status) {
                 $query->where('status', $status);
