@@ -1,8 +1,9 @@
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { WorkspaceInvitation } from "@/types/models/WorkspaceInvitation";
-import { Link } from "@inertiajs/react";
-import { CheckCircle, LogIn, UserPlus } from "lucide-react";
+import { Link, usePage } from "@inertiajs/react";
+import { AlertCircle, CheckCircle, LogIn, UserPlus } from "lucide-react";
 
 interface InvitationAcceptProps {
     invitation: WorkspaceInvitation;
@@ -11,10 +12,22 @@ interface InvitationAcceptProps {
 }
 
 export default function InvitationAccept({ invitation, isAuthenticated, accepted }: InvitationAcceptProps) {
+    const { errors } = usePage().props;
+
     return (
         <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
             <Card className="max-w-lg w-full p-6 shadow-xl rounded-2xl">
                 <CardContent className="space-y-6 text-center">
+                    {/* Show error message if present */}
+                    {errors && Object.keys(errors).length > 0 && (
+                        <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>
+                                {Object.values(errors)[0] as string}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
                     {/* If the invitation has already been accepted and we're showing
                         the post-accept state, surface a success message and a link
                         to the workspace. Otherwise show the normal accept/login
@@ -53,9 +66,21 @@ export default function InvitationAccept({ invitation, isAuthenticated, accepted
                             </div>
 
                             {isAuthenticated ? (
-                                <Link href={`/workspaces/invitations/${invitation.token}/accept`}>
-                                    <Button className="w-full py-3 rounded-xl text-base">Accept Invitation</Button>
-                                </Link>
+                                <div className="space-y-3 w-full">
+                                    {errors && Object.keys(errors).length > 0 ? (
+                                        <>
+                                            <Link href="/logout" method="post" as="button" className="w-full">
+                                                <Button variant="destructive" className="w-full py-3 rounded-xl text-base">
+                                                    Logout and Login with Correct Account
+                                                </Button>
+                                            </Link>
+                                        </>
+                                    ) : (
+                                        <Link href={`/workspaces/invitations/${invitation.token}/accept`}>
+                                            <Button className="w-full py-3 rounded-xl text-base">Accept Invitation</Button>
+                                        </Link>
+                                    )}
+                                </div>
                             ) : (
                                 <div className="space-y-3 w-full">
                                     <Link href={`/register?invitation=${invitation.token}`}>

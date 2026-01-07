@@ -142,7 +142,8 @@ class WorkspaceInvitationController extends Controller
                     ->with('success', 'You have already joined the workspace!');
             }
 
-            return back()->withErrors(['error' => 'This invitation is no longer valid.']);
+            return redirect()->to("/workspaces/invitations/{$token}")
+                ->withErrors(['error' => 'This invitation is no longer valid.']);
         }
 
         // If user is not authenticated, they need to register or login first
@@ -163,7 +164,8 @@ class WorkspaceInvitationController extends Controller
 
         // Check if the authenticated user's email matches the invitation (case-insensitive)
         if (strcasecmp($request->user()->email, $invitation->email) !== 0) {
-            return back()->withErrors(['error' => 'This invitation was sent to a different email address.']);
+            return redirect()->to("/workspaces/invitations/{$token}")
+                ->withErrors(['error' => 'This invitation was sent to a different email address. Please log out and login with the correct account.']);
         }
 
         DB::transaction(function () use ($invitation, $request) {
