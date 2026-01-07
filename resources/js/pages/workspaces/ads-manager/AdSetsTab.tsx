@@ -2,6 +2,7 @@ import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Workspace } from '@/types/models/Workspace';
+import { FilterCondition } from '@/components/ads-manager/CustomFilters';
 import axios from 'axios';
 
 interface AdSet {
@@ -64,6 +65,7 @@ interface AdSetsTabProps {
   searchQuery: string;
   statusFilter: string;
   dateRange: { from: Date; to: Date };
+  filterConditions: FilterCondition[];
   loading: boolean;
   setLoading: (loading: boolean) => void;
 }
@@ -73,6 +75,7 @@ const AdSetsTab = forwardRef(({
   searchQuery,
   statusFilter,
   dateRange,
+  filterConditions,
   loading,
   setLoading,
 }: AdSetsTabProps, ref) => {
@@ -94,6 +97,7 @@ const AdSetsTab = forwardRef(({
       const params: any = {
         search: searchQuery,
         status: statusFilter || undefined,
+        filters: filterConditions.length > 0 ? JSON.stringify(filterConditions) : undefined,
         page: pagination.current_page,
       };
 

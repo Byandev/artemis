@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Head } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
-import { Grid3x3, List, RefreshCw } from 'lucide-react';
+import { Grid3x3, List, RefreshCw, Filter } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import ComponentCard from '@/components/common/ComponentCard';
 import { Workspace } from '@/types/models/Workspace';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { addDays } from 'date-fns';
+import { CustomFilters, FilterCondition } from '@/components/ads-manager/CustomFilters';
 import CampaignsTab from './CampaignsTab';
 import AdSetsTab from './AdSetsTab';
 import AdsTab from './AdsTab';
@@ -26,6 +27,8 @@ const AdsManager = ({ workspace }: PageProps) => {
     to: new Date(),
   });
   const [loading, setLoading] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterConditions, setFilterConditions] = useState<FilterCondition[]>([]);
 
   // Refs to trigger fetch from child components
   const campaignsTabRef = useRef<any>(null);
@@ -60,6 +63,7 @@ const AdsManager = ({ workspace }: PageProps) => {
             searchQuery={searchQuery}
             statusFilter={statusFilter}
             dateRange={dateRange}
+            filterConditions={filterConditions}
             loading={loading}
             setLoading={setLoading}
           />
@@ -72,6 +76,7 @@ const AdsManager = ({ workspace }: PageProps) => {
             searchQuery={searchQuery}
             statusFilter={statusFilter}
             dateRange={dateRange}
+            filterConditions={filterConditions}
             loading={loading}
             setLoading={setLoading}
           />
@@ -84,6 +89,7 @@ const AdsManager = ({ workspace }: PageProps) => {
             searchQuery={searchQuery}
             statusFilter={statusFilter}
             dateRange={dateRange}
+            filterConditions={filterConditions}
             loading={loading}
             setLoading={setLoading}
           />
@@ -232,6 +238,20 @@ const AdsManager = ({ workspace }: PageProps) => {
                     align="end"
                     showCompare={false}
                   />
+                  <Button 
+                    variant={showFilters ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="h-9"
+                  >
+                    <Filter className="h-4 w-4 mr-2" />
+                    Filters
+                    {filterConditions.length > 0 && (
+                      <span className="ml-2 px-1.5 py-0.5 text-xs bg-brand-100 dark:bg-brand-900 rounded-full">
+                        {filterConditions.length}
+                      </span>
+                    )}
+                  </Button>
                   <Button variant="outline" size="icon">
                     <Grid3x3 className="h-4 w-4" />
                   </Button>
@@ -240,6 +260,15 @@ const AdsManager = ({ workspace }: PageProps) => {
                   </Button>
                 </div>
               </div>
+
+              {showFilters && (
+                <div className="border-b border-gray-100 dark:border-white/[0.05] px-4 py-4 bg-gray-50 dark:bg-gray-900/50">
+                  <CustomFilters 
+                    conditions={filterConditions}
+                    onConditionsChange={setFilterConditions}
+                  />
+                </div>
+              )}
 
               {renderTabContent()}
             </div>
