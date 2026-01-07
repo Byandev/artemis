@@ -38,6 +38,7 @@ class SyncOrder implements ShouldQueue
         $returning_at = null;
         $delivered_at = null;
         $shipped_at = null;
+        $conferrer_id = null;
 
         $confirmedHistory = collect($order['status_history'])->where('status', 1)->first();
         $shippedHistory = collect($order['status_history'])->where('status', 2)->first();
@@ -47,6 +48,8 @@ class SyncOrder implements ShouldQueue
         if ($confirmedHistory) {
             $confirmedAtUtc = Carbon::createFromFormat('Y-m-d\TH:i:s', $confirmedHistory['updated_at'], 'UTC');
             $confirmed_at = $confirmedAtUtc->setTimezone(config('app.timezone'))->toDateTimeString();
+
+            $conferrer_id = $confirmedHistory['editor_fb']?: null;
         }
 
         if ($shippedHistory) {
@@ -76,6 +79,8 @@ class SyncOrder implements ShouldQueue
             'status' => $order['status'],
             'status_name' => $order['status_name'],
             'total_amount' => $order['total_price'],
+            'discount' => $order['total_discount'] ?: 0,
+            'final_amount' => $order['total_price_after_sub_discount'],
             'ad_id' => $order['ad_id'] ?: null,
             'inserted_at' => $insertedAt->toDateTimeString(),
             'confirmed_at' => $confirmed_at,
@@ -83,6 +88,11 @@ class SyncOrder implements ShouldQueue
             'shipped_at' => $shipped_at,
             'delivered_at' => $delivered_at,
             'returning_at' => $returning_at,
+            'assignee_id' => isset($order['assigning_seller']) ? $order['assigning_seller']['fb_id'] : null,
+            'last_editor_id' => isset($order['last_editor']) ? $order['last_editor']['fb_id'] : null,
+            'customer_succeed_order_count' => $order['customer']['succeed_order_count']?: 0,
+            'customer_returned_order_count' => $order['customer']['returned_order_count']?: 0,
+            'conferrer_id' => $conferrer_id,
         ]);
 
         if (isset($order['shipping_address'])) {
@@ -139,6 +149,23 @@ class SyncOrder implements ShouldQueue
                     }
                 }
             }
+        }
+
+        $savedOrder->tags()->delete();
+
+        if (isset($order['tags'])) {
+            $savedOrder->tags()
+                ->insert(
+                    collect($order['tags'])
+                        ->map(function ($tag) use ($savedOrder) {
+                            return [
+                                'order_id' =>$savedOrder->id,
+                                'tag_id' => $tag['id'],
+                                'name' => $tag['name'],
+                            ];
+                        })
+                        ->values()
+                        ->toArray());
         }
 
         $savedOrder->update([
