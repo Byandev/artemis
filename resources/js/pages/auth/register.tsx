@@ -41,7 +41,7 @@ export default function Register() {
                 <Alert className="mb-4">
                     <Info className="h-4 w-4" />
                     <AlertDescription>
-                        You've been invited to join <strong>{invitation.workspace.name}</strong> as a {invitation.role}.
+                        You've been invited to join <strong>{invitation.workspace.name}</strong> as a {invitation.role}
                         Create your account to accept the invitation.
                     </AlertDescription>
                 </Alert>

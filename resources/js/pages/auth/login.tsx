@@ -44,7 +44,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                 <Alert className="mb-4">
                     <Info className="h-4 w-4" />
                     <AlertDescription>
-                        You've been invited to join <strong>{invitation.workspace.name}</strong>.
+                        You've been invited to join <strong>{invitation.workspace.name}</strong>
                         Login to accept the invitation.
                     </AlertDescription>
                 </Alert>

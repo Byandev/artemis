@@ -147,8 +147,18 @@ class WorkspaceInvitationController extends Controller
 
         // If user is not authenticated, they need to register or login first
         if (! $request->user()) {
+            // Check if a user with this email already exists
+            $existingUser = User::where('email', $invitation->email)->first();
+
+            if ($existingUser) {
+                // User exists, redirect to login
+                return redirect()->route('login', ['invitation' => $token])
+                    ->with('info', 'Please login to accept the invitation.');
+            }
+
+            // User doesn't exist, redirect to register
             return redirect()->route('register', ['invitation' => $token])
-                ->with('info', 'Please create an account or login to accept the invitation.');
+                ->with('info', 'Please create an account to accept the invitation.');
         }
 
         // Check if the authenticated user's email matches the invitation (case-insensitive)
