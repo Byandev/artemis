@@ -25,15 +25,30 @@ class TeamController extends Controller
             ->with(['members:id,name,email']);
 
         // Search by name
-        if ($request->filled('search')) {
-            $query->where('name', 'like', '%'.$request->get('search').'%');
+        $search = $request->input('filter.search') ?? $request->get('search');
+        if ($search) {
+            $query->where('name', 'like', '%'.$search.'%');
         }
 
-        // Sorting
-        $sortField = $request->get('sort', 'created_at');
-        $sortDirection = $request->get('direction', 'desc');
+        // Sorting - handle both "field:direction" and separate "sort" + "direction" params
+        $sortParam = $request->get('sort', '-created_at');
+        $sortDirection = 'desc';
+        $sortField = 'created_at';
 
-        $allowedSortFields = ['name', 'created_at', 'members_count'];
+        if (str_contains($sortParam, ':')) {
+            // Format: "name:asc" or "name:desc"
+            [$sortField, $sortDirection] = explode(':', $sortParam);
+            $sortField = ltrim($sortField, '-');
+        } elseif (str_starts_with($sortParam, '-')) {
+            // Format: "-name" (desc) or "name" (asc)
+            $sortField = ltrim($sortParam, '-');
+            $sortDirection = 'desc';
+        } else {
+            $sortField = $sortParam;
+            $sortDirection = $request->get('direction', 'asc');
+        }
+
+        $allowedSortFields = ['name', 'created_at', 'members_count', 'id'];
         if (in_array($sortField, $allowedSortFields)) {
             $query->orderBy($sortField, $sortDirection === 'desc' ? 'desc' : 'asc');
         }
@@ -53,10 +68,11 @@ class TeamController extends Controller
             'teams' => $teams,
             'workspaceMembers' => $workspaceMembers,
             'isAdmin' => $isAdmin,
-            'filters' => [
-                'search' => $request->get('search', ''),
-                'sort' => $sortField,
-                'direction' => $sortDirection,
+            'query' => [
+                'filter' => [
+                    'search' => $search ?? '',
+                ],
+                'sort' => $sortParam,
             ],
         ]);
     }
