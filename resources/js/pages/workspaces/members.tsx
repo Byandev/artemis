@@ -46,7 +46,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import { MoreHorizontal, Send, Trash2, UserMinus } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface User {
     id: number;
@@ -98,6 +98,33 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
         email: '',
         role: 'member',
     });
+
+    // Debounced search effect
+    useEffect(() => {
+        const currentSearchParam = query?.filter?.search ?? '';
+
+        if (searchValue === currentSearchParam) {
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            router.get(
+                `/workspaces/${workspace.slug}/members`,
+                {
+                    sort: query?.sort,
+                    'filter[search]': searchValue || undefined,
+                    page: 1,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                },
+            );
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchValue, query?.filter?.search, query?.sort, workspace.slug]);
 
     const handleInvite = (e: React.FormEvent) => {
         e.preventDefault();
