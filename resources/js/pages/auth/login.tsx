@@ -28,6 +28,7 @@ interface LoginProps {
     canResetPassword: boolean;
     invitation?: WorkspaceInvitation | null;
     invitationToken?: string | null;
+    [key: string]: unknown;
 }
 
 export default function Login({ status, canResetPassword }: LoginProps) {
@@ -128,7 +129,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
 
                         <div className="text-center text-sm text-muted-foreground">
                             Don't have an account?{' '}
-                            <TextLink href={invitationToken ? `${register()}?invitation=${invitationToken}` : register()} tabIndex={5}>
+                            <TextLink href={invitationToken ? register({ query: { invitation: invitationToken } }).url : register().url} tabIndex={5}>
                                 Sign up
                             </TextLink>
                         </div>
