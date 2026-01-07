@@ -119,10 +119,10 @@ const AdsTab = forwardRef(({
     fetchAds
   }));
 
-  // Fetch ads on mount
+  // Fetch ads when filters change
   useEffect(() => {
     fetchAds();
-  }, []);
+  }, [searchQuery, statusFilter, filterConditions]);
 
   const columns: ColumnDef<Ad>[] = [
     {

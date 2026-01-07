@@ -120,10 +120,10 @@ const CampaignsTab = forwardRef(({
     fetchCampaigns
   }));
 
-  // Fetch campaigns on mount
+  // Fetch campaigns when filters change
   useEffect(() => {
     fetchCampaigns(1);
-  }, []);
+  }, [searchQuery, statusFilter, dateRange, filterConditions]);
 
   const columns: ColumnDef<Campaign>[] = [
     {

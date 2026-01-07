@@ -25,6 +25,31 @@ class CampaignController extends Controller
             ->when($request->start_date && $request->end_date, function ($query) use ($request) {
                 $query->whereBetween('start_time', [$request->start_date, $request->end_date]);
             })
+            ->when($request->filters, function ($query) use ($request) {
+                $filters = json_decode($request->filters, true);
+                if (is_array($filters)) {
+                    foreach ($filters as $filter) {
+                        $metric = $filter['metric'] ?? null;
+                        $operator = $filter['operator'] ?? null;
+                        $value = $filter['value'] ?? null;
+
+                        if ($metric && $operator && $value !== null) {
+                            // Map operator to SQL operator
+                            $sqlOperator = match($operator) {
+                                'gt' => '>',
+                                'gte' => '>=',
+                                'lt' => '<',
+                                'lte' => '<=',
+                                'eq' => '=',
+                                'neq' => '!=',
+                                default => '='
+                            };
+
+                            $query->where($metric, $sqlOperator, $value);
+                        }
+                    }
+                }
+            })
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
