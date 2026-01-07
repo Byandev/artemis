@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class WorkspaceMemberController extends Controller
 {
@@ -20,15 +22,59 @@ class WorkspaceMemberController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
-        $members = $workspace->users()
-            ->withPivot('role', 'created_at')
-            ->orderByPivot('created_at', 'desc')
-            ->get();
+        // Get members with pagination, sorting, and filtering
+        $members = QueryBuilder::for(User::class)
+            ->join('workspace_user', 'users.id', '=', 'workspace_user.user_id')
+            ->where('workspace_user.workspace_id', $workspace->id)
+            ->select(
+                'users.*',
+                'workspace_user.role as pivot_role',
+                'workspace_user.created_at as pivot_created_at'
+            )
+            ->allowedFilters([
+                AllowedFilter::callback('search', function ($query, $value) {
+                    $query->where(function ($q) use ($value) {
+                        $q->where('users.name', 'like', "%{$value}%")
+                            ->orWhere('users.email', 'like', "%{$value}%");
+                    });
+                }),
+            ])
+            ->allowedSorts([
+                'id',
+                'name',
+                'email',
+                'pivot_role',
+                'pivot_created_at',
+            ])
+            ->defaultSort('-pivot_created_at')
+            ->paginate($request->input('perPage', 10))
+            ->withQueryString()
+            ->through(function ($user) {
+                // Transform the flat pivot columns back into a nested pivot object
+                $user->pivot = (object) [
+                    'role' => $user->pivot_role,
+                    'created_at' => $user->pivot_created_at,
+                ];
+                unset($user->pivot_role, $user->pivot_created_at);
 
-        $pendingInvitations = $workspace->pendingInvitations()
+                return $user;
+            });
+
+        // Get pending invitations with pagination
+        $pendingInvitations = QueryBuilder::for($workspace->pendingInvitations()->getQuery())
             ->with('inviter')
-            ->latest()
-            ->get();
+            ->allowedFilters([
+                AllowedFilter::partial('search', 'email'),
+            ])
+            ->allowedSorts([
+                'id',
+                'email',
+                'role',
+                'expires_at',
+            ])
+            ->defaultSort('-created_at')
+            ->paginate($request->input('perPage', 10))
+            ->withQueryString();
 
         $isAdmin = $request->user()->isAdminOf($workspace);
 
@@ -37,6 +83,10 @@ class WorkspaceMemberController extends Controller
             'members' => $members,
             'pendingInvitations' => $pendingInvitations,
             'isAdmin' => $isAdmin,
+            'query' => [
+                ...$request->only(['sort', 'perPage', 'page']),
+                'filter' => $request->input('filter', []),
+            ],
         ]);
     }
 
