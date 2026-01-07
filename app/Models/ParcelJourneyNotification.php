@@ -31,7 +31,7 @@ class ParcelJourneyNotification extends Model
     protected static function booted(): void
     {
         static::created(function (ParcelJourneyNotification $parcelJourneyNotification) {
-            if (app()->environment('production')) {
+            if (config('settings.parcel_journey_notification_enabled')) {
                 dispatch(new SendParcelUpdateNotification($parcelJourneyNotification))->onQueue('parcel-notifications');
             }
         });
