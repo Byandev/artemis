@@ -49,7 +49,7 @@ class SyncOrder implements ShouldQueue
             $confirmedAtUtc = Carbon::createFromFormat('Y-m-d\TH:i:s', $confirmedHistory['updated_at'], 'UTC');
             $confirmed_at = $confirmedAtUtc->setTimezone(config('app.timezone'))->toDateTimeString();
 
-            $conferrer_id = $confirmedHistory['editor_fb']?: null;
+            $conferrer_id = $confirmedHistory['editor_fb'] ?: null;
         }
 
         if ($shippedHistory) {
@@ -90,8 +90,8 @@ class SyncOrder implements ShouldQueue
             'returning_at' => $returning_at,
             'assignee_id' => isset($order['assigning_seller']) ? $order['assigning_seller']['fb_id'] : null,
             'last_editor_id' => isset($order['last_editor']) ? $order['last_editor']['fb_id'] : null,
-            'customer_succeed_order_count' => $order['customer']['succeed_order_count']?: 0,
-            'customer_returned_order_count' => $order['customer']['returned_order_count']?: 0,
+            'customer_succeed_order_count' => $order['customer']['succeed_order_count'] ?: 0,
+            'customer_returned_order_count' => $order['customer']['returned_order_count'] ?: 0,
             'conferrer_id' => $conferrer_id,
         ]);
 
@@ -159,7 +159,7 @@ class SyncOrder implements ShouldQueue
                     collect($order['tags'])
                         ->map(function ($tag) use ($savedOrder) {
                             return [
-                                'order_id' =>$savedOrder->id,
+                                'order_id' => $savedOrder->id,
                                 'tag_id' => $tag['id'],
                                 'name' => $tag['name'],
                             ];
