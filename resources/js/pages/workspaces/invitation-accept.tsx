@@ -1,9 +1,8 @@
-import React from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, LogIn } from "lucide-react";
-import { Link } from "@inertiajs/react";
+import { Card, CardContent } from "@/components/ui/card";
 import { WorkspaceInvitation } from "@/types/models/WorkspaceInvitation";
+import { Link } from "@inertiajs/react";
+import { CheckCircle, LogIn, UserPlus } from "lucide-react";
 
 interface InvitationAcceptProps {
     invitation: WorkspaceInvitation;
@@ -58,11 +57,21 @@ export default function InvitationAccept({ invitation, isAuthenticated, accepted
                                     <Button className="w-full py-3 rounded-xl text-base">Accept Invitation</Button>
                                 </Link>
                             ) : (
-                                <Link href={`/login?invitation=${invitation.token}`}>
-                                    <Button className="w-full py-3 rounded-xl text-base flex items-center gap-2 justify-center">
-                                        <LogIn className="w-5 h-5" /> Login to Accept
-                                    </Button>
-                                </Link>
+                                <div className="space-y-3 w-full">
+                                    <Link href={`/register?invitation=${invitation.token}`}>
+                                        <Button className="w-full py-3 rounded-xl text-base flex items-center gap-2 justify-center">
+                                            <UserPlus className="w-5 h-5" /> Create Account
+                                        </Button>
+                                    </Link>
+                                    <Link href={`/login?invitation=${invitation.token}`}>
+                                        <Button variant="outline" className="w-full py-3 rounded-xl text-base flex items-center gap-2 justify-center">
+                                            <LogIn className="w-5 h-5" /> Login Instead
+                                        </Button>
+                                    </Link>
+                                    <p className="text-xs text-gray-500 text-center">
+                                        Don't have an account? Create one to accept the invitation.
+                                    </p>
+                                </div>
                             )}
                         </>
                     )}
