@@ -103,13 +103,6 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
             ),
         },
         {
-            accessorKey: 'category',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Category'} />
-            ),
-            cell: ({ row }) => row.original.category || '-',
-        },
-        {
             accessorKey: 'status',
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Status'} />
