@@ -108,4 +108,14 @@ class WorkspaceInvitation extends Model
         return $query->whereNull('accepted_at')
             ->where('expires_at', '<=', now());
     }
+
+    /**
+     * Scope to get a valid invitation by token.
+     */
+    public function scopeValid($query, $token)
+    {
+        return $query->where('token', $token)
+            ->whereNull('accepted_at')
+            ->where('expires_at', '>', now());
+    }
 }
