@@ -11,6 +11,14 @@ interface Campaign {
   daily_budget: number | null;
   start_time: string;
   end_time: string | null;
+  impressions?: number;
+  clicks?: number;
+  spend?: number;
+  cpm?: number;
+  ctr?: number;
+  conversions?: number;
+  cpc?: number;
+  roas?: number;
   ad_account: {
     id: number;
     name: string;
@@ -136,6 +144,31 @@ const CampaignsTab = forwardRef(({
       accessorKey: 'status',
       header: ({ column }) => <SortableHeader column={column} title="Status" />,
       cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    },
+    {
+      accessorKey: 'impressions',
+      header: ({ column }) => <SortableHeader column={column} title="Impressions" />,
+      cell: ({ row }) => Number(row.original.impressions || 0).toLocaleString(),
+    },
+    {
+      accessorKey: 'clicks',
+      header: ({ column }) => <SortableHeader column={column} title="Clicks" />,
+      cell: ({ row }) => Number(row.original.clicks || 0).toLocaleString(),
+    },
+    {
+      accessorKey: 'spend',
+      header: ({ column }) => <SortableHeader column={column} title="Spend" />,
+      cell: ({ row }) => `₱${Number(row.original.spend || 0).toFixed(2)}`,
+    },
+    {
+      accessorKey: 'conversions',
+      header: ({ column }) => <SortableHeader column={column} title="Conversions" />,
+      cell: ({ row }) => Number(row.original.conversions || 0).toLocaleString(),
+    },
+    {
+      accessorKey: 'ctr',
+      header: ({ column }) => <SortableHeader column={column} title="CTR" />,
+      cell: ({ row }) => `${Number(row.original.ctr || 0).toFixed(2)}%`,
     },
     {
       accessorKey: 'daily_budget',

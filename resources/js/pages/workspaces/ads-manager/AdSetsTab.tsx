@@ -138,6 +138,31 @@ const AdSetsTab = forwardRef(({
       cell: ({ row }) => <StatusBadge status={row.original.status} />,
     },
     {
+      accessorKey: 'impressions',
+      header: ({ column }) => <SortableHeader column={column} title="Impressions" />,
+      cell: ({ row }) => Number(row.original.impressions || 0).toLocaleString(),
+    },
+    {
+      accessorKey: 'clicks',
+      header: ({ column }) => <SortableHeader column={column} title="Clicks" />,
+      cell: ({ row }) => Number(row.original.clicks || 0).toLocaleString(),
+    },
+    {
+      accessorKey: 'spend',
+      header: ({ column }) => <SortableHeader column={column} title="Spend" />,
+      cell: ({ row }) => `₱${Number(row.original.spend || 0).toFixed(2)}`,
+    },
+    {
+      accessorKey: 'conversions',
+      header: ({ column }) => <SortableHeader column={column} title="Conversions" />,
+      cell: ({ row }) => Number(row.original.conversions || 0).toLocaleString(),
+    },
+    {
+      accessorKey: 'ctr',
+      header: ({ column }) => <SortableHeader column={column} title="CTR" />,
+      cell: ({ row }) => `${Number(row.original.ctr || 0).toFixed(2)}%`,
+    },
+    {
       accessorKey: 'daily_budget',
       header: ({ column }) => <SortableHeader column={column} title="Daily Budget" />,
       cell: ({ row }) => 
