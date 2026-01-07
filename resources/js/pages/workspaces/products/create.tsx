@@ -1,6 +1,6 @@
 ﻿import { Workspace } from '@/types/models/Workspace';
 import { Page } from '@/types/models/Page';
-import AppLayout from '@/layouts/app-layout';
+import ProductLayout from '@/pages/workspaces/products/partials/layout';
 import { Head, useForm } from '@inertiajs/react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -43,7 +43,7 @@ const Create = ({ workspace, pages }: PageProps) => {
     };
 
     return (
-        <AppLayout>
+        <ProductLayout workspace={workspace}>
             <Head title={`${workspace.name} - Create Product`} />
             <div className="container max-w-5xl mx-auto py-8 px-4">
                 <div className="mb-8">
@@ -183,7 +183,7 @@ const Create = ({ workspace, pages }: PageProps) => {
                     </CardContent>
                 </Card>
             </div>
-        </AppLayout>
+        </ProductLayout>
     );
 };
 
