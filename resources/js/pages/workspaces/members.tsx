@@ -9,7 +9,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -44,6 +43,7 @@ import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import clsx from 'clsx';
 import { omit } from 'lodash';
 import { MoreHorizontal, Send, Trash2, UserMinus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -83,6 +83,32 @@ interface Props {
         };
     };
 }
+
+type RoleBadgeConfig = {
+    label: string;
+    className: string;
+};
+
+const ROLE_BADGE_CONFIG: Record<string, RoleBadgeConfig> = {
+    owner: { label: 'OWNER', className: 'bg-indigo-50 text-indigo-700 ring-indigo-200' },
+    admin: { label: 'ADMIN', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+    member: { label: 'MEMBER', className: 'bg-zinc-50 text-zinc-700 ring-zinc-200' },
+};
+
+const RoleBadge = ({ role }: { role: string }) => {
+    const config = ROLE_BADGE_CONFIG[role] ?? { label: role.toUpperCase(), className: 'bg-gray-50 text-gray-700 ring-gray-200' };
+
+    return (
+        <span
+            className={clsx(
+                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset',
+                config.className
+            )}
+        >
+            {config.label}
+        </span>
+    );
+};
 
 export default function WorkspaceMembers({ workspace, members, pendingInvitations, isAdmin, query }: Props) {
     const initialSorting = useMemo(() => {
@@ -172,17 +198,6 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
         });
     };
 
-    const getRoleBadgeVariant = (role: string): "default" | "secondary" | "destructive" | "outline" => {
-        switch (role) {
-            case 'owner':
-                return 'default';
-            case 'admin':
-                return 'secondary';
-            default:
-                return 'outline';
-        }
-    };
-
     const membersColumns: ColumnDef<User>[] = [
         {
             accessorKey: 'id',
@@ -229,11 +244,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                     );
                 }
 
-                return (
-                    <Badge variant={getRoleBadgeVariant(member.pivot.role)}>
-                        {member.pivot.role}
-                    </Badge>
-                );
+                return <RoleBadge role={member.pivot.role} />;
             },
         },
         {
@@ -293,11 +304,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Role'} />
             ),
-            cell: ({ row }) => (
-                <Badge variant={getRoleBadgeVariant(row.original.role)}>
-                    {row.original.role}
-                </Badge>
-            ),
+            cell: ({ row }) => <RoleBadge role={row.original.role} />,
         },
         {
             accessorKey: 'inviter.name',
