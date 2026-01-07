@@ -15,11 +15,12 @@ class ProductController extends Controller
         $query = Product::ofWorkspace($workspace)->with('owner');
 
         // Search filter (search by name and code only)
-        if ($request->filled('search')) {
-            $search = $request->search;
+        $search = $request->input('filter.search') ?? $request->get('search');
+        if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
+                    ->orWhere('code', 'like', "%{$search}%")
+                    ->orWhere('sku', 'like', "%{$search}%");
             });
         }
 
@@ -33,9 +34,24 @@ class ProductController extends Controller
             $query->where('status', $request->status);
         }
 
-        // Sorting
-        $sortField = $request->get('sort', 'created_at');
-        $sortDirection = $request->get('direction', 'desc');
+        // Sorting - handle both "field:direction" and separate "sort" + "direction" params
+        $sortParam = $request->get('sort', '-created_at');
+        $sortDirection = 'desc';
+        $sortField = 'created_at';
+
+        if (str_contains($sortParam, ':')) {
+            // Format: "name:asc" or "name:desc"
+            [$sortField, $sortDirection] = explode(':', $sortParam);
+            $sortField = ltrim($sortField, '-');
+        } elseif (str_starts_with($sortParam, '-')) {
+            // Format: "-name" (desc) or "name" (asc)
+            $sortField = ltrim($sortParam, '-');
+            $sortDirection = 'desc';
+        } else {
+            $sortField = $sortParam;
+            $sortDirection = $request->get('direction', 'asc');
+        }
+
         $query->orderBy($sortField, $sortDirection);
 
         $products = $query->paginate(10)->withQueryString();
@@ -51,12 +67,13 @@ class ProductController extends Controller
         return Inertia::render('workspaces/products/index', [
             'products' => $products,
             'workspace' => $workspace,
-            'filters' => [
-                'search' => $request->search ?? '',
-                'category' => $request->category ?? '',
-                'status' => $request->status ?? '',
-                'sort' => $sortField,
-                'direction' => $sortDirection,
+            'query' => [
+                'filter' => [
+                    'search' => $search ?? '',
+                    'category' => $request->category ?? '',
+                    'status' => $request->status ?? '',
+                ],
+                'sort' => $sortParam,
             ],
             'categories' => $categories,
         ]);
