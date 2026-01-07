@@ -26,9 +26,7 @@ class RegisteredUserController extends Controller
         // Check if there's an invitation token
         if ($request->has('invitation')) {
             $invitation = WorkspaceInvitation::with(['workspace'])
-                ->where('token', $request->invitation)
-                ->whereNull('accepted_at')
-                ->where('expires_at', '>', now())
+                ->valid($request->invitation)
                 ->first();
         }
 
@@ -66,9 +64,7 @@ class RegisteredUserController extends Controller
         // Check if there's an invitation to auto-accept
         if ($request->has('invitation')) {
             $invitation = WorkspaceInvitation::with('workspace')
-                ->where('token', $request->invitation)
-                ->whereNull('accepted_at')
-                ->where('expires_at', '>', now())
+                ->valid($request->invitation)
                 ->first();
 
             if ($invitation && strcasecmp($user->email, $invitation->email) === 0) {
