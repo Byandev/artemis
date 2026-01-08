@@ -52,7 +52,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
             )}
 
             <Form
-                {...AuthenticatedSessionController.store.form()}
+                {...AuthenticatedSessionController.store()}
                 resetOnSuccess={['password']}
                 className="flex flex-col gap-6"
             >

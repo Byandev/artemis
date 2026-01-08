@@ -32,7 +32,7 @@ class FetchAdSets implements ShouldQueue
         while ($cont) {
             sleep(1);
             $params = [
-                'fields' => 'id,name,account_id,status,campaign_id,daily_budget',
+                'fields' => 'id,name,account_id,status,campaign_id,daily_budget,effective_status',
                 'access_token' => $this->facebookAccount->access_token,
                 'limit' => 1000,
             ];
@@ -55,6 +55,7 @@ class FetchAdSets implements ShouldQueue
                     'campaign_id' => $adSet['campaign_id'],
                     'ad_account_id' => $adSet['account_id'],
                     'name' => $adSet['name'],
+                    'effective_status' => $adSet['effective_status'],
                     'status' => $adSet['status'],
                     'daily_budget' => isset($adSet['daily_budget'])
                         ? $adSet['daily_budget'] / 100 : 0,

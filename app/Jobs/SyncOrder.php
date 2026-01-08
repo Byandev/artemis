@@ -160,8 +160,8 @@ class SyncOrder implements ShouldQueue
                         ->map(function ($tag) use ($savedOrder) {
                             return [
                                 'order_id' => $savedOrder->id,
-                                'tag_id' => $tag['id'],
-                                'name' => $tag['name'],
+                                'tag_id' => $tag['id'] ?? 0,
+                                'name' => $tag['name'] ?? '',
                             ];
                         })
                         ->values()
