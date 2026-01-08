@@ -1,16 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
-import { Head } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
-import { Grid3x3, List, RefreshCw } from 'lucide-react';
-import AppLayout from '@/layouts/app-layout';
 import ComponentCard from '@/components/common/ComponentCard';
-import { Workspace } from '@/types/models/Workspace';
+import { Button } from '@/components/ui/button';
 import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
-import { addDays } from 'date-fns';
-import { DateRange } from 'react-day-picker';
-import CampaignsTab from './CampaignsTab';
+import { useDateRange } from '@/hooks/use-date-range';
+import AppLayout from '@/layouts/app-layout';
+import { Workspace } from '@/types/models/Workspace';
+import { Head } from '@inertiajs/react';
+import { Grid3x3, List } from 'lucide-react';
+import moment from 'moment';
+import { useEffect, useRef, useState } from 'react';
 import AdSetsTab from './AdSetsTab';
 import AdsTab from './AdsTab';
+import CampaignsTab from './CampaignsTab';
 
 type TabType = 'campaigns' | 'adSets' | 'ads' | 'optimizationRules' | 'optimizationLogs';
 
@@ -22,11 +22,18 @@ const AdsManager = ({ workspace }: PageProps) => {
   const [activeTab, setActiveTab] = useState<TabType>('campaigns');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: addDays(new Date(), -30),
-    to: new Date(),
-  });
+  const { dateRange, setDateRange } = useDateRange();
   const [loading, setLoading] = useState(false);
+
+  // Initialize date range if global state is empty
+  useEffect(() => {
+    if (!dateRange) {
+      setDateRange({
+        from: moment().startOf('month').toDate(),
+        to: moment().toDate()
+      });
+    }
+  }, []);
 
   // Refs to trigger fetch from child components
   const campaignsTabRef = useRef<any>(null);
@@ -37,7 +44,7 @@ const AdsManager = ({ workspace }: PageProps) => {
     const timeoutId = setTimeout(() => {
       handleRefresh();
     }, 300);
-    
+
     return () => clearTimeout(timeoutId);
   }, [activeTab, searchQuery, statusFilter, dateRange]);
 
@@ -138,51 +145,46 @@ const AdsManager = ({ workspace }: PageProps) => {
           <div className="flex gap-6">
             <button
               onClick={() => setActiveTab('campaigns')}
-              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'campaigns'
-                  ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'campaigns'
+                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
             >
               Campaigns
             </button>
             <button
               onClick={() => setActiveTab('adSets')}
-              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'adSets'
-                  ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'adSets'
+                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
             >
               Ad Sets
             </button>
             <button
               onClick={() => setActiveTab('ads')}
-              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'ads'
-                  ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'ads'
+                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
             >
               Ads
             </button>
             <button
               onClick={() => setActiveTab('optimizationRules')}
-              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'optimizationRules'
-                  ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'optimizationRules'
+                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
             >
               Optimization Rules
             </button>
             <button
               onClick={() => setActiveTab('optimizationLogs')}
-              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'optimizationLogs'
-                  ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'optimizationLogs'
+                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
             >
               Optimization Logs
             </button>
@@ -219,11 +221,7 @@ const AdsManager = ({ workspace }: PageProps) => {
                     <option value="PAUSED">Paused</option>
                     <option value="ARCHIVED">Archived</option>
                   </select>
-                  <SimpleDateRangePicker
-                    value={dateRange}
-                    onChange={setDateRange}
-                    placeholder="Select date range"
-                  />
+                  <SimpleDateRangePicker useGlobalState />
                   <Button variant="outline" size="icon">
                     <Grid3x3 className="h-4 w-4" />
                   </Button>
