@@ -6,10 +6,10 @@ import { DateRange } from "react-day-picker"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useDateRange } from "@/hooks/use-date-range"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { isPresetSelected as checkPresetSelected, DatePreset, dateRangePresets, PresetIconType } from "@/lib/date-presets"
 import { cn } from "@/lib/utils"
-import { useDateRange } from "@/hooks/use-date-range"
 
 interface SimpleDateRangePickerProps {
   value?: DateRange
@@ -38,15 +38,20 @@ export function SimpleDateRangePicker({
   const actualOnChange = useGlobalState ? globalState.setDateRange : onChange
 
   const [open, setOpen] = React.useState(false)
-  const [tempValue, setTempValue] = React.useState<DateRange | undefined>(value)
+  const [tempValue, setTempValue] = React.useState<DateRange | undefined>(actualValue)
   const isMobile = useIsMobile()
 
-  // Update temp value when popover opens
+  // Update temp value when popover opens or when actualValue changes
   React.useEffect(() => {
     if (open) {
-      setTempValue(value)
+      setTempValue(actualValue)
     }
   }, [open, actualValue])
+
+  // Sync tempValue with actualValue when component mounts or actualValue changes externally
+  React.useEffect(() => {
+    setTempValue(actualValue)
+  }, [actualValue])
 
   const formatDateRange = (dateRange?: DateRange): string => {
     if (!dateRange?.from) {
@@ -111,7 +116,7 @@ export function SimpleDateRangePicker({
         <div className="flex flex-col md:flex-row">
           {/* Presets Section */}
           {!isMobile && (
-            <div className="border-r border-gray-200 dark:border-gray-700 bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-950 w-56 p-2">
+            <div className="border-r border-gray-200 dark:border-gray-700 bg-linear-to-b from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-950 w-56 p-2">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2 px-3 py-1.5 mb-2">
                   <div className="h-1 w-1 rounded-full bg-primary animate-pulse" />
@@ -121,7 +126,8 @@ export function SimpleDateRangePicker({
                 </div>
                 <div className="space-y-0.5">
                   {dateRangePresets.map((preset) => {
-                    const isSelected = checkPresetSelected(preset, tempValue)
+                    // Check against tempValue when popover is open, actualValue when closed or initially loading
+                    const isSelected = checkPresetSelected(preset, open ? tempValue : actualValue)
                     return (
                       <button
                         key={preset.label}
@@ -180,7 +186,7 @@ export function SimpleDateRangePicker({
                 selected={tempValue}
                 onSelect={handleCalendarSelect}
                 numberOfMonths={isMobile ? 1 : 2}
-                defaultMonth={tempValue?.from || value?.from}
+                defaultMonth={tempValue?.from || actualValue?.from}
                 className="text-[0.7rem] p-1.5 [&_button[data-range-middle=true]]:bg-gray-100 [&_button[data-range-middle=true]]:text-gray-900 dark:[&_button[data-range-middle=true]]:bg-gray-800 dark:[&_button[data-range-middle=true]]:text-gray-100 [&_button[data-range-middle=true]]:hover:bg-gray-200 dark:[&_button[data-range-middle=true]]:hover:bg-gray-700 [&_button[data-range-start=true]]:relative [&_button[data-range-start=true]]:z-10 [&_button[data-range-end=true]]:relative [&_button[data-range-end=true]]:z-10 [&_.text-\\[0\\.8rem\\]]:text-[0.65rem] [&_.text-muted-foreground]:text-[0.65rem] [&_.font-medium]:text-[0.7rem]"
               />
             </div>
