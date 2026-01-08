@@ -23,7 +23,7 @@ class SendParcelUpdateNotification implements ShouldQueue
      */
     public function handle(): void
     {
-        if (! app()->environment('production')) {
+        if (! config('settings.parcel_journey_notification_enabled')) {
             return;
         }
 
