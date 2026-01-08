@@ -197,4 +197,9 @@ class Order extends Model
                 return $builder->orderBy($sortBy, $sortDir);
         }
     }
+
+    public function tags(): Order|\Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(OrderTag::class);
+    }
 }

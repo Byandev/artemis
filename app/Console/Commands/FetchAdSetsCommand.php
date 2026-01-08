@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-
 use App\Jobs\AdsManager\FetchAdSets;
 use App\Models\FacebookAccount;
 use Illuminate\Console\Command;

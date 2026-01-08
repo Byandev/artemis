@@ -18,26 +18,6 @@ class ParcelUpdateNotificationController extends Controller
 {
     public function index(Workspace $workspace, Request $request)
     {
-        // Prepare lists for filters
-        $baseResults = ParcelJourneyNotification::query()
-            ->whereHas('order', function ($query) use ($workspace) {
-                $query->where('workspace_id', $workspace->id);
-            })
-            ->with(['order.page.product'])
-            ->get();
-
-        $pages = $baseResults->pluck('order.page.name')
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
-        $types = $baseResults->pluck('type')
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
         // Build filtered and sorted query using QueryBuilder
         $notifications = QueryBuilder::for(
             ParcelJourneyNotification::query()
@@ -65,8 +45,8 @@ class ParcelUpdateNotificationController extends Controller
         return Inertia::render('workspaces/rts/parcel-update-notification', [
             'workspace' => $workspace,
             'notifications' => $notifications,
-            'pages' => $pages,
-            'types' => $types,
+            'pages' => [],
+            'types' => [],
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
