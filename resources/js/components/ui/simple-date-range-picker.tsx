@@ -192,7 +192,17 @@ export function SimpleDateRangePicker({
 
           {/* Calendar Section */}
           <div className="flex flex-col flex-1">
-            <div className="flex items-center justify-end gap-2 p-2 md:p-2 border-b">
+            <div className="flex justify-center md:justify-end">
+              <Calendar
+                mode="range"
+                selected={tempValue}
+                onSelect={handleCalendarSelect}
+                numberOfMonths={isMobile ? 1 : 2}
+                defaultMonth={tempValue?.from || value?.from}
+                className="text-[0.7rem] md:text-[0.7rem] p-2 md:p-1.5 [&_button[data-range-middle=true]]:bg-gray-100 [&_button[data-range-middle=true]]:text-gray-900 dark:[&_button[data-range-middle=true]]:bg-gray-800 dark:[&_button[data-range-middle=true]]:text-gray-100 [&_button[data-range-middle=true]]:hover:bg-gray-200 dark:[&_button[data-range-middle=true]]:hover:bg-gray-700 [&_button[data-range-start=true]]:relative [&_button[data-range-start=true]]:z-10 [&_button[data-range-end=true]]:relative [&_button[data-range-end=true]]:z-10 [&_.text-\[0\.8rem\]]:text-[0.65rem] [&_.text-muted-foreground]:text-[0.65rem] [&_.font-medium]:text-[0.7rem]"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 p-2 md:p-2 border-t">
               <Button
                 variant="ghost"
                 size="sm"
@@ -208,16 +218,6 @@ export function SimpleDateRangePicker({
               >
                 Apply
               </Button>
-            </div>
-            <div className="flex justify-center md:justify-end">
-              <Calendar
-                mode="range"
-                selected={tempValue}
-                onSelect={handleCalendarSelect}
-                numberOfMonths={isMobile ? 1 : 2}
-                defaultMonth={tempValue?.from || actualValue?.from}
-                className="text-[0.7rem] md:text-[0.7rem] p-2 md:p-1.5 [&_button[data-range-middle=true]]:bg-gray-100 [&_button[data-range-middle=true]]:text-gray-900 dark:[&_button[data-range-middle=true]]:bg-gray-800 dark:[&_button[data-range-middle=true]]:text-gray-100 [&_button[data-range-middle=true]]:hover:bg-gray-200 dark:[&_button[data-range-middle=true]]:hover:bg-gray-700 [&_button[data-range-start=true]]:relative [&_button[data-range-start=true]]:z-10 [&_button[data-range-end=true]]:relative [&_button[data-range-end=true]]:z-10 [&_.text-\[0\.8rem\]]:text-[0.65rem] [&_.text-muted-foreground]:text-[0.65rem] [&_.font-medium]:text-[0.7rem]"
-              />
             </div>
           </div>
         </div>
