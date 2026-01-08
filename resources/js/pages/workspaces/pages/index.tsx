@@ -142,7 +142,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
         {
             accessorKey: 'current_budget',
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Owner'} />
+                <SortableHeader column={column} title={'Current Budget'} enabled={false} />
             ),
             cell: ({ row }) => currencyFormatter(row.original.current_budget ?? 0),
         },

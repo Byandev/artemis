@@ -61,7 +61,8 @@ class FetchCampaigns implements ShouldQueue
                     'end_time' => isset($campaign['end_time']) ? Carbon::parse($campaign['end_time'])
                         ->setTimezone('Asia/Manila')
                         ->format('Y-m-d H:i:s') : null,
-                    'daily_budget' => $campaign['daily_budget'] ?? null,
+                    'daily_budget' => isset($campaign['daily_budget'])
+                        ? $campaign['daily_budget'] / 100 : 0,
                     'effective_status' => $campaign['effective_status'],
                 ]);
             }
