@@ -26,8 +26,8 @@ import { Edit2, Plus, Trash2 } from 'lucide-react';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import { type DateRange } from 'react-day-picker';
-import { OptimizationRuleDialog } from '../OptimizationRuleDialog';
-import AdsManagerLayout from '../partials/Layout';
+import { OptimizationRuleDialog } from './OptimizationRuleDialog';
+import AdsManagerLayout from './partials/Layout';
 
 type OptimizationRuleStatus = {
     label: string;
