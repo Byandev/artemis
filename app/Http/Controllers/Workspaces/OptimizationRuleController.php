@@ -6,6 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\OptimizationRule;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class OptimizationRuleController extends Controller
 {
@@ -14,34 +18,24 @@ class OptimizationRuleController extends Controller
      */
     public function index(Workspace $workspace, Request $request)
     {
-        $query = OptimizationRule::where('workspace_id', $workspace->id);
-
-        // Handle sorting
-        if ($request->has('sort')) {
-            $sortFields = explode(',', $request->sort);
-            
-            foreach ($sortFields as $sortField) {
-                $direction = 'asc';
-                $field = $sortField;
-                
-                // Check if descending (prefixed with -)
-                if (str_starts_with($sortField, '-')) {
-                    $direction = 'desc';
-                    $field = substr($sortField, 1);
-                }
-                
-                // Validate and apply sorting
-                $allowedSorts = ['name', 'description', 'target', 'action', 'status', 'created_at', 'updated_at'];
-                if (in_array($field, $allowedSorts)) {
-                    $query->orderBy($field, $direction);
-                }
-            }
-        } else {
-            // Default sorting
-            $query->orderBy('created_at', 'desc');
-        }
-
-        $rules = $query->paginate(20);
+        $rules = QueryBuilder::for(OptimizationRule::class)
+            ->where('workspace_id', $workspace->id)
+            ->allowedFilters([
+                AllowedFilter::scope('search'),
+                AllowedFilter::exact('status'),
+            ])
+            ->allowedSorts([
+                'name',
+                'description',
+                'target',
+                'action',
+                'status',
+                'created_at',
+                'updated_at',
+            ])
+            ->defaultSort('-created_at')
+            ->paginate($request->get('perPage', 20))
+            ->withQueryString();
 
         return response()->json($rules);
     }

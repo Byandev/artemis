@@ -90,11 +90,11 @@ export const OptimizationRuleDialog = ({
 
             if (editingRule) {
                 await axios.put(
-                    `/workspaces/${workspace.id}/api/optimization-rules/${editingRule.id}`,
+                    `/workspaces/${workspace.slug}/api/optimization-rules/${editingRule.id}`,
                     payload
                 );
             } else {
-                await axios.post(`/workspaces/${workspace.id}/api/optimization-rules`, payload);
+                await axios.post(`/workspaces/${workspace.slug}/api/optimization-rules`, payload);
             }
 
             onSuccess();

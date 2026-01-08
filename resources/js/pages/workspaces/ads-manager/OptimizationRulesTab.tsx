@@ -1,107 +1,149 @@
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
+import { toFrontendSort } from '@/lib/sort';
+import { PaginatedData } from '@/types';
 import { OptimizationRule, OptimizationRuleCondition } from '@/types/models/OptimizationRule';
 import { Workspace } from '@/types/models/Workspace';
+import { router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
+import clsx from 'clsx';
+import { omit } from 'lodash';
 import { Edit2, Plus, Trash2 } from 'lucide-react';
-import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { OptimizationRuleDialog } from './OptimizationRuleDialog';
 
-interface PaginationLinks {
-    url: string | null;
+type OptimizationRuleStatus = {
     label: string;
-    active: boolean;
-}
+    className: string;
+};
 
-interface PaginatedRules {
-    data: OptimizationRule[];
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-    links: PaginationLinks[];
-    from: number;
-    to: number;
-}
+const OPTIMIZATION_RULE_STATUS: Record<string, OptimizationRuleStatus> = {
+    active: {
+        label: 'ACTIVE',
+        className: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    },
+    paused: {
+        label: 'PAUSED',
+        className: 'bg-amber-50 text-amber-800 ring-amber-200',
+    },
+};
 
-interface StatusBadgeProps {
-    status: string;
-}
-
-const StatusBadge = ({ status }: StatusBadgeProps) => {
-    const getStatusColor = (status: string) => {
-        switch (status.toLowerCase()) {
-            case 'active':
-                return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
-            case 'paused':
-                return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
-            default:
-                return 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400';
-        }
-    };
+const StatusBadge = ({ status }: { status: string }) => {
+    const item =
+        OPTIMIZATION_RULE_STATUS[status] ??
+        { label: `UNKNOWN (${status})`, className: 'bg-red-50 text-red-700 ring-red-200' };
 
     return (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(status)}`}>
-            {status}
+        <span
+            className={clsx(
+                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset',
+                item.className
+            )}
+        >
+            {item.label}
         </span>
     );
 };
 
 interface OptimizationRulesTabProps {
     workspace: Workspace;
-    searchQuery: string;
-    statusFilter: string;
+    rules: PaginatedData<OptimizationRule>;
+    query?: {
+        sort?: string | null;
+        perPage?: number | string;
+        page?: number | string;
+        filter?: {
+            search?: string;
+            status?: string;
+        };
+    };
     dateRange: { from: Date; to: Date };
-    loading: boolean;
-    setLoading: (loading: boolean) => void;
 }
 
-const OptimizationRulesTab = forwardRef(({
+const OptimizationRulesTab = ({
     workspace,
-    searchQuery,
-    statusFilter,
+    rules,
+    query,
     dateRange,
-    loading,
-    setLoading,
-}: OptimizationRulesTabProps, ref) => {
-    const [rules, setRules] = useState<PaginatedRules | null>(null);
+}: OptimizationRulesTabProps) => {
+    const initialSorting = useMemo(() => {
+        return toFrontendSort(query?.sort ?? null);
+    }, [query?.sort]);
+
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [statusFilter, setStatusFilter] = useState(query?.filter?.status ?? '');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingRule, setEditingRule] = useState<OptimizationRule | null>(null);
+    const [ruleToDelete, setRuleToDelete] = useState<OptimizationRule | null>(null);
 
-    const fetchRules = async (page: number = 1, sort?: string) => {
-        setLoading(true);
-        try {
-            const response = await axios.get(`/workspaces/${workspace.id}/api/optimization-rules`, {
-                params: {
-                    page,
-                    sort,
-                },
-            });
-            setRules(response.data);
-        } catch (error) {
-            console.error('Error fetching optimization rules:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useImperativeHandle(ref, () => ({
-        fetchRules,
-    }));
-
+    // Debounce search
     useEffect(() => {
-        fetchRules();
-    }, [workspace.id]);
+        const currentSearchParam = query?.filter?.search ?? '';
 
-    const handleDelete = async (ruleId: number) => {
-        if (!confirm('Are you sure you want to delete this optimization rule?')) {
+        if (searchValue === currentSearchParam) {
             return;
         }
 
+        const timer = setTimeout(() => {
+            router.get(
+                `/workspaces/${workspace.slug}/ads-manager`,
+                {
+                    sort: query?.sort,
+                    'filter[search]': searchValue || undefined,
+                    'filter[status]': statusFilter || undefined,
+                    page: 1,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['rules'],
+                },
+            );
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchValue, query?.filter?.search]);
+
+    const handleStatusFilterChange = (value: string) => {
+        setStatusFilter(value);
+
+        router.get(
+            `/workspaces/${workspace.slug}/ads-manager`,
+            {
+                sort: query?.sort,
+                'filter[search]': searchValue || undefined,
+                'filter[status]': value || undefined,
+                page: 1,
+            },
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['rules'],
+            },
+        );
+    };
+
+    const handleDelete = async () => {
+        if (!ruleToDelete) return;
+
         try {
-            await axios.delete(`/workspaces/${workspace.id}/api/optimization-rules/${ruleId}`);
-            fetchRules(rules?.current_page || 1);
+            await axios.delete(`/workspaces/${workspace.slug}/api/optimization-rules/${ruleToDelete.id}`);
+            setRuleToDelete(null);
+            router.reload({ only: ['rules'] });
         } catch (error) {
             console.error('Error deleting optimization rule:', error);
             alert('Failed to delete optimization rule');
@@ -119,7 +161,7 @@ const OptimizationRulesTab = forwardRef(({
     };
 
     const handleDialogSuccess = () => {
-        fetchRules(rules?.current_page || 1);
+        router.reload({ only: ['rules'] });
         handleDialogClose();
     };
 
@@ -201,7 +243,6 @@ const OptimizationRulesTab = forwardRef(({
         },
         {
             id: 'actions',
-            header: ({ column }) => <SortableHeader column={column} title="Actions" enabled={false} />,
             cell: ({ row }) => (
                 <div className="flex items-center gap-2">
                     <Button
@@ -214,7 +255,7 @@ const OptimizationRulesTab = forwardRef(({
                     <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDelete(row.original.id)}
+                        onClick={() => setRuleToDelete(row.original)}
                     >
                         <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
@@ -225,35 +266,68 @@ const OptimizationRulesTab = forwardRef(({
 
     return (
         <div>
-            <div className="px-4 py-3 border-b border-gray-100 dark:border-white/[0.05] flex justify-between items-center">
+            <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/5">
+                <input
+                    className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3 dark:bg-gray-900 dark:placeholder:text-white/30 bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90 dark:focus:border-brand-800"
+                    placeholder="Search optimization rules..."
+                    value={searchValue}
+                    onChange={(e) => setSearchValue(e.target.value)}
+                />
+                <div className="flex items-center gap-2 relative z-50">
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => handleStatusFilterChange(e.target.value)}
+                        className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 dark:focus:border-brand-800"
+                    >
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="paused">Paused</option>
+                    </select>
+                    <SimpleDateRangePicker
+                        value={{ from: dateRange.from, to: dateRange.to }}
+                        onChange={(newRange) => {
+                            // Date range update logic can be added here if needed
+                            console.log('Date range updated:', newRange);
+                        }}
+                    />
+                    <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => setIsDialogOpen(true)}
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Rule
+                    </Button>
+                </div>
+            </div>
+
+            <div className="border-t border-gray-100 dark:border-white/5 px-4 py-3">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                     {rules ? `${rules.total} optimization rule${rules.total !== 1 ? 's' : ''}` : 'Loading...'}
                 </div>
-                <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => setIsDialogOpen(true)}
-                >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Rule
-                </Button>
             </div>
 
             <DataTable
                 columns={columns}
                 data={rules?.data || []}
                 enableInternalPagination={false}
-                meta={rules ? {
-                    current_page: rules.current_page,
-                    last_page: rules.last_page,
-                    per_page: rules.per_page,
-                    total: rules.total,
-                    from: rules.from,
-                    to: rules.to,
-                    links: rules.links,
-                } : undefined}
+                initialSorting={initialSorting}
+                meta={{ ...omit(rules, ['data']) }}
                 onFetch={(params) => {
-                    fetchRules(params?.page || 1, params?.sort);
+                    router.get(
+                        `/workspaces/${workspace.slug}/ads-manager`,
+                        {
+                            sort: params?.sort,
+                            'filter[search]': searchValue || undefined,
+                            'filter[status]': statusFilter || undefined,
+                            page: params?.page ?? 1,
+                        },
+                        {
+                            preserveState: false,
+                            replace: true,
+                            preserveScroll: true,
+                        },
+                    );
                 }}
             />
 
@@ -264,10 +338,27 @@ const OptimizationRulesTab = forwardRef(({
                 onSuccess={handleDialogSuccess}
                 editingRule={editingRule}
             />
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={!!ruleToDelete} onOpenChange={() => setRuleToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Optimization Rule</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete "{ruleToDelete?.name}"?
+                            This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete}>
+                            Delete Rule
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
-});
-
-OptimizationRulesTab.displayName = 'OptimizationRulesTab';
+};
 
 export default OptimizationRulesTab;

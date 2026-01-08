@@ -2,6 +2,8 @@ import ComponentCard from '@/components/common/ComponentCard';
 import { Button } from '@/components/ui/button';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import AppLayout from '@/layouts/app-layout';
+import { PaginatedData } from '@/types';
+import { OptimizationRule } from '@/types/models/OptimizationRule';
 import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
 import { addDays } from 'date-fns';
@@ -16,9 +18,19 @@ type TabType = 'campaigns' | 'adSets' | 'ads' | 'optimizationRules' | 'optimizat
 
 interface PageProps {
   workspace: Workspace;
+  rules?: PaginatedData<OptimizationRule>;
+  query?: {
+    sort?: string | null;
+    perPage?: number | string;
+    page?: number | string;
+    filter?: {
+      search?: string;
+      status?: string;
+    };
+  };
 }
 
-const AdsManager = ({ workspace }: PageProps) => {
+const AdsManager = ({ workspace, rules, query }: PageProps) => {
   const [activeTab, setActiveTab] = useState<TabType>('campaigns');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -32,7 +44,6 @@ const AdsManager = ({ workspace }: PageProps) => {
   const campaignsTabRef = useRef<any>(null);
   const adSetsTabRef = useRef<any>(null);
   const adsTabRef = useRef<any>(null);
-  const optimizationRulesTabRef = useRef<any>(null);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -49,8 +60,6 @@ const AdsManager = ({ workspace }: PageProps) => {
       adSetsTabRef.current.fetchAdSets();
     } else if (activeTab === 'ads' && adsTabRef.current) {
       adsTabRef.current.fetchAds();
-    } else if (activeTab === 'optimizationRules' && optimizationRulesTabRef.current) {
-      optimizationRulesTabRef.current.fetchRules();
     }
   };
 
@@ -95,13 +104,10 @@ const AdsManager = ({ workspace }: PageProps) => {
       case 'optimizationRules':
         return (
           <OptimizationRulesTab
-            ref={optimizationRulesTabRef}
             workspace={workspace}
-            searchQuery={searchQuery}
-            statusFilter={statusFilter}
+            rules={rules!}
+            query={query}
             dateRange={dateRange}
-            loading={loading}
-            setLoading={setLoading}
           />
         );
       case 'optimizationLogs':
@@ -143,13 +149,13 @@ const AdsManager = ({ workspace }: PageProps) => {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200 dark:border-white/[0.05]">
+        <div className="border-b border-gray-200 dark:border-white/5">
           <div className="flex gap-6">
             <button
               onClick={() => setActiveTab('campaigns')}
               className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'campaigns'
-                  ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                 }`}
             >
               Campaigns
@@ -157,8 +163,8 @@ const AdsManager = ({ workspace }: PageProps) => {
             <button
               onClick={() => setActiveTab('adSets')}
               className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'adSets'
-                  ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                 }`}
             >
               Ad Sets
@@ -166,8 +172,8 @@ const AdsManager = ({ workspace }: PageProps) => {
             <button
               onClick={() => setActiveTab('ads')}
               className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'ads'
-                  ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                 }`}
             >
               Ads
@@ -175,8 +181,8 @@ const AdsManager = ({ workspace }: PageProps) => {
             <button
               onClick={() => setActiveTab('optimizationRules')}
               className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'optimizationRules'
-                  ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                 }`}
             >
               Optimization Rules
@@ -184,8 +190,8 @@ const AdsManager = ({ workspace }: PageProps) => {
             <button
               onClick={() => setActiveTab('optimizationLogs')}
               className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'optimizationLogs'
-                  ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                 }`}
             >
               Optimization Logs
@@ -196,15 +202,16 @@ const AdsManager = ({ workspace }: PageProps) => {
         <div className="space-y-5 sm:space-y-6">
           <ComponentCard desc="Manage your advertising campaigns and ad sets">
             <div>
-              <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.05]">
-                <input
-                  className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3 dark:bg-gray-900 dark:placeholder:text-white/30 bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90 dark:focus:border-brand-800"
-                  placeholder={`Search ${getTabLabel()}...`}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <div className="flex items-center gap-2 relative z-50">
-                  {/* <Button 
+              {activeTab !== 'optimizationRules' && (
+                <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/5">
+                  <input
+                    className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3 dark:bg-gray-900 dark:placeholder:text-white/30 bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90 dark:focus:border-brand-800"
+                    placeholder={`Search ${getTabLabel()}...`}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <div className="flex items-center gap-2 relative z-50">
+                    {/* <Button 
                     variant="outline" 
                     size="sm"
                     onClick={handleRefresh}
@@ -213,38 +220,39 @@ const AdsManager = ({ workspace }: PageProps) => {
                     <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                     Refresh
                   </Button> */}
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 dark:focus:border-brand-800"
-                  >
-                    <option value="">All Status</option>
-                    <option value="ACTIVE">Active</option>
-                    <option value="PAUSED">Paused</option>
-                    <option value="ARCHIVED">Archived</option>
-                  </select>
-                  <DateRangePicker
-                    initialDateFrom={dateRange.from}
-                    initialDateTo={dateRange.to}
-                    onUpdate={(values) => {
-                      if (values.range.from && values.range.to) {
-                        setDateRange({
-                          from: values.range.from,
-                          to: values.range.to,
-                        });
-                      }
-                    }}
-                    align="end"
-                    showCompare={false}
-                  />
-                  <Button variant="outline" size="icon">
-                    <Grid3x3 className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon">
-                    <List className="h-4 w-4" />
-                  </Button>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 dark:focus:border-brand-800"
+                    >
+                      <option value="">All Status</option>
+                      <option value="ACTIVE">Active</option>
+                      <option value="PAUSED">Paused</option>
+                      <option value="ARCHIVED">Archived</option>
+                    </select>
+                    <DateRangePicker
+                      initialDateFrom={dateRange.from}
+                      initialDateTo={dateRange.to}
+                      onUpdate={(values) => {
+                        if (values.range.from && values.range.to) {
+                          setDateRange({
+                            from: values.range.from,
+                            to: values.range.to,
+                          });
+                        }
+                      }}
+                      align="end"
+                      showCompare={false}
+                    />
+                    <Button variant="outline" size="icon">
+                      <Grid3x3 className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="icon">
+                      <List className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {renderTabContent()}
             </div>

@@ -16,6 +16,7 @@ use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
 use App\Models\Workspace;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -96,9 +97,38 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/workspaces/{workspace}/facebook-accounts', [FacebookAccountController::class, 'index'])->name('workspaces.facebook-accounts.index');
     Route::get('/workspaces/{workspace}/ad-accounts', [AdAccountController::class, 'index'])->name('workspaces.ad-accounts.index');
     Route::post('/workspaces/{workspace}/ad-accounts/{adAccount}/refresh', [AdAccountController::class, 'refresh'])->name('workspaces.ad-accounts.refresh');
-    Route::get('/workspaces/{workspace}/ads-manager', function (Workspace $workspace) {
+    Route::get('/workspaces/{workspace}/ads-manager', function (Workspace $workspace, Request $request) {
+        $rules = \Spatie\QueryBuilder\QueryBuilder::for(\App\Models\OptimizationRule::class)
+            ->where('workspace_id', $workspace->id)
+            ->allowedFilters([
+                \Spatie\QueryBuilder\AllowedFilter::scope('search'),
+                \Spatie\QueryBuilder\AllowedFilter::exact('status'),
+            ])
+            ->allowedSorts([
+                'name',
+                'description',
+                'target',
+                'action',
+                'status',
+                'created_at',
+                'updated_at',
+            ])
+            ->defaultSort('-created_at')
+            ->paginate($request->get('perPage', 20))
+            ->withQueryString();
+
         return inertia('workspaces/ads-manager/index', [
             'workspace' => $workspace,
+            'rules' => $rules,
+            'query' => [
+                'sort' => $request->get('sort'),
+                'perPage' => $request->get('perPage', 20),
+                'page' => $request->get('page', 1),
+                'filter' => [
+                    'search' => $request->get('filter.search'),
+                    'status' => $request->get('filter.status'),
+                ],
+            ],
         ]);
     })->name('workspaces.ads-manager');
 
