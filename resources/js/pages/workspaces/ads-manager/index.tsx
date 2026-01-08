@@ -2,8 +2,6 @@ import ComponentCard from '@/components/common/ComponentCard';
 import { Button } from '@/components/ui/button';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import AppLayout from '@/layouts/app-layout';
-import { PaginatedData } from '@/types';
-import { OptimizationRule } from '@/types/models/OptimizationRule';
 import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
 import { addDays } from 'date-fns';
@@ -12,25 +10,15 @@ import { useEffect, useRef, useState } from 'react';
 import AdSetsTab from './AdSetsTab';
 import AdsTab from './AdsTab';
 import CampaignsTab from './CampaignsTab';
-import OptimizationRulesTab from './OptimizationRulesTab';
+import AdsManagerLayout from './partials/Layout';
 
 type TabType = 'campaigns' | 'adSets' | 'ads' | 'optimizationRules' | 'optimizationLogs';
 
 interface PageProps {
   workspace: Workspace;
-  rules?: PaginatedData<OptimizationRule>;
-  query?: {
-    sort?: string | null;
-    perPage?: number | string;
-    page?: number | string;
-    filter?: {
-      search?: string;
-      status?: string;
-    };
-  };
 }
 
-const AdsManager = ({ workspace, rules, query }: PageProps) => {
+const AdsManager = ({ workspace }: PageProps) => {
   const [activeTab, setActiveTab] = useState<TabType>('campaigns');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -101,15 +89,6 @@ const AdsManager = ({ workspace, rules, query }: PageProps) => {
             setLoading={setLoading}
           />
         );
-      case 'optimizationRules':
-        return (
-          <OptimizationRulesTab
-            workspace={workspace}
-            rules={rules!}
-            query={query}
-            dateRange={dateRange}
-          />
-        );
       case 'optimizationLogs':
         return (
           <div className="p-8 text-center text-gray-500 dark:text-gray-400">
@@ -141,64 +120,11 @@ const AdsManager = ({ workspace, rules, query }: PageProps) => {
   return (
     <AppLayout>
       <Head title={`${workspace.name} - Ads Manager`} />
-      <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white/90">
-            Ads Manager
-          </h2>
-        </div>
-
-        {/* Tabs */}
-        <div className="border-b border-gray-200 dark:border-white/5">
-          <div className="flex gap-6">
-            <button
-              onClick={() => setActiveTab('campaigns')}
-              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'campaigns'
-                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                }`}
-            >
-              Campaigns
-            </button>
-            <button
-              onClick={() => setActiveTab('adSets')}
-              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'adSets'
-                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                }`}
-            >
-              Ad Sets
-            </button>
-            <button
-              onClick={() => setActiveTab('ads')}
-              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'ads'
-                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                }`}
-            >
-              Ads
-            </button>
-            <button
-              onClick={() => setActiveTab('optimizationRules')}
-              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'optimizationRules'
-                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                }`}
-            >
-              Optimization Rules
-            </button>
-            <button
-              onClick={() => setActiveTab('optimizationLogs')}
-              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'optimizationLogs'
-                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                }`}
-            >
-              Optimization Logs
-            </button>
-          </div>
-        </div>
-
+      <AdsManagerLayout
+        workspace={workspace}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      >
         <div className="space-y-5 sm:space-y-6">
           <ComponentCard desc="Manage your advertising campaigns and ad sets">
             <div>
@@ -258,7 +184,7 @@ const AdsManager = ({ workspace, rules, query }: PageProps) => {
             </div>
           </ComponentCard>
         </div>
-      </div>
+      </AdsManagerLayout>
     </AppLayout>
   );
 };

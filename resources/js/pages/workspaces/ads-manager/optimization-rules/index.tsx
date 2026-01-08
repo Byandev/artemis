@@ -1,3 +1,4 @@
+import ComponentCard from '@/components/common/ComponentCard';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -11,11 +12,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
+import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { OptimizationRule, OptimizationRuleCondition } from '@/types/models/OptimizationRule';
 import { Workspace } from '@/types/models/Workspace';
-import { router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import clsx from 'clsx';
@@ -24,7 +26,8 @@ import { Edit2, Plus, Trash2 } from 'lucide-react';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import { type DateRange } from 'react-day-picker';
-import { OptimizationRuleDialog } from './OptimizationRuleDialog';
+import { OptimizationRuleDialog } from '../OptimizationRuleDialog';
+import AdsManagerLayout from '../partials/Layout';
 
 type OptimizationRuleStatus = {
     label: string;
@@ -59,7 +62,7 @@ const StatusBadge = ({ status }: { status: string }) => {
     );
 };
 
-interface OptimizationRulesTabProps {
+interface PageProps {
     workspace: Workspace;
     rules: PaginatedData<OptimizationRule>;
     query?: {
@@ -70,14 +73,12 @@ interface OptimizationRulesTabProps {
             search?: string;
             status?: string;
         };
+        start_date?: string;
+        end_date?: string;
     };
 }
 
-const OptimizationRulesTab = ({
-    workspace,
-    rules,
-    query,
-}: OptimizationRulesTabProps) => {
+const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
@@ -85,8 +86,8 @@ const OptimizationRulesTab = ({
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [statusFilter, setStatusFilter] = useState(query?.filter?.status ?? '');
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: moment().startOf('month').toDate(),
-        to: moment().toDate(),
+        from: query?.start_date ? new Date(query.start_date) : moment().startOf('month').toDate(),
+        to: query?.end_date ? new Date(query.end_date) : moment().toDate(),
     });
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingRule, setEditingRule] = useState<OptimizationRule | null>(null);
@@ -107,7 +108,7 @@ const OptimizationRulesTab = ({
 
         const timer = setTimeout(() => {
             router.get(
-                `/workspaces/${workspace.slug}/ads-manager`,
+                `/workspaces/${workspace.slug}/ads-manager/optimization-rules`,
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
@@ -132,7 +133,7 @@ const OptimizationRulesTab = ({
         setStatusFilter(value);
 
         router.get(
-            `/workspaces/${workspace.slug}/ads-manager`,
+            `/workspaces/${workspace.slug}/ads-manager/optimization-rules`,
             {
                 sort: query?.sort,
                 'filter[search]': searchValue || undefined,
@@ -153,7 +154,7 @@ const OptimizationRulesTab = ({
     // Update data when date range changes
     useEffect(() => {
         router.get(
-            `/workspaces/${workspace.slug}/ads-manager`,
+            `/workspaces/${workspace.slug}/ads-manager/optimization-rules`,
             {
                 sort: query?.sort,
                 'filter[search]': searchValue || undefined,
@@ -299,99 +300,111 @@ const OptimizationRulesTab = ({
     ];
 
     return (
-        <div>
-            <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/5">
-                <input
-                    className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3 dark:bg-gray-900 dark:placeholder:text-white/30 bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90 dark:focus:border-brand-800"
-                    placeholder="Search optimization rules..."
-                    value={searchValue}
-                    onChange={(e) => setSearchValue(e.target.value)}
-                />
-                <div className="flex items-center gap-2 relative z-50">
-                    <select
-                        value={statusFilter}
-                        onChange={(e) => handleStatusFilterChange(e.target.value)}
-                        className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 dark:focus:border-brand-800"
-                    >
-                        <option value="">All Status</option>
-                        <option value="active">Active</option>
-                        <option value="paused">Paused</option>
-                    </select>
-                    <SimpleDateRangePicker
-                        value={dateRange}
-                        onChange={setDateRange}
-                    />
-                    <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => setIsDialogOpen(true)}
-                    >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Rule
-                    </Button>
-                </div>
-            </div>
-
-            <div className="border-t border-gray-100 dark:border-white/5 px-4 py-3">
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                    {rules ? `${rules.total} optimization rule${rules.total !== 1 ? 's' : ''}` : 'Loading...'}
-                </div>
-            </div>
-
-            <DataTable
-                columns={columns}
-                data={rules?.data || []}
-                enableInternalPagination={false}
-                initialSorting={initialSorting}
-                meta={{ ...omit(rules, ['data']) }}
-                onFetch={(params) => {
-                    router.get(
-                        `/workspaces/${workspace.slug}/ads-manager`,
-                        {
-                            sort: params?.sort,
-                            'filter[search]': searchValue || undefined,
-                            'filter[status]': statusFilter || undefined,
-                            start_date: dateRange?.from ? dateRangeStr.from : undefined,
-                            end_date: dateRange?.to ? dateRangeStr.to : undefined,
-                            page: params?.page ?? 1,
-                        },
-                        {
-                            preserveState: false,
-                            replace: true,
-                            preserveScroll: true,
-                        },
-                    );
-                }}
-            />
-
-            <OptimizationRuleDialog
+        <AppLayout>
+            <Head title={`${workspace.name} - Optimization Rules`} />
+            <AdsManagerLayout
                 workspace={workspace}
-                open={isDialogOpen}
-                onClose={handleDialogClose}
-                onSuccess={handleDialogSuccess}
-                editingRule={editingRule}
-            />
+                activeTab="optimizationRules"
+            >
+                <div className="space-y-5 sm:space-y-6">
+                    <ComponentCard desc="Manage your advertising campaigns and ad sets">
+                        <div>
+                            <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/5">
+                                <input
+                                    className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3 dark:bg-gray-900 dark:placeholder:text-white/30 bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90 dark:focus:border-brand-800"
+                                    placeholder="Search optimization rules..."
+                                    value={searchValue}
+                                    onChange={(e) => setSearchValue(e.target.value)}
+                                />
+                                <div className="flex items-center gap-2 relative z-50">
+                                    <select
+                                        value={statusFilter}
+                                        onChange={(e) => handleStatusFilterChange(e.target.value)}
+                                        className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 dark:focus:border-brand-800"
+                                    >
+                                        <option value="">All Status</option>
+                                        <option value="active">Active</option>
+                                        <option value="paused">Paused</option>
+                                    </select>
+                                    <SimpleDateRangePicker
+                                        value={dateRange}
+                                        onChange={setDateRange}
+                                    />
+                                    <Button
+                                        variant="default"
+                                        size="sm"
+                                        onClick={() => setIsDialogOpen(true)}
+                                    >
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Add Rule
+                                    </Button>
+                                </div>
+                            </div>
 
-            {/* Delete Confirmation Dialog */}
-            <AlertDialog open={!!ruleToDelete} onOpenChange={() => setRuleToDelete(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Optimization Rule</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete "{ruleToDelete?.name}"?
-                            This action cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete}>
-                            Delete Rule
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        </div>
+                            <div className="border-t border-gray-100 dark:border-white/5 px-4 py-3">
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
+                                    {rules ? `${rules.total} optimization rule${rules.total !== 1 ? 's' : ''}` : 'Loading...'}
+                                </div>
+                            </div>
+
+                            <DataTable
+                                columns={columns}
+                                data={rules?.data || []}
+                                enableInternalPagination={false}
+                                initialSorting={initialSorting}
+                                meta={{ ...omit(rules, ['data']) }}
+                                onFetch={(params) => {
+                                    router.get(
+                                        `/workspaces/${workspace.slug}/ads-manager/optimization-rules`,
+                                        {
+                                            sort: params?.sort,
+                                            'filter[search]': searchValue || undefined,
+                                            'filter[status]': statusFilter || undefined,
+                                            start_date: dateRange?.from ? dateRangeStr.from : undefined,
+                                            end_date: dateRange?.to ? dateRangeStr.to : undefined,
+                                            page: params?.page ?? 1,
+                                        },
+                                        {
+                                            preserveState: false,
+                                            replace: true,
+                                            preserveScroll: true,
+                                        },
+                                    );
+                                }}
+                            />
+                        </div>
+                    </ComponentCard>
+                </div>
+
+                <OptimizationRuleDialog
+                    workspace={workspace}
+                    open={isDialogOpen}
+                    onClose={handleDialogClose}
+                    onSuccess={handleDialogSuccess}
+                    editingRule={editingRule}
+                />
+
+                {/* Delete Confirmation Dialog */}
+                <AlertDialog open={!!ruleToDelete} onOpenChange={() => setRuleToDelete(null)}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Optimization Rule</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Are you sure you want to delete "{ruleToDelete?.name}"?
+                                This action cannot be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDelete}>
+                                Delete Rule
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </AdsManagerLayout>
+        </AppLayout>
     );
 };
 
-export default OptimizationRulesTab;
+export default OptimizationRulesPage;
