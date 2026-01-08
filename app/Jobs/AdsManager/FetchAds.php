@@ -32,7 +32,7 @@ class FetchAds implements ShouldQueue
         while ($cont) {
             sleep(1);
             $params = [
-                'fields' => 'id,name,account_id,status,campaign_id,adset_id,effective_object_story_id,creative{id,name,effective_object_story_id,object_story_spec{page_id,instagram_actor_id}}',
+                'fields' => 'id,name,account_id,status,campaign_id,effective_status,adset_id,effective_object_story_id,creative{id,name,effective_object_story_id,object_story_spec{page_id,instagram_actor_id}}',
                 'access_token' => $this->facebookAccount->access_token,
                 'limit' => 1000,
             ];
@@ -55,6 +55,7 @@ class FetchAds implements ShouldQueue
                     'ad_account_id' => $ad['account_id'],
                     'name' => $ad['name'],
                     'status' => $ad['status'],
+                    'effective_status' => $ad['effective_status'],
                     'page_id' => isset($ad['creative']) && isset($ad['creative']['effective_object_story_id']) ? explode('_', $ad['creative']['effective_object_story_id'])[0] : null,
                 ]);
             }
