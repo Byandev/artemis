@@ -63,4 +63,9 @@ class Page extends Model
     {
         $this->delete();
     }
+
+    public function customerServiceRepresentatives(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(CustomerServiceRepresentative::class, 'page_customer_service_representative');
+    }
 }
