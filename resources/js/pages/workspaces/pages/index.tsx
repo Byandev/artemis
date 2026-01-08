@@ -33,13 +33,13 @@ interface PagesProps {
     workspace: Workspace;
     pages: PaginatedData<Page>;
     query?: {
-        sort?: string | null;
-        perPage?: number | string;
-        page?: number | string;
+        sort?: string | null
+        perPage?: number | string
+        page?: number | string
         filter?: {
-            search?: string;
-        };
-    };
+            search?: string
+        }
+    }
 }
 
 const StatusBadge = ({ isArchived }: { isArchived: boolean }) => {
@@ -118,12 +118,6 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
 
     const columns: ColumnDef<Page>[] = [
         {
-            accessorKey: 'id',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'ID'} />
-            ),
-        },
-        {
             accessorKey: 'name',
             enableSorting: true,
             header: ({ column }) => (
@@ -131,14 +125,14 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             ),
         },
         {
-            accessorKey: 'shop',
+            accessorKey: 'shop_name',
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Shop'} />
             ),
             cell: ({ row }) => row.original.shop?.name || '-',
         },
         {
-            accessorKey: 'owner',
+            accessorKey: 'owner_name',
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Owner'} />
             ),
@@ -155,7 +149,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             },
         },
         {
-            accessorKey: 'status',
+            accessorKey: 'deleted_at',
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Status'} />
             ),
