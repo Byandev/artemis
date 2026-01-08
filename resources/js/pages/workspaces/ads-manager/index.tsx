@@ -5,8 +5,9 @@ import { Grid3x3, List, RefreshCw } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import ComponentCard from '@/components/common/ComponentCard';
 import { Workspace } from '@/types/models/Workspace';
-import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
 import { addDays } from 'date-fns';
+import { DateRange } from 'react-day-picker';
 import CampaignsTab from './CampaignsTab';
 import AdSetsTab from './AdSetsTab';
 import AdsTab from './AdsTab';
@@ -21,7 +22,7 @@ const AdsManager = ({ workspace }: PageProps) => {
   const [activeTab, setActiveTab] = useState<TabType>('campaigns');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: addDays(new Date(), -30),
     to: new Date(),
   });
@@ -218,19 +219,10 @@ const AdsManager = ({ workspace }: PageProps) => {
                     <option value="PAUSED">Paused</option>
                     <option value="ARCHIVED">Archived</option>
                   </select>
-                  <DateRangePicker
-                    initialDateFrom={dateRange.from}
-                    initialDateTo={dateRange.to}
-                    onUpdate={(values) => {
-                      if (values.range.from && values.range.to) {
-                        setDateRange({
-                          from: values.range.from,
-                          to: values.range.to,
-                        });
-                      }
-                    }}
-                    align="end"
-                    showCompare={false}
+                  <SimpleDateRangePicker
+                    value={dateRange}
+                    onChange={setDateRange}
+                    placeholder="Select date range"
                   />
                   <Button variant="outline" size="icon">
                     <Grid3x3 className="h-4 w-4" />
