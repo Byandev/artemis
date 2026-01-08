@@ -6,22 +6,28 @@ type TabType = 'campaigns' | 'adSets' | 'ads' | 'optimizationRules' | 'optimizat
 interface AdsManagerTabsProps {
     workspace: Workspace;
     activeTab: TabType;
-    onTabChange?: (tab: TabType) => void;
 }
 
-const AdsManagerTabs = ({ workspace, activeTab, onTabChange }: AdsManagerTabsProps) => {
+const AdsManagerTabs = ({ workspace, activeTab }: AdsManagerTabsProps) => {
     const handleTabClick = (tab: TabType) => {
         if (tab === 'optimizationRules') {
             router.get(`/workspaces/${workspace.slug}/ads-manager/optimization-rules`);
-        } else if (onTabChange) {
-            onTabChange(tab);
+        } else {
+
+            //Update this when each tab has its own route
+            router.get(`/workspaces/${workspace.slug}/ads-manager`, {
+                preserveState: true,
+                preserveScroll: true,
+                only: ['activeTab'],
+                data: { tab },
+            });
         }
     };
 
     const getTabClassName = (tab: TabType) => {
         return `pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === tab
-                ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+            : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
             }`;
     };
 

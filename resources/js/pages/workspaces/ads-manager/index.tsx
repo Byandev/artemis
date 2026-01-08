@@ -123,7 +123,6 @@ const AdsManager = ({ workspace }: PageProps) => {
       <AdsManagerLayout
         workspace={workspace}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
       >
         <div className="space-y-5 sm:space-y-6">
           <ComponentCard desc="Manage your advertising campaigns and ad sets">
