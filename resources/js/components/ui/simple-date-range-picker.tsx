@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { useDateRange } from "@/hooks/use-date-range"
 
 interface SimpleDateRangePickerProps {
   value?: DateRange
@@ -32,7 +33,7 @@ export function SimpleDateRangePicker({
 }: SimpleDateRangePickerProps) {
   // Use global state if enabled, otherwise use local props
   const globalState = useDateRange()
-  
+
   const actualValue = useGlobalState ? globalState.dateRange : value
   const actualOnChange = useGlobalState ? globalState.setDateRange : onChange
 
