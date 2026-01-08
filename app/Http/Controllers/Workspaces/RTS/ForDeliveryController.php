@@ -18,28 +18,6 @@ class ForDeliveryController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
-        // Prepare lists of customers and riders for the dropdowns
-        $baseResults = Order::forDeliveryToday()
-            ->with([
-                'parcelJourney:id,order_id,rider_name,note',
-                'shippingAddress:id,order_id,full_name',
-            ])
-            ->get();
-
-        $customers = $baseResults->pluck('shippingAddress.full_name')
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
-        $riders = $baseResults->map(function ($order) {
-            return $order->parcelJourney?->rider_name;
-        })
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
         // Build filtered and sorted query using QueryBuilder
         $orders = QueryBuilder::for(Order::forDeliveryToday())
             ->with([
@@ -66,8 +44,8 @@ class ForDeliveryController extends Controller
         return Inertia::render('workspaces/rts/for-delivery-today', [
             'workspace' => $workspace,
             'orders' => $orders,
-            'customers' => $customers,
-            'riders' => $riders,
+            'customers' => [],
+            'riders' => [],
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
