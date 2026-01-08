@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Jobs\AdsManager\FetchAds;
 use App\Jobs\AdsManager\FetchAdSets;
+use App\Jobs\AdsManager\FetchCampaigns;
 use App\Models\AdAccount;
 use App\Models\FacebookAccount;
 use Carbon\Carbon;

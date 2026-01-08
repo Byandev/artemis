@@ -1,31 +1,4 @@
-import { Head, useForm, router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
+import ComponentCard from '@/components/common/ComponentCard';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -36,12 +9,44 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
+import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
-import { useState } from 'react';
+import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
+import { Head, router, useForm } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
+import clsx from 'clsx';
+import { omit } from 'lodash';
+import { MoreHorizontal, Send, Trash2, UserMinus } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface User {
     id: number;
@@ -66,20 +71,86 @@ interface Invitation {
 
 interface Props {
     workspace: Workspace;
-    members: User[];
-    pendingInvitations: Invitation[];
+    members: PaginatedData<User>;
+    pendingInvitations: PaginatedData<Invitation>;
     isAdmin: boolean;
+    query?: {
+        sort?: string | null;
+        perPage?: number | string;
+        page?: number | string;
+        filter?: {
+            search?: string;
+        };
+    };
 }
 
-export default function WorkspaceMembers({ workspace, members, pendingInvitations, isAdmin }: Props) {
+type RoleBadgeConfig = {
+    label: string;
+    className: string;
+};
+
+const ROLE_BADGE_CONFIG: Record<string, RoleBadgeConfig> = {
+    owner: { label: 'OWNER', className: 'bg-indigo-50 text-indigo-700 ring-indigo-200' },
+    admin: { label: 'ADMIN', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+    member: { label: 'MEMBER', className: 'bg-zinc-50 text-zinc-700 ring-zinc-200' },
+};
+
+const RoleBadge = ({ role }: { role: string }) => {
+    const config = ROLE_BADGE_CONFIG[role] ?? { label: role.toUpperCase(), className: 'bg-gray-50 text-gray-700 ring-gray-200' };
+
+    return (
+        <span
+            className={clsx(
+                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset',
+                config.className
+            )}
+        >
+            {config.label}
+        </span>
+    );
+};
+
+export default function WorkspaceMembers({ workspace, members, pendingInvitations, isAdmin, query }: Props) {
+    const initialSorting = useMemo(() => {
+        return toFrontendSort(query?.sort ?? null);
+    }, [query?.sort]);
+
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
     const [invitationToRevoke, setInvitationToRevoke] = useState<Invitation | null>(null);
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
     const inviteForm = useForm({
         email: '',
         role: 'member',
     });
+
+    // Debounced search effect
+    useEffect(() => {
+        const currentSearchParam = query?.filter?.search ?? '';
+
+        if (searchValue === currentSearchParam) {
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            router.get(
+                `/workspaces/${workspace.slug}/members`,
+                {
+                    sort: query?.sort,
+                    'filter[search]': searchValue || undefined,
+                    page: 1,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                },
+            );
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchValue, query?.filter?.search, query?.sort, workspace.slug]);
 
     const handleInvite = (e: React.FormEvent) => {
         e.preventDefault();
@@ -127,31 +198,180 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
         });
     };
 
-    const getRoleBadgeVariant = (role: string): "default" | "secondary" | "destructive" | "outline" => {
-        switch (role) {
-            case 'owner':
-                return 'default';
-            case 'admin':
-                return 'secondary';
-            default:
-                return 'outline';
-        }
-    };
+    const membersColumns: ColumnDef<User>[] = [
+        {
+            accessorKey: 'id',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'ID'} />
+            ),
+        },
+        {
+            accessorKey: 'name',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Name'} />
+            ),
+        },
+        {
+            accessorKey: 'email',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Email'} />
+            ),
+        },
+        {
+            accessorKey: 'pivot.role',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Role'} />
+            ),
+            cell: ({ row }) => {
+                const member = row.original;
+
+                if (isAdmin && member.pivot.role !== 'owner') {
+                    return (
+                        <Select
+                            value={member.pivot.role}
+                            onValueChange={(value) => handleRoleChange(member.id, value)}
+                        >
+                            <SelectTrigger className="w-[110px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="member">Member</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    );
+                }
+
+                return <RoleBadge role={member.pivot.role} />;
+            },
+        },
+        {
+            accessorKey: 'pivot.created_at',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Joined'} />
+            ),
+            cell: ({ row }) => {
+                return new Date(row.original.pivot.created_at).toLocaleDateString();
+            },
+        },
+        {
+            id: 'actions',
+            cell: ({ row }) => {
+                const member = row.original;
+
+                if (!isAdmin || member.pivot.role === 'owner') return null;
+
+                return (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                                onClick={() => setMemberToRemove(member)}
+                                className="text-destructive focus:text-destructive"
+                            >
+                                <UserMinus className="mr-2 h-4 w-4" />
+                                Remove
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                );
+            },
+        },
+    ];
+
+    const invitationsColumns: ColumnDef<Invitation>[] = [
+        {
+            accessorKey: 'id',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'ID'} />
+            ),
+        },
+        {
+            accessorKey: 'email',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Email'} />
+            ),
+        },
+        {
+            accessorKey: 'role',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Role'} />
+            ),
+            cell: ({ row }) => <RoleBadge role={row.original.role} />,
+        },
+        {
+            id: 'inviter_name',
+            accessorKey: 'inviter.name',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Invited By'} />
+            ),
+        },
+        {
+            accessorKey: 'expires_at',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Expires'} />
+            ),
+            cell: ({ row }) => {
+                return new Date(row.original.expires_at).toLocaleDateString();
+            },
+        },
+        {
+            id: 'actions',
+            cell: ({ row }) => {
+                const invitation = row.original;
+
+                if (!isAdmin) return null;
+
+                return (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleResendInvitation(invitation.id)}>
+                                <Send className="mr-2 h-4 w-4" />
+                                Resend
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                onClick={() => setInvitationToRevoke(invitation)}
+                                className="text-destructive focus:text-destructive"
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Revoke
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                );
+            },
+        },
+    ];
 
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Members`} />
-
-            <div className="space-y-6 p-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold">Members</h1>
-                        <p className="text-muted-foreground">Manage workspace members and invitations</p>
-                    </div>
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                    <h2
+                        className="text-xl font-semibold text-gray-800 dark:text-white/90"
+                        x-text="pageName"
+                    >
+                        Members
+                    </h2>
                     {isAdmin && (
                         <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
                             <DialogTrigger asChild>
-                                <Button>Invite Member</Button>
+                                <Button size="sm">Invite Member</Button>
                             </DialogTrigger>
                             <DialogContent>
                                 <form onSubmit={handleInvite}>
@@ -213,132 +433,72 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                     )}
                 </div>
 
-                {/* Members Table */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Workspace Members</CardTitle>
-                        <CardDescription>
-                            {members.length} {members.length === 1 ? 'member' : 'members'}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Email</TableHead>
-                                    <TableHead>Role</TableHead>
-                                    <TableHead>Joined</TableHead>
-                                    {isAdmin && <TableHead className="text-right">Actions</TableHead>}
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {members.map((member) => (
-                                    <TableRow key={member.id}>
-                                        <TableCell className="font-medium">{member.name}</TableCell>
-                                        <TableCell>{member.email}</TableCell>
-                                        <TableCell>
-                                            {isAdmin && member.pivot.role !== 'owner' ? (
-                                                <Select
-                                                    value={member.pivot.role}
-                                                    onValueChange={(value) => handleRoleChange(member.id, value)}
-                                                >
-                                                    <SelectTrigger className="w-[110px]">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="member">Member</SelectItem>
-                                                        <SelectItem value="admin">Admin</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            ) : (
-                                                <Badge variant={getRoleBadgeVariant(member.pivot.role)}>
-                                                    {member.pivot.role}
-                                                </Badge>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {new Date(member.pivot.created_at).toLocaleDateString()}
-                                        </TableCell>
-                                        {isAdmin && (
-                                            <TableCell className="text-right">
-                                                {member.pivot.role !== 'owner' && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => setMemberToRemove(member)}
-                                                    >
-                                                        Remove
-                                                    </Button>
-                                                )}
-                                            </TableCell>
-                                        )}
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                <div className="space-y-5 sm:space-y-6">
+                    {/* Members Table */}
+                    <ComponentCard desc="Manage workspace members and their roles">
+                        <div>
+                            <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/5">
+                                <input
+                                    className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900  dark:placeholder:text-white/30  bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800"
+                                    placeholder="Search members"
+                                    value={searchValue}
+                                    onChange={(e) => setSearchValue(e.target.value)}
+                                />
+                            </div>
 
-                {/* Pending Invitations */}
-                {pendingInvitations.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Pending Invitations</CardTitle>
-                            <CardDescription>
-                                {pendingInvitations.length} pending{' '}
-                                {pendingInvitations.length === 1 ? 'invitation' : 'invitations'}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Email</TableHead>
-                                        <TableHead>Role</TableHead>
-                                        <TableHead>Invited By</TableHead>
-                                        <TableHead>Expires</TableHead>
-                                        {isAdmin && <TableHead className="text-right">Actions</TableHead>}
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {pendingInvitations.map((invitation) => (
-                                        <TableRow key={invitation.id}>
-                                            <TableCell className="font-medium">{invitation.email}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={getRoleBadgeVariant(invitation.role)}>
-                                                    {invitation.role}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>{invitation.inviter.name}</TableCell>
-                                            <TableCell>
-                                                {new Date(invitation.expires_at).toLocaleDateString()}
-                                            </TableCell>
-                                            {isAdmin && (
-                                                <TableCell className="text-right space-x-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleResendInvitation(invitation.id)}
-                                                    >
-                                                        Resend
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => setInvitationToRevoke(invitation)}
-                                                    >
-                                                        Revoke
-                                                    </Button>
-                                                </TableCell>
-                                            )}
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                )}
+                            <DataTable
+                                columns={membersColumns}
+                                enableInternalPagination={false}
+                                data={members.data || []}
+                                initialSorting={initialSorting}
+                                meta={{ ...omit(members, ['data']) }}
+                                onFetch={(params) => {
+                                    router.get(
+                                        `/workspaces/${workspace.slug}/members`,
+                                        {
+                                            sort: params?.sort,
+                                            'filter[search]': searchValue || undefined,
+                                            page: params?.page ?? 1
+                                        },
+                                        {
+                                            preserveState: false,
+                                            replace: true,
+                                            preserveScroll: true,
+                                        },
+                                    );
+                                }}
+                            />
+                        </div>
+                    </ComponentCard>
+
+                    {/* Pending Invitations */}
+                    {pendingInvitations.data && pendingInvitations.data.length > 0 && (
+                        <ComponentCard desc="Pending workspace invitations">
+                            <DataTable
+                                columns={invitationsColumns}
+                                enableInternalPagination={false}
+                                data={pendingInvitations.data || []}
+                                initialSorting={initialSorting}
+                                meta={{ ...omit(pendingInvitations, ['data']) }}
+                                onFetch={(params) => {
+                                    router.get(
+                                        `/workspaces/${workspace.slug}/members`,
+                                        {
+                                            sort: params?.sort,
+                                            'filter[search]': searchValue || undefined,
+                                            page: params?.page ?? 1
+                                        },
+                                        {
+                                            preserveState: false,
+                                            replace: true,
+                                            preserveScroll: true,
+                                        },
+                                    );
+                                }}
+                            />
+                        </ComponentCard>
+                    )}
+                </div>
             </div>
 
             {/* Remove Member Confirmation Dialog */}
