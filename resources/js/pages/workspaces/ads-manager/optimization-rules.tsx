@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -22,12 +21,13 @@ import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import clsx from 'clsx';
 import { omit } from 'lodash';
-import { Edit2, Plus, Trash2 } from 'lucide-react';
+import { Edit2, Trash2 } from 'lucide-react';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import { type DateRange } from 'react-day-picker';
 import { OptimizationRuleDialog } from './OptimizationRuleDialog';
 import AdsManagerLayout from './partials/Layout';
+import OptimizationRulesFilters from './partials/OptimizationRulesFilters';
 
 type OptimizationRuleStatus = {
     label: string;
@@ -309,43 +309,15 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
                 <div className="space-y-5 sm:space-y-6">
                     <ComponentCard desc="Manage your advertising campaigns and ad sets">
                         <div>
-                            <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/5">
-                                <input
-                                    className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3 dark:bg-gray-900 dark:placeholder:text-white/30 bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90 dark:focus:border-brand-800"
-                                    placeholder="Search optimization rules..."
-                                    value={searchValue}
-                                    onChange={(e) => setSearchValue(e.target.value)}
-                                />
-                                <div className="flex items-center gap-2 relative z-50">
-                                    <select
-                                        value={statusFilter}
-                                        onChange={(e) => handleStatusFilterChange(e.target.value)}
-                                        className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 dark:focus:border-brand-800"
-                                    >
-                                        <option value="">All Status</option>
-                                        <option value="active">Active</option>
-                                        <option value="paused">Paused</option>
-                                    </select>
-                                    <SimpleDateRangePicker
-                                        value={dateRange}
-                                        onChange={setDateRange}
-                                    />
-                                    <Button
-                                        variant="default"
-                                        size="sm"
-                                        onClick={() => setIsDialogOpen(true)}
-                                    >
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        Add Rule
-                                    </Button>
-                                </div>
-                            </div>
-
-                            <div className="border-t border-gray-100 dark:border-white/5 px-4 py-3">
-                                <div className="text-sm text-gray-600 dark:text-gray-400">
-                                    {rules ? `${rules.total} optimization rule${rules.total !== 1 ? 's' : ''}` : 'Loading...'}
-                                </div>
-                            </div>
+                            <OptimizationRulesFilters
+                                searchValue={searchValue}
+                                onSearchChange={setSearchValue}
+                                statusFilter={statusFilter}
+                                onStatusChange={handleStatusFilterChange}
+                                dateRange={dateRange}
+                                onDateRangeChange={setDateRange}
+                                onAddRule={() => setIsDialogOpen(true)}
+                            />
 
                             <DataTable
                                 columns={columns}

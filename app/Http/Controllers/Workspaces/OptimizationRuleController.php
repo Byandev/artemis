@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Workspaces\StoreOptimizationRuleRequest;
+use App\Http\Requests\Workspaces\UpdateOptimizationRuleRequest;
 use App\Models\OptimizationRule;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
-use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class OptimizationRuleController extends Controller
@@ -38,8 +39,8 @@ class OptimizationRuleController extends Controller
         // Apply date range filter if provided
         if ($request->has('start_date') && $request->has('end_date')) {
             $query->whereBetween('created_at', [
-                $request->get('start_date') . ' 00:00:00',
-                $request->get('end_date') . ' 23:59:59'
+                $request->get('start_date').' 00:00:00',
+                $request->get('end_date').' 23:59:59',
             ]);
         }
 
@@ -93,20 +94,9 @@ class OptimizationRuleController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request, Workspace $workspace)
+    public function store(StoreOptimizationRuleRequest $request, Workspace $workspace)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'target' => 'required|in:campaign,ad_set',
-            'action' => 'required|in:increase_budget_fixed,decrease_budget_fixed,increase_budget_percentage,decrease_budget_percentage',
-            'action_value' => 'nullable|numeric|min:0',
-            'conditions' => 'required|array',
-            'conditions.*.metric' => 'required|in:spend,impressions,clicks,sales,roas',
-            'conditions.*.operator' => 'required|in:greater_than,less_than,equal,greater_than_or_equal,less_than_or_equal',
-            'conditions.*.value' => 'required|numeric',
-            'status' => 'nullable|in:active,paused',
-        ]);
+        $validated = $request->validated();
 
         $rule = OptimizationRule::create([
             ...$validated,
@@ -133,25 +123,14 @@ class OptimizationRuleController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Workspace $workspace, OptimizationRule $optimizationRule)
+    public function update(UpdateOptimizationRuleRequest $request, Workspace $workspace, OptimizationRule $optimizationRule)
     {
         // Ensure the rule belongs to the workspace
         if ($optimizationRule->workspace_id !== $workspace->id) {
             abort(403);
         }
 
-        $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'target' => 'sometimes|required|in:campaign,ad_set',
-            'action' => 'sometimes|required|in:increase_budget_fixed,decrease_budget_fixed,increase_budget_percentage,decrease_budget_percentage',
-            'action_value' => 'nullable|numeric|min:0',
-            'conditions' => 'sometimes|required|array',
-            'conditions.*.metric' => 'required|in:spend,impressions,clicks,sales,roas',
-            'conditions.*.operator' => 'required|in:greater_than,less_than,equal,greater_than_or_equal,less_than_or_equal',
-            'conditions.*.value' => 'required|numeric',
-            'status' => 'nullable|in:active,paused',
-        ]);
+        $validated = $request->validated();
 
         $optimizationRule->update($validated);
 
