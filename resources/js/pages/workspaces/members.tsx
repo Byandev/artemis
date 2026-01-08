@@ -307,7 +307,9 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
             cell: ({ row }) => <RoleBadge role={row.original.role} />,
         },
         {
+            id: 'inviter_name',
             accessorKey: 'inviter.name',
+            enableSorting: true,
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Invited By'} />
             ),
