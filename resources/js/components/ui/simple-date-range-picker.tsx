@@ -104,12 +104,12 @@ export function SimpleDateRangePicker({
           variant="outline"
           className={cn(
             "justify-start text-left font-normal bg-white w-full md:w-auto",
-            !value?.from && "text-muted-foreground",
+            !actualValue?.from && "text-muted-foreground",
             className
           )}
         >
           <CalendarIcon className="h-4 w-4 shrink-0" />
-          <span className='text-xs md:text-sm text-gray-500 dark:text-gray-400 truncate'>{formatDateRange(value)}</span>
+          <span className='text-xs md:text-sm text-gray-500 dark:text-gray-400 truncate'>{formatDateRange(actualValue)}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -131,7 +131,7 @@ export function SimpleDateRangePicker({
               </div>
               <div className="space-y-0.5">
                 {dateRangePresets.map((preset) => {
-                  const isSelected = checkPresetSelected(preset, tempValue)
+                  const isSelected = checkPresetSelected(preset, open ? tempValue : actualValue)
                   return (
                     <button
                       key={preset.label}
@@ -215,7 +215,7 @@ export function SimpleDateRangePicker({
                 selected={tempValue}
                 onSelect={handleCalendarSelect}
                 numberOfMonths={isMobile ? 1 : 2}
-                defaultMonth={tempValue?.from || value?.from}
+                defaultMonth={tempValue?.from || actualValue?.from}
                 className="text-[0.7rem] md:text-[0.7rem] p-2 md:p-1.5 [&_button[data-range-middle=true]]:bg-gray-100 [&_button[data-range-middle=true]]:text-gray-900 dark:[&_button[data-range-middle=true]]:bg-gray-800 dark:[&_button[data-range-middle=true]]:text-gray-100 [&_button[data-range-middle=true]]:hover:bg-gray-200 dark:[&_button[data-range-middle=true]]:hover:bg-gray-700 [&_button[data-range-start=true]]:relative [&_button[data-range-start=true]]:z-10 [&_button[data-range-end=true]]:relative [&_button[data-range-end=true]]:z-10 [&_.text-\[0\.8rem\]]:text-[0.65rem] [&_.text-muted-foreground]:text-[0.65rem] [&_.font-medium]:text-[0.7rem]"
               />
             </div>
