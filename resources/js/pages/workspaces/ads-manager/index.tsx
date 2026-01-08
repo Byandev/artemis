@@ -1,15 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
-import { Head } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
-import { Grid3x3, List, RefreshCw } from 'lucide-react';
-import AppLayout from '@/layouts/app-layout';
 import ComponentCard from '@/components/common/ComponentCard';
-import { Workspace } from '@/types/models/Workspace';
+import { Button } from '@/components/ui/button';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
+import AppLayout from '@/layouts/app-layout';
+import { Workspace } from '@/types/models/Workspace';
+import { Head } from '@inertiajs/react';
 import { addDays } from 'date-fns';
-import CampaignsTab from './CampaignsTab';
+import { Grid3x3, List } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import AdSetsTab from './AdSetsTab';
 import AdsTab from './AdsTab';
+import CampaignsTab from './CampaignsTab';
+import OptimizationRulesTab from './OptimizationRulesTab';
 
 type TabType = 'campaigns' | 'adSets' | 'ads' | 'optimizationRules' | 'optimizationLogs';
 
@@ -31,12 +32,13 @@ const AdsManager = ({ workspace }: PageProps) => {
   const campaignsTabRef = useRef<any>(null);
   const adSetsTabRef = useRef<any>(null);
   const adsTabRef = useRef<any>(null);
+  const optimizationRulesTabRef = useRef<any>(null);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       handleRefresh();
     }, 300);
-    
+
     return () => clearTimeout(timeoutId);
   }, [activeTab, searchQuery, statusFilter, dateRange]);
 
@@ -47,6 +49,8 @@ const AdsManager = ({ workspace }: PageProps) => {
       adSetsTabRef.current.fetchAdSets();
     } else if (activeTab === 'ads' && adsTabRef.current) {
       adsTabRef.current.fetchAds();
+    } else if (activeTab === 'optimizationRules' && optimizationRulesTabRef.current) {
+      optimizationRulesTabRef.current.fetchRules();
     }
   };
 
@@ -90,9 +94,15 @@ const AdsManager = ({ workspace }: PageProps) => {
         );
       case 'optimizationRules':
         return (
-          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-            Optimization Rules feature coming soon...
-          </div>
+          <OptimizationRulesTab
+            ref={optimizationRulesTabRef}
+            workspace={workspace}
+            searchQuery={searchQuery}
+            statusFilter={statusFilter}
+            dateRange={dateRange}
+            loading={loading}
+            setLoading={setLoading}
+          />
         );
       case 'optimizationLogs':
         return (
@@ -137,51 +147,46 @@ const AdsManager = ({ workspace }: PageProps) => {
           <div className="flex gap-6">
             <button
               onClick={() => setActiveTab('campaigns')}
-              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'campaigns'
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'campaigns'
                   ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
+                }`}
             >
               Campaigns
             </button>
             <button
               onClick={() => setActiveTab('adSets')}
-              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'adSets'
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'adSets'
                   ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
+                }`}
             >
               Ad Sets
             </button>
             <button
               onClick={() => setActiveTab('ads')}
-              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'ads'
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'ads'
                   ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
+                }`}
             >
               Ads
             </button>
             <button
               onClick={() => setActiveTab('optimizationRules')}
-              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'optimizationRules'
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'optimizationRules'
                   ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
+                }`}
             >
               Optimization Rules
             </button>
             <button
               onClick={() => setActiveTab('optimizationLogs')}
-              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'optimizationLogs'
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'optimizationLogs'
                   ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
+                }`}
             >
               Optimization Logs
             </button>
