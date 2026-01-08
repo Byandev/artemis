@@ -28,6 +28,7 @@ import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { omit } from 'lodash';
 import clsx from 'clsx';
+import { currencyFormatter } from '@/lib/utils';
 
 interface PagesProps {
     workspace: Workspace;
@@ -137,6 +138,13 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                 <SortableHeader column={column} title={'Owner'} />
             ),
             cell: ({ row }) => row.original.owner?.name || '-',
+        },
+        {
+            accessorKey: 'current_budget',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Current Budget'} enabled={false} />
+            ),
+            cell: ({ row }) => currencyFormatter(row.original.current_budget ?? 0),
         },
         {
             accessorKey: 'orders_last_synced_at',

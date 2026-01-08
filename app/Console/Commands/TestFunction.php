@@ -2,16 +2,11 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\FetchAdRecords;
-use App\Jobs\FetchPageOrders;
-use App\Jobs\GenerateVideoCreative;
-use App\Models\AdAccount;
-use App\Models\FacebookAccount;
+use App\Jobs\FetchPageEmployees;
+use App\Models\CustomerServiceRepresentative;
 use App\Models\Page;
-use App\Models\Product;
-use App\Models\VideoCreative;
-use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Http;
 
 class TestFunction extends Command
 {
@@ -34,58 +29,9 @@ class TestFunction extends Command
      */
     public function handle()
     {
-
-        $start = Carbon::now()->startOfYear();
-        $end = Carbon::now();
-
-        for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
-            echo $date->toDateString()."\n";
-        }
-
-        $adAccount = AdAccount::find(1400099324628111);
-        $facebookAccount = FacebookAccount::first();
-
-        dispatch(new FetchAdRecords($facebookAccount, $adAccount, Carbon::now()->toDateString()));
-        dd('DONE');
-
-        Page::where('created_at', '<=', now()->subDays(3))
-            ->get()
-            ->each(function (Page $page, $i) {
-                $page->update(['orders_last_synced_at' => null]);
-
-                dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonth(2)->startOfMonth()->unix(), \Carbon\Carbon::now()->unix()))
-                    ->delay(now()->addMinutes($i * 15));
+        Page::all()
+            ->each(function (Page $page) {
+                dispatch(new FetchPageEmployees($page));
             });
-        //        $path = storage_path('app/private/test.json');
-        //        $items = json_decode(file_get_contents($path), true);
-        //        $product = Product::first();
-        //
-        //        foreach ($items as $item) {
-        //            VideoCreative::create([
-        //                'product_id' => $product->id,
-        //                'summary' => $item['summary'],
-        //                'persona' => $item['persona'],
-        //                'prompt' => $item['prompt'],
-        //                'caption' => $item['post_caption'],
-        //            ]);
-        //        }
-        //
-        //        VideoCreative::whereIn('status', ['pending', 'failed'])
-        //            ->get()
-        //            ->each(function ($creative, $i) {
-        //                dispatch(new GenerateVideoCreative($creative))->delay(now()->addSeconds($i * 5));
-        //            });
-        //
-        //
-        //        dd("DONE");
-        //
-        //
-        //
-        //
-        //        dd("Done");
-        //
-        //        $page = Page::find(541830885691274);
-        //
-        //        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::parse($page->orders_last_synced_at)->unix(), \Carbon\Carbon::now()->unix()));
     }
 }
