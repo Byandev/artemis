@@ -10,18 +10,15 @@ interface AdsManagerTabsProps {
 
 const AdsManagerTabs = ({ workspace, activeTab }: AdsManagerTabsProps) => {
     const handleTabClick = (tab: TabType) => {
-        if (tab === 'optimizationRules') {
-            router.get(`/workspaces/${workspace.slug}/ads-manager/optimization-rules`);
-        } else {
+        const routes: Record<TabType, string> = {
+            campaigns: `/workspaces/${workspace.slug}/ads-manager/campaigns`,
+            adSets: `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
+            ads: `/workspaces/${workspace.slug}/ads-manager/ads`,
+            optimizationRules: `/workspaces/${workspace.slug}/ads-manager/optimization-rules`,
+            optimizationLogs: `/workspaces/${workspace.slug}/ads-manager/optimization-logs`,
+        };
 
-            //Update this when each tab has its own route
-            router.get(`/workspaces/${workspace.slug}/ads-manager`, {
-                preserveState: true,
-                preserveScroll: true,
-                only: ['activeTab'],
-                data: { tab },
-            });
-        }
+        router.get(routes[tab]);
     };
 
     const getTabClassName = (tab: TabType) => {

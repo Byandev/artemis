@@ -97,7 +97,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/workspaces/{workspace}/facebook-accounts', [FacebookAccountController::class, 'index'])->name('workspaces.facebook-accounts.index');
     Route::get('/workspaces/{workspace}/ad-accounts', [AdAccountController::class, 'index'])->name('workspaces.ad-accounts.index');
     Route::post('/workspaces/{workspace}/ad-accounts/{adAccount}/refresh', [AdAccountController::class, 'refresh'])->name('workspaces.ad-accounts.refresh');
+    
     Route::get('/workspaces/{workspace}/ads-manager', [AdsManagerController::class, 'index'])->name('workspaces.ads-manager');
+    Route::get('/workspaces/{workspace}/ads-manager/campaigns', [AdsManagerController::class, 'campaigns'])->name('workspaces.ads-manager.campaigns');
+    Route::get('/workspaces/{workspace}/ads-manager/ad-sets', [AdsManagerController::class, 'adSets'])->name('workspaces.ads-manager.ad-sets');
+    Route::get('/workspaces/{workspace}/ads-manager/ads', [AdsManagerController::class, 'ads'])->name('workspaces.ads-manager.ads');
     Route::get('/workspaces/{workspace}/ads-manager/optimization-rules', [\App\Http\Controllers\Workspaces\OptimizationRuleController::class, 'page'])->name('workspaces.ads-manager.optimization-rules');
 
     // Ads Manager API routes
