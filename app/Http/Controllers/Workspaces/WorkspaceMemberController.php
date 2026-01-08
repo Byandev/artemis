@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
+use App\Http\Sorts\WorkspaceInvitation\InviterNameSort;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class WorkspaceMemberController extends Controller
@@ -44,7 +46,10 @@ class WorkspaceMemberController extends Controller
                 'name',
                 'email',
                 'pivot_role',
+                AllowedSort::field('role', 'pivot_role'), // Map role to pivot_role for consistency with invitations table
                 'pivot_created_at',
+                AllowedSort::field('expires_at', 'pivot_created_at'), // Map expires_at for consistency
+                AllowedSort::field('inviter_name', 'name'), // Map inviter_name to name for consistency
             ])
             ->defaultSort('-pivot_created_at')
             ->paginate($request->input('perPage', 10))
@@ -69,8 +74,12 @@ class WorkspaceMemberController extends Controller
             ->allowedSorts([
                 'id',
                 'email',
+                AllowedSort::field('name', 'email'), // Map name to email for consistency with members table
                 'role',
+                AllowedSort::field('pivot_role', 'role'), // Map pivot_role to role for consistency with members table
+                AllowedSort::field('pivot_created_at', 'created_at'), // Map pivot_created_at to created_at
                 'expires_at',
+                AllowedSort::custom('inviter_name', new InviterNameSort, 'inviter.name'),
             ])
             ->defaultSort('-created_at')
             ->paginate($request->input('perPage', 10))
