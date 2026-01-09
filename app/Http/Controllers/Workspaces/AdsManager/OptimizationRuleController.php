@@ -15,9 +15,9 @@ use Spatie\QueryBuilder\QueryBuilder;
 class OptimizationRuleController extends Controller
 {
     /**
-     * Display the optimization rules page.
+     * Build the query for optimization rules.
      */
-    public function page(Workspace $workspace, Request $request)
+    private function buildQuery(Workspace $workspace, Request $request)
     {
         $query = QueryBuilder::for(OptimizationRule::class)
             ->where('workspace_id', $workspace->id)
@@ -44,7 +44,16 @@ class OptimizationRuleController extends Controller
             ]);
         }
 
-        $rules = $query->paginate($request->get('perPage', 20))
+        return $query;
+    }
+
+    /**
+     * Display the optimization rules page.
+     */
+    public function page(Workspace $workspace, Request $request)
+    {
+        $rules = $this->buildQuery($workspace, $request)
+            ->paginate($request->get('perPage', 20))
             ->withQueryString();
 
         return Inertia::render('workspaces/ads-manager/optimization-rules', [
@@ -62,33 +71,6 @@ class OptimizationRuleController extends Controller
                 'end_date' => $request->get('end_date'),
             ],
         ]);
-    }
-
-    /**
-     * Display a listing of the resource (API).
-     */
-    public function index(Workspace $workspace, Request $request)
-    {
-        $rules = QueryBuilder::for(OptimizationRule::class)
-            ->where('workspace_id', $workspace->id)
-            ->allowedFilters([
-                AllowedFilter::scope('search'),
-                AllowedFilter::exact('status'),
-            ])
-            ->allowedSorts([
-                'name',
-                'description',
-                'target',
-                'action',
-                'status',
-                'created_at',
-                'updated_at',
-            ])
-            ->defaultSort('-created_at')
-            ->paginate($request->get('perPage', 20))
-            ->withQueryString();
-
-        return response()->json($rules);
     }
 
     /**

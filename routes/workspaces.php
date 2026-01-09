@@ -114,7 +114,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/workspaces/{workspace}/api/ads', [AdController::class, 'index'])->name('workspaces.api.ads.index');
 
     // Optimization Rules API routes
-    Route::get('/workspaces/{workspace}/api/optimization-rules', [OptimizationRuleController::class, 'index'])->name('workspaces.api.optimization-rules.index');
     Route::post('/workspaces/{workspace}/api/optimization-rules', [OptimizationRuleController::class, 'store'])->name('workspaces.api.optimization-rules.store');
     Route::get('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'show'])->name('workspaces.api.optimization-rules.show');
     Route::put('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'update'])->name('workspaces.api.optimization-rules.update');
