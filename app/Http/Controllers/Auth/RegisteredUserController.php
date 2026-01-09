@@ -9,6 +9,7 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Inertia\Inertia;
@@ -68,10 +69,12 @@ class RegisteredUserController extends Controller
                 ->first();
 
             if ($invitation && strcasecmp($user->email, $invitation->email) === 0) {
-                // Auto-accept the invitation
-                $workspace = $invitation->workspace;
-                $workspace->addMember($user, $invitation->role);
-                $invitation->markAsAccepted();
+                // Auto-accept the invitation for consistency with login flow
+                DB::transaction(function () use ($invitation, $user) {
+                    $workspace = $invitation->workspace;
+                    $workspace->addMember($user, $invitation->role);
+                    $invitation->markAsAccepted();
+                });
 
                 // Redirect to the invitation success page
                 return redirect()->to("/workspaces/invitations/{$invitation->token}")

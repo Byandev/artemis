@@ -75,7 +75,13 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                     autoComplete="email"
                                     placeholder="email@example.com"
                                     defaultValue={invitation?.email || ''}
+                                    readOnly={!!invitation}
                                 />
+                                {invitation && (
+                                    <p className="text-xs text-muted-foreground">
+                                        This email matches your invitation. If this is incorrect, please sign up with a different email address.
+                                    </p>
+                                )}
                                 <InputError message={errors.email} />
                             </div>
 
