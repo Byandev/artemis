@@ -14,7 +14,7 @@ import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
-import { OptimizationRule, OptimizationRuleCondition } from '@/types/models/OptimizationRule';
+import { OptimizationRule } from '@/types/models/OptimizationRule';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
@@ -25,6 +25,7 @@ import { Edit2, Trash2 } from 'lucide-react';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import { type DateRange } from 'react-day-picker';
+import { ConditionsBadge } from './ConditionsBadge';
 import { OptimizationRuleDialog } from './OptimizationRuleDialog';
 import AdsManagerLayout from './partials/Layout';
 import OptimizationRulesFilters from './partials/OptimizationRulesFilters';
@@ -211,20 +212,6 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
         return actionValue ? `${label}: ${actionValue}` : label;
     };
 
-    const getConditionsLabel = (conditions: OptimizationRuleCondition[]) => {
-        if (!conditions || conditions.length === 0) return 'No conditions';
-        return conditions.map(c => {
-            const operatorLabels: Record<string, string> = {
-                greater_than: '>',
-                less_than: '<',
-                equal: '=',
-                greater_than_or_equal: '≥',
-                less_than_or_equal: '≤',
-            };
-            return `${c.metric} ${operatorLabels[c.operator] || c.operator} ${c.value}`;
-        }).join(', ');
-    };
-
     const columns: ColumnDef<OptimizationRule>[] = [
         {
             accessorKey: 'name',
@@ -265,11 +252,7 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
         {
             accessorKey: 'conditions',
             header: ({ column }) => <SortableHeader column={column} title="Conditions" enabled={false} />,
-            cell: ({ row }) => (
-                <div className="text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">
-                    {getConditionsLabel(row.original.conditions)}
-                </div>
-            ),
+            cell: ({ row }) => <ConditionsBadge conditions={row.original.conditions} />,
         },
         {
             accessorKey: 'status',
