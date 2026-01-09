@@ -7,6 +7,8 @@ use App\Models\Team;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class TeamController extends Controller
 {
@@ -20,41 +22,21 @@ class TeamController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
-        $query = Team::ofWorkspace($workspace)
+        $teams = QueryBuilder::for(Team::ofWorkspace($workspace))
             ->withCount('members')
-            ->with(['members:id,name,email']);
-
-        // Search by name
-        $search = $request->input('filter.search') ?? $request->get('search');
-        if ($search) {
-            $query->where('name', 'like', '%'.$search.'%');
-        }
-
-        // Sorting - handle both "field:direction" and separate "sort" + "direction" params
-        $sortParam = $request->get('sort', '-created_at');
-        $sortDirection = 'desc';
-        $sortField = 'created_at';
-
-        if (str_contains($sortParam, ':')) {
-            // Format: "name:asc" or "name:desc"
-            [$sortField, $sortDirection] = explode(':', $sortParam);
-            $sortField = ltrim($sortField, '-');
-        } elseif (str_starts_with($sortParam, '-')) {
-            // Format: "-name" (desc) or "name" (asc)
-            $sortField = ltrim($sortParam, '-');
-            $sortDirection = 'desc';
-        } else {
-            $sortField = $sortParam;
-            $sortDirection = $request->get('direction', 'asc');
-        }
-
-        $allowedSortFields = ['name', 'created_at', 'members_count', 'id'];
-        if (in_array($sortField, $allowedSortFields)) {
-            $query->orderBy($sortField, $sortDirection === 'desc' ? 'desc' : 'asc');
-        }
-
-        // Pagination
-        $teams = $query->paginate(10)->withQueryString();
+            ->with(['members:id,name,email'])
+            ->allowedFilters([
+                AllowedFilter::partial('search', 'name'),
+            ])
+            ->allowedSorts([
+                'id',
+                'name',
+                'created_at',
+                'members_count',
+            ])
+            ->defaultSort('-created_at')
+            ->paginate(10)
+            ->withQueryString();
 
         // Get workspace members for the dropdown
         $workspaceMembers = $workspace->users()
@@ -69,10 +51,8 @@ class TeamController extends Controller
             'workspaceMembers' => $workspaceMembers,
             'isAdmin' => $isAdmin,
             'query' => [
-                'filter' => [
-                    'search' => $search ?? '',
-                ],
-                'sort' => $sortParam,
+                ...$request->only(['sort', 'perPage', 'page']),
+                'filter' => $request->input('filter', []),
             ],
         ]);
     }
