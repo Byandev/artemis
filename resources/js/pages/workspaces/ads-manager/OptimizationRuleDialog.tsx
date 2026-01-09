@@ -185,39 +185,42 @@ export const OptimizationRuleDialog = ({
                         {errors.target && <p className="text-sm text-red-500 mt-1">{errors.target}</p>}
                     </div>
 
-                    {/* Action */}
-                    <div>
-                        <Label htmlFor="action">Action *</Label>
-                        <select
-                            id="action"
-                            value={formData.action}
-                            onChange={(e) => setFormData({ ...formData, action: e.target.value })}
-                            className="h-10 w-full rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 dark:focus:border-brand-800"
-                            required
-                        >
-                            <option value="increase_budget_fixed">Increase Daily Budget By Fixed Amount</option>
-                            <option value="decrease_budget_fixed">Decrease Daily Budget By Fixed Amount</option>
-                            <option value="increase_budget_percentage">Increase Daily Budget By Percentage</option>
-                            <option value="decrease_budget_percentage">Decrease Daily Budget By Percentage</option>
-                        </select>
-                        {errors.action && <p className="text-sm text-red-500 mt-1">{errors.action}</p>}
-                    </div>
+                    {/* Action and Action Value */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Action */}
+                        <div>
+                            <Label htmlFor="action">Action *</Label>
+                            <select
+                                id="action"
+                                value={formData.action}
+                                onChange={(e) => setFormData({ ...formData, action: e.target.value })}
+                                className="h-10 w-full rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 dark:focus:border-brand-800"
+                                required
+                            >
+                                <option value="increase_budget_fixed">Increase Daily Budget By Fixed Amount</option>
+                                <option value="decrease_budget_fixed">Decrease Daily Budget By Fixed Amount</option>
+                                <option value="increase_budget_percentage">Increase Daily Budget By Percentage</option>
+                                <option value="decrease_budget_percentage">Decrease Daily Budget By Percentage</option>
+                            </select>
+                            {errors.action && <p className="text-sm text-red-500 mt-1">{errors.action}</p>}
+                        </div>
 
-                    {/* Action Value */}
-                    <div>
-                        <Label htmlFor="action_value">
-                            {formData.action.includes('percentage') ? 'Percentage (%)' : 'Amount'}
-                        </Label>
-                        <Input
-                            id="action_value"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={formData.action_value}
-                            onChange={(e) => setFormData({ ...formData, action_value: e.target.value })}
-                            placeholder={formData.action.includes('percentage') ? 'e.g., 10' : 'e.g., 100'}
-                        />
-                        {errors.action_value && <p className="text-sm text-red-500 mt-1">{errors.action_value}</p>}
+                        {/* Action Value */}
+                        <div>
+                            <Label htmlFor="action_value">
+                                {formData.action.includes('percentage') ? 'Percentage (%)' : 'Amount'}
+                            </Label>
+                            <Input
+                                id="action_value"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={formData.action_value}
+                                onChange={(e) => setFormData({ ...formData, action_value: e.target.value })}
+                                placeholder={formData.action.includes('percentage') ? 'e.g., 10' : 'e.g., 100'}
+                            />
+                            {errors.action_value && <p className="text-sm text-red-500 mt-1">{errors.action_value}</p>}
+                        </div>
                     </div>
 
                     {/* Conditions */}
@@ -235,15 +238,25 @@ export const OptimizationRuleDialog = ({
                             </Button>
                         </div>
 
-                        <div className="space-y-3">
-                            {formData.conditions.map((condition, index) => (
-                                <div key={index} className="p-3 border border-gray-200 dark:border-gray-700 rounded-md space-y-2">
-                                    <div className="grid grid-cols-[1fr,1fr,1fr,auto] gap-2">
+                        <div className="space-y-2">
+                            {formData.conditions.map((condition, index) => {
+                                const operatorLabels: Record<string, string> = {
+                                    greater_than: 'Greater than',
+                                    less_than: 'Less than',
+                                    equal: 'Equal',
+                                    greater_than_or_equal: 'Greater than or equal to',
+                                    less_than_or_equal: 'Less than or equal to',
+                                };
+                                return (
+                                    <div
+                                        key={index}
+                                        className="flex items-center gap-2 p-3 bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border border-blue-200 dark:border-blue-800 rounded-lg"
+                                    >
                                         {/* Metric */}
                                         <select
                                             value={condition.metric}
                                             onChange={(e) => updateCondition(index, 'metric', e.target.value)}
-                                            className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-2 py-1 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
+                                            className="flex-1 min-w-[100px] h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
                                             required
                                         >
                                             <option value="spend">Spend</option>
@@ -253,18 +266,19 @@ export const OptimizationRuleDialog = ({
                                             <option value="roas">ROAS</option>
                                         </select>
 
-                                        {/* Operator */}
+                                        {/* Operator with symbol */}
                                         <select
                                             value={condition.operator}
                                             onChange={(e) => updateCondition(index, 'operator', e.target.value)}
-                                            className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-2 py-1 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
+                                            className="w-16 h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
+                                            title={operatorLabels[condition.operator]}
                                             required
                                         >
-                                            <option value="greater_than">Greater than</option>
-                                            <option value="less_than">Less than</option>
-                                            <option value="equal">Equal</option>
-                                            <option value="greater_than_or_equal">Greater than or equal to</option>
-                                            <option value="less_than_or_equal">Less than or equal to</option>
+                                            <option value="greater_than">&gt;</option>
+                                            <option value="less_than">&lt;</option>
+                                            <option value="equal">=</option>
+                                            <option value="greater_than_or_equal">≥</option>
+                                            <option value="less_than_or_equal">≤</option>
                                         </select>
 
                                         {/* Value */}
@@ -274,7 +288,7 @@ export const OptimizationRuleDialog = ({
                                             value={condition.value}
                                             onChange={(e) => updateCondition(index, 'value', e.target.value)}
                                             placeholder="Value"
-                                            className="h-9"
+                                            className="w-20 h-9"
                                             required
                                         />
 
@@ -285,14 +299,14 @@ export const OptimizationRuleDialog = ({
                                                 variant="ghost"
                                                 size="sm"
                                                 onClick={() => removeCondition(index)}
-                                                className="h-9"
+                                                className="h-9 text-red-500 hover:bg-red-100 dark:hover:bg-red-900"
                                             >
-                                                <Trash2 className="h-4 w-4 text-red-500" />
+                                                <Trash2 className="h-4 w-4" />
                                             </Button>
                                         )}
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                         {errors.conditions && <p className="text-sm text-red-500 mt-1">{errors.conditions}</p>}
                     </div>
