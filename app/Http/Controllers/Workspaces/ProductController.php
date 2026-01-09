@@ -7,53 +7,36 @@ use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class ProductController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
-        $query = Product::ofWorkspace($workspace)->with('owner');
-
-        // Search filter (search by name and code only)
-        $search = $request->input('filter.search') ?? $request->get('search');
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
-            });
-        }
-
-        // Category filter
-        if ($request->filled('category')) {
-            $query->where('category', $request->category);
-        }
-
-        // Status filter (for tabs: Analytics, Products, Testing Products)
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        // Sorting - handle both "field:direction" and separate "sort" + "direction" params
-        $sortParam = $request->get('sort', '-created_at');
-        $sortDirection = 'desc';
-        $sortField = 'created_at';
-
-        if (str_contains($sortParam, ':')) {
-            // Format: "name:asc" or "name:desc"
-            [$sortField, $sortDirection] = explode(':', $sortParam);
-            $sortField = ltrim($sortField, '-');
-        } elseif (str_starts_with($sortParam, '-')) {
-            // Format: "-name" (desc) or "name" (asc)
-            $sortField = ltrim($sortParam, '-');
-            $sortDirection = 'desc';
-        } else {
-            $sortField = $sortParam;
-            $sortDirection = $request->get('direction', 'asc');
-        }
-
-        $query->orderBy($sortField, $sortDirection);
-
-        $products = $query->paginate(10)->withQueryString();
+        $products = QueryBuilder::for(Product::ofWorkspace($workspace))
+            ->with('owner')
+            ->allowedFilters([
+                AllowedFilter::callback('search', function ($query, $value) {
+                    $query->where(function ($q) use ($value) {
+                        $q->where('name', 'like', "%{$value}%")
+                            ->orWhere('code', 'like', "%{$value}%");
+                    });
+                }),
+                AllowedFilter::exact('category'),
+                AllowedFilter::exact('status'),
+            ])
+            ->allowedSorts([
+                'id',
+                'name',
+                'code',
+                'category',
+                'status',
+                'created_at',
+            ])
+            ->defaultSort('-created_at')
+            ->paginate(10)
+            ->withQueryString();
 
         // Get unique categories for filter dropdown (exclude null/empty values)
         $categories = Product::ofWorkspace($workspace)
