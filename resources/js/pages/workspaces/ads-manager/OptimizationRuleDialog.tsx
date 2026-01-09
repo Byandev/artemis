@@ -145,7 +145,7 @@ export const OptimizationRuleDialog = ({
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {/* Name */}
                     <div>
-                        <Label htmlFor="name">Name *</Label>
+                        <Label htmlFor="name">Name</Label>
                         <Input
                             id="name"
                             value={formData.name}
@@ -171,7 +171,7 @@ export const OptimizationRuleDialog = ({
 
                     {/* Target */}
                     <div>
-                        <Label htmlFor="target">Target *</Label>
+                        <Label htmlFor="target">Target</Label>
                         <select
                             id="target"
                             value={formData.target}
@@ -189,7 +189,7 @@ export const OptimizationRuleDialog = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Action */}
                         <div>
-                            <Label htmlFor="action">Action *</Label>
+                            <Label htmlFor="action">Action</Label>
                             <select
                                 id="action"
                                 value={formData.action}
@@ -226,7 +226,7 @@ export const OptimizationRuleDialog = ({
                     {/* Conditions */}
                     <div>
                         <div className="flex items-center justify-between mb-2">
-                            <Label>Conditions *</Label>
+                            <Label>Conditions</Label>
                             <Button
                                 type="button"
                                 variant="outline"
@@ -313,7 +313,7 @@ export const OptimizationRuleDialog = ({
 
                     {/* Status */}
                     <div>
-                        <Label htmlFor="status">Status *</Label>
+                        <Label htmlFor="status">Status</Label>
                         <select
                             id="status"
                             value={formData.status}
