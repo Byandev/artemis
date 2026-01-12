@@ -6,9 +6,11 @@ import AppLayout from '@/layouts/app-layout';
 import { OptimizationRule } from '@/types/models/OptimizationRule';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
+import { startCase } from 'lodash';
 import axios from 'axios';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import AdsManagerLayout from './partials/Layout';
 
 interface PageProps {
     workspace: Workspace;
@@ -128,21 +130,12 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
     return (
         <AppLayout>
             <Head title={`${workspace.name} - ${rule ? 'Edit' : 'Create'} Optimization Rule`} />
-            <div className="max-w-4xl w-full mx-auto py-6 px-4">
-                {/* Back Button */}
-                <div className="mb-6">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.get(`/workspaces/${workspace.slug}/ads-manager/optimization-rules`)}
-                        className="gap-2"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        Back to Rules
-                    </Button>
-                </div>
-
-                <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
+            <AdsManagerLayout
+                workspace={workspace}
+                activeTab="optimizationRules"
+            >
+                <div className="max-w-5xl mx-auto py-6 px-4">
+                    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90 mb-6">
                         {rule ? 'Edit Optimization Rule' : 'Create New Optimization Rule'}
                     </h1>
@@ -250,24 +243,24 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                                 </div>
 
                                 <div className="space-y-3">
+
+                                    {/* Condition Rows */}
                                     {formData.conditions.map((condition, index) => {
-                                        const operatorLabels: Record<string, string> = {
-                                            greater_than: 'Greater than',
-                                            less_than: 'Less than',
-                                            equal: 'Equal',
-                                            greater_than_or_equal: 'Greater than or equal to',
-                                            less_than_or_equal: 'Less than or equal to',
-                                        };
                                         return (
                                             <div
                                                 key={index}
-                                                className="flex items-center gap-2 p-3 bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border border-blue-200 dark:border-blue-800 rounded-lg"
+                                                className="grid grid-cols-[80px_1fr_1.5fr_1fr_auto] items-center gap-3 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg"
                                             >
+                                                {/* Where label (only show for first row) */}
+                                                <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                    {index === 0 ? 'Where' : 'Or'}
+                                                </div>
+
                                                 {/* Metric */}
                                                 <select
                                                     value={condition.metric}
                                                     onChange={(e) => updateCondition(index, 'metric', e.target.value)}
-                                                    className="flex-1 min-w-[100px] h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
+                                                    className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
                                                     required
                                                 >
                                                     <option value="spend">Spend</option>
@@ -277,19 +270,19 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                                                     <option value="roas">ROAS</option>
                                                 </select>
 
-                                                {/* Operator with symbol */}
+                                                {/* Operator */}
                                                 <select
                                                     value={condition.operator}
                                                     onChange={(e) => updateCondition(index, 'operator', e.target.value)}
-                                                    className="w-16 h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
-                                                    title={operatorLabels[condition.operator]}
+                                                    className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
+                                                    title={startCase(condition.operator)}
                                                     required
                                                 >
-                                                    <option value="greater_than">&gt;</option>
-                                                    <option value="less_than">&lt;</option>
-                                                    <option value="equal">=</option>
-                                                    <option value="greater_than_or_equal">≥</option>
-                                                    <option value="less_than_or_equal">≤</option>
+                                                    <option value="greater_than">{startCase('greater_than')}</option>
+                                                    <option value="less_than">{startCase('less_than')}</option>
+                                                    <option value="equal">{startCase('equal')}</option>
+                                                    <option value="greater_than_or_equal">{startCase('greater_than_or_equal')}</option>
+                                                    <option value="less_than_or_equal">{startCase('less_than_or_equal')}</option>
                                                 </select>
 
                                                 {/* Value */}
@@ -299,7 +292,7 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                                                     value={condition.value}
                                                     onChange={(e) => updateCondition(index, 'value', e.target.value)}
                                                     placeholder="Value"
-                                                    className="w-20 h-9"
+                                                    className="h-9"
                                                     required
                                                 />
 
@@ -310,7 +303,7 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                                                         variant="ghost"
                                                         size="sm"
                                                         onClick={() => removeCondition(index)}
-                                                        className="h-9 text-red-500 hover:bg-red-100 dark:hover:bg-red-900"
+                                                        className="h-9 text-red-500 hover:bg-red-100 dark:hover:bg-red-900 justify-self-end"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>
@@ -355,8 +348,9 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                         </form>
                     </div>
                 </div>
-            </AppLayout>
-        );
-    };
-    
+            </AdsManagerLayout>
+        </AppLayout>
+    );
+};
+
 export default OptimizationRulesFormPage;
