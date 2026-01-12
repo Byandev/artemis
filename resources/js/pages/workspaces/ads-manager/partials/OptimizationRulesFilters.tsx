@@ -1,14 +1,10 @@
 import { Button } from '@/components/ui/button';
-import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
-import { type DateRange } from 'react-day-picker';
 
 interface OptimizationRulesFiltersProps {
     searchValue: string;
     onSearchChange: (value: string) => void;
     statusFilter: string;
     onStatusChange: (value: string) => void;
-    dateRange: DateRange | undefined;
-    onDateRangeChange: (range: DateRange | undefined) => void;
     onAddRule: () => void;
 }
 
@@ -17,8 +13,6 @@ const OptimizationRulesFilters = ({
     onSearchChange,
     statusFilter,
     onStatusChange,
-    dateRange,
-    onDateRangeChange,
     onAddRule,
 }: OptimizationRulesFiltersProps) => {
     return (
@@ -39,10 +33,6 @@ const OptimizationRulesFilters = ({
                     <option value="active">Active</option>
                     <option value="paused">Paused</option>
                 </select>
-                <SimpleDateRangePicker
-                    value={dateRange}
-                    onChange={onDateRangeChange}
-                />
                 <Button
                     variant="default"
                     size="sm"

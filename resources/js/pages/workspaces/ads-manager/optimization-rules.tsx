@@ -22,11 +22,8 @@ import axios from 'axios';
 import clsx from 'clsx';
 import { omit } from 'lodash';
 import { Edit2, Trash2 } from 'lucide-react';
-import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
-import { type DateRange } from 'react-day-picker';
 import { ConditionsBadge } from './ConditionsBadge';
-import { OptimizationRuleDialog } from './OptimizationRuleDialog';
 import AdsManagerLayout from './partials/Layout';
 import OptimizationRulesFilters from './partials/OptimizationRulesFilters';
 
@@ -74,8 +71,6 @@ interface PageProps {
             search?: string;
             status?: string;
         };
-        start_date?: string;
-        end_date?: string;
     };
 }
 
@@ -86,18 +81,7 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [statusFilter, setStatusFilter] = useState(query?.filter?.status ?? '');
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: query?.start_date ? new Date(query.start_date) : moment().startOf('month').toDate(),
-        to: query?.end_date ? new Date(query.end_date) : moment().toDate(),
-    });
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [editingRule, setEditingRule] = useState<OptimizationRule | null>(null);
     const [ruleToDelete, setRuleToDelete] = useState<OptimizationRule | null>(null);
-
-    const dateRangeStr = useMemo(() => ({
-        to: moment(dateRange?.to).format('YYYY-MM-DD'),
-        from: moment(dateRange?.from).format('YYYY-MM-DD'),
-    }), [dateRange]);
 
     // Debounce search
     useEffect(() => {
@@ -114,8 +98,6 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
                     'filter[status]': statusFilter || undefined,
-                    start_date: dateRange?.from ? dateRangeStr.from : undefined,
-                    end_date: dateRange?.to ? dateRangeStr.to : undefined,
                     page: 1,
                 },
                 {
@@ -139,8 +121,6 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
                 sort: query?.sort,
                 'filter[search]': searchValue || undefined,
                 'filter[status]': value || undefined,
-                start_date: dateRange?.from ? dateRangeStr.from : undefined,
-                end_date: dateRange?.to ? dateRangeStr.to : undefined,
                 page: 1,
             },
             {
@@ -151,27 +131,6 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
             },
         );
     };
-
-    // Update data when date range changes
-    useEffect(() => {
-        router.get(
-            `/workspaces/${workspace.slug}/ads-manager/optimization-rules`,
-            {
-                sort: query?.sort,
-                'filter[search]': searchValue || undefined,
-                'filter[status]': statusFilter || undefined,
-                start_date: dateRange?.from ? dateRangeStr.from : undefined,
-                end_date: dateRange?.to ? dateRangeStr.to : undefined,
-                page: 1,
-            },
-            {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-                only: ['rules'],
-            },
-        );
-    }, [dateRange, dateRangeStr]);
 
     const handleDelete = async () => {
         if (!ruleToDelete) return;
@@ -187,18 +146,7 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
     };
 
     const handleEdit = (rule: OptimizationRule) => {
-        setEditingRule(rule);
-        setIsDialogOpen(true);
-    };
-
-    const handleDialogClose = () => {
-        setIsDialogOpen(false);
-        setEditingRule(null);
-    };
-
-    const handleDialogSuccess = () => {
-        router.reload({ only: ['rules'] });
-        handleDialogClose();
+        router.get(`/workspaces/${workspace.slug}/ads-manager/optimization-rules/${rule.id}/edit`);
     };
 
     const getActionLabel = (action: string, actionValue: number | null) => {
@@ -297,9 +245,7 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
                                 onSearchChange={setSearchValue}
                                 statusFilter={statusFilter}
                                 onStatusChange={handleStatusFilterChange}
-                                dateRange={dateRange}
-                                onDateRangeChange={setDateRange}
-                                onAddRule={() => setIsDialogOpen(true)}
+                                onAddRule={() => router.get(`/workspaces/${workspace.slug}/ads-manager/optimization-rules/create`)}
                             />
 
                             <DataTable
@@ -315,8 +261,6 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
                                             sort: params?.sort,
                                             'filter[search]': searchValue || undefined,
                                             'filter[status]': statusFilter || undefined,
-                                            start_date: dateRange?.from ? dateRangeStr.from : undefined,
-                                            end_date: dateRange?.to ? dateRangeStr.to : undefined,
                                             page: params?.page ?? 1,
                                         },
                                         {
@@ -330,14 +274,6 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
                         </div>
                     </ComponentCard>
                 </div>
-
-                <OptimizationRuleDialog
-                    workspace={workspace}
-                    open={isDialogOpen}
-                    onClose={handleDialogClose}
-                    onSuccess={handleDialogSuccess}
-                    editingRule={editingRule}
-                />
 
                 {/* Delete Confirmation Dialog */}
                 <AlertDialog open={!!ruleToDelete} onOpenChange={() => setRuleToDelete(null)}>

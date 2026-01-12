@@ -20,7 +20,7 @@ class OptimizationRuleController extends Controller
      */
     private function buildQuery(Workspace $workspace, Request $request)
     {
-        $query = QueryBuilder::for(OptimizationRule::class)
+        return QueryBuilder::for(OptimizationRule::class)
             ->where('workspace_id', $workspace->id)
             ->allowedFilters([
                 AllowedFilter::scope('search'),
@@ -36,16 +36,6 @@ class OptimizationRuleController extends Controller
                 'updated_at',
             ])
             ->defaultSort('-created_at');
-
-        // Apply date range filter if provided
-        if ($request->has('start_date') && $request->has('end_date')) {
-            $query->whereBetween('created_at', [
-                $request->get('start_date').' 00:00:00',
-                $request->get('end_date').' 23:59:59',
-            ]);
-        }
-
-        return $query;
     }
 
     /**
@@ -69,9 +59,36 @@ class OptimizationRuleController extends Controller
                     'search' => $request->get('filter.search'),
                     'status' => $request->get('filter.status'),
                 ],
-                'start_date' => $request->get('start_date'),
-                'end_date' => $request->get('end_date'),
             ],
+        ]);
+    }
+
+    /**
+     * Show the create page.
+     */
+    public function create(Workspace $workspace)
+    {
+        return Inertia::render('workspaces/ads-manager/optimization-rules-form', [
+            'workspace' => $workspace,
+            'rule' => null,
+        ]);
+    }
+
+    /**
+     * Show the edit page.
+     */
+    public function edit(Workspace $workspace, OptimizationRule $optimizationRule)
+    {
+        // Ensure the rule belongs to the workspace
+        if ($optimizationRule->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
+        $optimizationRule->load('conditions');
+
+        return Inertia::render('workspaces/ads-manager/optimization-rules-form', [
+            'workspace' => $workspace,
+            'rule' => $optimizationRule,
         ]);
     }
 
