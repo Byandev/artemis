@@ -51,10 +51,8 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
 
     // Use global date range state with automatic initialization from URL filters
     const { dateRange, setDateRange } = useDateRange({
-        filters: {
-            start_date: filters?.start_date,
-            end_date: filters?.end_date
-        }
+        startDate: filters?.start_date,
+        endDate: filters?.end_date
     });
 
     const dateRangeStr = useMemo(() => ({
