@@ -50,12 +50,8 @@ class ProductController extends Controller
             'products' => $products,
             'workspace' => $workspace,
             'query' => [
-                'filter' => [
-                    'search' => $search ?? '',
-                    'category' => $request->category ?? '',
-                    'status' => $request->status ?? '',
-                ],
-                'sort' => $sortParam,
+                ...$request->only(['sort', 'perPage', 'page']),
+                'filter' => $request->input('filter', []),
             ],
             'categories' => $categories,
         ]);
