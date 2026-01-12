@@ -166,7 +166,7 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
                             <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.05]">
                                 <input
                                     className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900  dark:placeholder:text-white/30  bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800"
-                                    placeholder="Search product name or SKU"
+                                    placeholder="Search product name or code"
                                     value={searchValue}
                                     onChange={(e) => setSearchValue(e.target.value)}
                                 />
