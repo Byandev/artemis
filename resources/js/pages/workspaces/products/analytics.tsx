@@ -76,7 +76,9 @@ const Analytics = ({ workspace, summary }: Props) => {
                         inactive_product_count={summary.inactive_product_count}
                         testing_product_count={summary.testing_product_count}
                     />
+                </div>
 
+                <div className="grid gap-4">
                     <SalesBreakdown workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to}/>
 
                     <AdSpentBreakdown workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to}/>

@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\AdAccount\FacebookAccountsSort;
+use App\Jobs\AdsManager\FetchAds;
+use App\Jobs\AdsManager\FetchAdSets;
+use App\Jobs\AdsManager\FetchCampaigns;
 use App\Models\AdAccount;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
@@ -40,5 +43,16 @@ class AdAccountController extends Controller
                 'filter' => $request->input('filter', []),
             ],
         ]);
+    }
+
+    public function refresh(Workspace $workspace, AdAccount $adAccount)
+    {
+        $facebookAccount = $adAccount->facebook_accounts()->first();
+
+        dispatch(new FetchCampaigns($facebookAccount, $adAccount));
+        dispatch(new FetchAdSets($facebookAccount, $adAccount));
+        dispatch(new FetchAds($facebookAccount, $adAccount));
+
+        return redirect()->back();
     }
 }

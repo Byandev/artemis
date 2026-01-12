@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class FetchPageOrders implements ShouldQueue
 {
@@ -28,6 +29,8 @@ class FetchPageOrders implements ShouldQueue
     public function handle(): void
     {
         $page_number = $this->page_number;
+
+        Log::error('https://pos.pages.fm/api/v1/shops/'.$this->page->shop_id.'/orders?api_key='.$this->page->pos_token."&page_size=100&page_number=$page_number&order_sources[]=-1&order_sources[]={$this->page->id}&startDateTime=$this->startTime&endDateTime=$this->endTime&updateStatus=updated_at");
 
         $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$this->page->shop_id.'/orders?api_key='.$this->page->pos_token."&page_size=100&page_number=$page_number&order_sources[]=-1&order_sources[]={$this->page->id}&startDateTime=$this->startTime&endDateTime=$this->endTime&updateStatus=updated_at")
             ->throw();
