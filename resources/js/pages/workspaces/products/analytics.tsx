@@ -1,17 +1,16 @@
 
-import { useMemo, useState, useEffect } from 'react';
-import ProductLayout from '@/pages/workspaces/products/partials/layout';
-import { Workspace } from '@/types/models/Workspace';
-import TopProducts from '@/pages/workspaces/products/partials/analytics/TopProducts';
-import SalesBreakdown from '@/pages/workspaces/products/partials/analytics/SalesBreakdown';
+import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
+import { useDateRange } from '@/hooks/use-date-range';
 import AdSpentBreakdown from '@/pages/workspaces/products/partials/analytics/AdSpentBreakdown';
 import RoasBreakdown from '@/pages/workspaces/products/partials/analytics/RoasBreakdown';
 import RtsBreakdown from '@/pages/workspaces/products/partials/analytics/RtsBreakdown';
+import SalesBreakdown from '@/pages/workspaces/products/partials/analytics/SalesBreakdown';
 import StatusBreakdown from '@/pages/workspaces/products/partials/analytics/StatusBreakdown';
-import { type DateRange } from "react-day-picker"
-import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
+import TopProducts from '@/pages/workspaces/products/partials/analytics/TopProducts';
+import ProductLayout from '@/pages/workspaces/products/partials/layout';
+import { Workspace } from '@/types/models/Workspace';
 import moment from 'moment';
-import { useDateRange } from '@/hooks/use-date-range';
+import { useMemo } from 'react';
 
 interface Props {
     workspace: Workspace;
@@ -35,18 +34,8 @@ const Analytics = ({ workspace, summary }: Props) => {
         ];
     }, [summary]);
 
-    // Use global date range state
+    // Use global date range state with automatic initialization
     const { dateRange, setDateRange } = useDateRange();
-
-    // Initialize date range if global state is empty
-    useEffect(() => {
-        if (!dateRange) {
-            setDateRange({
-                from: moment().startOf('month').toDate(),
-                to: moment().toDate()
-            });
-        }
-    }, []); // Only run on mount
 
     const dateRangeStr = useMemo(() => ({
         to: moment(dateRange?.to).format('YYYY-MM-DD'),

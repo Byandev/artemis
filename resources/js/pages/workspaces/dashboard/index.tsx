@@ -49,24 +49,13 @@ type Props = {
 
 export default function Index({ workspace, stats, filters, availableTeams, availableProducts, availablePages, availableShops }: Props) {
 
-    // Use global date range state
-    const { dateRange, setDateRange } = useDateRange();
-
-    // Initialize date range from URL filters if global state is empty
-    useEffect(() => {
-        if (!dateRange && (filters?.start_date || filters?.end_date)) {
-            setDateRange({
-                from: filters?.start_date ? new Date(filters.start_date) : moment().startOf('month').toDate(),
-                to: filters?.end_date ? new Date(filters.end_date) : moment().toDate()
-            });
-        } else if (!dateRange) {
-            // Default to current month if no filters and no global state
-            setDateRange({
-                from: moment().startOf('month').toDate(),
-                to: moment().toDate()
-            });
+    // Use global date range state with automatic initialization from URL filters
+    const { dateRange, setDateRange } = useDateRange({
+        filters: {
+            start_date: filters?.start_date,
+            end_date: filters?.end_date
         }
-    }, []); // Only run on mount
+    });
 
     const dateRangeStr = useMemo(() => ({
         to: moment(dateRange?.to).format('YYYY-MM-DD'),

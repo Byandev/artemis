@@ -6,7 +6,6 @@ import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
 import { Grid3x3, List } from 'lucide-react';
-import moment from 'moment';
 import { useEffect, useRef, useState } from 'react';
 import AdSetsTab from './AdSetsTab';
 import AdsTab from './AdsTab';
@@ -22,18 +21,9 @@ const AdsManager = ({ workspace }: PageProps) => {
   const [activeTab, setActiveTab] = useState<TabType>('campaigns');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const { dateRange, setDateRange } = useDateRange();
   const [loading, setLoading] = useState(false);
-
-  // Initialize date range if global state is empty
-  useEffect(() => {
-    if (!dateRange) {
-      setDateRange({
-        from: moment().startOf('month').toDate(),
-        to: moment().toDate()
-      });
-    }
-  }, []);
+  // Use global date range state with automatic initialization
+  const { dateRange, setDateRange } = useDateRange();
 
   // Refs to trigger fetch from child components
   const campaignsTabRef = useRef<any>(null);
