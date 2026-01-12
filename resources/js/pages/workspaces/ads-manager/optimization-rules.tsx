@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -19,46 +20,12 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
-import clsx from 'clsx';
 import { omit } from 'lodash';
 import { Edit2, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { ConditionsBadge } from './ConditionsBadge';
 import AdsManagerLayout from './partials/Layout';
 import OptimizationRulesFilters from './partials/OptimizationRulesFilters';
-
-type OptimizationRuleStatus = {
-    label: string;
-    className: string;
-};
-
-const OPTIMIZATION_RULE_STATUS: Record<string, OptimizationRuleStatus> = {
-    active: {
-        label: 'ACTIVE',
-        className: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-    },
-    paused: {
-        label: 'PAUSED',
-        className: 'bg-amber-50 text-amber-800 ring-amber-200',
-    },
-};
-
-const StatusBadge = ({ status }: { status: string }) => {
-    const item =
-        OPTIMIZATION_RULE_STATUS[status] ??
-        { label: `UNKNOWN (${status})`, className: 'bg-red-50 text-red-700 ring-red-200' };
-
-    return (
-        <span
-            className={clsx(
-                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset',
-                item.className
-            )}
-        >
-            {item.label}
-        </span>
-    );
-};
 
 interface PageProps {
     workspace: Workspace;
