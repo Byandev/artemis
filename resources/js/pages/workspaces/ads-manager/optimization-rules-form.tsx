@@ -135,7 +135,7 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                 activeTab="optimizationRules"
             >
                 <div className="flex justify-center py-4 md:py-6 px-3 md:px-4">
-                    <div className="w-full max-w-4xl">
+                    <div className="w-full">
                         <div className="bg-white rounded-lg border border-gray-200 p-4 md:p-6">
                             <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">
                                 {rule ? 'Edit Optimization Rule' : 'Create New Optimization Rule'}
