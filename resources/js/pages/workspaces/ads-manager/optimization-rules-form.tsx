@@ -229,31 +229,35 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                                 </div>
 
                                 {/* Conditions */}
-                                <div className='border p-4 rounded-2xl bg-gray-50'>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <Label>Conditions</Label>
+                                <div className='border border-gray-200 dark:border-gray-700 p-5 rounded-lg bg-gray-50 dark:bg-gray-800/50'>
+                                    <div className="flex items-center justify-between mb-5">
+                                        <div>
+                                            <Label className="text-base">Conditions</Label>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Define when this rule should trigger</p>
+                                        </div>
                                         <Button
                                             type="button"
                                             variant="outline"
                                             size="sm"
                                             onClick={addCondition}
+                                            className="border-gray-300 dark:border-gray-600"
                                         >
-                                            <Plus className="h-4 w-4 mr-1" />
+                                            <Plus className="h-4 w-4 mr-2" />
                                             Add Condition
                                         </Button>
                                     </div>
 
-                                    <div className="flex flex-row gap-5 flex-wrap">
+                                    <div className="flex flex-col gap-3">
 
                                         {/* Condition Rows */}
                                         {formData.conditions.map((condition, index) => {
                                             return (
                                                 <div
                                                     key={index}
-                                                    className="flex w-fit items-center gap-3 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg"
+                                                    className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
                                                 >
-                                                    {/* Where label (only show for first row) */}
-                                                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                    {/* Where/Or label */}
+                                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide min-w-fit">
                                                         {index === 0 ? 'Where' : 'Or'}
                                                     </div>
 
@@ -261,7 +265,7 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                                                     <select
                                                         value={condition.metric}
                                                         onChange={(e) => updateCondition(index, 'metric', e.target.value)}
-                                                        className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
+                                                        className="h-9 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-white/90 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 dark:focus:border-brand-600 transition-colors"
                                                         required
                                                     >
                                                         <option value="spend">Spend</option>
@@ -275,7 +279,7 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                                                     <select
                                                         value={condition.operator}
                                                         onChange={(e) => updateCondition(index, 'operator', e.target.value)}
-                                                        className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
+                                                        className="h-9 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-white/90 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 dark:focus:border-brand-600 transition-colors"
                                                         title={startCase(condition.operator)}
                                                         required
                                                     >
@@ -293,7 +297,7 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                                                         value={condition.value}
                                                         onChange={(e) => updateCondition(index, 'value', e.target.value)}
                                                         placeholder="Value"
-                                                        className="h-9"
+                                                        className="h-9 flex-1 min-w-[120px]"
                                                         required
                                                     />
 
@@ -304,7 +308,7 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={() => removeCondition(index)}
-                                                            className="h-9 text-red-500 hover:bg-red-100 dark:hover:bg-red-900 justify-self-end"
+                                                            className="h-9 px-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                                                         >
                                                             <Trash2 className="h-4 w-4" />
                                                         </Button>
