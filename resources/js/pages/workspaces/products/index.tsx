@@ -96,6 +96,13 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
 
     const columns: ColumnDef<Product>[] = [
         {
+            accessorKey: 'code',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Code'} />
+            ),
+        },
+        {
             accessorKey: 'name',
             enableSorting: true,
             header: ({ column }) => (
@@ -152,8 +159,8 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
         <ProductLayout workspace={workspace}>
             <Head title={`${workspace.name} - Products`} />
             <div className="flex flex-wrap items-center justify-end gap-3 mb-4">
-                <Button 
-                    size="sm" 
+                <Button
+                    size="sm"
                     onClick={() => router.get(workspaces.products.create({ workspace }))}
                 >
                     Add Product
