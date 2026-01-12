@@ -58,7 +58,7 @@ class AdRecord extends Model
         $teamIds = $filters['team_ids'] ?? null;
 
         // Only apply filters if at least one is present
-        if (!$pageIds && !$shopIds && !$productIds && !$teamIds) {
+        if (! $pageIds && ! $shopIds && ! $productIds && ! $teamIds) {
             return $query;
         }
 
@@ -102,4 +102,3 @@ class AdRecord extends Model
         return $this->hasMany(Order::class, 'ad_id', 'ad_id');
     }
 }
-

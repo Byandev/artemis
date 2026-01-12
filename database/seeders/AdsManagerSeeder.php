@@ -18,17 +18,19 @@ class AdsManagerSeeder extends Seeder
     {
         // Get the first user (or you can specify a specific user)
         $user = User::first();
-        
-        if (!$user) {
+
+        if (! $user) {
             $this->command->error('No users found. Please create a user first.');
+
             return;
         }
 
         // Get the first workspace
         $workspace = Workspace::first();
-        
-        if (!$workspace) {
+
+        if (! $workspace) {
             $this->command->error('No workspace found. Please create a workspace first.');
+
             return;
         }
 
@@ -45,11 +47,11 @@ class AdsManagerSeeder extends Seeder
         );
 
         // Attach Facebook account to workspace
-        if (!$workspace->facebookAccounts()->where('facebook_account_id', $facebookAccount->id)->exists()) {
+        if (! $workspace->facebookAccounts()->where('facebook_account_id', $facebookAccount->id)->exists()) {
             $workspace->facebookAccounts()->attach($facebookAccount->id);
         }
 
-        $this->command->info('Facebook Account created/found: ' . $facebookAccount->name);
+        $this->command->info('Facebook Account created/found: '.$facebookAccount->name);
 
         // Create Ad Accounts
         $adAccounts = [
@@ -80,11 +82,11 @@ class AdsManagerSeeder extends Seeder
             );
 
             // Link Ad Account to Facebook Account
-            if (!$facebookAccount->adAccounts()->where('ad_account_id', $adAccount->id)->exists()) {
+            if (! $facebookAccount->adAccounts()->where('ad_account_id', $adAccount->id)->exists()) {
                 $facebookAccount->adAccounts()->attach($adAccount->id);
             }
 
-            $this->command->info('Ad Account created/found: ' . $adAccount->name);
+            $this->command->info('Ad Account created/found: '.$adAccount->name);
 
             // Create Campaigns for each Ad Account
             $this->createCampaigns($adAccount);
@@ -96,7 +98,7 @@ class AdsManagerSeeder extends Seeder
     private function createCampaigns(AdAccount $adAccount): void
     {
         $statuses = ['ACTIVE', 'PAUSED', 'ARCHIVED'];
-        
+
         $campaigns = [
             [
                 'name' => 'Black Friday Sale 2025',
@@ -137,7 +139,7 @@ class AdsManagerSeeder extends Seeder
 
         foreach ($campaigns as $campaignData) {
             $campaignData['ad_account_id'] = $adAccount->id;
-            
+
             Campaign::firstOrCreate(
                 [
                     'name' => $campaignData['name'],

@@ -42,7 +42,7 @@ const AdSpentBreakdown = ({ workspace, startDate, endDate }: Props) => {
                     {
                         name: "Ad Spent",
                         data: products.map(product => ({
-                            x: product.name,
+                            x: product.code,
                             y: product.ad_spent
                         })),
                     },

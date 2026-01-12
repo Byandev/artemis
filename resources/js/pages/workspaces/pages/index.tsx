@@ -28,18 +28,19 @@ import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { omit } from 'lodash';
 import clsx from 'clsx';
+import { currencyFormatter } from '@/lib/utils';
 
 interface PagesProps {
     workspace: Workspace;
     pages: PaginatedData<Page>;
     query?: {
-        sort?: string | null;
-        perPage?: number | string;
-        page?: number | string;
+        sort?: string | null
+        perPage?: number | string
+        page?: number | string
         filter?: {
-            search?: string;
-        };
-    };
+            search?: string
+        }
+    }
 }
 
 const StatusBadge = ({ isArchived }: { isArchived: boolean }) => {
@@ -118,12 +119,6 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
 
     const columns: ColumnDef<Page>[] = [
         {
-            accessorKey: 'id',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'ID'} />
-            ),
-        },
-        {
             accessorKey: 'name',
             enableSorting: true,
             header: ({ column }) => (
@@ -131,18 +126,25 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             ),
         },
         {
-            accessorKey: 'shop',
+            accessorKey: 'shop_name',
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Shop'} />
             ),
             cell: ({ row }) => row.original.shop?.name || '-',
         },
         {
-            accessorKey: 'owner',
+            accessorKey: 'owner_name',
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Owner'} />
             ),
             cell: ({ row }) => row.original.owner?.name || '-',
+        },
+        {
+            accessorKey: 'current_budget',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Current Budget'} enabled={false} />
+            ),
+            cell: ({ row }) => currencyFormatter(row.original.current_budget ?? 0),
         },
         {
             accessorKey: 'orders_last_synced_at',
@@ -155,7 +157,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             },
         },
         {
-            accessorKey: 'status',
+            accessorKey: 'deleted_at',
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Status'} />
             ),

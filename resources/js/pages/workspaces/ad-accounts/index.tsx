@@ -4,13 +4,21 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Workspace } from '@/types/models/Workspace';
 import { AdAccount } from '@/types/models/AdAccount';
 import ComponentCard from '@/components/common/ComponentCard';
-import { router } from "@inertiajs/react"
+import { router, useForm } from '@inertiajs/react';
 import workspaces from '@/routes/workspaces';
 import { toFrontendSort } from '@/lib/sort';
 import { useMemo, useState, useEffect } from 'react';
 import clsx from "clsx";
 import { PaginatedData } from '@/types';
 import { omit  } from 'lodash'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import { MoreHorizontal, RefreshCw } from 'lucide-react';
 
 interface AdAccountsProps {
     workspace: Workspace;
@@ -63,6 +71,8 @@ const StatusBadge = ({ status }: { status: number }) => {
 }
 
 const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
+    const { post, processing } = useForm({});
+
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
@@ -95,6 +105,12 @@ const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
 
         return () => clearTimeout(timer);
     }, [searchValue, query?.filter?.search, query?.sort, workspace]);
+
+    const refresh = (adAccount: AdAccount) => {
+        post(workspaces.adAccounts.refresh.url({ workspace, adAccount }), {
+            onSuccess: () => alert('Refresh Started'),
+        });
+    };
 
     const columns: ColumnDef<AdAccount>[] = [
         {
@@ -139,6 +155,31 @@ const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
                 <SortableHeader column={column} title={'Status'} />
             ),
             cell: ({ row }) => <StatusBadge status={row.original.status} />,
+        },
+        {
+            id: 'actions',
+            cell: ({ row }) => {
+                const adAccount = row.original;
+
+                return (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                                onClick={() => refresh(adAccount)}
+                                disabled={processing}
+                            >
+                                <RefreshCw className={`mr-2 h-4 w-4 ${processing ? 'animate-spin' : ''}`} />
+                                {processing ? 'Refreshing...' : 'Refresh Data'}
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                );
+            },
         },
     ];
 

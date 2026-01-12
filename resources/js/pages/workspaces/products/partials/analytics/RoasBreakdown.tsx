@@ -43,7 +43,7 @@ const SalesBreakdown = ({ workspace, startDate, endDate }: Props) => {
                     {
                         name: "ROAS",
                         data: products.map(product => ({
-                            x: product.name,
+                            x: product.code,
                             y: product.roas
                         })),
                     },

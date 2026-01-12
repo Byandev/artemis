@@ -8,6 +8,8 @@ import { DataTable } from '@/components/ui/data-table';
 import { startCase } from 'lodash'
 import { Button } from '@/components/ui/button';
 import TemplateForm from '@/components/rts/template-form';
+import RTSManagementLayout from '@/pages/workspaces/rts/partials/Layout';
+import ComponentCard from '@/components/common/ComponentCard';
 
 type Props = {
     workspace: Workspace;
@@ -57,22 +59,16 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates }: Props) => {
 
     return (
         <AppLayout>
-            <div className="px-4 py-6">
-                <RtsNavigation workspace={workspace} />
+                <RTSManagementLayout workspace={workspace}>
+                    <TemplateForm open={openForm} onOpenChange={setOpenForm} workspace={workspace} initialValue={selected} />
 
-                <div className="py-5">
-                    <h4 className="font-semibold text-2xl">Parcel Update Templates</h4>
-                </div>
-
-                <TemplateForm open={openForm} onOpenChange={setOpenForm} workspace={workspace} initialValue={selected} />
-
-                <div>
-                    <DataTable
-                        columns={columns}
-                        data={templates}
-                    />
-                </div>
-            </div>
+                    <ComponentCard title={'Parcel Journey Notification Templates'} desc={"Modify the template of the messages for your parcel journey"}>
+                        <DataTable
+                            columns={columns}
+                            data={templates}
+                        />
+                    </ComponentCard>
+                </RTSManagementLayout>
         </AppLayout>
     );
 };

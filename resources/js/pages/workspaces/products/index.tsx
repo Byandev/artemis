@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Head, router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
+import ProductLayout from '@/pages/workspaces/products/partials/layout';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Product } from '@/types/models/Product';
@@ -96,19 +96,6 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
 
     const columns: ColumnDef<Product>[] = [
         {
-            accessorKey: 'id',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'ID'} />
-            ),
-        },
-        {
-            accessorKey: 'sku',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'SKU'} />
-            ),
-        },
-        {
             accessorKey: 'name',
             enableSorting: true,
             header: ({ column }) => (
@@ -121,23 +108,6 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
                 <SortableHeader column={column} title={'Category'} />
             ),
             cell: ({ row }) => row.original.category || '-',
-        },
-        {
-            accessorKey: 'price',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Price'} />
-            ),
-            cell: ({ row }) => {
-                const price = row.original.price;
-                return price ? `₱${Number(price).toFixed(2)}` : '-';
-            },
-        },
-        {
-            accessorKey: 'stock',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Stock'} />
-            ),
-            cell: ({ row }) => row.original.stock ?? '-',
         },
         {
             accessorKey: 'status',
@@ -179,25 +149,18 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
     ];
 
     return (
-        <AppLayout>
+        <ProductLayout workspace={workspace}>
             <Head title={`${workspace.name} - Products`} />
-            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                    <h2
-                        className="text-xl font-semibold text-gray-800 dark:text-white/90"
-                        x-text="pageName"
-                    >
-                        Products
-                    </h2>
-                    <Button 
-                        size="sm" 
-                        onClick={() => router.get(workspaces.products.create({ workspace }))}
-                    >
-                        Add Product
-                    </Button>
-                </div>
+            <div className="flex flex-wrap items-center justify-end gap-3 mb-4">
+                <Button 
+                    size="sm" 
+                    onClick={() => router.get(workspaces.products.create({ workspace }))}
+                >
+                    Add Product
+                </Button>
+            </div>
 
-                <div className="space-y-5 sm:space-y-6">
+            <div className="space-y-5 sm:space-y-6">
                     <ComponentCard desc="Manage your product inventory and pricing">
                         <div>
                             <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.05]">
@@ -235,14 +198,13 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
                     </ComponentCard>
                 </div>
 
-                {/* Delete Confirmation Dialog */}
-                <DeleteProductDialog
-                    product={productToDelete}
-                    workspace={workspace}
-                    onClose={() => setProductToDelete(null)}
-                />
-            </div>
-        </AppLayout>
+            {/* Delete Confirmation Dialog */}
+            <DeleteProductDialog
+                product={productToDelete}
+                workspace={workspace}
+                onClose={() => setProductToDelete(null)}
+            />
+        </ProductLayout>
     );
 };
 
