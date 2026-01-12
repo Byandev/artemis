@@ -170,8 +170,8 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                                     {errors.description && <p className="text-sm text-red-500 mt-1">{errors.description}</p>}
                                 </div>
 
-                                {/* Target and Action */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Target, Action, and Amount */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     {/* Target */}
                                     <div>
                                         <Label htmlFor="target">
@@ -209,23 +209,23 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                                         </select>
                                         {errors.action && <p className="text-sm text-red-500 mt-1">{errors.action}</p>}
                                     </div>
-                                </div>
 
-                                {/* Action Value */}
-                                <div>
-                                    <Label htmlFor="action_value">
-                                        {formData.action.includes('percentage') ? 'Percentage (%)' : 'Amount'}
-                                    </Label>
-                                    <Input
-                                        id="action_value"
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={formData.action_value}
-                                        onChange={(e) => setFormData({ ...formData, action_value: e.target.value })}
-                                        placeholder={formData.action.includes('percentage') ? 'e.g., 10' : 'e.g., 100'}
-                                    />
-                                    {errors.action_value && <p className="text-sm text-red-500 mt-1">{errors.action_value}</p>}
+                                    {/* Amount/Percentage */}
+                                    <div>
+                                        <Label htmlFor="action_value">
+                                            {formData.action.includes('percentage') ? 'Percentage (%)' : 'Amount'}
+                                        </Label>
+                                        <Input
+                                            id="action_value"
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={formData.action_value}
+                                            onChange={(e) => setFormData({ ...formData, action_value: e.target.value })}
+                                            placeholder={formData.action.includes('percentage') ? 'e.g., 10' : 'e.g., 100'}
+                                        />
+                                        {errors.action_value && <p className="text-sm text-red-500 mt-1">{errors.action_value}</p>}
+                                    </div>
                                 </div>
 
                                 {/* Conditions */}
