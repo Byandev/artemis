@@ -24,7 +24,6 @@ return new class extends Migration
                 'decrease_budget_percentage'
             ]);
             $table->decimal('action_value', 10, 2)->nullable(); // Fixed amount or percentage value
-            $table->json('conditions'); // Array of conditions (metric, operator, value)
             $table->enum('status', ['active', 'paused'])->default('active');
             $table->timestamps();
         });

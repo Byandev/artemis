@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Workspaces\StoreOptimizationRuleRequest;
 use App\Http\Requests\Workspaces\UpdateOptimizationRuleRequest;
 use App\Models\OptimizationRule;
+use App\Models\OptimizationRuleCondition;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -53,6 +54,7 @@ class OptimizationRuleController extends Controller
     public function page(Workspace $workspace, Request $request)
     {
         $rules = $this->buildQuery($workspace, $request)
+            ->with('conditions')
             ->paginate($request->get('perPage', 20))
             ->withQueryString();
 
@@ -79,12 +81,29 @@ class OptimizationRuleController extends Controller
     public function store(StoreOptimizationRuleRequest $request, Workspace $workspace)
     {
         $validated = $request->validated();
+        $conditions = $validated['conditions'] ?? [];
+
+        // Remove conditions from the main create array
+        unset($validated['conditions']);
 
         $rule = OptimizationRule::create([
             ...$validated,
             'workspace_id' => $workspace->id,
             'status' => $validated['status'] ?? 'active',
         ]);
+
+        // Create conditions
+        foreach ($conditions as $condition) {
+            OptimizationRuleCondition::create([
+                'optimization_rule_id' => $rule->id,
+                'metric' => $condition['metric'],
+                'operator' => $condition['operator'],
+                'value' => $condition['value'],
+            ]);
+        }
+
+        // Reload with conditions
+        $rule->load('conditions');
 
         return response()->json($rule, 201);
     }
@@ -98,6 +117,8 @@ class OptimizationRuleController extends Controller
         if ($optimizationRule->workspace_id !== $workspace->id) {
             abort(403);
         }
+
+        $optimizationRule->load('conditions');
 
         return response()->json($optimizationRule);
     }
@@ -113,8 +134,31 @@ class OptimizationRuleController extends Controller
         }
 
         $validated = $request->validated();
+        $conditions = $validated['conditions'] ?? null;
+
+        // Remove conditions from the update array
+        unset($validated['conditions']);
 
         $optimizationRule->update($validated);
+
+        // Sync conditions if provided
+        if ($conditions !== null) {
+            // Delete existing conditions
+            $optimizationRule->conditions()->delete();
+
+            // Create new conditions
+            foreach ($conditions as $condition) {
+                OptimizationRuleCondition::create([
+                    'optimization_rule_id' => $optimizationRule->id,
+                    'metric' => $condition['metric'],
+                    'operator' => $condition['operator'],
+                    'value' => $condition['value'],
+                ]);
+            }
+        }
+
+        // Reload with conditions
+        $optimizationRule->load('conditions');
 
         return response()->json($optimizationRule);
     }
