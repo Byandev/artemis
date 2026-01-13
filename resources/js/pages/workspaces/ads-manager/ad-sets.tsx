@@ -4,6 +4,7 @@ import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { AdSet, PaginatedAdSets } from '@/types/models/AdManager';
 import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
@@ -13,7 +14,6 @@ import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import { type DateRange } from "react-day-picker";
 import AdsManagerLayout from './partials/Layout';
-import { AdSet, PaginatedAdSets } from '@/types/models/AdManager';
 
 const AdSetsPage = ({ workspace, filters }: { workspace: Workspace; filters?: { start_date?: string; end_date?: string; status?: string; search?: string; } }) => {
     const [searchQuery, setSearchQuery] = useState(filters?.search || '');
@@ -22,7 +22,6 @@ const AdSetsPage = ({ workspace, filters }: { workspace: Workspace; filters?: { 
         from: filters?.start_date ? new Date(filters.start_date) : moment().startOf('month').toDate(),
         to: filters?.end_date ? new Date(filters.end_date) : moment().toDate()
     });
-    const [loading, setLoading] = useState(false);
     const [adSets, setAdSets] = useState<AdSet[]>([]);
     const [pagination, setPagination] = useState<PaginatedAdSets>({
         data: [],
@@ -41,7 +40,6 @@ const AdSetsPage = ({ workspace, filters }: { workspace: Workspace; filters?: { 
     }), [dateRange]);
 
     const fetchAdSets = async (page: number = 1) => {
-        setLoading(true);
         try {
             const params: any = {
                 search: searchQuery,
@@ -56,8 +54,6 @@ const AdSetsPage = ({ workspace, filters }: { workspace: Workspace; filters?: { 
             setPagination(response.data);
         } catch (error) {
             console.error('Failed to fetch ad sets:', error);
-        } finally {
-            setLoading(false);
         }
     };
 
