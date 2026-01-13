@@ -13,7 +13,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { type DateRange } from "react-day-picker";
 import AdsManagerLayout from './partials/Layout';
 
-const CampaignsPage = ({ workspace, campaigns: initialCampaigns, query }: { workspace: Workspace; campaigns: PaginatedCampaigns; query?: { search?: string; status?: string; start_date?: string; end_date?: string; page?: number | string } }) => {
+const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; campaigns: PaginatedCampaigns; query?: { search?: string; status?: string; start_date?: string; end_date?: string; page?: number | string } }) => {
+    console.log('Campaigns Data:', campaigns);
     const [searchValue, setSearchValue] = useState(query?.search ?? '');
     const [statusFilter, setStatusFilter] = useState(query?.status ?? '');
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -166,21 +167,11 @@ const CampaignsPage = ({ workspace, campaigns: initialCampaigns, query }: { work
             cell: ({ row }) => `₱${Number(row.original.spend || 0).toFixed(2)}`,
         },
         {
-            accessorKey: 'conversions',
-            header: ({ column }) => <SortableHeader column={column} title="Conversions" />,
-            cell: ({ row }) => Number(row.original.conversions || 0).toLocaleString(),
-        },
-        {
-            accessorKey: 'ctr',
-            header: ({ column }) => <SortableHeader column={column} title="CTR" />,
-            cell: ({ row }) => `${Number(row.original.ctr || 0).toFixed(2)}%`,
-        },
-        {
             accessorKey: 'daily_budget',
             header: ({ column }) => <SortableHeader column={column} title="Daily Budget" />,
             cell: ({ row }) =>
                 row.original.daily_budget
-                    ? `₱${(row.original.daily_budget / 100).toFixed(2)}`
+                    ? `₱${Number(row.original.daily_budget).toFixed(2)}`
                     : 'N/A',
         },
         {
@@ -240,16 +231,16 @@ const CampaignsPage = ({ workspace, campaigns: initialCampaigns, query }: { work
 
                             <DataTable
                                 columns={columns}
-                                data={initialCampaigns?.data || []}
+                                data={campaigns?.data || []}
                                 enableInternalPagination={false}
                                 meta={{
-                                    current_page: initialCampaigns?.current_page,
-                                    last_page: initialCampaigns?.last_page,
-                                    per_page: initialCampaigns?.per_page,
-                                    total: initialCampaigns?.total,
-                                    from: initialCampaigns?.from,
-                                    to: initialCampaigns?.to,
-                                    links: initialCampaigns?.links,
+                                    current_page: campaigns?.current_page,
+                                    last_page: campaigns?.last_page,
+                                    per_page: campaigns?.per_page,
+                                    total: campaigns?.total,
+                                    from: campaigns?.from,
+                                    to: campaigns?.to,
+                                    links: campaigns?.links,
                                 }}
                                 onFetch={(params) => {
                                     if (params?.page) {

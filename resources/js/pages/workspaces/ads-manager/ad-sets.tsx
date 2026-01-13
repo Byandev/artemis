@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { type DateRange } from "react-day-picker";
 import AdsManagerLayout from './partials/Layout';
 
-const AdSetsPage = ({ workspace, adSets: initialAdSets, query }: { workspace: Workspace; adSets: PaginatedAdSets; query?: { search?: string; status?: string; start_date?: string; end_date?: string; page?: number | string } }) => {
+const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets: PaginatedAdSets; query?: { search?: string; status?: string; start_date?: string; end_date?: string; page?: number | string } }) => {
     const [searchValue, setSearchValue] = useState(query?.search ?? '');
     const [statusFilter, setStatusFilter] = useState(query?.status ?? '');
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -227,16 +227,16 @@ const AdSetsPage = ({ workspace, adSets: initialAdSets, query }: { workspace: Wo
 
                             <DataTable
                                 columns={columns}
-                                data={initialAdSets?.data || []}
+                                data={adSets?.data || []}
                                 enableInternalPagination={false}
                                 meta={{
-                                    current_page: initialAdSets?.current_page,
-                                    last_page: initialAdSets?.last_page,
-                                    per_page: initialAdSets?.per_page,
-                                    total: initialAdSets?.total,
-                                    from: initialAdSets?.from,
-                                    to: initialAdSets?.to,
-                                    links: initialAdSets?.links,
+                                    current_page: adSets?.current_page,
+                                    last_page: adSets?.last_page,
+                                    per_page: adSets?.per_page,
+                                    total: adSets?.total,
+                                    from: adSets?.from,
+                                    to: adSets?.to,
+                                    links: adSets?.links,
                                 }}
                                 onFetch={(params) => {
                                     if (params?.page) {
