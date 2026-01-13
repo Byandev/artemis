@@ -1,39 +1,39 @@
 import clsx from 'clsx';
 
 type StatusConfig = {
-    label: string;
     className: string;
 };
 
 const STATUS_VARIANTS: Record<string, StatusConfig> = {
     active: {
-        label: 'ACTIVE',
-        className: 'bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800',
+        className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
     },
     paused: {
-        label: 'PAUSED',
-        className: 'bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800',
+        className: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+    },
+    archived: {
+        className: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400',
     },
 };
 
 interface StatusBadgeProps {
     status: string;
-    variant?: 'default' | 'compact';
 }
 
-export const StatusBadge = ({ status, variant = 'default' }: StatusBadgeProps) => {
+export const StatusBadge = ({ status }: StatusBadgeProps) => {
+    const normalizedStatus = status.toLowerCase();
     const config =
-        STATUS_VARIANTS[status] ??
-        { label: `UNKNOWN (${status})`, className: 'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800' };
+        STATUS_VARIANTS[normalizedStatus] ??
+        { className: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400' };
 
     return (
         <span
             className={clsx(
-                'inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap cursor-default',
+                'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
                 config.className
             )}
         >
-            {config.label}
+            {status.toUpperCase()}
         </span>
     );
 };
