@@ -23,8 +23,8 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [statusFilter, setStatusFilter] = useState(query?.filter?.status ?? '');
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: query?.filter?.start_date ? new Date(query.filter.start_date) : moment().startOf('month').toDate(),
-        to: query?.filter?.end_date ? new Date(query.filter.end_date) : moment().toDate()
+        from: query?.filter?.start_date ? moment(query.filter.start_date).toDate() : moment().startOf('month').toDate(),
+        to: query?.filter?.end_date ? moment(query.filter.end_date).toDate() : moment().toDate()
     });
 
     const dateRangeStr = useMemo(() => ({
@@ -47,8 +47,8 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
                     'filter[status]': statusFilter || undefined,
-                    start_date: dateRange?.from?.toISOString().split('T')[0],
-                    end_date: dateRange?.to?.toISOString().split('T')[0],
+                    start_date: dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
+                    end_date: dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
                     page: 1,
                 },
                 {
@@ -71,8 +71,8 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
                 {
                     'filter[search]': query?.filter?.search || undefined,
                     'filter[status]': query?.filter?.status || undefined,
-                    start_date: dateRange?.from?.toISOString().split('T')[0],
-                    end_date: dateRange?.to?.toISOString().split('T')[0],
+                    start_date: dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
+                    end_date: dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
                     page: 1,
                 },
                 {
@@ -94,8 +94,8 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
                 sort: query?.sort,
                 'filter[search]': searchValue || undefined,
                 'filter[status]': value || undefined,
-                start_date: dateRange?.from?.toISOString().split('T')[0],
-                end_date: dateRange?.to?.toISOString().split('T')[0],
+                start_date: dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
+                end_date: dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
                 page: 1,
             },
             {
@@ -116,8 +116,8 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
                 sort: query?.sort,
                 'filter[search]': searchValue || undefined,
                 'filter[status]': statusFilter || undefined,
-                start_date: range?.from?.toISOString().split('T')[0],
-                end_date: range?.to?.toISOString().split('T')[0],
+                start_date: range?.from ? moment(range.from).format('YYYY-MM-DD') : undefined,
+                end_date: range?.to ? moment(range.to).format('YYYY-MM-DD') : undefined,
                 page: 1,
             },
             {
@@ -238,10 +238,10 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
                                             'filter[search]': searchValue || undefined,
                                             'filter[status]': statusFilter || undefined,
                                             start_date: dateRange?.from
-                                                ? dateRange.from.toISOString().split('T')[0]
+                                                ? moment(dateRange.from).format('YYYY-MM-DD')
                                                 : undefined,
                                             end_date: dateRange?.to
-                                                ? dateRange.to.toISOString().split('T')[0]
+                                                ? moment(dateRange.to).format('YYYY-MM-DD')
                                                 : undefined,
                                             page: params?.page ?? 1,
                                         },
