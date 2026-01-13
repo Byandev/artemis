@@ -25,6 +25,9 @@ class AdController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
-        return response()->json($ads);
+        return inertia('workspaces/ads-manager/ads', [
+            'workspace' => $workspace,
+            'ads' => $ads,
+        ]);
     }
 }

@@ -6,32 +6,19 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { AdSet, PaginatedAdSets } from '@/types/models/AdManager';
 import { Workspace } from '@/types/models/Workspace';
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import axios from 'axios';
-import { Grid3x3, List } from 'lucide-react';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import { type DateRange } from "react-day-picker";
 import AdsManagerLayout from './partials/Layout';
 
-const AdSetsPage = ({ workspace, filters }: { workspace: Workspace; filters?: { start_date?: string; end_date?: string; status?: string; search?: string; } }) => {
-    const [searchQuery, setSearchQuery] = useState(filters?.search || '');
-    const [statusFilter, setStatusFilter] = useState<string>(filters?.status || '');
+const AdSetsPage = ({ workspace, adSets: initialAdSets, query }: { workspace: Workspace; adSets: PaginatedAdSets; query?: { search?: string; status?: string; start_date?: string; end_date?: string; page?: number | string } }) => {
+    const [searchValue, setSearchValue] = useState(query?.search ?? '');
+    const [statusFilter, setStatusFilter] = useState(query?.status ?? '');
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: filters?.start_date ? new Date(filters.start_date) : moment().startOf('month').toDate(),
-        to: filters?.end_date ? new Date(filters.end_date) : moment().toDate()
-    });
-    const [adSets, setAdSets] = useState<AdSet[]>([]);
-    const [pagination, setPagination] = useState<PaginatedAdSets>({
-        data: [],
-        current_page: 1,
-        last_page: 1,
-        per_page: 10,
-        total: 0,
-        links: [],
-        from: 0,
-        to: 0,
+        from: query?.start_date ? new Date(query.start_date) : moment().startOf('month').toDate(),
+        to: query?.end_date ? new Date(query.end_date) : moment().toDate()
     });
 
     const dateRangeStr = useMemo(() => ({
@@ -39,35 +26,111 @@ const AdSetsPage = ({ workspace, filters }: { workspace: Workspace; filters?: { 
         from: moment(dateRange?.from).format('YYYY-MM-DD'),
     }), [dateRange]);
 
-    const fetchAdSets = async (page: number = 1) => {
-        try {
-            const params: any = {
-                search: searchQuery,
-                status: statusFilter || undefined,
+    // Debounce search
+    useEffect(() => {
+        const currentSearchParam = query?.search ?? '';
+
+        if (searchValue === currentSearchParam) {
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            router.get(
+                `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
+                {
+                    search: searchValue || undefined,
+                    status: statusFilter || undefined,
+                    start_date: dateRange?.from?.toISOString().split('T')[0],
+                    end_date: dateRange?.to?.toISOString().split('T')[0],
+                    page: 1,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['adSets'],
+                },
+            );
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchValue, query?.search]);
+
+    // Sync date range with URL on mount
+    useEffect(() => {
+        if (!query?.start_date || !query?.end_date) {
+            router.get(
+                `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
+                {
+                    search: query?.search || undefined,
+                    status: query?.status || undefined,
+                    start_date: dateRange?.from?.toISOString().split('T')[0],
+                    end_date: dateRange?.to?.toISOString().split('T')[0],
+                    page: 1,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['adSets'],
+                },
+            );
+        }
+    }, []);
+
+    const handleStatusFilterChange = (value: string) => {
+        setStatusFilter(value);
+
+        router.get(
+            `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
+            {
+                search: searchValue || undefined,
+                status: value || undefined,
                 start_date: dateRange?.from?.toISOString().split('T')[0],
                 end_date: dateRange?.to?.toISOString().split('T')[0],
-                page,
-            };
-
-            const response = await axios.get(`/workspaces/${workspace.slug}/api/ad-sets`, { params });
-            setAdSets(response.data.data);
-            setPagination(response.data);
-        } catch (error) {
-            console.error('Failed to fetch ad sets:', error);
-        }
+                page: 1,
+            },
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['adSets'],
+            },
+        );
     };
 
-    // Fetch ad sets when filters change
-    useEffect(() => {
-        fetchAdSets(1);
-    }, [searchQuery, statusFilter, dateRange]);
+    const handleDateRangeChange = (range: DateRange | undefined) => {
+        setDateRange(range);
+
+        router.get(
+            `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
+            {
+                search: searchValue || undefined,
+                status: statusFilter || undefined,
+                start_date: range?.from?.toISOString().split('T')[0],
+                end_date: range?.to?.toISOString().split('T')[0],
+                page: 1,
+            },
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['adSets'],
+            },
+        );
+    };
 
     const clearFilters = () => {
-        setSearchQuery('');
+        setSearchValue('');
         setStatusFilter('');
         setDateRange({
             from: moment().startOf('month').toDate(),
             to: moment().toDate()
+        });
+        router.get(`/workspaces/${workspace.slug}/ads-manager/ad-sets`, {}, {
+            preserveState: false,
+            replace: true,
+            preserveScroll: true,
         });
     };
 
@@ -133,13 +196,13 @@ const AdSetsPage = ({ workspace, filters }: { workspace: Workspace; filters?: { 
                                 <input
                                     className="w-full lg:max-w-sm border rounded-lg appearance-none px-3 py-2 sm:px-4 sm:py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3 dark:bg-gray-900 dark:placeholder:text-white/30 bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90 dark:focus:border-brand-800"
                                     placeholder="Search ad sets..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    value={searchValue}
+                                    onChange={(e) => setSearchValue(e.target.value)}
                                 />
                                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 relative z-50">
                                     <select
                                         value={statusFilter}
-                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        onChange={(e) => handleStatusFilterChange(e.target.value)}
                                         className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 dark:focus:border-brand-800"
                                     >
                                         <option value="">All Status</option>
@@ -149,9 +212,9 @@ const AdSetsPage = ({ workspace, filters }: { workspace: Workspace; filters?: { 
                                     </select>
                                     <SimpleDateRangePicker
                                         value={dateRange}
-                                        onChange={setDateRange}
+                                        onChange={handleDateRangeChange}
                                     />
-                                    {(searchQuery || statusFilter || dateRangeStr.from !== moment().startOf('month').format('YYYY-MM-DD') || dateRangeStr.to !== moment().format('YYYY-MM-DD')) && (
+                                    {(searchValue || statusFilter || dateRangeStr.from !== moment().startOf('month').format('YYYY-MM-DD') || dateRangeStr.to !== moment().format('YYYY-MM-DD')) && (
                                         <Button
                                             variant="outline"
                                             onClick={clearFilters}
@@ -159,33 +222,40 @@ const AdSetsPage = ({ workspace, filters }: { workspace: Workspace; filters?: { 
                                             Clear Filters
                                         </Button>
                                     )}
-                                    <div className="hidden sm:flex items-center gap-2">
-                                        <Button variant="outline" size="icon">
-                                            <Grid3x3 className="h-4 w-4" />
-                                        </Button>
-                                        <Button variant="outline" size="icon">
-                                            <List className="h-4 w-4" />
-                                        </Button>
-                                    </div>
                                 </div>
                             </div>
 
                             <DataTable
                                 columns={columns}
-                                data={adSets}
+                                data={initialAdSets?.data || []}
                                 enableInternalPagination={false}
                                 meta={{
-                                    current_page: pagination.current_page,
-                                    last_page: pagination.last_page,
-                                    per_page: pagination.per_page,
-                                    total: pagination.total,
-                                    from: pagination.from,
-                                    to: pagination.to,
-                                    links: pagination.links,
+                                    current_page: initialAdSets?.current_page,
+                                    last_page: initialAdSets?.last_page,
+                                    per_page: initialAdSets?.per_page,
+                                    total: initialAdSets?.total,
+                                    from: initialAdSets?.from,
+                                    to: initialAdSets?.to,
+                                    links: initialAdSets?.links,
                                 }}
                                 onFetch={(params) => {
                                     if (params?.page) {
-                                        fetchAdSets(params.page);
+                                        router.get(
+                                            `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
+                                            {
+                                                search: query?.search || undefined,
+                                                status: query?.status || undefined,
+                                                start_date: query?.start_date || undefined,
+                                                end_date: query?.end_date || undefined,
+                                                page: params.page,
+                                            },
+                                            {
+                                                preserveState: true,
+                                                replace: true,
+                                                preserveScroll: true,
+                                                only: ['adSets'],
+                                            },
+                                        );
                                     }
                                 }}
                             />

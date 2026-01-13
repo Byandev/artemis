@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Campaign;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class CampaignController extends Controller
 {
@@ -44,10 +43,18 @@ class CampaignController extends Controller
                 );
         }
 
-        return response()->json(
-            $campaigns
+        return inertia('workspaces/ads-manager/campaigns', [
+            'workspace' => $workspace,
+            'campaigns' => $campaigns
                 ->orderBy('created_at', 'desc')
-                ->paginate(10)
-        );
+                ->paginate(10),
+            'query' => [
+                'search' => $request->get('search'),
+                'status' => $request->get('status'),
+                'start_date' => $request->get('start_date'),
+                'end_date' => $request->get('end_date'),
+                'page' => $request->get('page', 1),
+            ],
+        ]);
     }
 }

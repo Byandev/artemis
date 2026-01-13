@@ -43,10 +43,18 @@ class AdSetController extends Controller
                 );
         }
 
-        return response()->json(
-            $adSets
+        return inertia('workspaces/ads-manager/ad-sets', [
+            'workspace' => $workspace,
+            'adSets' => $adSets
                 ->orderBy('created_at', 'desc')
-                ->paginate(10)
-        );
+                ->paginate(10),
+            'query' => [
+                'search' => $request->get('search'),
+                'status' => $request->get('status'),
+                'start_date' => $request->get('start_date'),
+                'end_date' => $request->get('end_date'),
+                'page' => $request->get('page', 1),
+            ],
+        ]);
     }
 }
