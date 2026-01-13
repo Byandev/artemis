@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AdSet;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class AdSetController extends Controller
 {
@@ -43,7 +44,7 @@ class AdSetController extends Controller
                 );
         }
 
-        return inertia('workspaces/ads-manager/ad-sets', [
+        return Inertia::render('workspaces/ads-manager/ad-sets', [
             'workspace' => $workspace,
             'adSets' => $adSets
                 ->orderBy('created_at', 'desc')

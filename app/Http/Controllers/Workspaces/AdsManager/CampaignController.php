@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Campaign;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class CampaignController extends Controller
 {
@@ -43,7 +44,7 @@ class CampaignController extends Controller
                 );
         }
 
-        return inertia('workspaces/ads-manager/campaigns', [
+        return Inertia::render('workspaces/ads-manager/campaigns', [
             'workspace' => $workspace,
             'campaigns' => $campaigns
                 ->orderBy('created_at', 'desc')
