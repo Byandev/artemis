@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { OptimizationRule } from '@/types/models/OptimizationRule';
@@ -257,8 +258,8 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                                                     className="flex flex-col sm:flex-row sm:items-center gap-2 px-3 py-2.5 bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-colors w-full sm:w-fit"
                                                 >
                                                     {/* Where/Or label */}
-                                                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap flex-shrink-0">
-                                                        {index === 0 ? 'Where' : 'Or'}
+                                                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap shrink-0">
+                                                        {index === 0 ? 'Where' : 'And'}
                                                     </div>
 
                                                     {/* Metric */}
@@ -321,18 +322,15 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                                 </div>
 
                                 {/* Status */}
-                                <div>
-                                    <Label htmlFor="status">Status</Label>
-                                    <select
+                                <div className='flex flex-col gap-2 justify-between'>
+                                    <div className="flex items-center gap-3">
+                                        <Label htmlFor="status">Status</Label>
+                                    </div>
+                                    <Switch
                                         id="status"
-                                        value={formData.status}
-                                        onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'paused' })}
-                                        className="h-10 w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300"
-                                        required
-                                    >
-                                        <option value="active">Active</option>
-                                        <option value="paused">Paused</option>
-                                    </select>
+                                        checked={formData.status === 'active'}
+                                        onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'active' : 'paused' })}
+                                    />
                                     {errors.status && <p className="text-sm text-red-500 mt-1">{errors.status}</p>}
                                 </div>
 
