@@ -4,22 +4,28 @@ import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { toFrontendSort } from '@/lib/sort';
 import { Campaign, PaginatedCampaigns } from '@/types/models/AdManager';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import { omit } from 'lodash';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import { type DateRange } from "react-day-picker";
 import AdsManagerLayout from './partials/Layout';
 
-const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; campaigns: PaginatedCampaigns; query?: { search?: string; status?: string; start_date?: string; end_date?: string; page?: number | string } }) => {
+const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; campaigns: PaginatedCampaigns; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string } } }) => {
+    const initialSorting = useMemo(() => {
+        return toFrontendSort(query?.sort ?? null);
+    }, [query?.sort]);
+
     console.log('Campaigns Data:', campaigns);
-    const [searchValue, setSearchValue] = useState(query?.search ?? '');
-    const [statusFilter, setStatusFilter] = useState(query?.status ?? '');
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [statusFilter, setStatusFilter] = useState(query?.filter?.status ?? '');
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: query?.start_date ? new Date(query.start_date) : moment().startOf('month').toDate(),
-        to: query?.end_date ? new Date(query.end_date) : moment().toDate()
+        from: query?.filter?.start_date ? new Date(query.filter.start_date) : moment().startOf('month').toDate(),
+        to: query?.filter?.end_date ? new Date(query.filter.end_date) : moment().toDate()
     });
 
     const dateRangeStr = useMemo(() => ({
@@ -29,7 +35,7 @@ const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; 
 
     // Debounce search
     useEffect(() => {
-        const currentSearchParam = query?.search ?? '';
+        const currentSearchParam = query?.filter?.search ?? '';
 
         if (searchValue === currentSearchParam) {
             return;
@@ -39,8 +45,9 @@ const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; 
             router.get(
                 `/workspaces/${workspace.slug}/ads-manager/campaigns`,
                 {
-                    search: searchValue || undefined,
-                    status: statusFilter || undefined,
+                    sort: query?.sort,
+                    'filter[search]': searchValue || undefined,
+                    'filter[status]': statusFilter || undefined,
                     start_date: dateRange?.from?.toISOString().split('T')[0],
                     end_date: dateRange?.to?.toISOString().split('T')[0],
                     page: 1,
@@ -55,16 +62,16 @@ const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; 
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [searchValue, query?.search]);
+    }, [searchValue, query?.filter?.search]);
 
     // Sync date range with URL on mount
     useEffect(() => {
-        if (!query?.start_date || !query?.end_date) {
+        if (!query?.filter?.start_date || !query?.filter?.end_date) {
             router.get(
                 `/workspaces/${workspace.slug}/ads-manager/campaigns`,
                 {
-                    search: query?.search || undefined,
-                    status: query?.status || undefined,
+                    'filter[search]': query?.filter?.search || undefined,
+                    'filter[status]': query?.filter?.status || undefined,
                     start_date: dateRange?.from?.toISOString().split('T')[0],
                     end_date: dateRange?.to?.toISOString().split('T')[0],
                     page: 1,
@@ -85,8 +92,9 @@ const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; 
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/campaigns`,
             {
-                search: searchValue || undefined,
-                status: value || undefined,
+                sort: query?.sort,
+                'filter[search]': searchValue || undefined,
+                'filter[status]': value || undefined,
                 start_date: dateRange?.from?.toISOString().split('T')[0],
                 end_date: dateRange?.to?.toISOString().split('T')[0],
                 page: 1,
@@ -106,8 +114,9 @@ const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; 
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/campaigns`,
             {
-                search: searchValue || undefined,
-                status: statusFilter || undefined,
+                sort: query?.sort,
+                'filter[search]': searchValue || undefined,
+                'filter[status]': statusFilter || undefined,
                 start_date: range?.from?.toISOString().split('T')[0],
                 end_date: range?.to?.toISOString().split('T')[0],
                 page: 1,
@@ -142,7 +151,7 @@ const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; 
             cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
         },
         {
-            accessorKey: 'ad_account',
+            accessorKey: 'ad_account_id',
             header: ({ column }) => <SortableHeader column={column} title="Ad Account" />,
             cell: ({ row }) => <div className="font-medium">{row.original.ad_account?.name || 'N/A'}</div>,
         },
@@ -233,38 +242,29 @@ const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; 
                                 columns={columns}
                                 data={campaigns?.data || []}
                                 enableInternalPagination={false}
-                                meta={{
-                                    current_page: campaigns?.current_page,
-                                    last_page: campaigns?.last_page,
-                                    per_page: campaigns?.per_page,
-                                    total: campaigns?.total,
-                                    from: campaigns?.from,
-                                    to: campaigns?.to,
-                                    links: campaigns?.links,
-                                }}
+                                initialSorting={initialSorting}
+                                meta={{ ...omit(campaigns, ['data']) }}
                                 onFetch={(params) => {
-                                    if (params?.page) {
-                                        router.get(
-                                            `/workspaces/${workspace.slug}/ads-manager/campaigns`,
-                                            {
-                                                search: searchValue || undefined,
-                                                status: statusFilter || undefined,
-                                                start_date: dateRange?.from
-                                                    ? dateRange.from.toISOString().split('T')[0]
-                                                    : undefined,
-                                                end_date: dateRange?.to
-                                                    ? dateRange.to.toISOString().split('T')[0]
-                                                    : undefined,
-                                                page: params.page,
-                                            },
-                                            {
-                                                preserveState: true,
-                                                replace: true,
-                                                preserveScroll: true,
-                                                only: ['campaigns'],
-                                            },
-                                        );
-                                    }
+                                    router.get(
+                                        `/workspaces/${workspace.slug}/ads-manager/campaigns`,
+                                        {
+                                            sort: params?.sort,
+                                            'filter[search]': searchValue || undefined,
+                                            'filter[status]': statusFilter || undefined,
+                                            start_date: dateRange?.from
+                                                ? dateRange.from.toISOString().split('T')[0]
+                                                : undefined,
+                                            end_date: dateRange?.to
+                                                ? dateRange.to.toISOString().split('T')[0]
+                                                : undefined,
+                                            page: params?.page ?? 1,
+                                        },
+                                        {
+                                            preserveState: false,
+                                            replace: true,
+                                            preserveScroll: true,
+                                        },
+                                    );
                                 }}
                             />
 

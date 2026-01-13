@@ -7,25 +7,47 @@ use App\Models\AdSet;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class AdSetController extends Controller
 {
+    /**
+     * Build the query for ad sets.
+     */
+    private function buildQuery(Workspace $workspace, Request $request)
+    {
+        return QueryBuilder::for(
+            AdSet::query()
+                ->whereHas('adAccount.facebook_accounts.workspaces', function ($query) use ($workspace) {
+                    $query->where('workspace_id', $workspace->id);
+                })
+        )
+            ->with(['campaign', 'adAccount'])
+            ->allowedFilters([
+                AllowedFilter::scope('search'),
+                AllowedFilter::exact('status'),
+            ])
+            ->allowedSorts([
+                'name',
+                'status',
+                'impressions',
+                'clicks',
+                'spend',
+                'daily_budget',
+                'campaign_id',
+                'created_at',
+                'updated_at',
+            ])
+            ->defaultSort('-created_at');
+    }
+
     public function index(Workspace $workspace, Request $request)
     {
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
 
-        $adSets = AdSet::query()
-            ->whereHas('adAccount.facebook_accounts.workspaces', function ($query) use ($workspace) {
-                $query->where('workspace_id', $workspace->id);
-            })
-            ->with(['campaign', 'adAccount'])
-            ->when($request->search, function ($query, $search) {
-                $query->where('name', 'like', '%'.$search.'%');
-            })
-            ->when($request->status, function ($query, $status) {
-                $query->where('status', $status);
-            });
+        $adSets = $this->buildQuery($workspace, $request);
 
         // Aggregate metrics from ad_records for the given date range
         if ($startDate && $endDate) {
@@ -47,14 +69,18 @@ class AdSetController extends Controller
         return Inertia::render('workspaces/ads-manager/ad-sets', [
             'workspace' => $workspace,
             'adSets' => $adSets
-                ->orderBy('created_at', 'desc')
-                ->paginate(10),
+                ->paginate($request->get('perPage', 10))
+                ->withQueryString(),
             'query' => [
-                'search' => $request->get('search'),
-                'status' => $request->get('status'),
-                'start_date' => $request->get('start_date'),
-                'end_date' => $request->get('end_date'),
+                'sort' => $request->get('sort'),
+                'perPage' => $request->get('perPage', 10),
                 'page' => $request->get('page', 1),
+                'filter' => [
+                    'search' => $request->get('filter.search'),
+                    'status' => $request->get('filter.status'),
+                    'start_date' => $request->get('start_date'),
+                    'end_date' => $request->get('end_date'),
+                ],
             ],
         ]);
     }

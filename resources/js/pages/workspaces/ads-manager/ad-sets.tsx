@@ -4,21 +4,27 @@ import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { toFrontendSort } from '@/lib/sort';
 import { AdSet, PaginatedAdSets } from '@/types/models/AdManager';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import { omit } from 'lodash';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import { type DateRange } from "react-day-picker";
 import AdsManagerLayout from './partials/Layout';
 
-const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets: PaginatedAdSets; query?: { search?: string; status?: string; start_date?: string; end_date?: string; page?: number | string } }) => {
-    const [searchValue, setSearchValue] = useState(query?.search ?? '');
-    const [statusFilter, setStatusFilter] = useState(query?.status ?? '');
+const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets: PaginatedAdSets; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string } } }) => {
+    const initialSorting = useMemo(() => {
+        return toFrontendSort(query?.sort ?? null);
+    }, [query?.sort]);
+
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [statusFilter, setStatusFilter] = useState(query?.filter?.status ?? '');
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: query?.start_date ? new Date(query.start_date) : moment().startOf('month').toDate(),
-        to: query?.end_date ? new Date(query.end_date) : moment().toDate()
+        from: query?.filter?.start_date ? new Date(query.filter.start_date) : moment().startOf('month').toDate(),
+        to: query?.filter?.end_date ? new Date(query.filter.end_date) : moment().toDate()
     });
 
     const dateRangeStr = useMemo(() => ({
@@ -28,7 +34,7 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
 
     // Debounce search
     useEffect(() => {
-        const currentSearchParam = query?.search ?? '';
+        const currentSearchParam = query?.filter?.search ?? '';
 
         if (searchValue === currentSearchParam) {
             return;
@@ -38,8 +44,9 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
             router.get(
                 `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
                 {
-                    search: searchValue || undefined,
-                    status: statusFilter || undefined,
+                    sort: query?.sort,
+                    'filter[search]': searchValue || undefined,
+                    'filter[status]': statusFilter || undefined,
                     start_date: dateRange?.from?.toISOString().split('T')[0],
                     end_date: dateRange?.to?.toISOString().split('T')[0],
                     page: 1,
@@ -54,16 +61,16 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [searchValue, query?.search]);
+    }, [searchValue, query?.filter?.search]);
 
     // Sync date range with URL on mount
     useEffect(() => {
-        if (!query?.start_date || !query?.end_date) {
+        if (!query?.filter?.start_date || !query?.filter?.end_date) {
             router.get(
                 `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
                 {
-                    search: query?.search || undefined,
-                    status: query?.status || undefined,
+                    'filter[search]': query?.filter?.search || undefined,
+                    'filter[status]': query?.filter?.status || undefined,
                     start_date: dateRange?.from?.toISOString().split('T')[0],
                     end_date: dateRange?.to?.toISOString().split('T')[0],
                     page: 1,
@@ -84,8 +91,9 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
             {
-                search: searchValue || undefined,
-                status: value || undefined,
+                sort: query?.sort,
+                'filter[search]': searchValue || undefined,
+                'filter[status]': value || undefined,
                 start_date: dateRange?.from?.toISOString().split('T')[0],
                 end_date: dateRange?.to?.toISOString().split('T')[0],
                 page: 1,
@@ -105,8 +113,9 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
             {
-                search: searchValue || undefined,
-                status: statusFilter || undefined,
+                sort: query?.sort,
+                'filter[search]': searchValue || undefined,
+                'filter[status]': statusFilter || undefined,
                 start_date: range?.from?.toISOString().split('T')[0],
                 end_date: range?.to?.toISOString().split('T')[0],
                 page: 1,
@@ -166,21 +175,11 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
             cell: ({ row }) => `₱${Number(row.original.spend || 0).toFixed(2)}`,
         },
         {
-            accessorKey: 'conversions',
-            header: ({ column }) => <SortableHeader column={column} title="Conversions" />,
-            cell: ({ row }) => Number(row.original.conversions || 0).toLocaleString(),
-        },
-        {
-            accessorKey: 'ctr',
-            header: ({ column }) => <SortableHeader column={column} title="CTR" />,
-            cell: ({ row }) => `${Number(row.original.ctr || 0).toFixed(2)}%`,
-        },
-        {
             accessorKey: 'daily_budget',
             header: ({ column }) => <SortableHeader column={column} title="Daily Budget" />,
             cell: ({ row }) =>
                 row.original.daily_budget
-                    ? `₱${(row.original.daily_budget / 100).toFixed(2)}`
+                    ? `₱${Number(row.original.daily_budget).toFixed(2)}`
                     : 'N/A',
         },
     ];
@@ -229,38 +228,29 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
                                 columns={columns}
                                 data={adSets?.data || []}
                                 enableInternalPagination={false}
-                                meta={{
-                                    current_page: adSets?.current_page,
-                                    last_page: adSets?.last_page,
-                                    per_page: adSets?.per_page,
-                                    total: adSets?.total,
-                                    from: adSets?.from,
-                                    to: adSets?.to,
-                                    links: adSets?.links,
-                                }}
+                                initialSorting={initialSorting}
+                                meta={{ ...omit(adSets, ['data']) }}
                                 onFetch={(params) => {
-                                    if (params?.page) {
-                                        router.get(
-                                            `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
-                                            {
-                                                search: searchValue || undefined,
-                                                status: statusFilter || undefined,
-                                                start_date: dateRange?.from
-                                                    ? dateRange.from.toISOString().split('T')[0]
-                                                    : undefined,
-                                                end_date: dateRange?.to
-                                                    ? dateRange.to.toISOString().split('T')[0]
-                                                    : undefined,
-                                                page: params.page,
-                                            },
-                                            {
-                                                preserveState: true,
-                                                replace: true,
-                                                preserveScroll: true,
-                                                only: ['adSets'],
-                                            },
-                                        );
-                                    }
+                                    router.get(
+                                        `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
+                                        {
+                                            sort: params?.sort,
+                                            'filter[search]': searchValue || undefined,
+                                            'filter[status]': statusFilter || undefined,
+                                            start_date: dateRange?.from
+                                                ? dateRange.from.toISOString().split('T')[0]
+                                                : undefined,
+                                            end_date: dateRange?.to
+                                                ? dateRange.to.toISOString().split('T')[0]
+                                                : undefined,
+                                            page: params?.page ?? 1,
+                                        },
+                                        {
+                                            preserveState: false,
+                                            replace: true,
+                                            preserveScroll: true,
+                                        },
+                                    );
                                 }}
                             />
                         </div>
