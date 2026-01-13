@@ -2,38 +2,69 @@ import ComponentCard from '@/components/common/ComponentCard';
 import { Button } from '@/components/ui/button';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import AppLayout from '@/layouts/app-layout';
+import { adSets as adSetsRoute } from '@/routes/workspaces/ads-manager';
 import { Workspace } from '@/types/models/Workspace';
-import { Head } from '@inertiajs/react';
-import { addDays } from 'date-fns';
+import { Head, router } from '@inertiajs/react';
 import { Grid3x3, List } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import moment from 'moment';
+import { useEffect, useMemo, useState } from 'react';
 import AdSetsTab from './AdSetsTab';
 import AdsManagerLayout from './partials/Layout';
 
 interface PageProps {
     workspace: Workspace;
+    filters?: {
+        start_date?: string;
+        end_date?: string;
+        status?: string;
+        search?: string;
+    }
 }
 
-const AdSetsPage = ({ workspace }: PageProps) => {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<string>('');
+const AdSetsPage = ({ workspace, filters }: PageProps) => {
+    const [searchQuery, setSearchQuery] = useState(filters?.search || '');
+    const [statusFilter, setStatusFilter] = useState<string>(filters?.status || '');
     const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-        from: addDays(new Date(), -30),
-        to: new Date(),
+        from: filters?.start_date ? new Date(filters.start_date) : moment().startOf('month').toDate(),
+        to: filters?.end_date ? new Date(filters.end_date) : moment().toDate()
     });
     const [loading, setLoading] = useState(false);
 
-    const adSetsTabRef = useRef<any>(null);
+    const dateRangeStr = useMemo(() => ({
+        to: moment(dateRange.to).format('YYYY-MM-DD'),
+        from: moment(dateRange.from).format('YYYY-MM-DD'),
+    }), [dateRange]);
 
+    // Update URL and refetch data when filters change
     useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            if (adSetsTabRef.current) {
-                adSetsTabRef.current.fetchAdSets();
+        router.get(
+            adSetsRoute(workspace.slug),
+            {
+                search: searchQuery || undefined,
+                status: statusFilter || undefined,
+                start_date: dateRange.from ? dateRangeStr.from : undefined,
+                end_date: dateRange.to ? dateRangeStr.to : undefined,
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
             }
-        }, 300);
+        );
+    }, [workspace.slug, searchQuery, statusFilter, dateRange, dateRangeStr]);
 
-        return () => clearTimeout(timeoutId);
-    }, [searchQuery, statusFilter, dateRange]);
+    const clearFilters = () => {
+        setSearchQuery('');
+        setStatusFilter('');
+        setDateRange({
+            from: moment().startOf('month').toDate(),
+            to: moment().toDate()
+        });
+        router.get(
+            adSetsRoute(workspace.slug),
+            {},
+            { preserveState: true, preserveScroll: true }
+        );
+    };
 
     return (
         <AppLayout>
@@ -74,6 +105,14 @@ const AdSetsPage = ({ workspace }: PageProps) => {
                                         align="end"
                                         showCompare={false}
                                     />
+                                    {(searchQuery || statusFilter || dateRangeStr.from !== moment().startOf('month').format('YYYY-MM-DD') || dateRangeStr.to !== moment().format('YYYY-MM-DD')) && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={clearFilters}
+                                        >
+                                            Clear Filters
+                                        </Button>
+                                    )}
                                     <div className="hidden sm:flex items-center gap-2">
                                         <Button variant="outline" size="icon">
                                             <Grid3x3 className="h-4 w-4" />
@@ -86,7 +125,6 @@ const AdSetsPage = ({ workspace }: PageProps) => {
                             </div>
 
                             <AdSetsTab
-                                ref={adSetsTabRef}
                                 workspace={workspace}
                                 searchQuery={searchQuery}
                                 statusFilter={statusFilter}
