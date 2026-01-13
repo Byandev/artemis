@@ -11,6 +11,9 @@ class AdSetController extends Controller
 {
     public function index(Workspace $workspace, Request $request)
     {
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
         $adSets = AdSet::query()
             ->whereHas('adAccount.facebook_accounts.workspaces', function ($query) use ($workspace) {
                 $query->where('workspace_id', $workspace->id);
@@ -21,13 +24,29 @@ class AdSetController extends Controller
             })
             ->when($request->status, function ($query, $status) {
                 $query->where('status', $status);
-            })
-            ->when($request->start_date && $request->end_date, function ($query) use ($request) {
-                $query->whereBetween('created_at', [$request->start_date, $request->end_date]);
-            })
-            ->orderBy('created_at', 'desc')
-            ->paginate(10);
+            });
 
-        return response()->json($adSets);
+        // Aggregate metrics from ad_records for the given date range
+        if ($startDate && $endDate) {
+            $adSets->addSelect('ad_sets.*')
+                ->selectRaw(
+                    '(SELECT COALESCE(SUM(impressions), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id AND ad_records.date BETWEEN ? AND ?) as impressions',
+                    [$startDate, $endDate]
+                )
+                ->selectRaw(
+                    '(SELECT COALESCE(SUM(clicks), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id AND ad_records.date BETWEEN ? AND ?) as clicks',
+                    [$startDate, $endDate]
+                )
+                ->selectRaw(
+                    '(SELECT COALESCE(SUM(spend), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id AND ad_records.date BETWEEN ? AND ?) as spend',
+                    [$startDate, $endDate]
+                );
+        }
+
+        return response()->json(
+            $adSets
+                ->orderBy('created_at', 'desc')
+                ->paginate(10)
+        );
     }
 }
