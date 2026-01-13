@@ -243,10 +243,14 @@ const AdSetsPage = ({ workspace, adSets: initialAdSets, query }: { workspace: Wo
                                         router.get(
                                             `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
                                             {
-                                                search: query?.search || undefined,
-                                                status: query?.status || undefined,
-                                                start_date: query?.start_date || undefined,
-                                                end_date: query?.end_date || undefined,
+                                                search: searchValue || undefined,
+                                                status: statusFilter || undefined,
+                                                start_date: dateRange?.from
+                                                    ? dateRange.from.toISOString().split('T')[0]
+                                                    : undefined,
+                                                end_date: dateRange?.to
+                                                    ? dateRange.to.toISOString().split('T')[0]
+                                                    : undefined,
                                                 page: params.page,
                                             },
                                             {
