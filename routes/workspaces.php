@@ -1,8 +1,6 @@
 <?php
 
 use App\Http\Controllers\Workspaces\AdAccountController;
-use App\Http\Controllers\Workspaces\AdController;
-use App\Http\Controllers\Workspaces\AdSetController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\ProductController;
@@ -97,6 +95,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/workspaces/{workspace}/facebook-accounts', [FacebookAccountController::class, 'index'])->name('workspaces.facebook-accounts.index');
     Route::get('/workspaces/{workspace}/ad-accounts', [AdAccountController::class, 'index'])->name('workspaces.ad-accounts.index');
+    Route::post('/workspaces/{workspace}/ad-accounts/{adAccount}/refresh', [AdAccountController::class, 'refresh'])->name('workspaces.ad-accounts.refresh');
     Route::get('/workspaces/{workspace}/ads-manager', function (Workspace $workspace) {
         return inertia('workspaces/ads-manager/index', [
             'workspace' => $workspace,

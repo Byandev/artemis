@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Jobs;
+namespace App\Jobs\AdsManager;
 
 use App\Models\AdAccount;
 use App\Models\Campaign;
@@ -32,7 +32,7 @@ class FetchCampaigns implements ShouldQueue
 
         while ($cont) {
             $params = [
-                'fields' => 'id,name,account_id,status,daily_budget,created_time,start_time,stop_time,updated_time',
+                'fields' => 'id,name,account_id,status,daily_budget,created_time,start_time,stop_time,updated_time,effective_status',
                 'access_token' => $this->facebookAccount->access_token,
                 'limit' => 1000,
             ];
@@ -61,7 +61,9 @@ class FetchCampaigns implements ShouldQueue
                     'end_time' => isset($campaign['end_time']) ? Carbon::parse($campaign['end_time'])
                         ->setTimezone('Asia/Manila')
                         ->format('Y-m-d H:i:s') : null,
-                    'daily_budget' => $campaign['daily_budget'] ?? null,
+                    'daily_budget' => isset($campaign['daily_budget'])
+                        ? $campaign['daily_budget'] / 100 : 0,
+                    'effective_status' => $campaign['effective_status'],
                 ]);
             }
 

@@ -17,13 +17,10 @@ class CampaignController extends Controller
             })
             ->with(['adAccount'])
             ->when($request->search, function ($query, $search) {
-                $query->where('name', 'like', '%' . $search . '%');
+                $query->where('name', 'like', '%'.$search.'%');
             })
             ->when($request->status, function ($query, $status) {
                 $query->where('status', $status);
-            })
-            ->when($request->start_date && $request->end_date, function ($query) use ($request) {
-                $query->whereBetween('start_time', [$request->start_date, $request->end_date]);
             })
             ->orderBy('created_at', 'desc')
             ->paginate(10);
