@@ -1,14 +1,21 @@
-import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import { ColumnDef } from '@tanstack/react-table';
 import { Workspace } from '@/types/models/Workspace';
+import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 
 interface AdSet {
   id: number;
   name: string;
   status: string;
   daily_budget: number | null;
+  impressions?: number;
+  clicks?: number;
+  spend?: number;
+  conversions?: number;
+  ctr?: number;
+  cpc?: number;
+  cpm?: number;
   campaign: {
     id: number;
     name: string;
@@ -100,7 +107,7 @@ const AdSetsTab = forwardRef(({
       // Only add date filters if they're explicitly set (not the default 30-day range)
       // For now, we'll skip date filtering for ad sets since they don't have start_time/end_time
       // and created_at would filter based on when we synced them, not the actual ad set dates
-      
+
       const response = await axios.get(`/workspaces/${workspace.slug}/api/ad-sets`, { params });
       setAdSets(response.data.data);
       setPagination(response.data);
@@ -165,9 +172,9 @@ const AdSetsTab = forwardRef(({
     {
       accessorKey: 'daily_budget',
       header: ({ column }) => <SortableHeader column={column} title="Daily Budget" />,
-      cell: ({ row }) => 
-        row.original.daily_budget 
-          ? `₱${(row.original.daily_budget / 100).toFixed(2)}` 
+      cell: ({ row }) =>
+        row.original.daily_budget
+          ? `₱${(row.original.daily_budget / 100).toFixed(2)}`
           : 'N/A',
     },
   ];
