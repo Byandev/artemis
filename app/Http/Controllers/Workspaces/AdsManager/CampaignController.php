@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Workspaces;
+namespace App\Http\Controllers\Workspaces\AdsManager;
 
 use App\Http\Controllers\Controller;
 use App\Models\Campaign;
