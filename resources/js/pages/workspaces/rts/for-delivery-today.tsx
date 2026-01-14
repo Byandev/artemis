@@ -160,6 +160,7 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders, query }: ForDe
     return (
         <AppLayout>
             <Head title={`${workspace.name} - For Delivery Today`} />
+
             <RTSManagementLayout workspace={workspace}>
                 <ComponentCard title="List of Orders for Delivery Today" >
                     <div>

@@ -26,7 +26,7 @@ const TabItem = ({ href, label, isActive }: { href: string; label: React.ReactNo
 };
 
 const RtsNavigation = ({ workspace }: { workspace: Workspace }) => {
-    const { url } = usePage();
+    const { url,  } = usePage();
 
     const currentPath = useMemo(() => extractPathFromUrl(url), [url]);
 
@@ -35,6 +35,7 @@ const RtsNavigation = ({ workspace }: { workspace: Workspace }) => {
             { key: 'analytics', label: 'Analytics', href: `/workspaces/${workspace.slug}/rts/analytics` },
             { key: 'for-delivery-today', label: 'For Delivery Today', href: `/workspaces/${workspace.slug}/rts/for-delivery-today` },
             { key: 'parcel-update-notification', label: 'Parcel Updates', href: `/workspaces/${workspace.slug}/rts/parcel-update-notification` },
+            { key: 'parcel-journey-notification-templates', label: 'Parcel Update Templates', href: `/workspaces/${workspace.slug}/rts/parcel-journey-notification-templates` },
         ],
         [workspace.slug]
     );
@@ -43,6 +44,7 @@ const RtsNavigation = ({ workspace }: { workspace: Workspace }) => {
         if (currentPath.includes('/rts/analytics')) return 'analytics';
         if (currentPath.includes('/rts/for-delivery-today')) return 'for-delivery-today';
         if (currentPath.includes('/rts/parcel-update-notification')) return 'parcel-update-notification';
+        if (currentPath.includes('/rts/parcel-journey-notification-templates')) return 'parcel-journey-notification-templates';
         return 'analytics';
     }, [currentPath]);
 

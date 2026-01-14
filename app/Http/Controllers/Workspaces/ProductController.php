@@ -7,38 +7,36 @@ use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class ProductController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
-        $query = Product::ofWorkspace($workspace)->with('owner');
-
-        // Search filter (search by name and code only)
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
-            });
-        }
-
-        // Category filter
-        if ($request->filled('category')) {
-            $query->where('category', $request->category);
-        }
-
-        // Status filter (for tabs: Analytics, Products, Testing Products)
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        // Sorting
-        $sortField = $request->get('sort', 'created_at');
-        $sortDirection = $request->get('direction', 'desc');
-        $query->orderBy($sortField, $sortDirection);
-
-        $products = $query->paginate(10)->withQueryString();
+        $products = QueryBuilder::for(Product::ofWorkspace($workspace))
+            ->with('owner')
+            ->allowedFilters([
+                AllowedFilter::callback('search', function ($query, $value) {
+                    $query->where(function ($q) use ($value) {
+                        $q->where('name', 'like', "%{$value}%")
+                            ->orWhere('code', 'like', "%{$value}%");
+                    });
+                }),
+                AllowedFilter::exact('category'),
+                AllowedFilter::exact('status'),
+            ])
+            ->allowedSorts([
+                'id',
+                'name',
+                'code',
+                'category',
+                'status',
+                'created_at',
+            ])
+            ->defaultSort('-created_at')
+            ->paginate(10)
+            ->withQueryString();
 
         // Get unique categories for filter dropdown (exclude null/empty values)
         $categories = Product::ofWorkspace($workspace)
@@ -51,12 +49,9 @@ class ProductController extends Controller
         return Inertia::render('workspaces/products/index', [
             'products' => $products,
             'workspace' => $workspace,
-            'filters' => [
-                'search' => $request->search ?? '',
-                'category' => $request->category ?? '',
-                'status' => $request->status ?? '',
-                'sort' => $sortField,
-                'direction' => $sortDirection,
+            'query' => [
+                ...$request->only(['sort', 'perPage', 'page']),
+                'filter' => $request->input('filter', []),
             ],
             'categories' => $categories,
         ]);

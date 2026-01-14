@@ -19,4 +19,5 @@ export interface Page {
     shop?: Shop;
     owner?: User;
     product?: Product;
+    current_budget?: number;
 }

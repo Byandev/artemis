@@ -48,40 +48,7 @@ const OrderFilters = ({
                         )}
                     </div>
                 </div>
-                <div className="flex-1">
-                    <Select
-                        value={customerFilter || undefined}
-                        onValueChange={(value) => onFilterChange('customer', value)}
-                    >
-                        <SelectTrigger>
-                            <SelectValue placeholder="All customers" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {customers.map((customer) => (
-                                <SelectItem key={customer} value={customer}>
-                                    {customer}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="flex-1">
-                    <Select
-                        value={riderFilter || undefined}
-                        onValueChange={(value) => onFilterChange('rider', value)}
-                    >
-                        <SelectTrigger>
-                            <SelectValue placeholder="All riders" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {riders.map((rider) => (
-                                <SelectItem key={rider} value={rider}>
-                                    {rider}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
+
                 {(pageNameSearch || customerFilter || riderFilter) && (
                     <Button onClick={onClearFilters} variant="outline">
                         Clear Filters
