@@ -27,6 +27,10 @@ class AdSetController extends Controller
             ->allowedFilters([
                 AllowedFilter::scope('search'),
                 AllowedFilter::exact('status'),
+                AllowedFilter::scope('impressions_greater_than'),
+                AllowedFilter::scope('clicks_greater_than'),
+                AllowedFilter::scope('spend_greater_than'),
+                AllowedFilter::scope('daily_budget_greater_than'),
             ])
             ->allowedSorts([
                 'name',
@@ -46,36 +50,25 @@ class AdSetController extends Controller
     {
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
+        $metrics = $request->input('metrics', ['impressions', 'clicks', 'spend']); // Default metrics
 
         $adSets = $this->buildQuery($workspace, $request);
 
-        // Aggregate metrics from ad_records for the given date range
-        if ($startDate && $endDate) {
-            $adSets->addSelect('ad_sets.*')
-                ->selectRaw(
-                    '(SELECT COALESCE(SUM(impressions), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id AND ad_records.date BETWEEN ? AND ?) as impressions',
-                    [$startDate, $endDate]
-                )
-                ->selectRaw(
-                    '(SELECT COALESCE(SUM(clicks), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id AND ad_records.date BETWEEN ? AND ?) as clicks',
-                    [$startDate, $endDate]
-                )
-                ->selectRaw(
-                    '(SELECT COALESCE(SUM(spend), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id AND ad_records.date BETWEEN ? AND ?) as spend',
+        // Add base select
+        $adSets->addSelect('ad_sets.*');
+
+        // Aggregate metrics from ad_records based on requested metrics
+        foreach ($metrics as $metric) {
+            if ($startDate && $endDate) {
+                $adSets->selectRaw(
+                    "(SELECT COALESCE(SUM({$metric}), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id AND ad_records.date BETWEEN ? AND ?) as {$metric}",
                     [$startDate, $endDate]
                 );
-        } else {
-            // Get all data when no date range is specified
-            $adSets->addSelect('ad_sets.*')
-                ->selectRaw(
-                    '(SELECT COALESCE(SUM(impressions), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id) as impressions'
-                )
-                ->selectRaw(
-                    '(SELECT COALESCE(SUM(clicks), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id) as clicks'
-                )
-                ->selectRaw(
-                    '(SELECT COALESCE(SUM(spend), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id) as spend'
+            } else {
+                $adSets->selectRaw(
+                    "(SELECT COALESCE(SUM({$metric}), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id) as {$metric}"
                 );
+            }
         }
 
         return Inertia::render('workspaces/ads-manager/ad-sets', [

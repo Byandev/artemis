@@ -82,3 +82,14 @@ export interface PageProps {
         search?: string;
     }
 }
+export enum AdMetric {
+    IMPRESSIONS = 'impressions',
+    CLICKS = 'clicks',
+    SPEND = 'spend',
+}
+
+export const AVAILABLE_AD_METRICS = [
+    AdMetric.IMPRESSIONS,
+    AdMetric.CLICKS,
+    AdMetric.SPEND,
+];
