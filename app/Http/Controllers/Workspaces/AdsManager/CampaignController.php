@@ -66,6 +66,18 @@ class CampaignController extends Controller
                     '(SELECT COALESCE(SUM(spend), 0) FROM ad_records WHERE ad_records.campaign_id = campaigns.id AND ad_records.date BETWEEN ? AND ?) as spend',
                     [$startDate, $endDate]
                 );
+        } else {
+            // Get all data when no date range is specified
+            $campaigns->addSelect('campaigns.*')
+                ->selectRaw(
+                    '(SELECT COALESCE(SUM(impressions), 0) FROM ad_records WHERE ad_records.campaign_id = campaigns.id) as impressions'
+                )
+                ->selectRaw(
+                    '(SELECT COALESCE(SUM(clicks), 0) FROM ad_records WHERE ad_records.campaign_id = campaigns.id) as clicks'
+                )
+                ->selectRaw(
+                    '(SELECT COALESCE(SUM(spend), 0) FROM ad_records WHERE ad_records.campaign_id = campaigns.id) as spend'
+                );
         }
 
         return Inertia::render('workspaces/ads-manager/campaigns', [

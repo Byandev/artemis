@@ -64,6 +64,18 @@ class AdSetController extends Controller
                     '(SELECT COALESCE(SUM(spend), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id AND ad_records.date BETWEEN ? AND ?) as spend',
                     [$startDate, $endDate]
                 );
+        } else {
+            // Get all data when no date range is specified
+            $adSets->addSelect('ad_sets.*')
+                ->selectRaw(
+                    '(SELECT COALESCE(SUM(impressions), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id) as impressions'
+                )
+                ->selectRaw(
+                    '(SELECT COALESCE(SUM(clicks), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id) as clicks'
+                )
+                ->selectRaw(
+                    '(SELECT COALESCE(SUM(spend), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id) as spend'
+                );
         }
 
         return Inertia::render('workspaces/ads-manager/ad-sets', [
