@@ -31,6 +31,8 @@ class AdSetController extends Controller
                 AllowedFilter::scope('clicks_greater_than'),
                 AllowedFilter::scope('spend_greater_than'),
                 AllowedFilter::scope('daily_budget_greater_than'),
+                AllowedFilter::scope('start_date'),
+                AllowedFilter::scope('end_date'),
             ])
             ->allowedSorts([
                 'name',
