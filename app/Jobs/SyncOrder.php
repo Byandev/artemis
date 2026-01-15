@@ -153,20 +153,20 @@ class SyncOrder implements ShouldQueue
 
         $savedOrder->tags()->delete();
 
-        if (isset($order['tags'])) {
-            $savedOrder->tags()
-                ->insert(
-                    collect($order['tags'])
-                        ->map(function ($tag) use ($savedOrder) {
-                            return [
-                                'order_id' => $savedOrder->id,
-                                'tag_id' => $tag['id'] ?? 0,
-                                'name' => $tag['name'] ?? '',
-                            ];
-                        })
-                        ->values()
-                        ->toArray());
-        }
+//        if (isset($order['tags'])) {
+//            $savedOrder->tags()
+//                ->insert(
+//                    collect($order['tags'])
+//                        ->map(function ($tag) use ($savedOrder) {
+//                            return [
+//                                'order_id' => $savedOrder->id,
+//                                'tag_id' => $tag['id'] ?? 0,
+//                                'name' => $tag['name'] ?? '',
+//                            ];
+//                        })
+//                        ->values()
+//                        ->toArray());
+//        }
 
         $savedOrder->update([
             'delivery_attempts' => $deliveryAttempts,
