@@ -55,7 +55,7 @@ export const MetricFiltersBar = ({
 }: MetricFiltersBarProps) => {
     const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    const hasActiveFilters = searchValue || statusFilter || metricFilters.length > 0 || dateRangeStr.from !== moment().startOf('month').format('YYYY-MM-DD') || dateRangeStr.to !== moment().format('YYYY-MM-DD');
+    const hasActiveFilters = searchValue || statusFilter || metricFilters.length > 0 || selectedMetrics.length > 0 || dateRangeStr.from !== moment().startOf('month').format('YYYY-MM-DD') || dateRangeStr.to !== moment().format('YYYY-MM-DD');
 
     const toggleMetric = (metric: string) => {
         const updated = selectedMetrics.includes(metric)
@@ -65,7 +65,7 @@ export const MetricFiltersBar = ({
     };
 
     const addMetricFilter = () => {
-        onMetricFiltersChange([...metricFilters, { metric: 'impressions', operator: 'greater_than', value: '' }]);
+        onMetricFiltersChange([...metricFilters, { metric: 'impressions', operator: 'greater_than', value: '0' }]);
     };
 
     const removeMetricFilter = (index: number) => {
@@ -90,6 +90,12 @@ export const MetricFiltersBar = ({
                 />
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 relative z-50">
+                     {hasActiveFilters && (
+                        <Button variant="outline" onClick={onClearFilters} size="sm">
+                            Clear All
+                        </Button>
+                    )}
+                    
                     <select
                         value={statusFilter}
                         onChange={(e) => onStatusChange(e.target.value)}
@@ -128,12 +134,6 @@ export const MetricFiltersBar = ({
                             </DropdownMenuContent>
                         </DropdownMenu>
                     )}
-
-                    {hasActiveFilters && (
-                        <Button variant="outline" onClick={onClearFilters} size="sm">
-                            Clear All
-                        </Button>
-                    )}
                 </div>
             </div>
 
@@ -154,13 +154,13 @@ export const MetricFiltersBar = ({
                         </Button>
                     </div>
 
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
                         {metricFilters.map((filter, index) => (
                             <div
                                 key={index}
-                                className="flex flex-col sm:flex-row sm:items-center gap-2 p-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg"
+                                className="flex flex-col sm:flex-row sm:items-center gap-2 px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 transition-colors w-full sm:w-fit"
                             >
-                                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide shrink-0">
+                                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap shrink-0">
                                     {index === 0 ? 'Where' : 'And'}
                                 </div>
 
@@ -168,18 +168,18 @@ export const MetricFiltersBar = ({
                                 <select
                                     value={filter.metric}
                                     onChange={(e) => updateMetricFilter(index, 'metric', e.target.value)}
-                                    className="h-8 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 text-xs text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 flex-1 sm:flex-none"
+                                    className="h-8 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 text-xs text-gray-800 dark:text-white/90 hover:border-gray-400 dark:hover:border-gray-600 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-colors flex-1 sm:flex-none"
                                 >
-                                    <option value="impressions">Impressions</option>
-                                    <option value="clicks">Clicks</option>
-                                    <option value="spend">Spend</option>
+                                    {selectedMetrics.map(metric => (
+                                        <option key={metric} value={metric}>{metric.charAt(0).toUpperCase() + metric.slice(1)}</option>
+                                    ))}
                                 </select>
 
                                 {/* Operator */}
                                 <select
                                     value={filter.operator}
                                     onChange={(e) => updateMetricFilter(index, 'operator', e.target.value)}
-                                    className="h-8 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 text-xs text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 flex-1 sm:flex-none"
+                                    className="h-8 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-1 text-xs text-gray-800 dark:text-white/90 hover:border-gray-400 dark:hover:border-gray-600 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-colors flex-1 sm:flex-none"
                                 >
                                     <option value="greater_than">Greater Than</option>
                                     <option value="less_than">Less Than</option>
@@ -195,21 +195,19 @@ export const MetricFiltersBar = ({
                                     value={filter.value}
                                     onChange={(e) => updateMetricFilter(index, 'value', e.target.value)}
                                     placeholder="Value"
-                                    className="h-8 w-full sm:w-24"
+                                    className="h-8 w-full sm:w-20"
                                 />
 
                                 {/* Remove Button */}
-                                {metricFilters.length > 1 && (
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => removeMetricFilter(index)}
-                                        className="h-8 px-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                )}
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeMetricFilter(index)}
+                                    className="h-8 px-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
                             </div>
                         ))}
                     </div>
@@ -217,7 +215,7 @@ export const MetricFiltersBar = ({
             )}
 
             {/* Add First Metric Filter */}
-            {metricFilters.length === 0 && (
+            {metricFilters.length === 0 && selectedMetrics.length > 0 && (
                 <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
                     <Button
                         type="button"

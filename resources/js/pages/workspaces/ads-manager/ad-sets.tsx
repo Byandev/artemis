@@ -154,9 +154,16 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
     const handleMetricsChange = (metrics: string[]) => {
         setSelectedMetrics(metrics);
 
+        // Remove metric filters for disabled metrics
+        const filteredMetricFilters = metricFilters.filter(filter => metrics.includes(filter.metric));
+        setMetricFilters(filteredMetricFilters);
+
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
-            getNavParams({ metrics: metrics.length > 0 ? metrics : undefined }),
+            getNavParams({ 
+                metrics: metrics.length > 0 ? metrics : undefined,
+                metric_filters: filteredMetricFilters.length > 0 ? encodeURIComponent(JSON.stringify(filteredMetricFilters)) : undefined,
+            }),
             {
                 preserveState: true,
                 replace: true,
@@ -170,11 +177,21 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
         setSearchValue('');
         setStatusFilter('');
         setMetricFilters([]);
+        setSelectedMetrics([]);
         setDateRange({
             from: moment().startOf('month').toDate(),
             to: moment().toDate()
         });
-        router.get(`/workspaces/${workspace.slug}/ads-manager/ad-sets`, getNavParams(), {
+        router.get(`/workspaces/${workspace.slug}/ads-manager/ad-sets`, {
+            sort: undefined,
+            'filter[search]': undefined,
+            'filter[status]': undefined,
+            'filter[start_date]': undefined,
+            'filter[end_date]': undefined,
+            metric_filters: undefined,
+            metrics: undefined,
+            page: 1,
+        }, {
             preserveState: false,
             replace: true,
             preserveScroll: true,
