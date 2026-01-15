@@ -75,4 +75,3 @@ class AdSet extends Model
         return $query->whereDate('created_at', '<=', $date);
     }
 }
-}
