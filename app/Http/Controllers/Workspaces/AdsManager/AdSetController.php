@@ -17,7 +17,7 @@ class AdSetController extends Controller
      */
     private function buildQuery(Workspace $workspace, Request $request)
     {
-        $query = QueryBuilder::for(
+        return QueryBuilder::for(
             AdSet::query()
                 ->whereHas('adAccount.facebook_accounts.workspaces', function ($query) use ($workspace) {
                     $query->where('workspace_id', $workspace->id);
@@ -43,14 +43,13 @@ class AdSetController extends Controller
             ])
             ->defaultSort('-created_at');
 
-        return $query;
     }
 
     public function index(Workspace $workspace, Request $request)
     {
         $startDate = $request->input('filter.start_date');
         $endDate = $request->input('filter.end_date');
-        $metrics = $request->input('metrics', []); // Default metrics
+        $metrics = $request->input('metrics', []);
 
         $adSets = $this->buildQuery($workspace, $request);
 

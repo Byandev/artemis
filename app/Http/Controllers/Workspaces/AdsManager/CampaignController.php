@@ -17,7 +17,7 @@ class CampaignController extends Controller
      */
     private function buildQuery(Workspace $workspace, Request $request)
     {
-        $query = QueryBuilder::for(
+        return QueryBuilder::for(
             Campaign::query()
                 ->whereHas('adAccount.facebook_accounts.workspaces', function ($query) use ($workspace) {
                     $query->where('workspace_id', $workspace->id);
@@ -44,15 +44,13 @@ class CampaignController extends Controller
                 'updated_at',
             ])
             ->defaultSort('-created_at');
-
-        return $query;
     }
 
     public function index(Workspace $workspace, Request $request)
     {
         $startDate = $request->input('filter.start_date');
         $endDate = $request->input('filter.end_date');
-        $metrics = $request->input('metrics', []); // Default metrics
+        $metrics = $request->input('metrics', []);
 
         $campaigns = $this->buildQuery($workspace, $request);
 
