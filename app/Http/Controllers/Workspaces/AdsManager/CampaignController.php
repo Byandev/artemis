@@ -27,10 +27,6 @@ class CampaignController extends Controller
             ->allowedFilters([
                 AllowedFilter::scope('search'),
                 AllowedFilter::exact('status'),
-                AllowedFilter::scope('impressions_greater_than'),
-                AllowedFilter::scope('clicks_greater_than'),
-                AllowedFilter::scope('spend_greater_than'),
-                AllowedFilter::scope('daily_budget_greater_than'),
                 AllowedFilter::scope('start_date'),
                 AllowedFilter::scope('end_date'),
             ])
@@ -56,9 +52,39 @@ class CampaignController extends Controller
     {
         $startDate = $request->input('filter.start_date');
         $endDate = $request->input('filter.end_date');
-        $metrics = $request->input('metrics', ['impressions', 'clicks', 'spend']); // Default metrics
+        $metrics = $request->input('metrics', []); // Default metrics
 
         $campaigns = $this->buildQuery($workspace, $request);
+
+        // Apply metric filters (outside of QueryBuilder to avoid filter validation)
+        if ($request->filled('metric_filters')) {
+            try {
+                $metricFilters = json_decode(urldecode($request->input('metric_filters')), true);
+                if (is_array($metricFilters)) {
+                    foreach ($metricFilters as $filter) {
+                        $metric = $filter['metric'] ?? null;
+                        $operator = $filter['operator'] ?? null;
+                        $value = $filter['value'] ?? null;
+
+                        if ($metric && $operator && $value !== null) {
+                            $sqlOperator = match ($operator) {
+                                'greater_than' => '>',
+                                'less_than' => '<',
+                                'equal' => '=',
+                                'greater_than_or_equal' => '>=',
+                                'less_than_or_equal' => '<=',
+                                default => '='
+                            };
+
+                            $campaigns->having($metric, $sqlOperator, $value)
+                                ->groupBy('campaigns.id');
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                // Log error if needed
+            }
+        }
 
         // Add base select
         $campaigns->addSelect('campaigns.*');
@@ -89,13 +115,11 @@ class CampaignController extends Controller
                 'filter' => [
                     'search' => $request->get('filter.search'),
                     'status' => $request->get('filter.status'),
-                    'impressions_greater_than' => $request->get('filter.impressions_greater_than'),
-                    'clicks_greater_than' => $request->get('filter.clicks_greater_than'),
-                    'spend_greater_than' => $request->get('filter.spend_greater_than'),
-                    'daily_budget_greater_than' => $request->get('filter.daily_budget_greater_than'),
                     'start_date' => $request->get('filter.start_date'),
                     'end_date' => $request->get('filter.end_date'),
                 ],
+                'metric_filters' => $request->get('metric_filters'),
+                'metrics' => $metrics,
             ],
         ]);
     }

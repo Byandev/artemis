@@ -27,10 +27,6 @@ class AdSetController extends Controller
             ->allowedFilters([
                 AllowedFilter::scope('search'),
                 AllowedFilter::exact('status'),
-                AllowedFilter::scope('impressions_greater_than'),
-                AllowedFilter::scope('clicks_greater_than'),
-                AllowedFilter::scope('spend_greater_than'),
-                AllowedFilter::scope('daily_budget_greater_than'),
                 AllowedFilter::scope('start_date'),
                 AllowedFilter::scope('end_date'),
             ])
@@ -54,9 +50,39 @@ class AdSetController extends Controller
     {
         $startDate = $request->input('filter.start_date');
         $endDate = $request->input('filter.end_date');
-        $metrics = $request->input('metrics', ['impressions', 'clicks', 'spend']); // Default metrics
+        $metrics = $request->input('metrics', []); // Default metrics
 
         $adSets = $this->buildQuery($workspace, $request);
+
+        // Apply metric filters (outside of QueryBuilder to avoid filter validation)
+        if ($request->filled('metric_filters')) {
+            try {
+                $metricFilters = json_decode(urldecode($request->input('metric_filters')), true);
+                if (is_array($metricFilters)) {
+                    foreach ($metricFilters as $filter) {
+                        $metric = $filter['metric'] ?? null;
+                        $operator = $filter['operator'] ?? null;
+                        $value = $filter['value'] ?? null;
+
+                        if ($metric && $operator && $value !== null) {
+                            $sqlOperator = match ($operator) {
+                                'greater_than' => '>',
+                                'less_than' => '<',
+                                'equal' => '=',
+                                'greater_than_or_equal' => '>=',
+                                'less_than_or_equal' => '<=',
+                                default => '='
+                            };
+
+                            $adSets->having($metric, $sqlOperator, $value)
+                                ->groupBy('ad_sets.id');
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                // Log error if needed
+            }
+        }
 
         // Add base select
         $adSets->addSelect('ad_sets.*');
@@ -90,6 +116,8 @@ class AdSetController extends Controller
                     'start_date' => $request->get('filter.start_date'),
                     'end_date' => $request->get('filter.end_date'),
                 ],
+                'metric_filters' => $request->get('metric_filters'),
+                'metrics' => $metrics,
             ],
         ]);
     }

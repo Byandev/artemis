@@ -11,11 +11,27 @@ import { omit } from 'lodash';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import { type DateRange } from "react-day-picker";
-import { FiltersBar } from './partials/FiltersBar';
+import { MetricFiltersBar } from './partials/MetricFiltersBar';
 import AdsManagerLayout from './partials/Layout';
 
-const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets: PaginatedAdSets; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string; impressions_greater_than?: string; clicks_greater_than?: string; spend_greater_than?: string; daily_budget_greater_than?: string }; metrics?: string[] } }) => {
+interface MetricFilter {
+    metric: string;
+    operator: string;
+    value: string;
+}
+
+const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets: PaginatedAdSets; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string }; metric_filters?: string; metrics?: string[] } }) => {
     const [selectedMetrics, setSelectedMetrics] = useState<string[]>(query?.metrics ?? []);
+    const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() => {
+        if (query?.metric_filters) {
+            try {
+                return JSON.parse(decodeURIComponent(query.metric_filters));
+            } catch {
+                return [];
+            }
+        }
+        return [];
+    });
 
     const requestedMetrics = selectedMetrics;
 
@@ -23,12 +39,9 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
         sort: query?.sort,
         'filter[search]': searchValue || undefined,
         'filter[status]': statusFilter || undefined,
-        'filter[impressions_greater_than]': impressionsGreaterThan || undefined,
-        'filter[clicks_greater_than]': clicksGreaterThan || undefined,
-        'filter[spend_greater_than]': spendGreaterThan || undefined,
-        'filter[daily_budget_greater_than]': dailyBudgetGreaterThan || undefined,
         'filter[start_date]': dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
         'filter[end_date]': dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
+        metric_filters: metricFilters.length > 0 ? encodeURIComponent(JSON.stringify(metricFilters)) : undefined,
         metrics: requestedMetrics,
         page: 1,
         ...overrides,
@@ -40,10 +53,6 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [statusFilter, setStatusFilter] = useState(query?.filter?.status ?? '');
-    const [impressionsGreaterThan, setImpressionsGreaterThan] = useState(query?.filter?.impressions_greater_than ?? '');
-    const [clicksGreaterThan, setClicksGreaterThan] = useState(query?.filter?.clicks_greater_than ?? '');
-    const [spendGreaterThan, setSpendGreaterThan] = useState(query?.filter?.spend_greater_than ?? '');
-    const [dailyBudgetGreaterThan, setDailyBudgetGreaterThan] = useState(query?.filter?.daily_budget_greater_than ?? '');
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
         from: query?.filter?.start_date ? moment(query.filter.start_date).toDate() : moment().startOf('month').toDate(),
         to: query?.filter?.end_date ? moment(query.filter.end_date).toDate() : moment().toDate()
@@ -109,10 +118,12 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
         );
     };
 
-    const handleNumericFilterChange = () => {
+    const handleMetricFilterChange = (filters: MetricFilter[]) => {
+        setMetricFilters(filters);
+
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
-            getNavParams(),
+            getNavParams({ metric_filters: filters.length > 0 ? encodeURIComponent(JSON.stringify(filters)) : undefined }),
             {
                 preserveState: true,
                 replace: true,
@@ -128,8 +139,8 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
             getNavParams({
-                start_date: range?.from ? moment(range.from).format('YYYY-MM-DD') : undefined,
-                end_date: range?.to ? moment(range.to).format('YYYY-MM-DD') : undefined,
+                'filter[start_date]': range?.from ? moment(range.from).format('YYYY-MM-DD') : undefined,
+                'filter[end_date]': range?.to ? moment(range.to).format('YYYY-MM-DD') : undefined,
             }),
             {
                 preserveState: true,
@@ -145,7 +156,7 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
 
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
-            getNavParams({ metrics: metrics.length > 0 ? metrics : AVAILABLE_AD_METRICS }),
+            getNavParams({ metrics: metrics.length > 0 ? metrics : undefined }),
             {
                 preserveState: true,
                 replace: true,
@@ -158,10 +169,7 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
     const clearFilters = () => {
         setSearchValue('');
         setStatusFilter('');
-        setImpressionsGreaterThan('');
-        setClicksGreaterThan('');
-        setSpendGreaterThan('');
-        setDailyBudgetGreaterThan('');
+        setMetricFilters([]);
         setDateRange({
             from: moment().startOf('month').toDate(),
             to: moment().toDate()
@@ -221,26 +229,19 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
                 <div className="space-y-5 sm:space-y-6">
                     <ComponentCard desc="Manage your ad sets">
                         <div>
-                            <FiltersBar
+                            <MetricFiltersBar
+                                metricFilters={metricFilters}
+                                onMetricFiltersChange={handleMetricFilterChange}
                                 searchValue={searchValue}
                                 statusFilter={statusFilter}
-                                impressionsGreaterThan={impressionsGreaterThan}
-                                clicksGreaterThan={clicksGreaterThan}
-                                spendGreaterThan={spendGreaterThan}
-                                dailyBudgetGreaterThan={dailyBudgetGreaterThan}
                                 dateRange={dateRange}
                                 dateRangeStr={dateRangeStr}
                                 selectedMetrics={selectedMetrics}
                                 availableMetrics={AVAILABLE_AD_METRICS}
                                 onSearchChange={setSearchValue}
                                 onStatusChange={handleStatusFilterChange}
-                                onImpressionsChange={setImpressionsGreaterThan}
-                                onClicksChange={setClicksGreaterThan}
-                                onSpendChange={setSpendGreaterThan}
-                                onDailyBudgetChange={setDailyBudgetGreaterThan}
                                 onDateRangeChange={handleDateRangeChange}
                                 onMetricsChange={handleMetricsChange}
-                                onNumericFilterChange={handleNumericFilterChange}
                                 onClearFilters={clearFilters}
                                 searchPlaceholder="Search ad sets..."
                             />
