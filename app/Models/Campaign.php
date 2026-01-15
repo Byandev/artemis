@@ -56,20 +56,4 @@ class Campaign extends Model
     {
         return $query->where('daily_budget', '>', $value);
     }
-
-    /**
-     * Scope for start date filter
-     */
-    public function scopeStartDate(Builder $query, $date): Builder
-    {
-        return $query->where('created_at', '>=', $date);
-    }
-
-    /**
-     * Scope for end date filter
-     */
-    public function scopeEndDate(Builder $query, $date): Builder
-    {
-        return $query->where('created_at', '<=', $date);
-    }
 }

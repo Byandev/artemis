@@ -3,7 +3,7 @@ import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { AVAILABLE_AD_METRICS, Campaign, PaginatedCampaigns } from '@/types/models/AdManager';
+import { Campaign, PaginatedCampaigns, AVAILABLE_AD_METRICS } from '@/types/models/AdManager';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
@@ -14,52 +14,25 @@ import { type DateRange } from "react-day-picker";
 import { FiltersBar } from './partials/FiltersBar';
 import AdsManagerLayout from './partials/Layout';
 
-const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; campaigns: PaginatedCampaigns; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string;[key: string]: any }; metrics?: string[] } }) => {
+const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; campaigns: PaginatedCampaigns; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string; impressions_greater_than?: string; clicks_greater_than?: string; spend_greater_than?: string; daily_budget_greater_than?: string }; metrics?: string[] } }) => {
     const [selectedMetrics, setSelectedMetrics] = useState<string[]>(query?.metrics ?? []);
-    const [filters, setFilters] = useState<Array<{ metric: string; operator: string; value: string }>>(() => {
-        // Parse filters from query
-        const result: Array<{ metric: string; operator: string; value: string }> = [];
-        const filterObj = query?.filter || {};
-
-        // Extract metric filters from the query
-        for (const [key, value] of Object.entries(filterObj)) {
-            if (key.endsWith('_operator') && value) {
-                const metric = key.replace('_operator', '');
-                result.push({
-                    metric,
-                    operator: value as string,
-                    value: (filterObj[`${metric}_value`] || '') as string,
-                });
-            }
-        }
-
-        return result.length > 0 ? result : [];
-    });
 
     const requestedMetrics = selectedMetrics;
 
-    const getNavParams = (overrides: Record<string, any> = {}) => {
-        const params: Record<string, any> = {
-            sort: query?.sort,
-            'filter[search]': searchValue || undefined,
-            'filter[status]': statusFilter || undefined,
-            'filter[start_date]': dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
-            'filter[end_date]': dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
-            metrics: requestedMetrics,
-            page: 1,
-            ...overrides,
-        };
-
-        // Add filter conditions
-        filters.forEach(filter => {
-            if (filter.value) {
-                params[`filter[${filter.metric}_operator]`] = filter.operator;
-                params[`filter[${filter.metric}_value]`] = filter.value;
-            }
-        });
-
-        return params;
-    };
+    const getNavParams = (overrides: Record<string, any> = {}) => ({
+        sort: query?.sort,
+        'filter[search]': searchValue || undefined,
+        'filter[status]': statusFilter || undefined,
+        'filter[impressions_greater_than]': impressionsGreaterThan || undefined,
+        'filter[clicks_greater_than]': clicksGreaterThan || undefined,
+        'filter[spend_greater_than]': spendGreaterThan || undefined,
+        'filter[daily_budget_greater_than]': dailyBudgetGreaterThan || undefined,
+        start_date: dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
+        end_date: dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
+        metrics: requestedMetrics,
+        page: 1,
+        ...overrides,
+    });
 
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
@@ -155,8 +128,8 @@ const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; 
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/campaigns`,
             getNavParams({
-                'filter[start_date]': range?.from ? moment(range.from).format('YYYY-MM-DD') : undefined,
-                'filter[end_date]': range?.to ? moment(range.to).format('YYYY-MM-DD') : undefined,
+                start_date: range?.from ? moment(range.from).format('YYYY-MM-DD') : undefined,
+                end_date: range?.to ? moment(range.to).format('YYYY-MM-DD') : undefined,
             }),
             {
                 preserveState: true,

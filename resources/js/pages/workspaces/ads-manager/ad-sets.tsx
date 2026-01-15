@@ -3,7 +3,7 @@ import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { AdSet, AVAILABLE_AD_METRICS, PaginatedAdSets } from '@/types/models/AdManager';
+import { AdSet, PaginatedAdSets, AVAILABLE_AD_METRICS } from '@/types/models/AdManager';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
@@ -27,8 +27,8 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
         'filter[clicks_greater_than]': clicksGreaterThan || undefined,
         'filter[spend_greater_than]': spendGreaterThan || undefined,
         'filter[daily_budget_greater_than]': dailyBudgetGreaterThan || undefined,
-        'filter[start_date]': dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
-        'filter[end_date]': dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
+        start_date: dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
+        end_date: dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
         metrics: requestedMetrics,
         page: 1,
         ...overrides,
@@ -128,8 +128,8 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
             getNavParams({
-                'filter[start_date]': range?.from ? moment(range.from).format('YYYY-MM-DD') : undefined,
-                'filter[end_date]': range?.to ? moment(range.to).format('YYYY-MM-DD') : undefined,
+                start_date: range?.from ? moment(range.from).format('YYYY-MM-DD') : undefined,
+                end_date: range?.to ? moment(range.to).format('YYYY-MM-DD') : undefined,
             }),
             {
                 preserveState: true,

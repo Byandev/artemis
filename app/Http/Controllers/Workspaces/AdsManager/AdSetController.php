@@ -31,8 +31,6 @@ class AdSetController extends Controller
                 AllowedFilter::scope('clicks_greater_than'),
                 AllowedFilter::scope('spend_greater_than'),
                 AllowedFilter::scope('daily_budget_greater_than'),
-                AllowedFilter::scope('start_date'),
-                AllowedFilter::scope('end_date'),
             ])
             ->allowedSorts([
                 'name',
@@ -50,8 +48,8 @@ class AdSetController extends Controller
 
     public function index(Workspace $workspace, Request $request)
     {
-        $startDate = $request->input('filter.start_date');
-        $endDate = $request->input('filter.end_date');
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
         $metrics = $request->input('metrics', ['impressions', 'clicks', 'spend']); // Default metrics
 
         $adSets = $this->buildQuery($workspace, $request);
@@ -85,12 +83,8 @@ class AdSetController extends Controller
                 'filter' => [
                     'search' => $request->get('filter.search'),
                     'status' => $request->get('filter.status'),
-                    'impressions_greater_than' => $request->get('filter.impressions_greater_than'),
-                    'clicks_greater_than' => $request->get('filter.clicks_greater_than'),
-                    'spend_greater_than' => $request->get('filter.spend_greater_than'),
-                    'daily_budget_greater_than' => $request->get('filter.daily_budget_greater_than'),
-                    'start_date' => $request->get('filter.start_date'),
-                    'end_date' => $request->get('filter.end_date'),
+                    'start_date' => $request->get('start_date'),
+                    'end_date' => $request->get('end_date'),
                 ],
             ],
         ]);
