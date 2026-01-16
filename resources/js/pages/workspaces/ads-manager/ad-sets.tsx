@@ -11,8 +11,8 @@ import { omit } from 'lodash';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import { type DateRange } from "react-day-picker";
-import { MetricFiltersBar } from './partials/MetricFiltersBar';
 import AdsManagerLayout from './partials/Layout';
+import { MetricFiltersBar } from './partials/MetricFiltersBar';
 
 interface MetricFilter {
     metric: string;
@@ -160,7 +160,7 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
 
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
-            getNavParams({ 
+            getNavParams({
                 metrics: metrics.length > 0 ? metrics : undefined,
                 metric_filters: filteredMetricFilters.length > 0 ? encodeURIComponent(JSON.stringify(filteredMetricFilters)) : undefined,
             }),
@@ -205,7 +205,7 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
             cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
         },
         {
-            accessorKey: 'campaign',
+            accessorKey: 'campaign_id',
             header: ({ column }) => <SortableHeader column={column} title="Campaign" />,
             cell: ({ row }) => <div className="font-medium">{row.original.campaign?.name || 'N/A'}</div>,
         },
