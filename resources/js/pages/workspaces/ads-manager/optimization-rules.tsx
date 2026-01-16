@@ -139,7 +139,7 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
         },
         {
             accessorKey: 'description',
-            header: ({ column }) => <SortableHeader column={column} title="Description" />,
+            header: ({ column }) => <SortableHeader column={column} title="Description" enabled={false} />,
             cell: ({ row }) => (
                 <div className="text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">
                     {row.original.description || '-'}
@@ -157,7 +157,7 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
         },
         {
             accessorKey: 'action',
-            header: ({ column }) => <SortableHeader column={column} title="Action" />,
+            header: ({ column }) => <SortableHeader column={column} title="Action" enabled={false} />,
             cell: ({ row }) => (
                 <div className="text-sm">
                     {getActionLabel(row.original.action, row.original.action_value)}
