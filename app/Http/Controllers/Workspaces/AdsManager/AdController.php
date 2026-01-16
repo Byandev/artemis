@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Ad;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class AdController extends Controller
 {
@@ -32,7 +33,7 @@ class AdController extends Controller
 
                         if ($metric && $operator && $value !== null) {
                             // Map operator to SQL operator
-                            $sqlOperator = match($operator) {
+                            $sqlOperator = match ($operator) {
                                 'gt' => '>',
                                 'gte' => '>=',
                                 'lt' => '<',
@@ -50,6 +51,10 @@ class AdController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
-        return response()->json($ads);
+        return Inertia::render('workspaces/ads-manager/ads', [
+            'workspace' => $workspace,
+            'ads' => $ads,
+            'filters' => $request->only(['search', 'status', 'filters']),
+        ]);
     }
 }
