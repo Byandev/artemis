@@ -56,7 +56,7 @@ export const MetricFiltersBar = ({
     const hasActiveFilters = !!(searchValue || statusFilter || metricFilters.length > 0 || selectedMetrics.length > 0 || dateRangeStr.from !== moment().startOf('month').format('YYYY-MM-DD') || dateRangeStr.to !== moment().format('YYYY-MM-DD'));
 
     return (
-        <div className="flex flex-col gap-3 rounded-t-xl border border-b-0 border-gray-100 px-3 py-3 sm:px-4 sm:py-4 dark:border-white/5">
+        <div className="flex flex-col gap-3 rounded-t-xl border border-b-0 border-gray-100 px-3 py-3 sm:px-4 sm:py-4">
             <SearchAndFiltersRow
                 searchValue={searchValue}
                 statusFilter={statusFilter}

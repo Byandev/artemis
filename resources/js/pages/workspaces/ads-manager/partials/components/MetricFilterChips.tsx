@@ -1,3 +1,4 @@
+import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
 import { type MetricFilter, getOperatorSymbol } from '../types/metric-filters';
 
@@ -17,15 +18,16 @@ export const MetricFilterChips = ({
     return (
         <div className="flex flex-wrap gap-2">
             {filters.map((filter, index) => (
-                <div
+                <Badge
                     key={index}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-full hover:shadow-md transition-shadow cursor-pointer"
+                    variant="secondary"
+                    className="cursor-pointer transition-shadow hover:brightness-95 gap-2 p-2"
                     onClick={() => onEdit(index)}
                 >
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                    <span>
                         <span className="font-medium capitalize">{filter.metric}</span>
                         {' '}
-                        <span className="text-gray-600 dark:text-gray-400">
+                        <span>
                             {getOperatorSymbol(filter.operator)}
                         </span>
                         {' '}
@@ -37,11 +39,11 @@ export const MetricFilterChips = ({
                             e.stopPropagation();
                             onRemove(index);
                         }}
-                        className="text-gray-400 hover:text-red-600 transition-colors"
+                        className="text-gray-400 hover:text-red-600 transition-colors ml-1"
                     >
                         <X className="h-4 w-4" />
                     </button>
-                </div>
+                </Badge>
             ))}
         </div>
     );
