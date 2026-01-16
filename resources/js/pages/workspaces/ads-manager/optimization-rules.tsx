@@ -52,12 +52,6 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
 
     // Debounce search
     useEffect(() => {
-        const currentSearchParam = query?.filter?.search ?? '';
-
-        if (searchValue === currentSearchParam) {
-            return;
-        }
-
         const timer = setTimeout(() => {
             router.get(
                 `/workspaces/${workspace.slug}/ads-manager/optimization-rules`,
@@ -77,7 +71,7 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [searchValue, query?.filter?.search]);
+    }, [searchValue]);
 
     const handleStatusFilterChange = (value: string) => {
         setStatusFilter(value);
