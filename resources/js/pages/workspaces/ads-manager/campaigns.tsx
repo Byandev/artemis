@@ -11,8 +11,8 @@ import { omit } from 'lodash';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import { type DateRange } from "react-day-picker";
-import { MetricFiltersBar } from './partials/MetricFiltersBar';
 import AdsManagerLayout from './partials/Layout';
+import { MetricFiltersBar } from './partials/MetricFiltersBar';
 
 interface MetricFilter {
     metric: string;
@@ -63,29 +63,27 @@ const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; 
         from: moment(dateRange?.from).format('YYYY-MM-DD'),
     }), [dateRange]);
 
-    // Debounce search
     useEffect(() => {
-        const currentSearchParam = query?.filter?.search ?? '';
-
-        if (searchValue === currentSearchParam) {
-            return;
-        }
-
         const timer = setTimeout(() => {
             router.get(
                 `/workspaces/${workspace.slug}/ads-manager/campaigns`,
-                getNavParams(),
+                {
+                    ...getNavParams(),
+                    'filter[search]': searchValue || undefined, // 👈 force override
+                    page: 1,
+                },
                 {
                     preserveState: true,
                     replace: true,
                     preserveScroll: true,
                     only: ['campaigns'],
-                },
+                }
             );
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [searchValue, query?.filter?.search]);
+    }, [searchValue]);
+
 
     // Sync date range with URL on mount
     useEffect(() => {
@@ -160,7 +158,7 @@ const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; 
 
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/campaigns`,
-            getNavParams({ 
+            getNavParams({
                 metrics: metrics.length > 0 ? metrics : undefined,
                 metric_filters: filteredMetricFilters.length > 0 ? encodeURIComponent(JSON.stringify(filteredMetricFilters)) : undefined,
             }),

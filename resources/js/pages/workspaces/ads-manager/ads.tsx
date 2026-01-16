@@ -94,27 +94,25 @@ const AdsPage = ({ workspace, ads, query }: { workspace: Workspace; ads: Paginat
 
     // Debounce search
     useEffect(() => {
-        const currentSearchParam = query?.filter?.search ?? '';
-
-        if (searchValue === currentSearchParam) {
-            return;
-        }
-
         const timer = setTimeout(() => {
             router.get(
                 `/workspaces/${workspace.slug}/ads-manager/ads`,
-                getNavParams(),
+                {
+                    ...getNavParams(),
+                    'filter[search]': searchValue || undefined,
+                    page: 1,
+                },
                 {
                     preserveState: true,
                     replace: true,
                     preserveScroll: true,
                     only: ['ads'],
-                },
+                }
             );
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [searchValue, query?.filter?.search]);
+    }, [searchValue]);
 
     // Sync date range with URL on mount
     useEffect(() => {
