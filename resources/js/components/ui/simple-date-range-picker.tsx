@@ -1,12 +1,14 @@
-import * as React from "react"
-import { CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
+import { CalendarDays, CalendarIcon, CalendarRange, Clock, Sparkles } from "lucide-react"
+import * as React from "react"
 import { DateRange } from "react-day-picker"
 
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useIsMobile } from "@/hooks/use-mobile"
+import { isPresetSelected as checkPresetSelected, DatePreset, dateRangePresets, PresetIconType } from "@/lib/date-presets"
+import { cn } from "@/lib/utils"
 
 interface SimpleDateRangePickerProps {
   value?: DateRange
@@ -23,6 +25,7 @@ export function SimpleDateRangePicker({
 }: SimpleDateRangePickerProps) {
   const [open, setOpen] = React.useState(false)
   const [tempValue, setTempValue] = React.useState<DateRange | undefined>(value)
+  const isMobile = useIsMobile()
 
   // Update temp value when popover opens
   React.useEffect(() => {
@@ -43,6 +46,10 @@ export function SimpleDateRangePicker({
     return format(dateRange.from, "MMM dd, yyyy")
   }
 
+  const handleCalendarSelect = (range: DateRange | undefined) => {
+    setTempValue(range)
+  }
+
   const handleApply = () => {
     onChange?.(tempValue)
     setOpen(false)
@@ -51,6 +58,24 @@ export function SimpleDateRangePicker({
   const handleCancel = () => {
     setTempValue(value)
     setOpen(false)
+  }
+
+  const handlePresetClick = (preset: DatePreset) => {
+    const range = preset.getValue()
+    setTempValue(range)
+  }
+
+  const getPresetIcon = (iconType: PresetIconType) => {
+    switch (iconType) {
+      case "clock":
+        return <Clock className="h-3.5 w-3.5" />
+      case "calendar-days":
+        return <CalendarDays className="h-3.5 w-3.5" />
+      case "calendar-range":
+        return <CalendarRange className="h-3.5 w-3.5" />
+      case "sparkles":
+        return <Sparkles className="h-3.5 w-3.5" />
+    }
   }
 
   return (
@@ -77,7 +102,7 @@ export function SimpleDateRangePicker({
       >
         <div className="flex flex-col lg:flex-row">
           {/* Presets Section */}
-          <div className="hidden md:block border-r border-gray-200 dark:border-gray-700 bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-950 w-48 lg:w-56 p-2">
+          <div className="hidden md:block border-r border-gray-200 dark:border-gray-700 bg-linear-to-b from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-950 w-48 lg:w-56 p-2">
             <div className="space-y-0.5">
               <div className="flex items-center gap-2 px-3 py-1.5 mb-2">
                 <div className="h-1 w-1 rounded-full bg-primary animate-pulse" />
