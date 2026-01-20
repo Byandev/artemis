@@ -70,7 +70,7 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
-                    page: 1,
+                    page: searchValue ? 1 : query?.page ?? 1
                 },
                 {
                     preserveState: true,
@@ -201,7 +201,7 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                                             page: params?.page ?? 1
                                         },
                                         {
-                                            preserveState: false,
+                                            preserveState: true,
                                             replace: true,
                                             preserveScroll: true,
                                         },

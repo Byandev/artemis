@@ -53,7 +53,7 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                     sort: query?.sort,
                     'filter[page_name]': pageNameSearch || undefined,
                     'filter[type]': typeFilter || undefined,
-                    page: 1,
+                    page: pageNameSearch ? 1 : query?.page ?? 1
                 },
                 {
                     preserveState: true,
@@ -76,7 +76,7 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                 sort: query?.sort,
                 'filter[page_name]': pageNameSearch || undefined,
                 'filter[type]': value || undefined,
-                page: 1,
+                page: pageNameSearch ? 1 : query?.page ?? 1
             },
             {
                 preserveState: true,
@@ -207,7 +207,7 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                                             page: params?.page ?? 1,
                                         },
                                         {
-                                            preserveState: false,
+                                            preserveState: true,
                                             replace: true,
                                             preserveScroll: true,
                                             only: ['notifications', 'query'],

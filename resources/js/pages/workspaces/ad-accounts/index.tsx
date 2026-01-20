@@ -86,7 +86,7 @@ const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
-                    page: 1,
+                    page: searchValue ? 1 : query?.page ?? 1
                 },
                 {
                     preserveState: true,
