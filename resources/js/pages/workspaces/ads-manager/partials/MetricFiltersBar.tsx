@@ -1,5 +1,4 @@
 import moment from 'moment';
-import { type DateRange } from 'react-day-picker';
 
 import { MetricFilterSection } from './components/MetricFilterSection';
 import { SearchAndFiltersRow } from './components/SearchAndFiltersRow';
@@ -9,14 +8,12 @@ import { type MetricFilter } from './types/metric-filters';
 export interface MetricFiltersBarProps {
     searchValue: string;
     statusFilter: string;
-    dateRange: DateRange | undefined;
     dateRangeStr: { from: string; to: string };
     selectedMetrics?: string[];
     availableMetrics?: string[];
     metricFilters: MetricFilter[];
     onSearchChange: (value: string) => void;
     onStatusChange: (value: string) => void;
-    onDateRangeChange: (range: DateRange | undefined) => void;
     onMetricsChange?: (metrics: string[]) => void;
     onMetricFiltersChange: (filters: MetricFilter[]) => void;
     onClearFilters: () => void;
@@ -26,14 +23,12 @@ export interface MetricFiltersBarProps {
 export const MetricFiltersBar = ({
     searchValue,
     statusFilter,
-    dateRange,
     dateRangeStr,
     selectedMetrics = [],
     availableMetrics = [],
     metricFilters,
     onSearchChange,
     onStatusChange,
-    onDateRangeChange,
     onMetricsChange,
     onMetricFiltersChange,
     onClearFilters,
@@ -60,14 +55,12 @@ export const MetricFiltersBar = ({
             <SearchAndFiltersRow
                 searchValue={searchValue}
                 statusFilter={statusFilter}
-                dateRange={dateRange}
                 selectedMetrics={selectedMetrics}
                 availableMetrics={availableMetrics}
                 hasActiveFilters={hasActiveFilters}
                 searchPlaceholder={searchPlaceholder}
                 onSearchChange={onSearchChange}
                 onStatusChange={onStatusChange}
-                onDateRangeChange={onDateRangeChange}
                 onMetricsChange={onMetricsChange || (() => { })}
                 onClearFilters={onClearFilters}
             />
