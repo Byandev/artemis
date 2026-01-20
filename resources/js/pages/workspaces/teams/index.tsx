@@ -1,15 +1,8 @@
-import { Head, router } from '@inertiajs/react';
-import { useMemo, useState, useEffect } from 'react';
-import { ColumnDef } from '@tanstack/react-table';
-import AppLayout from '@/layouts/app-layout';
+import ComponentCard from '@/components/common/ComponentCard';
+import { DeleteTeamDialog } from '@/components/teams/delete-team-dialog';
+import { TeamFormDialog } from '@/components/teams/team-form-dialog';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import ComponentCard from '@/components/common/ComponentCard';
-import { TeamFormDialog } from '@/components/teams/team-form-dialog';
-import { DeleteTeamDialog } from '@/components/teams/delete-team-dialog';
-import { toFrontendSort } from '@/lib/sort';
-import { PaginatedData } from '@/types';
-import { omit } from 'lodash';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -17,7 +10,14 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
+import { toFrontendSort } from '@/lib/sort';
+import { PaginatedData } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
+import { omit } from 'lodash';
+import { Edit, MoreHorizontal, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface User {
     id: number;
@@ -64,12 +64,6 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
     useEffect(() => {
-        const currentSearchParam = query?.filter?.search ?? '';
-
-        if (searchValue === currentSearchParam) {
-            return;
-        }
-
         const timer = setTimeout(() => {
             router.get(
                 `/workspaces/${workspace.slug}/teams`,
@@ -88,7 +82,7 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [searchValue, query?.filter?.search, query?.sort, workspace.slug]);
+    }, [searchValue]);
 
     const handleEdit = (team: Team) => {
         setEditingTeam(team);

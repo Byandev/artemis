@@ -1,18 +1,17 @@
-import AppLayout from '@/layouts/app-layout';
-import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import { ColumnDef } from '@tanstack/react-table';
-import { Button } from '@/components/ui/button';
-import { Workspace } from '@/types/models/Workspace';
-import { FacebookAccount } from '@/types/models/FacebookAccount';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { router, usePage } from '@inertiajs/react';
-import { PaginatedData, SharedData } from '@/types';
 import ComponentCard from '@/components/common/ComponentCard';
-import { omit } from 'lodash';
-import workspaces from '@/routes/workspaces';
-import { toFrontendSort } from '@/lib/sort';
-import moment from 'moment';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import AppLayout from '@/layouts/app-layout';
+import { toFrontendSort } from '@/lib/sort';
+import workspaces from '@/routes/workspaces';
+import { PaginatedData, SharedData } from '@/types';
+import { FacebookAccount } from '@/types/models/FacebookAccount';
+import { Workspace } from '@/types/models/Workspace';
+import { router, usePage } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
+import { omit } from 'lodash';
+import moment from 'moment';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface FacebookAccountsProps {
     workspace: Workspace;
@@ -41,12 +40,6 @@ const FacebookAccounts = ({
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
     useEffect(() => {
-        const currentSearchParam = query?.filter?.search ?? '';
-
-        if (searchValue === currentSearchParam) {
-            return;
-        }
-
         const timer = setTimeout(() => {
             router.get(
                 workspaces.facebookAccounts.index({ workspace }),
@@ -65,7 +58,7 @@ const FacebookAccounts = ({
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [searchValue, query?.filter?.search, query?.sort, workspace]);
+    }, [searchValue]);
 
     const columns: ColumnDef<FacebookAccount>[] = [
         {
