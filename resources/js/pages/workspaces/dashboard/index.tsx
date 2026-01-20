@@ -1,17 +1,17 @@
-import DashboardLayout from './partials/Layout';
-import { Head, router } from '@inertiajs/react';
-import { useMemo, useState, useEffect } from 'react';
-import { Workspace } from '@/types/models/Workspace';
-import { currencyFormatter, numberFormatter, percentageFormatter, getDateRangeDescription } from '@/lib/utils';
-import MetricsCard from '@/components/workspaces/MetricsCard';
 import LineComparisonChart from '@/components/charts/LineComparisonChart';
 import SingleLineChart from '@/components/charts/SingleLineChart';
-import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
 import { Button } from '@/components/ui/button';
+import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
 import DashboardFilters from '@/components/workspaces/DashboardFilters';
-import { type DateRange } from "react-day-picker";
-import moment from 'moment';
+import MetricsCard from '@/components/workspaces/MetricsCard';
+import { useDateRange } from '@/hooks/use-date-range';
+import { currencyFormatter, getDateRangeDescription, numberFormatter, percentageFormatter } from '@/lib/utils';
 import workspaces from '@/routes/workspace';
+import { Workspace } from '@/types/models/Workspace';
+import { Head, router } from '@inertiajs/react';
+import moment from 'moment';
+import { useEffect, useMemo, useState } from 'react';
+import DashboardLayout from './partials/Layout';
 
 interface ChartDataPoint {
     date: string;
@@ -49,10 +49,10 @@ type Props = {
 
 export default function Index({ workspace, stats, filters, availableTeams, availableProducts, availablePages, availableShops }: Props) {
 
-    // Initialize dates from URL filters
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: filters?.start_date ? new Date(filters.start_date) : moment().startOf('month').toDate(),
-        to: filters?.end_date ? new Date(filters.end_date) : moment().toDate()
+    // Use global date range state with automatic initialization from URL filters
+    const { dateRange, setDateRange } = useDateRange({
+        startDate: filters?.start_date,
+        endDate: filters?.end_date
     });
 
     const dateRangeStr = useMemo(() => ({
@@ -211,10 +211,7 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
                     selectedShops={selectedShops}
                     setSelectedShops={setSelectedShops}
                 />
-                <SimpleDateRangePicker
-                    value={dateRange}
-                    onChange={setDateRange}
-                />
+                <SimpleDateRangePicker useGlobalState />
             </div>
 
             <div className="space-y-5 sm:space-y-6">

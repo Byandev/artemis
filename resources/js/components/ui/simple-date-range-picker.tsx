@@ -6,6 +6,7 @@ import { DateRange } from "react-day-picker"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useDateRange } from "@/hooks/use-date-range"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { isPresetSelected as checkPresetSelected, DatePreset, dateRangePresets, PresetIconType } from "@/lib/date-presets"
 import { cn } from "@/lib/utils"
@@ -15,6 +16,12 @@ interface SimpleDateRangePickerProps {
   onChange?: (value: DateRange | undefined) => void
   placeholder?: string
   className?: string
+  /**
+   * If true, uses global state management for date range persistence across the application.
+   * When enabled, the date range will be stored in localStorage and shared across all pages.
+   * If false or undefined, uses local state (controlled by value/onChange props).
+   */
+  useGlobalState?: boolean
 }
 
 export function SimpleDateRangePicker({
@@ -22,17 +29,29 @@ export function SimpleDateRangePicker({
   onChange,
   placeholder = "Select date range",
   className,
+  useGlobalState = false,
 }: SimpleDateRangePickerProps) {
+  // Use global state if enabled, otherwise use local props
+  const globalState = useDateRange()
+
+  const actualValue = useGlobalState ? globalState.dateRange : value
+  const actualOnChange = useGlobalState ? globalState.setDateRange : onChange
+
   const [open, setOpen] = React.useState(false)
-  const [tempValue, setTempValue] = React.useState<DateRange | undefined>(value)
+  const [tempValue, setTempValue] = React.useState<DateRange | undefined>(actualValue)
   const isMobile = useIsMobile()
 
-  // Update temp value when popover opens
+  // Update temp value when popover opens or when actualValue changes
   React.useEffect(() => {
     if (open) {
-      setTempValue(value)
+      setTempValue(actualValue)
     }
-  }, [open, value])
+  }, [open, actualValue])
+
+  // Sync tempValue with actualValue when component mounts or actualValue changes externally
+  React.useEffect(() => {
+    setTempValue(actualValue)
+  }, [actualValue])
 
   const formatDateRange = (dateRange?: DateRange): string => {
     if (!dateRange?.from) {
@@ -51,12 +70,12 @@ export function SimpleDateRangePicker({
   }
 
   const handleApply = () => {
-    onChange?.(tempValue)
+    actualOnChange?.(tempValue)
     setOpen(false)
   }
 
   const handleCancel = () => {
-    setTempValue(value)
+    setTempValue(actualValue)
     setOpen(false)
   }
 
@@ -85,12 +104,12 @@ export function SimpleDateRangePicker({
           variant="outline"
           className={cn(
             "justify-start text-left font-normal bg-white w-full md:w-auto",
-            !value?.from && "text-muted-foreground",
+            !actualValue?.from && "text-muted-foreground",
             className
           )}
         >
           <CalendarIcon className="h-4 w-4 shrink-0" />
-          <span className='text-xs md:text-sm text-gray-500 dark:text-gray-400 truncate'>{formatDateRange(value)}</span>
+          <span className='text-xs md:text-sm text-gray-500 dark:text-gray-400 truncate'>{formatDateRange(actualValue)}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -112,7 +131,7 @@ export function SimpleDateRangePicker({
               </div>
               <div className="space-y-0.5">
                 {dateRangePresets.map((preset) => {
-                  const isSelected = checkPresetSelected(preset, tempValue)
+                  const isSelected = checkPresetSelected(preset, open ? tempValue : actualValue)
                   return (
                     <button
                       key={preset.label}
