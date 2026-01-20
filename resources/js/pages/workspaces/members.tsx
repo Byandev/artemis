@@ -127,12 +127,6 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
 
     // Debounced search effect
     useEffect(() => {
-        const currentSearchParam = query?.filter?.search ?? '';
-
-        if (searchValue === currentSearchParam) {
-            return;
-        }
-
         const timer = setTimeout(() => {
             router.get(
                 `/workspaces/${workspace.slug}/members`,
@@ -150,7 +144,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [searchValue, query?.filter?.search, query?.sort, workspace.slug]);
+    }, [searchValue]);
 
     const handleInvite = (e: React.FormEvent) => {
         e.preventDefault();

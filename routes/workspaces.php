@@ -1,6 +1,10 @@
 <?php
 
 use App\Http\Controllers\Workspaces\AdAccountController;
+use App\Http\Controllers\Workspaces\AdsManager\AdController;
+use App\Http\Controllers\Workspaces\AdsManager\AdSetController;
+use App\Http\Controllers\Workspaces\AdsManager\CampaignController;
+use App\Http\Controllers\Workspaces\AdsManager\OptimizationRuleController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\ProductController;
@@ -96,16 +100,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/workspaces/{workspace}/facebook-accounts', [FacebookAccountController::class, 'index'])->name('workspaces.facebook-accounts.index');
     Route::get('/workspaces/{workspace}/ad-accounts', [AdAccountController::class, 'index'])->name('workspaces.ad-accounts.index');
     Route::post('/workspaces/{workspace}/ad-accounts/{adAccount}/refresh', [AdAccountController::class, 'refresh'])->name('workspaces.ad-accounts.refresh');
-    Route::get('/workspaces/{workspace}/ads-manager', function (Workspace $workspace) {
-        return inertia('workspaces/ads-manager/index', [
-            'workspace' => $workspace,
-        ]);
-    })->name('workspaces.ads-manager');
 
-    // Ads Manager API routes
-    Route::get('/workspaces/{workspace}/api/campaigns', [\App\Http\Controllers\Workspaces\CampaignController::class, 'index'])->name('workspaces.api.campaigns.index');
-    Route::get('/workspaces/{workspace}/api/ad-sets', [\App\Http\Controllers\Workspaces\AdSetController::class, 'index'])->name('workspaces.api.ad-sets.index');
-    Route::get('/workspaces/{workspace}/api/ads', [\App\Http\Controllers\Workspaces\AdController::class, 'index'])->name('workspaces.api.ads.index');
+    Route::get('/workspaces/{workspace}/ads-manager', function (Workspace $workspace) {
+        return redirect()->route('workspaces.ads-manager.campaigns', $workspace);
+    })->name('workspaces.ads-manager');
+    Route::get('/workspaces/{workspace}/ads-manager/campaigns', [CampaignController::class, 'index'])->name('workspaces.ads-manager.campaigns');
+    Route::get('/workspaces/{workspace}/ads-manager/ad-sets', [AdSetController::class, 'index'])->name('workspaces.ads-manager.ad-sets');
+    Route::get('/workspaces/{workspace}/ads-manager/ads', [AdController::class, 'index'])->name('workspaces.ads-manager.ads');
+    Route::get('/workspaces/{workspace}/ads-manager/optimization-rules', [OptimizationRuleController::class, 'page'])->name('workspaces.ads-manager.optimization-rules');
+    Route::get('/workspaces/{workspace}/ads-manager/optimization-rules/create', [OptimizationRuleController::class, 'create'])->name('workspaces.ads-manager.optimization-rules.create');
+    Route::get('/workspaces/{workspace}/ads-manager/optimization-rules/{optimizationRule}/edit', [OptimizationRuleController::class, 'edit'])->name('workspaces.ads-manager.optimization-rules.edit');
+
+    // Optimization Rules API routes
+    Route::post('/workspaces/{workspace}/api/optimization-rules', [OptimizationRuleController::class, 'store'])->name('workspaces.api.optimization-rules.store');
+    Route::get('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'show'])->name('workspaces.api.optimization-rules.show');
+    Route::put('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'update'])->name('workspaces.api.optimization-rules.update');
+    Route::delete('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'destroy'])->name('workspaces.api.optimization-rules.destroy');
 
     // Team routes
     Route::get('/workspaces/{workspace}/teams', [TeamController::class, 'index'])->name('workspaces.teams.index');

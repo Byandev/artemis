@@ -1,16 +1,17 @@
 "use client"
 
 import {
+    Column,
     ColumnDef,
+    PaginationState,
+    SortingState,
     flexRender,
     getCoreRowModel,
-    useReactTable,
-    SortingState,
     getSortedRowModel,
-    Column,
-    PaginationState
-} from "@tanstack/react-table"
+    useReactTable
+} from "@tanstack/react-table";
 
+import Pagination from '@/components/ui/pagination';
 import {
     Table,
     TableBody,
@@ -18,12 +19,11 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table"
-import { useMemo, useState } from 'react';
+} from "@/components/ui/table";
 import { toBackendSort } from '@/lib/sort';
-import { TriangleDownIcon, TriangleUpIcon } from '@radix-ui/react-icons';
 import { PaginatedData } from '@/types';
-import Pagination from '@/components/ui/pagination';
+import { TriangleDownIcon, TriangleUpIcon } from '@radix-ui/react-icons';
+import { useMemo, useState } from 'react';
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
@@ -147,19 +147,19 @@ export function SortableHeader<TData>({ column, title, enabled = true }: Sortabl
 
     return (
         <div
-            className="flex items-center justify-between cursor-pointer"
+            className={`flex items-center justify-between ${enabled ? 'cursor-pointer' : ''}`}
             onClick={() => {
                 if (enabled) {
                     column.toggleSorting(sorted === 'asc')
-                    }
+                }
             }}
         >
             <p className="font-medium text-gray-700 text-theme-xs dark:text-gray-400">
                 {title}
             </p>
             {enabled && <button className="flex flex-col">
-                <TriangleUpIcon className={`-mb-1 ${sorted === 'asc' ? 'text-brand-500': 'text-gray-300'}`}/>
-                <TriangleDownIcon className={`-mt-1 ${sorted === 'desc' ? 'text-brand-500': 'text-gray-300'}`}/>
+                <TriangleUpIcon className={`-mb-1 ${sorted === 'asc' ? 'text-brand-500' : 'text-gray-300'}`} />
+                <TriangleDownIcon className={`-mt-1 ${sorted === 'desc' ? 'text-brand-500' : 'text-gray-300'}`} />
             </button>}
         </div>
     )
