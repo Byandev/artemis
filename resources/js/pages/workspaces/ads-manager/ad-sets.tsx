@@ -1,9 +1,10 @@
 import ComponentCard from '@/components/common/ComponentCard';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useDateRange } from '@/hooks/use-date-range';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { AdSet, AVAILABLE_AD_METRICS, PaginatedAdSets } from '@/types/models/AdManager';
+import { AdSet, AVAILABLE_AD_METRICS, MetricFilter, PaginatedAdSets } from '@/types/models/AdManager';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
@@ -12,15 +13,26 @@ import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import AdsManagerLayout from './partials/Layout';
 import { MetricFiltersBar } from './partials/MetricFiltersBar';
-import { useDateRange } from '@/hooks/use-date-range';
 
-interface MetricFilter {
-    metric: string;
-    operator: string;
-    value: string;
+interface PageProps {
+    workspace: Workspace;
+    adSets: PaginatedAdSets;
+    query?: {
+        sort?: string | null;
+        perPage?: number | string;
+        page?: number | string;
+        filter?: {
+            search?: string;
+            status?: string;
+            start_date?: string;
+            end_date?: string;
+        };
+        metric_filters?: string;
+        metrics?: string[];
+    };
 }
 
-const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets: PaginatedAdSets; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string }; metric_filters?: string; metrics?: string[] } }) => {
+const AdSetsPage = ({ workspace, adSets, query }: PageProps) => {
     const [selectedMetrics, setSelectedMetrics] = useState<string[]>(query?.metrics ?? []);
     const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() => {
         if (query?.metric_filters) {
@@ -231,7 +243,6 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
                                 onMetricFiltersChange={handleMetricFilterChange}
                                 searchValue={searchValue}
                                 statusFilter={statusFilter}
-                                dateRangeStr={dateRangeStr}
                                 selectedMetrics={selectedMetrics}
                                 availableMetrics={AVAILABLE_AD_METRICS}
                                 onSearchChange={setSearchValue}
