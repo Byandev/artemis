@@ -1,18 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Head, router } from '@inertiajs/react';
-import ProductLayout from '@/pages/workspaces/products/partials/layout';
-import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import { ColumnDef } from '@tanstack/react-table';
-import { Product } from '@/types/models/Product';
-import { Button } from '@/components/ui/button';
-import { DeleteProductDialog } from '@/components/products/delete-product-dialog';
-import { Workspace } from '@/types/models/Workspace';
 import ComponentCard from '@/components/common/ComponentCard';
-import {
-    MoreHorizontal,
-    Trash2,
-    Edit,
-} from 'lucide-react';
+import { DeleteProductDialog } from '@/components/products/delete-product-dialog';
+import { Button } from '@/components/ui/button';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -20,11 +9,22 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import workspaces from '@/routes/workspaces';
 import { toFrontendSort } from '@/lib/sort';
+import ProductLayout from '@/pages/workspaces/products/partials/layout';
+import workspaces from '@/routes/workspaces';
 import { PaginatedData } from '@/types';
-import { omit } from 'lodash';
+import { Product } from '@/types/models/Product';
+import { Workspace } from '@/types/models/Workspace';
+import { Head, router } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
+import { omit } from 'lodash';
+import {
+    Edit,
+    MoreHorizontal,
+    Trash2,
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface ProductsProps {
     workspace: Workspace;
@@ -64,12 +64,6 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
     useEffect(() => {
-        const currentSearchParam = query?.filter?.search ?? '';
-
-        if (searchValue === currentSearchParam) {
-            return;
-        }
-
         const timer = setTimeout(() => {
             router.get(
                 workspaces.products.index({ workspace }),
@@ -88,13 +82,20 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [searchValue, query?.filter?.search, query?.sort, workspace]);
+    }, [searchValue]);
 
     const handleEdit = (product: Product) => {
         router.get(workspaces.products.edit({ workspace, product }));
     };
 
     const columns: ColumnDef<Product>[] = [
+        {
+            accessorKey: 'code',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Code'} />
+            ),
+        },
         {
             accessorKey: 'name',
             enableSorting: true,
@@ -152,8 +153,8 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
         <ProductLayout workspace={workspace}>
             <Head title={`${workspace.name} - Products`} />
             <div className="flex flex-wrap items-center justify-end gap-3 mb-4">
-                <Button 
-                    size="sm" 
+                <Button
+                    size="sm"
                     onClick={() => router.get(workspaces.products.create({ workspace }))}
                 >
                     Add Product
@@ -161,42 +162,42 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
             </div>
 
             <div className="space-y-5 sm:space-y-6">
-                    <ComponentCard desc="Manage your product inventory and pricing">
-                        <div>
-                            <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.05]">
-                                <input
-                                    className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900  dark:placeholder:text-white/30  bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800"
-                                    placeholder="Search product name or SKU"
-                                    value={searchValue}
-                                    onChange={(e) => setSearchValue(e.target.value)}
-                                />
-                            </div>
-
-                            <DataTable
-                                columns={columns}
-                                enableInternalPagination={false}
-                                data={products.data || []}
-                                initialSorting={initialSorting}
-                                meta={{ ...omit(products, ['data']) }}
-                                onFetch={(params) => {
-                                    router.get(
-                                        workspaces.products.index({ workspace }),
-                                        {
-                                            sort: params?.sort,
-                                            'filter[search]': searchValue || undefined,
-                                            page: params?.page ?? 1
-                                        },
-                                        {
-                                            preserveState: false,
-                                            replace: true,
-                                            preserveScroll: true,
-                                        },
-                                    );
-                                }}
+                <ComponentCard desc="Manage your product inventory and pricing">
+                    <div>
+                        <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.05]">
+                            <input
+                                className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900  dark:placeholder:text-white/30  bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800"
+                                placeholder="Search product name or code"
+                                value={searchValue}
+                                onChange={(e) => setSearchValue(e.target.value)}
                             />
                         </div>
-                    </ComponentCard>
-                </div>
+
+                        <DataTable
+                            columns={columns}
+                            enableInternalPagination={false}
+                            data={products.data || []}
+                            initialSorting={initialSorting}
+                            meta={{ ...omit(products, ['data']) }}
+                            onFetch={(params) => {
+                                router.get(
+                                    workspaces.products.index({ workspace }),
+                                    {
+                                        sort: params?.sort,
+                                        'filter[search]': searchValue || undefined,
+                                        page: params?.page ?? 1
+                                    },
+                                    {
+                                        preserveState: false,
+                                        replace: true,
+                                        preserveScroll: true,
+                                    },
+                                );
+                            }}
+                        />
+                    </div>
+                </ComponentCard>
+            </div>
 
             {/* Delete Confirmation Dialog */}
             <DeleteProductDialog

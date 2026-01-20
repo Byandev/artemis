@@ -59,63 +59,122 @@ export function SimpleDateRangePicker({
         <Button
           variant="outline"
           className={cn(
-            "justify-start text-left font-normal bg-white",
+            "justify-start text-left font-normal bg-white w-full md:w-auto",
             !value?.from && "text-muted-foreground",
             className
           )}
         >
-          <CalendarIcon className="h-4 w-4" />
-          <span className='text-theme-sm text-gray-500 dark:text-gray-400'>{formatDateRange(value)}</span>
+          <CalendarIcon className="h-4 w-4 shrink-0" />
+          <span className='text-xs md:text-sm text-gray-500 dark:text-gray-400 truncate'>{formatDateRange(value)}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <div className="flex flex-col">
-          <Calendar
-            mode="range"
-            selected={tempValue}
-            onSelect={setTempValue}
-            numberOfMonths={2}
-            defaultMonth={tempValue?.from || value?.from}
-            className="border-b text-xs p-2"
-            classNames={{
-              months: "flex gap-2",
-              month: "gap-2",
-              caption: "flex justify-center pt-1 pb-2 relative items-center text-xs",
-              caption_label: "text-xs font-medium",
-              nav: "flex items-center justify-between w-full absolute top-1 left-0 right-0 px-1",
-              nav_button: "h-6 w-6 bg-transparent p-0 opacity-50 hover:opacity-100",
-              table: "w-full border-collapse space-y-1",
-              head_row: "flex",
-              head_cell: "text-muted-foreground rounded-md w-7 font-normal text-[0.65rem]",
-              row: "flex w-full mt-1",
-              cell: "relative p-0 text-center text-xs focus-within:relative focus-within:z-20 [&:has([aria-selected])]:bg-accent [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-range-start)]:rounded-l-md first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md",
-              day: "h-7 w-7 p-0 font-normal text-xs aria-selected:opacity-100 hover:bg-accent hover:text-accent-foreground rounded-md",
-              day_range_start: "day-range-start bg-primary text-primary-foreground rounded-l-md hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-              day_range_end: "day-range-end bg-primary text-primary-foreground rounded-r-md hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-              day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-              day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground rounded-none",
-              day_today: "bg-accent text-accent-foreground font-semibold",
-              day_outside: "text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
-              day_disabled: "text-muted-foreground opacity-50",
-              day_hidden: "invisible",
-            }}
-          />
-          <div className="flex items-center justify-end gap-2 p-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCancel}
-              className="h-7 text-xs px-2"
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleApply}
-              className="h-7 text-xs px-3"
-            >
-              Apply
-            </Button>
+      <PopoverContent
+        className={cn(
+          "w-auto p-0",
+          isMobile ? "w-[calc(100vw-2rem)] max-h-[85vh] overflow-y-auto" : "max-w-[900px]"
+        )}
+        align={isMobile ? "center" : "start"}
+      >
+        <div className="flex flex-col lg:flex-row">
+          {/* Presets Section */}
+          <div className="hidden md:block border-r border-gray-200 dark:border-gray-700 bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-950 w-48 lg:w-56 p-2">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2 px-3 py-1.5 mb-2">
+                <div className="h-1 w-1 rounded-full bg-primary animate-pulse" />
+                <h4 className="text-xs font-semibold tracking-wide text-gray-700 dark:text-gray-300 uppercase">
+                  Quick Select
+                </h4>
+              </div>
+              <div className="space-y-0.5">
+                {dateRangePresets.map((preset) => {
+                  const isSelected = checkPresetSelected(preset, tempValue)
+                  return (
+                    <button
+                      key={preset.label}
+                      onClick={() => handlePresetClick(preset)}
+                      className={cn(
+                        "group w-full flex items-center gap-2.5 px-3 py-1.5 text-sm rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-1 relative overflow-hidden",
+                        isSelected
+                          ? "bg-primary text-primary-foreground shadow-sm font-medium"
+                          : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "transition-colors",
+                          isSelected
+                            ? "text-primary-foreground"
+                            : "text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400"
+                        )}
+                      >
+                        {getPresetIcon(preset.icon)}
+                      </span>
+                      <span className="flex-1 text-left">{preset.label}</span>
+                      {isSelected && (
+                        <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground animate-pulse" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile Presets - Show as horizontal scroll on mobile */}
+          <div className="md:hidden border-b border-gray-200 dark:border-gray-700 p-2 overflow-x-auto">
+            <div className="flex gap-1.5 min-w-max">
+              {dateRangePresets.map((preset) => {
+                const isSelected = checkPresetSelected(preset, tempValue)
+                return (
+                  <button
+                    key={preset.label}
+                    onClick={() => handlePresetClick(preset)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg whitespace-nowrap transition-all duration-200",
+                      isSelected
+                        ? "bg-primary text-primary-foreground shadow-sm font-medium"
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                    )}
+                  >
+                    <span className={cn(isSelected ? "text-primary-foreground" : "text-gray-400 dark:text-gray-500")}>
+                      {getPresetIcon(preset.icon)}
+                    </span>
+                    <span>{preset.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Calendar Section */}
+          <div className="flex flex-col flex-1">
+            <div className="flex justify-center md:justify-end">
+              <Calendar
+                mode="range"
+                selected={tempValue}
+                onSelect={handleCalendarSelect}
+                numberOfMonths={isMobile ? 1 : 2}
+                defaultMonth={tempValue?.from || value?.from}
+                className="text-[0.7rem] md:text-[0.7rem] p-2 md:p-1.5 [&_button[data-range-middle=true]]:bg-gray-100 [&_button[data-range-middle=true]]:text-gray-900 dark:[&_button[data-range-middle=true]]:bg-gray-800 dark:[&_button[data-range-middle=true]]:text-gray-100 [&_button[data-range-middle=true]]:hover:bg-gray-200 dark:[&_button[data-range-middle=true]]:hover:bg-gray-700 [&_button[data-range-start=true]]:relative [&_button[data-range-start=true]]:z-10 [&_button[data-range-end=true]]:relative [&_button[data-range-end=true]]:z-10 [&_.text-\[0\.8rem\]]:text-[0.65rem] [&_.text-muted-foreground]:text-[0.65rem] [&_.font-medium]:text-[0.7rem]"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 p-2 md:p-2 border-t">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCancel}
+                className="h-8 md:h-7 text-xs px-3 md:px-2"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleApply}
+                className="h-8 md:h-7 text-xs px-4 md:px-3"
+              >
+                Apply
+              </Button>
+            </div>
           </div>
         </div>
       </PopoverContent>
