@@ -3,12 +3,18 @@
 import {
     Column,
     ColumnDef,
-    PaginationState,
-    SortingState,
+    ColumnFiltersState,
     flexRender,
     getCoreRowModel,
+    getFacetedRowModel,
+    getFacetedUniqueValues,
+    getFilteredRowModel,
+    getPaginationRowModel,
     getSortedRowModel,
-    useReactTable
+    PaginationState,
+    SortingState,
+    useReactTable,
+    VisibilityState
 } from "@tanstack/react-table";
 
 import Pagination from '@/components/ui/pagination';
@@ -32,6 +38,7 @@ interface DataTableProps<TData, TValue> {
     enableInternalPagination?: boolean
     onFetch?: (params?: { sort?: string, page?: number }) => void,
     meta?: Omit<PaginatedData<TData>, 'data'>
+    enableRowSelection?: boolean
 }
 
 export function DataTable<TData, TValue>({
@@ -40,8 +47,12 @@ export function DataTable<TData, TValue>({
     onFetch,
     initialSorting,
     meta,
+    enableRowSelection = false,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
+    const [rowSelection, setRowSelection] = useState({})
+    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
     const pagination = useMemo<PaginationState>(() => ({
         pageIndex: meta?.current_page ? meta.current_page - 1 : 0,
@@ -59,10 +70,21 @@ export function DataTable<TData, TValue>({
             if (onFetch) onFetch({ sort: toBackendSort(next), page: 1 })
         },
         getSortedRowModel: getSortedRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+        getPaginationRowModel: getPaginationRowModel(),
+        getFacetedRowModel: getFacetedRowModel(),
+        getFacetedUniqueValues: getFacetedUniqueValues(),
         state: {
             sorting,
-            pagination
+            pagination,
+            rowSelection,
+            columnVisibility,
+            columnFilters,
         },
+        onRowSelectionChange: setRowSelection,
+        onColumnFiltersChange: setColumnFilters,
+        onColumnVisibilityChange: setColumnVisibility,
+        enableRowSelection: enableRowSelection,
         manualSorting: true,
     })
 

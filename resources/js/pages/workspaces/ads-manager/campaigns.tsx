@@ -1,4 +1,5 @@
 import ComponentCard from '@/components/common/ComponentCard';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
@@ -198,6 +199,30 @@ const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; 
 
     const columns: ColumnDef<Campaign>[] = [
         {
+            id: 'select',
+            header: ({ table }) => (
+                <div className="flex justify-start">
+                    <Checkbox
+                        checked={
+                            table.getIsAllPageRowsSelected() ||
+                            (table.getIsSomePageRowsSelected() && 'indeterminate')
+                        }
+                        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+                        aria-label="Select all"
+                    />
+                </div>
+            ),
+            cell: ({ row }) => (
+                <Checkbox
+                    checked={row.getIsSelected()}
+                    onCheckedChange={(value) => row.toggleSelected(!!value)}
+                    aria-label="Select row"
+                />
+            ),
+            enableSorting: false,
+            enableHiding: false,
+        },
+        {
             accessorKey: 'name',
             header: ({ column }) => <SortableHeader column={column} title="Campaign Name" />,
             cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
@@ -278,6 +303,7 @@ const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; 
                                 columns={columns}
                                 data={campaigns?.data || []}
                                 enableInternalPagination={false}
+                                enableRowSelection={true}
                                 initialSorting={initialSorting}
                                 meta={{ ...omit(campaigns, ['data']) }}
                                 onFetch={(params) => {
