@@ -265,7 +265,7 @@ const AdSetsPage = ({ workspace, adSets, query }: PageProps) => {
                                             page: params?.page ?? 1,
                                         }),
                                         {
-                                            preserveState: false,
+                                            preserveState: true,
                                             replace: true,
                                             preserveScroll: true,
                                         },
