@@ -76,6 +76,7 @@ export const SearchAndFiltersRow = ({
                 <SimpleDateRangePicker
                     value={dateRange}
                     onChange={onDateRangeChange}
+                    useGlobalState
                 />
 
                 {availableMetrics.length > 0 && (
