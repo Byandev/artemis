@@ -83,9 +83,8 @@ const AdSetsPage = ({ workspace, adSets, query }: PageProps) => {
             router.get(
                 `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
                 {
-                    ...getNavParams(),
+                    ...getNavParams({ page: searchValue ? 1 : query?.page ?? 1 }),
                     'filter[search]': searchValue || undefined,
-                    page: 1,
                 },
                 {
                     preserveState: true,
@@ -103,7 +102,7 @@ const AdSetsPage = ({ workspace, adSets, query }: PageProps) => {
     useEffect(() => {
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/ad-sets`,
-            getNavParams(),
+            getNavParams({ page: query?.page ?? 1 }),
             {
                 preserveState: true,
                 replace: true,
