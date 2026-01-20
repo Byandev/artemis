@@ -1,6 +1,6 @@
 import { Workspace } from '@/types/models/Workspace';
 import { type PropsWithChildren } from 'react';
-import AdsManagerTabs from '../AdsManagerTabs';
+import AdsManagerTabs from './AdsManagerTabs';
 
 type TabType = 'campaigns' | 'adSets' | 'ads' | 'optimizationRules' | 'optimizationLogs';
 

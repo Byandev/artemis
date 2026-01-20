@@ -27,6 +27,8 @@ class AdSetController extends Controller
             ->allowedFilters([
                 AllowedFilter::scope('search'),
                 AllowedFilter::exact('status'),
+                AllowedFilter::scope('start_date'),
+                AllowedFilter::scope('end_date'),
             ])
             ->allowedSorts([
                 'name',
@@ -40,42 +42,62 @@ class AdSetController extends Controller
                 'updated_at',
             ])
             ->defaultSort('-created_at');
+
     }
 
     public function index(Workspace $workspace, Request $request)
     {
-        $startDate = $request->input('start_date');
-        $endDate = $request->input('end_date');
+        $startDate = $request->input('filter.start_date');
+        $endDate = $request->input('filter.end_date');
+        $metrics = $request->input('metrics', []);
 
         $adSets = $this->buildQuery($workspace, $request);
 
-        // Aggregate metrics from ad_records for the given date range
-        if ($startDate && $endDate) {
-            $adSets->addSelect('ad_sets.*')
-                ->selectRaw(
-                    '(SELECT COALESCE(SUM(impressions), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id AND ad_records.date BETWEEN ? AND ?) as impressions',
-                    [$startDate, $endDate]
-                )
-                ->selectRaw(
-                    '(SELECT COALESCE(SUM(clicks), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id AND ad_records.date BETWEEN ? AND ?) as clicks',
-                    [$startDate, $endDate]
-                )
-                ->selectRaw(
-                    '(SELECT COALESCE(SUM(spend), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id AND ad_records.date BETWEEN ? AND ?) as spend',
+        // Apply metric filters (outside of QueryBuilder to avoid filter validation)
+        if ($request->filled('metric_filters')) {
+            try {
+                $metricFilters = json_decode(urldecode($request->input('metric_filters')), true);
+                if (is_array($metricFilters)) {
+                    foreach ($metricFilters as $filter) {
+                        $metric = $filter['metric'] ?? null;
+                        $operator = $filter['operator'] ?? null;
+                        $value = $filter['value'] ?? null;
+
+                        if ($metric && $operator && $value !== null) {
+                            $sqlOperator = match ($operator) {
+                                'greater_than' => '>',
+                                'less_than' => '<',
+                                'equal' => '=',
+                                'greater_than_or_equal' => '>=',
+                                'less_than_or_equal' => '<=',
+                                default => '='
+                            };
+
+                            $adSets->having($metric, $sqlOperator, $value)
+                                ->groupBy('ad_sets.id');
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                // Log error if needed
+            }
+        }
+
+        // Add base select
+        $adSets->addSelect('ad_sets.*');
+
+        // Aggregate metrics from ad_records based on requested metrics
+        foreach ($metrics as $metric) {
+            if ($startDate && $endDate) {
+                $adSets->selectRaw(
+                    "(SELECT COALESCE(SUM({$metric}), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id AND ad_records.date BETWEEN ? AND ?) as {$metric}",
                     [$startDate, $endDate]
                 );
-        } else {
-            // Get all data when no date range is specified
-            $adSets->addSelect('ad_sets.*')
-                ->selectRaw(
-                    '(SELECT COALESCE(SUM(impressions), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id) as impressions'
-                )
-                ->selectRaw(
-                    '(SELECT COALESCE(SUM(clicks), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id) as clicks'
-                )
-                ->selectRaw(
-                    '(SELECT COALESCE(SUM(spend), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id) as spend'
+            } else {
+                $adSets->selectRaw(
+                    "(SELECT COALESCE(SUM({$metric}), 0) FROM ad_records WHERE ad_records.ad_set_id = ad_sets.id) as {$metric}"
                 );
+            }
         }
 
         return Inertia::render('workspaces/ads-manager/ad-sets', [
@@ -90,9 +112,11 @@ class AdSetController extends Controller
                 'filter' => [
                     'search' => $request->get('filter.search'),
                     'status' => $request->get('filter.status'),
-                    'start_date' => $request->get('start_date'),
-                    'end_date' => $request->get('end_date'),
+                    'start_date' => $request->get('filter.start_date'),
+                    'end_date' => $request->get('filter.end_date'),
                 ],
+                'metric_filters' => $request->get('metric_filters'),
+                'metrics' => $metrics,
             ],
         ]);
     }

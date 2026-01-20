@@ -1,39 +1,267 @@
 import ComponentCard from '@/components/common/ComponentCard';
-import { Button } from '@/components/ui/button';
-import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { toFrontendSort } from '@/lib/sort';
+import { AVAILABLE_AD_METRICS } from '@/types/models/AdManager';
 import { Workspace } from '@/types/models/Workspace';
-import { Head } from '@inertiajs/react';
-import { addDays } from 'date-fns';
-import { Grid3x3, List } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import AdsTab from './AdsTab';
+import { Head, router } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
+import { omit } from 'lodash';
+import moment from 'moment';
+import { useEffect, useMemo, useState } from 'react';
+import { type DateRange } from "react-day-picker";
 import AdsManagerLayout from './partials/Layout';
+import { MetricFiltersBar } from './partials/MetricFiltersBar';
 
-interface PageProps {
-    workspace: Workspace;
+interface Ad {
+    id: number;
+    name: string;
+    status: string;
+    impressions?: number;
+    clicks?: number;
+    spend?: number;
+    campaign: {
+        id: number;
+        name: string;
+    };
+    ad_set: {
+        id: number;
+        name: string;
+    };
+    created_at: string;
+    updated_at: string;
 }
 
-const AdsPage = ({ workspace }: PageProps) => {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<string>('');
-    const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-        from: addDays(new Date(), -30),
-        to: new Date(),
-    });
-    const [loading, setLoading] = useState(false);
+interface PaginatedAds {
+    data: Ad[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number;
+    to: number;
+}
 
-    const adsTabRef = useRef<any>(null);
+interface MetricFilter {
+    metric: string;
+    operator: string;
+    value: string;
+}
 
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            if (adsTabRef.current) {
-                adsTabRef.current.fetchAds();
+const AdsPage = ({ workspace, ads, query }: { workspace: Workspace; ads: PaginatedAds; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string }; metric_filters?: string; metrics?: string[] } }) => {
+    const [selectedMetrics, setSelectedMetrics] = useState<string[]>(query?.metrics ?? []);
+    const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() => {
+        if (query?.metric_filters) {
+            try {
+                return JSON.parse(decodeURIComponent(query.metric_filters));
+            } catch {
+                return [];
             }
-        }, 300);
+        }
+        return [];
+    });
 
-        return () => clearTimeout(timeoutId);
-    }, [searchQuery, statusFilter, dateRange]);
+    const requestedMetrics = selectedMetrics;
+
+    const getNavParams = (overrides: Record<string, any> = {}) => ({
+        sort: query?.sort,
+        'filter[search]': searchValue || undefined,
+        'filter[status]': statusFilter || undefined,
+        'filter[start_date]': dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
+        'filter[end_date]': dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
+        metric_filters: metricFilters.length > 0 ? encodeURIComponent(JSON.stringify(metricFilters)) : undefined,
+        metrics: requestedMetrics,
+        page: 1,
+        ...overrides,
+    });
+
+    const initialSorting = useMemo(() => {
+        return toFrontendSort(query?.sort ?? null);
+    }, [query?.sort]);
+
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [statusFilter, setStatusFilter] = useState(query?.filter?.status ?? '');
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({
+        from: query?.filter?.start_date ? moment(query.filter.start_date).toDate() : moment().startOf('month').toDate(),
+        to: query?.filter?.end_date ? moment(query.filter.end_date).toDate() : moment().toDate()
+    });
+
+    const dateRangeStr = useMemo(() => ({
+        to: moment(dateRange?.to).format('YYYY-MM-DD'),
+        from: moment(dateRange?.from).format('YYYY-MM-DD'),
+    }), [dateRange]);
+
+    // Debounce search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            router.get(
+                `/workspaces/${workspace.slug}/ads-manager/ads`,
+                {
+                    ...getNavParams(),
+                    'filter[search]': searchValue || undefined,
+                    page: 1,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['ads'],
+                }
+            );
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchValue]);
+
+    // Sync date range with URL on mount
+    useEffect(() => {
+        if (!query?.filter?.start_date || !query?.filter?.end_date) {
+            router.get(
+                `/workspaces/${workspace.slug}/ads-manager/ads`,
+                getNavParams(),
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['ads'],
+                },
+            );
+        }
+    }, []);
+
+    const handleStatusFilterChange = (value: string) => {
+        setStatusFilter(value);
+
+        router.get(
+            `/workspaces/${workspace.slug}/ads-manager/ads`,
+            getNavParams({ 'filter[status]': value || undefined }),
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['ads'],
+            },
+        );
+    };
+
+    const handleMetricFilterChange = (filters: MetricFilter[]) => {
+        setMetricFilters(filters);
+
+        router.get(
+            `/workspaces/${workspace.slug}/ads-manager/ads`,
+            getNavParams({ metric_filters: filters.length > 0 ? encodeURIComponent(JSON.stringify(filters)) : undefined }),
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['ads'],
+            },
+        );
+    };
+
+    const handleDateRangeChange = (range: DateRange | undefined) => {
+        setDateRange(range);
+
+        router.get(
+            `/workspaces/${workspace.slug}/ads-manager/ads`,
+            getNavParams({
+                'filter[start_date]': range?.from ? moment(range.from).format('YYYY-MM-DD') : undefined,
+                'filter[end_date]': range?.to ? moment(range.to).format('YYYY-MM-DD') : undefined,
+            }),
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['ads'],
+            },
+        );
+    };
+
+    const handleMetricsChange = (metrics: string[]) => {
+        setSelectedMetrics(metrics);
+
+        // Remove metric filters for disabled metrics
+        const filteredMetricFilters = metricFilters.filter(filter => metrics.includes(filter.metric));
+        setMetricFilters(filteredMetricFilters);
+
+        router.get(
+            `/workspaces/${workspace.slug}/ads-manager/ads`,
+            getNavParams({
+                metrics: metrics.length > 0 ? metrics : undefined,
+                metric_filters: filteredMetricFilters.length > 0 ? encodeURIComponent(JSON.stringify(filteredMetricFilters)) : undefined,
+            }),
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['ads'],
+            },
+        );
+    };
+
+    const clearFilters = () => {
+        setSearchValue('');
+        setStatusFilter('');
+        setMetricFilters([]);
+        setSelectedMetrics([]);
+        setDateRange({
+            from: moment().startOf('month').toDate(),
+            to: moment().toDate()
+        });
+        router.get(`/workspaces/${workspace.slug}/ads-manager/ads`, {
+            sort: undefined,
+            'filter[search]': undefined,
+            'filter[status]': undefined,
+            'filter[start_date]': undefined,
+            'filter[end_date]': undefined,
+            metric_filters: undefined,
+            metrics: undefined,
+            page: 1,
+        }, {
+            preserveState: false,
+            replace: true,
+            preserveScroll: true,
+        });
+    };
+
+    const columns: ColumnDef<Ad>[] = [
+        {
+            accessorKey: 'name',
+            header: ({ column }) => <SortableHeader column={column} title="Ad Name" />,
+            cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
+        },
+        {
+            accessorKey: 'campaign_id',
+            header: ({ column }) => <SortableHeader column={column} title="Campaign" />,
+            cell: ({ row }) => <div>{row.original.campaign?.name || 'N/A'}</div>,
+        },
+        {
+            accessorKey: 'ad_set_id',
+            header: ({ column }) => <SortableHeader column={column} title="Ad Set" />,
+            cell: ({ row }) => <div>{row.original.ad_set?.name || 'N/A'}</div>,
+        },
+        {
+            accessorKey: 'status',
+            header: ({ column }) => <SortableHeader column={column} title="Status" />,
+            cell: ({ row }) => <StatusBadge status={row.original.status} />,
+        },
+        ...(selectedMetrics.includes('impressions') ? [{
+            accessorKey: 'impressions',
+            header: ({ column }: { column: any }) => <SortableHeader column={column} title="Impressions" />,
+            cell: ({ row }: { row: any }) => Number(row.original.impressions || 0).toLocaleString(),
+        } as ColumnDef<Ad>] : []),
+        ...(selectedMetrics.includes('clicks') ? [{
+            accessorKey: 'clicks',
+            header: ({ column }: { column: any }) => <SortableHeader column={column} title="Clicks" />,
+            cell: ({ row }: { row: any }) => Number(row.original.clicks || 0).toLocaleString(),
+        } as ColumnDef<Ad>] : []),
+        ...(selectedMetrics.includes('spend') ? [{
+            accessorKey: 'spend',
+            header: ({ column }: { column: any }) => <SortableHeader column={column} title="Spend" />,
+            cell: ({ row }: { row: any }) => `₱${Number(row.original.spend || 0).toFixed(2)}`,
+        } as ColumnDef<Ad>] : []),
+    ];
 
     return (
         <AppLayout>
@@ -42,57 +270,43 @@ const AdsPage = ({ workspace }: PageProps) => {
                 <div className="space-y-5 sm:space-y-6">
                     <ComponentCard desc="Manage your ads">
                         <div>
-                            <div className="flex flex-col gap-3 rounded-t-xl border border-b-0 border-gray-100 px-3 py-3 sm:px-4 sm:py-4 lg:flex-row lg:items-center lg:justify-between dark:border-white/5">
-                                <input
-                                    className="w-full lg:max-w-sm border rounded-lg appearance-none px-3 py-2 sm:px-4 sm:py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3 dark:bg-gray-900 dark:placeholder:text-white/30 bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90 dark:focus:border-brand-800"
-                                    placeholder="Search ads..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                />
-                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 relative z-50">
-                                    <select
-                                        value={statusFilter}
-                                        onChange={(e) => setStatusFilter(e.target.value)}
-                                        className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 dark:focus:border-brand-800"
-                                    >
-                                        <option value="">All Status</option>
-                                        <option value="ACTIVE">Active</option>
-                                        <option value="PAUSED">Paused</option>
-                                        <option value="ARCHIVED">Archived</option>
-                                    </select>
-                                    <DateRangePicker
-                                        initialDateFrom={dateRange.from}
-                                        initialDateTo={dateRange.to}
-                                        onUpdate={(values) => {
-                                            if (values.range.from && values.range.to) {
-                                                setDateRange({
-                                                    from: values.range.from,
-                                                    to: values.range.to,
-                                                });
-                                            }
-                                        }}
-                                        align="end"
-                                        showCompare={false}
-                                    />
-                                    <div className="hidden sm:flex items-center gap-2">
-                                        <Button variant="outline" size="icon">
-                                            <Grid3x3 className="h-4 w-4" />
-                                        </Button>
-                                        <Button variant="outline" size="icon">
-                                            <List className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <AdsTab
-                                ref={adsTabRef}
-                                workspace={workspace}
-                                searchQuery={searchQuery}
+                            <MetricFiltersBar
+                                metricFilters={metricFilters}
+                                onMetricFiltersChange={handleMetricFilterChange}
+                                searchValue={searchValue}
                                 statusFilter={statusFilter}
                                 dateRange={dateRange}
-                                loading={loading}
-                                setLoading={setLoading}
+                                dateRangeStr={dateRangeStr}
+                                selectedMetrics={selectedMetrics}
+                                availableMetrics={AVAILABLE_AD_METRICS}
+                                onSearchChange={setSearchValue}
+                                onStatusChange={handleStatusFilterChange}
+                                onDateRangeChange={handleDateRangeChange}
+                                onMetricsChange={handleMetricsChange}
+                                onClearFilters={clearFilters}
+                                searchPlaceholder="Search ads..."
+                            />
+
+                            <DataTable
+                                columns={columns}
+                                data={ads?.data || []}
+                                enableInternalPagination={false}
+                                initialSorting={initialSorting}
+                                meta={{ ...omit(ads, ['data']) }}
+                                onFetch={(params) => {
+                                    router.get(
+                                        `/workspaces/${workspace.slug}/ads-manager/ads`,
+                                        getNavParams({
+                                            sort: params?.sort,
+                                            page: params?.page ?? 1,
+                                        }),
+                                        {
+                                            preserveState: false,
+                                            replace: true,
+                                            preserveScroll: true,
+                                        },
+                                    );
+                                }}
                             />
                         </div>
                     </ComponentCard>

@@ -24,4 +24,20 @@ class Campaign extends Model
     {
         return $query->where('name', 'like', '%'.$search.'%');
     }
+
+    /**
+     * Scope for start date filter
+     */
+    public function scopeStartDate(Builder $query, $date): Builder
+    {
+        return $query->whereDate('created_at', '>=', $date);
+    }
+
+    /**
+     * Scope for end date filter
+     */
+    public function scopeEndDate(Builder $query, $date): Builder
+    {
+        return $query->whereDate('created_at', '<=', $date);
+    }
 }
