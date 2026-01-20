@@ -83,7 +83,7 @@ const AdsPage = ({ workspace, ads, query }: PageProps) => {
             router.get(
                 `/workspaces/${workspace.slug}/ads-manager/ads`,
                 {
-                    ...getNavParams(),
+                    ...getNavParams({ page: searchValue ? 1 : query?.page ?? 1 }),
                     'filter[search]': searchValue || undefined,
                     page: 1,
                 },
@@ -103,7 +103,7 @@ const AdsPage = ({ workspace, ads, query }: PageProps) => {
     useEffect(() => {
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/ads`,
-            getNavParams(),
+            getNavParams({ page: query?.page ?? 1 }),
             {
                 preserveState: true,
                 replace: true,
@@ -263,7 +263,7 @@ const AdsPage = ({ workspace, ads, query }: PageProps) => {
                                             page: params?.page ?? 1,
                                         }),
                                         {
-                                            preserveState: false,
+                                            preserveState: true,
                                             replace: true,
                                             preserveScroll: true,
                                         },
