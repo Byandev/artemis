@@ -1,9 +1,11 @@
 import ComponentCard from '@/components/common/ComponentCard';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { useCampaignFilter } from '@/hooks/useCampaignFilter';
+import { useAdsManagerSelectionStore } from '@/stores/useCampaignSelectionStore';
+import { useHierarchicalFilter } from '@/hooks/useHierarchicalFilter';
 import { AdSet, AVAILABLE_AD_METRICS, PaginatedAdSets } from '@/types/models/AdManager';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
@@ -21,8 +23,11 @@ interface MetricFilter {
     value: string;
 }
 
-const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets: PaginatedAdSets; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string }; metric_filters?: string; metrics?: string[] } }) => {
-    const { encodedCampaignIds } = useCampaignFilter();
+const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets: PaginatedAdSets; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string; campaign_ids?: string; ad_ids?: string }; metric_filters?: string; metrics?: string[] } }) => {
+    const TABLE_ID = 'adSets';
+    const { selections, setSelectedRows, clearSelection } = useAdsManagerSelectionStore();
+    const selectedRowIds = selections[TABLE_ID] || {};
+    const { encodedCampaignIds, encodedAdIds } = useHierarchicalFilter();
 
     const [selectedMetrics, setSelectedMetrics] = useState<string[]>(query?.metrics ?? []);
     const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() => {
@@ -58,12 +63,13 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
             'filter[start_date]': dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
             'filter[end_date]': dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
             'filter[campaign_ids]': encodedCampaignIds,
+            'filter[ad_ids]': encodedAdIds,
             metric_filters: metricFilters.length > 0 ? encodeURIComponent(JSON.stringify(metricFilters)) : undefined,
             metrics: requestedMetrics,
             page: 1,
             ...overrides,
         });
-    }, [query?.sort, searchValue, statusFilter, dateRange, encodedCampaignIds, metricFilters, requestedMetrics]);
+    }, [query?.sort, searchValue, statusFilter, dateRange, encodedCampaignIds, encodedAdIds, metricFilters, requestedMetrics]);
 
     const dateRangeStr = useMemo(() => ({
         to: moment(dateRange?.to).format('YYYY-MM-DD'),
@@ -183,6 +189,7 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
         setStatusFilter('');
         setMetricFilters([]);
         setSelectedMetrics([]);
+        clearSelection(TABLE_ID);
         setDateRange({
             from: moment().startOf('month').toDate(),
             to: moment().toDate()
@@ -193,6 +200,8 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
             'filter[status]': undefined,
             'filter[start_date]': undefined,
             'filter[end_date]': undefined,
+            'filter[campaign_ids]': undefined,
+            'filter[ad_ids]': undefined,
             metric_filters: undefined,
             metrics: undefined,
             page: 1,
@@ -204,6 +213,50 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
     };
 
     const columns: ColumnDef<AdSet>[] = [
+        {
+            id: 'select',
+            header: ({ table }) => (
+                <div className="flex justify-start">
+                    <Checkbox
+                        checked={
+                            adSets?.data?.length > 0 && adSets.data.every(row => selectedRowIds[row.id])
+                                ? true
+                                : adSets?.data?.some(row => selectedRowIds[row.id])
+                                    ? 'indeterminate'
+                                    : false
+                        }
+                        onCheckedChange={(value) => {
+                            if (value) {
+                                setSelectedRows(
+                                    TABLE_ID,
+                                    (adSets?.data || []).reduce(
+                                        (acc, row) => ({ ...acc, [row.id]: true }),
+                                        {}
+                                    )
+                                );
+                            } else {
+                                clearSelection(TABLE_ID);
+                            }
+                        }}
+                        aria-label="Select all"
+                    />
+                </div>
+            ),
+            cell: ({ row }) => (
+                <Checkbox
+                    checked={selectedRowIds[row.original.id] || false}
+                    onCheckedChange={(value) => {
+                        setSelectedRows(TABLE_ID, {
+                            ...selectedRowIds,
+                            [row.original.id]: !!value,
+                        });
+                    }}
+                    aria-label="Select row"
+                />
+            ),
+            enableSorting: false,
+            enableHiding: false,
+        },
         {
             accessorKey: 'name',
             header: ({ column }) => <SortableHeader column={column} title="Ad Set Name" />,
@@ -272,6 +325,7 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
                                 columns={columns}
                                 data={adSets?.data || []}
                                 enableInternalPagination={false}
+                                enableRowSelection={true}
                                 initialSorting={initialSorting}
                                 meta={{ ...omit(adSets, ['data']) }}
                                 onFetch={(params) => {

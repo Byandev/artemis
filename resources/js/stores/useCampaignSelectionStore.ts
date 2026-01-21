@@ -8,6 +8,7 @@ interface AdsManagerSelectionState {
   selectAllRows: (tableId: string, rowIds: string[]) => void
   deselectAllRows: (tableId: string) => void
   clearSelection: (tableId: string) => void
+  clearAllSelections: () => void
   getTableSelection: (tableId: string) => Record<string, boolean>
 }
 
@@ -65,6 +66,10 @@ export const useAdsManagerSelectionStore = create<AdsManagerSelectionState>()(
             ...state.selections,
             [tableId]: {},
           },
+        })),
+      clearAllSelections: () =>
+        set(() => ({
+          selections: {},
         })),
       getTableSelection: (tableId) => {
         const state = get()

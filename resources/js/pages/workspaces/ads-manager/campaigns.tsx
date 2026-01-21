@@ -5,6 +5,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { useAdsManagerSelectionStore } from '@/stores/useCampaignSelectionStore';
+import { useHierarchicalFilter } from '@/hooks/useHierarchicalFilter';
 import { AVAILABLE_AD_METRICS, Campaign, PaginatedCampaigns } from '@/types/models/AdManager';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
@@ -22,10 +23,11 @@ interface MetricFilter {
     value: string;
 }
 
-const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; campaigns: PaginatedCampaigns; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string }; metric_filters?: string; metrics?: string[] } }) => {
+const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; campaigns: PaginatedCampaigns; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string; ad_set_ids?: string; ad_ids?: string }; metric_filters?: string; metrics?: string[] } }) => {
     const TABLE_ID = 'campaigns';
     const [selectedMetrics, setSelectedMetrics] = useState<string[]>(query?.metrics ?? []);
     const { selections, setSelectedRows, clearSelection } = useAdsManagerSelectionStore();
+    const { encodedAdSetIds, encodedAdIds } = useHierarchicalFilter();
     const selectedRowIds = selections[TABLE_ID] || {};
     const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() => {
         if (query?.metric_filters) {
@@ -46,6 +48,8 @@ const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; 
         'filter[status]': statusFilter || undefined,
         'filter[start_date]': dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
         'filter[end_date]': dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
+        'filter[ad_set_ids]': encodedAdSetIds,
+        'filter[ad_ids]': encodedAdIds,
         metric_filters: metricFilters.length > 0 ? encodeURIComponent(JSON.stringify(metricFilters)) : undefined,
         metrics: requestedMetrics,
         page: 1,

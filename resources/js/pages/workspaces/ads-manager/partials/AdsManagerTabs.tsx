@@ -13,7 +13,12 @@ interface AdsManagerTabsProps {
 const AdsManagerTabs = ({ workspace, activeTab }: AdsManagerTabsProps) => {
     const { selections } = useCampaignSelectionStore();
     const campaignSelections = selections['campaigns'] || {};
-    const selectedCount = Object.values(campaignSelections).filter(Boolean).length;
+    const adSetSelections = selections['adSets'] || {};
+    const adSelections = selections['ads'] || {};
+    
+    const campaignCount = Object.values(campaignSelections).filter(Boolean).length;
+    const adSetCount = Object.values(adSetSelections).filter(Boolean).length;
+    const adCount = Object.values(adSelections).filter(Boolean).length;
 
     const handleTabClick = (tab: TabType) => {
         const routes: Record<TabType, string> = {
@@ -43,9 +48,9 @@ const AdsManagerTabs = ({ workspace, activeTab }: AdsManagerTabsProps) => {
                 >
                     <span className="hidden sm:inline">Campaigns</span>
                     <span className="sm:hidden">Campaigns</span>
-                    {selectedCount > 0 && (
+                    {campaignCount > 0 && (
                         <Badge variant="default" className="ml-2">
-                            {selectedCount} campaign{selectedCount !== 1 ? 's' : ''}
+                            {campaignCount}
                         </Badge>
                     )}
                 </button>
@@ -55,9 +60,9 @@ const AdsManagerTabs = ({ workspace, activeTab }: AdsManagerTabsProps) => {
                 >
                     <span className="hidden sm:inline">Ad Sets</span>
                     <span className="sm:hidden">Sets</span>
-                    {selectedCount > 0 && (
+                    {adSetCount > 0 && (
                         <Badge variant="default" className="ml-2">
-                            {selectedCount} campaign{selectedCount !== 1 ? 's' : ''}
+                            {adSetCount}
                         </Badge>
                     )}
                 </button>
@@ -66,9 +71,9 @@ const AdsManagerTabs = ({ workspace, activeTab }: AdsManagerTabsProps) => {
                     className={getTabClassName('ads')}
                 >
                     Ads
-                    {selectedCount > 0 && (
+                    {adCount > 0 && (
                         <Badge variant="default" className="ml-2">
-                            {selectedCount} campaign{selectedCount !== 1 ? 's' : ''}
+                            {adCount}
                         </Badge>
                     )}
                 </button>

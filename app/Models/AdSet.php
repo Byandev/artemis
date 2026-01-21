@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AdSet extends Model
 {
@@ -17,6 +18,11 @@ class AdSet extends Model
     public function adAccount()
     {
         return $this->belongsTo(AdAccount::class);
+    }
+
+    public function ads(): HasMany
+    {
+        return $this->hasMany(Ad::class, 'ad_set_id');
     }
 
     /**

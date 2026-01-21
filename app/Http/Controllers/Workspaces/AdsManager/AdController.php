@@ -39,6 +39,16 @@ class AdController extends Controller
                         // Log error if needed
                     }
                 }),
+                AllowedFilter::callback('ad_set_ids', function ($query, $value) {
+                    try {
+                        $adSetIdsArray = json_decode(urldecode($value), true);
+                        if (is_array($adSetIdsArray) && !empty($adSetIdsArray)) {
+                            $query->whereIn('ad_set_id', $adSetIdsArray);
+                        }
+                    } catch (\Exception $e) {
+                        // Log error if needed
+                    }
+                }),
             ])
             ->allowedSorts([
                 'name',
@@ -124,6 +134,7 @@ class AdController extends Controller
                     'start_date' => $request->get('filter.start_date'),
                     'end_date' => $request->get('filter.end_date'),
                     'campaign_ids' => $request->get('filter.campaign_ids'),
+                    'ad_set_ids' => $request->get('filter.ad_set_ids'),
                 ],
                 'metric_filters' => $request->get('metric_filters'),
                 'metrics' => $metrics,
