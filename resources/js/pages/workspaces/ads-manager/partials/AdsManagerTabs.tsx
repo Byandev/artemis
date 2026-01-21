@@ -1,3 +1,4 @@
+import { Badge } from '@/components/ui/badge';
 import { useCampaignSelectionStore } from '@/stores/useCampaignSelectionStore';
 import { Workspace } from '@/types/models/Workspace';
 import { router } from '@inertiajs/react';
@@ -43,9 +44,9 @@ const AdsManagerTabs = ({ workspace, activeTab }: AdsManagerTabsProps) => {
                     <span className="hidden sm:inline">Campaigns</span>
                     <span className="sm:hidden">Campaigns</span>
                     {selectedCount > 0 && (
-                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand-100 text-brand-800 dark:bg-brand-900/30 dark:text-brand-300">
-                            {selectedCount}
-                        </span>
+                        <Badge variant="default" className="ml-2">
+                            {selectedCount} campaign{selectedCount !== 1 ? 's' : ''}
+                        </Badge>
                     )}
                 </button>
                 <button
@@ -54,12 +55,22 @@ const AdsManagerTabs = ({ workspace, activeTab }: AdsManagerTabsProps) => {
                 >
                     <span className="hidden sm:inline">Ad Sets</span>
                     <span className="sm:hidden">Sets</span>
+                    {selectedCount > 0 && (
+                        <Badge variant="default" className="ml-2">
+                            {selectedCount} campaign{selectedCount !== 1 ? 's' : ''}
+                        </Badge>
+                    )}
                 </button>
                 <button
                     onClick={() => handleTabClick('ads')}
                     className={getTabClassName('ads')}
                 >
                     Ads
+                    {selectedCount > 0 && (
+                        <Badge variant="default" className="ml-2">
+                            {selectedCount} campaign{selectedCount !== 1 ? 's' : ''}
+                        </Badge>
+                    )}
                 </button>
                 <button
                     onClick={() => handleTabClick('optimizationRules')}
