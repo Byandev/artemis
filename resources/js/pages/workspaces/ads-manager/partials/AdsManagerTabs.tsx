@@ -1,3 +1,4 @@
+import { useCampaignSelectionStore } from '@/stores/useCampaignSelectionStore';
 import { Workspace } from '@/types/models/Workspace';
 import { router } from '@inertiajs/react';
 
@@ -9,6 +10,10 @@ interface AdsManagerTabsProps {
 }
 
 const AdsManagerTabs = ({ workspace, activeTab }: AdsManagerTabsProps) => {
+    const { selections } = useCampaignSelectionStore();
+    const campaignSelections = selections['campaigns'] || {};
+    const selectedCount = Object.values(campaignSelections).filter(Boolean).length;
+
     const handleTabClick = (tab: TabType) => {
         const routes: Record<TabType, string> = {
             campaigns: `/workspaces/${workspace.slug}/ads-manager/campaigns`,
@@ -37,6 +42,11 @@ const AdsManagerTabs = ({ workspace, activeTab }: AdsManagerTabsProps) => {
                 >
                     <span className="hidden sm:inline">Campaigns</span>
                     <span className="sm:hidden">Campaigns</span>
+                    {selectedCount > 0 && (
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand-100 text-brand-800 dark:bg-brand-900/30 dark:text-brand-300">
+                            {selectedCount}
+                        </span>
+                    )}
                 </button>
                 <button
                     onClick={() => handleTabClick('adSets')}

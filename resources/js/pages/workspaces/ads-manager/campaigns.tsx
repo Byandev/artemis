@@ -4,6 +4,7 @@ import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
+import { useAdsManagerSelectionStore } from '@/stores/useCampaignSelectionStore';
 import { AVAILABLE_AD_METRICS, Campaign, PaginatedCampaigns } from '@/types/models/AdManager';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
@@ -22,7 +23,10 @@ interface MetricFilter {
 }
 
 const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; campaigns: PaginatedCampaigns; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string }; metric_filters?: string; metrics?: string[] } }) => {
+    const TABLE_ID = 'campaigns';
     const [selectedMetrics, setSelectedMetrics] = useState<string[]>(query?.metrics ?? []);
+    const { selections, setSelectedRows, clearSelection } = useAdsManagerSelectionStore();
+    const selectedRowIds = selections[TABLE_ID] || {};
     const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() => {
         if (query?.metric_filters) {
             try {
@@ -177,6 +181,7 @@ const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; 
         setStatusFilter('');
         setMetricFilters([]);
         setSelectedMetrics([]);
+        clearSelection(TABLE_ID);
         setDateRange({
             from: moment().startOf('month').toDate(),
             to: moment().toDate()
@@ -204,18 +209,38 @@ const CampaignsPage = ({ workspace, campaigns, query }: { workspace: Workspace; 
                 <div className="flex justify-start">
                     <Checkbox
                         checked={
-                            table.getIsAllPageRowsSelected() ||
-                            (table.getIsSomePageRowsSelected() && 'indeterminate')
+                            campaigns?.data?.length > 0 && campaigns.data.every(row => selectedRowIds[row.id])
+                                ? true
+                                : campaigns?.data?.some(row => selectedRowIds[row.id])
+                                    ? 'indeterminate'
+                                    : false
                         }
-                        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+                        onCheckedChange={(value) => {
+                            if (value) {
+                                setSelectedRows(
+                                    TABLE_ID,
+                                    (campaigns?.data || []).reduce(
+                                        (acc, row) => ({ ...acc, [row.id]: true }),
+                                        {}
+                                    )
+                                );
+                            } else {
+                                clearSelection(TABLE_ID);
+                            }
+                        }}
                         aria-label="Select all"
                     />
                 </div>
             ),
             cell: ({ row }) => (
                 <Checkbox
-                    checked={row.getIsSelected()}
-                    onCheckedChange={(value) => row.toggleSelected(!!value)}
+                    checked={selectedRowIds[row.original.id] || false}
+                    onCheckedChange={(value) => {
+                        setSelectedRows(TABLE_ID, {
+                            ...selectedRowIds,
+                            [row.original.id]: !!value,
+                        });
+                    }}
                     aria-label="Select row"
                 />
             ),
