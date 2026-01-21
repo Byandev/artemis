@@ -3,6 +3,7 @@ import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
+import { useCampaignFilter } from '@/hooks/useCampaignFilter';
 import { AdSet, AVAILABLE_AD_METRICS, PaginatedAdSets } from '@/types/models/AdManager';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
@@ -21,6 +22,8 @@ interface MetricFilter {
 }
 
 const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets: PaginatedAdSets; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string }; metric_filters?: string; metrics?: string[] } }) => {
+    const { encodedCampaignIds } = useCampaignFilter();
+
     const [selectedMetrics, setSelectedMetrics] = useState<string[]>(query?.metrics ?? []);
     const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() => {
         if (query?.metric_filters) {
@@ -35,18 +38,6 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
 
     const requestedMetrics = selectedMetrics;
 
-    const getNavParams = (overrides: Record<string, any> = {}) => ({
-        sort: query?.sort,
-        'filter[search]': searchValue || undefined,
-        'filter[status]': statusFilter || undefined,
-        'filter[start_date]': dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
-        'filter[end_date]': dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
-        metric_filters: metricFilters.length > 0 ? encodeURIComponent(JSON.stringify(metricFilters)) : undefined,
-        metrics: requestedMetrics,
-        page: 1,
-        ...overrides,
-    });
-
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
@@ -57,6 +48,22 @@ const AdSetsPage = ({ workspace, adSets, query }: { workspace: Workspace; adSets
         from: query?.filter?.start_date ? moment(query.filter.start_date).toDate() : moment().startOf('month').toDate(),
         to: query?.filter?.end_date ? moment(query.filter.end_date).toDate() : moment().toDate()
     });
+
+    // Memoize nav params to prevent unnecessary re-renders
+    const getNavParams = useMemo(() => {
+        return (overrides: Record<string, any> = {}) => ({
+            sort: query?.sort,
+            'filter[search]': searchValue || undefined,
+            'filter[status]': statusFilter || undefined,
+            'filter[start_date]': dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
+            'filter[end_date]': dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
+            'filter[campaign_ids]': encodedCampaignIds,
+            metric_filters: metricFilters.length > 0 ? encodeURIComponent(JSON.stringify(metricFilters)) : undefined,
+            metrics: requestedMetrics,
+            page: 1,
+            ...overrides,
+        });
+    }, [query?.sort, searchValue, statusFilter, dateRange, encodedCampaignIds, metricFilters, requestedMetrics]);
 
     const dateRangeStr = useMemo(() => ({
         to: moment(dateRange?.to).format('YYYY-MM-DD'),

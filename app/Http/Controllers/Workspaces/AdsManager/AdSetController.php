@@ -29,6 +29,16 @@ class AdSetController extends Controller
                 AllowedFilter::exact('status'),
                 AllowedFilter::scope('start_date'),
                 AllowedFilter::scope('end_date'),
+                AllowedFilter::callback('campaign_ids', function ($query, $value) {
+                    try {
+                        $campaignIdsArray = json_decode(urldecode($value), true);
+                        if (is_array($campaignIdsArray) && ! empty($campaignIdsArray)) {
+                            $query->whereIn('campaign_id', $campaignIdsArray);
+                        }
+                    } catch (\Exception $e) {
+                        // Log error if needed
+                    }
+                }),
             ])
             ->allowedSorts([
                 'name',
@@ -114,6 +124,7 @@ class AdSetController extends Controller
                     'status' => $request->get('filter.status'),
                     'start_date' => $request->get('filter.start_date'),
                     'end_date' => $request->get('filter.end_date'),
+                    'campaign_ids' => $request->get('filter.campaign_ids'),
                 ],
                 'metric_filters' => $request->get('metric_filters'),
                 'metrics' => $metrics,

@@ -3,6 +3,7 @@ import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
+import { useCampaignFilter } from '@/hooks/useCampaignFilter';
 import { AVAILABLE_AD_METRICS } from '@/types/models/AdManager';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
@@ -50,6 +51,8 @@ interface MetricFilter {
 }
 
 const AdsPage = ({ workspace, ads, query }: { workspace: Workspace; ads: PaginatedAds; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string }; metric_filters?: string; metrics?: string[] } }) => {
+    const { encodedCampaignIds } = useCampaignFilter();
+
     const [selectedMetrics, setSelectedMetrics] = useState<string[]>(query?.metrics ?? []);
     const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() => {
         if (query?.metric_filters) {
@@ -64,18 +67,6 @@ const AdsPage = ({ workspace, ads, query }: { workspace: Workspace; ads: Paginat
 
     const requestedMetrics = selectedMetrics;
 
-    const getNavParams = (overrides: Record<string, any> = {}) => ({
-        sort: query?.sort,
-        'filter[search]': searchValue || undefined,
-        'filter[status]': statusFilter || undefined,
-        'filter[start_date]': dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
-        'filter[end_date]': dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
-        metric_filters: metricFilters.length > 0 ? encodeURIComponent(JSON.stringify(metricFilters)) : undefined,
-        metrics: requestedMetrics,
-        page: 1,
-        ...overrides,
-    });
-
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
@@ -86,6 +77,27 @@ const AdsPage = ({ workspace, ads, query }: { workspace: Workspace; ads: Paginat
         from: query?.filter?.start_date ? moment(query.filter.start_date).toDate() : moment().startOf('month').toDate(),
         to: query?.filter?.end_date ? moment(query.filter.end_date).toDate() : moment().toDate()
     });
+
+    // Memoize encoded metric filters string
+    const encodedMetricFilters = useMemo(() => {
+        return metricFilters.length > 0 ? encodeURIComponent(JSON.stringify(metricFilters)) : undefined;
+    }, [metricFilters]);
+
+    // Memoize nav params to prevent unnecessary re-renders
+    const getNavParams = useMemo(() => {
+        return (overrides: Record<string, any> = {}) => ({
+            sort: query?.sort,
+            'filter[search]': searchValue || undefined,
+            'filter[status]': statusFilter || undefined,
+            'filter[start_date]': dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
+            'filter[end_date]': dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
+            'filter[campaign_ids]': encodedCampaignIds,
+            metric_filters: encodedMetricFilters,
+            metrics: requestedMetrics,
+            page: 1,
+            ...overrides,
+        });
+    }, [query?.sort, searchValue, statusFilter, dateRange, encodedCampaignIds, encodedMetricFilters, requestedMetrics]);
 
     const dateRangeStr = useMemo(() => ({
         to: moment(dateRange?.to).format('YYYY-MM-DD'),
@@ -150,7 +162,7 @@ const AdsPage = ({ workspace, ads, query }: { workspace: Workspace; ads: Paginat
 
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/ads`,
-            getNavParams({ metric_filters: filters.length > 0 ? encodeURIComponent(JSON.stringify(filters)) : undefined }),
+            getNavParams({ metric_filters: filters.length > 0 ? encodeURIComponent(JSON.stringify(filters)) : undefined, page: 1 }),
             {
                 preserveState: true,
                 replace: true,
@@ -190,6 +202,7 @@ const AdsPage = ({ workspace, ads, query }: { workspace: Workspace; ads: Paginat
             getNavParams({
                 metrics: metrics.length > 0 ? metrics : undefined,
                 metric_filters: filteredMetricFilters.length > 0 ? encodeURIComponent(JSON.stringify(filteredMetricFilters)) : undefined,
+                page: 1,
             }),
             {
                 preserveState: true,
