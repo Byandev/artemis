@@ -121,7 +121,7 @@ export function SimpleDateRangePicker({
       >
         <div className="flex flex-col lg:flex-row">
           {/* Presets Section */}
-          <div className="hidden md:block border-r border-gray-200 dark:border-gray-700 bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-950 w-48 lg:w-56 p-2">
+          <div className="hidden md:block border-r border-gray-200 dark:border-gray-700 bg-linear-to-b from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-950 w-48 lg:w-56 p-2">
             <div className="space-y-0.5">
               <div className="flex items-center gap-2 px-3 py-1.5 mb-2">
                 <div className="h-1 w-1 rounded-full bg-primary animate-pulse" />

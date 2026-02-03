@@ -1,6 +1,7 @@
 import AuthenticatedSessionController from '@/actions/App/Http/Controllers/Auth/AuthenticatedSessionController';
 import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -8,21 +9,47 @@ import { Label } from '@/components/ui/label';
 import AuthLayout from '@/layouts/auth-layout';
 import { register } from '@/routes';
 import { request } from '@/routes/password';
-import { Form, Head } from '@inertiajs/react';
-import { LoaderCircle } from 'lucide-react';
+import { Form, Head, usePage } from '@inertiajs/react';
+import { Info, LoaderCircle } from 'lucide-react';
+
+interface WorkspaceInvitation {
+    id: number;
+    workspace_id: number;
+    email: string;
+    role: string;
+    workspace: {
+        name: string;
+        slug: string;
+    };
+}
 
 interface LoginProps {
     status?: string;
     canResetPassword: boolean;
+    invitation?: WorkspaceInvitation | null;
+    invitationToken?: string | null;
+    [key: string]: unknown;
 }
 
 export default function Login({ status, canResetPassword }: LoginProps) {
+    const { invitation, invitationToken } = usePage<LoginProps>().props;
+
     return (
         <AuthLayout
             title="Log in to your account"
-            description="Enter your email and password below to log in"
+            description={invitation ? `Login to join ${invitation.workspace.name}` : "Enter your email and password below to log in"}
         >
             <Head title="Log in" />
+
+            {invitation && (
+                <Alert className="mb-4">
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                        You've been invited to join <strong>{invitation.workspace.name}</strong>
+                        Login to accept the invitation.
+                    </AlertDescription>
+                </Alert>
+            )}
 
             <Form
                 {...AuthenticatedSessionController.store()}
@@ -31,6 +58,10 @@ export default function Login({ status, canResetPassword }: LoginProps) {
             >
                 {({ processing, errors }) => (
                     <>
+                        {invitationToken && (
+                            <input type="hidden" name="invitation" value={invitationToken} />
+                        )}
+
                         <div className="grid gap-6">
                             <div className="grid gap-2">
                                 <Label htmlFor="email">Email address</Label>
@@ -43,7 +74,14 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                     tabIndex={1}
                                     autoComplete="email"
                                     placeholder="email@example.com"
+                                    defaultValue={invitation?.email || ''}
+                                    readOnly={!!invitation}
                                 />
+                                {invitation && (
+                                    <p className="text-xs text-muted-foreground">
+                                        This email matches your invitation. If this is incorrect, please sign up with a different email address.
+                                    </p>
+                                )}
                                 <InputError message={errors.email} />
                             </div>
 
@@ -97,7 +135,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
 
                         <div className="text-center text-sm text-muted-foreground">
                             Don't have an account?{' '}
-                            <TextLink href={register()} tabIndex={5}>
+                            <TextLink href={invitationToken ? register({ query: { invitation: invitationToken } }).url : register().url} tabIndex={5}>
                                 Sign up
                             </TextLink>
                         </div>
