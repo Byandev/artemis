@@ -21,6 +21,25 @@ export interface Campaign {
     updated_at: string;
 }
 
+export interface Ad {
+    id: number;
+    name: string;
+    status: string;
+    impressions?: number;
+    clicks?: number;
+    spend?: number;
+    campaign: {
+        id: number;
+        name: string;
+    };
+    ad_set: {
+        id: number;
+        name: string;
+    };
+    created_at: string;
+    updated_at: string;
+}
+
 export interface AdSet {
     id: number;
     name: string;
@@ -47,8 +66,8 @@ export interface PaginationLinks {
     active: boolean;
 }
 
-export interface PaginatedCampaigns {
-    data: Campaign[];
+export interface PaginatedData<T> {
+    data: T[];
     current_page: number;
     last_page: number;
     per_page: number;
@@ -58,15 +77,16 @@ export interface PaginatedCampaigns {
     to: number;
 }
 
-export interface PaginatedAdSets {
-    data: AdSet[];
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-    links: PaginationLinks[];
-    from: number;
-    to: number;
+export interface PaginatedCampaigns extends PaginatedData<Campaign> {}
+
+export interface PaginatedAdSets extends PaginatedData<AdSet> {}
+
+export interface PaginatedAds extends PaginatedData<Ad> {}
+
+export interface MetricFilter {
+    metric: string;
+    operator: string;
+    value: string;
 }
 
 export interface StatusBadgeProps {
@@ -82,6 +102,7 @@ export interface PageProps {
         search?: string;
     }
 }
+
 export enum AdMetric {
     IMPRESSIONS = 'impressions',
     CLICKS = 'clicks',

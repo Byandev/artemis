@@ -1,55 +1,38 @@
 import ComponentCard from '@/components/common/ComponentCard';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useDateRange } from '@/hooks/use-date-range';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { AVAILABLE_AD_METRICS } from '@/types/models/AdManager';
+import { Ad, AVAILABLE_AD_METRICS, MetricFilter, PaginatedAds } from '@/types/models/AdManager';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
-import { type DateRange } from "react-day-picker";
 import AdsManagerLayout from './partials/Layout';
 import { MetricFiltersBar } from './partials/MetricFiltersBar';
 
-interface Ad {
-    id: number;
-    name: string;
-    status: string;
-    impressions?: number;
-    clicks?: number;
-    spend?: number;
-    campaign: {
-        id: number;
-        name: string;
+interface PageProps {
+    workspace: Workspace;
+    ads: PaginatedAds;
+    query?: {
+        sort?: string | null;
+        perPage?: number | string;
+        page?: number | string;
+        filter?: {
+            search?: string;
+            status?: string;
+            start_date?: string;
+            end_date?: string;
+        };
+        metric_filters?: string;
+        metrics?: string[];
     };
-    ad_set: {
-        id: number;
-        name: string;
-    };
-    created_at: string;
-    updated_at: string;
 }
 
-interface PaginatedAds {
-    data: Ad[];
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-    from: number;
-    to: number;
-}
-
-interface MetricFilter {
-    metric: string;
-    operator: string;
-    value: string;
-}
-
-const AdsPage = ({ workspace, ads, query }: { workspace: Workspace; ads: PaginatedAds; query?: { sort?: string; perPage?: number; page?: number; filter?: { search?: string; status?: string; start_date?: string; end_date?: string }; metric_filters?: string; metrics?: string[] } }) => {
+const AdsPage = ({ workspace, ads, query }: PageProps) => {
     const [selectedMetrics, setSelectedMetrics] = useState<string[]>(query?.metrics ?? []);
     const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() => {
         if (query?.metric_filters) {
@@ -64,12 +47,23 @@ const AdsPage = ({ workspace, ads, query }: { workspace: Workspace; ads: Paginat
 
     const requestedMetrics = selectedMetrics;
 
+    // Use global date range state with automatic initialization from URL filters
+    const { dateRange, setDateRange } = useDateRange({
+        startDate: query?.filter?.start_date,
+        endDate: query?.filter?.end_date
+    });
+
+    const dateRangeStr = useMemo(() => ({
+        to: moment(dateRange?.to).format('YYYY-MM-DD'),
+        from: moment(dateRange?.from).format('YYYY-MM-DD'),
+    }), [dateRange]);
+
     const getNavParams = (overrides: Record<string, any> = {}) => ({
         sort: query?.sort,
         'filter[search]': searchValue || undefined,
         'filter[status]': statusFilter || undefined,
-        'filter[start_date]': dateRange?.from ? moment(dateRange.from).format('YYYY-MM-DD') : undefined,
-        'filter[end_date]': dateRange?.to ? moment(dateRange.to).format('YYYY-MM-DD') : undefined,
+        'filter[start_date]': dateRange?.from ? dateRangeStr.from : undefined,
+        'filter[end_date]': dateRange?.to ? dateRangeStr.to : undefined,
         metric_filters: metricFilters.length > 0 ? encodeURIComponent(JSON.stringify(metricFilters)) : undefined,
         metrics: requestedMetrics,
         page: 1,
@@ -82,15 +76,6 @@ const AdsPage = ({ workspace, ads, query }: { workspace: Workspace; ads: Paginat
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [statusFilter, setStatusFilter] = useState(query?.filter?.status ?? '');
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: query?.filter?.start_date ? moment(query.filter.start_date).toDate() : moment().startOf('month').toDate(),
-        to: query?.filter?.end_date ? moment(query.filter.end_date).toDate() : moment().toDate()
-    });
-
-    const dateRangeStr = useMemo(() => ({
-        to: moment(dateRange?.to).format('YYYY-MM-DD'),
-        from: moment(dateRange?.from).format('YYYY-MM-DD'),
-    }), [dateRange]);
 
     // Debounce search
     useEffect(() => {
@@ -114,21 +99,19 @@ const AdsPage = ({ workspace, ads, query }: { workspace: Workspace; ads: Paginat
         return () => clearTimeout(timer);
     }, [searchValue]);
 
-    // Sync date range with URL on mount
+    // Sync date range with URL when dateRange changes
     useEffect(() => {
-        if (!query?.filter?.start_date || !query?.filter?.end_date) {
-            router.get(
-                `/workspaces/${workspace.slug}/ads-manager/ads`,
-                getNavParams(),
-                {
-                    preserveState: true,
-                    replace: true,
-                    preserveScroll: true,
-                    only: ['ads'],
-                },
-            );
-        }
-    }, []);
+        router.get(
+            `/workspaces/${workspace.slug}/ads-manager/ads`,
+            getNavParams(),
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['ads'],
+            },
+        );
+    }, [dateRange, dateRangeStr]);
 
     const handleStatusFilterChange = (value: string) => {
         setStatusFilter(value);
@@ -151,24 +134,6 @@ const AdsPage = ({ workspace, ads, query }: { workspace: Workspace; ads: Paginat
         router.get(
             `/workspaces/${workspace.slug}/ads-manager/ads`,
             getNavParams({ metric_filters: filters.length > 0 ? encodeURIComponent(JSON.stringify(filters)) : undefined }),
-            {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-                only: ['ads'],
-            },
-        );
-    };
-
-    const handleDateRangeChange = (range: DateRange | undefined) => {
-        setDateRange(range);
-
-        router.get(
-            `/workspaces/${workspace.slug}/ads-manager/ads`,
-            getNavParams({
-                'filter[start_date]': range?.from ? moment(range.from).format('YYYY-MM-DD') : undefined,
-                'filter[end_date]': range?.to ? moment(range.to).format('YYYY-MM-DD') : undefined,
-            }),
             {
                 preserveState: true,
                 replace: true,
@@ -275,13 +240,10 @@ const AdsPage = ({ workspace, ads, query }: { workspace: Workspace; ads: Paginat
                                 onMetricFiltersChange={handleMetricFilterChange}
                                 searchValue={searchValue}
                                 statusFilter={statusFilter}
-                                dateRange={dateRange}
-                                dateRangeStr={dateRangeStr}
                                 selectedMetrics={selectedMetrics}
                                 availableMetrics={AVAILABLE_AD_METRICS}
                                 onSearchChange={setSearchValue}
                                 onStatusChange={handleStatusFilterChange}
-                                onDateRangeChange={handleDateRangeChange}
                                 onMetricsChange={handleMetricsChange}
                                 onClearFilters={clearFilters}
                                 searchPlaceholder="Search ads..."

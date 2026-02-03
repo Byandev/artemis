@@ -8,19 +8,16 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
-import { type DateRange } from 'react-day-picker';
 
 interface SearchAndFiltersRowProps {
     searchValue: string;
     statusFilter: string;
-    dateRange: DateRange | undefined;
     selectedMetrics: string[];
     availableMetrics: string[];
     hasActiveFilters: boolean;
     searchPlaceholder: string;
     onSearchChange: (value: string) => void;
     onStatusChange: (value: string) => void;
-    onDateRangeChange: (range: DateRange | undefined) => void;
     onMetricsChange: (metrics: string[]) => void;
     onClearFilters: () => void;
 }
@@ -28,14 +25,12 @@ interface SearchAndFiltersRowProps {
 export const SearchAndFiltersRow = ({
     searchValue,
     statusFilter,
-    dateRange,
     selectedMetrics,
     availableMetrics,
     hasActiveFilters,
     searchPlaceholder,
     onSearchChange,
     onStatusChange,
-    onDateRangeChange,
     onMetricsChange,
     onClearFilters,
 }: SearchAndFiltersRowProps) => {
@@ -74,8 +69,7 @@ export const SearchAndFiltersRow = ({
                 </select>
 
                 <SimpleDateRangePicker
-                    value={dateRange}
-                    onChange={onDateRangeChange}
+                    useGlobalState
                 />
 
                 {availableMetrics.length > 0 && (
