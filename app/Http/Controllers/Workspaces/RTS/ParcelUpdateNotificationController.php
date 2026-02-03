@@ -42,20 +42,11 @@ class ParcelUpdateNotificationController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        $types = ParcelJourneyNotification::query()
-            ->whereHas('order', function ($query) use ($workspace) {
-                $query->where('workspace_id', $workspace->id);
-            })
-            ->distinct()
-            ->pluck('type')
-            ->values()
-            ->toArray();
-
         return Inertia::render('workspaces/rts/parcel-update-notification', [
             'workspace' => $workspace,
             'notifications' => $notifications,
             'pages' => [],
-            'types' => $types,
+            'types' => ['sms', 'chat'],
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
