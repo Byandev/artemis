@@ -11,18 +11,17 @@ import { dashboard } from '@/routes';
 import workspace from '@/routes/workspace';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { 
-    BookOpen, 
-    Folder, 
-    LayoutDashboard, 
-    Package, 
-    Users,
-    Store,
-    Target,
-    UserCircle,
+import {
+    BookOpen,
     CreditCard,
     FacebookIcon,
-    TrendingUp
+    Folder,
+    LayoutDashboard,
+    Package,
+    Store,
+    Target,
+    TrendingUp,
+    Users
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
@@ -52,7 +51,7 @@ export function AppSidebar() {
             href: dashboardUrl,
             icon: LayoutDashboard,
         },
-          {
+        {
             title: 'Ads Manager',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ads-manager`,
             icon: Target,
@@ -64,7 +63,7 @@ export function AppSidebar() {
         },
         {
             title: 'Products',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products/analytics`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products`,
             icon: Package,
         },
         {
@@ -84,7 +83,7 @@ export function AppSidebar() {
         },
         {
             title: 'RTS Management',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts`,
             icon: TrendingUp,
         },
     ];
