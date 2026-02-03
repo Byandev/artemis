@@ -46,7 +46,7 @@ class ParcelUpdateNotificationController extends Controller
             'workspace' => $workspace,
             'notifications' => $notifications,
             'pages' => [],
-            'types' => [],
+            'types' => ['sms', 'chat'],
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
