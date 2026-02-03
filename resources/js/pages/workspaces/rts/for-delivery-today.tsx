@@ -49,7 +49,7 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders, query }: ForDe
                     'filter[page_name]': pageNameSearch || undefined,
                     'filter[customer]': customerFilter || undefined,
                     'filter[rider]': riderFilter || undefined,
-                    page: 1,
+                    page: pageNameSearch ? 1 : query?.page ?? 1
                 },
                 {
                     preserveState: true,
@@ -185,7 +185,7 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders, query }: ForDe
                                             page: params?.page ?? 1,
                                         },
                                         {
-                                            preserveState: false,
+                                            preserveState: true,
                                             replace: true,
                                             preserveScroll: true,
                                         },

@@ -59,7 +59,7 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
                     'filter[status]': statusFilter || undefined,
-                    page: 1,
+                    page: searchValue ? 1 : query?.page ?? 1
                 },
                 {
                     preserveState: true,
@@ -168,6 +168,7 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
             header: ({ column }) => <SortableHeader column={column} title="Status" />,
             cell: ({ row }) => <StatusBadge status={row.original.status} />,
         },
+
         {
             id: 'actions',
             cell: ({ row }) => (
@@ -225,7 +226,7 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
                                             page: params?.page ?? 1,
                                         },
                                         {
-                                            preserveState: false,
+                                            preserveState: true,
                                             replace: true,
                                             preserveScroll: true,
                                         },

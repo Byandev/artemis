@@ -70,7 +70,7 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
-                    page: 1,
+                    page: searchValue ? 1 : query?.page ?? 1
                 },
                 {
                     preserveState: true,

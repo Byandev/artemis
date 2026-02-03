@@ -46,7 +46,7 @@ const FacebookAccounts = ({
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
-                    page: 1,
+                    page: searchValue ? 1 : query?.page ?? 1
                 },
                 {
                     preserveState: true,
@@ -148,7 +148,7 @@ const FacebookAccounts = ({
                                             page: params?.page ?? 1
                                         },
                                         {
-                                            preserveState: false,
+                                            preserveState: true,
                                             replace: true,
                                             preserveScroll: true,
                                         },
