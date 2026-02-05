@@ -137,7 +137,7 @@ export function SimpleDateRangePicker({
                       key={preset.label}
                       onClick={() => handlePresetClick(preset)}
                       className={cn(
-                        "group w-full flex items-center gap-2.5 px-3 py-1.5 text-sm rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-1 relative overflow-hidden",
+                        "group w-full flex items-center gap-2.5 px-3 py-1.5 text-xs rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-1 relative overflow-hidden",
                         isSelected
                           ? "bg-primary text-primary-foreground shadow-sm font-medium"
                           : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
@@ -153,7 +153,7 @@ export function SimpleDateRangePicker({
                       >
                         {getPresetIcon(preset.icon)}
                       </span>
-                      <span className="flex-1 text-left">{preset.label}</span>
+                      <span className="flex-1 text-left text-[11px]">{preset.label}</span>
                       {isSelected && (
                         <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground animate-pulse" />
                       )}
