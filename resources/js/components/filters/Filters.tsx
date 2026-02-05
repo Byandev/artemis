@@ -46,11 +46,26 @@ const Filters = ({ workspace }: Props) => {
                 </Button>
             </PopoverTrigger>
 
-            <PopoverContent className="w-48 h-48">
+            <PopoverContent className="max-h-72 w-48 p-2.5">
                 {selectedOption ? (
-                    <selectedOption.component workspace={workspace}/>
+                    <div>
+                        <div className="mb-2 flex justify-between">
+                            <span className="text-sm font-semibold">
+                                {selectedOption.name}
+                            </span>
+
+                            <span
+                                onClick={() => setSelectedOption(null)}
+                                className="text-sm font-semibold text-blue-700 cursor-pointer"
+                            >
+                                Back
+                            </span>
+                        </div>
+
+                        <selectedOption.component workspace={workspace} />
+                    </div>
                 ) : (
-                    <div className="space-y-4 text-sm">
+                    <div className="space-y-3 text-sm">
                         {options.map((option) => {
                             return (
                                 <div
