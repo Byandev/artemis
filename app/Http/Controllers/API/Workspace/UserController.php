@@ -14,8 +14,8 @@ class UserController extends Controller
     public function index(Workspace $workspace)
     {
         return QueryBuilder::for(User::class)
-            ->whereHas('workspace', function ($query) use ($workspace) {
-                $query->where('id', $workspace->id);
+            ->whereHas('workspaces', function ($query) use ($workspace) {
+                $query->where('workspaces.id', $workspace->id);
             })
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),

@@ -2,7 +2,14 @@ import { Shop } from '@/types/models/Shop';
 import { Workspace } from '@/types/models/Workspace';
 import { EntityFilter } from '@/components/filters/EntityFilter';
 
-const ShopFilter = ({ workspace }: { workspace: Workspace }) => {
+
+interface Props {
+    workspace: Workspace;
+    selected: (string | number)[];
+    onSelect: (id: string | number) => void;
+}
+
+const ShopFilter = ({ workspace }: Props) => {
     return (
         <EntityFilter<Shop>
             workspace={workspace}

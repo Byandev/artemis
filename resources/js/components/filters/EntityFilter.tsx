@@ -19,6 +19,8 @@ type EntityFilterProps<T> = {
     getId: (item: T) => IdLike;
     getLabel: (item: T) => string;
     queryParam?: string;
+    selected: IdLike[],
+    onSelect: (id: IdLike) => void
 };
 
 export function EntityFilter<T>({
@@ -28,6 +30,8 @@ export function EntityFilter<T>({
     getId,
     getLabel,
     queryParam = 'filter[search]',
+    selected,
+    onSelect
 }: EntityFilterProps<T>) {
     const [items, setItems] = useState<T[]>([]);
     const {
@@ -72,10 +76,10 @@ export function EntityFilter<T>({
                         return (
                             <div
                                 key={idStr}
-                                className="flex items-center gap-x-2 text-sm"
+                                className="flex items-center gap-x-2 text-xs"
                             >
-                                <Checkbox id={idStr} name={idStr} />
-                                <Label htmlFor={idStr} className="text-sm text-gray-800">
+                                <Checkbox id={idStr} name={idStr} checked={selected.includes(idStr)} onSelect={() => onSelect(idStr)}/>
+                                <Label htmlFor={idStr} className="text-xs text-gray-800">
                                     {getLabel(item)}
                                 </Label>
                             </div>
