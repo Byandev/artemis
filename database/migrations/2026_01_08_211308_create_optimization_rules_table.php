@@ -21,7 +21,7 @@ return new class extends Migration
                 'increase_budget_fixed',
                 'decrease_budget_fixed',
                 'increase_budget_percentage',
-                'decrease_budget_percentage'
+                'decrease_budget_percentage',
             ]);
             $table->decimal('action_value', 10, 2)->nullable(); // Fixed amount or percentage value
             $table->enum('status', ['active', 'paused'])->default('active');

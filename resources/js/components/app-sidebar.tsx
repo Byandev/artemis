@@ -36,11 +36,11 @@ export function AppSidebar() {
             href: dashboardUrl,
             icon: LayoutDashboard,
         },
-        {
-            title: 'Ads Manager',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ads-manager`,
-            icon: Target,
-        },
+        // {
+        //     title: 'Ads Manager',
+        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ads-manager`,
+        //     icon: Target,
+        // },
         {
             title: 'Shop and Pages',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,

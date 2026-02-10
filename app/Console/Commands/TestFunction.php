@@ -3,10 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Jobs\FetchPageEmployees;
-use App\Models\CustomerServiceRepresentative;
 use App\Models\Page;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Http;
 
 class TestFunction extends Command
 {

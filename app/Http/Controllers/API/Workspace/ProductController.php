@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers\API\Workspace;
 
-use App\Models\Product;
-use App\Models\Team;
-use App\Models\Workspace;
 use App\Http\Controllers\Controller;
+use App\Models\Product;
+use App\Models\Workspace;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
