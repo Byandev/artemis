@@ -30,7 +30,7 @@ interface DataTableProps<TData, TValue> {
     data: TData[]
     initialSorting?: SortingState,
     enableInternalPagination?: boolean
-    onFetch?: (params?: { sort?: string, page?: number }) => void,
+    onFetch?: (params?: { [key: string]: string | number | null }) => void,
     meta?: Omit<PaginatedData<TData>, 'data'>
 }
 

@@ -18,6 +18,13 @@ class Page extends Model
         'orders_last_synced_at' => 'datetime',
     ];
 
+    protected $hidden = [
+        'botcake_token',
+        'pancake_token',
+        'infotxt_token',
+        'pos_token'
+    ];
+
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);

@@ -5,6 +5,7 @@ namespace Modules\Botcake\Providers;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Modules\Botcake\Console\TriggerFetchFlows;
+use Modules\Botcake\Console\TriggerFetchFlowStatistics;
 use Modules\Botcake\Console\TriggerFetchSequences;
 use Modules\Botcake\Console\TriggerFetchSequenceStatistics;
 use Nwidart\Modules\Traits\PathNamespace;
@@ -50,6 +51,7 @@ class BotcakeServiceProvider extends ServiceProvider
             TriggerFetchFlows::class,
             TriggerFetchSequences::class,
             TriggerFetchSequenceStatistics::class,
+            TriggerFetchFlowStatistics::class,
         ]);
     }
 

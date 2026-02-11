@@ -29,16 +29,21 @@ class FetchFlowStatistics implements ShouldQueue
         $response = Http::withHeaders([
             'access-token' => $flow->page->botcake_token,
         ])
-            ->get("https://botcake.io/api/public_api/v1/pages/{$flow->page->id}/flows/{$flow->flow_id}/statistics")
-            ->throw()
-            ->json();
+            ->get("https://botcake.io/api/public_api/v1/pages/{$flow->page->id}/flows/{$flow->flow_id}/statistics");
 
-        $flow->update([
-            'delivery' => $response['data']['delivery'],
-            'is_clicked' => $response['data']['is_clicked'],
-            'seen' => $response['data']['seen'],
-            'sent' => $response['data']['sent'],
-            'total_phone_number' => $response['data']['total_phone_number'],
-        ]);
+//        if ($response->getStatusCode() !== )
+        if ($response->ok()) {
+            $response = $response->json();
+
+            $flow->update([
+                'delivery' => $response['data']['delivery'],
+                'is_clicked' => $response['data']['is_clicked'],
+                'seen' => $response['data']['seen'],
+                'sent' => $response['data']['sent'],
+                'total_phone_number' => $response['data']['total_phone_number'],
+            ]);
+        }
+
+
     }
 }
