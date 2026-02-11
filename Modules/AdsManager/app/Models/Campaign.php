@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class Campaign extends Model
 {
-
     protected $guarded = [];
 
     public function adAccount(): \Illuminate\Database\Eloquent\Relations\BelongsTo

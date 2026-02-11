@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class AdAccount extends Model
 {
-
     protected $guarded = [];
 
     public function facebookAccounts(): BelongsToMany

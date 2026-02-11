@@ -1,34 +1,31 @@
 <?php
 
-namespace App\Console\Commands;
+namespace Modules\Botcake\Jobs;
 
-use Illuminate\Console\Command;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Modules\Botcake\Models\Sequence;
 use Modules\Botcake\Models\SequenceMessage;
 
-class TestFunction extends Command
+class FetchSequenceStatistics implements ShouldQueue
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    protected $signature = 'test-function';
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
-     * The console command description.
-     *
-     * @var string
+     * Create a new job instance.
      */
-    protected $description = 'Command description';
+    public function __construct(public Sequence $sequence) {}
 
     /**
-     * Execute the console command.
+     * Execute the job.
      */
-    public function handle()
+    public function handle(): void
     {
-        $sequence = Sequence::where('sequence_id', 3160615)->first()->load('page');
+        $sequence = $this->sequence->load('page');
 
         $response = Http::withHeaders([
             'access-token' => $sequence->page->botcake_token,
@@ -39,10 +36,10 @@ class TestFunction extends Command
 
         $items = collect($response['data'])->map(function ($item) use ($sequence) {
             return [
-                'sequence_id' => $sequence->id,
+                'sequence_id' => $sequence->sequence_id,
                 'message_id' => $item['message_id'],
                 'delivery' => $item['delivery'],
-                'name' => $item['name'],
+                'name' => $item['name'] ?? $item['message_id'],
                 'seen' => $item['seen'],
                 'sent' => $item['sends'],
                 'total_phone_number' => $item['total_phone_number'],

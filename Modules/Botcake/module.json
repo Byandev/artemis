@@ -1,0 +1,11 @@
+{
+    "name": "Botcake",
+    "alias": "botcake",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Botcake\\Providers\\BotcakeServiceProvider"
+    ],
+    "files": []
+}
