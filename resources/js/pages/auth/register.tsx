@@ -1,22 +1,53 @@
 import RegisteredUserController from '@/actions/App/Http/Controllers/Auth/RegisteredUserController';
 import { login } from '@/routes';
-import { Form, Head } from '@inertiajs/react';
-import { LoaderCircle } from 'lucide-react';
+import { Form, Head, usePage } from '@inertiajs/react';
+import { Info, LoaderCircle } from 'lucide-react';
 
 import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AuthLayout from '@/layouts/auth-layout';
 
+interface WorkspaceInvitation {
+    id: number;
+    workspace_id: number;
+    email: string;
+    role: string;
+    workspace: {
+        name: string;
+        slug: string;
+    };
+}
+
+interface RegisterProps {
+    invitation?: WorkspaceInvitation | null;
+    invitationToken?: string | null;
+    [key: string]: unknown;
+}
+
 export default function Register() {
+    const { invitation, invitationToken } = usePage<RegisterProps>().props;
+
     return (
         <AuthLayout
             title="Create an account"
-            description="Enter your details below to create your account"
+            description={invitation ? `Join ${invitation.workspace.name}` : "Enter your details below to create your account"}
         >
             <Head title="Register" />
+
+            {invitation && (
+                <Alert className="mb-4">
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                        You've been invited to join <strong>{invitation.workspace.name}</strong> as a {invitation.role}
+                        Create your account to accept the invitation.
+                    </AlertDescription>
+                </Alert>
+            )}
+
             <Form
                 {...RegisteredUserController.store.form()}
                 resetOnSuccess={['password', 'password_confirmation']}
@@ -25,6 +56,10 @@ export default function Register() {
             >
                 {({ processing, errors }) => (
                     <>
+                        {invitationToken && (
+                            <input type="hidden" name="invitation" value={invitationToken} />
+                        )}
+
                         <div className="grid gap-6">
                             <div className="grid gap-2">
                                 <Label htmlFor="name">Name</Label>
@@ -54,6 +89,8 @@ export default function Register() {
                                     autoComplete="email"
                                     name="email"
                                     placeholder="email@example.com"
+                                    defaultValue={invitation?.email || ''}
+                                    readOnly={!!invitation}
                                 />
                                 <InputError message={errors.email} />
                             </div>
@@ -105,7 +142,7 @@ export default function Register() {
 
                         <div className="text-center text-sm text-muted-foreground">
                             Already have an account?{' '}
-                            <TextLink href={login()} tabIndex={6}>
+                            <TextLink href={invitationToken ? login({ query: { invitation: invitationToken } }).url : login().url} tabIndex={6}>
                                 Log in
                             </TextLink>
                         </div>

@@ -52,7 +52,7 @@ export function TeamFormDialog({
     });
 
     // Set initial values when team changes (for editing)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     useEffect(() => {
         if (team) {
             setData({

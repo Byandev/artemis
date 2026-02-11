@@ -1,17 +1,16 @@
-import DashboardLayout from './partials/Layout';
-import { Head, router } from '@inertiajs/react';
-import { useMemo, useState, useEffect } from 'react';
-import { Workspace } from '@/types/models/Workspace';
-import { currencyFormatter, numberFormatter, percentageFormatter, getDateRangeDescription } from '@/lib/utils';
-import MetricsCard from '@/components/workspaces/MetricsCard';
 import LineComparisonChart from '@/components/charts/LineComparisonChart';
 import SingleLineChart from '@/components/charts/SingleLineChart';
 import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
-import { Button } from '@/components/ui/button';
-import DashboardFilters from '@/components/workspaces/DashboardFilters';
-import { type DateRange } from "react-day-picker";
-import moment from 'moment';
+import MetricsCard from '@/components/workspaces/MetricsCard';
+import { useDateRange } from '@/hooks/use-date-range';
+import { currencyFormatter, getDateRangeDescription, numberFormatter, percentageFormatter } from '@/lib/utils';
 import workspaces from '@/routes/workspace';
+import { Workspace } from '@/types/models/Workspace';
+import { Head, router } from '@inertiajs/react';
+import moment from 'moment';
+import { useEffect, useMemo, useState } from 'react';
+import DashboardLayout from './partials/Layout';
+import Filters from '@/components/filters/Filters';
 
 interface ChartDataPoint {
     date: string;
@@ -41,18 +40,14 @@ type Props = {
         page_ids?: string;
         shop_ids?: string;
     }
-    availableTeams: { id: number; name: string }[];
-    availableProducts: { id: number; name: string }[];
-    availablePages: { id: number; name: string }[];
-    availableShops: { id: number; name: string }[];
 }
 
-export default function Index({ workspace, stats, filters, availableTeams, availableProducts, availablePages, availableShops }: Props) {
+export default function Index({ workspace, stats, filters }: Props) {
 
-    // Initialize dates from URL filters
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: filters?.start_date ? new Date(filters.start_date) : moment().startOf('month').toDate(),
-        to: filters?.end_date ? new Date(filters.end_date) : moment().toDate()
+    // Use global date range state with automatic initialization from URL filters
+    const { dateRange, setDateRange } = useDateRange({
+        startDate: filters?.start_date,
+        endDate: filters?.end_date
     });
 
     const dateRangeStr = useMemo(() => ({
@@ -189,32 +184,8 @@ export default function Index({ workspace, stats, filters, availableTeams, avail
         <DashboardLayout workspace={workspace}>
             <Head title="Dashboard" />
             <div className="flex items-center justify-end gap-2 mb-6">
-                {(selectedTeams.length > 0 || selectedProducts.length > 0 || selectedPages.length > 0 || selectedShops.length > 0 || dateRangeStr.from !== moment().startOf('month').format('YYYY-MM-DD') || dateRangeStr.to !== moment().format('YYYY-MM-DD')) && (
-                    <Button
-                        variant="outline"
-                        onClick={clearFilters}
-                    >
-                        Clear Filters
-                    </Button>
-                )}
-                <DashboardFilters
-                    availableTeams={availableTeams}
-                    availableProducts={availableProducts}
-                    availablePages={availablePages}
-                    availableShops={availableShops}
-                    selectedTeams={selectedTeams}
-                    setSelectedTeams={setSelectedTeams}
-                    selectedProducts={selectedProducts}
-                    setSelectedProducts={setSelectedProducts}
-                    selectedPages={selectedPages}
-                    setSelectedPages={setSelectedPages}
-                    selectedShops={selectedShops}
-                    setSelectedShops={setSelectedShops}
-                />
-                <SimpleDateRangePicker
-                    value={dateRange}
-                    onChange={setDateRange}
-                />
+                <Filters workspace={workspace}/>
+                <SimpleDateRangePicker useGlobalState />
             </div>
 
             <div className="space-y-5 sm:space-y-6">
