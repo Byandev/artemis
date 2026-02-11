@@ -139,15 +139,16 @@ export function DataTable<TData, TValue>({
 type SortableHeaderProps<TData> = {
     column: Column<TData, unknown>
     title: string
-    enabled?: boolean
+    enabled?: boolean;
+    className?: string
 }
 
-export function SortableHeader<TData>({ column, title, enabled = true }: SortableHeaderProps<TData>) {
+export function SortableHeader<TData>({ column, title, enabled = true, className = '' }: SortableHeaderProps<TData>) {
     const sorted = useMemo(() => column.getIsSorted(), [column])
 
     return (
         <div
-            className={`flex items-center justify-between ${enabled ? 'cursor-pointer' : ''}`}
+            className={`flex items-center justify-between ${enabled ? 'cursor-pointer' : ''} ${className}`}
             onClick={() => {
                 if (enabled) {
                     column.toggleSorting(sorted === 'asc')

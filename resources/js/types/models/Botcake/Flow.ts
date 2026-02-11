@@ -10,9 +10,10 @@ export interface Flow {
     is_clicked: number;
     seen: number;
     sent: number;
+    success_rate?: number;
     total_phone_number: number;
     created_at: string;
     updated_at: string;
     name: string;
-    page?: Page
+    page?: Page;
 }

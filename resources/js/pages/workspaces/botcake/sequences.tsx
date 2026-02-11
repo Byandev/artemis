@@ -35,7 +35,7 @@ const Sequences = ({ workspace }: {workspace: Workspace}) => {
         {
             accessorKey: 'name',
             header: ({ column }) => (
-                <SortableHeader column={column} title={'ID'} />
+                <SortableHeader column={column} title={'Name'} />
             ),
             cell: ({ row }) => {
                 return (
@@ -49,23 +49,35 @@ const Sequences = ({ workspace }: {workspace: Workspace}) => {
             },
         },
         {
-            accessorKey: 'sent',
+            accessorKey: 'total_sent',
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Sent'} />
+                <SortableHeader
+                    className="w-24"
+                    column={column}
+                    title={'Sent'}
+                />
             ),
             cell: ({ row }) => numberFormatter(row.original.total_sent),
         },
         {
             accessorKey: 'total_phone_number',
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Left Phone Number'} />
+                <SortableHeader
+                    className="w-24"
+                    column={column}
+                    title={'Phone Number'}
+                />
             ),
             cell: ({ row }) => numberFormatter(row.original.total_phone_number),
         },
         {
             accessorKey: 'success_rate',
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Success Rate'} />
+                <SortableHeader
+                    className="w-24"
+                    column={column}
+                    title={'Success Rate'}
+                />
             ),
             cell: ({ row }) => percentageFormatter(row.original.success_rate),
         },
@@ -92,7 +104,6 @@ const Sequences = ({ workspace }: {workspace: Workspace}) => {
                                 columns={columns}
                                 enableInternalPagination={false}
                                 data={flows?.data || []}
-                                // initialSorting={initialSorting}
                                 meta={{ ...omit(flows, ['data']) }}
                                 onFetch={(params) => {
                                     setParams((prev) => ({ ...prev, ...params}))

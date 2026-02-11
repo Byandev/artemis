@@ -11,8 +11,10 @@ class FlowController extends Controller
     public function index()
     {
         return QueryBuilder::for(Flow::class)
+            ->select('*')
+            ->appendSuccessRate()
             ->allowedIncludes('page')
-            ->allowedSorts(['total_phone_number', 'delivery', 'seen', 'sent'])
+            ->allowedSorts(['total_phone_number', 'delivery', 'seen', 'sent', 'success_rate'])
             ->paginate();
     }
 }

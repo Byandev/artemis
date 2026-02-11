@@ -9,7 +9,7 @@ import { Head } from '@inertiajs/react';
 import ComponentCard from '@/components/common/ComponentCard';
 import { omit } from 'lodash';
 import { Workspace } from '@/types/models/Workspace';
-import { numberFormatter } from '@/lib/utils';
+import { numberFormatter, percentageFormatter } from '@/lib/utils';
 
 const Flows = ({ workspace }: {workspace: Workspace}) => {
     const [flows, setFlows] = useState<PaginatedData<Flow> | null>(null);
@@ -37,42 +37,49 @@ const Flows = ({ workspace }: {workspace: Workspace}) => {
             header: ({ column }) => (
                 <SortableHeader column={column} title={'ID'} />
             ),
-            cell: ({row}) => {
+            cell: ({ row }) => {
                 return (
                     <div>
                         <p className="font-medium">{row.original.name}</p>
-                        <p className="font-light text-xs text-gray-700">{row.original.page?.name}</p>
+                        <p className="text-xs font-light text-gray-700">
+                            {row.original.page?.name}
+                        </p>
                     </div>
                 );
-            }
-        },
-        {
-            accessorKey: 'delivery',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Delivery'} />
-            ),
-            cell: ({ row }) => numberFormatter(row.original.delivery),
+            },
         },
         {
             accessorKey: 'sent',
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Sent'} />
+                <SortableHeader
+                    className={'w-24'}
+                    column={column}
+                    title={'Sent'}
+                />
             ),
             cell: ({ row }) => numberFormatter(row.original.sent),
         },
         {
-            accessorKey: 'seen',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Seen'} />
-            ),
-            cell: ({ row }) => numberFormatter(row.original.seen),
-        },
-        {
             accessorKey: 'total_phone_number',
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Order'} />
+                <SortableHeader
+                    className={'w-24'}
+                    column={column}
+                    title={'Phone Number'}
+                />
             ),
             cell: ({ row }) => numberFormatter(row.original.total_phone_number),
+        },
+        {
+            accessorKey: 'success_rate',
+            header: ({ column }) => (
+                <SortableHeader
+                    className={'w-24'}
+                    column={column}
+                    title={'Success Rate'}
+                />
+            ),
+            cell: ({ row }) => percentageFormatter(row.original.success_rate),
         },
     ];
 
@@ -97,10 +104,9 @@ const Flows = ({ workspace }: {workspace: Workspace}) => {
                                 columns={columns}
                                 enableInternalPagination={false}
                                 data={flows?.data || []}
-                                // initialSorting={initialSorting}
                                 meta={{ ...omit(flows, ['data']) }}
                                 onFetch={(params) => {
-                                    setParams(params)
+                                    setParams((prev) => ({ ...prev, ...params }))
                                 }}
                             />
                         </div>
