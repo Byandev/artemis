@@ -17,7 +17,7 @@ import {
     LayoutDashboard,
     Package,
     Store,
-    Target,
+    MousePointerClickIcon,
     TrendingUp,
     Users,
 } from 'lucide-react';
@@ -70,6 +70,11 @@ export function AppSidebar() {
             title: 'RTS Management',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts`,
             icon: TrendingUp,
+        },
+        {
+            title: 'Botcake',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/botcake`,
+            icon: MousePointerClickIcon,
         },
     ];
 

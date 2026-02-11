@@ -134,6 +134,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/workspaces/{workspace}/teams/{team}', [TeamController::class, 'update'])->name('workspaces.teams.update');
     Route::delete('/workspaces/{workspace}/teams/{team}', [TeamController::class, 'destroy'])->name('workspaces.teams.destroy');
 
+    Route::get('/workspaces/{workspace}/botcake', function (Workspace $workspace) {
+        return redirect()->route('workspaces.botcake.sequences.index', $workspace );
+    })->name('workspaces.botcake');
     Route::get('/workspaces/{workspace}/botcake/flows', [FlowController::class, 'index'])->name('workspaces.botcake.flows.index');
     Route::get('/workspaces/{workspace}/botcake/sequences', [SequenceController::class, 'index'])->name('workspaces.botcake.sequences.index');
 });
