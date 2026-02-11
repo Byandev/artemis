@@ -1,6 +1,12 @@
 <?php
 
 use App\Http\Controllers\Workspaces\AdAccountController;
+use App\Http\Controllers\Workspaces\AdsManager\AdController;
+use App\Http\Controllers\Workspaces\AdsManager\AdSetController;
+use App\Http\Controllers\Workspaces\AdsManager\CampaignController;
+use App\Http\Controllers\Workspaces\AdsManager\OptimizationRuleController;
+use App\Http\Controllers\Workspaces\Botcake\FlowController;
+use App\Http\Controllers\Workspaces\Botcake\SequenceController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\ProductController;
@@ -58,7 +64,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/workspaces/{workspace}/invitations', [WorkspaceInvitationController::class, 'store'])->name('workspaces.invitations.store');
     Route::post('/workspaces/invitations/{invitation}/resend', [WorkspaceInvitationController::class, 'resend'])->name('workspaces.invitations.resend');
     Route::delete('/workspaces/invitations/{invitation}', [WorkspaceInvitationController::class, 'destroy'])->name('workspaces.invitations.destroy');
-    Route::get('/workspaces/invitations/{token}/accept', [WorkspaceInvitationController::class, 'accept'])->name('workspaces.invitations.accept');
 
     //    Route::get('/workspaces/{workspace}/products', [ProductController::class, 'index'])->name('workspaces.products.index');
     //    Route::get('/workspaces/{workspace}/products/create', [ProductController::class, 'create'])->name('workspaces.products.create');
@@ -72,6 +77,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/workspaces/{workspace}/pages/{page}/restore', [PageController::class, 'restore'])->name('workspaces.pages.restore');
 
     // Product routes
+    // Redirect to analytics by default for navigation item active state
+    Route::get('/workspaces/{workspace}/products', function (Workspace $workspace) {
+        return redirect()->route('workspaces.products.analytics', $workspace);
+    })->name('workspaces.products');
     Route::get('/workspaces/{workspace}/products/list', [ProductController::class, 'index'])->name('workspaces.products.index');
     Route::get('/workspaces/{workspace}/products/analytics', [\App\Http\Controllers\Workspaces\Product\AnalyticsController::class, 'index'])->name('workspaces.products.analytics');
     Route::get('/workspaces/{workspace}/products/analytics/metrics', [\App\Http\Controllers\Workspaces\Product\AnalyticsController::class, 'metrics'])->name('workspaces-workspace.products.analytics.metrics');
@@ -81,6 +90,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/workspaces/{workspace}/products/{product}', [ProductController::class, 'update'])->name('workspaces.products.update');
     Route::delete('/workspaces/{workspace}/products/{product}', [ProductController::class, 'destroy'])->name('workspaces.products.destroy');
 
+    // RTS routes
+    // Redirect to analytics by default for navigation item active state
+    Route::get('/workspaces/{workspace}/rts', function (Workspace $workspace) {
+        return redirect()->route('workspaces.rts.analytics', $workspace);
+    })->name('workspaces.rts');
     Route::get('/workspaces/{workspace}/rts/analytics', [AnalyticController::class, 'index'])->name('workspaces.rts.analytics');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/pages', [AnalyticController::class, 'groupByPages'])->name('workspaces.rts.analytics.group-by-pages');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/shops', [AnalyticController::class, 'groupByShops'])->name('workspaces.rts.analytics.group-by-shops');
@@ -96,23 +110,37 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/workspaces/{workspace}/facebook-accounts', [FacebookAccountController::class, 'index'])->name('workspaces.facebook-accounts.index');
     Route::get('/workspaces/{workspace}/ad-accounts', [AdAccountController::class, 'index'])->name('workspaces.ad-accounts.index');
     Route::post('/workspaces/{workspace}/ad-accounts/{adAccount}/refresh', [AdAccountController::class, 'refresh'])->name('workspaces.ad-accounts.refresh');
-    Route::get('/workspaces/{workspace}/ads-manager', function (Workspace $workspace) {
-        return inertia('workspaces/ads-manager/index', [
-            'workspace' => $workspace,
-        ]);
-    })->name('workspaces.ads-manager');
 
-    // Ads Manager API routes
-    Route::get('/workspaces/{workspace}/api/campaigns', [\App\Http\Controllers\Workspaces\CampaignController::class, 'index'])->name('workspaces.api.campaigns.index');
-    Route::get('/workspaces/{workspace}/api/ad-sets', [\App\Http\Controllers\Workspaces\AdSetController::class, 'index'])->name('workspaces.api.ad-sets.index');
-    Route::get('/workspaces/{workspace}/api/ads', [\App\Http\Controllers\Workspaces\AdController::class, 'index'])->name('workspaces.api.ads.index');
+    // Redirect to campaigns by default for navigation item active state
+    Route::get('/workspaces/{workspace}/ads-manager', function (Workspace $workspace) {
+        return redirect()->route('workspaces.ads-manager.campaigns', $workspace);
+    })->name('workspaces.ads-manager');
+    Route::get('/workspaces/{workspace}/ads-manager/campaigns', [CampaignController::class, 'index'])->name('workspaces.ads-manager.campaigns');
+    Route::get('/workspaces/{workspace}/ads-manager/ad-sets', [AdSetController::class, 'index'])->name('workspaces.ads-manager.ad-sets');
+    Route::get('/workspaces/{workspace}/ads-manager/ads', [AdController::class, 'index'])->name('workspaces.ads-manager.ads');
+    Route::get('/workspaces/{workspace}/ads-manager/optimization-rules', [OptimizationRuleController::class, 'page'])->name('workspaces.ads-manager.optimization-rules');
+    Route::get('/workspaces/{workspace}/ads-manager/optimization-rules/create', [OptimizationRuleController::class, 'create'])->name('workspaces.ads-manager.optimization-rules.create');
+    Route::get('/workspaces/{workspace}/ads-manager/optimization-rules/{optimizationRule}/edit', [OptimizationRuleController::class, 'edit'])->name('workspaces.ads-manager.optimization-rules.edit');
+
+    // Optimization Rules API routes
+    Route::post('/workspaces/{workspace}/api/optimization-rules', [OptimizationRuleController::class, 'store'])->name('workspaces.api.optimization-rules.store');
+    Route::get('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'show'])->name('workspaces.api.optimization-rules.show');
+    Route::put('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'update'])->name('workspaces.api.optimization-rules.update');
+    Route::delete('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'destroy'])->name('workspaces.api.optimization-rules.destroy');
 
     // Team routes
     Route::get('/workspaces/{workspace}/teams', [TeamController::class, 'index'])->name('workspaces.teams.index');
     Route::post('/workspaces/{workspace}/teams', [TeamController::class, 'store'])->name('workspaces.teams.store');
     Route::put('/workspaces/{workspace}/teams/{team}', [TeamController::class, 'update'])->name('workspaces.teams.update');
     Route::delete('/workspaces/{workspace}/teams/{team}', [TeamController::class, 'destroy'])->name('workspaces.teams.destroy');
+
+    Route::get('/workspaces/{workspace}/botcake', function (Workspace $workspace) {
+        return redirect()->route('workspaces.botcake.sequences.index', $workspace );
+    })->name('workspaces.botcake');
+    Route::get('/workspaces/{workspace}/botcake/flows', [FlowController::class, 'index'])->name('workspaces.botcake.flows.index');
+    Route::get('/workspaces/{workspace}/botcake/sequences', [SequenceController::class, 'index'])->name('workspaces.botcake.sequences.index');
 });
 
 // Public invitation routes (guest or authenticated)
 Route::get('/workspaces/invitations/{token}', [WorkspaceInvitationController::class, 'show'])->name('workspaces.invitations.show');
+Route::get('/workspaces/invitations/{token}/accept', [WorkspaceInvitationController::class, 'accept'])->name('workspaces.invitations.accept');

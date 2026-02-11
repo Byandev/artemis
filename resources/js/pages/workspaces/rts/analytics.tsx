@@ -1,20 +1,20 @@
-import { useMemo, useState, useEffect } from 'react';
-import AppLayout from '@/layouts/app-layout';
-import RTSManagementLayout from './partials/Layout';
-import { Workspace } from '@/types/models/Workspace';
-import AnalyticsFilters from './partials/AnalyticsFilters';
-import MetricsCard from '@/components/workspaces/MetricsCard';
-import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
-import { Head, router } from '@inertiajs/react';
-import workspaces from '@/routes/workspaces';
+import ComponentCard from '@/components/common/ComponentCard';
 import { Button } from '@/components/ui/button';
+import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
+import MetricsCard from '@/components/workspaces/MetricsCard';
+import { useDateRange } from '@/hooks/use-date-range';
+import AppLayout from '@/layouts/app-layout';
+import workspaces from '@/routes/workspaces';
+import { Workspace } from '@/types/models/Workspace';
+import { Head, router } from '@inertiajs/react';
+import moment from 'moment';
+import { useEffect, useMemo, useState } from 'react';
+import AnalyticsFilters from './partials/AnalyticsFilters';
+import BreakdownPerCities from './partials/BreakdownPerCities';
 import BreakdownPerPages from './partials/BreakdownPerPages';
 import BreakdownPerShops from './partials/BreakdownPerShops';
 import BreakdownPerUsers from './partials/BreakdownPerUsers';
-import BreakdownPerCities from './partials/BreakdownPerCities';
-import ComponentCard from '@/components/common/ComponentCard';
-import { type DateRange } from "react-day-picker"
-import moment from 'moment';
+import RTSManagementLayout from './partials/Layout';
 
 type Props = {
     workspace: Workspace;
@@ -40,9 +40,11 @@ const Analytics = ({ workspace, filters, data }: Props) => {
     const [selectedPagesFilter, setSelectedPagesFilter] = useState<number[]>(filters.page_ids ?? []);
     const [selectedUsersFilter, setSelectedUsersFilter] = useState<number[]>(filters.user_ids ?? []);
     const [selectedShopFilter, setSelectedShopFilter] = useState<number[]>(filters.shop_ids ?? []);
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: filters.start_date ? new Date(filters.start_date) : moment().startOf('month').toDate(),
-        to: filters.end_date ? new Date(filters.end_date) : moment().toDate()
+
+    // Use global date range state with automatic initialization from URL filters
+    const { dateRange, setDateRange } = useDateRange({
+        startDate: filters.start_date,
+        endDate: filters.end_date
     });
 
     const dateRangeStr = useMemo(() => ({
@@ -110,7 +112,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
                 <ComponentCard title="Track your RTS performance metrics">
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
                         <div className="flex items-center justify-start w-full flex-wrap gap-2">
-                            <SimpleDateRangePicker value={dateRange} onChange={setDateRange} />
+                            <SimpleDateRangePicker useGlobalState />
 
                             <AnalyticsFilters
                                 workspace={workspace}

@@ -5,10 +5,6 @@ namespace App\Http\Controllers\Workspaces;
 use App\Http\Controllers\Controller;
 use App\Models\AdRecord;
 use App\Models\Order;
-use App\Models\Page;
-use App\Models\Product;
-use App\Models\Shop;
-use App\Models\Team;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -173,12 +169,6 @@ class WorkspaceController extends Controller
 
         $workspace->load('owner');
 
-        $userRole = $workspace->users()
-            ->where('user_id', $request->user()->id)
-            ->first()
-            ->pivot
-            ->role;
-
         // Get date filters from query
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
@@ -252,26 +242,6 @@ class WorkspaceController extends Controller
             'roas' => $total_ad_spend > 0 ? round($total_sales / $total_ad_spend, 2) : 0.0,
         ];
 
-        // Fetch available filter options
-        $availableFilters = [
-            'teams' => Team::ofWorkspace($workspace)
-                ->select('id', 'name')
-                ->orderBy('name')
-                ->get(),
-            'products' => Product::ofWorkspace($workspace)
-                ->select('id', 'name')
-                ->orderBy('name')
-                ->get(),
-            'pages' => Page::ofWorkspace($workspace)
-                ->select('id', 'name')
-                ->orderBy('name')
-                ->get(),
-            'shops' => Shop::where('workspace_id', $workspace->id)
-                ->select('id', 'name')
-                ->orderBy('name')
-                ->get(),
-        ];
-
         return Inertia::render('workspaces/dashboard/index', [
             'workspace' => $workspace,
             'stats' => $stats,
@@ -283,10 +253,6 @@ class WorkspaceController extends Controller
                 'page_ids' => $request->query('page_ids'),
                 'shop_ids' => $request->query('shop_ids'),
             ],
-            'availableTeams' => $availableFilters['teams'],
-            'availableProducts' => $availableFilters['products'],
-            'availablePages' => $availableFilters['pages'],
-            'availableShops' => $availableFilters['shops'],
         ]);
     }
 

@@ -1,16 +1,16 @@
 
-import { useMemo, useState } from 'react';
-import ProductLayout from '@/pages/workspaces/products/partials/layout';
-import { Workspace } from '@/types/models/Workspace';
-import TopProducts from '@/pages/workspaces/products/partials/analytics/TopProducts';
-import SalesBreakdown from '@/pages/workspaces/products/partials/analytics/SalesBreakdown';
+import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
+import { useDateRange } from '@/hooks/use-date-range';
 import AdSpentBreakdown from '@/pages/workspaces/products/partials/analytics/AdSpentBreakdown';
 import RoasBreakdown from '@/pages/workspaces/products/partials/analytics/RoasBreakdown';
 import RtsBreakdown from '@/pages/workspaces/products/partials/analytics/RtsBreakdown';
+import SalesBreakdown from '@/pages/workspaces/products/partials/analytics/SalesBreakdown';
 import StatusBreakdown from '@/pages/workspaces/products/partials/analytics/StatusBreakdown';
-import { type DateRange } from "react-day-picker"
-import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
+import TopProducts from '@/pages/workspaces/products/partials/analytics/TopProducts';
+import ProductLayout from '@/pages/workspaces/products/partials/layout';
+import { Workspace } from '@/types/models/Workspace';
 import moment from 'moment';
+import { useMemo } from 'react';
 
 interface Props {
     workspace: Workspace;
@@ -34,10 +34,8 @@ const Analytics = ({ workspace, summary }: Props) => {
         ];
     }, [summary]);
 
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: moment().startOf('month').toDate(),
-        to: moment().toDate()
-    })
+    // Use global date range state with automatic initialization
+    const { dateRange, setDateRange } = useDateRange();
 
     const dateRangeStr = useMemo(() => ({
         to: moment(dateRange?.to).format('YYYY-MM-DD'),
@@ -48,7 +46,7 @@ const Analytics = ({ workspace, summary }: Props) => {
         <ProductLayout workspace={workspace}>
             <div className="space-y-5 sm:space-y-6">
                 <div>
-                    <SimpleDateRangePicker value={dateRange} onChange={setDateRange}/>
+                    <SimpleDateRangePicker useGlobalState />
                 </div>
 
                 <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4'>
@@ -69,7 +67,7 @@ const Analytics = ({ workspace, summary }: Props) => {
                 </div>
 
                 <div className="grid lg:grid-cols-2 gap-4">
-                    <TopProducts workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to}/>
+                    <TopProducts workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to} />
 
                     <StatusBreakdown
                         scaling_product_count={summary.scaling_product_count}
@@ -79,13 +77,13 @@ const Analytics = ({ workspace, summary }: Props) => {
                 </div>
 
                 <div className="grid gap-4">
-                    <SalesBreakdown workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to}/>
+                    <SalesBreakdown workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to} />
 
-                    <AdSpentBreakdown workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to}/>
+                    <AdSpentBreakdown workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to} />
 
-                    <RoasBreakdown workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to}/>
+                    <RoasBreakdown workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to} />
 
-                    <RtsBreakdown workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to}/>
+                    <RtsBreakdown workspace={workspace} startDate={dateRangeStr.from} endDate={dateRangeStr.to} />
                 </div>
             </div>
         </ProductLayout>

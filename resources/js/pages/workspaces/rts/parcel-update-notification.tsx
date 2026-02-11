@@ -1,18 +1,18 @@
+import ComponentCard from '@/components/common/ComponentCard';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import AppLayout from '@/layouts/app-layout';
+import { toFrontendSort } from '@/lib/sort';
+import workspaces from '@/routes/workspaces';
+import { PaginatedData } from '@/types';
+import { ParcelJourneyNotification } from '@/types/models/ParcelJourneyNotification';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
+import { format } from 'date-fns';
+import { omit } from 'lodash';
+import { useEffect, useMemo, useState } from 'react';
 import RTSManagementLayout from './partials/Layout';
 import ParcelUpdateNotificationFilters from './partials/ParcelUpdateNotificationFilters';
-import { useState, useEffect, useMemo } from 'react';
-import { ParcelJourneyNotification } from '@/types/models/ParcelJourneyNotification';
-import { ColumnDef } from '@tanstack/react-table';
-import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import { PaginatedData } from '@/types';
-import { format } from 'date-fns';
-import ComponentCard from '@/components/common/ComponentCard';
-import workspaces from '@/routes/workspaces';
-import { toFrontendSort } from '@/lib/sort';
-import { omit } from 'lodash';
 
 interface ParcelUpdateNotificationProps {
     workspace: Workspace;
@@ -46,12 +46,6 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
 
     // Debounce page name search
     useEffect(() => {
-        const currentSearchParam = query?.filter?.page_name ?? '';
-
-        if (pageNameSearch === currentSearchParam) {
-            return;
-        }
-
         const timer = setTimeout(() => {
             router.get(
                 workspaces.rts.parcelUpdateNotification(workspace.slug),
@@ -59,7 +53,7 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                     sort: query?.sort,
                     'filter[page_name]': pageNameSearch || undefined,
                     'filter[type]': typeFilter || undefined,
-                    page: 1,
+                    page: pageNameSearch ? 1 : query?.page ?? 1
                 },
                 {
                     preserveState: true,
@@ -71,7 +65,7 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [pageNameSearch, typeFilter, query?.filter?.page_name, query?.sort, workspace.slug]);
+    }, [pageNameSearch]);
 
     const handleTypeFilterChange = (value: string) => {
         setTypeFilter(value);
@@ -82,7 +76,7 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                 sort: query?.sort,
                 'filter[page_name]': pageNameSearch || undefined,
                 'filter[type]': value || undefined,
-                page: 1,
+                page: pageNameSearch ? 1 : query?.page ?? 1
             },
             {
                 preserveState: true,
@@ -213,7 +207,7 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                                             page: params?.page ?? 1,
                                         },
                                         {
-                                            preserveState: false,
+                                            preserveState: true,
                                             replace: true,
                                             preserveScroll: true,
                                             only: ['notifications', 'query'],

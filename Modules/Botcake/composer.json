@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/botcake",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Botcake\\": "app/",
+            "Modules\\Botcake\\Database\\Factories\\": "database/factories/",
+            "Modules\\Botcake\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Botcake\\Tests\\": "tests/"
+        }
+    }
+}
