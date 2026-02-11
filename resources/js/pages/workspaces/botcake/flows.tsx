@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { useEffect, useState } from 'react';
 import axios, {AxiosResponse} from 'axios';
-import { PaginatedData } from '@/types';
+import { PaginatedData, RequestParams } from '@/types';
 import { Flow } from '@/types/models/Botcake/Flow';
 import { ColumnDef } from '@tanstack/react-table';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
@@ -13,23 +13,19 @@ import { numberFormatter, percentageFormatter } from '@/lib/utils';
 
 const Flows = ({ workspace }: {workspace: Workspace}) => {
     const [flows, setFlows] = useState<PaginatedData<Flow> | null>(null);
-    const [params, setParams] = useState<
-        | {
-              [key: string]: string | number | null;
-          }
-        | undefined
-    >({
+    const [params, setParams] = useState<RequestParams| undefined>({
         include: 'page',
         page: 1,
     });
 
     useEffect(() => {
         axios.get('/api/v1/botcake/flows', {
-            params
+            params,
+            headers: { 'X-Workspace-Id': workspace.id }
         }).then((response: AxiosResponse<PaginatedData<Flow>>) => {
             setFlows(response.data)
         });
-    }, [params]);
+    }, [params, workspace.id]);
 
     const columns: ColumnDef<Flow>[] = [
         {
@@ -79,7 +75,7 @@ const Flows = ({ workspace }: {workspace: Workspace}) => {
                     title={'Success Rate'}
                 />
             ),
-            cell: ({ row }) => percentageFormatter(row.original.success_rate),
+            cell: ({ row }) => percentageFormatter(row.original.success_rate ?? 0),
         },
     ];
 

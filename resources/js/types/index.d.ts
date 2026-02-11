@@ -58,3 +58,8 @@ export interface PaginatedData<T> {
     from: number;
     to: number;
 }
+
+
+export interface RequestParams {
+    [key: string]: string | number | null;
+}

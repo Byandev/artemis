@@ -24,12 +24,15 @@ const Sequences = ({ workspace }: {workspace: Workspace}) => {
     });
 
     useEffect(() => {
-        axios.get('/api/v1/botcake/sequences', {
-            params
-        }).then((response: AxiosResponse<PaginatedData<Sequence>>) => {
-            setFlows(response.data)
-        });
-    }, [params]);
+        axios
+            .get('/api/v1/botcake/sequences', {
+                params,
+                headers: { 'X-Workspace-Id': workspace.id },
+            })
+            .then((response: AxiosResponse<PaginatedData<Sequence>>) => {
+                setFlows(response.data);
+            });
+    }, [params, workspace.id]);
 
     const columns: ColumnDef<Sequence>[] = [
         {
