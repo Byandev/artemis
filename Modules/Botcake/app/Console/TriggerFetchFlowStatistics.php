@@ -2,13 +2,9 @@
 
 namespace Modules\Botcake\Console;
 
-use App\Models\Page;
 use Illuminate\Console\Command;
 use Modules\Botcake\Jobs\FetchFlowStatistics;
-use Modules\Botcake\Jobs\FetchSequences;
-use Modules\Botcake\Jobs\FetchSequenceStatistics;
 use Modules\Botcake\Models\Flow;
-use Modules\Botcake\Models\Sequence;
 
 class TriggerFetchFlowStatistics extends Command
 {

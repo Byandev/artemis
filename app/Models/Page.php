@@ -22,7 +22,7 @@ class Page extends Model
         'botcake_token',
         'pancake_token',
         'infotxt_token',
-        'pos_token'
+        'pos_token',
     ];
 
     public function workspace(): BelongsTo

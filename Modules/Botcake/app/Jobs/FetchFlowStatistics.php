@@ -31,7 +31,7 @@ class FetchFlowStatistics implements ShouldQueue
         ])
             ->get("https://botcake.io/api/public_api/v1/pages/{$flow->page->id}/flows/{$flow->flow_id}/statistics");
 
-//        if ($response->getStatusCode() !== )
+        //        if ($response->getStatusCode() !== )
         if ($response->ok()) {
             $response = $response->json();
 
@@ -43,7 +43,6 @@ class FetchFlowStatistics implements ShouldQueue
                 'total_phone_number' => $response['data']['total_phone_number'],
             ]);
         }
-
 
     }
 }

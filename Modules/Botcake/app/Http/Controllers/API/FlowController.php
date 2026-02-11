@@ -3,7 +3,6 @@
 namespace Modules\Botcake\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use Modules\Botcake\Models\Flow;
 use Spatie\QueryBuilder\QueryBuilder;
 
