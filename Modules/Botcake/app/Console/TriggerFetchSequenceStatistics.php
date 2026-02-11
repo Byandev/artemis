@@ -33,7 +33,7 @@ class TriggerFetchSequenceStatistics extends Command
     {
         Sequence::get()
             ->each(function (Sequence $sequence) {
-                dispatch(new FetchSequenceStatistics($sequence));
+                dispatch(new FetchSequenceStatistics($sequence))->onQueue('botcake');
             });
     }
 
