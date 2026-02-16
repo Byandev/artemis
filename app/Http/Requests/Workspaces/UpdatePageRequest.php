@@ -33,6 +33,7 @@ class UpdatePageRequest extends FormRequest
             'botcake_token' => 'nullable|string|max:255',
             'infotxt_token' => 'nullable|string|max:255',
             'infotxt_user_id' => 'nullable|string|max:255',
+            'pancake_token' => 'nullable|string',
         ];
     }
 
