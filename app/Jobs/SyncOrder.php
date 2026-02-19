@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Order;
+use App\Models\Page;
 use App\Models\ParcelJourney;
 use App\Models\ParcelJourneyNotification;
 use App\Models\ParcelJourneyNotificationTemplate;
@@ -19,7 +20,7 @@ class SyncOrder implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(public Workspace $workspace, public array $data)
+    public function __construct(public Workspace $workspace, public Page $page, public array $data)
     {
         //
     }
@@ -139,7 +140,7 @@ class SyncOrder implements ShouldQueue
                             'created_at' => $update['updated_at'],
                         ]);
 
-                        if ($isLatestUpdate && $savedOrder->status == 2 && in_array($parcelJourney->status, ['On Delivery', 'Departure', 'Arrival']) && Carbon::parse($parcelJourney->created_at)->isToday()) {
+                        if ($this->page->parcel_journey_enabled && $isLatestUpdate && $savedOrder->status == 2 && in_array($parcelJourney->status, ['On Delivery', 'Departure', 'Arrival']) && Carbon::parse($parcelJourney->created_at)->isToday()) {
                             $isLatestUpdate = false;
 
                             if ($parcelJourney->notifications()->doesntExist()) {
