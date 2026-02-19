@@ -13,7 +13,6 @@ use App\Models\Shop;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -137,6 +136,7 @@ class PageController extends Controller
             'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
             'pancake_token' => $validated['pancake_token'] ?? null,
             'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
+            'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
         ]);
 
         dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear(2)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()));
@@ -159,6 +159,7 @@ class PageController extends Controller
             'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
             'pancake_token' => $validated['pancake_token'] ?? null,
             'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
+            'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
         ]);
 
         return redirect()->route('workspaces.pages.index', $workspace)

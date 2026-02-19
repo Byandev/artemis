@@ -26,7 +26,9 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
         botcake_token: page?.botcake_token || '',
         infotxt_token: page?.infotxt_token || '',
         infotxt_user_id: page?.infotxt_user_id || '',
-        pancake_token: page?.pancake_token || ''
+        pancake_token: page?.pancake_token || '',
+        parcel_journey_flow_id: page?.parcel_journey_flow_id || '',
+        parcel_journey_custom_field_id: page?.parcel_journey_custom_field_id || ''
     });
 
     // setData and reset from useForm are stable references
@@ -41,6 +43,9 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                 infotxt_token: page.infotxt_token || '',
                 infotxt_user_id: page.infotxt_user_id || '',
                 pancake_token: page?.pancake_token || '',
+                parcel_journey_flow_id: page?.parcel_journey_flow_id || '',
+                parcel_journey_custom_field_id:
+                    page?.parcel_journey_custom_field_id || '',
             });
         } else {
             reset();
@@ -57,6 +62,7 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                     onOpenChange(false);
                     reset();
                 },
+                onError: (e) => console.log(e)
             });
         } else {
             post(workspaces.pages.store.url({ workspace }), {
@@ -64,6 +70,7 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                     onOpenChange(false);
                     reset();
                 },
+                onError: (e) => console.log(e),
             });
         }
     };
@@ -100,7 +107,6 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                                 </p>
                             )}
                         </div>
-
                         <div className="grid gap-2">
                             <Label htmlFor="shop_id">Shop ID</Label>
                             <Input
@@ -119,7 +125,6 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                                 </p>
                             )}
                         </div>
-
                         <div className="grid gap-2">
                             <Label htmlFor="name">Name</Label>
                             <Input
@@ -137,7 +142,6 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                                 </p>
                             )}
                         </div>
-
                         <div className="grid gap-2">
                             <Label htmlFor="pos_token">POS Token</Label>
                             <Input
@@ -155,7 +159,6 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                                 </p>
                             )}
                         </div>
-
                         <div className="grid gap-2">
                             <Label htmlFor="pancake_token">Pancake Token</Label>
                             <Input
@@ -173,7 +176,6 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                                 </p>
                             )}
                         </div>
-
                         <div className="grid gap-2">
                             <Label htmlFor="botcake_token">Botcake Token</Label>
                             <Input
@@ -188,6 +190,53 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                             {errors.botcake_token && (
                                 <p className="text-destructive text-sm">
                                     {errors.botcake_token}
+                                </p>
+                            )}
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="parcel_journey_flow_id">
+                                Parcel Journey Flow Id
+                            </Label>
+                            <Input
+                                id="parcel_journey_flow_id"
+                                value={data.parcel_journey_flow_id}
+                                onChange={(e) =>
+                                    setData(
+                                        'parcel_journey_flow_id',
+                                        e.target.value,
+                                    )
+                                }
+                                placeholder="Enter Parcel Journey Flow Id"
+                                aria-invalid={!!errors.parcel_journey_flow_id}
+                            />
+                            {errors.parcel_journey_flow_id && (
+                                <p className="text-destructive text-sm">
+                                    {errors.parcel_journey_flow_id}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="parcel_journey_custom_field_id">
+                                Parcel Journey Custom Field Id
+                            </Label>
+                            <Input
+                                id="parcel_journey_custom_field_id"
+                                value={data.parcel_journey_custom_field_id}
+                                onChange={(e) =>
+                                    setData(
+                                        'parcel_journey_custom_field_id',
+                                        e.target.value,
+                                    )
+                                }
+                                placeholder="Enter Parcel Journey Custom Field Id"
+                                aria-invalid={
+                                    !!errors.parcel_journey_custom_field_id
+                                }
+                            />
+                            {errors.parcel_journey_custom_field_id && (
+                                <p className="text-destructive text-sm">
+                                    {errors.parcel_journey_custom_field_id}
                                 </p>
                             )}
                         </div>
@@ -209,7 +258,6 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                                 </p>
                             )}
                         </div>
-
                         <div className="grid gap-2">
                             <Label htmlFor="infotxt_user_id">
                                 Infotxt User ID

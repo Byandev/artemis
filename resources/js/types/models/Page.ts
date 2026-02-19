@@ -16,6 +16,8 @@ export interface Page {
     orders_last_synced_at: string;
     deleted_at: string | null; // SoftDeletes column
     pancake_token: string | null;
+    parcel_journey_flow_id: number | null;
+    parcel_journey_custom_field_id: number | null;
 
     shop?: Shop;
     owner?: User;

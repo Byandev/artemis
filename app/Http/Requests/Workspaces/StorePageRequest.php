@@ -30,7 +30,8 @@ class StorePageRequest extends FormRequest
             'pancake_token' => 'nullable|string',
             'infotxt_token' => 'nullable|string|max:255',
             'infotxt_user_id' => 'nullable|string|max:255',
-            'parcel_journey_flow_id' => 'required|integer',
+            'parcel_journey_flow_id' => 'nullable|integer',
+            'parcel_journey_custom_field_id' => 'nullable|integer',
         ];
     }
 
