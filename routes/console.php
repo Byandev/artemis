@@ -8,4 +8,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('trigger-fetch-page-orders')->hourlyAt(0);
-Schedule::command('trigger-fetch-ads-data')->hourlyAt(30);
+// Schedule::command('trigger-fetch-ads-data')->hourlyAt(30);

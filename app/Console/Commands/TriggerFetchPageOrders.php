@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Page;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 
 class TriggerFetchPageOrders extends Command
 {

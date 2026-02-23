@@ -2,10 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\FetchPageEmployees;
+use App\Models\Page;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Http;
-use Modules\Botcake\Models\Sequence;
-use Modules\Botcake\Models\SequenceMessage;
 
 class TestFunction extends Command
 {
