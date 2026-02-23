@@ -134,6 +134,9 @@ class PageController extends Controller
             'botcake_token' => $validated['botcake_token'] ?? null,
             'infotxt_token' => $validated['infotxt_token'] ?? null,
             'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
+            'pancake_token' => $validated['pancake_token'] ?? null,
+            'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
+            'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
         ]);
 
         dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear(2)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()));
@@ -154,6 +157,9 @@ class PageController extends Controller
             'botcake_token' => $validated['botcake_token'] ?? null,
             'infotxt_token' => $validated['infotxt_token'] ?? null,
             'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
+            'pancake_token' => $validated['pancake_token'] ?? null,
+            'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
+            'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
         ]);
 
         return redirect()->route('workspaces.pages.index', $workspace)

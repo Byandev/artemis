@@ -9,7 +9,7 @@ Route::get('/', function () {
 
 Route::get('/auth/facebook/callback', [\App\Http\Controllers\Integrations\FacebookController::class, 'callback']);
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth'])->group(function () {
 
     Route::get('dashboard', function () {
         $user = auth()->user();

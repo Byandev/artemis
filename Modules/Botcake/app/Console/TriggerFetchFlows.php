@@ -32,7 +32,7 @@ class TriggerFetchFlows extends Command
     public function handle()
     {
         Page::whereNotNull('botcake_token')->get()->each(function ($page) {
-            dispatch(new FetchFlows($page));
+            dispatch(new FetchFlows($page))->onQueue('botcake');
         });
     }
 

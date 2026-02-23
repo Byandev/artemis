@@ -1,5 +1,5 @@
 import { Shop } from '@/types/models/Shop';
-import { User } from '@/types/models/User';
+import { User } from '@/types';
 import { Product } from '@/types/models/Product';
 
 export interface Page {
@@ -15,6 +15,9 @@ export interface Page {
     infotxt_user_id?: string;
     orders_last_synced_at: string;
     deleted_at: string | null; // SoftDeletes column
+    pancake_token: string | null;
+    parcel_journey_flow_id: number | null;
+    parcel_journey_custom_field_id: number | null;
 
     shop?: Shop;
     owner?: User;

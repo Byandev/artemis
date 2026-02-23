@@ -32,7 +32,7 @@ class TriggerFetchSequences extends Command
     public function handle()
     {
         Page::whereNotNull('botcake_token')->get()->each(function ($page) {
-            dispatch(new FetchSequences($page));
+            dispatch(new FetchSequences($page))->onQueue('botcake');
         });
     }
 

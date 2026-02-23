@@ -34,7 +34,7 @@ class TriggerFetchFlowStatistics extends Command
         Flow::limit(10)
             ->get()
             ->each(function (Flow $flow, $index) {
-                dispatch(new FetchFlowStatistics($flow))->delay(now()->addSeconds($index));
+                dispatch(new FetchFlowStatistics($flow))->delay(now()->addSeconds($index))->onQueue('botcake');
             });
     }
 
