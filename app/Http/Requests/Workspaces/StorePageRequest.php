@@ -27,8 +27,11 @@ class StorePageRequest extends FormRequest
             'name' => 'required|string|max:255',
             'pos_token' => 'required|string|max:255',
             'botcake_token' => 'nullable|string|max:255',
+            'pancake_token' => 'nullable|string',
             'infotxt_token' => 'nullable|string|max:255',
             'infotxt_user_id' => 'nullable|string|max:255',
+            'parcel_journey_flow_id' => 'nullable|integer',
+            'parcel_journey_custom_field_id' => 'nullable|integer',
         ];
     }
 

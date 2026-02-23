@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\ParcelJourneyNotification;
+use App\Services\Botcake;
 use DateTime;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -52,49 +53,18 @@ class SendParcelUpdateNotification implements ShouldQueue
             }
 
         } elseif ($this->parcelJourneyNotification->type === 'chat') {
-            $pageId = $this->parcelJourneyNotification->order->page->id;
-            $convoId = $this->parcelJourneyNotification->order->fb_id;
+            [$pageId, $psid] = explode('_', $this->parcelJourneyNotification->order->fb_id);
 
-            $usingPancake = (bool) $this->parcelJourneyNotification->order->page->pancake_token;
+            try {
+                $botcake = new Botcake($pageId, $this->parcelJourneyNotification->order->page->botcake_token);
 
-            if ($usingPancake) {
-                $pancakeToken = $this->parcelJourneyNotification->order->page->pancake_token;
+                $botcake->updateCustomField($psid, $this->parcelJourneyNotification->order->page->parcel_journey_custom_field_id, $this->parcelJourneyNotification->message);
 
-                $response = Http::post("https://pages.fm/api/public_api/v1/pages/$pageId/conversations/$convoId/messages?page_access_token=$pancakeToken", [
-                    'action' => 'reply_inbox',
-                    'message' => $this->parcelJourneyNotification->message,
-                ]);
-            } else {
-                $response = Http::withHeaders(['access-token' => $this->parcelJourneyNotification->order->page->botcake_token])
-                    ->post("https://botcake.io/api/public_api/v1/pages/$pageId/flows/send_content", [
-                        'psid' => $this->parcelJourneyNotification->receiver_identity,
-                        'message_tag' => 'POST_PURCHASE_UPDATE',
-                        'data' => [
-                            'version' => 'v2',
-                            'content' => [
-                                'messages' => [
-                                    [
-                                        'type' => 'text',
-                                        'text' => $this->parcelJourneyNotification->message,
-                                    ],
-                                ],
-                            ],
-                        ],
-                    ]);
-            }
+                $botcake->sendFlow($psid, $this->parcelJourneyNotification->order->page->parcel_journey_flow_id);
 
-            if ($response->ok()) {
-                $response = $response->json();
-
-                if (! $response['success']) {
-                    $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => $response['message']
-                        ?? 'Unable to send chat message',
-                    ]);
-                } else {
-                    $this->parcelJourneyNotification->update(['status' => 'sent']);
-                }
-            } else {
-                $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => 'Request failed']);
+                $this->parcelJourneyNotification->update(['status' => 'sent']);
+            } catch (\Exception $e) {
+                $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => $e->getMessage()]);
             }
         }
     }

@@ -26,6 +26,9 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
         botcake_token: page?.botcake_token || '',
         infotxt_token: page?.infotxt_token || '',
         infotxt_user_id: page?.infotxt_user_id || '',
+        pancake_token: page?.pancake_token || '',
+        parcel_journey_flow_id: page?.parcel_journey_flow_id || '',
+        parcel_journey_custom_field_id: page?.parcel_journey_custom_field_id || ''
     });
 
     // setData and reset from useForm are stable references
@@ -39,6 +42,10 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                 botcake_token: page.botcake_token || '',
                 infotxt_token: page.infotxt_token || '',
                 infotxt_user_id: page.infotxt_user_id || '',
+                pancake_token: page?.pancake_token || '',
+                parcel_journey_flow_id: page?.parcel_journey_flow_id || '',
+                parcel_journey_custom_field_id:
+                    page?.parcel_journey_custom_field_id || '',
             });
         } else {
             reset();
@@ -55,6 +62,7 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                     onOpenChange(false);
                     reset();
                 },
+                onError: (e) => console.log(e)
             });
         } else {
             post(workspaces.pages.store.url({ workspace }), {
@@ -62,6 +70,7 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                     onOpenChange(false);
                     reset();
                 },
+                onError: (e) => console.log(e),
             });
         }
     };
@@ -71,7 +80,9 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
             <DialogContent className="sm:max-w-[600px]">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
-                        <DialogTitle>{isEditing ? 'Edit Page' : 'Create New Page'}</DialogTitle>
+                        <DialogTitle>
+                            {isEditing ? 'Edit Page' : 'Create New Page'}
+                        </DialogTitle>
                         <DialogDescription>
                             {isEditing
                                 ? 'Update the page information below.'
@@ -91,64 +102,142 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                                 aria-invalid={!!errors.id}
                             />
                             {errors.id && (
-                                <p className="text-sm text-destructive">{errors.id}</p>
+                                <p className="text-destructive text-sm">
+                                    {errors.id}
+                                </p>
                             )}
                         </div>
-
                         <div className="grid gap-2">
                             <Label htmlFor="shop_id">Shop ID</Label>
                             <Input
                                 id="shop_id"
                                 type="number"
                                 value={data.shop_id}
-                                onChange={(e) => setData('shop_id', e.target.value)}
+                                onChange={(e) =>
+                                    setData('shop_id', e.target.value)
+                                }
                                 placeholder="Enter shop ID"
                                 aria-invalid={!!errors.shop_id}
                             />
                             {errors.shop_id && (
-                                <p className="text-sm text-destructive">{errors.shop_id}</p>
+                                <p className="text-destructive text-sm">
+                                    {errors.shop_id}
+                                </p>
                             )}
                         </div>
-
                         <div className="grid gap-2">
                             <Label htmlFor="name">Name</Label>
                             <Input
                                 id="name"
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
                                 placeholder="Enter page name"
                                 aria-invalid={!!errors.name}
                             />
                             {errors.name && (
-                                <p className="text-sm text-destructive">{errors.name}</p>
+                                <p className="text-destructive text-sm">
+                                    {errors.name}
+                                </p>
                             )}
                         </div>
-
                         <div className="grid gap-2">
                             <Label htmlFor="pos_token">POS Token</Label>
                             <Input
                                 id="pos_token"
                                 value={data.pos_token}
-                                onChange={(e) => setData('pos_token', e.target.value)}
+                                onChange={(e) =>
+                                    setData('pos_token', e.target.value)
+                                }
                                 placeholder="Enter POS token"
                                 aria-invalid={!!errors.pos_token}
                             />
                             {errors.pos_token && (
-                                <p className="text-sm text-destructive">{errors.pos_token}</p>
+                                <p className="text-destructive text-sm">
+                                    {errors.pos_token}
+                                </p>
                             )}
                         </div>
-
+                        <div className="grid gap-2">
+                            <Label htmlFor="pancake_token">Pancake Token</Label>
+                            <Input
+                                id="pancake_token"
+                                value={data.pancake_token}
+                                onChange={(e) =>
+                                    setData('pancake_token', e.target.value)
+                                }
+                                placeholder="Enter Pancake token"
+                                aria-invalid={!!errors.pancake_token}
+                            />
+                            {errors.pancake_token && (
+                                <p className="text-destructive text-sm">
+                                    {errors.pancake_token}
+                                </p>
+                            )}
+                        </div>
                         <div className="grid gap-2">
                             <Label htmlFor="botcake_token">Botcake Token</Label>
                             <Input
                                 id="botcake_token"
                                 value={data.botcake_token}
-                                onChange={(e) => setData('botcake_token', e.target.value)}
+                                onChange={(e) =>
+                                    setData('botcake_token', e.target.value)
+                                }
                                 placeholder="Enter Botcake token"
                                 aria-invalid={!!errors.botcake_token}
                             />
                             {errors.botcake_token && (
-                                <p className="text-sm text-destructive">{errors.botcake_token}</p>
+                                <p className="text-destructive text-sm">
+                                    {errors.botcake_token}
+                                </p>
+                            )}
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="parcel_journey_flow_id">
+                                Parcel Journey Flow Id
+                            </Label>
+                            <Input
+                                id="parcel_journey_flow_id"
+                                value={data.parcel_journey_flow_id}
+                                onChange={(e) =>
+                                    setData(
+                                        'parcel_journey_flow_id',
+                                        e.target.value,
+                                    )
+                                }
+                                placeholder="Enter Parcel Journey Flow Id"
+                                aria-invalid={!!errors.parcel_journey_flow_id}
+                            />
+                            {errors.parcel_journey_flow_id && (
+                                <p className="text-destructive text-sm">
+                                    {errors.parcel_journey_flow_id}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="parcel_journey_custom_field_id">
+                                Parcel Journey Custom Field Id
+                            </Label>
+                            <Input
+                                id="parcel_journey_custom_field_id"
+                                value={data.parcel_journey_custom_field_id}
+                                onChange={(e) =>
+                                    setData(
+                                        'parcel_journey_custom_field_id',
+                                        e.target.value,
+                                    )
+                                }
+                                placeholder="Enter Parcel Journey Custom Field Id"
+                                aria-invalid={
+                                    !!errors.parcel_journey_custom_field_id
+                                }
+                            />
+                            {errors.parcel_journey_custom_field_id && (
+                                <p className="text-destructive text-sm">
+                                    {errors.parcel_journey_custom_field_id}
+                                </p>
                             )}
                         </div>
 
@@ -157,26 +246,35 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                             <Input
                                 id="infotxt_token"
                                 value={data.infotxt_token}
-                                onChange={(e) => setData('infotxt_token', e.target.value)}
+                                onChange={(e) =>
+                                    setData('infotxt_token', e.target.value)
+                                }
                                 placeholder="Enter Infotxt token"
                                 aria-invalid={!!errors.infotxt_token}
                             />
                             {errors.infotxt_token && (
-                                <p className="text-sm text-destructive">{errors.infotxt_token}</p>
+                                <p className="text-destructive text-sm">
+                                    {errors.infotxt_token}
+                                </p>
                             )}
                         </div>
-
                         <div className="grid gap-2">
-                            <Label htmlFor="infotxt_user_id">Infotxt User ID</Label>
+                            <Label htmlFor="infotxt_user_id">
+                                Infotxt User ID
+                            </Label>
                             <Input
                                 id="infotxt_user_id"
                                 value={data.infotxt_user_id}
-                                onChange={(e) => setData('infotxt_user_id', e.target.value)}
+                                onChange={(e) =>
+                                    setData('infotxt_user_id', e.target.value)
+                                }
                                 placeholder="Enter Infotxt user ID"
                                 aria-invalid={!!errors.infotxt_user_id}
                             />
                             {errors.infotxt_user_id && (
-                                <p className="text-sm text-destructive">{errors.infotxt_user_id}</p>
+                                <p className="text-destructive text-sm">
+                                    {errors.infotxt_user_id}
+                                </p>
                             )}
                         </div>
                     </div>
@@ -191,7 +289,11 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                             Cancel
                         </Button>
                         <Button type="submit" disabled={processing}>
-                            {processing ? 'Saving...' : isEditing ? 'Update Page' : 'Create Page'}
+                            {processing
+                                ? 'Saving...'
+                                : isEditing
+                                  ? 'Update Page'
+                                  : 'Create Page'}
                         </Button>
                     </DialogFooter>
                 </form>

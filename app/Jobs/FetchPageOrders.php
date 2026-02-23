@@ -42,7 +42,7 @@ class FetchPageOrders implements ShouldQueue
         $data = $response['data'];
 
         foreach ($data as $i => $order) {
-            dispatch(new SyncOrder($this->page->workspace, $order))->delay(now()->addSeconds($i));
+            dispatch(new SyncOrder($this->page->workspace, $this->page, $order))->delay(now()->addSeconds($i));
         }
 
         if ($totalPages > $this->page_number) {
