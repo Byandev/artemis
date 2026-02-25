@@ -87,12 +87,14 @@ class PageController extends Controller
 
     public function store(StorePageRequest $request, Workspace $workspace)
     {
+
         // Check if user has access to this workspace
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
         $validated = $request->validated();
+
 
         $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
             'api_key' => $validated['pos_token'],
@@ -135,6 +137,7 @@ class PageController extends Controller
             'infotxt_token' => $validated['infotxt_token'] ?? null,
             'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
             'pancake_token' => $validated['pancake_token'] ?? null,
+            'parcel_journey_enabled' => $validated['parcel_journey_enabled'] ?? null,
             'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
             'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
         ]);
@@ -158,6 +161,7 @@ class PageController extends Controller
             'infotxt_token' => $validated['infotxt_token'] ?? null,
             'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
             'pancake_token' => $validated['pancake_token'] ?? null,
+            'parcel_journey_enabled' => $validated['parcel_journey_enabled'] ?? null,
             'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
             'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
         ]);
