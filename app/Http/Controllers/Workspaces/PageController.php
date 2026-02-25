@@ -70,6 +70,7 @@ class PageController extends Controller
                 'deleted_at',
                 AllowedSort::custom('shop_name', new ShopNameSort),
                 AllowedSort::custom('owner_name', new OwnerNameSort),
+                'parcel_journey_enabled',
             ])
             ->with(['shop', 'owner'])
             ->paginate(10)
