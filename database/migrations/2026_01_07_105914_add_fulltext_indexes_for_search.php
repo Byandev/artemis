@@ -14,16 +14,16 @@ return new class extends Migration
         // These indexes dramatically improve search queries (80-90% faster)
 
         // Pages name search
-        DB::statement('ALTER TABLE pages ADD FULLTEXT INDEX idx_pages_name_fulltext (name)');
+        // DB::statement('ALTER TABLE pages ADD FULLTEXT INDEX idx_pages_name_fulltext (name)');
 
-        // Products name/code search
-        DB::statement('ALTER TABLE products ADD FULLTEXT INDEX idx_products_search_fulltext (name, code)');
+        // // Products name/code search
+        // DB::statement('ALTER TABLE products ADD FULLTEXT INDEX idx_products_search_fulltext (name, code)');
 
-        // Shipping addresses customer name search
-        DB::statement('ALTER TABLE shipping_addresses ADD FULLTEXT INDEX idx_shipping_addresses_fullname_fulltext (full_name)');
+        // // Shipping addresses customer name search
+        // DB::statement('ALTER TABLE shipping_addresses ADD FULLTEXT INDEX idx_shipping_addresses_fullname_fulltext (full_name)');
 
-        // Parcel journeys rider search
-        DB::statement('ALTER TABLE parcel_journeys ADD FULLTEXT INDEX idx_parcel_journeys_rider_fulltext (rider_name, note)');
+        // // Parcel journeys rider search
+        // DB::statement('ALTER TABLE parcel_journeys ADD FULLTEXT INDEX idx_parcel_journeys_rider_fulltext (rider_name, note)');
     }
 
     /**

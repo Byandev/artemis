@@ -36,6 +36,7 @@ class UpdatePageRequest extends FormRequest
             'pancake_token' => 'nullable|string',
             'parcel_journey_flow_id' => 'required|integer',
             'parcel_journey_custom_field_id' => 'nullable|integer',
+            'parcel_journey_enabled' => 'required|boolean',
         ];
     }
 
