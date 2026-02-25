@@ -35,7 +35,7 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
             page?.parcel_journey_custom_field_id || '',
         parcel_journey_enabled: page?.parcel_journey_enabled || false,
     });
-    
+
     // setData and reset from useForm are stable references
     useEffect(() => {
         if (page) {
