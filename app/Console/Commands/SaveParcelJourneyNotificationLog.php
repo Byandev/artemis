@@ -30,7 +30,7 @@ class SaveParcelJourneyNotificationLog extends Command
      */
     public function handle(): void
     {
-        $startDate = Carbon::now()->subYear()->startOfMonth()->format('Y-m-d');
+        $startDate = Carbon::now()->subMonth()->startOfMonth()->format('Y-m-d');
         $endDate = Carbon::now()->subMonth()->endOfMonth()->format('Y-m-d');
 
         $result = DB::table('parcel_journey_notifications as pjn')

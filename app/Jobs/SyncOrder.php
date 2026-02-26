@@ -132,16 +132,16 @@ class SyncOrder implements ShouldQueue
                             }
                         }
 
-                        $parcelJourney = ParcelJourney::updateOrCreate([
-                            'order_id' => $savedOrder->id,
-                            'status' => $update['status'],
-                            'note' => $update['note'],
-                        ], [
-                            'created_at' => $update['updated_at'],
-                        ]);
-
-                        if ($this->page->parcel_journey_enabled && $isLatestUpdate && $savedOrder->status == 2 && in_array($parcelJourney->status, ['On Delivery', 'Departure', 'Arrival']) && Carbon::parse($parcelJourney->created_at)->isToday()) {
+                        if ($this->page->parcel_journey_enabled && $isLatestUpdate && $savedOrder->status == 2 && in_array($update['status'], ['On Delivery', 'Departure', 'Arrival']) && Carbon::parse($update['updated_at'])->isToday()) {
                             $isLatestUpdate = false;
+
+                            $parcelJourney = ParcelJourney::updateOrCreate([
+                                'order_id' => $savedOrder->id,
+                                'status' => $update['status'],
+                                'note' => $update['note'],
+                            ], [
+                                'created_at' => $update['updated_at'],
+                            ]);
 
                             if ($parcelJourney->notifications()->doesntExist()) {
                                 $this->sendParcelJourneyNotification($savedOrder, $parcelJourney);
