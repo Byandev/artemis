@@ -60,12 +60,12 @@ class SaveParcelJourneyNotificationLog extends Command
             ]);
         });
 
-//        ParcelJourneyNotification::whereBetween('created_at', [$startDate, $endDate])
-//            ->where('status', 'sent')
-//            ->delete();
-//
-//        ParcelJourney::doesntHave('notifications')
-//            ->whereBetween('created_at', [$startDate, $endDate])
-//            ->delete();
+        ParcelJourneyNotification::whereBetween('created_at', [$startDate, $endDate])
+            ->where('status', 'sent')
+            ->delete();
+
+        ParcelJourney::doesntHave('notifications')
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->delete();
     }
 }
