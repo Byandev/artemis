@@ -2,7 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Shop;
 use Illuminate\Console\Command;
+use Modules\Pancake\Jobs\FetchShopCustomers;
 
 class TestFunction extends Command
 {
@@ -25,27 +27,8 @@ class TestFunction extends Command
      */
     public function handle()
     {
-        $sequence = Sequence::where('sequence_id', 3160615)->first()->load('page');
+        $shop = Shop::first();
 
-        $response = Http::withHeaders([
-            'access-token' => $sequence->page->botcake_token,
-        ])
-            ->get("https://botcake.io/api/public_api/v1/pages/{$sequence->page->id}/sequences/{$sequence->sequence_id}/statistics")
-            ->throw()
-            ->json();
-
-        $items = collect($response['data'])->map(function ($item) use ($sequence) {
-            return [
-                'sequence_id' => $sequence->id,
-                'message_id' => $item['message_id'],
-                'delivery' => $item['delivery'],
-                'name' => $item['name'],
-                'seen' => $item['seen'],
-                'sent' => $item['sends'],
-                'total_phone_number' => $item['total_phone_number'],
-            ];
-        })->toArray();
-
-        SequenceMessage::upsert($items, ['message_id', 'sequence_id']);
+        dispatch(new FetchShopCustomers($shop, 1));
     }
 }
