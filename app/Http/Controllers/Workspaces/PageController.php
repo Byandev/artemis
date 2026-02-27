@@ -143,7 +143,7 @@ class PageController extends Controller
             'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
         ]);
 
-        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear(2)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()));
+        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear(1)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()));
 
         return redirect()->route('workspaces.pages.index', $workspace)
             ->with('success', 'Page created successfully.');
