@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from '@inertiajs/react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Page } from '@/types/models/Page';
 import workspaces from '@/routes/workspaces';
 import { Workspace } from '@/types/models/Workspace';
+import { Switch } from '@headlessui/react';
+
 
 interface PageFormDialogProps {
     open: boolean;
@@ -18,6 +20,7 @@ interface PageFormDialogProps {
 export function PageFormDialog({ open, onOpenChange, page, workspace }: PageFormDialogProps) {
     const isEditing = !!page;
 
+
     const { data, setData, post, put, processing, errors, reset } = useForm({
         id: page?.id || '',
         shop_id: page?.shop_id || '',
@@ -28,7 +31,9 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
         infotxt_user_id: page?.infotxt_user_id || '',
         pancake_token: page?.pancake_token || '',
         parcel_journey_flow_id: page?.parcel_journey_flow_id || '',
-        parcel_journey_custom_field_id: page?.parcel_journey_custom_field_id || ''
+        parcel_journey_custom_field_id:
+            page?.parcel_journey_custom_field_id || '',
+        parcel_journey_enabled: page?.parcel_journey_enabled || false,
     });
 
     // setData and reset from useForm are stable references
@@ -46,6 +51,7 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                 parcel_journey_flow_id: page?.parcel_journey_flow_id || '',
                 parcel_journey_custom_field_id:
                     page?.parcel_journey_custom_field_id || '',
+                parcel_journey_enabled: Boolean(page?.parcel_journey_enabled),
             });
         } else {
             reset();
@@ -274,6 +280,26 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                             {errors.infotxt_user_id && (
                                 <p className="text-destructive text-sm">
                                     {errors.infotxt_user_id}
+                                </p>
+                            )}
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                            <Label htmlFor="parcel_journey_enabled">
+                                Enable Parcel Journey
+                            </Label>
+                            <Switch
+                                checked={data.parcel_journey_enabled}
+                                onChange={(value) => setData('parcel_journey_enabled', value)}
+                                className="group relative flex h-7 w-14 cursor-pointer rounded-full border bg-white/10 p-1 ease-in-out focus:not-data-focus:outline-none data-checked:bg-white/10 data-focus:outline data-focus:outline-white"
+                            >
+                                <span
+                                    aria-hidden="true"
+                                    className="pointer-events-none inline-block size-5 translate-x-0 rounded-full bg-black shadow-lg ring-0 transition duration-200 ease-in-out group-data-checked:translate-x-7"
+                                />
+                            </Switch>
+                            {errors.parcel_journey_enabled && (
+                                <p className="text-destructive text-sm">
+                                    {errors.parcel_journey_enabled}
                                 </p>
                             )}
                         </div>

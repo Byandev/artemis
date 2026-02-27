@@ -18,6 +18,7 @@ export interface Page {
     pancake_token: string | null;
     parcel_journey_flow_id: number | null;
     parcel_journey_custom_field_id: number | null;
+    parcel_journey_enabled: boolean | null;
 
     shop?: Shop;
     owner?: User;

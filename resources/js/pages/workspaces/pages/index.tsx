@@ -58,6 +58,21 @@ const StatusBadge = ({ isArchived }: { isArchived: boolean }) => {
     );
 };
 
+const EnableBadge = ({ isEnabled }: { isEnabled: boolean }) => {
+    return (
+        <span
+            className={clsx(
+                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset',
+                isEnabled
+                    ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                    : 'bg-red-50 text-red-700 ring-red-200',
+            )}
+        >
+            {isEnabled ? 'ENABLED' : 'DISABLED'}
+        </span>
+    );
+};
+
 const Pages = ({ pages, workspace, query }: PagesProps) => {
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
@@ -158,6 +173,17 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             cell: ({ row }) => {
                 const isArchived = row.original.deleted_at !== null;
                 return <StatusBadge isArchived={isArchived} />;
+            },
+        },
+        {
+            accessorKey: 'parcel_journey_enabled',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Parcel Journey'} />
+            ),
+            cell: ({ row }) => {
+                const isEnabled = Boolean(row.original.parcel_journey_enabled);
+
+                return <EnableBadge isEnabled={isEnabled} />;
             },
         },
         {

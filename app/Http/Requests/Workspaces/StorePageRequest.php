@@ -32,6 +32,7 @@ class StorePageRequest extends FormRequest
             'infotxt_user_id' => 'nullable|string|max:255',
             'parcel_journey_flow_id' => 'nullable|integer',
             'parcel_journey_custom_field_id' => 'nullable|integer',
+            'parcel_journey_enabled' => 'required|boolean',
         ];
     }
 

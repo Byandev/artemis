@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 
 Schedule::command('trigger-fetch-page-orders')->hourlyAt(0);
 // Schedule::command('trigger-fetch-ads-data')->hourlyAt(30);
+Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
