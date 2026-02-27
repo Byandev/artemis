@@ -158,4 +158,9 @@ class Workspace extends Model
     {
         return $this->belongsToMany(FacebookAccount::class, 'workspace_facebook_account');
     }
+
+    public function metrics(): \App\Support\WorkspaceMetrics
+    {
+        return new \App\Support\WorkspaceMetrics($this);
+    }
 }

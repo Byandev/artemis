@@ -7,6 +7,8 @@ import {
     numberFormatter,
     percentageFormatter,
 } from '@/lib/utils';
+import BarChart from '@/components/charts/BarChart';
+import ComponentCard from '@/components/common/ComponentCard';
 
 interface Props {
     workspace: Workspace
@@ -15,7 +17,6 @@ interface Props {
 interface Analytics {
     totalOrders: number;
     totalSales: number;
-    totalQuantity: number;
     aov: number;
     totalDeliveredAmount: number;
     totalReturningAmount: number;
@@ -25,6 +26,7 @@ interface Analytics {
 
 const Dashboard = ({ workspace }: Props) => {
     const [analytics, setAnalytics] = useState<Analytics | null>();
+    const [breakdown, setBreakdown ] = useState([]);
 
     useEffect(() => {
         axios
@@ -38,6 +40,17 @@ const Dashboard = ({ workspace }: Props) => {
             });
     }, [workspace.id]);
 
+    useEffect(() => {
+        axios
+            .get(`/api/v1/workspace/analytics/breakdown`, {
+                headers: {
+                    'X-Workspace-Id': workspace.id,
+                },
+            }).then(response =>setBreakdown(response.data.data))
+    }, [workspace.id]);
+
+    console.log(breakdown)
+
     const cards = useMemo(() => {
         return [
             {
@@ -47,10 +60,6 @@ const Dashboard = ({ workspace }: Props) => {
             {
                 label: 'Total Orders',
                 value: numberFormatter(analytics?.totalOrders ?? 0),
-            },
-            {
-                label: 'Total Item Quantity',
-                value: numberFormatter(analytics?.totalQuantity ?? 0),
             },
             { label: 'AOV', value: currencyFormatter(analytics?.aov ?? 0) },
             {
@@ -76,22 +85,40 @@ const Dashboard = ({ workspace }: Props) => {
         <AppLayout>
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
-                {cards.map((card) => (
-                    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-                        <p className="text-theme-sm text-gray-500 dark:text-gray-400">
-                            {card.label}
-                        </p>
+                    {cards.map((card) => (
+                        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                            <p className="text-theme-sm text-gray-500 dark:text-gray-400">
+                                {card.label}
+                            </p>
 
-                        <div className="mt-3 flex items-end justify-between">
-                            <div>
-                                <h4 className="text-2xl font-bold text-gray-800 dark:text-white/90">
-                                    {card.value}
-                                </h4>
+                            <div className="mt-3 flex items-end justify-between">
+                                <div>
+                                    <h4 className="text-2xl font-bold text-gray-800 dark:text-white/90">
+                                        {card.value}
+                                    </h4>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    ))}
                 </div>
+
+                {/*const series: ApexNonAxisChartSeries = [*/}
+                {/*{*/}
+                {/*    name: 'Sales',*/}
+                {/*    data: [168, 385, 201, 298, 187, 195, 291, 110, 215, 390, 280, 112],*/}
+                {/*},*/}
+                {/*];*/}
+
+
+                <ComponentCard title='Sales' className="mt-6 h-auto">
+                    <BarChart categories={breakdown.map(a => a.period)} series={[
+                        {
+                            name: 'Sales',
+                            data:breakdown.map(a => a.value)
+                        }
+                    ]}/>
+                </ComponentCard>
+
             </div>
         </AppLayout>
     );

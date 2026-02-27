@@ -23,7 +23,8 @@ class FetchShopCustomers implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(): void {
+    public function handle(): void
+    {
         $page_number = $this->page_number;
 
         $pancake = new Pancake($this->shop->id, $this->shop->pages->first()->pos_token);

@@ -4,10 +4,10 @@ namespace Modules\Pancake\Jobs;
 
 use App\Models\Shop;
 use Illuminate\Bus\Queueable;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
 use Modules\Pancake\Models\Customer;
 
 class SyncShopCustomer implements ShouldQueue
@@ -22,7 +22,8 @@ class SyncShopCustomer implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(): void {
+    public function handle(): void
+    {
         Customer::updateOrCreate([
             'id' => $this->data['id'],
         ], [

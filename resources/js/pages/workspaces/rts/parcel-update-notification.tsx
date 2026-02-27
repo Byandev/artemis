@@ -127,7 +127,7 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
             id: 'order.order_number',
             accessorKey: 'order.order_number',
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Order #'} />
+                <SortableHeader column={column} title={'Orders #'} />
             ),
             cell: ({ row }) => {
                 return row.original.order?.order_number || '-';

@@ -30,36 +30,6 @@ class PageController extends Controller
         }
 
         $pages = QueryBuilder::for(Page::where('pages.workspace_id', $workspace->id))
-            ->select('pages.*')
-            ->selectRaw("
-        (
-            COALESCE(
-                (
-                    SELECT SUM(s.daily_budget)
-                    FROM ad_sets s
-                    WHERE s.effective_status = 'ACTIVE'
-                      AND s.id IN (
-                          SELECT DISTINCT a.ad_set_id
-                          FROM ads a
-                          WHERE a.page_id = pages.id
-                      )
-                ), 0
-            )
-            +
-            COALESCE(
-                (
-                    SELECT SUM(c.daily_budget)
-                    FROM campaigns c
-                    WHERE c.effective_status = 'ACTIVE'
-                      AND c.id IN (
-                          SELECT DISTINCT a.campaign_id
-                          FROM ads a
-                          WHERE a.page_id = pages.id
-                      )
-                ), 0
-            )
-        ) AS current_budget
-    ")
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),
             ])

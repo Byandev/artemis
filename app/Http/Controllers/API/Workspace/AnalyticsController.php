@@ -3,67 +3,41 @@
 namespace App\Http\Controllers\API\Workspace;
 
 use App\Http\Controllers\Controller;
+use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Modules\Pancake\Models\Order;
-use Modules\Pancake\Models\OrderItem;
 
 class AnalyticsController extends Controller
 {
     public function index(Request $request)
     {
-        $totalOrders = Order::whereHas('page', function ($query) use ($request) {
-            $query->where('workspace_id', $request->workspace->id);
-        })->whereNotNull('confirmed_at')->count();
+        $workspace = Workspace::find($request->workspace->id);
 
-        $totalSales = Order::whereHas('page', function ($query) use ($request) {
-            $query->where('workspace_id', $request->workspace->id);
-        })
-            ->whereNotNull('confirmed_at')
-            ->sum('final_amount');
+        $data = $workspace->metrics()->extract(['rtsRate', 'aov', 'totalSales', 'totalOrders']);
 
-        $totalQuantity = OrderItem::whereHas('order', function ($query) use ($request) {
-            $query->whereHas('page', function ($query) use ($request) {
-                $query->where('workspace_id', $request->workspace->id);
-            })->whereNotNull('confirmed_at');
-        })->count();
+        return response()->json($data);
+    }
 
-        $totalDeliveredAmount = Order::whereHas('page', function ($query) use ($request) {
-            $query->where('workspace_id', $request->workspace->id);
-        })
-            ->whereNotNull('delivered_at')
-            ->sum('final_amount');
+    public function breakdown(Request $request)
+    {
+        $group = $request->input('group', 'monthly');
 
-        $totalInTransitAmount = Order::whereHas('page', function ($query) use ($request) {
-            $query->where('workspace_id', $request->workspace->id);
-        })
-            ->whereNotNull('shipped_at')
-            ->whereNull('delivered_at')
-            ->whereNull('returning_at')
-            ->sum('final_amount');
+        $base = Order::query()
+            ->whereHas('page', fn ($q) => $q->where('workspace_id', $request->workspace->id))
+            ->whereNotNull('confirmed_at');
 
-        $totalReturningAmount = Order::whereHas('page', function ($query) use ($request) {
-            $query->where('workspace_id', $request->workspace->id);
-        })
-            ->whereNotNull('returning_at')
-            ->whereNull('returned_at')
-            ->sum('final_amount');
+        $periodSql = match ($group) {
+            'weekly' => "DATE_FORMAT(confirmed_at, '%x-W%v')",
+            'monthly' => "DATE_FORMAT(confirmed_at, '%Y-%m')",
+            default => 'DATE(confirmed_at)',
+        };
 
-        $totalReturnedAmount = Order::whereHas('page', function ($query) use ($request) {
-            $query->where('workspace_id', $request->workspace->id);
-        })
-            ->whereNotNull('returning_at')
-            ->whereNotNull('returned_at')
-            ->sum('final_amount');
+        $totals = (clone $base)
+            ->selectRaw("$periodSql as period, COUNT(*) as value")
+            ->groupByRaw($periodSql)
+            ->orderByRaw($periodSql)
+            ->get();
 
-        return response()->json([
-            'totalOrders' => $totalOrders,
-            'totalSales' => $totalSales,
-            'totalQuantity' => $totalQuantity,
-            'aov' => $totalSales / $totalOrders,
-            'totalDeliveredAmount' => $totalDeliveredAmount,
-            'totalReturningAmount' => $totalReturningAmount,
-            'totalReturnedAmount' => $totalReturnedAmount,
-            'rts_rate' => ($totalReturningAmount + $totalReturnedAmount) / ($totalReturningAmount + $totalReturnedAmount + $totalDeliveredAmount),
-        ]);
+        return response()->json(['data' => $totals]);
     }
 }
