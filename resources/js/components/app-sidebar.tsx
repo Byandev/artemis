@@ -51,31 +51,31 @@ export function AppSidebar() {
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products`,
             icon: Package,
         },
-        {
-            title: 'Facebook Accounts',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/facebook-accounts`,
-            icon: FacebookIcon,
-        },
-        {
-            title: 'Ad Accounts',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ad-accounts`,
-            icon: CreditCard,
-        },
+        // {
+        //     title: 'Facebook Accounts',
+        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/facebook-accounts`,
+        //     icon: FacebookIcon,
+        // },
+        // {
+        //     title: 'Ad Accounts',
+        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ad-accounts`,
+        //     icon: CreditCard,
+        // },
         {
             title: 'Teams',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
             icon: Users,
         },
-        {
-            title: 'RTS Management',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts`,
-            icon: TrendingUp,
-        },
-        {
-            title: 'Botcake',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/botcake`,
-            icon: MousePointerClickIcon,
-        },
+        // {
+        //     title: 'RTS Management',
+        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts`,
+        //     icon: TrendingUp,
+        // },
+        // {
+        //     title: 'Botcake',
+        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/botcake`,
+        //     icon: MousePointerClickIcon,
+        // },
     ];
 
     return (

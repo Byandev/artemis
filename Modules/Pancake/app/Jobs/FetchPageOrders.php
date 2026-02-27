@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Jobs;
+namespace Modules\Pancake\Jobs;
+
 
 use App\Models\Page;
 use Carbon\Carbon;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
+use Modules\Pancake\Services\Pancake;
 
 class FetchPageOrders implements ShouldQueue
 {
@@ -30,12 +30,9 @@ class FetchPageOrders implements ShouldQueue
     {
         $page_number = $this->page_number;
 
-        Log::error('https://pos.pages.fm/api/v1/shops/'.$this->page->shop_id.'/orders?api_key='.$this->page->pos_token."&page_size=100&page_number=$page_number&order_sources[]=-1&order_sources[]={$this->page->id}&startDateTime=$this->startTime&endDateTime=$this->endTime&updateStatus=updated_at");
+        $pancake = new Pancake($this->page->shop_id, $this->page->pos_token);
 
-        $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$this->page->shop_id.'/orders?api_key='.$this->page->pos_token."&page_size=100&page_number=$page_number&order_sources[]=-1&order_sources[]={$this->page->id}&startDateTime=$this->startTime&endDateTime=$this->endTime&updateStatus=updated_at")
-            ->throw();
-
-        $response = $response->json();
+        $response = $pancake->listProducts("&page_size=100&page_number=$page_number&order_sources[]=-1&order_sources[]={$this->page->id}&startDateTime=$this->startTime&endDateTime=$this->endTime&updateStatus=updated_at");
 
         $totalPages = $response['total_pages'];
 

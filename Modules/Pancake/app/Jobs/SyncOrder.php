@@ -1,11 +1,12 @@
 <?php
 
-namespace App\Jobs;
+namespace Modules\Pancake\Jobs;
 
-use App\Models\Order;
+use Modules\Pancake\Models\Order;
 use App\Models\Page;
-use App\Models\ParcelJourney;
-use App\Models\ParcelJourneyNotification;
+use Modules\Pancake\Models\OrderItem;
+use Modules\Pancake\Models\ParcelJourney;
+use Modules\Pancake\Models\ParcelJourneyNotification;
 use App\Models\ParcelJourneyNotificationTemplate;
 use App\Models\ShippingAddress;
 use App\Models\Workspace;
@@ -86,6 +87,7 @@ class SyncOrder implements ShouldQueue
             'inserted_at' => $insertedAt->toDateTimeString(),
             'confirmed_at' => $confirmed_at,
             'fb_id' => $order['conversation_id'],
+            'customer_id' => isset($order['customer']) ? $order['customer']['customer_id']: null,
             'shipped_at' => $shipped_at,
             'delivered_at' => $delivered_at,
             'returning_at' => $returning_at,
@@ -95,6 +97,20 @@ class SyncOrder implements ShouldQueue
             'customer_returned_order_count' => $order['customer']['returned_order_count'] ?: 0,
             'conferrer_id' => $conferrer_id,
         ]);
+
+        if (isset($order['items'])) {
+            foreach ($order['items'] as $item) {
+                OrderItem::updateOrCreate([
+                    'order_id' => $savedOrder->id,
+                    'pancake_order_id' => $order['id'],
+                    'pancake_id' => $item['id'],
+                    'pancake_product_id' => $item['product_id'],
+                    'pancake_variant_id' => $item['variation_id'],
+                    'quantity' => $item['quantity'],
+                    'name' => $item['variation_info']['display_id'],
+                ]);
+            }
+        }
 
         if (isset($order['shipping_address'])) {
             ShippingAddress::updateOrCreate([
@@ -152,23 +168,6 @@ class SyncOrder implements ShouldQueue
             }
         }
 
-        $savedOrder->tags()->delete();
-
-        //        if (isset($order['tags'])) {
-        //            $savedOrder->tags()
-        //                ->insert(
-        //                    collect($order['tags'])
-        //                        ->map(function ($tag) use ($savedOrder) {
-        //                            return [
-        //                                'order_id' => $savedOrder->id,
-        //                                'tag_id' => $tag['id'] ?? 0,
-        //                                'name' => $tag['name'] ?? '',
-        //                            ];
-        //                        })
-        //                        ->values()
-        //                        ->toArray());
-        //        }
-
         $savedOrder->update([
             'delivery_attempts' => $deliveryAttempts,
             'first_delivery_attempt' => $first_delivery_attempt,
@@ -178,6 +177,7 @@ class SyncOrder implements ShouldQueue
     private function sendParcelJourneyNotification(Order $order, ParcelJourney $parcelJourney): void
     {
         $order->loadMissing(['shippingAddress', 'page']);
+
         [$page, $psid] = explode('_', $order->fb_id);
         $date = Carbon::parse($parcelJourney->created_at)->format('F d');
 
@@ -259,8 +259,6 @@ class SyncOrder implements ShouldQueue
                     'receiver_name' => $rider_name,
                     'receiver_identity' => $rider_mobile,
                 ]);
-
-                $message = "{$order->shippingAddress->full_name}, Magandang Araw po. Kamusta po ? \nNgayong araw po matatanggap ang parcel nyo. Pwede nyo dn po sila tawagan ang rider na magdedeliver sayo. \n\n$rider_name\n$rider_mobile\n\n Make sure po na matatawagan ang cp number nyo po. Pakibantayan dn po. Salamat po";
 
                 ParcelJourneyNotification::create([
                     'order_id' => $order->id,
