@@ -2,8 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\FetchPageEmployees;
-use App\Models\Page;
 use Illuminate\Console\Command;
 
 class TestFunction extends Command

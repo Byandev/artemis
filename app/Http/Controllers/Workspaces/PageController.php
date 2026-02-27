@@ -96,7 +96,6 @@ class PageController extends Controller
 
         $validated = $request->validated();
 
-
         $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
             'api_key' => $validated['pos_token'],
         ]);

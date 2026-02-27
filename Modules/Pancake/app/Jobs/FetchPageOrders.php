@@ -2,7 +2,6 @@
 
 namespace Modules\Pancake\Jobs;
 
-
 use App\Models\Page;
 use Carbon\Carbon;
 use Illuminate\Contracts\Queue\ShouldQueue;

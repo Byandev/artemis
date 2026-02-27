@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\API\Workspace\AnalyticsController;
 use App\Http\Controllers\API\Workspace\PageController;
 use App\Http\Controllers\API\Workspace\ProductController;
 use App\Http\Controllers\API\Workspace\ShopController;
@@ -14,4 +15,8 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth', 'verif
         Route::get('/pages', [PageController::class, 'index'])->name('pages.index');
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
     });
+});
+
+Route::group(['prefix' => 'api/v1/workspace', 'as' => 'api.v1.workspace', 'middleware' => ['auth', 'workspace']], function () {
+    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics');
 });

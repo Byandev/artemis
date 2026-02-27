@@ -1,259 +1,100 @@
-import LineComparisonChart from '@/components/charts/LineComparisonChart';
-import SingleLineChart from '@/components/charts/SingleLineChart';
-import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
-import MetricsCard from '@/components/workspaces/MetricsCard';
-import { useDateRange } from '@/hooks/use-date-range';
-import { currencyFormatter, getDateRangeDescription, numberFormatter, percentageFormatter } from '@/lib/utils';
-import workspaces from '@/routes/workspace';
-import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
-import moment from 'moment';
+import AppLayout from '@/layouts/app-layout';
 import { useEffect, useMemo, useState } from 'react';
-import DashboardLayout from './partials/Layout';
-import Filters from '@/components/filters/Filters';
+import axios, { AxiosResponse } from 'axios';
+import { Workspace } from '@/types/models/Workspace';
+import {
+    currencyFormatter,
+    numberFormatter,
+    percentageFormatter,
+} from '@/lib/utils';
 
-interface ChartDataPoint {
-    date: string;
-    sales: number;
-    spend: number;
-    roas: number;
+interface Props {
+    workspace: Workspace
+}
+
+interface Analytics {
+    totalOrders: number;
+    totalSales: number;
+    totalQuantity: number;
+    aov: number;
+    totalDeliveredAmount: number;
+    totalReturningAmount: number;
+    totalReturnedAmount: number;
     rts_rate: number;
 }
 
-type Props = {
-    workspace: Workspace;
-    stats: {
-        total_sales: number;
-        total_ad_spend: number;
-        total_orders: number;
-        roas: number;
-        rts_rate_percentage: number;
-        delivered_orders: number;
-        sms_sent: number;
-        chat_msg_sent: number;
-    }
-    filters?: {
-        start_date?: string;
-        end_date?: string;
-        team_ids?: string;
-        product_ids?: string;
-        page_ids?: string;
-        shop_ids?: string;
-    }
-}
-
-export default function Index({ workspace, stats, filters }: Props) {
-
-    // Use global date range state with automatic initialization from URL filters
-    const { dateRange, setDateRange } = useDateRange({
-        startDate: filters?.start_date,
-        endDate: filters?.end_date
-    });
-
-    const dateRangeStr = useMemo(() => ({
-        to: moment(dateRange?.to).format('YYYY-MM-DD'),
-        from: moment(dateRange?.from).format('YYYY-MM-DD'),
-    }), [dateRange]);
-
-    // Initialize entity filters from URL
-    const [selectedTeams, setSelectedTeams] = useState<number[]>(
-        filters?.team_ids ? filters.team_ids.split(',').map(Number) : []
-    );
-    const [selectedProducts, setSelectedProducts] = useState<number[]>(
-        filters?.product_ids ? filters.product_ids.split(',').map(Number) : []
-    );
-    const [selectedPages, setSelectedPages] = useState<number[]>(
-        filters?.page_ids ? filters.page_ids.split(',').map(Number) : []
-    );
-    const [selectedShops, setSelectedShops] = useState<number[]>(
-        filters?.shop_ids ? filters.shop_ids.split(',').map(Number) : []
-    );
-
-    const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    const analytics = useMemo(() => {
-        return [
-            { title: 'Total Sales', value: currencyFormatter(stats.total_sales) },
-            { title: 'Total Ad Spend', value: currencyFormatter(stats.total_ad_spend) },
-            { title: 'Total Orders', value: numberFormatter(stats.total_orders) },
-            { title: 'ROAS', value: stats.roas },
-            { title: 'RTS Rate', value: percentageFormatter(stats.rts_rate_percentage / 100) },
-            { title: 'Delivered Orders', value: numberFormatter(stats.delivered_orders) },
-            { title: 'SMS Sent', value: numberFormatter(stats.sms_sent) },
-            { title: 'Chat Messages Sent', value: numberFormatter(stats.chat_msg_sent) },
-        ]
-    }, [stats])
-
-    // Calculate dynamic chart description based on date range
-    const chartDescription = useMemo(() => getDateRangeDescription(dateRange), [dateRange]);
-
-    // Build query string for chart data
-    const queryString = useMemo(() => {
-        const params = new URLSearchParams();
-        if (dateRange?.from) {
-            params.append('start_date', dateRangeStr.from);
-        }
-        if (dateRange?.to) {
-            params.append('end_date', dateRangeStr.to);
-        }
-        // If no date range is set, default to last 30 days
-        if (!dateRange?.from && !dateRange?.to) {
-            params.append('days', '30');
-        }
-        if (selectedTeams.length > 0) {
-            params.append('team_ids', selectedTeams.join(','));
-        }
-        if (selectedProducts.length > 0) {
-            params.append('product_ids', selectedProducts.join(','));
-        }
-        if (selectedPages.length > 0) {
-            params.append('page_ids', selectedPages.join(','));
-        }
-        if (selectedShops.length > 0) {
-            params.append('shop_ids', selectedShops.join(','));
-        }
-        return params.toString();
-    }, [dateRange, dateRangeStr, selectedTeams, selectedProducts, selectedPages, selectedShops]);
+const Dashboard = ({ workspace }: Props) => {
+    const [analytics, setAnalytics] = useState<Analytics | null>();
 
     useEffect(() => {
-        const fetchChartData = async () => {
-            try {
-                setLoading(true);
-
-                const response = await fetch(
-                    `/workspaces/${workspace.slug}/chart-data?${queryString}`
-                );
-
-                if (!response.ok) {
-                    throw new Error('Failed to fetch chart data');
+        axios
+            .get(`/api/v1/workspace/analytics`, {
+                headers: {
+                    'X-Workspace-Id': workspace.id
                 }
+            })
+            .then((response: AxiosResponse<Analytics>) => {
+                setAnalytics(response.data)
+            });
+    }, [workspace.id]);
 
-                const data = await response.json();
-                setChartData(data.chartData);
-                setError(null);
-            } catch (err) {
-                setError(err instanceof Error ? err.message : 'An error occurred');
-                console.error('Error fetching chart data:', err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchChartData();
-    }, [workspace.slug, queryString]);
-
-    // Update URL and refetch data when filters change
-    useEffect(() => {
-        router.get(
-            workspaces.dashboard(workspace.slug),
+    const cards = useMemo(() => {
+        return [
             {
-                team_ids: selectedTeams.length > 0 ? selectedTeams.join(',') : undefined,
-                product_ids: selectedProducts.length > 0 ? selectedProducts.join(',') : undefined,
-                page_ids: selectedPages.length > 0 ? selectedPages.join(',') : undefined,
-                shop_ids: selectedShops.length > 0 ? selectedShops.join(',') : undefined,
-                start_date: dateRange?.from ? dateRangeStr.from : undefined,
-                end_date: dateRange?.to ? dateRangeStr.to : undefined,
+                label: 'Total Sales',
+                value: currencyFormatter(analytics?.totalSales ?? 0),
             },
             {
-                preserveState: true,
-                preserveScroll: true,
-                only: ['stats']
-            }
-        );
-    }, [workspace.slug, selectedTeams, selectedProducts, selectedPages, selectedShops, dateRange, dateRangeStr]);
-
-    const clearFilters = () => {
-        setDateRange({
-            from: moment().startOf('month').toDate(),
-            to: moment().toDate()
-        });
-        setSelectedTeams([]);
-        setSelectedProducts([]);
-        setSelectedPages([]);
-        setSelectedShops([]);
-        router.get(
-            workspaces.dashboard(workspace.slug),
-            {},
-            { preserveState: true, preserveScroll: true }
-        );
-    };
+                label: 'Total Orders',
+                value: numberFormatter(analytics?.totalOrders ?? 0),
+            },
+            {
+                label: 'Total Item Quantity',
+                value: numberFormatter(analytics?.totalQuantity ?? 0),
+            },
+            { label: 'AOV', value: currencyFormatter(analytics?.aov ?? 0) },
+            {
+                label: 'Total Delivered',
+                value: currencyFormatter(analytics?.totalDeliveredAmount ?? 0),
+            },
+            {
+                label: 'Total Returning',
+                value: currencyFormatter(analytics?.totalReturningAmount ?? 0),
+            },
+            {
+                label: 'Total Returned',
+                value: currencyFormatter(analytics?.totalReturnedAmount ?? 0),
+            },
+            {
+                label: 'RTS Rate',
+                value: percentageFormatter(analytics?.rts_rate ?? 0),
+            },
+        ];
+    }, [analytics])
 
     return (
-        <DashboardLayout workspace={workspace}>
-            <Head title="Dashboard" />
-            <div className="flex items-center justify-end gap-2 mb-6">
-                <Filters workspace={workspace}/>
-                <SimpleDateRangePicker useGlobalState />
-            </div>
+        <AppLayout>
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
+                {cards.map((card) => (
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                        <p className="text-theme-sm text-gray-500 dark:text-gray-400">
+                            {card.label}
+                        </p>
 
-            <div className="space-y-5 sm:space-y-6">
-                <div className="grid auto-rows-min gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-                    {analytics.map((data, key) => (
-                        <MetricsCard key={key} title={data.title} value={data.value} />
-                    ))}
-                </div>                    <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-                    <LineComparisonChart<ChartDataPoint>
-                        chartData={chartData}
-                        loading={loading}
-                        error={error}
-                        title="Total Sales vs. Total Ad Spent"
-                        description={chartDescription}
-                        dataKeyLeft="sales"
-                        dataKeyRight="spend"
-                        labelLeft="Total Sales"
-                        labelRight="Ad Spend"
-                    />
-                </div>
-
-                <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-                    <SingleLineChart<ChartDataPoint>
-                        chartData={chartData}
-                        loading={loading}
-                        error={error}
-                        title="Total Sales"
-                        description={chartDescription}
-                        dataKey="sales"
-                        label="Total Sales"
-                        color="#465FFF"
-                    />
-                    <SingleLineChart<ChartDataPoint>
-                        chartData={chartData}
-                        loading={loading}
-                        error={error}
-                        title="Total Ad Spend"
-                        description={chartDescription}
-                        dataKey="spend"
-                        label="Ad Spend"
-                        color="#9CB9FF"
-                    />
-                </div>
-
-                <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-                    <SingleLineChart<ChartDataPoint>
-                        chartData={chartData}
-                        loading={loading}
-                        error={error}
-                        title="ROAS (Return on Ad Spend)"
-                        description={chartDescription}
-                        dataKey="roas"
-                        label="ROAS"
-                        color="#10B981"
-                    />
-                    <SingleLineChart<ChartDataPoint>
-                        chartData={chartData}
-                        loading={loading}
-                        error={error}
-                        title="RTS Rate (Return to Sender)"
-                        description={chartDescription}
-                        dataKey="rts_rate"
-                        label="RTS Rate"
-                        color="#EF4444"
-                        yAxisFormatter={(value: number) => value.toFixed(0) + '%'}
-                    />
+                        <div className="mt-3 flex items-end justify-between">
+                            <div>
+                                <h4 className="text-2xl font-bold text-gray-800 dark:text-white/90">
+                                    {card.value}
+                                </h4>
+                            </div>
+                        </div>
+                    </div>
+                ))}
                 </div>
             </div>
-        </DashboardLayout>
+        </AppLayout>
     );
 }
+
+export default Dashboard;

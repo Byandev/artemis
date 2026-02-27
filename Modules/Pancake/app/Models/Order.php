@@ -13,7 +13,6 @@ class Order extends Model
 
     protected $table = 'pancake_orders';
 
-
     public function shippingAddress(): \Illuminate\Database\Eloquent\Relations\HasOne|\App\Models\Order
     {
         return $this->hasOne(ShippingAddress::class);
@@ -28,5 +27,4 @@ class Order extends Model
     {
         return $this->belongsTo(Page::class);
     }
-
 }

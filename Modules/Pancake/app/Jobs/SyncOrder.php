@@ -2,17 +2,17 @@
 
 namespace Modules\Pancake\Jobs;
 
-use Modules\Pancake\Models\Order;
 use App\Models\Page;
-use Modules\Pancake\Models\OrderItem;
-use Modules\Pancake\Models\ParcelJourney;
-use Modules\Pancake\Models\ParcelJourneyNotification;
 use App\Models\ParcelJourneyNotificationTemplate;
 use App\Models\ShippingAddress;
 use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Modules\Pancake\Models\Order;
+use Modules\Pancake\Models\OrderItem;
+use Modules\Pancake\Models\ParcelJourney;
+use Modules\Pancake\Models\ParcelJourneyNotification;
 
 class SyncOrder implements ShouldQueue
 {
@@ -38,6 +38,7 @@ class SyncOrder implements ShouldQueue
 
         $confirmed_at = null;
         $returning_at = null;
+        $returned_at = null;
         $delivered_at = null;
         $shipped_at = null;
         $conferrer_id = null;
@@ -46,6 +47,7 @@ class SyncOrder implements ShouldQueue
         $shippedHistory = collect($order['status_history'])->where('status', 2)->first();
         $deliveredHistory = collect($order['status_history'])->where('status', 3)->first();
         $returningHistory = collect($order['status_history'])->where('status', 4)->first();
+        $returnedHistory = collect($order['status_history'])->where('status', 5)->first();
 
         if ($confirmedHistory) {
             $confirmedAtUtc = Carbon::createFromFormat('Y-m-d\TH:i:s', $confirmedHistory['updated_at'], 'UTC');
@@ -69,6 +71,11 @@ class SyncOrder implements ShouldQueue
             $returning_at = $returningAtUtc->setTimezone(config('app.timezone'))->toDateTimeString();
         }
 
+        if ($returnedHistory) {
+            $returnedAtUtc = Carbon::createFromFormat('Y-m-d\TH:i:s', $returnedHistory['updated_at'], 'UTC');
+            $returned_at = $returnedAtUtc->setTimezone(config('app.timezone'))->toDateTimeString();
+        }
+
         $deliveryAttempts = null;
         $first_delivery_attempt = null;
 
@@ -87,10 +94,11 @@ class SyncOrder implements ShouldQueue
             'inserted_at' => $insertedAt->toDateTimeString(),
             'confirmed_at' => $confirmed_at,
             'fb_id' => $order['conversation_id'],
-            'customer_id' => isset($order['customer']) ? $order['customer']['customer_id']: null,
+            'customer_id' => isset($order['customer']) ? $order['customer']['customer_id'] : null,
             'shipped_at' => $shipped_at,
             'delivered_at' => $delivered_at,
             'returning_at' => $returning_at,
+            'returned_at' => $returned_at,
             'assignee_id' => isset($order['assigning_seller']) ? $order['assigning_seller']['fb_id'] : null,
             'last_editor_id' => isset($order['last_editor']) ? $order['last_editor']['fb_id'] : null,
             'customer_succeed_order_count' => $order['customer']['succeed_order_count'] ?: 0,

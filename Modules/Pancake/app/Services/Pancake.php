@@ -8,9 +8,7 @@ use Illuminate\Support\Facades\Http;
 
 class Pancake
 {
-    public function __construct(public int $shop_id, public string $api_key)
-    {
-    }
+    public function __construct(public int $shop_id, public string $api_key) {}
 
     /**
      * @throws RequestException
