@@ -18,10 +18,11 @@ interface Analytics {
     totalOrders: number;
     totalSales: number;
     aov: number;
-    totalDeliveredAmount: number;
-    totalReturningAmount: number;
-    totalReturnedAmount: number;
-    rts_rate: number;
+    rtsRate: number;
+    retentionRate: number;
+    timeToFirstOrder: number;
+    avgLifetimeValue: number;
+    avgDeliveryDays: number
 }
 
 const Dashboard = ({ workspace }: Props) => {
@@ -49,7 +50,6 @@ const Dashboard = ({ workspace }: Props) => {
             }).then(response =>setBreakdown(response.data.data))
     }, [workspace.id]);
 
-    console.log(breakdown)
 
     const cards = useMemo(() => {
         return [
@@ -63,20 +63,24 @@ const Dashboard = ({ workspace }: Props) => {
             },
             { label: 'AOV', value: currencyFormatter(analytics?.aov ?? 0) },
             {
-                label: 'Total Delivered',
-                value: currencyFormatter(analytics?.totalDeliveredAmount ?? 0),
-            },
-            {
-                label: 'Total Returning',
-                value: currencyFormatter(analytics?.totalReturningAmount ?? 0),
-            },
-            {
-                label: 'Total Returned',
-                value: currencyFormatter(analytics?.totalReturnedAmount ?? 0),
-            },
-            {
                 label: 'RTS Rate',
-                value: percentageFormatter(analytics?.rts_rate ?? 0),
+                value: percentageFormatter(analytics?.rtsRate ?? 0),
+            },
+            {
+                label: 'Retention Rate',
+                value: percentageFormatter(analytics?.retentionRate ?? 0),
+            },
+            {
+                label: 'Time to first Order',
+                value: `${analytics?.timeToFirstOrder ?? 0} Hrs`,
+            },
+            {
+                label: 'Avg. Lifetime Value',
+                value: currencyFormatter(analytics?.avgLifetimeValue ?? 0),
+            },
+            {
+                label: 'Avg Delivery Days',
+                value: `${analytics?.avgDeliveryDays ?? 0} Days`,
             },
         ];
     }, [analytics])
@@ -101,13 +105,6 @@ const Dashboard = ({ workspace }: Props) => {
                         </div>
                     ))}
                 </div>
-
-                {/*const series: ApexNonAxisChartSeries = [*/}
-                {/*{*/}
-                {/*    name: 'Sales',*/}
-                {/*    data: [168, 385, 201, 298, 187, 195, 291, 110, 215, 390, 280, 112],*/}
-                {/*},*/}
-                {/*];*/}
 
 
                 <ComponentCard title='Sales' className="mt-6 h-auto">

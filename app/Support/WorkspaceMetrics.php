@@ -3,7 +3,14 @@
 namespace App\Support;
 
 use App\Models\Workspace;
-use App\Metrics\Orders\{RtsRate, TotalSales, TotalOrders, Aov};
+use App\Metrics\Orders\{AverageDeliveryDays,
+    AverageLifetimeValue,
+    RetentionRate,
+    RtsRate,
+    TimeToFirstOrder,
+    TotalSales,
+    TotalOrders,
+    Aov};
 use InvalidArgumentException;
 
 final class WorkspaceMetrics
@@ -19,6 +26,10 @@ final class WorkspaceMetrics
         'rtsRate' => RtsRate::class,
         'totalSales' => TotalSales::class,
         'totalOrders' => TotalOrders::class,
+        'retentionRate' => RetentionRate::class,
+        'timeToFirstOrder' => TimeToFirstOrder::class,
+        'avgLifetimeValue' => AverageLifetimeValue::class,
+        'avgDeliveryDays' => AverageDeliveryDays::class,
     ];
 
     /**
