@@ -107,14 +107,14 @@ const Dashboard = ({ workspace }: Props) => {
                 </div>
 
 
-                <ComponentCard title='Sales' className="mt-6 h-auto">
-                    <BarChart categories={breakdown.map(a => a.period)} series={[
-                        {
-                            name: 'Sales',
-                            data:breakdown.map(a => a.value)
-                        }
-                    ]}/>
-                </ComponentCard>
+                {/*<ComponentCard title='Sales' className="mt-6 h-auto">*/}
+                {/*    <BarChart categories={breakdown.map(a => a.period)} series={[*/}
+                {/*        {*/}
+                {/*            name: 'Sales',*/}
+                {/*            data:breakdown.map(a => a.value)*/}
+                {/*        }*/}
+                {/*    ]}/>*/}
+                {/*</ComponentCard>*/}
 
             </div>
         </AppLayout>
