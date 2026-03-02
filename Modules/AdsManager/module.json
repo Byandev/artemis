@@ -1,0 +1,11 @@
+{
+    "name": "AdsManager",
+    "alias": "adsmanager",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\AdsManager\\Providers\\AdsManagerServiceProvider"
+    ],
+    "files": []
+}

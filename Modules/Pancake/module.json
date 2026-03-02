@@ -1,0 +1,11 @@
+{
+    "name": "Pancake",
+    "alias": "pancake",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Pancake\\Providers\\PancakeServiceProvider"
+    ],
+    "files": []
+}
