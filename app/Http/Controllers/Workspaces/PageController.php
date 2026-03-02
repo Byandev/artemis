@@ -7,7 +7,6 @@ use App\Http\Requests\Workspaces\StorePageRequest;
 use App\Http\Requests\Workspaces\UpdatePageRequest;
 use App\Http\Sorts\Page\OwnerNameSort;
 use App\Http\Sorts\Page\ShopNameSort;
-use App\Jobs\FetchPageOrders;
 use App\Models\Page;
 use App\Models\Shop;
 use App\Models\User;
@@ -16,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Modules\Pancake\Jobs\FetchPageOrders;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -30,36 +30,6 @@ class PageController extends Controller
         }
 
         $pages = QueryBuilder::for(Page::where('pages.workspace_id', $workspace->id))
-            ->select('pages.*')
-            ->selectRaw("
-        (
-            COALESCE(
-                (
-                    SELECT SUM(s.daily_budget)
-                    FROM ad_sets s
-                    WHERE s.effective_status = 'ACTIVE'
-                      AND s.id IN (
-                          SELECT DISTINCT a.ad_set_id
-                          FROM ads a
-                          WHERE a.page_id = pages.id
-                      )
-                ), 0
-            )
-            +
-            COALESCE(
-                (
-                    SELECT SUM(c.daily_budget)
-                    FROM campaigns c
-                    WHERE c.effective_status = 'ACTIVE'
-                      AND c.id IN (
-                          SELECT DISTINCT a.campaign_id
-                          FROM ads a
-                          WHERE a.page_id = pages.id
-                      )
-                ), 0
-            )
-        ) AS current_budget
-    ")
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),
             ])
@@ -95,7 +65,6 @@ class PageController extends Controller
         }
 
         $validated = $request->validated();
-
 
         $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
             'api_key' => $validated['pos_token'],

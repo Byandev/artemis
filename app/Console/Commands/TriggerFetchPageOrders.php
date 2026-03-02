@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Page;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
+use Modules\Pancake\Jobs\FetchPageOrders;
 
 class TriggerFetchPageOrders extends Command
 {
@@ -35,7 +35,7 @@ class TriggerFetchPageOrders extends Command
             ->whereNotNull('infotxt_user_id')
             ->get()
             ->each(function (Page $page) {
-                dispatch(new \App\Jobs\FetchPageOrders($page, 1, \Carbon\Carbon::parse($page->orders_last_synced_at)->unix(), \Carbon\Carbon::now()->unix()));
+                dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::parse($page->orders_last_synced_at)->unix(), \Carbon\Carbon::now()->unix()));
             });
     }
 }

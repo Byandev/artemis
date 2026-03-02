@@ -1,24 +1,24 @@
-import AppLayout from '@/layouts/app-layout';
-import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import { ColumnDef } from '@tanstack/react-table';
-import { Workspace } from '@/types/models/Workspace';
-import { AdAccount } from '@/types/models/AdAccount';
 import ComponentCard from '@/components/common/ComponentCard';
-import { router, useForm } from '@inertiajs/react';
-import workspaces from '@/routes/workspaces';
-import { toFrontendSort } from '@/lib/sort';
-import { useMemo, useState, useEffect } from 'react';
-import clsx from "clsx";
-import { PaginatedData } from '@/types';
-import { omit  } from 'lodash'
+import { Button } from '@/components/ui/button';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
+import AppLayout from '@/layouts/app-layout';
+import { toFrontendSort } from '@/lib/sort';
+import workspaces from '@/routes/workspaces';
+import { PaginatedData } from '@/types';
+import { AdAccount } from '@/types/models/AdAccount';
+import { Workspace } from '@/types/models/Workspace';
+import { router, useForm } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
+import clsx from "clsx";
+import { omit } from 'lodash';
 import { MoreHorizontal, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface AdAccountsProps {
     workspace: Workspace;
@@ -41,16 +41,16 @@ type AdAccountStatus = {
 };
 
 const AD_ACCOUNT_STATUS: Record<number, AdAccountStatus> = {
-    1:   { label: "ACTIVE",               className: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
-    2:   { label: "DISABLED",             className: "bg-zinc-50 text-zinc-700 ring-zinc-200" },
-    3:   { label: "UNSETTLED",            className: "bg-amber-50 text-amber-800 ring-amber-200" },
-    7:   { label: "PENDING_RISK_REVIEW",  className: "bg-rose-50 text-rose-700 ring-rose-200" },
-    8:   { label: "PENDING_SETTLEMENT",   className: "bg-sky-50 text-sky-700 ring-sky-200" },
-    9:   { label: "IN_GRACE_PERIOD",      className: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
-    100: { label: "PENDING_CLOSURE",      className: "bg-orange-50 text-orange-700 ring-orange-200" },
-    101: { label: "CLOSED",               className: "bg-slate-50 text-slate-700 ring-slate-200" },
-    201: { label: "ANY_ACTIVE",           className: "bg-teal-50 text-teal-700 ring-teal-200" },
-    202: { label: "ANY_CLOSED",           className: "bg-gray-50 text-gray-700 ring-gray-200" },
+    1: { label: "ACTIVE", className: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+    2: { label: "DISABLED", className: "bg-zinc-50 text-zinc-700 ring-zinc-200" },
+    3: { label: "UNSETTLED", className: "bg-amber-50 text-amber-800 ring-amber-200" },
+    7: { label: "PENDING_RISK_REVIEW", className: "bg-rose-50 text-rose-700 ring-rose-200" },
+    8: { label: "PENDING_SETTLEMENT", className: "bg-sky-50 text-sky-700 ring-sky-200" },
+    9: { label: "IN_GRACE_PERIOD", className: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
+    100: { label: "PENDING_CLOSURE", className: "bg-orange-50 text-orange-700 ring-orange-200" },
+    101: { label: "CLOSED", className: "bg-slate-50 text-slate-700 ring-slate-200" },
+    201: { label: "ANY_ACTIVE", className: "bg-teal-50 text-teal-700 ring-teal-200" },
+    202: { label: "ANY_CLOSED", className: "bg-gray-50 text-gray-700 ring-gray-200" },
 };
 
 const StatusBadge = ({ status }: { status: number }) => {
@@ -65,8 +65,8 @@ const StatusBadge = ({ status }: { status: number }) => {
                 item.className
             )}
         >
-      {item.label}
-    </span>
+            {item.label}
+        </span>
     );
 }
 
@@ -80,19 +80,13 @@ const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
     useEffect(() => {
-        const currentSearchParam = query?.filter?.search ?? '';
-
-        if (searchValue === currentSearchParam) {
-            return;
-        }
-
         const timer = setTimeout(() => {
             router.get(
                 workspaces.adAccounts.index({ workspace }),
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
-                    page: 1,
+                    page: searchValue ? 1 : query?.page ?? 1
                 },
                 {
                     preserveState: true,
@@ -104,7 +98,7 @@ const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [searchValue, query?.filter?.search, query?.sort, workspace]);
+    }, [searchValue]);
 
     const refresh = (adAccount: AdAccount) => {
         post(workspaces.adAccounts.refresh.url({ workspace, adAccount }), {
@@ -212,7 +206,7 @@ const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
                                 enableInternalPagination={false}
                                 data={ad_accounts.data || []}
                                 initialSorting={initialSorting}
-                                meta={{ ...omit(ad_accounts, ['data'])  }}
+                                meta={{ ...omit(ad_accounts, ['data']) }}
                                 onFetch={(params) => {
                                     router.get(
                                         workspaces.adAccounts.index({ workspace }),

@@ -1,19 +1,17 @@
+import ComponentCard from '@/components/common/ComponentCard'
+import { DataTable, SortableHeader } from '@/components/ui/data-table'
 import AppLayout from '@/layouts/app-layout'
+import { toFrontendSort } from '@/lib/sort'
+import workspaces from '@/routes/workspaces'
+import { PaginatedData } from '@/types'
+import { Order } from '@/types/models/Orders'
 import { Workspace } from '@/types/models/Workspace'
-import { Head } from '@inertiajs/react'
+import { Head, router } from '@inertiajs/react'
+import { ColumnDef } from '@tanstack/react-table'
+import _, { omit } from 'lodash'
+import { useEffect, useMemo, useState } from 'react'
 import RTSManagementLayout from './partials/Layout'
 import OrderFilters from './partials/OrderFilters'
-import { useState, useEffect, useMemo } from 'react'
-import { Order } from '@/types/models/Orders'
-import { ColumnDef } from '@tanstack/react-table'
-import { DataTable, SortableHeader } from '@/components/ui/data-table'
-import { router } from '@inertiajs/react'
-import workspaces from '@/routes/workspaces'
-import _ from 'lodash'
-import { PaginatedData } from '@/types'
-import { toFrontendSort } from '@/lib/sort'
-import { omit } from 'lodash'
-import ComponentCard from '@/components/common/ComponentCard'
 
 interface ForDeliveryTodayProps {
     orders: PaginatedData<Order>;
@@ -43,12 +41,6 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders, query }: ForDe
 
     // Debounce page name search
     useEffect(() => {
-        const currentSearchParam = query?.filter?.page_name ?? '';
-
-        if (pageNameSearch === currentSearchParam) {
-            return;
-        }
-
         const timer = setTimeout(() => {
             router.get(
                 workspaces.rts.forDeliveryToday(workspace.slug),
@@ -57,7 +49,7 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders, query }: ForDe
                     'filter[page_name]': pageNameSearch || undefined,
                     'filter[customer]': customerFilter || undefined,
                     'filter[rider]': riderFilter || undefined,
-                    page: 1,
+                    page: pageNameSearch ? 1 : query?.page ?? 1
                 },
                 {
                     preserveState: true,
@@ -69,7 +61,7 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders, query }: ForDe
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [pageNameSearch, query?.filter?.page_name]);
+    }, [pageNameSearch]);
 
     const handleFilterChange = (filterType: 'customer' | 'rider', value: string) => {
         const filters = {
@@ -193,7 +185,7 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders, query }: ForDe
                                             page: params?.page ?? 1,
                                         },
                                         {
-                                            preserveState: false,
+                                            preserveState: true,
                                             replace: true,
                                             preserveScroll: true,
                                         },

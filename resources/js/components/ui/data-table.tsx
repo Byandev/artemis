@@ -1,16 +1,17 @@
 "use client"
 
 import {
+    Column,
     ColumnDef,
+    PaginationState,
+    SortingState,
     flexRender,
     getCoreRowModel,
-    useReactTable,
-    SortingState,
     getSortedRowModel,
-    Column,
-    PaginationState
-} from "@tanstack/react-table"
+    useReactTable
+} from "@tanstack/react-table";
 
+import Pagination from '@/components/ui/pagination';
 import {
     Table,
     TableBody,
@@ -18,19 +19,18 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table"
-import { useMemo, useState } from 'react';
+} from "@/components/ui/table";
 import { toBackendSort } from '@/lib/sort';
-import { TriangleDownIcon, TriangleUpIcon } from '@radix-ui/react-icons';
 import { PaginatedData } from '@/types';
-import Pagination from '@/components/ui/pagination';
+import { TriangleDownIcon, TriangleUpIcon } from '@radix-ui/react-icons';
+import { useMemo, useState } from 'react';
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
     data: TData[]
     initialSorting?: SortingState,
     enableInternalPagination?: boolean
-    onFetch?: (params?: { sort?: string, page?: number }) => void,
+    onFetch?: (params?: { [key: string]: string | number | null }) => void,
     meta?: Omit<PaginatedData<TData>, 'data'>
 }
 
@@ -97,7 +97,7 @@ export function DataTable<TData, TValue>({
                                     data-state={row.getIsSelected() && "selected"}
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id} className='px-4 py-2 border border-gray-100 dark:border-white/[0.05]text-gray-700 text-theme-xs dark:text-gray-400'>
+                                        <TableCell key={cell.id} className='px-4 py-4 border border-gray-100 dark:border-white/[0.05]text-gray-700 text-theme-xs dark:text-gray-400'>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}
@@ -139,27 +139,28 @@ export function DataTable<TData, TValue>({
 type SortableHeaderProps<TData> = {
     column: Column<TData, unknown>
     title: string
-    enabled?: boolean
+    enabled?: boolean;
+    className?: string
 }
 
-export function SortableHeader<TData>({ column, title, enabled = true }: SortableHeaderProps<TData>) {
+export function SortableHeader<TData>({ column, title, enabled = true, className = '' }: SortableHeaderProps<TData>) {
     const sorted = useMemo(() => column.getIsSorted(), [column])
 
     return (
         <div
-            className="flex items-center justify-between cursor-pointer"
+            className={`flex items-center justify-between ${enabled ? 'cursor-pointer' : ''} ${className}`}
             onClick={() => {
                 if (enabled) {
                     column.toggleSorting(sorted === 'asc')
-                    }
+                }
             }}
         >
             <p className="font-medium text-gray-700 text-theme-xs dark:text-gray-400">
                 {title}
             </p>
             {enabled && <button className="flex flex-col">
-                <TriangleUpIcon className={`-mb-1 ${sorted === 'asc' ? 'text-brand-500': 'text-gray-300'}`}/>
-                <TriangleDownIcon className={`-mt-1 ${sorted === 'desc' ? 'text-brand-500': 'text-gray-300'}`}/>
+                <TriangleUpIcon className={`-mb-1 ${sorted === 'asc' ? 'text-brand-500' : 'text-gray-300'}`} />
+                <TriangleDownIcon className={`-mt-1 ${sorted === 'desc' ? 'text-brand-500' : 'text-gray-300'}`} />
             </button>}
         </div>
     )

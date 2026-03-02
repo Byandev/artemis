@@ -11,33 +11,17 @@ import { dashboard } from '@/routes';
 import workspace from '@/routes/workspace';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { 
-    BookOpen, 
-    Folder, 
-    LayoutDashboard, 
-    Package, 
-    Users,
-    Store,
-    Target,
-    UserCircle,
+import {
     CreditCard,
     FacebookIcon,
-    TrendingUp
+    LayoutDashboard,
+    Package,
+    Store,
+    MousePointerClickIcon,
+    TrendingUp,
+    Users,
 } from 'lucide-react';
 import AppLogo from './app-logo';
-
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
-    },
-];
 
 export function AppSidebar() {
     const { currentWorkspace } = usePage().props;
@@ -52,11 +36,11 @@ export function AppSidebar() {
             href: dashboardUrl,
             icon: LayoutDashboard,
         },
-          {
-            title: 'Ads Manager',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ads-manager`,
-            icon: Target,
-        },
+        // {
+        //     title: 'Ads Manager',
+        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ads-manager`,
+        //     icon: Target,
+        // },
         {
             title: 'Shop and Pages',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
@@ -64,29 +48,34 @@ export function AppSidebar() {
         },
         {
             title: 'Products',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products/analytics`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products`,
             icon: Package,
         },
-        {
-            title: 'Facebook Accounts',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/facebook-accounts`,
-            icon: FacebookIcon,
-        },
-        {
-            title: 'Ad Accounts',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ad-accounts`,
-            icon: CreditCard,
-        },
+        // {
+        //     title: 'Facebook Accounts',
+        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/facebook-accounts`,
+        //     icon: FacebookIcon,
+        // },
+        // {
+        //     title: 'Ad Accounts',
+        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ad-accounts`,
+        //     icon: CreditCard,
+        // },
         {
             title: 'Teams',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
             icon: Users,
         },
-        {
-            title: 'RTS Management',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
-            icon: TrendingUp,
-        },
+        // {
+        //     title: 'RTS Management',
+        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts`,
+        //     icon: TrendingUp,
+        // },
+        // {
+        //     title: 'Botcake',
+        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/botcake`,
+        //     icon: MousePointerClickIcon,
+        // },
     ];
 
     return (

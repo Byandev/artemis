@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\FetchPageEmployees;
-use App\Models\Page;
+use App\Models\Shop;
 use Illuminate\Console\Command;
+use Modules\Pancake\Jobs\FetchShopCustomers;
 
 class TestFunction extends Command
 {
@@ -27,9 +27,8 @@ class TestFunction extends Command
      */
     public function handle()
     {
-        Page::all()
-            ->each(function (Page $page) {
-                dispatch(new FetchPageEmployees($page));
-            });
+        $shop = Shop::first();
+
+        dispatch(new FetchShopCustomers($shop, 1));
     }
 }

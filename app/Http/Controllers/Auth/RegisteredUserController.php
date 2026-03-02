@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\WorkspaceInvitation;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Inertia\Inertia;
@@ -18,9 +20,21 @@ class RegisteredUserController extends Controller
     /**
      * Show the registration page.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
-        return Inertia::render('auth/register');
+        $invitation = null;
+
+        // Check if there's an invitation token
+        if ($request->has('invitation')) {
+            $invitation = WorkspaceInvitation::with(['workspace'])
+                ->valid($request->invitation)
+                ->first();
+        }
+
+        return Inertia::render('auth/register', [
+            'invitation' => $invitation,
+            'invitationToken' => $request->invitation,
+        ]);
     }
 
     /**
@@ -47,6 +61,26 @@ class RegisteredUserController extends Controller
         Auth::login($user);
 
         $request->session()->regenerate();
+
+        // Check if there's an invitation to auto-accept
+        if ($request->has('invitation')) {
+            $invitation = WorkspaceInvitation::with('workspace')
+                ->valid($request->invitation)
+                ->first();
+
+            if ($invitation && strcasecmp($user->email, $invitation->email) === 0) {
+                // Auto-accept the invitation for consistency with login flow
+                DB::transaction(function () use ($invitation, $user) {
+                    $workspace = $invitation->workspace;
+                    $workspace->addMember($user, $invitation->role);
+                    $invitation->markAsAccepted();
+                });
+
+                // Redirect to the invitation success page
+                return redirect()->to("/workspaces/invitations/{$invitation->token}")
+                    ->with('success', 'You have successfully joined the workspace!');
+            }
+        }
 
         // Redirect to workspace setup for first-time users
         return redirect()->intended(route('workspaces.setup', absolute: false));

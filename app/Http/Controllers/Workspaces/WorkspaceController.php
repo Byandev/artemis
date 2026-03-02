@@ -5,10 +5,6 @@ namespace App\Http\Controllers\Workspaces;
 use App\Http\Controllers\Controller;
 use App\Models\AdRecord;
 use App\Models\Order;
-use App\Models\Page;
-use App\Models\Product;
-use App\Models\Shop;
-use App\Models\Team;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -163,130 +159,12 @@ class WorkspaceController extends Controller
      */
     public function dashboard(Request $request, Workspace $workspace)
     {
-        // Check if user has access to this workspace
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
-        // Set as current workspace
-        session(['current_workspace_id' => $workspace->id]);
-
-        $workspace->load('owner');
-
-        $userRole = $workspace->users()
-            ->where('user_id', $request->user()->id)
-            ->first()
-            ->pivot
-            ->role;
-
-        // Get date filters from query
-        $startDate = $request->query('start_date');
-        $endDate = $request->query('end_date');
-
-        // Get entity filters from query
-        $filters = [
-            'team_ids' => $request->query('team_ids'),
-            'product_ids' => $request->query('product_ids'),
-            'page_ids' => $request->query('page_ids'),
-            'shop_ids' => $request->query('shop_ids'),
-        ];
-
-        // Consolidated query for all order-based stats
-        $orderStats = Order::where('workspace_id', $workspace->id)
-            ->whereNotNull('confirmed_at')
-            ->applyDateFilter($startDate, $endDate, 'confirmed_at')
-            ->applyEntityFilters($filters)
-            ->selectRaw('
-                COUNT(*) as total_orders,
-                SUM(total_amount) as total_sales,
-                SUM(CASE WHEN delivered_at IS NOT NULL THEN 1 ELSE 0 END) as delivered_orders,
-                ROUND(
-                    (SUM(CASE WHEN status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
-                    NULLIF(SUM(CASE WHEN status IN (3,4,5) THEN 1 ELSE 0 END), 0),
-                    2
-                ) as rts_rate_percentage
-            ')
-            ->first();
-
-        // Notification counts (SMS and Chat) - using subquery in a single query
-        $notificationStats = Order::where('workspace_id', $workspace->id)
-            ->whereNotNull('confirmed_at')
-            ->applyDateFilter($startDate, $endDate, 'confirmed_at')
-            ->applyEntityFilters($filters)
-            ->selectRaw('
-                SUM(CASE WHEN EXISTS(
-                    SELECT 1 FROM parcel_journey_notifications pjn
-                    WHERE pjn.order_id = orders.id
-                    AND pjn.type = "sms"
-                    AND pjn.status = "sent"
-                ) THEN 1 ELSE 0 END) as sms_sent,
-                SUM(CASE WHEN EXISTS(
-                    SELECT 1 FROM parcel_journey_notifications pjn
-                    WHERE pjn.order_id = orders.id
-                    AND pjn.type = "chat"
-                    AND pjn.status = "sent"
-                ) THEN 1 ELSE 0 END) as chat_msg_sent
-            ')
-            ->first();
-
-        // Ad spend and sales in one query
-        // Ad records are filtered through their relationship to orders
-        $adStats = AdRecord::ofWorkspace($workspace)
-            ->applyDateFilter($startDate, $endDate, 'date')
-            ->applyEntityFilters($filters)
-            ->selectRaw('SUM(spend) as total_ad_spend')
-            ->first();
-
-        $total_sales = $orderStats->total_sales ?? 0;
-        $total_orders = $orderStats->total_orders ?? 0;
-        $total_ad_spend = $adStats->total_ad_spend ?? 0;
-
-        $stats = [
-            'total_sales' => $total_sales,
-            'total_orders' => $total_orders,
-            'total_ad_spend' => $total_ad_spend,
-            'rts_rate_percentage' => $orderStats->rts_rate_percentage ?? 0,
-            'delivered_orders' => $orderStats->delivered_orders ?? 0,
-            'sms_sent' => $notificationStats->sms_sent ?? 0,
-            'chat_msg_sent' => $notificationStats->chat_msg_sent ?? 0,
-            'roas' => $total_ad_spend > 0 ? round($total_sales / $total_ad_spend, 2) : 0.0,
-        ];
-
-        // Fetch available filter options
-        $availableFilters = [
-            'teams' => Team::ofWorkspace($workspace)
-                ->select('id', 'name')
-                ->orderBy('name')
-                ->get(),
-            'products' => Product::ofWorkspace($workspace)
-                ->select('id', 'name')
-                ->orderBy('name')
-                ->get(),
-            'pages' => Page::ofWorkspace($workspace)
-                ->select('id', 'name')
-                ->orderBy('name')
-                ->get(),
-            'shops' => Shop::where('workspace_id', $workspace->id)
-                ->select('id', 'name')
-                ->orderBy('name')
-                ->get(),
-        ];
-
         return Inertia::render('workspaces/dashboard/index', [
             'workspace' => $workspace,
-            'stats' => $stats,
-            'filters' => [
-                'start_date' => $request->query('start_date'),
-                'end_date' => $request->query('end_date'),
-                'team_ids' => $request->query('team_ids'),
-                'product_ids' => $request->query('product_ids'),
-                'page_ids' => $request->query('page_ids'),
-                'shop_ids' => $request->query('shop_ids'),
-            ],
-            'availableTeams' => $availableFilters['teams'],
-            'availableProducts' => $availableFilters['products'],
-            'availablePages' => $availableFilters['pages'],
-            'availableShops' => $availableFilters['shops'],
         ]);
     }
 

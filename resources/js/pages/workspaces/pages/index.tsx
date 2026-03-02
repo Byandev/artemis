@@ -1,21 +1,8 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Head, router, useForm } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import { ColumnDef } from '@tanstack/react-table';
-import { Page } from '@/types/models/Page';
-import { Button } from '@/components/ui/button';
-import { PageFormDialog } from '@/components/pages/page-form-dialog';
-import { ArchivePageDialog } from '@/components/pages/archive-page-dialog';
-import { Workspace } from '@/types/models/Workspace';
 import ComponentCard from '@/components/common/ComponentCard';
-import {
-    Edit,
-    MoreHorizontal,
-    Archive,
-    RotateCcw,
-    RefreshCw
-} from 'lucide-react';
+import { ArchivePageDialog } from '@/components/pages/archive-page-dialog';
+import { PageFormDialog } from '@/components/pages/page-form-dialog';
+import { Button } from '@/components/ui/button';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -23,12 +10,25 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import workspaces from '@/routes/workspaces';
+import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { PaginatedData } from '@/types';
-import { omit } from 'lodash';
-import clsx from 'clsx';
 import { currencyFormatter } from '@/lib/utils';
+import workspaces from '@/routes/workspaces';
+import { PaginatedData } from '@/types';
+import { Page } from '@/types/models/Page';
+import { Workspace } from '@/types/models/Workspace';
+import { Head, router, useForm } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
+import clsx from 'clsx';
+import { omit } from 'lodash';
+import {
+    Archive,
+    Edit,
+    MoreHorizontal,
+    RefreshCw,
+    RotateCcw
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface PagesProps {
     workspace: Workspace;
@@ -86,19 +86,13 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
     const { post, processing } = useForm({});
 
     useEffect(() => {
-        const currentSearchParam = query?.filter?.search ?? '';
-
-        if (searchValue === currentSearchParam) {
-            return;
-        }
-
         const timer = setTimeout(() => {
             router.get(
                 workspaces.pages.index({ workspace }),
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
-                    page: 1,
+                    page: searchValue ? 1 : query?.page ?? 1
                 },
                 {
                     preserveState: true,
@@ -110,7 +104,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [searchValue, query?.filter?.search, query?.sort, workspace]);
+    }, [searchValue]);
 
     const handleEdit = (page: Page) => {
         setSelectedPage(page);
@@ -154,13 +148,13 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             ),
             cell: ({ row }) => row.original.owner?.name || '-',
         },
-        {
-            accessorKey: 'current_budget',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Current Budget'} enabled={false} />
-            ),
-            cell: ({ row }) => currencyFormatter(row.original.current_budget ?? 0),
-        },
+        // {
+        //     accessorKey: 'current_budget',
+        //     header: ({ column }) => (
+        //         <SortableHeader column={column} title={'Current Budget'} enabled={false} />
+        //     ),
+        //     cell: ({ row }) => currencyFormatter(row.original.current_budget ?? 0),
+        // },
         {
             accessorKey: 'orders_last_synced_at',
             header: ({ column }) => (
@@ -285,7 +279,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                                             page: params?.page ?? 1
                                         },
                                         {
-                                            preserveState: false,
+                                            preserveState: true,
                                             replace: true,
                                             preserveScroll: true,
                                         },
