@@ -57,72 +57,32 @@ const Filters = ({ workspace }: Props) => {
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[calc(100vw-2rem)] rounded-2xl sm:w-80">
-                <PageFilter
-                    workspace={workspace}
-                    selected={value.pageIds}
-                    onSelect={(id) => {
-                        setValue((prev) => ({
-                            ...prev,
-                            pageIds: prev.pageIds.includes(id)
-                                ? prev.pageIds.filter((i) => i !== id)
-                                : [...prev.pageIds, id],
-                        }));
-                    }}
-                />
-            </PopoverContent>
-        </Popover>
-    );
+                <div className="max-h-72 space-y-1.5">
+                    <PageFilter
+                        workspace={workspace}
+                        selected={value.pageIds}
+                        onSelect={(id) => {
+                            setValue((prev) => ({
+                                ...prev,
+                                pageIds: prev.pageIds.includes(id)
+                                    ? prev.pageIds.filter((i) => i !== id)
+                                    : [...prev.pageIds, id],
+                            }));
+                        }}
+                    />
 
-    return (
-        <Popover>
-            <PopoverTrigger asChild>
-                <Button variant="outline" className="text-gray-800">
-                    <Filter />
-                    <span className="font-medium">Filters</span>
-                </Button>
-            </PopoverTrigger>
-
-            <PopoverContent className="z-99999 w-[300px] rounded-xl border border-gray-200 bg-white shadow-md dark:border-gray-700 dark:bg-[#1E2634]">
-                <div className="max-h-72">
-                    <Collapsible className='bg-gray-50 p-2 rounded-xl'>
-                        <CollapsibleTrigger>
-                            Page
-                        </CollapsibleTrigger>
-
-                        <CollapsibleContent className='mt-2'>
-                            <PageFilter
-                                workspace={workspace}
-                                selected={value.pageIds}
-                                onSelect={(value) => {
-                                    setValue((prev) => {
-                                        return {
-                                            ...prev,
-                                            userIds: prev.userIds.includes(
-                                                value,
-                                            )
-                                                ? prev.userIds.filter(
-                                                      (i) => i !== value,
-                                                  )
-                                                : [...prev.userIds, value],
-                                        };
-                                    });
-                                }}
-                            />
-                        </CollapsibleContent>
-                    </Collapsible>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between gap-x-2 border-t pt-2">
-                    <Button
-                        className="w-full font-medium"
-                        variant="outline"
-                        size={'sm'}
-                    >
-                        <span className="text-xs">Cancel</span>
-                    </Button>
-                    <Button className="w-full font-medium" size={'sm'}>
-                        <span className="text-xs">Apply</span>
-                    </Button>
+                    <ShopFilter
+                        workspace={workspace}
+                        selected={value.shopIds}
+                        onSelect={(id) => {
+                            setValue((prev) => ({
+                                ...prev,
+                                shopIds: prev.shopIds.includes(id)
+                                    ? prev.shopIds.filter((i) => i !== id)
+                                    : [...prev.shopIds, id],
+                            }));
+                        }}
+                    />
                 </div>
             </PopoverContent>
         </Popover>
