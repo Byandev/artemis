@@ -57,7 +57,7 @@ const Filters = ({ workspace }: Props) => {
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[calc(100vw-2rem)] rounded-2xl sm:w-80">
-                <div className="max-h-72 space-y-1.5">
+                <div className="max-h-72 overflow-scroll space-y-1.5">
                     <PageFilter
                         workspace={workspace}
                         selected={value.pageIds}
