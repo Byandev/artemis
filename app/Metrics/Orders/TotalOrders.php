@@ -12,8 +12,10 @@ final class TotalOrders
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
             ->where('pages.workspace_id', $workspaceId)
             ->whereNotNull('pancake_orders.confirmed_at')
-            ->whereDate('pancake_orders.confirmed_at', '<=', $date_range['end_date'])
-            ->whereDate('pancake_orders.confirmed_at', '>=', $date_range['start_date'])
+            ->whereBetween('pancake_orders.confirmed_at', [
+                $date_range['start_date'] . ' 00:00:00',
+                $date_range['end_date'] . ' 23:59:59',
+            ])
             ->when(isset($filter['page_ids']) && $filter['page_ids'], function ($query) use ($filter) {
                 $query->whereIn('pages.id', explode(',', $filter['page_ids']));
             })

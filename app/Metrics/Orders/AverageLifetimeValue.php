@@ -30,8 +30,10 @@ final class AverageLifetimeValue
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotIn('pancake_orders.status', [6,7])
-            ->whereDate('pancake_orders.confirmed_at', '<=', $date_range['end_date'])
-            ->whereDate('pancake_orders.confirmed_at', '>=', $date_range['start_date'])
+            ->whereBetween('pancake_orders.confirmed_at', [
+                $date_range['start_date'] . ' 00:00:00',
+                $date_range['end_date'] . ' 23:59:59',
+            ])
             ->selectRaw('
                 COALESCE(
                     SUM(pancake_orders.final_amount) / NULLIF(COUNT(DISTINCT pancake_orders.customer_id), 0),

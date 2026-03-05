@@ -29,7 +29,10 @@ final class RepeatOrderRatio
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotIn('pancake_orders.status', [6,7])
-            ->whereBetween('pancake_orders.confirmed_at', [$startAt, $endAt])
+            ->whereBetween('pancake_orders.confirmed_at', [
+                $startAt . ' 00:00:00',
+                $endAt . ' 23:59:59',
+            ])
             ->groupBy('pancake_orders.customer_id')
             ->selectRaw('pancake_orders.customer_id as customer_key');
 
@@ -45,7 +48,7 @@ final class RepeatOrderRatio
             })
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotNull('pancake_orders.customer_id')
-            ->where('pancake_orders.confirmed_at', '<=', $endAt)
+            ->whereDate('pancake_orders.confirmed_at', '<=', $endAt)
             ->whereNotIn('pancake_orders.status', [6,7])
             ->groupBy('pancake_orders.customer_id')
             ->selectRaw('pancake_orders.customer_id as customer_key, COUNT(*) as orders_count');

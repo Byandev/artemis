@@ -29,8 +29,10 @@ final class AverageDeliveryDays
             ->where('pages.workspace_id', $workspaceId)
             ->whereNotNull('pancake_orders.shipped_at')
             ->whereNotNull('pancake_orders.delivered_at')
-            ->whereDate('pancake_orders.delivered_at', '<=', $date_range['end_date'])
-            ->whereDate('pancake_orders.delivered_at', '>=', $date_range['start_date'])
+            ->whereBetween('pancake_orders.delivered_at', [
+                $date_range['start_date'] . ' 00:00:00',
+                $date_range['end_date'] . ' 23:59:59',
+            ])
             ->selectRaw('
                 COALESCE(
                     AVG(TIMESTAMPDIFF(DAY, pancake_orders.shipped_at, pancake_orders.delivered_at)),

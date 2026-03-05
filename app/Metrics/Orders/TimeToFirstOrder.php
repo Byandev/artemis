@@ -29,8 +29,10 @@ final class TimeToFirstOrder
             })
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotNull('pancake_orders.confirmed_at')
-            ->whereDate('pancake_orders.confirmed_at', '<=', $date_range['end_date'])
-            ->whereDate('pancake_orders.confirmed_at', '>=', $date_range['start_date'])
+            ->whereBetween('pancake_orders.confirmed_at', [
+                $date_range['start_date'] . ' 00:00:00',
+                $date_range['end_date'] . ' 23:59:59',
+            ])
             ->whereNotIn('pancake_orders.status', [6,7])
             ->groupBy('pancake_orders.customer_id')
             ->selectRaw('
