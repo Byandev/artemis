@@ -19,6 +19,7 @@ final class Aov
                 $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
             })
             ->whereNotNull('pancake_orders.confirmed_at')
+            ->whereNotIn('pancake_orders.status', [6,7])
             ->whereDate('pancake_orders.confirmed_at', '<=', $date_range['end_date'])
             ->whereDate('pancake_orders.confirmed_at', '>=', $date_range['start_date'])
             ->selectRaw('COALESCE(SUM(pancake_orders.final_amount) / NULLIF(COUNT(*),0), 0) as aov')

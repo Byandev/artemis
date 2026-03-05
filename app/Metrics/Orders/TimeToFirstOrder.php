@@ -31,6 +31,7 @@ final class TimeToFirstOrder
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereDate('pancake_orders.confirmed_at', '<=', $date_range['end_date'])
             ->whereDate('pancake_orders.confirmed_at', '>=', $date_range['start_date'])
+            ->whereNotIn('pancake_orders.status', [6,7])
             ->groupBy('pancake_orders.customer_id')
             ->selectRaw('
                 pancake_orders.customer_id as customer_id,

@@ -20,6 +20,7 @@ final class TotalOrders
             ->when(isset($filter['shop_ids']) && $filter['shop_ids'], function ($query) use ($filter) {
                 $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
             })
+            ->whereNotIn('pancake_orders.status', [6,7])
             ->count();
     }
 }

@@ -25,6 +25,7 @@ final class AverageDeliveryDays
             ->when(isset($filter['shop_ids']) && $filter['shop_ids'], function ($query) use ($filter) {
                 $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
             })
+            ->whereNotIn('pancake_orders.status', [6,7])
             ->where('pages.workspace_id', $workspaceId)
             ->whereNotNull('pancake_orders.shipped_at')
             ->whereNotNull('pancake_orders.delivered_at')
