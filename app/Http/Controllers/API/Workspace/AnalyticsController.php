@@ -13,7 +13,8 @@ class AnalyticsController extends Controller
     {
         $workspace = Workspace::find($request->workspace->id);
 
-        $data = $workspace->metrics()->extract(['rtsRate', 'aov', 'totalSales', 'totalOrders', 'retentionRate', 'timeToFirstOrder', 'avgLifetimeValue', 'avgDeliveryDays']);
+        $data = $workspace->metrics($request->array('date_range', []))
+            ->extract(['rtsRate', 'aov', 'totalSales', 'totalOrders', 'repeatOrderRatio', 'timeToFirstOrder', 'avgLifetimeValue', 'avgDeliveryDays']);
 
         return response()->json($data);
     }

@@ -1,30 +1,10 @@
-import { useState, ComponentType } from 'react';
-import {
-    ChevronUp,
-    Filter,
-    LucideIcon,
-    Package,
-    SlidersHorizontal,
-    Store,
-    Users,
-} from 'lucide-react';
-
+import { useState } from 'react';
+import { SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-
 import { Workspace } from '@/types/models/Workspace';
-
-import TeamFilter from '@/components/filters/TeamFilter';
 import ShopFilter from '@/components/filters/ShopFilter';
 import PageFilter from '@/components/filters/PageFilter';
-import UserFilter from '@/components/filters/UserFilter';
-import ProductFilter from '@/components/filters/ProductFilter';
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-
 
 interface Props {
     workspace: Workspace;
