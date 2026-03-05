@@ -15,7 +15,7 @@ final class TimeToFirstOrder
      *
      * @return float average days
      */
-    public function compute(int $workspaceId): float
+    public function compute(int $workspaceId, array $date_range): float
     {
         // 1) First confirmed order per customer (scoped to workspace)
         $firstOrderPerCustomer = DB::table('pancake_orders')
@@ -23,6 +23,8 @@ final class TimeToFirstOrder
             ->where('pages.workspace_id', $workspaceId)
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotNull('pancake_orders.confirmed_at')
+            ->whereDate('pancake_orders.confirmed_at', '<=', $date_range['end_date'])
+            ->whereDate('pancake_orders.confirmed_at', '>=', $date_range['start_date'])
             ->groupBy('pancake_orders.customer_id')
             ->selectRaw('
                 pancake_orders.customer_id as customer_id,

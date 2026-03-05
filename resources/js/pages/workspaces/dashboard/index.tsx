@@ -9,6 +9,9 @@ import {
 } from '@/lib/utils';
 import DatePicker from '@/components/ui/date-picker';
 import Filters from '@/components/filters/Filters';
+import moment from 'moment';
+import flatpickr from 'flatpickr';
+import DateOption = flatpickr.Options.DateOption;
 
 interface Props {
     workspace: Workspace
@@ -19,39 +22,39 @@ interface Analytics {
     totalSales: number;
     aov: number;
     rtsRate: number;
-    retentionRate: number;
+    repeatOrderRatio: number;
     timeToFirstOrder: number;
     avgLifetimeValue: number;
-    avgDeliveryDays: number
+    avgDeliveryDays: number;
 }
 
 const Dashboard = ({ workspace }: Props) => {
-    const [analytics, setAnalytics] = useState<Analytics | null>();
-    const [breakdown, setBreakdown ] = useState([]);
+    const [dateRange, setDateRange] = useState([
+        moment().startOf('month').format('YYYY-MM-DD'),
+        moment().endOf('month').format('YYYY-MM-DD'),
+    ]);
 
-    console.log(workspace)
+    const [analytics, setAnalytics] = useState<Analytics | null>();
 
     useEffect(() => {
         axios
             .get(`/api/v1/workspace/analytics`, {
                 headers: {
-                    'X-Workspace-Id': workspace.id
-                }
-            })
-            .then((response: AxiosResponse<Analytics>) => {
-                setAnalytics(response.data)
-            });
-    }, [workspace.id]);
-
-    useEffect(() => {
-        axios
-            .get(`/api/v1/workspace/analytics/breakdown`, {
-                headers: {
                     'X-Workspace-Id': workspace.id,
                 },
-            }).then(response =>setBreakdown(response.data.data))
-    }, [workspace.id]);
-
+                params: {
+                    'date_range[start_date]': moment(dateRange[0]).format(
+                        'YYYY-MM-DD',
+                    ),
+                    'date_range[end_date]': moment(dateRange[1]).format(
+                        'YYYY-MM-DD',
+                    ),
+                },
+            })
+            .then((response: AxiosResponse<Analytics>) => {
+                setAnalytics(response.data);
+            });
+    }, [workspace.id, dateRange]);
 
     const cards = useMemo(() => {
         return [
@@ -69,8 +72,8 @@ const Dashboard = ({ workspace }: Props) => {
                 value: percentageFormatter(analytics?.rtsRate ?? 0),
             },
             {
-                label: 'Retention Rate',
-                value: percentageFormatter(analytics?.retentionRate ?? 0),
+                label: 'Repeat Order Ratio',
+                value: percentageFormatter(analytics?.repeatOrderRatio ?? 0),
             },
             {
                 label: 'Time to first Order',
@@ -99,7 +102,15 @@ const Dashboard = ({ workspace }: Props) => {
                         <DatePicker
                             id={'dashboard-date-range'}
                             mode={'range'}
-                            onChange={(e) => console.log(e)}
+                            onChange={(dates) => {
+                                if (dates.length === 2) {
+                                    setDateRange([
+                                        moment(dates[0]).format('YYYY-MM-DD'),
+                                        moment(dates[1]).format('YYYY-MM-DD'),
+                                    ]);
+                                }
+                            }}
+                            defaultDate={dateRange as never as DateOption}
                         />
                     </div>
                 </div>
