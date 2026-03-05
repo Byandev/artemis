@@ -2,13 +2,10 @@
 
 namespace App\Metrics\Orders;
 
-use App\Metrics\Orders\Concerns\OrdersMetricBase;
 use Illuminate\Support\Facades\DB;
 
 final class Aov
 {
-    use OrdersMetricBase;
-
     public function compute(int $workspaceId, array $date_range): float
     {
         $row = DB::table('pancake_orders')

@@ -2,13 +2,10 @@
 
 namespace App\Metrics\Orders;
 
-use App\Metrics\Orders\Concerns\OrdersMetricBase;
 use Illuminate\Support\Facades\DB;
 
 final class TotalOrders
 {
-    use OrdersMetricBase;
-
     public function compute(int $workspaceId, array $date_range): int
     {
         return (int) DB::table('pancake_orders')
