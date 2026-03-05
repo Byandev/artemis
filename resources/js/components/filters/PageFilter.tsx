@@ -10,6 +10,7 @@ interface Props {
 
 const PageFilter = ({ workspace, selected, onSelect }: Props) => {
     return <FilterGroup<Page>
+        name={'Page'}
         getId={(item) => item.id}
         getLabel={(item) => item.name}
         selected={selected}
