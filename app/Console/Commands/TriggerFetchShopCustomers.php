@@ -27,8 +27,7 @@ class TriggerFetchShopCustomers extends Command
      */
     public function handle(): void
     {
-        Shop::whereNotNull('pos_token')
-            ->get()
+        Shop::all()
             ->each(function (Shop $shop) {
                 dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::parse($shop->customers_last_synced_at)->unix(), \Carbon\Carbon::now()->unix()));
             });
