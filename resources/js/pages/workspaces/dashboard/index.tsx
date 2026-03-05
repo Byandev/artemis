@@ -7,8 +7,8 @@ import {
     numberFormatter,
     percentageFormatter,
 } from '@/lib/utils';
-import BarChart from '@/components/charts/BarChart';
-import ComponentCard from '@/components/common/ComponentCard';
+import DatePicker from '@/components/ui/date-picker';
+import Filters from '@/components/filters/Filters';
 
 interface Props {
     workspace: Workspace
@@ -28,6 +28,8 @@ interface Analytics {
 const Dashboard = ({ workspace }: Props) => {
     const [analytics, setAnalytics] = useState<Analytics | null>();
     const [breakdown, setBreakdown ] = useState([]);
+
+    console.log(workspace)
 
     useEffect(() => {
         axios
@@ -88,9 +90,26 @@ const Dashboard = ({ workspace }: Props) => {
     return (
         <AppLayout>
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+                <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:gap-6 xl:grid-cols-4">
+                    <div className="sm:col-start-1 md:col-start-2 xl:col-start-3">
+                        <Filters workspace={workspace} />
+                    </div>
+
+                    <div className="sm:col-start-2 md:col-start-3 xl:col-start-4">
+                        <DatePicker
+                            id={'dashboard-date-range'}
+                            mode={'range'}
+                            onChange={(e) => console.log(e)}
+                        />
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
                     {cards.map((card) => (
-                        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                        <div
+                            key={card.label}
+                            className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]"
+                        >
                             <p className="text-theme-sm text-gray-500 dark:text-gray-400">
                                 {card.label}
                             </p>
@@ -106,7 +125,6 @@ const Dashboard = ({ workspace }: Props) => {
                     ))}
                 </div>
 
-
                 {/*<ComponentCard title='Sales' className="mt-6 h-auto">*/}
                 {/*    <BarChart categories={breakdown.map(a => a.period)} series={[*/}
                 {/*        {*/}
@@ -115,7 +133,6 @@ const Dashboard = ({ workspace }: Props) => {
                 {/*        }*/}
                 {/*    ]}/>*/}
                 {/*</ComponentCard>*/}
-
             </div>
         </AppLayout>
     );

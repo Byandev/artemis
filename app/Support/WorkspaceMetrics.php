@@ -2,15 +2,15 @@
 
 namespace App\Support;
 
+use App\Metrics\Orders\Aov;
+use App\Metrics\Orders\AverageDeliveryDays;
+use App\Metrics\Orders\AverageLifetimeValue;
+use App\Metrics\Orders\RetentionRate;
+use App\Metrics\Orders\RtsRate;
+use App\Metrics\Orders\TimeToFirstOrder;
+use App\Metrics\Orders\TotalOrders;
+use App\Metrics\Orders\TotalSales;
 use App\Models\Workspace;
-use App\Metrics\Orders\{AverageDeliveryDays,
-    AverageLifetimeValue,
-    RetentionRate,
-    RtsRate,
-    TimeToFirstOrder,
-    TotalSales,
-    TotalOrders,
-    Aov};
 use InvalidArgumentException;
 
 final class WorkspaceMetrics
@@ -33,7 +33,7 @@ final class WorkspaceMetrics
     ];
 
     /**
-     * @param string[] $names
+     * @param  string[]  $names
      */
     public function extract(array $names): array
     {
@@ -43,7 +43,7 @@ final class WorkspaceMetrics
         foreach ($names as $name) {
             $class = self::MAP[$name] ?? null;
 
-            if (!$class) {
+            if (! $class) {
                 throw new InvalidArgumentException("Unknown metric: {$name}");
             }
 

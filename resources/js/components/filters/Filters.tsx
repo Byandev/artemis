@@ -1,5 +1,13 @@
 import { useState, ComponentType } from 'react';
-import { Filter, LucideIcon, Package, Store, Users } from 'lucide-react';
+import {
+    ChevronUp,
+    Filter,
+    LucideIcon,
+    Package,
+    SlidersHorizontal,
+    Store,
+    Users,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -11,39 +19,59 @@ import ShopFilter from '@/components/filters/ShopFilter';
 import PageFilter from '@/components/filters/PageFilter';
 import UserFilter from '@/components/filters/UserFilter';
 import ProductFilter from '@/components/filters/ProductFilter';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
-interface Option {
-    name: string;
-    icon: LucideIcon;
-    component: ComponentType<{ workspace: Workspace }>
-}
 
 interface Props {
-    workspace: Workspace
+    workspace: Workspace;
 }
 
 const Filters = ({ workspace }: Props) => {
-    const options: Option[] = [
-        { name: 'Teams', icon: Users, component: TeamFilter },
-        { name: 'Products', icon: Package, component: ProductFilter },
-        { name: 'Shop', icon: Store, component: ShopFilter },
-        { name: 'Pages', icon: Store, component: PageFilter },
-        { name: 'User', icon: Users, component: UserFilter },
-    ];
-
-    const [selectedOption, setSelectedOption] = useState<Option | null>();
-
-    const [value, setValue] = useState({
+    const [value, setValue] = useState<{
+        teamIds: (string | number)[]
+        productIds: (string | number)[]
+        shopIds: (string | number)[]
+        pageIds: (string | number)[]
+        userIds: (string | number)[]
+    }>({
         teamIds: [],
         productIds: [],
         shopIds: [],
         pageIds: [],
         userIds: [],
-    })
+    });
 
-    const onClick = (option: Option) => {
-        setSelectedOption(option)
-    }
+    return (
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button
+                    className="h-11 w-full appearance-none rounded-2xl border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/20 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                    variant="outline"
+                >
+                    <SlidersHorizontal />
+                    Filter
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[calc(100vw-2rem)] rounded-2xl sm:w-80">
+                <PageFilter
+                    workspace={workspace}
+                    selected={value.pageIds}
+                    onSelect={(id) => {
+                        setValue((prev) => ({
+                            ...prev,
+                            pageIds: prev.pageIds.includes(id)
+                                ? prev.pageIds.filter((i) => i !== id)
+                                : [...prev.pageIds, id],
+                        }));
+                    }}
+                />
+            </PopoverContent>
+        </Popover>
+    );
 
     return (
         <Popover>
@@ -54,45 +82,34 @@ const Filters = ({ workspace }: Props) => {
                 </Button>
             </PopoverTrigger>
 
-            <PopoverContent className="w-48 px-2.5 py-4">
+            <PopoverContent className="z-99999 w-[300px] rounded-xl border border-gray-200 bg-white shadow-md dark:border-gray-700 dark:bg-[#1E2634]">
                 <div className="max-h-72">
-                    {selectedOption ? (
-                        <div>
-                            <div className="mb-2 flex justify-between">
-                                <span className="text-xs font-semibold">
-                                    {selectedOption.name}
-                                </span>
+                    <Collapsible className='bg-gray-50 p-2 rounded-xl'>
+                        <CollapsibleTrigger>
+                            Page
+                        </CollapsibleTrigger>
 
-                                <span
-                                    onClick={() => setSelectedOption(null)}
-                                    className="cursor-pointer text-xs font-semibold text-blue-700"
-                                >
-                                    Back
-                                </span>
-                            </div>
-
-                            <selectedOption.component workspace={workspace} />
-                        </div>
-                    ) : (
-                        <div className="space-y-3 text-xs">
-                            {options.map((option) => {
-                                return (
-                                    <div
-                                        key={option.name}
-                                        onClick={() => onClick(option)}
-                                        className="flex cursor-pointer items-center gap-x-2 text-gray-800"
-                                    >
-                                        {option.icon && (
-                                            <option.icon
-                                                className={'h-4 w-4'}
-                                            />
-                                        )}
-                                        <span>{option.name}</span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
+                        <CollapsibleContent className='mt-2'>
+                            <PageFilter
+                                workspace={workspace}
+                                selected={value.pageIds}
+                                onSelect={(value) => {
+                                    setValue((prev) => {
+                                        return {
+                                            ...prev,
+                                            userIds: prev.userIds.includes(
+                                                value,
+                                            )
+                                                ? prev.userIds.filter(
+                                                      (i) => i !== value,
+                                                  )
+                                                : [...prev.userIds, value],
+                                        };
+                                    });
+                                }}
+                            />
+                        </CollapsibleContent>
+                    </Collapsible>
                 </div>
 
                 <div className="mt-4 flex items-center justify-between gap-x-2 border-t pt-2">

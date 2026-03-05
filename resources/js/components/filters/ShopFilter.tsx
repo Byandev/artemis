@@ -9,13 +9,15 @@ interface Props {
     onSelect: (id: string | number) => void;
 }
 
-const ShopFilter = ({ workspace }: Props) => {
+const ShopFilter = ({ workspace, selected, onSelect }: Props) => {
     return (
         <EntityFilter<Shop>
             workspace={workspace}
             endpoint={'/shops'}
             getId={(p) => p.id}
             getLabel={(p) => p.name}
+            selected={selected}
+            onSelect={onSelect}
         />
     );
 };
