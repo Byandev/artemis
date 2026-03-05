@@ -159,9 +159,9 @@ class Workspace extends Model
         return $this->belongsToMany(FacebookAccount::class, 'workspace_facebook_account');
     }
 
-    public function metrics(array $dateRange): \App\Support\WorkspaceMetrics
+    public function metrics(array $dateRange, array $filter): \App\Support\WorkspaceMetrics
     {
-        return new \App\Support\WorkspaceMetrics($this, $dateRange);
+        return new \App\Support\WorkspaceMetrics($this, $dateRange, $filter);
     }
 
     public function shops(): HasMany|Workspace
