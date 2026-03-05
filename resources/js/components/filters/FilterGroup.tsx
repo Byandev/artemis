@@ -28,7 +28,7 @@ export function FilterGroup<T>({
             </CollapsibleTrigger>
 
             <CollapsibleContent className="mt-2">
-                <div>
+                <div className='space-y-1.5'>
                     {options.map((item) => {
                         const id = getId(item);
                         const idStr = String(id);
@@ -46,7 +46,7 @@ export function FilterGroup<T>({
                                 />
                                 <Label
                                     htmlFor={idStr}
-                                    className="text-sm text-gray-800"
+                                    className="text-sm text-gray-800 truncate"
                                 >
                                     {getLabel(item)}
                                 </Label>

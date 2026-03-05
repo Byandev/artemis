@@ -11,7 +11,7 @@ final class RepeatOrderRatio
      *
      * @return float ratio 0..1 (multiply by 100 if you want percent)
      */
-    public function compute(int $workspaceId, array $dateRange): float
+    public function compute(int $workspaceId, array $dateRange, array $filter): float
     {
         $startAt = $dateRange['start_date'];
         $endAt   = $dateRange['end_date'];
@@ -20,9 +20,19 @@ final class RepeatOrderRatio
         $cohort = DB::table('pancake_orders')
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
             ->where('pages.workspace_id', $workspaceId)
+            ->when(isset($filter['page_ids']) && $filter['page_ids'], function ($query) use ($filter) {
+                $query->whereIn('pages.id', explode(',', $filter['page_ids']));
+            })
+            ->when(isset($filter['shop_ids']) && $filter['shop_ids'], function ($query) use ($filter) {
+                $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
+            })
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotNull('pancake_orders.customer_id')
-            ->whereBetween('pancake_orders.confirmed_at', [$startAt, $endAt])
+            ->whereNotIn('pancake_orders.status', [6,7])
+            ->whereBetween('pancake_orders.confirmed_at', [
+                $startAt . ' 00:00:00',
+                $endAt . ' 23:59:59',
+            ])
             ->groupBy('pancake_orders.customer_id')
             ->selectRaw('pancake_orders.customer_id as customer_key');
 
@@ -30,9 +40,16 @@ final class RepeatOrderRatio
         $ordersUpToEnd = DB::table('pancake_orders')
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
             ->where('pages.workspace_id', $workspaceId)
+            ->when(isset($filter['page_ids']) && $filter['page_ids'], function ($query) use ($filter) {
+                $query->whereIn('pages.id', explode(',', $filter['page_ids']));
+            })
+            ->when(isset($filter['shop_ids']) && $filter['shop_ids'], function ($query) use ($filter) {
+                $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
+            })
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotNull('pancake_orders.customer_id')
-            ->where('pancake_orders.confirmed_at', '<=', $endAt)
+            ->whereDate('pancake_orders.confirmed_at', '<=', $endAt)
+            ->whereNotIn('pancake_orders.status', [6,7])
             ->groupBy('pancake_orders.customer_id')
             ->selectRaw('pancake_orders.customer_id as customer_key, COUNT(*) as orders_count');
 
