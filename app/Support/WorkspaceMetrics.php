@@ -5,7 +5,7 @@ namespace App\Support;
 use App\Metrics\Orders\Aov;
 use App\Metrics\Orders\AverageDeliveryDays;
 use App\Metrics\Orders\AverageLifetimeValue;
-use App\Metrics\Orders\RetentionRate;
+use App\Metrics\Orders\RepeatOrderRatio;
 use App\Metrics\Orders\RtsRate;
 use App\Metrics\Orders\TimeToFirstOrder;
 use App\Metrics\Orders\TotalOrders;
@@ -15,7 +15,7 @@ use InvalidArgumentException;
 
 final class WorkspaceMetrics
 {
-    public function __construct(private readonly Workspace $workspace) {}
+    public function __construct(private readonly Workspace $workspace,  public array $dateRange) {}
 
     /**
      * Registry: metricName => class
@@ -26,7 +26,7 @@ final class WorkspaceMetrics
         'rtsRate' => RtsRate::class,
         'totalSales' => TotalSales::class,
         'totalOrders' => TotalOrders::class,
-        'retentionRate' => RetentionRate::class,
+        'repeatOrderRatio' => RepeatOrderRatio::class,
         'timeToFirstOrder' => TimeToFirstOrder::class,
         'avgLifetimeValue' => AverageLifetimeValue::class,
         'avgDeliveryDays' => AverageDeliveryDays::class,
@@ -47,7 +47,7 @@ final class WorkspaceMetrics
                 throw new InvalidArgumentException("Unknown metric: {$name}");
             }
 
-            $out[$name] = app($class)->compute($workspaceId);
+            $out[$name] = app($class)->compute($workspaceId, $this->dateRange);
         }
 
         return $out;

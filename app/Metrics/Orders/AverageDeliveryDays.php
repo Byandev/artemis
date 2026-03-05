@@ -15,13 +15,15 @@ final class AverageDeliveryDays
      *
      * @return float average days
      */
-    public function compute(int $workspaceId): float
+    public function compute(int $workspaceId, array $date_range): float
     {
         $row = DB::table('pancake_orders')
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
             ->where('pages.workspace_id', $workspaceId)
             ->whereNotNull('pancake_orders.shipped_at')
             ->whereNotNull('pancake_orders.delivered_at')
+            ->whereDate('pancake_orders.delivered_at', '<=', $date_range['end_date'])
+            ->whereDate('pancake_orders.delivered_at', '>=', $date_range['start_date'])
             ->selectRaw('
                 COALESCE(
                     AVG(TIMESTAMPDIFF(DAY, pancake_orders.shipped_at, pancake_orders.delivered_at)),
