@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Modules\Pancake\Jobs\FetchPageOrders;
+use Modules\Pancake\Jobs\FetchShopCustomers;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -88,7 +89,7 @@ class PageController extends Controller
             ]);
         }
 
-        Shop::firstOrCreate([
+        $shop = Shop::firstOrCreate([
             'id' => $validated['shop_id'],
             'workspace_id' => $workspace->id,
         ], [
@@ -113,6 +114,7 @@ class PageController extends Controller
         ]);
 
         dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear(1)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()));
+        dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subYear(1)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()));
 
         return redirect()->route('workspaces.pages.index', $workspace)
             ->with('success', 'Page created successfully.');

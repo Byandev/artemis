@@ -15,7 +15,7 @@ class FetchShopCustomers implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(public Shop $shop, public int $page_number)
+    public function __construct(public Shop $shop, public int $page_number, public int $startTime, public int $endTime)
     {
         $this->shop->loadMissing('pages');
     }
@@ -29,7 +29,7 @@ class FetchShopCustomers implements ShouldQueue
 
         $pancake = new Pancake($this->shop->id, $this->shop->pages->first()->pos_token);
 
-        $response = $pancake->listCustomers("&page_size=100&page_number=$page_number");
+        $response = $pancake->listCustomers("&page_size=100&page_number=$page_number&start_time_updated_at=$this->startTime&end_time_updated_at=$this->endTime");
 
         $totalPages = $response['total_pages'];
 
@@ -40,7 +40,7 @@ class FetchShopCustomers implements ShouldQueue
         }
 
         if ($totalPages > $this->page_number) {
-            dispatch(new FetchShopCustomers($this->shop, $page_number + 1));
+            dispatch(new FetchShopCustomers($this->shop, $page_number + 1, $this->startTime, $this->endTime))->delay(now()->addSeconds(5));
         }
     }
 }
