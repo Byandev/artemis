@@ -9,6 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Workspace } from '@/types/models/Workspace';
 import { useDebouncedState } from '@/hooks/use-debounced-state';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 type IdLike = string | number;
 
@@ -76,10 +81,10 @@ export function EntityFilter<T>({
                         return (
                             <div
                                 key={idStr}
-                                className="flex items-center gap-x-2 text-xs"
+                                className="flex items-center gap-x-2 text-sm"
                             >
                                 <Checkbox id={idStr} name={idStr} checked={selected.includes(idStr)} onSelect={() => onSelect(idStr)}/>
-                                <Label htmlFor={idStr} className="text-xs text-gray-800">
+                                <Label htmlFor={idStr} className="text-sm text-gray-800">
                                     {getLabel(item)}
                                 </Label>
                             </div>

@@ -8,13 +8,15 @@ interface Props {
     onSelect: (id: string | number) => void;
 }
 
-const TeamFilter = ({ workspace }: Props) => {
+const TeamFilter = ({ workspace, selected, onSelect }: Props) => {
     return (
         <EntityFilter<Team>
             workspace={workspace}
             endpoint={'/teams'}
             getId={(p) => p.id}
             getLabel={(p) => p.name}
+            selected={selected}
+            onSelect={onSelect}
         />
     );
 };

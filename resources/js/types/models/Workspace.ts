@@ -1,3 +1,6 @@
+import { Page } from '@/types/models/Page';
+import { Shop } from '@/types/models/Shop';
+
 export interface Workspace {
     id: number;
     name: string;
@@ -5,4 +8,7 @@ export interface Workspace {
     owner_id: number;
     created_at: string;
     updated_at: string;
+
+    pages?: Page[]
+    shops?: Shop[]
 }

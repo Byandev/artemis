@@ -1,6 +1,6 @@
 import { Page } from '@/types/models/Page';
 import { Workspace } from '@/types/models/Workspace';
-import { EntityFilter } from '@/components/filters/EntityFilter';
+import { FilterGroup } from '@/components/filters/FilterGroup';
 
 interface Props {
     workspace: Workspace;
@@ -9,13 +9,12 @@ interface Props {
 }
 
 const PageFilter = ({ workspace, selected, onSelect }: Props) => {
-    return <EntityFilter<Page>
-        workspace={workspace}
-        endpoint={'/pages'}
-        getId={(p) => p.id}
-        getLabel={(p) => p.name}
+    return <FilterGroup<Page>
+        getId={(item) => item.id}
+        getLabel={(item) => item.name}
         selected={selected}
         onSelect={onSelect}
+        options={workspace.pages ?? []}
     />
 }
 
