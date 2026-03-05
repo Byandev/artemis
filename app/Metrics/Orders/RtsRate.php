@@ -6,11 +6,17 @@ use Illuminate\Support\Facades\DB;
 
 final class RtsRate
 {
-    public function compute(int $workspaceId, array $date_range): float
+    public function compute(int $workspaceId, array $date_range, array $filter): float
     {
         $row = DB::table('pancake_orders')
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
             ->where('pages.workspace_id', $workspaceId)
+            ->when(isset($filter['page_ids']) && $filter['page_ids'], function ($query) use ($filter) {
+                $query->whereIn('pages.id', explode(',', $filter['page_ids']));
+            })
+            ->when(isset($filter['shop_ids']) && $filter['shop_ids'], function ($query) use ($filter) {
+                $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
+            })
             ->where(function ($query) use ($date_range) {
                 $query->orWhere(function ($subQuery) use ($date_range) {
                     $subQuery->whereDate('pancake_orders.returning_at', '<=', $date_range['end_date'])

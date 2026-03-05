@@ -8,7 +8,7 @@ import {
     percentageFormatter,
 } from '@/lib/utils';
 import DatePicker from '@/components/ui/date-picker';
-import Filters from '@/components/filters/Filters';
+import Filters, { FilterValue } from '@/components/filters/Filters';
 import moment from 'moment';
 import flatpickr from 'flatpickr';
 import DateOption = flatpickr.Options.DateOption;
@@ -34,6 +34,14 @@ const Dashboard = ({ workspace }: Props) => {
         moment().endOf('month').format('YYYY-MM-DD'),
     ]);
 
+    const [filter, setFilter] = useState<FilterValue>({
+        teamIds: [],
+        productIds: [],
+        shopIds: [],
+        pageIds: [],
+        userIds: [],
+    });
+
     const [analytics, setAnalytics] = useState<Analytics | null>();
 
     useEffect(() => {
@@ -49,12 +57,17 @@ const Dashboard = ({ workspace }: Props) => {
                     'date_range[end_date]': moment(dateRange[1]).format(
                         'YYYY-MM-DD',
                     ),
+                    'filter[team_ids]': filter.teamIds.join(','),
+                    'filter[shop_ids]': filter.shopIds.join(','),
+                    'filter[page_ids]': filter.pageIds.join(','),
+                    'filter[user_ids]': filter.userIds.join(','),
+                    'filter[product_ids]': filter.productIds.join(','),
                 },
             })
             .then((response: AxiosResponse<Analytics>) => {
                 setAnalytics(response.data);
             });
-    }, [workspace.id, dateRange]);
+    }, [workspace.id, dateRange, filter]);
 
     const cards = useMemo(() => {
         return [
@@ -95,7 +108,7 @@ const Dashboard = ({ workspace }: Props) => {
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:gap-6 xl:grid-cols-4">
                     <div className="sm:col-start-1 md:col-start-2 xl:col-start-3">
-                        <Filters workspace={workspace} />
+                        <Filters workspace={workspace} onChange={value => setFilter(value)}/>
                     </div>
 
                     <div className="sm:col-start-2 md:col-start-3 xl:col-start-4">

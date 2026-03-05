@@ -15,7 +15,7 @@ use InvalidArgumentException;
 
 final class WorkspaceMetrics
 {
-    public function __construct(private readonly Workspace $workspace,  public array $dateRange) {}
+    public function __construct(private readonly Workspace $workspace,  public array $dateRange, public array $filter) {}
 
     /**
      * Registry: metricName => class
@@ -47,7 +47,7 @@ final class WorkspaceMetrics
                 throw new InvalidArgumentException("Unknown metric: {$name}");
             }
 
-            $out[$name] = app($class)->compute($workspaceId, $this->dateRange);
+            $out[$name] = app($class)->compute($workspaceId, $this->dateRange, $this->filter);
         }
 
         return $out;

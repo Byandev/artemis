@@ -6,18 +6,21 @@ import { Workspace } from '@/types/models/Workspace';
 import ShopFilter from '@/components/filters/ShopFilter';
 import PageFilter from '@/components/filters/PageFilter';
 
-interface Props {
-    workspace: Workspace;
+export interface FilterValue {
+    teamIds: (string | number)[];
+    productIds: (string | number)[];
+    shopIds: (string | number)[];
+    pageIds: (string | number)[];
+    userIds: (string | number)[];
 }
 
-const Filters = ({ workspace }: Props) => {
-    const [value, setValue] = useState<{
-        teamIds: (string | number)[]
-        productIds: (string | number)[]
-        shopIds: (string | number)[]
-        pageIds: (string | number)[]
-        userIds: (string | number)[]
-    }>({
+interface Props {
+    workspace: Workspace;
+    onChange: (value: FilterValue) => void
+}
+
+const Filters = ({ workspace, onChange }: Props) => {
+    const [value, setValue] = useState<FilterValue>({
         teamIds: [],
         productIds: [],
         shopIds: [],
@@ -36,8 +39,9 @@ const Filters = ({ workspace }: Props) => {
                     Filter
                 </Button>
             </PopoverTrigger>
+
             <PopoverContent className="w-[calc(100vw-2rem)] rounded-2xl sm:w-80">
-                <div className="max-h-72 overflow-scroll space-y-1.5">
+                <div className="max-h-72 space-y-1.5 overflow-scroll">
                     <PageFilter
                         workspace={workspace}
                         selected={value.pageIds}
@@ -63,6 +67,10 @@ const Filters = ({ workspace }: Props) => {
                             }));
                         }}
                     />
+                </div>
+
+                <div className="flex mt-2 gap-x-2">
+                    <Button size={'sm'} onClick={() => onChange(value)}>Apply</Button>
                 </div>
             </PopoverContent>
         </Popover>
