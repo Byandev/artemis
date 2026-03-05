@@ -1,7 +1,6 @@
+import { FilterGroup } from '@/components/filters/FilterGroup';
 import { Shop } from '@/types/models/Shop';
 import { Workspace } from '@/types/models/Workspace';
-import { EntityFilter } from '@/components/filters/EntityFilter';
-
 
 interface Props {
     workspace: Workspace;
@@ -11,13 +10,13 @@ interface Props {
 
 const ShopFilter = ({ workspace, selected, onSelect }: Props) => {
     return (
-        <EntityFilter<Shop>
-            workspace={workspace}
-            endpoint={'/shops'}
-            getId={(p) => p.id}
-            getLabel={(p) => p.name}
+        <FilterGroup<Shop>
+            name={'Shop'}
+            getId={(item) => item.id}
+            getLabel={(item) => item.name}
             selected={selected}
             onSelect={onSelect}
+            options={workspace.shops ?? []}
         />
     );
 };
