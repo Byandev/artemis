@@ -7,7 +7,7 @@ use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
 
-Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth', 'verified']], function () {
+Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], function () {
     Route::group(['prefix' => 'workspaces/{workspace}', 'as' => 'workspaces.'], function () {
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');

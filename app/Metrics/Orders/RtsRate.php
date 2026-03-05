@@ -11,7 +11,7 @@ final class RtsRate
         $row = DB::table('pancake_orders')
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
             ->where('pages.workspace_id', $workspaceId)
-            ->selectRaw("
+            ->selectRaw('
                 COALESCE(
                     (SUM(CASE WHEN pancake_orders.returning_at IS NOT NULL THEN pancake_orders.final_amount ELSE 0 END))
                     / NULLIF(
@@ -21,7 +21,7 @@ final class RtsRate
                     ),
                     0
                 ) as rts_rate
-            ")
+            ')
             ->first();
 
         return (float) ($row->rts_rate ?? 0);

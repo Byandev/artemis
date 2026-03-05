@@ -66,11 +66,11 @@ export function AppSidebar() {
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
             icon: Users,
         },
-        // {
-        //     title: 'RTS Management',
-        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts`,
-        //     icon: TrendingUp,
-        // },
+        {
+            title: 'RTS Management',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts`,
+            icon: TrendingUp,
+        },
         // {
         //     title: 'Botcake',
         //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/botcake`,

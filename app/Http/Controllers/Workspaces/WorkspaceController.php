@@ -164,7 +164,14 @@ class WorkspaceController extends Controller
         }
 
         return Inertia::render('workspaces/dashboard/index', [
-            'workspace' => $workspace,
+            'workspace' => $workspace->loadMissing([
+                'shops' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                },
+                'pages' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                }
+            ]),
         ]);
     }
 

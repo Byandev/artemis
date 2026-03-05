@@ -163,4 +163,14 @@ class Workspace extends Model
     {
         return new \App\Support\WorkspaceMetrics($this);
     }
+
+    public function shops(): HasMany|Workspace
+    {
+        return $this->hasMany(Shop::class);
+    }
+
+    public function pages(): HasMany|Workspace
+    {
+        return $this->hasMany(Page::class);
+    }
 }
