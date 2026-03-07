@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Metrics\Orders\Aov;
 use App\Metrics\Orders\AverageDeliveryDays;
 use App\Metrics\Orders\AverageLifetimeValue;
+use App\Metrics\Orders\AverageShippedOutDays;
 use App\Metrics\Orders\RepeatOrderRatio;
 use App\Metrics\Orders\RtsRate;
 use App\Metrics\Orders\TimeToFirstOrder;
@@ -30,6 +31,7 @@ final class WorkspaceMetrics
         'timeToFirstOrder' => TimeToFirstOrder::class,
         'avgLifetimeValue' => AverageLifetimeValue::class,
         'avgDeliveryDays' => AverageDeliveryDays::class,
+        'avgShippedOutDays' => AverageShippedOutDays::class,
     ];
 
     /**
