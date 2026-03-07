@@ -139,7 +139,7 @@ const Dashboard = ({ workspace }: Props) => {
             },
             {
                 label: 'Avg Shipped Out Days',
-                value: `${analytics?.avgDeliveryDays ?? 0} Days`,
+                value: `${analytics?.avgShippedOutDays ?? 0} Days`,
             },
         ];
     }, [analytics]);
