@@ -9,17 +9,19 @@ import {
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
 import { useEffect, useState } from 'react';
+import moment from 'moment/moment';
 
 interface Props {
     workspace: Workspace;
+    dateRange: string[];
 }
 
-export function StatisticBreakdown({ workspace }: Props) {
+export function StatisticBreakdown({ workspace , dateRange}: Props) {
     const [breakdown, setBreakdown] = useState<any[]>([]);
-    const [option, setOption] = useState('sales');
+    const [option, setOption] = useState('totalSales');
 
     const optionLabels: Record<string, string> = {
-        sales: 'Sales',
+        totalSales: 'Sales',
         orders: 'Orders',
         oav: 'AOV',
         rts: 'RTS',
@@ -38,11 +40,17 @@ export function StatisticBreakdown({ workspace }: Props) {
                 },
                 params: {
                     metric: option,
+                        'date_range[start_date]': moment(dateRange[0]).format(
+                            'YYYY-MM-DD',
+                        ),
+                        'date_range[end_date]': moment(dateRange[1]).format(
+                            'YYYY-MM-DD',
+                        ),
                 },
             })
             .then((response) => setBreakdown(response.data.data))
             .catch((error) => console.error(error));
-    }, [workspace.id, option]);
+    }, [workspace.id, option, dateRange]);
 
     return (
         <div className="space-y-4">
