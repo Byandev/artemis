@@ -49,7 +49,7 @@ class Order extends Model
             $query->whereIn('orders.page_id', is_array($pageIds) ? $pageIds : explode(',', $pageIds));
         }
 
-        // Filter by shop IDs
+        // Filter by shops IDs
         if ($shopIds) {
             $query->whereIn('orders.shop_id', is_array($shopIds) ? $shopIds : explode(',', $shopIds));
         }

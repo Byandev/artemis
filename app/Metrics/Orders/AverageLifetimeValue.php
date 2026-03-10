@@ -29,10 +29,10 @@ final class AverageLifetimeValue
             })
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotNull('pancake_orders.customer_id')
-            ->whereNotIn('pancake_orders.status', [6,7])
+            ->whereNotIn('pancake_orders.status', [6, 7])
             ->whereBetween('pancake_orders.confirmed_at', [
-                $date_range['start_date'] . ' 00:00:00',
-                $date_range['end_date'] . ' 23:59:59',
+                $date_range['start_date'].' 00:00:00',
+                $date_range['end_date'].' 23:59:59',
             ])
             ->selectRaw('
                 COALESCE(

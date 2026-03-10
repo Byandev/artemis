@@ -49,7 +49,7 @@ class PageSeeder extends Seeder
 
         // Create active pages
         foreach ($shops as $shop) {
-            // Create 2-4 active pages per shop
+            // Create 2-4 active pages per shops
             $pageCount = rand(2, 4);
 
             for ($i = 0; $i < $pageCount; $i++) {
@@ -61,7 +61,7 @@ class PageSeeder extends Seeder
                     ->create();
             }
         }
-        $this->command->info('Created active pages for each shop');
+        $this->command->info('Created active pages for each shops');
 
         // Create some archived pages
         $archivedCount = rand(2, 4);

@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // pages: supports workspace + shop filters + join to orders
+        // pages: supports workspace + shops filters + join to orders
         Schema::table('pages', function (Blueprint $table) {
             $table->index(['workspace_id', 'shop_id', 'id'], 'pages_workspace_shop_id_id_idx');
         });

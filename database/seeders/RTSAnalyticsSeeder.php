@@ -36,7 +36,7 @@ class RTSAnalyticsSeeder extends Seeder
         $pagesByShop = [];
 
         $numShops = 10; // total shops to create
-        $pagesPerShop = 5; // pages per shop
+        $pagesPerShop = 5; // pages per shops
 
         for ($s = 1; $s <= $numShops; $s++) {
             $shop = Shop::firstOrCreate([
@@ -76,7 +76,7 @@ class RTSAnalyticsSeeder extends Seeder
                 $statusName = 'returned_rt';
             }
 
-            // pick a random shop and one of its pages for this order
+            // pick a random shops and one of its pages for this order
             $shop = $shops[array_rand($shops)];
             $page = $pagesByShop[$shop->id][array_rand($pagesByShop[$shop->id])];
 

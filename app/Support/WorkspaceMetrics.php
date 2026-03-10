@@ -16,7 +16,7 @@ use InvalidArgumentException;
 
 final class WorkspaceMetrics
 {
-    public function __construct(private readonly Workspace $workspace,  public array $dateRange, public array $filter) {}
+    public function __construct(private readonly Workspace $workspace, public array $dateRange, public array $filter) {}
 
     /**
      * Registry: metricName => class

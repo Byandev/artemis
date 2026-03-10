@@ -69,7 +69,7 @@ class AdRecord extends Model
                 $q->whereIn('orders.page_id', is_array($pageIds) ? $pageIds : explode(',', $pageIds));
             }
 
-            // Filter by shop IDs
+            // Filter by shops IDs
             if ($shopIds) {
                 $q->whereIn('orders.shop_id', is_array($shopIds) ? $shopIds : explode(',', $shopIds));
             }
