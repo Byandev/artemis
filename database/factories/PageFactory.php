@@ -47,7 +47,7 @@ class PageFactory extends Factory
     }
 
     /**
-     * Set a specific shop for the page.
+     * Set a specific shops for the page.
      */
     public function forShop(Shop $shop): static
     {

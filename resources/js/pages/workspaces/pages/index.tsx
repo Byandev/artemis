@@ -238,14 +238,14 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
 
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - Shop & Pages`} />
+            <Head title={`${workspace.name} - Pages`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                     <h2
                         className="text-xl font-semibold text-gray-800 dark:text-white/90"
                         x-text="pageName"
                     >
-                        Shop & Pages
+                        Pages
                     </h2>
                     <Button size="sm" onClick={handleCreate}>
                         Add New Page

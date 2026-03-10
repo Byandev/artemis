@@ -20,6 +20,7 @@ import {
     MousePointerClickIcon,
     TrendingUp,
     Users,
+    BookOpenIcon
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
@@ -42,9 +43,14 @@ export function AppSidebar() {
         //     icon: Target,
         // },
         {
-            title: 'Shop and Pages',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
+            title: 'Shops',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/shops`,
             icon: Store,
+        },
+        {
+            title: 'Pages',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
+            icon: BookOpenIcon,
         },
         {
             title: 'Products',

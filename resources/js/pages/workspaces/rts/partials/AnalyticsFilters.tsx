@@ -70,7 +70,7 @@ const AnalyticsFilters = ({
                     setFilterOptions(prev => ({ ...prev, shops: result.filter_options ?? [] }));
                 }
             } catch (error) {
-                console.error('Error fetching shop filter options:', error);
+                console.error('Error fetching shops filter options:', error);
             }
         };
 
