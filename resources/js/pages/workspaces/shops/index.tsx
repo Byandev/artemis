@@ -154,7 +154,7 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                                 meta={{ ...omit(pages, ['data']) }}
                                 onFetch={(params) => {
                                     router.get(
-                                        workspaces.pages.index({ workspace }),
+                                        workspaces.shops.index({ workspace }),
                                         {
                                             sort: params?.sort,
                                             'filter[search]':
