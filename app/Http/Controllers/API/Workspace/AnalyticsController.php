@@ -23,24 +23,16 @@ class AnalyticsController extends Controller
 
     public function breakdown(Request $request)
     {
-        $group = $request->input('group', 'monthly');
+        $workspace = Workspace::find($request->workspace->id);
 
-        $base = Order::query()
-            ->whereHas('page', fn ($q) => $q->where('workspace_id', $request->workspace->id))
-            ->whereNotNull('confirmed_at');
+        $data = $workspace->metrics(
+            $request->array('date_range', []),
+            $request->array('filter', [])
+        )->breakdown(
+            $request->input('metric', 'totalSales'),
+            $request->input('group', 'daily')
+        );
 
-        $periodSql = match ($group) {
-            'weekly' => "DATE_FORMAT(confirmed_at, '%x-W%v')",
-            'monthly' => "DATE_FORMAT(confirmed_at, '%Y-%m')",
-            default => 'DATE(confirmed_at)',
-        };
-
-        $totals = (clone $base)
-            ->selectRaw("$periodSql as period, COUNT(*) as value")
-            ->groupByRaw($periodSql)
-            ->orderByRaw($periodSql)
-            ->get();
-
-        return response()->json(['data' => $totals]);
+        return response()->json(['data' => $data]);
     }
 }

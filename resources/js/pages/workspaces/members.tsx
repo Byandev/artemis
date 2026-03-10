@@ -41,11 +41,11 @@ import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { omit } from 'lodash';
-import { MoreHorizontal, Send, Trash2, UserMinus } from 'lucide-react';
+import { MoreHorizontal, Send, Trash2, UserMinus, CopyleftIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 interface User {
@@ -111,6 +111,7 @@ const RoleBadge = ({ role }: { role: string }) => {
 };
 
 export default function WorkspaceMembers({ workspace, members, pendingInvitations, isAdmin, query }: Props) {
+    const page = usePage();
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
@@ -164,6 +165,19 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
             { preserveScroll: true }
         );
     };
+
+    const copyInviteUrl = async (invitation: Invitation) => {
+        try {
+            const domain = window.location.origin;
+
+            await navigator.clipboard.writeText(
+                `${domain}/workspaces/invitations/${invitation.token}/accept`,
+            );
+            alert('Copied!');
+        } catch (error) {
+            console.error('Failed to copy:', error);
+        }
+    }
 
     const handleRemoveMember = () => {
         if (!memberToRemove) return;
@@ -332,17 +346,31 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleResendInvitation(invitation.id)}>
+                            <DropdownMenuItem
+                                onClick={() =>
+                                    handleResendInvitation(invitation.id)
+                                }
+                            >
                                 <Send className="mr-2 h-4 w-4" />
                                 Resend
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                                onClick={() => setInvitationToRevoke(invitation)}
+                                onClick={() =>
+                                    setInvitationToRevoke(invitation)
+                                }
                                 className="text-destructive focus:text-destructive"
                             >
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Revoke
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                                onClick={() => copyInviteUrl(invitation)}
+                                className="text-destructive focus:text-destructive"
+                            >
+                                <CopyleftIcon className="mr-2 h-4 w-4" />
+                                Copy
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
