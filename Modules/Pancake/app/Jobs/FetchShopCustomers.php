@@ -39,7 +39,7 @@ class FetchShopCustomers implements ShouldQueue
         $data = $response['data'];
 
         foreach ($data as $i => $customer) {
-            dispatch(new SyncShopCustomer($this->shop, $customer))->delay(now()->addSeconds($i));
+            dispatch(new SyncShopCustomer($this->shop, $customer))->delay(now()->addSeconds($i))->onQueue('pancake');
         }
 
         if ($totalPages > $this->page_number) {

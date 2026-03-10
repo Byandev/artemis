@@ -59,7 +59,7 @@ class ShopController extends Controller
 
         $shop->update(['customers_last_synced_at' => null]);
 
-        dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subYear()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()));
+        dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subYear()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
 
         return redirect()->route('workspaces.shops.index', $workspace);
     }
