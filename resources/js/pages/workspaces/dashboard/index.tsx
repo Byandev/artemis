@@ -26,6 +26,7 @@ interface Analytics {
     timeToFirstOrder: number;
     avgLifetimeValue: number;
     avgDeliveryDays: number;
+    avgShippedOutDays: number;
 }
 
 function CardSkeleton({ label }: { label: string }) {
@@ -135,6 +136,10 @@ const Dashboard = ({ workspace }: Props) => {
             {
                 label: 'Avg Delivery Days',
                 value: `${analytics?.avgDeliveryDays ?? 0} Days`,
+            },
+            {
+                label: 'Avg Shipped Out Days',
+                value: `${analytics?.avgShippedOutDays ?? 0} Days`,
             },
         ];
     }, [analytics]);
