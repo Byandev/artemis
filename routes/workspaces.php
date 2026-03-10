@@ -77,6 +77,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace}/pages/{page}/archive', [PageController::class, 'archive'])->name('workspaces.pages.archive');
     Route::post('/workspaces/{workspace}/pages/{page}/restore', [PageController::class, 'restore'])->name('workspaces.pages.restore');
 
+    Route::get('/workspaces/{workspace}/shops', [\App\Http\Controllers\Workspaces\ShopController::class, 'index'])->name('workspaces.shops.index');
+    Route::post('/workspaces/{workspace}/shops/{shop}/refresh', [\App\Http\Controllers\Workspaces\ShopController::class, 'refresh'])->name('workspaces.shops.refresh');
+
     // Product routes
     // Redirect to analytics by default for navigation item active state
     Route::get('/workspaces/{workspace}/products', function (Workspace $workspace) {

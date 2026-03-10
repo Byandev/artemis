@@ -14,7 +14,7 @@ final class RepeatOrderRatio
     public function compute(int $workspaceId, array $dateRange, array $filter): float
     {
         $startAt = $dateRange['start_date'];
-        $endAt   = $dateRange['end_date'];
+        $endAt = $dateRange['end_date'];
 
         // 1) Cohort customers: at least 1 order inside the window
         $cohort = DB::table('pancake_orders')
@@ -28,10 +28,10 @@ final class RepeatOrderRatio
             })
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotNull('pancake_orders.customer_id')
-            ->whereNotIn('pancake_orders.status', [6,7])
+            ->whereNotIn('pancake_orders.status', [6, 7])
             ->whereBetween('pancake_orders.confirmed_at', [
-                $startAt . ' 00:00:00',
-                $endAt . ' 23:59:59',
+                $startAt.' 00:00:00',
+                $endAt.' 23:59:59',
             ])
             ->groupBy('pancake_orders.customer_id')
             ->selectRaw('pancake_orders.customer_id as customer_key');
@@ -49,7 +49,7 @@ final class RepeatOrderRatio
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotNull('pancake_orders.customer_id')
             ->whereDate('pancake_orders.confirmed_at', '<=', $endAt)
-            ->whereNotIn('pancake_orders.status', [6,7])
+            ->whereNotIn('pancake_orders.status', [6, 7])
             ->groupBy('pancake_orders.customer_id')
             ->selectRaw('pancake_orders.customer_id as customer_key, COUNT(*) as orders_count');
 

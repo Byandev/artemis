@@ -28,7 +28,7 @@ class ShopFactory extends Factory
     }
 
     /**
-     * Set a specific workspace for the shop.
+     * Set a specific workspace for the shops.
      */
     public function forWorkspace(Workspace $workspace): static
     {

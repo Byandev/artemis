@@ -13,8 +13,8 @@ final class TotalOrders
             ->where('pages.workspace_id', $workspaceId)
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereBetween('pancake_orders.confirmed_at', [
-                $date_range['start_date'] . ' 00:00:00',
-                $date_range['end_date'] . ' 23:59:59',
+                $date_range['start_date'].' 00:00:00',
+                $date_range['end_date'].' 23:59:59',
             ])
             ->when(isset($filter['page_ids']) && $filter['page_ids'], function ($query) use ($filter) {
                 $query->whereIn('pages.id', explode(',', $filter['page_ids']));
@@ -22,7 +22,7 @@ final class TotalOrders
             ->when(isset($filter['shop_ids']) && $filter['shop_ids'], function ($query) use ($filter) {
                 $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
             })
-            ->whereNotIn('pancake_orders.status', [6,7])
+            ->whereNotIn('pancake_orders.status', [6, 7])
             ->count();
     }
 }

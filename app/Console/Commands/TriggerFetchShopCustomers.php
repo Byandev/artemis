@@ -14,7 +14,7 @@ class TriggerFetchShopCustomers extends Command
      *
      * @var string
      */
-    protected $signature = 'trigger-fetch-shop-customers';
+    protected $signature = 'trigger-fetch-shops-customers';
 
     /**
      * The console command description.

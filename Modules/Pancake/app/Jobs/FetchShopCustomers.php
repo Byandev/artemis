@@ -17,7 +17,7 @@ class FetchShopCustomers implements ShouldQueue
      */
     public function __construct(public Shop $shop, public int $page_number, public int $startTime, public int $endTime)
     {
-        $this->shop->loadMissing('pages');
+
     }
 
     /**
@@ -25,6 +25,8 @@ class FetchShopCustomers implements ShouldQueue
      */
     public function handle(): void
     {
+        $this->shop->loadMissing('pages');
+
         $page_number = $this->page_number;
 
         $pancake = new Pancake($this->shop->id, $this->shop->pages->first()->pos_token);

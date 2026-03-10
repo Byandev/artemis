@@ -11,7 +11,7 @@ final class RtsRate
         $row = DB::table('pancake_orders')
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
             ->where('pages.workspace_id', $workspaceId)
-            ->whereNotIn('pancake_orders.status', [6,7])
+            ->whereNotIn('pancake_orders.status', [6, 7])
             ->when(isset($filter['page_ids']) && $filter['page_ids'], function ($query) use ($filter) {
                 $query->whereIn('pages.id', explode(',', $filter['page_ids']));
             })
@@ -22,14 +22,14 @@ final class RtsRate
                 $query->orWhere(function ($subQuery) use ($date_range) {
                     $subQuery
                         ->whereBetween('pancake_orders.returning_at', [
-                            $date_range['start_date'] . ' 00:00:00',
-                            $date_range['end_date'] . ' 23:59:59',
+                            $date_range['start_date'].' 00:00:00',
+                            $date_range['end_date'].' 23:59:59',
                         ]);
                 })->orWhere(function ($subQuery) use ($date_range) {
                     $subQuery
                         ->whereBetween('pancake_orders.delivered_at', [
-                            $date_range['start_date'] . ' 00:00:00',
-                            $date_range['end_date'] . ' 23:59:59',
+                            $date_range['start_date'].' 00:00:00',
+                            $date_range['end_date'].' 23:59:59',
                         ]);
                 });
             })

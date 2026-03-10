@@ -48,8 +48,8 @@ class UpdatePageRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'shop_id.required' => 'The shop is required.',
-            'shop_id.exists' => 'The selected shop does not exist.',
+            'shop_id.required' => 'The shops is required.',
+            'shop_id.exists' => 'The selected shops does not exist.',
             'name.required' => 'The page name is required.',
             'facebook_url.url' => 'The Facebook URL must be a valid URL.',
         ];

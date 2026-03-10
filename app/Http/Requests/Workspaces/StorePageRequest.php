@@ -46,7 +46,7 @@ class StorePageRequest extends FormRequest
         return [
             'id.required' => 'The page ID is required.',
             'id.unique' => 'This page has already been added to a workspace.',
-            'shop_id.required' => 'The shop ID is required.',
+            'shop_id.required' => 'The shops ID is required.',
             'name.required' => 'The page name is required.',
             'pos_token.required' => 'The POS token is required.',
         ];
