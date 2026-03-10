@@ -178,7 +178,7 @@ class WorkspaceController extends Controller
     /**
      * Get historical sales vs ad spend data for charts.
      */
-    public function getChartData(Request $request, Workspace $workspace)
+        public function getChartData(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
         if (! $request->user()->isMemberOf($workspace)) {
