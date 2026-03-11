@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        $indexes = collect(DB::select("SHOW INDEX FROM pancake_orders"))
+        $indexes = collect(DB::select('SHOW INDEX FROM pancake_orders'))
             ->pluck('Key_name')
             ->unique()
             ->values()
@@ -31,7 +31,6 @@ return new class extends Migration
             }
         });
     }
-
 
     /**
      * Reverse the migrations.

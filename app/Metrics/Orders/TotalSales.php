@@ -17,7 +17,7 @@ final class TotalSales
         $periodSql = match ($group) {
             'weekly' => "DATE_FORMAT(pancake_orders.confirmed_at, '%x-W%v')",
             'monthly' => "DATE_FORMAT(pancake_orders.confirmed_at, '%Y-%m')",
-            default => "DATE(pancake_orders.confirmed_at)",
+            default => 'DATE(pancake_orders.confirmed_at)',
         };
 
         return $this->baseQuery($workspaceId, $date_range, $filter)
@@ -31,7 +31,7 @@ final class TotalSales
     {
         return DB::table('pancake_orders')
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->where('pages.workspace_id', $workspaceId)
+            ->where('pancake_orders.workspace_id', $workspaceId)
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereBetween('pancake_orders.confirmed_at', [
                 $date_range['start_date'].' 00:00:00',
@@ -43,6 +43,6 @@ final class TotalSales
             ->when(isset($filter['shop_ids']) && $filter['shop_ids'], function ($query) use ($filter) {
                 $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
             })
-            ->whereNotIn('pancake_orders.status', [6,7]);
+            ->whereNotIn('pancake_orders.status', [6, 7]);
     }
 }

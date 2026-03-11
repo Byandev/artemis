@@ -10,7 +10,7 @@ final class TotalOrders
     {
         return (int) DB::table('pancake_orders')
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->where('pages.workspace_id', $workspaceId)
+            ->where('pancake_orders.workspace_id', $workspaceId)
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereBetween('pancake_orders.confirmed_at', [
                 $date_range['start_date'].' 00:00:00',

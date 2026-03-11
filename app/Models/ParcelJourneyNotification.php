@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Jobs\SendParcelUpdateNotification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
