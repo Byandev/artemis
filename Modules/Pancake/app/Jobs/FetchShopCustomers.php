@@ -16,10 +16,7 @@ class FetchShopCustomers implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(public Shop $shop, public int $page_number, public int $startTime, public int $endTime)
-    {
-
-    }
+    public function __construct(public Shop $shop, public int $page_number, public int $startTime, public int $endTime) {}
 
     /**
      * Execute the job.
