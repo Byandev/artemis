@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-
 use App\Services\Botcake;
 use DateTime;
 use Illuminate\Contracts\Queue\ShouldQueue;

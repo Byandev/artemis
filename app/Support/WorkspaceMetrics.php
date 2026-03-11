@@ -65,7 +65,7 @@ final class WorkspaceMetrics
 
         $workspaceId = $this->workspace->id;
 
-        if (!method_exists($class, 'breakdown')) {
+        if (! method_exists($class, 'breakdown')) {
             throw new InvalidArgumentException("Metric {$name} does not support breakdown.");
         }
 

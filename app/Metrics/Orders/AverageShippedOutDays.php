@@ -26,7 +26,7 @@ final class AverageShippedOutDays
                 $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
             })
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->where('pages.workspace_id', $workspaceId)
+            ->where('pancake_orders.workspace_id', $workspaceId)
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotNull('pancake_orders.shipped_at')
             ->whereBetween('pancake_orders.shipped_at', [
