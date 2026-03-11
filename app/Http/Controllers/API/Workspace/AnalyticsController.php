@@ -29,7 +29,7 @@ class AnalyticsController extends Controller
 
         $data = $workspace->metrics($request->array('date_range', []), $request->array('filter', []))
             ->extract([
-                //                    'rtsRate',
+                                    'rtsRate',
                                     'aov',
                 'totalSales',
                 'totalOrders',
