@@ -24,16 +24,4 @@ class ParcelJourneyNotification extends Model
             $q->where('name', 'like', '%'.$pageName.'%');
         });
     }
-
-    /**
-     * The "booted" method of the model.
-     */
-    protected static function booted(): void
-    {
-        static::created(function (ParcelJourneyNotification $parcelJourneyNotification) {
-            if (config('settings.parcel_journey_notification_enabled')) {
-                dispatch(new SendParcelUpdateNotification($parcelJourneyNotification))->onQueue('parcel-notifications');
-            }
-        });
-    }
 }
