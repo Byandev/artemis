@@ -33,7 +33,7 @@ class AnalyticsController extends Controller
                                     'aov',
                 'totalSales',
                 'totalOrders',
-                //                    'repeatOrderRatio',
+                                    'repeatOrderRatio',
                 //                    'timeToFirstOrder',
                 //                    'avgLifetimeValue',
                 //                    'avgDeliveryDays',
