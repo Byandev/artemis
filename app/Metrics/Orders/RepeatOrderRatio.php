@@ -113,6 +113,6 @@ final class RepeatOrderRatio
 
     private function needsPagesJoin(array $filter): bool
     {
-        return !empty($filter['page_ids']) || !empty($filter['shop_ids']);
+        return ! empty($filter['page_ids']) || ! empty($filter['shop_ids']);
     }
 }

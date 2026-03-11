@@ -29,15 +29,15 @@ class AnalyticsController extends Controller
 
         $data = $workspace->metrics($request->array('date_range', []), $request->array('filter', []))
             ->extract([
-                                    'rtsRate',
-                                    'aov',
+                'rtsRate',
+                'aov',
                 'totalSales',
                 'totalOrders',
-                                    'repeatOrderRatio',
-                                    'timeToFirstOrder',
-                                    'avgLifetimeValue',
-                //                    'avgDeliveryDays',
-                //                    'avgShippedOutDays'
+                'repeatOrderRatio',
+                'timeToFirstOrder',
+                'avgLifetimeValue',
+                'avgDeliveryDays',
+                'avgShippedOutDays',
             ]);
 
         return response()->json($data);

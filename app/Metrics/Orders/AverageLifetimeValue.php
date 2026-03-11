@@ -13,12 +13,6 @@ final class AverageLifetimeValue
      *
      * Formula:
      * total confirmed sales up to end date / unique confirmed customers up to end date
-     *
-     * @param  int  $workspaceId
-     * @param  array  $dateRange
-     * @param  array  $filter
-     *
-     * @return float
      */
     public function compute(int $workspaceId, array $dateRange, array $filter): float
     {
@@ -83,16 +77,16 @@ final class AverageLifetimeValue
             ->where('pancake_orders.confirmed_at', '<', $endExclusive)
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(!empty($filter['page_ids']), function (Builder $query) use ($filter) {
+            ->when(! empty($filter['page_ids']), function (Builder $query) use ($filter) {
                 $query->whereIn('pages.id', explode(',', $filter['page_ids']));
             })
-            ->when(!empty($filter['shop_ids']), function (Builder $query) use ($filter) {
+            ->when(! empty($filter['shop_ids']), function (Builder $query) use ($filter) {
                 $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
             });
     }
 
     private function needsPagesJoin(array $filter): bool
     {
-        return !empty($filter['page_ids']) || !empty($filter['shop_ids']);
+        return ! empty($filter['page_ids']) || ! empty($filter['shop_ids']);
     }
 }
