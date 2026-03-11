@@ -12,33 +12,10 @@ class AnalyticsController extends Controller
     {
         $workspace = Workspace::find($request->workspace->id);
 
-        //        $data = \Cache::remember(json_encode($request->only(['date_range', 'filter'])), 5 * 60, function () use ($request, $workspace) {
-        //            return $workspace->metrics($request->array('date_range', []), $request->array('filter', []))
-        //                ->extract([
-        // //                    'rtsRate',
-        // //                    'aov',
-        //                    'totalSales',
-        //                    'totalOrders',
-        // //                    'repeatOrderRatio',
-        // //                    'timeToFirstOrder',
-        // //                    'avgLifetimeValue',
-        // //                    'avgDeliveryDays',
-        // //                    'avgShippedOutDays'
-        //                ]);
-        //        });
-
-        $data = $workspace->metrics($request->array('date_range', []), $request->array('filter', []))
-            ->extract([
-                'rtsRate',
-                'aov',
-                'totalSales',
-                'totalOrders',
-                'repeatOrderRatio',
-                'timeToFirstOrder',
-                'avgLifetimeValue',
-                'avgDeliveryDays',
-                'avgShippedOutDays',
-            ]);
+        $data = \Cache::remember(json_encode($request->only(['date_range', 'filter', 'metric'])), 5 * 60, function () use ($request, $workspace) {
+            return $workspace->metrics($request->array('date_range', []), $request->array('filter', []))
+                ->extract($request->array('metric'));
+        });
 
         return response()->json($data);
     }
