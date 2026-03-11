@@ -35,7 +35,7 @@ class TriggerFetchPageOrders extends Command
             ->whereNotNull('infotxt_user_id')
             ->get()
             ->each(function (Page $page) {
-                dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::parse($page->orders_last_synced_at)->unix(), \Carbon\Carbon::now()->unix()));
+                dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::parse($page->orders_last_synced_at)->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
             });
     }
 }

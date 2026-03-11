@@ -113,8 +113,8 @@ class PageController extends Controller
             'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
         ]);
 
-        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear(1)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()));
-        dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subYear(1)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()));
+        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear(1)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subYear(1)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
 
         return redirect()->route('workspaces.pages.index', $workspace)
             ->with('success', 'Page created successfully.');
@@ -156,7 +156,7 @@ class PageController extends Controller
 
         $page->update(['orders_last_synced_at' => null]);
 
-        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()));
+        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
 
         return redirect()->route('workspaces.pages.index', $workspace);
     }
