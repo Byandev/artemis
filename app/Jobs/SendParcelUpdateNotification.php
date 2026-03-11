@@ -45,7 +45,7 @@ class SendParcelUpdateNotification implements ShouldQueue
                 if (isset($response['status']) && $response['status'] === '00') {
                     $this->parcelJourneyNotification->update(['sms_id' => $response['smsid']]);
 
-                    dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5));
+                    dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5))->onQueue('parcel-notifications');
                 } else {
                     $this->parcelJourneyNotification->update(['remarks' => json_encode($response)]);
                 }
