@@ -4,8 +4,9 @@ import Chart from 'react-apexcharts';
 interface Props {
     series: ApexNonAxisChartSeries | undefined;
     categories: string[];
+    formatValue: (value: number) => string;
 }
-export default function LineChartOne({categories, series} : Props) {
+export default function LineChartOne({categories, series, formatValue} : Props) {
     const options: ApexOptions = {
         legend: {
             show: false, // Hide legend
@@ -76,7 +77,9 @@ export default function LineChartOne({categories, series} : Props) {
             },
         },
         yaxis: {
+            min: 0,
             labels: {
+                formatter: formatValue,
                 style: {
                     fontSize: '12px', // Adjust font size for y-axis labels
                     colors: ['#6B7280'], // Color of the labels

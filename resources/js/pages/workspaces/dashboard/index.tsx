@@ -69,7 +69,7 @@ const Dashboard = ({ workspace }: Props) => {
                 />
 
                 <ComponentCard className="mt-6">
-                    <StatisticBreakdown dateRange={dateRange}  workspace={workspace}/>
+                    <StatisticBreakdown filter={filter} dateRange={dateRange}  workspace={workspace}/>
                 </ComponentCard>
 
             </div>

@@ -163,6 +163,7 @@ class WorkspaceController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
+
         return Inertia::render('workspaces/dashboard/index', [
             'workspace' => $workspace->loadMissing([
                 'shops' => function ($query) {

@@ -8,8 +8,11 @@ final class TotalSales
 {
     public function compute(int $workspaceId, array $date_range, array $filter): float
     {
-        return (float) $this->baseQuery($workspaceId, $date_range, $filter)
-            ->sum('pancake_orders.final_amount');
+        return round(
+            (float) $this->baseQuery($workspaceId, $date_range, $filter)
+                ->sum('pancake_orders.final_amount'),
+            2
+        );
     }
 
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'monthly')
