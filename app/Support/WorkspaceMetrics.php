@@ -55,6 +55,28 @@ final class WorkspaceMetrics
         return $out;
     }
 
+    public function breakdown(string $name, string $group = 'monthly')
+    {
+        $class = self::MAP[$name] ?? null;
+
+        if (! $class) {
+            throw new InvalidArgumentException("Unknown metric: {$name}");
+        }
+
+        $workspaceId = $this->workspace->id;
+
+        if (!method_exists($class, 'breakdown')) {
+            throw new InvalidArgumentException("Metric {$name} does not support breakdown.");
+        }
+
+        return app($class)->breakdown(
+            $workspaceId,
+            $this->dateRange,
+            $this->filter,
+            $group
+        );
+    }
+
     public function keys(): array
     {
         return array_keys(self::MAP);
