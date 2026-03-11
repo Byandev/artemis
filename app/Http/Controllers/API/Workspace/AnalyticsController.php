@@ -34,8 +34,8 @@ class AnalyticsController extends Controller
                 'totalSales',
                 'totalOrders',
                                     'repeatOrderRatio',
-                //                    'timeToFirstOrder',
-                //                    'avgLifetimeValue',
+                                    'timeToFirstOrder',
+                                    'avgLifetimeValue',
                 //                    'avgDeliveryDays',
                 //                    'avgShippedOutDays'
             ]);
