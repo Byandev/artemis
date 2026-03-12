@@ -11,7 +11,26 @@ final class TimeToFirstOrder
      */
     public function compute(int $workspaceId, array $date_range, array $filter): float
     {
-        $firstOrderPerCustomer = $this->baseQuery($workspaceId, $date_range, $filter)
+        // 1) First confirmed order per customer (scoped to workspace)
+        $firstOrderPerCustomer = DB::table('pancake_orders')
+            ->where('pancake_orders.workspace_id', $workspaceId)
+            ->when((isset($filter['page_ids']) && $filter['page_ids']) || (isset($filter['shop_ids']) && $filter['shop_ids']), function ($query) use ($filter) {
+                $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
+                    ->when(isset($filter['page_ids']) && $filter['page_ids'], function ($query) use ($filter) {
+                        $query->whereIn('pages.id', explode(',', $filter['page_ids']));
+                    })
+                    ->when(isset($filter['shop_ids']) && $filter['shop_ids'], function ($query) use ($filter) {
+                        $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
+                    });
+            })
+            ->whereNotNull('pancake_orders.customer_id')
+            ->whereNotNull('pancake_orders.confirmed_at')
+            ->whereBetween('pancake_orders.confirmed_at', [
+                $date_range['start_date'].' 00:00:00',
+                $date_range['end_date'].' 23:59:59',
+            ])
+            ->whereNotIn('pancake_orders.status', [6, 7])
+            ->groupBy('pancake_orders.customer_id')
             ->selectRaw('
                 pancake_orders.customer_id as customer_id,
                 MIN(pancake_orders.confirmed_at) as first_confirmed_at

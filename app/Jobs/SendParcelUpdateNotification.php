@@ -2,13 +2,13 @@
 
 namespace App\Jobs;
 
-use App\Models\ParcelJourneyNotification;
 use App\Services\Botcake;
 use DateTime;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\ThrottlesExceptions;
 use Illuminate\Support\Facades\Http;
+use Modules\Pancake\Models\ParcelJourneyNotification;
 
 class SendParcelUpdateNotification implements ShouldQueue
 {
@@ -44,7 +44,7 @@ class SendParcelUpdateNotification implements ShouldQueue
                 if (isset($response['status']) && $response['status'] === '00') {
                     $this->parcelJourneyNotification->update(['sms_id' => $response['smsid']]);
 
-                    dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5));
+                    dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5))->onQueue('parcel-notifications');
                 } else {
                     $this->parcelJourneyNotification->update(['remarks' => json_encode($response)]);
                 }

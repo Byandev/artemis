@@ -1,6 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import { useEffect, useMemo, useState } from 'react';
-import axios, { AxiosResponse } from 'axios';
+import { useState } from 'react';
 import { Workspace } from '@/types/models/Workspace';
 import {
     currencyFormatter,
@@ -12,7 +11,7 @@ import Filters, { FilterValue } from '@/components/filters/Filters';
 import moment from 'moment';
 import flatpickr from 'flatpickr';
 import DateOption = flatpickr.Options.DateOption;
-import StatisticsCards from '@/pages/workspaces/dashboard/partials/StatisticsCards';
+import StatisticCard from '@/pages/workspaces/dashboard/partials/StatisticCard';
 import { StatisticBreakdown } from '@/pages/workspaces/dashboard/partials/StatisticBreakdown';
 import ComponentCard from '@/components/common/ComponentCard';
 
@@ -33,6 +32,54 @@ const Dashboard = ({ workspace }: Props) => {
         pageIds: [],
         userIds: [],
     });
+
+    const cards = [
+        {
+            label: 'Total Sales',
+            key: 'totalSales',
+            formatter: currencyFormatter,
+        },
+        {
+            label: 'Total Orders',
+            key: 'totalOrders',
+            formatter: numberFormatter,
+        },
+        {
+            label: 'AOV',
+            key: 'aov',
+            formatter: currencyFormatter,
+        },
+        {
+            label: 'RTS Rate',
+            key: 'rtsRate',
+            formatter: percentageFormatter,
+        },
+        {
+            label: 'Repeat Order Ratio',
+            key: 'repeatOrderRatio',
+            formatter: percentageFormatter,
+        },
+        {
+            label: 'Time to first Order',
+            key: 'timeToFirstOrder',
+            formatter: (value: number) => `${value ?? 0} Hrs`,
+        },
+        {
+            label: 'Avg. Lifetime Value',
+            key: 'avgLifetimeValue',
+            formatter: currencyFormatter,
+        },
+        {
+            label: 'Avg Delivery Days',
+            key: 'avgDeliveryDays',
+            formatter: (value: number) => `${value ?? 0} Days`,
+        },
+        {
+            label: 'Avg Shipped Out Days',
+            key: 'avgShippedOutDays',
+            formatter: (value: number) => `${value ?? 0} Days`,
+        },
+    ];
 
     return (
         <AppLayout>
@@ -68,6 +115,19 @@ const Dashboard = ({ workspace }: Props) => {
                     workspace={workspace}
                 />
 
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
+                    {cards.map((card) => (
+                        <StatisticCard
+                            key={card.key}
+                            filter={filter}
+                            metric={card.key}
+                            label={card.label}
+                            workspace={workspace}
+                            dateRange={dateRange}
+                            formatter={card.formatter}
+                        />
+                    ))}
+                </div>
                 <ComponentCard className="mt-6">
                     <StatisticBreakdown filter={filter} dateRange={dateRange}  workspace={workspace}/>
                 </ComponentCard>

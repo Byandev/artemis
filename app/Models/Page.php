@@ -18,12 +18,7 @@ class Page extends Model
         'orders_last_synced_at' => 'datetime',
     ];
 
-    protected $hidden = [
-        'botcake_token',
-        'pancake_token',
-        'infotxt_token',
-        'pos_token',
-    ];
+    protected $hidden = [];
 
     public function workspace(): BelongsTo
     {

@@ -58,7 +58,14 @@ final class AverageShippedOutDays
     {
         return DB::table('pancake_orders')
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->where('pages.workspace_id', $workspaceId)
+            ->when(isset($filter['page_ids']) && $filter['page_ids'], function ($query) use ($filter) {
+                $query->whereIn('pages.id', explode(',', $filter['page_ids']));
+            })
+            ->when(isset($filter['shop_ids']) && $filter['shop_ids'], function ($query) use ($filter) {
+                $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
+            })
+            ->whereNotIn('pancake_orders.status', [6, 7])
+            ->where('pancake_orders.workspace_id', $workspaceId)
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotNull('pancake_orders.shipped_at')
             ->whereNotIn('pancake_orders.status', [6, 7])

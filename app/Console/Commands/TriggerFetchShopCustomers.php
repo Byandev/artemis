@@ -31,7 +31,7 @@ class TriggerFetchShopCustomers extends Command
         Shop::whereNotNull('customers_last_synced_at')
             ->get()
             ->each(function (Shop $shop) {
-                dispatch(new FetchShopCustomers($shop, 1, $shop->customers_last_synced_at ? \Carbon\Carbon::parse($shop->customers_last_synced_at)->unix() : Carbon::now()->subYear()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()));
+                dispatch(new FetchShopCustomers($shop, 1, $shop->customers_last_synced_at ? \Carbon\Carbon::parse($shop->customers_last_synced_at)->unix() : Carbon::now()->subYear()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
             });
     }
 }
