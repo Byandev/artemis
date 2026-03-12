@@ -38,7 +38,7 @@ final class WorkspaceMetrics
     ];
 
     /**
-     * @param string[] $names
+     * @param  string[]  $names
      */
     public function extract(array $names): array
     {

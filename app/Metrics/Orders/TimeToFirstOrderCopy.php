@@ -44,7 +44,7 @@ final class TimeToFirstOrderCopy
         $periodSql = match ($group) {
             'weekly' => "DATE_FORMAT(MIN(pancake_orders.confirmed_at), '%x-W%v')",
             'monthly' => "DATE_FORMAT(MIN(pancake_orders.confirmed_at), '%Y-%m')",
-            default => "DATE(MIN(pancake_orders.confirmed_at))",
+            default => 'DATE(MIN(pancake_orders.confirmed_at))',
         };
 
         $firstOrderPerCustomer = $this->baseQuery($workspaceId, $date_range, $filter)
@@ -86,8 +86,8 @@ final class TimeToFirstOrderCopy
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->whereBetween('pancake_orders.confirmed_at', [
-                $date_range['start_date'] . ' 00:00:00',
-                $date_range['end_date'] . ' 23:59:59',
+                $date_range['start_date'].' 00:00:00',
+                $date_range['end_date'].' 23:59:59',
             ])
             ->when(isset($filter['page_ids']) && $filter['page_ids'], function ($query) use ($filter) {
                 $query->whereIn('pages.id', explode(',', $filter['page_ids']));

@@ -32,10 +32,10 @@ final class AverageShippedOutDays
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
         $periodSql = match ($group) {
-            'daily' => "DATE(pancake_orders.shipped_at)",
+            'daily' => 'DATE(pancake_orders.shipped_at)',
             'weekly' => "DATE_FORMAT(pancake_orders.shipped_at, '%x-W%v')",
             'monthly' => "DATE_FORMAT(pancake_orders.shipped_at, '%Y-%m')",
-            default => "DATE(pancake_orders.shipped_at)",
+            default => 'DATE(pancake_orders.shipped_at)',
         };
 
         return $this->baseQuery($workspaceId, $date_range, $filter)
@@ -84,16 +84,16 @@ final class AverageShippedOutDays
     ) {
         return DB::table('pancake_orders')
             ->when(
-                $forceJoinPages || !empty($filter['page_ids']) || !empty($filter['shop_ids']),
+                $forceJoinPages || ! empty($filter['page_ids']) || ! empty($filter['shop_ids']),
                 function ($query) use ($filter) {
                     $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-                        ->when(!empty($filter['page_ids']), function ($query) use ($filter) {
+                        ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
                             $query->whereIn(
                                 'pages.id',
                                 is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids'])
                             );
                         })
-                        ->when(!empty($filter['shop_ids']), function ($query) use ($filter) {
+                        ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
                             $query->whereIn(
                                 'pages.shop_id',
                                 is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids'])
@@ -106,8 +106,8 @@ final class AverageShippedOutDays
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotNull('pancake_orders.shipped_at')
             ->whereBetween('pancake_orders.shipped_at', [
-                $date_range['start_date'] . ' 00:00:00',
-                $date_range['end_date'] . ' 23:59:59',
+                $date_range['start_date'].' 00:00:00',
+                $date_range['end_date'].' 23:59:59',
             ]);
     }
 }

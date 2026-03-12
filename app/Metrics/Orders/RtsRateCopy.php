@@ -22,7 +22,6 @@ final class RtsRateCopy
             ')
             ->first();
 
-
         return (float) ($row->rts_rate ?? 0);
     }
 
@@ -31,7 +30,7 @@ final class RtsRateCopy
         $periodSql = match ($group) {
             'weekly' => "DATE_FORMAT(COALESCE(pancake_orders.returning_at, pancake_orders.delivered_at), '%x-W%v')",
             'monthly' => "DATE_FORMAT(COALESCE(pancake_orders.returning_at, pancake_orders.delivered_at), '%Y-%m')",
-            default => "DATE(COALESCE(pancake_orders.returning_at, pancake_orders.delivered_at))",
+            default => 'DATE(COALESCE(pancake_orders.returning_at, pancake_orders.delivered_at))',
         };
 
         return $this->baseQuery($workspaceId, $date_range, $filter)

@@ -17,7 +17,7 @@ final class TotalOrdersCopy
         $periodSql = match ($group) {
             'weekly' => "DATE_FORMAT(pancake_orders.confirmed_at, '%x-W%v')",
             'monthly' => "DATE_FORMAT(pancake_orders.confirmed_at, '%Y-%m')",
-            default => "DATE(pancake_orders.confirmed_at)",
+            default => 'DATE(pancake_orders.confirmed_at)',
         };
 
         return $this->baseQuery($workspaceId, $date_range, $filter)

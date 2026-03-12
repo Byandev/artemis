@@ -66,14 +66,13 @@ final class RtsRate
             ')
             ->first();
 
-
         return (float) ($row->rts_rate ?? 0);
     }
 
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
-        $start = $date_range['start_date'] . ' 00:00:00';
-        $end = $date_range['end_date'] . ' 23:59:59';
+        $start = $date_range['start_date'].' 00:00:00';
+        $end = $date_range['end_date'].' 23:59:59';
 
         $pageIds = ! empty($filter['page_ids'])
             ? (is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids']))
@@ -86,13 +85,13 @@ final class RtsRate
         $returnedPeriodSql = match ($group) {
             'weekly' => "DATE_FORMAT(pancake_orders.returning_at, '%x-W%v')",
             'monthly' => "DATE_FORMAT(pancake_orders.returning_at, '%Y-%m')",
-            default => "DATE(pancake_orders.returning_at)",
+            default => 'DATE(pancake_orders.returning_at)',
         };
 
         $deliveredPeriodSql = match ($group) {
             'weekly' => "DATE_FORMAT(pancake_orders.delivered_at, '%x-W%v')",
             'monthly' => "DATE_FORMAT(pancake_orders.delivered_at, '%Y-%m')",
-            default => "DATE(pancake_orders.delivered_at)",
+            default => 'DATE(pancake_orders.delivered_at)',
         };
 
         $returnedQuery = DB::table('pancake_orders')
@@ -161,8 +160,8 @@ final class RtsRate
 
     public function perPage(int $workspaceId, array $date_range, array $filter)
     {
-        $start = $date_range['start_date'] . ' 00:00:00';
-        $end = $date_range['end_date'] . ' 23:59:59';
+        $start = $date_range['start_date'].' 00:00:00';
+        $end = $date_range['end_date'].' 23:59:59';
 
         $pageIds = ! empty($filter['page_ids'])
             ? (is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids']))

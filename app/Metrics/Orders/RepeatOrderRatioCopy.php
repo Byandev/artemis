@@ -22,7 +22,7 @@ final class RepeatOrderRatioCopy
         $periodSql = match ($group) {
             'weekly' => "DATE_FORMAT(pancake_orders.confirmed_at, '%x-W%v')",
             'monthly' => "DATE_FORMAT(pancake_orders.confirmed_at, '%Y-%m')",
-            default => "DATE(pancake_orders.confirmed_at)",
+            default => 'DATE(pancake_orders.confirmed_at)',
         };
 
         // 1) Cohort: customers per period
@@ -101,7 +101,7 @@ final class RepeatOrderRatioCopy
             ->where('pages.workspace_id', $workspaceId)
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotNull('pancake_orders.confirmed_at')
-            ->whereNotIn('pancake_orders.status', [6,7])
+            ->whereNotIn('pancake_orders.status', [6, 7])
             ->when(isset($filter['page_ids']) && $filter['page_ids'], function ($query) use ($filter) {
                 $query->whereIn('pages.id', explode(',', $filter['page_ids']));
             })

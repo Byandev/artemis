@@ -33,7 +33,7 @@ final class AverageShippedOutDaysCopy
         $periodSql = match ($group) {
             'weekly' => "DATE_FORMAT(pancake_orders.shipped_at, '%x-W%v')",
             'monthly' => "DATE_FORMAT(pancake_orders.shipped_at, '%Y-%m')",
-            default => "DATE(pancake_orders.shipped_at)",
+            default => 'DATE(pancake_orders.shipped_at)',
         };
 
         return $this->baseQuery($workspaceId, $date_range, $filter)

@@ -25,7 +25,7 @@ final class AverageDeliveryDaysCopy
         $periodSql = match ($group) {
             'weekly' => "DATE_FORMAT(pancake_orders.delivered_at, '%x-W%v')",
             'monthly' => "DATE_FORMAT(pancake_orders.delivered_at, '%Y-%m')",
-            default => "DATE(pancake_orders.delivered_at)",
+            default => 'DATE(pancake_orders.delivered_at)',
         };
 
         return $this->baseQuery($workspaceId, $date_range, $filter)
@@ -33,10 +33,10 @@ final class AverageDeliveryDaysCopy
                 $periodSql as period,
                 ROUND(AVG(TIMESTAMPDIFF(DAY, pancake_orders.shipped_at, pancake_orders.delivered_at)), 2) as value
             ")
-                    ->groupByRaw($periodSql)
-                    ->orderByRaw($periodSql)
-                    ->get();
-            }
+            ->groupByRaw($periodSql)
+            ->orderByRaw($periodSql)
+            ->get();
+    }
 
     private function baseQuery(int $workspaceId, array $date_range, array $filter)
     {

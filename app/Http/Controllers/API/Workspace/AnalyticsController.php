@@ -49,7 +49,8 @@ class AnalyticsController extends Controller
         return response()->json(['data' => $data]);
     }
 
-    public function perStore(Request $request){
+    public function perStore(Request $request)
+    {
         $workspace = Workspace::findOrFail($request->workspace->id);
 
     }
