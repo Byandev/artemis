@@ -14,8 +14,19 @@ import DateOption = flatpickr.Options.DateOption;
 import StatisticCard from '@/pages/workspaces/dashboard/partials/StatisticCard';
 import { StatisticBreakdown } from '@/pages/workspaces/dashboard/partials/StatisticBreakdown';
 import ComponentCard from '@/components/common/ComponentCard';
-import StatisticsCards from '@/pages/workspaces/dashboard/partials/StatisticsCards';
 import PageBreakdown from '@/pages/workspaces/dashboard/partials/PageBreakdown';
+import ShopBreakdown from '@/pages/workspaces/dashboard/partials/ShopBreakdown';
+import {
+    Clock3,
+    DollarSign,
+    PackageCheck,
+    ReceiptText,
+    Repeat,
+    ShoppingCart,
+    Truck,
+    Undo2,
+    Wallet,
+} from 'lucide-react';
 
 interface Props {
     workspace: Workspace;
@@ -40,53 +51,79 @@ const Dashboard = ({ workspace }: Props) => {
             label: 'Total Sales',
             key: 'totalSales',
             formatter: currencyFormatter,
+            icon: DollarSign,
+            tooltipLabel:
+                'Total confirmed sales within the selected date range.',
         },
         {
             label: 'Total Orders',
             key: 'totalOrders',
             formatter: numberFormatter,
+            icon: ShoppingCart,
+            tooltipLabel:
+                'Total number of valid orders for the selected filters.',
         },
         {
             label: 'AOV',
             key: 'aov',
             formatter: currencyFormatter,
+            icon: ReceiptText,
+            tooltipLabel:
+                'Average Order Value. Computed as total sales divided by total orders.',
         },
         {
             label: 'RTS Rate',
             key: 'rtsRate',
             formatter: percentageFormatter,
+            icon: Undo2,
+            tooltipLabel:
+                'Return-to-sender rate based on returned amount versus total amount.',
         },
         {
             label: 'Repeat Order Ratio',
             key: 'repeatOrderRatio',
             formatter: percentageFormatter,
+            icon: Repeat,
+            tooltipLabel: 'Percentage of orders coming from repeat customers.',
         },
         {
-            label: 'Time to first Order',
+            label: 'Time to First Order',
             key: 'timeToFirstOrder',
             formatter: (value: number) => `${value ?? 0} Hrs`,
+            icon: Clock3,
+            tooltipLabel:
+                'Average time from customer creation to first confirmed order.',
         },
         {
             label: 'Avg. Lifetime Value',
             key: 'avgLifetimeValue',
             formatter: currencyFormatter,
+            icon: Wallet,
+            tooltipLabel:
+                'Average revenue generated per customer over their lifetime.',
         },
         {
             label: 'Avg Delivery Days',
             key: 'avgDeliveryDays',
             formatter: (value: number) => `${value ?? 0} Days`,
+            icon: Truck,
+            tooltipLabel:
+                'Average number of days from shipped date to delivered date.',
         },
         {
             label: 'Avg Shipped Out Days',
             key: 'avgShippedOutDays',
             formatter: (value: number) => `${value ?? 0} Days`,
+            icon: PackageCheck,
+            tooltipLabel:
+                'Average number of days from confirmed date to shipped out date.',
         },
     ];
 
     return (
         <AppLayout>
-            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:gap-6 xl:grid-cols-4">
+            <div className="max-w-(--breakpoint-2xl) mx-auto w-full p-4 md:p-6">
+                <div className=" flex justify-end gap-6">
                     <div className="sm:col-start-1 md:col-start-2 xl:col-start-3">
                         {/* Optional: if your Filters supports disabled, pass it; otherwise just leave it */}
                         <Filters
@@ -112,28 +149,44 @@ const Dashboard = ({ workspace }: Props) => {
                     </div>
                 </div>
 
-
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
                     {cards.map((card) => (
                         <StatisticCard
                             key={card.key}
-                            filter={filter}
-                            metric={card.key}
                             label={card.label}
+                            metric={card.key}
                             workspace={workspace}
+                            filter={filter}
                             dateRange={dateRange}
                             formatter={card.formatter}
+                            icon={card.icon}
+                            tooltipLabel={card.tooltipLabel}
                         />
                     ))}
                 </div>
                 <ComponentCard className="mt-6">
-                    <StatisticBreakdown filter={filter} dateRange={dateRange}  workspace={workspace}/>
+                    <StatisticBreakdown
+                        filter={filter}
+                        dateRange={dateRange}
+                        workspace={workspace}
+                    />
                 </ComponentCard>
 
                 <ComponentCard className="mt-6">
-                    <PageBreakdown dateRange={dateRange} workspace={workspace} filter={filter}/>
+                    <PageBreakdown
+                        dateRange={dateRange}
+                        workspace={workspace}
+                        filter={filter}
+                    />
                 </ComponentCard>
 
+                <ComponentCard className="mt-6">
+                    <ShopBreakdown
+                        filter={filter}
+                        dateRange={dateRange}
+                        workspace={workspace}
+                    />
+                </ComponentCard>
             </div>
         </AppLayout>
     );

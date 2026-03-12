@@ -40,6 +40,21 @@ final class TotalOrders
             ->get();
     }
 
+    public function perShop(int $workspaceId, array $date_range, array $filter)
+    {
+        return $this->baseQuery($workspaceId, $date_range, $filter, true)
+            ->join('shops', 'shops.id', '=', 'pages.shop_id')
+            ->selectRaw('
+                shops.id as shop_id,
+                shops.name as shop_name,
+                COUNT(*) as value
+            ')
+            ->whereNotNull('pages.shop_id')
+            ->groupBy('shops.id', 'shops.name')
+            ->orderByDesc('value')
+            ->get();
+    }
+
     private function baseQuery(int $workspaceId, array $date_range, array $filter, bool $forceJoinPages = false)
     {
         return DB::table('pancake_orders')
