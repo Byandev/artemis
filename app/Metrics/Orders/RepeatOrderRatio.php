@@ -4,6 +4,7 @@ namespace App\Metrics\Orders;
 
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 final class RepeatOrderRatio
@@ -18,6 +19,57 @@ final class RepeatOrderRatio
         $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
+        return $this->computeRatioForWindow($workspaceId, $filter, $startAt, $endExclusive);
+    }
+
+    public function breakdown(int $workspaceId, array $dateRange, array $filter, string $group = 'daily'): Collection
+    {
+        $periods = $this->generatePeriods($dateRange, $group);
+
+        return collect($periods)->map(function (array $period) use ($workspaceId, $filter) {
+            return (object) [
+                'period' => $period['label'],
+                'value' => $this->computeRatioForWindow(
+                    $workspaceId,
+                    $filter,
+                    $period['start'],
+                    $period['end_exclusive']
+                ),
+            ];
+        });
+    }
+
+    public function perPage(int $workspaceId, array $dateRange, array $filter)
+    {
+        $pages = DB::table('pages')
+            ->where('workspace_id', $workspaceId)
+            ->when(!empty($filter['page_ids']), function ($query) use ($filter) {
+                $query->whereIn('id', explode(',', $filter['page_ids']));
+            })
+            ->when(!empty($filter['shop_ids']), function ($query) use ($filter) {
+                $query->whereIn('shop_id', explode(',', $filter['shop_ids']));
+            })
+            ->select('id', 'name')
+            ->get();
+
+        return $pages->map(function ($page) use ($workspaceId, $dateRange, $filter) {
+            $pageFilter = $filter;
+            $pageFilter['page_ids'] = (string) $page->id;
+
+            return (object) [
+                'page_id' => $page->id,
+                'page_name' => $page->name,
+                'value' => $this->compute($workspaceId, $dateRange, $pageFilter),
+            ];
+        })->sortByDesc('value')->values();
+    }
+
+    private function computeRatioForWindow(
+        int $workspaceId,
+        array $filter,
+        string $startAt,
+        string $endExclusive
+    ): float {
         $cohort = $this->buildCohortQuery($workspaceId, $filter, $startAt, $endExclusive);
 
         $ordersUpToEnd = DB::table('pancake_orders as po')
@@ -35,10 +87,10 @@ final class RepeatOrderRatio
             ->where('po.confirmed_at', '<', $endExclusive)
             ->whereNotNull('po.customer_id')
             ->whereNotIn('po.status', [6, 7])
-            ->when(isset($filter['page_ids']) && $filter['page_ids'], function (Builder $query) use ($filter) {
+            ->when(!empty($filter['page_ids']), function (Builder $query) use ($filter) {
                 $query->whereIn('pages.id', explode(',', $filter['page_ids']));
             })
-            ->when(isset($filter['shop_ids']) && $filter['shop_ids'], function (Builder $query) use ($filter) {
+            ->when(!empty($filter['shop_ids']), function (Builder $query) use ($filter) {
                 $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
             })
             ->groupBy('po.customer_id')
@@ -58,7 +110,7 @@ final class RepeatOrderRatio
             ')
             ->first();
 
-        return (float) ($row->repeat_ratio ?? 0);
+        return round((float) ($row->repeat_ratio ?? 0), 4);
     }
 
     private function buildCohortQuery(
@@ -76,10 +128,10 @@ final class RepeatOrderRatio
             ->where('pancake_orders.confirmed_at', '<', $endExclusive)
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(isset($filter['page_ids']) && $filter['page_ids'], function (Builder $query) use ($filter) {
+            ->when(!empty($filter['page_ids']), function (Builder $query) use ($filter) {
                 $query->whereIn('pages.id', explode(',', $filter['page_ids']));
             })
-            ->when(isset($filter['shop_ids']) && $filter['shop_ids'], function (Builder $query) use ($filter) {
+            ->when(!empty($filter['shop_ids']), function (Builder $query) use ($filter) {
                 $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
             })
             ->groupBy('pancake_orders.customer_id')
@@ -101,18 +153,83 @@ final class RepeatOrderRatio
             ->where('pancake_orders.confirmed_at', '<', $endExclusive)
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(isset($filter['page_ids']) && $filter['page_ids'], function (Builder $query) use ($filter) {
+            ->when(!empty($filter['page_ids']), function (Builder $query) use ($filter) {
                 $query->whereIn('pages.id', explode(',', $filter['page_ids']));
             })
-            ->when(isset($filter['shop_ids']) && $filter['shop_ids'], function (Builder $query) use ($filter) {
+            ->when(!empty($filter['shop_ids']), function (Builder $query) use ($filter) {
                 $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
             })
             ->groupBy('pancake_orders.customer_id')
             ->select('pancake_orders.customer_id');
     }
 
+    private function generatePeriods(array $dateRange, string $group): array
+    {
+        $start = Carbon::parse($dateRange['start_date'])->startOfDay();
+        $end = Carbon::parse($dateRange['end_date'])->startOfDay();
+
+        $periods = [];
+
+        if ($group === 'monthly') {
+            $cursor = $start->copy()->startOfMonth();
+            $last = $end->copy()->startOfMonth();
+
+            while ($cursor <= $last) {
+                $periodStart = $cursor->copy()->startOfMonth();
+                $periodEndExclusive = $cursor->copy()->addMonth()->startOfMonth();
+
+                $periods[] = [
+                    'label' => $periodStart->format('Y-m'),
+                    'start' => $periodStart->toDateTimeString(),
+                    'end_exclusive' => $periodEndExclusive->toDateTimeString(),
+                ];
+
+                $cursor->addMonth();
+            }
+
+            return $periods;
+        }
+
+        if ($group === 'weekly') {
+            $cursor = $start->copy()->startOfWeek(Carbon::MONDAY);
+            $last = $end->copy()->startOfWeek(Carbon::MONDAY);
+
+            while ($cursor <= $last) {
+                $periodStart = $cursor->copy()->startOfWeek(Carbon::MONDAY);
+                $periodEndExclusive = $cursor->copy()->addWeek()->startOfWeek(Carbon::MONDAY);
+
+                $periods[] = [
+                    'label' => $periodStart->format('o-\WW'),
+                    'start' => $periodStart->toDateTimeString(),
+                    'end_exclusive' => $periodEndExclusive->toDateTimeString(),
+                ];
+
+                $cursor->addWeek();
+            }
+
+            return $periods;
+        }
+
+        $cursor = $start->copy();
+
+        while ($cursor <= $end) {
+            $periodStart = $cursor->copy()->startOfDay();
+            $periodEndExclusive = $cursor->copy()->addDay()->startOfDay();
+
+            $periods[] = [
+                'label' => $periodStart->format('Y-m-d'),
+                'start' => $periodStart->toDateTimeString(),
+                'end_exclusive' => $periodEndExclusive->toDateTimeString(),
+            ];
+
+            $cursor->addDay();
+        }
+
+        return $periods;
+    }
+
     private function needsPagesJoin(array $filter): bool
     {
-        return ! empty($filter['page_ids']) || ! empty($filter['shop_ids']);
+        return !empty($filter['page_ids']) || !empty($filter['shop_ids']);
     }
 }

@@ -70,7 +70,7 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
             case 'timeToFirstOrder':
             case 'avgDeliveryDays':
             case 'avgShippedOutDays':
-                return `${value.toFixed(1)} days`;
+                return `${value.toFixed(1)} hrs`;
             case 'aov':
             case 'totalOrders':
             default:

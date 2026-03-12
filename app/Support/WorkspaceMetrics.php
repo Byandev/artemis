@@ -16,11 +16,14 @@ use InvalidArgumentException;
 
 final class WorkspaceMetrics
 {
-    public function __construct(private readonly Workspace $workspace, public array $dateRange, public array $filter) {}
+    public function __construct(
+        private readonly Workspace $workspace,
+        public array $dateRange,
+        public array $filter
+    ) {}
 
     /**
      * Registry: metricName => class
-     * Add new metrics here (single line).
      */
     private const MAP = [
         'aov' => Aov::class,
@@ -35,7 +38,7 @@ final class WorkspaceMetrics
     ];
 
     /**
-     * @param  string[]  $names
+     * @param string[] $names
      */
     public function extract(array $names): array
     {
@@ -49,7 +52,11 @@ final class WorkspaceMetrics
                 throw new InvalidArgumentException("Unknown metric: {$name}");
             }
 
-            $out[$name] = app($class)->compute($workspaceId, $this->dateRange, $this->filter);
+            $out[$name] = app($class)->compute(
+                $workspaceId,
+                $this->dateRange,
+                $this->filter
+            );
         }
 
         return $out;
@@ -74,6 +81,48 @@ final class WorkspaceMetrics
             $this->dateRange,
             $this->filter,
             $group
+        );
+    }
+
+    public function perPage(string $name)
+    {
+        $class = self::MAP[$name] ?? null;
+
+        if (! $class) {
+            throw new InvalidArgumentException("Unknown metric: {$name}");
+        }
+
+        $workspaceId = $this->workspace->id;
+
+        if (! method_exists($class, 'perPage')) {
+            throw new InvalidArgumentException("Metric {$name} does not support perPage.");
+        }
+
+        return app($class)->perPage(
+            $workspaceId,
+            $this->dateRange,
+            $this->filter
+        );
+    }
+
+    public function perStore(string $name)
+    {
+        $class = self::MAP[$name] ?? null;
+
+        if (! $class) {
+            throw new InvalidArgumentException("Unknown metric: {$name}");
+        }
+
+        $workspaceId = $this->workspace->id;
+
+        if (! method_exists($class, 'perStore')) {
+            throw new InvalidArgumentException("Metric {$name} does not support perStore.");
+        }
+
+        return app($class)->perStore(
+            $workspaceId,
+            $this->dateRange,
+            $this->filter
         );
     }
 

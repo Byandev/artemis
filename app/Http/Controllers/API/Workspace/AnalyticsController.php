@@ -34,4 +34,23 @@ class AnalyticsController extends Controller
 
         return response()->json(['data' => $data]);
     }
+
+    public function perPage(Request $request)
+    {
+        $workspace = Workspace::findOrFail($request->workspace->id);
+
+        $data = $workspace->metrics(
+            $request->array('date_range', []),
+            $request->array('filter', [])
+        )->perPage(
+            $request->input('metric', 'totalSales')
+        );
+
+        return response()->json(['data' => $data]);
+    }
+
+    public function perStore(Request $request){
+        $workspace = Workspace::findOrFail($request->workspace->id);
+
+    }
 }
