@@ -3,12 +3,13 @@ import Chart from 'react-apexcharts';
 
 interface Props {
     series: ApexNonAxisChartSeries | undefined;
-    categories: string[]
+    categories: string[];
+    formatValue: (value: number) => string;
 }
 
-export default function BarChart({ categories, series }: Props) {
+export default function BarChart({ categories, series, formatValue }: Props) {
     const options: ApexOptions = {
-        colors: ['#465fff'],
+        colors: ['#87c0a6'],
         chart: {
             fontFamily: 'Outfit, sans-serif',
             type: 'bar',
@@ -19,7 +20,7 @@ export default function BarChart({ categories, series }: Props) {
         plotOptions: {
             bar: {
                 horizontal: false,
-                columnWidth: '39%',
+                columnWidth: '8%',
                 borderRadius: 5,
                 borderRadiusApplication: 'end',
             },
@@ -48,8 +49,8 @@ export default function BarChart({ categories, series }: Props) {
             fontFamily: 'Outfit',
         },
         yaxis: {
-            title: {
-                text: undefined,
+            labels: {
+                formatter: formatValue,
             },
         },
         grid: {
@@ -68,7 +69,7 @@ export default function BarChart({ categories, series }: Props) {
                 show: false,
             },
             y: {
-                formatter: (val: number) => `${val}`,
+                formatter: formatValue,
             },
         },
     };
