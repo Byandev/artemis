@@ -20,70 +20,65 @@ import {
     MousePointerClickIcon,
     TrendingUp,
     Users,
-    BookOpenIcon
+    BookOpenIcon,
+    ShieldCheck
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
 export function AppSidebar() {
-    const { currentWorkspace } = usePage().props;
+    // 2. Destructure 'auth' from props (as any for easier access to .user.role)
+    const { auth, currentWorkspace } = usePage().props as any;
 
     const dashboardUrl = currentWorkspace
         ? workspace.dashboard.url((currentWorkspace as { slug: string }).slug)
         : dashboard().url;
 
+    const slug = (currentWorkspace as { slug: string })?.slug;
+
+    // 3. Keep your original items
     const mainNavItems: NavItem[] = [
         {
             title: 'Dashboard',
             href: dashboardUrl,
             icon: LayoutDashboard,
         },
-        // {
-        //     title: 'Ads Manager',
-        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ads-manager`,
-        //     icon: Target,
-        // },
         {
             title: 'Shops',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/shops`,
+            href: `/workspaces/${slug}/shops`,
             icon: Store,
         },
         {
             title: 'Pages',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
+            href: `/workspaces/${slug}/pages`,
             icon: BookOpenIcon,
         },
         {
             title: 'Products',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products`,
+            href: `/workspaces/${slug}/products`,
             icon: Package,
         },
-        // {
-        //     title: 'Facebook Accounts',
-        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/facebook-accounts`,
-        //     icon: FacebookIcon,
-        // },
-        // {
-        //     title: 'Ad Accounts',
-        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ad-accounts`,
-        //     icon: CreditCard,
-        // },
         {
             title: 'Teams',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
+            href: `/workspaces/${slug}/teams`,
             icon: Users,
         },
-        {
-            title: 'RTS Management',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts`,
-            icon: TrendingUp,
-        },
-        // {
-        //     title: 'Botcake',
-        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/botcake`,
-        //     icon: MousePointerClickIcon,
-        // },
     ];
 
+    // 4. Add the Role Management item ONLY if the user is authorized
+    if (auth.user.role === 'superadmin' || auth.user.role === 'admin') {
+        mainNavItems.push({
+            title: 'Role Management',
+            href: `/workspaces/${slug}/roles`,
+            icon: ShieldCheck,
+        });
+    }
+
+    // 5. Add the remaining item
+    mainNavItems.push({
+        title: 'RTS Management',
+        href: `/workspaces/${slug}/rts`,
+        icon: TrendingUp,
+    });
     return (
         <Sidebar collapsible="icon" variant="sidebar">
             <SidebarHeader>

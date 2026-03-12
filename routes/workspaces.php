@@ -21,6 +21,7 @@ use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
+use App\Http\Controllers\Workspaces\RoleController;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Modules\Inventory\Http\Controllers\PurchaseOrderController;
@@ -42,7 +43,11 @@ Route::middleware(['auth'])->group(function () {
 
     // Workspace dashboard
     Route::get('/workspaces/{workspace}/dashboard', [WorkspaceController::class, 'dashboard'])->name('workspace.dashboard');
+    Route::get('/workspaces/{workspace}/roles', [RoleController::class, 'index'])
+        ->middleware('admin')
+        ->name('roles.index');
     Route::get('/workspaces/{workspace}/chart-data', [WorkspaceController::class, 'getChartData'])->name('workspace.chart-data');
+
 
     // Workspace CRUD routes
     Route::get('/workspaces', [WorkspaceController::class, 'index'])->name('workspaces.index');
