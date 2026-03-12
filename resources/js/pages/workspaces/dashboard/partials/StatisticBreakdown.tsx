@@ -1,4 +1,6 @@
 import LineChart from '@/components/charts/LineChart';
+import { FilterValue } from '@/components/filters/Filters';
+import { Button } from '@/components/ui/button';
 import {
     Select,
     SelectContent,
@@ -8,9 +10,9 @@ import {
 } from '@/components/ui/select';
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
-import { useEffect, useState } from 'react';
 import moment from 'moment/moment';
-import { FilterValue } from '@/components/filters/Filters';
+import { useEffect, useState } from 'react';
+import LineChartSkeleton from '@/components/charts/skeletons/LineChartSkeleton';
 
 interface Props {
     workspace: Workspace;
@@ -18,11 +20,11 @@ interface Props {
     filter: FilterValue;
 }
 
-
 export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
     const [breakdown, setBreakdown] = useState<any[]>([]);
     const [option, setOption] = useState('totalSales');
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [group, setGroup] = useState('daily');
 
     const start = moment(dateRange[0]);
@@ -35,17 +37,17 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
     } else if (daysDiff <= 30) {
         availableGroups.push('daily', 'weekly');
     } else if (daysDiff <= 365) {
-        availableGroups.push(
-
-
-
-
-
-
-            'weekly', 'monthly');
+        availableGroups.push('weekly', 'monthly');
     } else {
-        availableGroups.push( 'weekly', 'monthly', 'yearly');
+        availableGroups.push('weekly', 'monthly', 'yearly');
     }
+
+    // Update group when available groups change
+    useEffect(() => {
+        if (!availableGroups.includes(group) && availableGroups.length > 0) {
+            setGroup(availableGroups[0]);
+        }
+    }, [availableGroups, group]);
 
     const optionLabels: Record<string, string> = {
         totalSales: 'Sales',
@@ -79,27 +81,42 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
     };
 
     useEffect(() => {
-        setLoading(true);
-        axios
-            .get(`/api/v1/workspace/analytics/breakdown`, {
-                headers: {
-                    'X-Workspace-Id': workspace.id,
-                },
-                params: {
-                    metric: option,
-                    group: group,
-                    'date_range[start_date]': start.format('YYYY-MM-DD'),
-                    'date_range[end_date]': end.format('YYYY-MM-DD'),
-                    'filter[team_ids]': filter.teamIds.join(','),
-                    'filter[shop_ids]': filter.shopIds.join(','),
-                    'filter[page_ids]': filter.pageIds.join(','),
-                    'filter[user_ids]': filter.userIds.join(','),
-                    'filter[product_ids]': filter.productIds.join(','),
-                },
-            })
-            .then((response) => setBreakdown(response.data.data))
-            .catch((error) => console.error(error))
-            .finally(() => setLoading(false));
+        const fetchData = async () => {
+            setLoading(true);
+            setError(null);
+
+            try {
+                const response = await axios.get(
+                    `/api/v1/workspace/analytics/breakdown`,
+                    {
+                        headers: {
+                            'X-Workspace-Id': workspace.id,
+                        },
+                        params: {
+                            metric: option,
+                            group: group,
+                            'date_range[start_date]':
+                                start.format('YYYY-MM-DD'),
+                            'date_range[end_date]': end.format('YYYY-MM-DD'),
+                            'filter[team_ids]': filter.teamIds.join(','),
+                            'filter[shop_ids]': filter.shopIds.join(','),
+                            'filter[page_ids]': filter.pageIds.join(','),
+                            'filter[user_ids]': filter.userIds.join(','),
+                            'filter[product_ids]': filter.productIds.join(','),
+                        },
+                    },
+                );
+
+                setBreakdown(response.data.data);
+            } catch (error) {
+                console.error('Failed to fetch breakdown:', error);
+                setError('Failed to load data. Please try again.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
     }, [workspace.id, option, group, dateRange, filter]);
 
     const capitalizeFirstLetter = (str: string) =>
@@ -116,10 +133,10 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
                         {availableGroups.map((g) => (
                             <button
                                 key={g}
-                                className={`px-4 py-1 text-sm text-gray-400 ${
+                                className={`rounded-md px-4 py-1 text-sm transition-all ${
                                     group === g
-                                        ? 'rounded-md bg-white text-gray-950'
-                                        : ''
+                                        ? 'bg-white text-gray-950 shadow-sm'
+                                        : 'text-gray-400 hover:text-gray-600'
                                 }`}
                                 onClick={() => setGroup(g)}
                             >
@@ -148,7 +165,40 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
             </div>
 
             {loading ? (
-                <div className="m-8 h-120 bg-gray-50"></div>
+                <LineChartSkeleton />
+            ) : error ? (
+                <div className="h-60 flex flex-col items-center justify-center space-y-4 rounded-lg border border-gray-200 bg-gray-50">
+                    <p className="text-red-500">{error}</p>
+                    <Button
+                        variant="outline"
+                        onClick={() => window.location.reload()}
+                        className="gap-2"
+                    >
+                        <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                            />
+                        </svg>
+                        Try Again
+                    </Button>
+                </div>
+            ) : !breakdown.length ? (
+                <div className="h-60 flex flex-col items-center justify-center space-y-2 rounded-lg border border-gray-200 bg-gray-50">
+                    <p className="text-gray-500">
+                        No data available for the selected period
+                    </p>
+                    <p className="text-sm text-gray-400">
+                        Try adjusting your filters or date range
+                    </p>
+                </div>
             ) : (
                 <LineChart
                     categories={breakdown.map((a) => a.period)}

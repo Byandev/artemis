@@ -8,6 +8,10 @@ interface Props {
 }
 
 export default function BarChart({ categories, series, formatValue }: Props) {
+    const columnWidth =
+        categories.length > 20 ? '80%' : categories.length > 10 ? '60%' : '40%';
+
+
     const options: ApexOptions = {
         colors: ['#87c0a6'],
         chart: {
@@ -20,7 +24,7 @@ export default function BarChart({ categories, series, formatValue }: Props) {
         plotOptions: {
             bar: {
                 horizontal: false,
-                columnWidth: '8%',
+                columnWidth: columnWidth,
                 borderRadius: 5,
                 borderRadiusApplication: 'end',
             },

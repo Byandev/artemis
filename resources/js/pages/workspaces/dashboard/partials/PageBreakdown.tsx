@@ -1,5 +1,6 @@
 import BarChart from '@/components/charts/BarChart';
 import { FilterValue } from '@/components/filters/Filters';
+import { Button } from '@/components/ui/button';
 import {
     Select,
     SelectContent,
@@ -11,6 +12,7 @@ import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
+import BarChartSkeleton from '@/components/charts/skeletons/BarChartSkeleton';
 
 interface Props {
     workspace: Workspace;
@@ -24,11 +26,10 @@ interface BreakdownItem {
     value: number | string;
 }
 
-
-
 export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
     const [breakdown, setBreakdown] = useState<BreakdownItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [option, setOption] = useState('totalSales');
 
     const startDate = moment(dateRange[0]).format('YYYY-MM-DD');
@@ -59,11 +60,11 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
         }
     };
 
-
     useEffect(() => {
         const controller = new AbortController();
 
         setLoading(true);
+        setError(null);
 
         axios
             .get('/api/v1/workspace/analytics/per-page', {
@@ -88,6 +89,7 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
             .catch((error) => {
                 if (error.code !== 'ERR_CANCELED') {
                     console.error(error?.response?.data || error);
+                    setError('Failed to load data. Please try again.');
                     setBreakdown([]);
                 }
             })
@@ -135,12 +137,8 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
         ];
     }, [breakdown, option]);
 
-    if (loading) {
-        return <div>Loading...</div>;
-    }
-
     return (
-        <div>
+        <div className="space-y-4">
             <div className="flex items-center justify-between gap-4">
                 <h2 className="text-lg font-semibold">
                     {optionLabels[option]} Per Page
@@ -163,7 +161,49 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
                     </Select>
                 </div>
             </div>
-            <BarChart categories={categories} series={series}  formatValue={formatValue}/>
+
+            {loading ? (
+                <BarChartSkeleton />
+            ) : error ? (
+                <div className="flex h-60 flex-col items-center justify-center space-y-4 rounded-lg border border-gray-200 bg-gray-50">
+                    <p className="text-red-500">{error}</p>
+                    <Button
+                        variant="outline"
+                        onClick={() => window.location.reload()}
+                        className="gap-2"
+                    >
+                        <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                            />
+                        </svg>
+                        Try Again
+                    </Button>
+                </div>
+            ) : !breakdown.length ? (
+                <div className="flex h-60 flex-col items-center justify-center space-y-2 rounded-lg border border-gray-200 bg-gray-50">
+                    <p className="text-gray-500">
+                        No data available for the selected period
+                    </p>
+                    <p className="text-sm text-gray-400">
+                        Try adjusting your filters or date range
+                    </p>
+                </div>
+            ) : (
+                <BarChart
+                    categories={categories}
+                    series={series}
+                    formatValue={formatValue}
+                />
+            )}
         </div>
     );
 }
