@@ -11,7 +11,6 @@ export default function BarChart({ categories, series, formatValue }: Props) {
     const columnWidth =
         categories.length > 20 ? '80%' : categories.length > 10 ? '60%' : '40%';
 
-
     const options: ApexOptions = {
         colors: ['#87c0a6'],
         chart: {
@@ -37,8 +36,12 @@ export default function BarChart({ categories, series, formatValue }: Props) {
             width: 4,
             colors: ['transparent'],
         },
+
         xaxis: {
             categories,
+            labels: {
+                show: false, // ❌ hide bottom labels
+            },
             axisBorder: {
                 show: false,
             },
@@ -46,17 +49,17 @@ export default function BarChart({ categories, series, formatValue }: Props) {
                 show: false,
             },
         },
+
         legend: {
-            show: true,
-            position: 'top',
-            horizontalAlign: 'left',
-            fontFamily: 'Outfit',
+            show: false, // ❌ hide series legend
         },
+
         yaxis: {
             labels: {
                 formatter: formatValue,
             },
         },
+
         grid: {
             yaxis: {
                 lines: {
@@ -64,16 +67,20 @@ export default function BarChart({ categories, series, formatValue }: Props) {
                 },
             },
         },
+
         fill: {
             opacity: 1,
         },
 
         tooltip: {
             x: {
-                show: false,
+                show: true, // keep default tooltip category
             },
             y: {
                 formatter: formatValue,
+                title: {
+                    formatter: () => '', // remove series name inside tooltip
+                },
             },
         },
     };

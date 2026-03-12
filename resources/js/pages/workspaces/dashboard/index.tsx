@@ -123,16 +123,15 @@ const Dashboard = ({ workspace }: Props) => {
     return (
         <AppLayout>
             <div className="max-w-(--breakpoint-2xl) mx-auto w-full p-4 md:p-6">
-                <div className=" flex justify-end gap-6">
-                    <div className="sm:col-start-1 md:col-start-2 xl:col-start-3">
-                        {/* Optional: if your Filters supports disabled, pass it; otherwise just leave it */}
+                <div className=" flex justify-between  items-center gap-6 mb-6">
+                    <h1 className='text-2xl font-bold'>Dashboard</h1>
+                    <div className='flex gap-4 items-center'>
+                            {/* Optional: if your Filters supports disabled, pass it; otherwise just leave it */}
                         <Filters
                             workspace={workspace}
                             onChange={(value) => setFilter(value)}
                         />
-                    </div>
 
-                    <div className="sm:col-start-2 md:col-start-3 xl:col-start-4">
                         <DatePicker
                             id={'dashboard-date-range'}
                             mode={'range'}
@@ -147,9 +146,10 @@ const Dashboard = ({ workspace }: Props) => {
                             defaultDate={dateRange as never as DateOption}
                         />
                     </div>
+
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-3 ">
                     {cards.map((card) => (
                         <StatisticCard
                             key={card.key}
