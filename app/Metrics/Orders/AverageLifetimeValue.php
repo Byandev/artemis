@@ -174,10 +174,10 @@ final class AverageLifetimeValue
             ->where('pancake_orders.confirmed_at', '<', $endExclusive)
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(!empty($filter['page_ids']), function ($query) use ($filter) {
+            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
                 $query->whereIn('pages.id', explode(',', $filter['page_ids']));
             })
-            ->when(!empty($filter['shop_ids']), function ($query) use ($filter) {
+            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
                 $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
             })
             ->selectRaw('
