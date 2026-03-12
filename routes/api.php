@@ -20,4 +20,6 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
 Route::group(['prefix' => 'api/v1/workspace', 'as' => 'api.v1.workspace', 'middleware' => ['auth', 'workspace']], function () {
     Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
     Route::get('/analytics/breakdown', [AnalyticsController::class, 'breakdown'])->name('analytics.breakdown');
+    Route::get('/analytics/per-page', [AnalyticsController::class, 'perPage'])->name('analytics.perPage');
+    Route::get('/analytics/per-store', [AnalyticsController::class, 'perStore'])->name('analytics.perStore');
 });
