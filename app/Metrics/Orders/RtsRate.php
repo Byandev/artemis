@@ -310,7 +310,7 @@ final class RtsRate
     {
         return DB::table('pancake_orders')
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->where('pages.workspace_id', $workspaceId)
+            ->where('pancake_orders.workspace_id', $workspaceId)
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->when(isset($filter['page_ids']) && $filter['page_ids'], function ($query) use ($filter) {
                 $pageIds = is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids']);
