@@ -117,8 +117,8 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
     }, [breakdown]);
 
     const optionLabels: Record<string, string> = {
-        totalSales: 'Sales',
-        totalOrders: 'Orders',
+        totalSales: 'Total Sales',
+        totalOrders: 'Total Orders',
         aov: 'AOV',
         rtsRate: 'RTS',
         repeatOrderRatio: 'ROR',

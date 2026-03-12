@@ -50,8 +50,8 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
     }, [availableGroups, group]);
 
     const optionLabels: Record<string, string> = {
-        totalSales: 'Sales',
-        totalOrders: 'Orders',
+        totalSales: 'Total Sales',
+        totalOrders: 'Total Orders',
         aov: 'AOV',
         rtsRate: 'RTS',
         repeatOrderRatio: 'ROR',
@@ -129,7 +129,7 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
                     {optionLabels[option]} Breakdown
                 </h2>
                 <div className="flex items-center justify-between gap-4">
-                    <div className="flex rounded-lg bg-gray-100 p-1.5">
+                    <div className="flex rounded-lg bg-gray-100 p-1">
                         {availableGroups.map((g) => (
                             <button
                                 key={g}
