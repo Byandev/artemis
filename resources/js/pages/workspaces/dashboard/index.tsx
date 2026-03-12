@@ -14,8 +14,8 @@ import DateOption = flatpickr.Options.DateOption;
 import StatisticCard from '@/pages/workspaces/dashboard/partials/StatisticCard';
 import { StatisticBreakdown } from '@/pages/workspaces/dashboard/partials/StatisticBreakdown';
 import ComponentCard from '@/components/common/ComponentCard';
-import StatisticsCards from '@/pages/workspaces/dashboard/partials/StatisticsCards';
 import PageBreakdown from '@/pages/workspaces/dashboard/partials/PageBreakdown';
+import ShopBreakdown from '@/pages/workspaces/dashboard/partials/ShopBreakdown';
 
 interface Props {
     workspace: Workspace;
@@ -112,7 +112,6 @@ const Dashboard = ({ workspace }: Props) => {
                     </div>
                 </div>
 
-
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
                     {cards.map((card) => (
                         <StatisticCard
@@ -127,13 +126,24 @@ const Dashboard = ({ workspace }: Props) => {
                     ))}
                 </div>
                 <ComponentCard className="mt-6">
-                    <StatisticBreakdown filter={filter} dateRange={dateRange}  workspace={workspace}/>
+                    <StatisticBreakdown
+                        filter={filter}
+                        dateRange={dateRange}
+                        workspace={workspace}
+                    />
                 </ComponentCard>
 
                 <ComponentCard className="mt-6">
-                    <PageBreakdown dateRange={dateRange} workspace={workspace} filter={filter}/>
+                    <PageBreakdown
+                        dateRange={dateRange}
+                        workspace={workspace}
+                        filter={filter}
+                    />
                 </ComponentCard>
 
+                <ComponentCard className="mt-6">
+                   <ShopBreakdown filter={filter} dateRange={dateRange} workspace={workspace} />
+                </ComponentCard>
             </div>
         </AppLayout>
     );

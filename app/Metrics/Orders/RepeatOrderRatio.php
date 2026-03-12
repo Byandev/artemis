@@ -43,23 +43,66 @@ final class RepeatOrderRatio
     {
         $pages = DB::table('pages')
             ->where('workspace_id', $workspaceId)
-            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                $query->whereIn('id', explode(',', $filter['page_ids']));
+            ->when(!empty($filter['page_ids']), function ($query) use ($filter) {
+                $pageIds = is_array($filter['page_ids'])
+                    ? $filter['page_ids']
+                    : explode(',', $filter['page_ids']);
+
+                $query->whereIn('id', $pageIds);
             })
-            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                $query->whereIn('shop_id', explode(',', $filter['shop_ids']));
+            ->when(!empty($filter['shop_ids']), function ($query) use ($filter) {
+                $shopIds = is_array($filter['shop_ids'])
+                    ? $filter['shop_ids']
+                    : explode(',', $filter['shop_ids']);
+
+                $query->whereIn('shop_id', $shopIds);
             })
             ->select('id', 'name')
             ->get();
 
         return $pages->map(function ($page) use ($workspaceId, $dateRange, $filter) {
             $pageFilter = $filter;
-            $pageFilter['page_ids'] = (string) $page->id;
+            $pageFilter['page_ids'] = [(int) $page->id];
 
             return (object) [
                 'page_id' => $page->id,
                 'page_name' => $page->name,
                 'value' => $this->compute($workspaceId, $dateRange, $pageFilter),
+            ];
+        })->sortByDesc('value')->values();
+    }
+
+    public function perShop(int $workspaceId, array $dateRange, array $filter)
+    {
+        $shops = DB::table('shops')
+            ->join('pages', 'pages.shop_id', '=', 'shops.id')
+            ->where('pages.workspace_id', $workspaceId)
+            ->when(!empty($filter['shop_ids']), function ($query) use ($filter) {
+                $shopIds = is_array($filter['shop_ids'])
+                    ? $filter['shop_ids']
+                    : explode(',', $filter['shop_ids']);
+
+                $query->whereIn('shops.id', $shopIds);
+            })
+            ->when(!empty($filter['page_ids']), function ($query) use ($filter) {
+                $pageIds = is_array($filter['page_ids'])
+                    ? $filter['page_ids']
+                    : explode(',', $filter['page_ids']);
+
+                $query->whereIn('pages.id', $pageIds);
+            })
+            ->select('shops.id', 'shops.name')
+            ->distinct()
+            ->get();
+
+        return $shops->map(function ($shop) use ($workspaceId, $dateRange, $filter) {
+            $shopFilter = $filter;
+            $shopFilter['shop_ids'] = [(int) $shop->id];
+
+            return (object) [
+                'shop_id' => $shop->id,
+                'shop_name' => $shop->name,
+                'value' => $this->compute($workspaceId, $dateRange, $shopFilter),
             ];
         })->sortByDesc('value')->values();
     }
@@ -87,11 +130,19 @@ final class RepeatOrderRatio
             ->where('po.confirmed_at', '<', $endExclusive)
             ->whereNotNull('po.customer_id')
             ->whereNotIn('po.status', [6, 7])
-            ->when(! empty($filter['page_ids']), function (Builder $query) use ($filter) {
-                $query->whereIn('pages.id', explode(',', $filter['page_ids']));
+            ->when(!empty($filter['page_ids']), function (Builder $query) use ($filter) {
+                $pageIds = is_array($filter['page_ids'])
+                    ? $filter['page_ids']
+                    : explode(',', $filter['page_ids']);
+
+                $query->whereIn('pages.id', $pageIds);
             })
-            ->when(! empty($filter['shop_ids']), function (Builder $query) use ($filter) {
-                $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
+            ->when(!empty($filter['shop_ids']), function (Builder $query) use ($filter) {
+                $shopIds = is_array($filter['shop_ids'])
+                    ? $filter['shop_ids']
+                    : explode(',', $filter['shop_ids']);
+
+                $query->whereIn('pages.shop_id', $shopIds);
             })
             ->groupBy('po.customer_id')
             ->selectRaw('po.customer_id as customer_key, COUNT(*) as orders_count');
@@ -128,11 +179,19 @@ final class RepeatOrderRatio
             ->where('pancake_orders.confirmed_at', '<', $endExclusive)
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(! empty($filter['page_ids']), function (Builder $query) use ($filter) {
-                $query->whereIn('pages.id', explode(',', $filter['page_ids']));
+            ->when(!empty($filter['page_ids']), function (Builder $query) use ($filter) {
+                $pageIds = is_array($filter['page_ids'])
+                    ? $filter['page_ids']
+                    : explode(',', $filter['page_ids']);
+
+                $query->whereIn('pages.id', $pageIds);
             })
-            ->when(! empty($filter['shop_ids']), function (Builder $query) use ($filter) {
-                $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
+            ->when(!empty($filter['shop_ids']), function (Builder $query) use ($filter) {
+                $shopIds = is_array($filter['shop_ids'])
+                    ? $filter['shop_ids']
+                    : explode(',', $filter['shop_ids']);
+
+                $query->whereIn('pages.shop_id', $shopIds);
             })
             ->groupBy('pancake_orders.customer_id')
             ->selectRaw('pancake_orders.customer_id as customer_key');
@@ -153,11 +212,19 @@ final class RepeatOrderRatio
             ->where('pancake_orders.confirmed_at', '<', $endExclusive)
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(! empty($filter['page_ids']), function (Builder $query) use ($filter) {
-                $query->whereIn('pages.id', explode(',', $filter['page_ids']));
+            ->when(!empty($filter['page_ids']), function (Builder $query) use ($filter) {
+                $pageIds = is_array($filter['page_ids'])
+                    ? $filter['page_ids']
+                    : explode(',', $filter['page_ids']);
+
+                $query->whereIn('pages.id', $pageIds);
             })
-            ->when(! empty($filter['shop_ids']), function (Builder $query) use ($filter) {
-                $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
+            ->when(!empty($filter['shop_ids']), function (Builder $query) use ($filter) {
+                $shopIds = is_array($filter['shop_ids'])
+                    ? $filter['shop_ids']
+                    : explode(',', $filter['shop_ids']);
+
+                $query->whereIn('pages.shop_id', $shopIds);
             })
             ->groupBy('pancake_orders.customer_id')
             ->select('pancake_orders.customer_id');
@@ -230,6 +297,6 @@ final class RepeatOrderRatio
 
     private function needsPagesJoin(array $filter): bool
     {
-        return ! empty($filter['page_ids']) || ! empty($filter['shop_ids']);
+        return !empty($filter['page_ids']) || !empty($filter['shop_ids']);
     }
 }
