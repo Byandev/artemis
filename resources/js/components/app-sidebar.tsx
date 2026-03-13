@@ -2,12 +2,13 @@ import { NavMain } from '@/components/nav-main';
 import {
     Sidebar,
     SidebarContent,
+    SidebarFooter,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard } from '@/routes';
+import { dashboard, logout } from '@/routes';
 import workspace from '@/routes/workspace';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
@@ -20,9 +21,14 @@ import {
     MousePointerClickIcon,
     TrendingUp,
     Users,
-    BookOpenIcon
+    BookOpenIcon,
+    LogOut,
+    Settings,
+    User,
 } from 'lucide-react';
 import AppLogo from './app-logo';
+import { NavFooter } from '@/components/nav-footer';
+import { NavUser } from '@/components/nav-user';
 
 export function AppSidebar() {
     const { currentWorkspace } = usePage().props;
@@ -84,13 +90,43 @@ export function AppSidebar() {
         // },
     ];
 
+    const accountNavItems: NavItem[] = [
+        {
+            title: 'Profile',
+            href: '/profile',
+            icon: User,
+        },
+
+        {
+            title: 'Settings',
+            href: `/settings`,
+            icon: Settings,
+        },
+    ];
+
+    const footerNavItems: NavItem[] = [
+
+        {
+            title: 'Logout',
+            href: logout(),
+            icon: LogOut,
+        },
+    ];
+
+
+
+
     return (
-        <Sidebar collapsible="icon" variant="sidebar">
+        <Sidebar
+            className="bg-white"
+            collapsible="icon"
+            variant="sidebar"
+        >
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboardUrl} prefetch>
+                            <Link href={dashboard()} prefetch>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
@@ -98,12 +134,14 @@ export function AppSidebar() {
                 </SidebarMenu>
             </SidebarHeader>
 
-            <SidebarContent>
-                <NavMain items={mainNavItems} />
+            <SidebarContent className="p-3">
+                <NavMain items={mainNavItems} group_label="Main" />
+                <NavMain items={accountNavItems} group_label="Account" />
             </SidebarContent>
 
-            {/* <SidebarFooter>
-            </SidebarFooter> */}
+                <SidebarFooter>
+                    <NavFooter items={footerNavItems} className="mt-auto" />
+                </SidebarFooter>
         </Sidebar>
     );
 }

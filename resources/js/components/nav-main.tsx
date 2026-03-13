@@ -1,3 +1,4 @@
+import { Link } from '@inertiajs/react';
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -5,30 +6,53 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { type NavItem } from '@/types';
-import { Link, usePage } from '@inertiajs/react';
+import { useCurrentUrl } from '@/hooks/use-current-url';
+import type { NavItem } from '@/types';
 
-export function NavMain({ items = [] }: { items: NavItem[] }) {
-    const page = usePage();
+type NavMainProps = {
+    items?: NavItem[];
+    group_label?: string;
+};
+
+export function NavMain({ items = [], group_label = '' }: NavMainProps) {
+    const { isCurrentUrl } = useCurrentUrl();
+
     return (
-        <SidebarGroup className="px-2 py-0">
-            <SidebarGroupLabel>Menu</SidebarGroupLabel>
-            <SidebarMenu>
+        <SidebarGroup className=" ">
+            {group_label && (
+                <SidebarGroupLabel className="text-xs tracking-wide  text-gray-400 uppercase">
+                    {group_label}
+                </SidebarGroupLabel>
+            )}
+
+            <SidebarMenu className="mt-2">
                 {items.map((item) => {
-                    const itemHref = typeof item.href === 'string' ? item.href : item.href.url;
-                    const currentPath = page.url.split('?')[0];
-                    const isActive = currentPath === itemHref || currentPath.startsWith(itemHref + '/');
+                    const active = isCurrentUrl(item.href);
 
                     return (
                         <SidebarMenuItem key={item.title}>
                             <SidebarMenuButton
                                 asChild
-                                isActive={isActive}
+                                size="lg"
+                                isActive={active}
                                 tooltip={{ children: item.title }}
-                                className={`p-3 ${isActive ? 'bg-gray-100 text-primary' : ''}`}
+                                className={[
+                                    'relative h-11 justify-start rounded-md ',
+                                    'text-gray-500 hover:bg-emerald-100 hover:text-emerald-500ra',
+                                    'border-l-4 border-transparent',
+                                    active
+                                        ? 'ml-1 border-emerald-600 bg-emerald-50 font-medium text-emerald-500 transition-all'
+                                        : '',
+                                ].join(' ')}
                             >
-                                <Link href={item.href} prefetch>
-                                    {item.icon && <item.icon />}
+                                <Link
+                                    href={item.href}
+                                    prefetch
+                                    className="flex items-center gap-3"
+                                >
+                                    {item.icon && (
+                                        <item.icon className="h-4 w-4" />
+                                    )}
                                     <span>{item.title}</span>
                                 </Link>
                             </SidebarMenuButton>
