@@ -27,6 +27,7 @@ import {
     Undo2,
     Wallet,
 } from 'lucide-react';
+import UserBreakdown from '@/pages/workspaces/dashboard/partials/UserBreakdown';
 
 interface Props {
     workspace: Workspace;
@@ -122,11 +123,11 @@ const Dashboard = ({ workspace }: Props) => {
 
     return (
         <AppLayout>
-            <div className="max-w-(--breakpoint-2xl) mx-auto w-full p-4 md:p-6">
-                <div className=" flex justify-between  items-center gap-6 mb-6">
-                    <h1 className='text-2xl font-bold'>Dashboard</h1>
-                    <div className='flex gap-4 items-center'>
-                            {/* Optional: if your Filters supports disabled, pass it; otherwise just leave it */}
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+                <div className="mb-6 flex items-center justify-between gap-6">
+                    <h1 className="text-2xl font-bold">Dashboard</h1>
+                    <div className="flex items-center gap-4">
+                        {/* Optional: if your Filters supports disabled, pass it; otherwise just leave it */}
                         <Filters
                             workspace={workspace}
                             onChange={(value) => setFilter(value)}
@@ -146,10 +147,9 @@ const Dashboard = ({ workspace }: Props) => {
                             defaultDate={dateRange as never as DateOption}
                         />
                     </div>
-
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-3 ">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-3">
                     {cards.map((card) => (
                         <StatisticCard
                             key={card.key}
@@ -182,6 +182,13 @@ const Dashboard = ({ workspace }: Props) => {
 
                 <ComponentCard className="mt-6">
                     <ShopBreakdown
+                        filter={filter}
+                        dateRange={dateRange}
+                        workspace={workspace}
+                    />
+                </ComponentCard>
+                <ComponentCard className="mt-6">
+                    <UserBreakdown
                         filter={filter}
                         dateRange={dateRange}
                         workspace={workspace}

@@ -62,4 +62,18 @@ class AnalyticsController extends Controller
 
         return response()->json(['data' => $data]);
     }
+
+    public function perUser(Request $request)
+    {
+        $workspace = Workspace::findOrFail($request->workspace->id);
+
+        $data = $workspace->metrics(
+            $request->array('date_range', []),
+            $request->array('filter', [])
+        )->perUser(
+            $request->input('metric', 'totalSales')
+        );
+
+        return response()->json(['data' => $data]);
+    }
 }
