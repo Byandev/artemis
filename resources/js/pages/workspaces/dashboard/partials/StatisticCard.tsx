@@ -1,8 +1,17 @@
-import { Workspace } from '@/types/models/Workspace';
 import { FilterValue } from '@/components/filters/Filters';
-import { useEffect, useState } from 'react';
+import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
+import type { LucideIcon } from 'lucide-react';
+import { CircleHelp } from 'lucide-react';
 import moment from 'moment/moment';
+import { useEffect, useState } from 'react';
+
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export interface Props {
     label: string;
@@ -10,9 +19,12 @@ export interface Props {
     workspace: Workspace;
     filter: FilterValue;
     dateRange: string[];
-    formatter: (value: number) => string
+    formatter: (value: number) => string;
+    icon?: LucideIcon;
+    tooltipLabel?: string;
 }
 
+type AnalyticsResponse = Record<string, number>;
 
 function CardSkeleton({ label }: { label: string }) {
     return (
@@ -27,8 +39,17 @@ function CardSkeleton({ label }: { label: string }) {
     );
 }
 
-const StatisticCard = ({ metric, label, workspace, dateRange, filter, formatter}: Props) => {
-    const [analytics, setAnalytics] = useState(null);
+const StatisticCard = ({
+    metric,
+    label,
+    workspace,
+    dateRange,
+    filter,
+    formatter,
+    icon: Icon,
+    tooltipLabel,
+}: Props) => {
+    const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -61,7 +82,6 @@ const StatisticCard = ({ metric, label, workspace, dateRange, filter, formatter}
                 setAnalytics(response.data);
             })
             .catch((err) => {
-                // If request was cancelled, ignore
                 if (axios.isCancel?.(err) || err?.name === 'CanceledError')
                     return;
 
@@ -72,32 +92,61 @@ const StatisticCard = ({ metric, label, workspace, dateRange, filter, formatter}
                 );
             })
             .finally(() => {
-                // If aborted, avoid flipping loading state after unmount/change
                 if (!controller.signal.aborted) setLoading(false);
             });
 
         return () => controller.abort();
     }, [workspace.id, dateRange, filter, metric]);
 
-    return loading ?
-        <CardSkeleton label={label}/> :
-        (
-            <div
-                className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3"
-            >
-                <p className="text-theme-sm text-gray-500 dark:text-gray-400">
-                    {label}
-                </p>
+    if (loading) return <CardSkeleton label={label} />;
 
-                <div className="mt-3 flex items-end justify-between">
-                    <div>
-                        <h4 className="text-2xl font-bold text-gray-800 dark:text-white/90">
-                            {formatter(analytics ? analytics[metric] : 0)}
-                        </h4>
+    return (
+        <div className="dark:bg-white/3 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800">
+            <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                    <p className="text-theme-sm text-gray-500 dark:text-gray-400">
+                        {label}
+                    </p>
+
+                    {tooltipLabel && (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className="text-gray-400 transition hover:text-gray-600 dark:hover:text-gray-200"
+                                    >
+                                        <CircleHelp className="h-4 w-4" />
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>{tooltipLabel}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
+                </div>
+
+                {Icon && (
+                    <div className="rounded-lg bg-gray-100 p-2 dark:bg-gray-800">
+                        <Icon className="h-5 w-5 text-gray-700 dark:text-white/90" />
                     </div>
+                )}
+            </div>
+
+            <div className="mt-3 flex items-end justify-between">
+                <div>
+                    <h4 className="text-2xl font-bold text-gray-800 dark:text-white/90">
+                        {formatter(analytics?.[metric] ?? 0)}
+                    </h4>
+
+                    {error && (
+                        <p className="mt-1 text-xs text-red-500">{error}</p>
+                    )}
                 </div>
             </div>
-        );
-}
+        </div>
+    );
+};
 
-export default StatisticCard
+export default StatisticCard;

@@ -1,6 +1,5 @@
 import BarChart from '@/components/charts/BarChart';
 import { FilterValue } from '@/components/filters/Filters';
-import { Button } from '@/components/ui/button';
 import {
     Select,
     SelectContent,
@@ -8,6 +7,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
 import moment from 'moment';
@@ -21,12 +21,16 @@ interface Props {
 }
 
 interface BreakdownItem {
-    page_id: number;
-    page_name: string;
+    shop_id: number | string;
+    shop_name: string;
     value: number | string;
 }
 
-export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
+export default function ShopBreakdown({
+                                          workspace,
+                                          dateRange,
+                                          filter,
+                                      }: Props) {
     const [breakdown, setBreakdown] = useState<BreakdownItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -41,19 +45,39 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
     const userIds = filter.userIds.join(',');
     const productIds = filter.productIds.join(',');
 
+    const optionLabels: Record<string, string> = {
+        totalSales: 'Total Sales',
+        totalOrders: 'Total Orders',
+        aov: 'AOV',
+        rtsRate: 'RTS',
+        repeatOrderRatio: 'ROR',
+        timeToFirstOrder: 'Time to First Order',
+        avgLifetimeValue: 'Average Lifetime Value',
+        avgDeliveryDays: 'Average Delivery Days',
+        avgShippedOutDays: 'Average Shipped Out Days',
+    };
+
     const formatValue = (value: number) => {
         switch (option) {
             case 'totalSales':
+            case 'aov':
             case 'avgLifetimeValue':
-                return `₱${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                return `₱${value.toLocaleString('en-PH', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                })}`;
+
             case 'rtsRate':
             case 'repeatOrderRatio':
                 return `${(value * 100).toFixed(1)}%`;
+
             case 'timeToFirstOrder':
+                return `${value.toFixed(1)} hrs`;
+
             case 'avgDeliveryDays':
             case 'avgShippedOutDays':
-                return `${value.toFixed(1)} hrs`;
-            case 'aov':
+                return `${value.toFixed(1)} days`;
+
             case 'totalOrders':
             default:
                 return value.toLocaleString();
@@ -67,7 +91,7 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
         setError(null);
 
         axios
-            .get('/api/v1/workspace/analytics/per-page', {
+            .get('/api/v1/workspace/analytics/per-shop', {
                 signal: controller.signal,
                 headers: {
                     'X-Workspace-Id': workspace.id,
@@ -113,20 +137,8 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
     ]);
 
     const categories = useMemo(() => {
-        return breakdown.map((item) => item.page_name);
+        return breakdown.map((item) => item.shop_name);
     }, [breakdown]);
-
-    const optionLabels: Record<string, string> = {
-        totalSales: 'Total Sales',
-        totalOrders: 'Total Orders',
-        aov: 'AOV',
-        rtsRate: 'RTS',
-        repeatOrderRatio: 'ROR',
-        timeToFirstOrder: 'Time to First Order',
-        avgLifetimeValue: 'Average Lifetime Value',
-        avgDeliveryDays: 'Average Delivery Days',
-        avgShippedOutDays: 'Average Shipped Out Days',
-    };
 
     const series = useMemo(() => {
         return [
@@ -141,7 +153,7 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
         <div className="space-y-4">
             <div className="flex items-center justify-between gap-4">
                 <h2 className="text-lg font-semibold">
-                    {optionLabels[option]} Per Page
+                    {optionLabels[option]} Per Shop
                 </h2>
 
                 <div className="w-80">
@@ -190,12 +202,8 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
                 </div>
             ) : !breakdown.length ? (
                 <div className="flex h-60 flex-col items-center justify-center space-y-2 rounded-lg border border-gray-200 bg-gray-50">
-                    <p className="text-gray-500">
-                        No data available for the selected period
-                    </p>
-                    <p className="text-sm text-gray-400">
-                        Try adjusting your filters or date range
-                    </p>
+                    <p className="text-gray-500">No data available for the selected period</p>
+                    <p className="text-sm text-gray-400">Try adjusting your filters or date range</p>
                 </div>
             ) : (
                 <BarChart

@@ -105,7 +105,7 @@ final class WorkspaceMetrics
         );
     }
 
-    public function perStore(string $name)
+    public function perShop(string $name)
     {
         $class = self::MAP[$name] ?? null;
 
@@ -115,11 +115,11 @@ final class WorkspaceMetrics
 
         $workspaceId = $this->workspace->id;
 
-        if (! method_exists($class, 'perStore')) {
-            throw new InvalidArgumentException("Metric {$name} does not support perStore.");
+        if (! method_exists($class, 'perShop')) {
+            throw new InvalidArgumentException("Metric {$name} does not support perShop.");
         }
 
-        return app($class)->perStore(
+        return app($class)->perShop(
             $workspaceId,
             $this->dateRange,
             $this->filter
