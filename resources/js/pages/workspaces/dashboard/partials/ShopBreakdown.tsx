@@ -46,8 +46,8 @@ export default function ShopBreakdown({
     const productIds = filter.productIds.join(',');
 
     const optionLabels: Record<string, string> = {
-        totalSales: 'Sales',
-        totalOrders: 'Orders',
+        totalSales: 'Total Sales',
+        totalOrders: 'Total Orders',
         aov: 'AOV',
         rtsRate: 'RTS',
         repeatOrderRatio: 'ROR',

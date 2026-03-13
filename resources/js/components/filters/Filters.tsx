@@ -115,7 +115,7 @@ const Filters = ({
                 <Button
                     variant="outline"
                     size="default"
-                    className="relative gap-2 rounded-full px-4"
+                    className="relative border  border-gray-300 gap-2 rounded-full px-4"
                 >
                     <SlidersHorizontal className="h-4 w-4" />
                     Filter
