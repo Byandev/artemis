@@ -64,6 +64,28 @@ final class AverageDeliveryDays
             ->get();
     }
 
+    public function perShop(int $workspaceId, array $date_range, array $filter)
+    {
+        return $this->baseQuery($workspaceId, $date_range, $filter, true)
+            ->join('shops', 'shops.id', '=', 'pages.shop_id')
+            ->selectRaw('
+                shops.id as shop_id,
+                shops.name as shop_name,
+                ROUND(
+                    COALESCE(
+                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.shipped_at, pancake_orders.delivered_at)),
+                        0
+                    ),
+                    2
+                ) as value
+            ')
+            ->whereNotNull('pages.shop_id')
+            ->groupBy('shops.id', 'shops.name')
+            ->orderByDesc('value')
+            ->get();
+    }
+
+
     private function baseQuery(
         int $workspaceId,
         array $date_range,

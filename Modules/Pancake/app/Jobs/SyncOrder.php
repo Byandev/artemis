@@ -147,7 +147,28 @@ class SyncOrder implements ShouldQueue
                 if (isset($order['partner']['extend_update'])) {
                     $isLatestUpdate = true;
 
-                    foreach ($order['partner']['extend_update'] as $update) {
+                    $parcelJourneyHistory = collect($order['partner']['extend_update'])
+                        ->map(function ($item) {
+                            if ($item['note'] === '') {
+                                $note = $item['status'];
+
+                                if (str_contains($note, 'is sending')) {
+                                    $item['status'] = "On Delivery";
+                                }
+
+                                if (str_contains($note, 'send package')) {
+                                    $item['status'] = "Arrival";
+                                }
+
+                                $item['note'] = $note;
+                                $item['updated_at'] = $item['update_at'];
+                            }
+
+                            return $item;
+                        })
+                        ->toArray();
+
+                    foreach ($parcelJourneyHistory as $update) {
                         if ($update['status'] == 'On Delivery') {
                             $deliveryAttempts = $deliveryAttempts + 1;
 

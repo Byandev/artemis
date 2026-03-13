@@ -1,6 +1,12 @@
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Label } from '@/components/ui/label';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useState } from 'react';
 
 type IdLike = string | number;
 
@@ -9,7 +15,7 @@ type FilterGroupProps<T> = {
     getLabel: (item: T) => string;
     selected: IdLike[];
     onSelect: (id: IdLike) => void;
-    options: T[]
+    options: T[];
     name: string;
 };
 
@@ -21,14 +27,25 @@ export function FilterGroup<T>({
     selected,
     onSelect,
 }: FilterGroupProps<T>) {
+    const [open, setOpen] = useState(false);
+
     return (
-        <Collapsible className="rounded-xl bg-gray-50 p-2">
-            <CollapsibleTrigger className='w-full text-left text-sm font-medium'>
+        <Collapsible
+            open={open}
+            onOpenChange={setOpen}
+            className="rounded-lg border bg-gray-50 p-4"
+        >
+            <CollapsibleTrigger className="flex w-full items-center justify-between text-sm font-medium">
                 {name}
+                {open ? (
+                    <ChevronUp className="h-4 w-4" />
+                ) : (
+                    <ChevronDown className="h-4 w-4" />
+                )}
             </CollapsibleTrigger>
 
-            <CollapsibleContent className="mt-2">
-                <div className='space-y-1.5'>
+            <CollapsibleContent className="mt-4 border-t border-emerald-200 pt-2">
+                <div className="space-y-2">
                     {options.map((item) => {
                         const id = getId(item);
                         const idStr = String(id);
@@ -46,7 +63,7 @@ export function FilterGroup<T>({
                                 />
                                 <Label
                                     htmlFor={idStr}
-                                    className="text-sm text-gray-800 truncate"
+                                    className="truncate text-sm text-gray-800"
                                 >
                                     {getLabel(item)}
                                 </Label>
