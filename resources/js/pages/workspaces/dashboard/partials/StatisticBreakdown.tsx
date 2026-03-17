@@ -13,6 +13,12 @@ import axios from 'axios';
 import moment from 'moment/moment';
 import { useEffect, useState } from 'react';
 import LineChartSkeleton from '@/components/charts/skeletons/LineChartSkeleton';
+import { RefreshCcw } from 'lucide-react';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface Props {
     workspace: Workspace;
@@ -26,7 +32,7 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [group, setGroup] = useState('daily');
-    const [again, setAgain] = useState(false);
+    const [reload, setReload] = useState(false);
 
     const start = moment(dateRange[0]);
     const end = moment(dateRange[1]);
@@ -111,14 +117,14 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
                 setBreakdown(response.data.data);
             } catch (error) {
                 console.error('Failed to fetch breakdown:', error);
-                setError('Failed to load data. Please try again.');
+                setError('Failed to load data. Please try reload.');
             } finally {
                 setLoading(false);
             }
         };
 
         fetchData();
-    }, [workspace.id, option, group, dateRange, filter, again]);
+    }, [workspace.id, option, group, dateRange, filter, reload]);
 
     const capitalizeFirstLetter = (str: string) =>
         str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -146,21 +152,37 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
                         ))}
                     </div>
 
-                    <div className="w-80">
-                        <Select value={option} onValueChange={setOption}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select options" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {Object.entries(optionLabels).map(
-                                    ([key, label]) => (
-                                        <SelectItem key={key} value={key}>
-                                            {label}
-                                        </SelectItem>
-                                    ),
-                                )}
-                            </SelectContent>
-                        </Select>
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="w-80">
+                            <Select value={option} onValueChange={setOption}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select options" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {Object.entries(optionLabels).map(
+                                        ([key, label]) => (
+                                            <SelectItem key={key} value={key}>
+                                                {label}
+                                            </SelectItem>
+                                        ),
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    className="rounded-md bg-gray-100 p-2 hover:text-white"
+                                    onClick={() =>
+                                        setReload((prevState) => !prevState)
+                                    }
+                                >
+                                    <RefreshCcw className="h-5 w-5 text-gray-500" />
+                                </Button>
+                            </TooltipTrigger>
+
+                            <TooltipContent>Refresh</TooltipContent>
+                        </Tooltip>
                     </div>
                 </div>
             </div>
@@ -168,11 +190,11 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
             {loading ? (
                 <LineChartSkeleton />
             ) : error ? (
-                <div className="h-60 flex flex-col items-center justify-center space-y-4 rounded-lg border border-gray-200 bg-gray-50">
+                <div className="flex h-60 flex-col items-center justify-center space-y-4 rounded-lg border border-gray-200 bg-gray-50">
                     <p className="text-red-500">{error}</p>
                     <Button
                         variant="outline"
-                        onClick={() => setAgain(true)}
+                        onClick={() => setReload((prevState) => !prevState)}
                         className="gap-2"
                     >
                         <svg
@@ -192,7 +214,7 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
                     </Button>
                 </div>
             ) : !breakdown.length ? (
-                <div className="h-60 flex flex-col items-center justify-center space-y-2 rounded-lg border border-gray-200 bg-gray-50">
+                <div className="flex h-60 flex-col items-center justify-center space-y-2 rounded-lg border border-gray-200 bg-gray-50">
                     <p className="text-gray-500">
                         No data available for the selected period
                     </p>

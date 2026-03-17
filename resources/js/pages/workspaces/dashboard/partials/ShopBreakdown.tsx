@@ -13,6 +13,8 @@ import axios from 'axios';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import BarChartSkeleton from '@/components/charts/skeletons/BarChartSkeleton';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { RefreshCcw } from 'lucide-react';
 
 interface Props {
     workspace: Workspace;
@@ -35,7 +37,7 @@ export default function ShopBreakdown({
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [option, setOption] = useState('totalSales');
-    const [again, isAgain] = useState(false);
+    const [reload, setReload] = useState(false);
 
     const startDate = moment(dateRange[0]).format('YYYY-MM-DD');
     const endDate = moment(dateRange[1]).format('YYYY-MM-DD');
@@ -114,7 +116,7 @@ export default function ShopBreakdown({
             .catch((error) => {
                 if (error.code !== 'ERR_CANCELED') {
                     console.error(error?.response?.data || error);
-                    setError('Failed to load data. Please try again.');
+                    setError('Failed to load data. Please try reload.');
                     setBreakdown([]);
                 }
             })
@@ -135,7 +137,7 @@ export default function ShopBreakdown({
         pageIds,
         userIds,
         productIds,
-        again,
+        reload,
     ]);
 
     const categories = useMemo(() => {
@@ -157,22 +159,37 @@ export default function ShopBreakdown({
                 <h2 className="text-lg font-semibold">
                     {optionLabels[option]} Per Shop
                 </h2>
+                <div className="flex items-center gap-4">
+                    <div className="w-80">
+                        <Select value={option} onValueChange={setOption}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select options" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Object.entries(optionLabels).map(
+                                    ([key, label]) => (
+                                        <SelectItem key={key} value={key}>
+                                            {label}
+                                        </SelectItem>
+                                    ),
+                                )}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                className="rounded-md bg-gray-100 p-2 hover:text-white"
+                                onClick={() =>
+                                    setReload((prevState) => !prevState)
+                                }
+                            >
+                                <RefreshCcw className="h-5 w-5 text-gray-500" />
+                            </Button>
+                        </TooltipTrigger>
 
-                <div className="w-80">
-                    <Select value={option} onValueChange={setOption}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select options" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {Object.entries(optionLabels).map(
-                                ([key, label]) => (
-                                    <SelectItem key={key} value={key}>
-                                        {label}
-                                    </SelectItem>
-                                ),
-                            )}
-                        </SelectContent>
-                    </Select>
+                        <TooltipContent>Refresh</TooltipContent>
+                    </Tooltip>
                 </div>
             </div>
 
@@ -183,7 +200,7 @@ export default function ShopBreakdown({
                     <p className="text-red-500">{error}</p>
                     <Button
                         variant="outline"
-                        onClick={() => isAgain(true)}
+                        onClick={() => setReload(true)}
                         className="gap-2"
                     >
                         <svg
@@ -204,8 +221,12 @@ export default function ShopBreakdown({
                 </div>
             ) : !breakdown.length ? (
                 <div className="flex h-60 flex-col items-center justify-center space-y-2 rounded-lg border border-gray-200 bg-gray-50">
-                    <p className="text-gray-500">No data available for the selected period</p>
-                    <p className="text-sm text-gray-400">Try adjusting your filters or date range</p>
+                    <p className="text-gray-500">
+                        No data available for the selected period
+                    </p>
+                    <p className="text-sm text-gray-400">
+                        Try adjusting your filters or date range
+                    </p>
                 </div>
             ) : (
                 <BarChart
