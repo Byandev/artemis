@@ -1,7 +1,7 @@
 # CSR Leaderboards
 
 <h3>Backend Updates</h3>
-<ul="1">
+<ul>
 <li>Initial Uploading</li>
     <ol>
         <li>Tokens must be used in the API to get the data in the database.</li>
