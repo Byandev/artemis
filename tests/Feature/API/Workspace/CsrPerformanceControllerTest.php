@@ -60,9 +60,40 @@ test('workspace members can fetch csr performance ranked by sales', function () 
         ->assertJsonPath('data.0.name', 'Alpha CSR')
         ->assertJsonPath('data.0.rank', 1)
         ->assertJsonPath('data.0.total_orders', 2)
-        ->assertJsonPath('data.0.total_sales', 200.0)
+        ->assertJsonPath('data.0.total_sales', 200)
         ->assertJsonPath('data.1.name', 'Beta CSR')
         ->assertJsonPath('data.1.rank', 2)
         ->assertJsonPath('data.1.total_orders', 1)
-        ->assertJsonPath('data.1.total_sales', 120.0);
+        ->assertJsonPath('data.1.total_sales', 120);
+});
+
+test('guests can fetch public csr performance', function () {
+    $user = User::factory()->create();
+    $workspace = Workspace::factory()->forOwner($user)->create();
+    $page = Page::factory()->forWorkspace($workspace)->forOwner($user)->create();
+
+    $csr = CustomerServiceRepresentative::create([
+        'id' => 303,
+        'uuid' => 'csr-public',
+        'name' => 'Public CSR',
+        'email' => 'public@example.com',
+    ]);
+
+    Order::factory()->forPage($page)->create([
+        'workspace_id' => $workspace->id,
+        'assignee_id' => $csr->id,
+        'final_amount' => 300,
+        'confirmed_at' => now()->startOfMonth()->addDay(),
+    ]);
+
+    $response = $this->getJson(route('api.public.workspaces.csrs.performance.index', [
+        'workspace' => $workspace,
+        'period' => 'monthly',
+    ]));
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('data.0.name', 'Public CSR')
+        ->assertJsonPath('data.0.total_orders', 1)
+        ->assertJsonPath('data.0.total_sales', 300);
 });

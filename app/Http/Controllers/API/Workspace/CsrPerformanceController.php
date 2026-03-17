@@ -16,13 +16,24 @@ class CsrPerformanceController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
-        $validated = $request->validate([
-            'period' => ['nullable', 'in:daily,weekly,monthly'],
-            'sort_by' => ['nullable', 'in:rank,name,sales,orders'],
-            'sort_dir' => ['nullable', 'in:asc,desc'],
-            'start_date' => ['nullable', 'date'],
-            'end_date' => ['nullable', 'date'],
+        $validated = $this->validatedFilters($request);
+
+        return response()->json([
+            'data' => $this->buildLeaderboard($workspace, $validated),
         ]);
+    }
+
+    public function publicIndex(Request $request, Workspace $workspace)
+    {
+        $validated = $this->validatedFilters($request);
+
+        return response()->json([
+            'data' => $this->buildLeaderboard($workspace, $validated),
+        ]);
+    }
+
+    private function buildLeaderboard(Workspace $workspace, array $validated): Collection
+    {
 
         $period = $validated['period'] ?? 'monthly';
         $sortBy = $validated['sort_by'] ?? 'rank';
@@ -49,8 +60,17 @@ class CsrPerformanceController extends Controller
             ->orderBy('period_start')
             ->get();
 
-        return response()->json([
-            'data' => $this->rankRows($rows, $period, $sortBy, $sortDir),
+        return $this->rankRows($rows, $period, $sortBy, $sortDir);
+    }
+
+    private function validatedFilters(Request $request): array
+    {
+        return $request->validate([
+            'period' => ['nullable', 'in:daily,weekly,monthly'],
+            'sort_by' => ['nullable', 'in:rank,name,sales,orders'],
+            'sort_dir' => ['nullable', 'in:asc,desc'],
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date'],
         ]);
     }
 
