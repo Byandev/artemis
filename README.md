@@ -13,6 +13,7 @@
 </ol>
 
 <h3>API Testing Snapshots</h3>
-<img src="https://drive.google.com/drive/u/2/folders/1_CdQ_jndEjTo_t4tMPQDdz9d93fT8PHG" alt="daily">
+<img src="https://drive.google.com/uc?export=view&id=1ABCxyz12345" alt="daily" width="500">
 <img src="https://cdn.discordapp.com/attachments/1104416442034194176/1104416442833890322/image.png" alt="weekly">
 <img src="https://cdn.discordapp.com/attachments/1104416442034194176/1104416443235725568/image.png" alt="monthly">
+
