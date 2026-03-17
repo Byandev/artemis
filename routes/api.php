@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\API\Workspace\AnalyticsController;
+use App\Http\Controllers\API\Workspace\CsrPerformanceController;
 use App\Http\Controllers\API\Workspace\PageController;
 use App\Http\Controllers\API\Workspace\ProductController;
 use App\Http\Controllers\API\Workspace\ShopController;
@@ -9,6 +10,7 @@ use App\Http\Controllers\API\Workspace\UserController;
 
 Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], function () {
     Route::group(['prefix' => 'workspaces/{workspace}', 'as' => 'workspaces.'], function () {
+        Route::get('/csrs/performance', [CsrPerformanceController::class, 'index'])->name('csrs.performance.index');
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
