@@ -31,6 +31,8 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [option, setOption] = useState('totalSales');
+    const [again, setAgain] = useState(false);
+
 
     const startDate = moment(dateRange[0]).format('YYYY-MM-DD');
     const endDate = moment(dateRange[1]).format('YYYY-MM-DD');
@@ -110,6 +112,7 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
         pageIds,
         userIds,
         productIds,
+        again
     ]);
 
     const categories = useMemo(() => {
@@ -169,7 +172,7 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
                     <p className="text-red-500">{error}</p>
                     <Button
                         variant="outline"
-                        onClick={() => window.location.reload()}
+                        onClick={() => setAgain(true)}
                         className="gap-2"
                     >
                         <svg

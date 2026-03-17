@@ -26,6 +26,7 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [group, setGroup] = useState('daily');
+    const [again, setAgain] = useState(false);
 
     const start = moment(dateRange[0]);
     const end = moment(dateRange[1]);
@@ -117,7 +118,7 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
         };
 
         fetchData();
-    }, [workspace.id, option, group, dateRange, filter]);
+    }, [workspace.id, option, group, dateRange, filter, again]);
 
     const capitalizeFirstLetter = (str: string) =>
         str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -171,7 +172,7 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
                     <p className="text-red-500">{error}</p>
                     <Button
                         variant="outline"
-                        onClick={() => window.location.reload()}
+                        onClick={() => setAgain(true)}
                         className="gap-2"
                     >
                         <svg

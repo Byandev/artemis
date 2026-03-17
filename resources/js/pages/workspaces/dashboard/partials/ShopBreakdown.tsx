@@ -35,6 +35,7 @@ export default function ShopBreakdown({
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [option, setOption] = useState('totalSales');
+    const [again, isAgain] = useState(false);
 
     const startDate = moment(dateRange[0]).format('YYYY-MM-DD');
     const endDate = moment(dateRange[1]).format('YYYY-MM-DD');
@@ -134,6 +135,7 @@ export default function ShopBreakdown({
         pageIds,
         userIds,
         productIds,
+        again,
     ]);
 
     const categories = useMemo(() => {
@@ -181,7 +183,7 @@ export default function ShopBreakdown({
                     <p className="text-red-500">{error}</p>
                     <Button
                         variant="outline"
-                        onClick={() => window.location.reload()}
+                        onClick={() => isAgain(true)}
                         className="gap-2"
                     >
                         <svg
