@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CSR Leaderboard Sample</title>
+    <style>
+        :root {
+            --bg-1: #f8fafc;
+            --bg-2: #e2e8f0;
+            --card: #ffffff;
+            --text: #0f172a;
+            --muted: #64748b;
+            --line: #cbd5e1;
+            --accent: #0ea5e9;
+            --gold: #f59e0b;
+            --silver: #94a3b8;
+            --bronze: #b45309;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text);
+            background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 980px;
+            margin: 0 auto;
+        }
+
+        .title {
+            margin: 0 0 18px;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 24px;
+        }
+
+        .btn {
+            border: 1px solid var(--line);
+            background: var(--card);
+            color: var(--text);
+            padding: 10px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .btn.active {
+            border-color: var(--accent);
+            color: #ffffff;
+            background: var(--accent);
+        }
+
+        .podium {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+
+        .podium-card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            min-height: 220px;
+        }
+
+        .rank-label {
+            font-size: 22px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .rank-1 .rank-label { color: var(--gold); }
+        .rank-2 .rank-label { color: var(--silver); }
+        .rank-3 .rank-label { color: var(--bronze); }
+
+        .avatar {
+            width: 72px;
+            height: 72px;
+            border-radius: 999px;
+            background: #dbeafe;
+            border: 2px solid #bfdbfe;
+            margin-bottom: 10px;
+        }
+
+        .name {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .meta {
+            font-size: 14px;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+
+        .list-wrap {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 14px;
+        }
+
+        .list-title {
+            margin: 0 0 10px;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .list-header {
+            display: grid;
+            grid-template-columns: 90px 56px 1.4fr 1fr 1fr;
+            gap: 10px;
+            padding: 8px 12px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--muted);
+            border-bottom: 1px solid var(--line);
+            margin-bottom: 6px;
+        }
+
+        .list-row {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #f8fafc;
+            font-size: 14px;
+            display: grid;
+            grid-template-columns: 90px 56px 1.4fr 1fr 1fr;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .avatar-small {
+            width: 34px;
+            height: 34px;
+            border-radius: 999px;
+            background: #dbeafe;
+            border: 2px solid #bfdbfe;
+        }
+
+        .cell-rank {
+            font-weight: 700;
+        }
+
+        .cell-name {
+            font-weight: 600;
+        }
+
+        .empty {
+            color: var(--muted);
+            font-size: 14px;
+            padding: 10px;
+        }
+
+        @media (max-width: 800px) {
+            .podium {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1 class="title">CSR Leaderboard</h1>
+
+    <div class="controls">
+        <button class="btn active" data-period="daily">Daily</button>
+        <button class="btn" data-period="weekly">Weekly</button>
+        <button class="btn" data-period="monthly">Monthly</button>
+    </div>
+
+    <section class="podium" id="podium"></section>
+
+    <section class="list-wrap">
+        <h2 class="list-title">Other CSR</h2>
+        <div class="list-header">
+            <div>Rank</div>
+            <div>Photo</div>
+            <div>Name</div>
+            <div>Total Orders</div>
+            <div>Total Sales</div>
+        </div>
+        <div id="list" class="list"></div>
+    </section>
+</div>
+
+<script>
+    const WORKSPACE_SLUG = "developers-workspace";
+    const ENDPOINT_BASE = `/api/public/workspaces/${WORKSPACE_SLUG}/csrs/performance`;
+
+    const buttons = Array.from(document.querySelectorAll(".btn"));
+    const podiumEl = document.getElementById("podium");
+    const listEl = document.getElementById("list");
+
+    buttons.forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            buttons.forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+            await loadLeaderboard(btn.dataset.period);
+        });
+    });
+
+    function currency(n) {
+        return new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "USD",
+            maximumFractionDigits: 2,
+        }).format(Number(n || 0));
+    }
+
+    function renderPodium(items) {
+        podiumEl.innerHTML = "";
+
+        const byRank = new Map(items.map((item) => [item.rank, item]));
+        const order = [2, 1, 3];
+
+        order.forEach((rank) => {
+            const item = byRank.get(rank);
+            const card = document.createElement("article");
+            card.className = `podium-card rank-${rank}`;
+
+            if (!item) {
+                card.innerHTML = `
+                    <div class="rank-label">${rank}${suffix(rank)}</div>
+                    <div class="avatar"></div>
+                    <div class="name">No Data</div>
+                    <div class="meta">total orders: 0<br/>total sales: ${currency(0)}</div>
+                `;
+            } else {
+                card.innerHTML = `
+                    <div class="rank-label">${rank}${suffix(rank)}</div>
+                    <div class="avatar"></div>
+                    <div class="name">${escapeHtml(item.name || "-")}</div>
+                    <div class="meta">total orders: ${item.total_orders}<br/>total sales: ${currency(item.total_sales)}</div>
+                `;
+            }
+
+            podiumEl.appendChild(card);
+        });
+    }
+
+    function renderList(items) {
+        listEl.innerHTML = "";
+
+        if (!items.length) {
+            listEl.innerHTML = '<div class="empty">No additional CSR data.</div>';
+            return;
+        }
+
+        items.forEach((item) => {
+            const row = document.createElement("div");
+            row.className = "list-row";
+            row.innerHTML = `
+                <div class="cell-rank">#${item.rank}</div>
+                <div class="avatar-small"></div>
+                <div class="cell-name">${escapeHtml(item.name || "-")}</div>
+                <div>${item.total_orders}</div>
+                <div>${currency(item.total_sales)}</div>
+            `;
+            listEl.appendChild(row);
+        });
+    }
+
+    function suffix(rank) {
+        if (rank === 1) return "st";
+        if (rank === 2) return "nd";
+        if (rank === 3) return "rd";
+        return "th";
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/\"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    async function loadLeaderboard(period) {
+        try {
+            const response = await fetch(`${ENDPOINT_BASE}?period=${encodeURIComponent(period)}&sort_by=rank&sort_dir=desc`);
+            const payload = await response.json();
+
+            if (!response.ok) {
+                throw new Error(payload.message || "Failed to load leaderboard");
+            }
+
+            const rows = Array.isArray(payload.data) ? payload.data : [];
+
+            const grouped = rows.reduce((acc, row) => {
+                const key = row.period_start || "";
+                if (!acc[key]) acc[key] = [];
+                acc[key].push(row);
+                return acc;
+            }, {});
+
+            const periodStarts = Object.keys(grouped).sort();
+            const latestPeriod = periodStarts[periodStarts.length - 1];
+            const latestRows = latestPeriod ? grouped[latestPeriod] : [];
+
+            const sorted = latestRows.slice().sort((a, b) => a.rank - b.rank);
+            const top3 = sorted.filter((x) => x.rank <= 3);
+            const others = sorted.filter((x) => x.rank > 3);
+
+            renderPodium(top3);
+            renderList(others);
+        } catch (error) {
+            podiumEl.innerHTML = "";
+            listEl.innerHTML = "";
+            listEl.innerHTML = `<div class="empty">Error: ${escapeHtml(error.message)}</div>`;
+        }
+    }
+
+    loadLeaderboard("daily");
+</script>
+</body>
+</html>
