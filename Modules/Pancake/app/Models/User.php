@@ -12,4 +12,9 @@ class User extends Model
     protected $guarded = [];
 
     protected $table = 'pancake_users';
+
+    public function orders()
+    {
+        return $this->hasMany(Order::class, 'confirmed_by', 'id');
+    }
 }

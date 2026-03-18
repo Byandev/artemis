@@ -19,14 +19,13 @@ class FetchShopUsers implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(public Shop $shop) {
-
-    }
+    public function __construct(public Shop $shop) {}
 
     /**
      * Execute the job.
      */
-    public function handle(): void {
+    public function handle(): void
+    {
         $this->shop->loadMissing('pages');
 
         $pancake = new Pancake($this->shop->id, $this->shop->pages->first()->pos_token);
@@ -53,7 +52,6 @@ class FetchShopUsers implements ShouldQueue
                 'user_id' => $user['user']['id'],
             ]);
         });
-
 
     }
 }

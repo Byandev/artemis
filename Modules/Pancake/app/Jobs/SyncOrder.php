@@ -42,6 +42,7 @@ class SyncOrder implements ShouldQueue
         $delivered_at = null;
         $shipped_at = null;
         $conferrer_id = null;
+        $confirmed_by = null;
 
         $confirmedHistory = collect($order['status_history'])->where('status', 1)->first();
         $shippedHistory = collect($order['status_history'])->where('status', 2)->first();
@@ -54,6 +55,7 @@ class SyncOrder implements ShouldQueue
             $confirmed_at = $confirmedAtUtc->setTimezone(config('app.timezone'))->toDateTimeString();
 
             $conferrer_id = $confirmedHistory['editor_fb'] ?: null;
+            $confirmed_by = $confirmedHistory['editor_id'] ?: null;
         }
 
         if ($shippedHistory) {
@@ -104,6 +106,7 @@ class SyncOrder implements ShouldQueue
             'customer_succeed_order_count' => $order['customer']['succeed_order_count'] ?: 0,
             'customer_returned_order_count' => $order['customer']['returned_order_count'] ?: 0,
             'conferrer_id' => $conferrer_id,
+            'confirmed_by' => $confirmed_by,
         ]);
 
         if (isset($order['items'])) {
