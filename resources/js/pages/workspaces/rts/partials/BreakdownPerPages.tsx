@@ -192,7 +192,7 @@ const BreakdownPerPages = ({ workspace, queryString }: Props) => {
     }
 
     return (
-        <div className="rounded-lg border bg-card p-6  h-fit">
+        <div className="rounded-lg border bg-card p-6  h-full">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
                     <h3 className="text-lg font-semibold tracking-tight">Breakdown per Pages</h3>

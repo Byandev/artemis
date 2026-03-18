@@ -134,7 +134,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Analytics`} />
-            <div className="p-4 md:p-6">
+            <div className="p-4 md:p-6 space-y-6">
                 <div className="mb-6 flex flex-col items-start justify-between md:flex-row md:items-center">
                     <div className="flex flex-col">
                         <h1 className="text-2xl font-bold">RTS Analytics</h1>
@@ -169,7 +169,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
                     )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 space-y-8 ">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                     {analytics.map((item, key) => (
                         <MetricsCard
                             key={key}
@@ -180,30 +180,32 @@ const Analytics = ({ workspace, filters, data }: Props) => {
                             color={item.color}
                         />
                     ))}
+                </div>
 
-                    <div className="col-span-2 flex flex-col gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="col-span-1 md:col-span-2 ">
                         <BreakdownPerPages
                             workspace={workspace}
                             queryString={queryString}
                         />
-
-                        <BreakdownPerShops
-                            workspace={workspace}
-                            queryString={queryString}
-                        />
-
-                        <BreakdownPerUsers
-                            workspace={workspace}
-                            queryString={queryString}
-                        />
                     </div>
-
-                    <div className="col-span-2">
+                    <div className='h-full'>
                         <BreakdownPerCities
                             workspace={workspace}
                             queryString={queryString}
                         />
                     </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <BreakdownPerShops
+                        workspace={workspace}
+                        queryString={queryString}
+                    />
+                    <BreakdownPerUsers
+                        workspace={workspace}
+                        queryString={queryString}
+                    />
                 </div>
             </div>
         </AppLayout>

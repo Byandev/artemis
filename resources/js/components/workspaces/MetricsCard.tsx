@@ -1,5 +1,11 @@
-import { Info } from 'lucide-react';
+import { CircleHelp, Info } from 'lucide-react';
 import React from 'react';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 type Props = {
     title: string;
@@ -88,39 +94,48 @@ const MetricsCard = ({
 
     return (
         <div
-            className={`group relative rounded-lg border p-5 transition-all duration-200 hover:shadow-md bg-white ${className}`}
+            className={`group relative rounded-lg border bg-white p-5 transition-all duration-200 hover:shadow-md ${className}`}
         >
             {/* Header with title and optional tooltip */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    {icon && <span className={`${colors.icon} ${colors.bg} p-1.5 rounded-md`}>{icon}</span>}
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                         {title}
                     </p>
+                    {tooltip && (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className="text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+                                    >
+                                        <CircleHelp className="h-3.5 w-3.5" />
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                    side="top"
+                                    className="max-w-[200px] text-xs"
+                                >
+                                    <p>{tooltip}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
                 </div>
+                {icon && (
+                    <span
+                        className={`${colors.icon} ${colors.bg} rounded-md p-1.5`}
+                    >
+                        {icon}
+                    </span>
+                )}
             </div>
 
             {/* Value and trend */}
             <div className="mt-3 flex items-end justify-between">
                 <div>
-                    <h4 className={`text-2xl font-bold ${colors.text}`}>
-                        {formattedValue}
-                    </h4>
-
-                    {/* Optional trend indicator */}
-                    {trend && (
-                        <div className="mt-1 flex items-center gap-1">
-                            <span
-                                className={`text-xs font-medium ${trend.isPositive ? 'text-green-600' : 'text-red-600'}`}
-                            >
-                                {trend.isPositive ? '↑' : '↓'}{' '}
-                                {Math.abs(trend.value)}%
-                            </span>
-                            <span className="text-xs text-gray-500">
-                                vs last month
-                            </span>
-                        </div>
-                    )}
+                    <h4 className={`text-2xl font-bold`}>{formattedValue}</h4>
                 </div>
             </div>
         </div>
