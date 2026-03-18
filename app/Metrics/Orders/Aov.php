@@ -73,6 +73,24 @@ final class Aov
             ->get();
     }
 
+    public function perUser(int $workspaceId, array $date_range, array $filter)
+    {
+        return $this->baseQuery($workspaceId, $date_range, $filter, true)
+            ->join('users', 'users.id', '=', 'pages.owner_id')
+            ->selectRaw('
+            users.id as user_id,
+            users.name as user_name,
+            ROUND(
+                COALESCE(SUM(pancake_orders.final_amount) / NULLIF(COUNT(*), 0), 0),
+                2
+            ) as value
+        ')
+            ->whereNotNull('pages.owner_id')
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc('value')
+            ->get();
+    }
+
     private function baseQuery(
         int $workspaceId,
         array $date_range,

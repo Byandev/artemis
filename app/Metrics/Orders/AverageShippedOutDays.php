@@ -94,6 +94,47 @@ final class AverageShippedOutDays
             ->get();
     }
 
+
+    public function perUser(int $workspaceId, array $date_range, array $filter)
+    {
+        $users = DB::table('users')
+            ->join('pages', 'pages.owner_id', '=', 'users.id')
+            ->where('pages.workspace_id', $workspaceId)
+            ->when(!empty($filter['shop_ids']), function ($query) use ($filter) {
+                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
+            })
+            ->when(!empty($filter['page_ids']), function ($query) use ($filter) {
+                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
+            })
+            ->select('users.id', 'users.name')
+            ->distinct()
+            ->get();
+
+        return $users->map(function ($user) use ($workspaceId, $date_range, $filter) {
+            $userFilter = $filter;
+            $userFilter['page_ids'] = DB::table('pages')
+                ->where('workspace_id', $workspaceId)
+                ->where('owner_id', $user->id)
+                ->when(!empty($filter['shop_ids']), function ($query) use ($filter) {
+                    $query->whereIn('shop_id', $this->parseIds($filter['shop_ids']));
+                })
+                ->when(!empty($filter['page_ids']), function ($query) use ($filter) {
+                    $query->whereIn('id', $this->parseIds($filter['page_ids']));
+                })
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            return (object) [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'value' => !empty($userFilter['page_ids'])
+                    ? $this->compute($workspaceId, $date_range, $userFilter)
+                    : 0,
+            ];
+        })->sortByDesc('value')->values();
+    }
+
     /**
      * Base query to avoid duplicating filters
      */
