@@ -8,7 +8,7 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('/csr-leaderboard', function () {
-    return redirect('/csr1/index.html');
+    return redirect('/csr-leaderboards/index.html');
 })->name('csr-leaderboard.public');
 
 Route::get('/auth/facebook/callback', [\App\Http\Controllers\Integrations\FacebookController::class, 'callback']);

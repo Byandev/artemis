@@ -8,7 +8,15 @@ const ENDPOINT_BASE = `/api/public/workspaces/${WORKSPACE_SLUG}/csrs/performance
 const ENDPOINT_CSR_LIST = `/api/public/workspaces/${WORKSPACE_SLUG}/csrs`;
 
 function setLoading(isLoading) {
-    loader.style.display = isLoading ? "flex" : "none";
+    if (isLoading) {
+        loader.classList.remove("hide");
+        loader.style.display = "flex";
+    } else {
+        loader.classList.add("hide");
+        setTimeout(() => {
+            loader.style.display = "none";
+        }, 220);
+    }
     mainContent.style.display = "block";
 }
 
@@ -22,6 +30,20 @@ function currency(value) {
 function avatarFromName(name) {
     const encoded = encodeURIComponent(name || "CSR");
     return `https://ui-avatars.com/api/?name=${encoded}&background=ffffff&color=3b006a&bold=true`;
+}
+
+function preloadImage(src) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = src;
+    });
+}
+
+async function preloadAvatars(items) {
+    const urls = items.map((item) => avatarFromName(item.name));
+    await Promise.all(urls.map((url) => preloadImage(url)));
 }
 
 function groupedLatest(rows) {
@@ -85,6 +107,10 @@ function fillCard(card, item) {
 
 function updatePodium(sorted) {
     const cards = document.querySelectorAll(".podium .card");
+    const podium = document.querySelector(".podium");
+
+    podium.classList.remove("ready");
+    void podium.offsetWidth;
 
     const first = sorted.find((x) => x.rank === 1);
     const second = sorted.find((x) => x.rank === 2);
@@ -93,6 +119,8 @@ function updatePodium(sorted) {
     fillCard(cards[1], first);
     fillCard(cards[0], second);
     fillCard(cards[2], third);
+
+    podium.classList.add("ready");
 }
 
 function renderLeaderboard(sorted) {
@@ -108,6 +136,7 @@ function renderLeaderboard(sorted) {
     others.forEach((item) => {
         const row = document.createElement("div");
         row.classList.add("row");
+        row.style.setProperty("--delay", `${Math.min((item.rank - 4) * 20, 220)}ms`);
 
         row.innerHTML = `
             <span>${item.rank}</span>
@@ -148,6 +177,8 @@ async function loadPeriod(period) {
         const sortedLatest = groupedLatest(rows);
         const allRows = mergeWithAllCsrs(sortedLatest, csrList);
 
+        await preloadAvatars(allRows);
+
         updatePodium(allRows);
         renderLeaderboard(allRows);
     } catch (error) {
@@ -161,8 +192,11 @@ tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
         tabs.forEach((t) => t.classList.remove("active"));
         tab.classList.add("active");
-        loadPeriod(tab.dataset.period);
+        const period = tab.dataset.period || tab.textContent.trim().toLowerCase();
+        loadPeriod(period);
     });
 });
 
-loadPeriod("daily");
+window.addEventListener("load", () => {
+    loadPeriod("daily");
+});
