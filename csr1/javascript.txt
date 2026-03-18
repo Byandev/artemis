@@ -13,11 +13,9 @@ function formatPeso(value){
 }
 
 function loadLeaderboard(dataset){
-
     leaderboard.innerHTML=""
 
     dataset.slice(3).forEach((user,index)=>{
-
         const row=document.createElement("div")
         row.classList.add("row")
 
@@ -36,7 +34,6 @@ function loadLeaderboard(dataset){
 }
 
 function updatePodium(dataset){
-
     const cards=document.querySelectorAll(".podium .card")
 
     cards[1].querySelector(".avatar").src=dataset[0].avatar
@@ -61,7 +58,6 @@ async function load(period){
     updatePodium(data)
 }
 
-/* Tabs */
 const tabs=document.querySelectorAll(".tab")
 
 tabs.forEach(tab=>{
@@ -74,7 +70,6 @@ tabs.forEach(tab=>{
     })
 })
 
-/* Initial Load */
 window.onload = () => {
     setTimeout(()=>{
         document.getElementById("loader").style.display="none";
@@ -82,8 +77,3 @@ window.onload = () => {
         load("daily");
     },2000)
 }
-
-});
-});
-
-fetchData("daily");
