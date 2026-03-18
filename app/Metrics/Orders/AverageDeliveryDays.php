@@ -85,7 +85,6 @@ final class AverageDeliveryDays
             ->get();
     }
 
-
     private function baseQuery(
         int $workspaceId,
         array $date_range,

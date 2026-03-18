@@ -20,8 +20,8 @@ final class TimeToFirstOrder
             ->join('pancake_customers as c', 'c.customer_id', '=', 't.customer_id')
             ->whereNotNull('c.created_at')
             ->whereBetween('t.first_confirmed_at', [
-                $date_range['start_date'] . ' 00:00:00',
-                $date_range['end_date'] . ' 23:59:59',
+                $date_range['start_date'].' 00:00:00',
+                $date_range['end_date'].' 23:59:59',
             ])
             ->selectRaw('
                 ROUND(
@@ -53,8 +53,8 @@ final class TimeToFirstOrder
             ->join('pancake_customers as c', 'c.customer_id', '=', 't.customer_id')
             ->whereNotNull('c.created_at')
             ->whereBetween('t.first_confirmed_at', [
-                $date_range['start_date'] . ' 00:00:00',
-                $date_range['end_date'] . ' 23:59:59',
+                $date_range['start_date'].' 00:00:00',
+                $date_range['end_date'].' 23:59:59',
             ])
             ->selectRaw("
                 $periodSql as period,
@@ -80,8 +80,8 @@ final class TimeToFirstOrder
             ->join('pancake_customers as c', 'c.customer_id', '=', 't.customer_id')
             ->whereNotNull('c.created_at')
             ->whereBetween('t.first_confirmed_at', [
-                $date_range['start_date'] . ' 00:00:00',
-                $date_range['end_date'] . ' 23:59:59',
+                $date_range['start_date'].' 00:00:00',
+                $date_range['end_date'].' 23:59:59',
             ])
             ->selectRaw('
                 t.page_id,
@@ -108,8 +108,8 @@ final class TimeToFirstOrder
             ->join('pancake_customers as c', 'c.customer_id', '=', 't.customer_id')
             ->whereNotNull('c.created_at')
             ->whereBetween('t.first_confirmed_at', [
-                $date_range['start_date'] . ' 00:00:00',
-                $date_range['end_date'] . ' 23:59:59',
+                $date_range['start_date'].' 00:00:00',
+                $date_range['end_date'].' 23:59:59',
             ])
             ->selectRaw('
                 t.shop_id,
@@ -138,13 +138,13 @@ final class TimeToFirstOrder
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->when(
-                !empty($filter['page_ids']) || !empty($filter['shop_ids']),
+                ! empty($filter['page_ids']) || ! empty($filter['shop_ids']),
                 function ($query) use ($filter) {
                     $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-                        ->when(!empty($filter['page_ids']), function ($query) use ($filter) {
+                        ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
                             $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
                         })
-                        ->when(!empty($filter['shop_ids']), function ($query) use ($filter) {
+                        ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
                             $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
                         });
                 }
@@ -167,10 +167,10 @@ final class TimeToFirstOrder
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(!empty($filter['page_ids']), function ($query) use ($filter) {
+            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
                 $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
             })
-            ->when(!empty($filter['shop_ids']), function ($query) use ($filter) {
+            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
                 $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
             })
             ->groupBy('pages.id', 'pages.name', 'pancake_orders.customer_id')
@@ -194,10 +194,10 @@ final class TimeToFirstOrder
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(!empty($filter['page_ids']), function ($query) use ($filter) {
+            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
                 $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
             })
-            ->when(!empty($filter['shop_ids']), function ($query) use ($filter) {
+            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
                 $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
             })
             ->whereNotNull('pages.shop_id')
