@@ -103,9 +103,6 @@ export function PageFormDialog({
         }
     };
 
-    // Find the selected user's name for display
-    const selectedUserName = users.find(user => user.id === data.owner_id)?.name || '';
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
@@ -318,7 +315,7 @@ export function PageFormDialog({
                                 </span>
                             </Label>
                             <Select
-                                value={data.owner_id}
+                                value={data.owner_id?.toString()}
                                 onValueChange={(value) => setData('owner_id', value)}
                             >
                                 <SelectTrigger
@@ -335,7 +332,7 @@ export function PageFormDialog({
                                         </SelectItem>
                                     ) : (
                                         users.map((user) => (
-                                            <SelectItem key={user.id} value={user.id}>
+                                            <SelectItem key={user.id} value={user.id.toString()}>
                                                 {user.name}
                                             </SelectItem>
                                         ))
