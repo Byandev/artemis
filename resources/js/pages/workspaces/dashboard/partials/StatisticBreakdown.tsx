@@ -19,6 +19,7 @@ import axios from 'axios';
 import { RefreshCcw } from 'lucide-react';
 import moment from 'moment/moment';
 import { useEffect, useMemo, useState } from 'react';
+import ComponentCard from '@/components/common/ComponentCard';
 
 interface Props {
     workspace: Workspace;
@@ -71,8 +72,8 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
         avgShippedOutDays: 'Average Shipped Out Days',
     };
 
-    const formatValue = (value: number) => {
-        switch (option) {
+    const formatMetricValue = (metric: string, value: number) => {
+        switch (metric) {
             case 'totalSales':
             case 'avgLifetimeValue':
                 return `₱${value.toLocaleString('en-PH', {
@@ -87,6 +88,10 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
             case 'avgShippedOutDays':
                 return `${value.toFixed(1)} hrs`;
             case 'aov':
+                return `₱${value.toLocaleString('en-PH', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                })}`;
             case 'totalOrders':
             default:
                 return value.toLocaleString();
@@ -188,8 +193,8 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
 
     return (
         <div className="space-y-4">
-            <div className="flex justify-between">
-                <h2 className="text-lg font-semibold">
+            <div className="flex item-center justify-between">
+                <h2 className=" font-semibold">
                     {optionLabels[option]} vs {optionLabels[secondOption]}
                 </h2>
 
@@ -302,11 +307,20 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
                     </p>
                 </div>
             ) : (
-                <LineChart
-                    categories={mergedChartData.categories}
-                    series={mergedChartData.series}
-                    formatValue={formatValue}
-                />
+                <ComponentCard>
+                    <LineChart
+                        categories={mergedChartData.categories}
+                        series={mergedChartData.series}
+                        leftAxisTitle={optionLabels[option]}
+                        rightAxisTitle={optionLabels[secondOption]}
+                        leftFormatter={(value) =>
+                            formatMetricValue(option, value)
+                        }
+                        rightFormatter={(value) =>
+                            formatMetricValue(secondOption, value)
+                        }
+                    />
+                </ComponentCard>
             )}
         </div>
     );
