@@ -32,6 +32,30 @@ class CsrPerformanceController extends Controller
         ]);
     }
 
+    public function publicCsrIndex(Workspace $workspace)
+    {
+        $data = DB::table('customer_service_representatives as csr')
+            ->leftJoin('page_customer_service_representative as pcsr', 'pcsr.customer_service_representative_id', '=', 'csr.id')
+            ->leftJoin('pages', 'pages.id', '=', 'pcsr.page_id')
+            ->where(function ($query) use ($workspace) {
+                $query->where('pages.workspace_id', $workspace->id)
+                    ->orWhereExists(function ($exists) use ($workspace) {
+                        $exists->select(DB::raw(1))
+                            ->from('orders')
+                            ->whereColumn('orders.assignee_id', 'csr.id')
+                            ->where('orders.workspace_id', $workspace->id);
+                    });
+            })
+            ->select('csr.id as csr_id', 'csr.name')
+            ->distinct()
+            ->orderBy('csr.name')
+            ->get();
+
+        return response()->json([
+            'data' => $data,
+        ]);
+    }
+
     private function buildLeaderboard(Workspace $workspace, array $validated): Collection
     {
 
@@ -83,6 +107,7 @@ class CsrPerformanceController extends Controller
                     ->values()
                     ->map(function ($row, int $index) use ($period) {
                         return [
+                            'csr_id' => (int) $row->csr_id,
                             'period' => $period,
                             'period_start' => $row->period_start,
                             'rank' => $index + 1,
