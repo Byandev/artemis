@@ -2,78 +2,90 @@ import { ApexOptions } from 'apexcharts';
 import Chart from 'react-apexcharts';
 
 interface Props {
-    series: ApexNonAxisChartSeries | undefined;
+    series:
+        | {
+              name: string;
+              data: number[];
+          }[]
+        | undefined;
     categories: string[];
     formatValue: (value: number) => string;
 }
-export default function LineChartOne({categories, series, formatValue} : Props) {
+
+export default function LineChartOne({
+    categories,
+    series,
+    formatValue,
+}: Props) {
     const options: ApexOptions = {
         legend: {
-            show: false, // Hide legend
+            show: true,
             position: 'top',
             horizontalAlign: 'left',
         },
-        colors: ['#059669', '#9CB9FF'], // Define line colors
+        colors: ['#87c0a6', '#9CB9FF'],
         chart: {
             fontFamily: 'Outfit, sans-serif',
             height: 310,
-            type: 'line', // Set the chart type to 'line'
+            type: 'area',
             toolbar: {
-                show: false, // Hide chart toolbar
+                show: false,
             },
         },
         stroke: {
-            curve: 'smooth', // Define the line style (straight, smooth, or step)
-            width: [1, 10], // Line width for each dataset
+            curve: 'smooth',
+            width: 3,
         },
-
         fill: {
             type: 'gradient',
             gradient: {
-                opacityFrom: 0.55,
-                opacityTo: 0,
+                shadeIntensity: 1,
+                inverseColors: false,
+                opacityFrom: 0.40,
+                opacityTo: 0.02,
+                stops: [0, 90, 100],
             },
         },
         markers: {
-            size: 0, // Size of the marker points
-            strokeColors: '#fff', // Marker border color
+            size: 3,
+            strokeColors: '#fff',
             strokeWidth: 2,
             hover: {
-                size: 6, // Marker size on hover
+                size: 6,
             },
         },
         grid: {
             xaxis: {
                 lines: {
-                    show: false, // Hide grid lines on x-axis
+                    show: false,
                 },
             },
             yaxis: {
                 lines: {
-                    show: true, // Show grid lines on y-axis
+                    show: true,
                 },
             },
         },
         dataLabels: {
-            enabled: false, // Disable data labels
+            enabled: false,
         },
         tooltip: {
-            enabled: true, // Enable tooltip
-            x: {
-                format: 'dd MMM yyyy', // Format for x-axis tooltip
+            enabled: true,
+            y: {
+                formatter: formatValue,
             },
         },
         xaxis: {
-            type: 'category', // Category-based x-axis
-            categories: categories,
+            type: 'category',
+            categories,
             axisBorder: {
-                show: false, // Hide x-axis border
+                show: false,
             },
             axisTicks: {
-                show: false, // Hide x-axis ticks
+                show: false,
             },
             tooltip: {
-                enabled: false, // Disable tooltip for x-axis points
+                enabled: false,
             },
         },
         yaxis: {
@@ -81,19 +93,18 @@ export default function LineChartOne({categories, series, formatValue} : Props) 
             labels: {
                 formatter: formatValue,
                 style: {
-                    fontSize: '12px', // Adjust font size for y-axis labels
-                    colors: ['#6B7280'], // Color of the labels
+                    fontSize: '12px',
+                    colors: ['#6B7280'],
                 },
             },
             title: {
-                text: '', // Remove y-axis title
+                text: '',
                 style: {
                     fontSize: '0px',
                 },
             },
         },
     };
-
 
     return (
         <div className="custom-scrollbar max-w-full overflow-x-auto">
