@@ -9,6 +9,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import workspaces from '@/routes/workspaces';
 import { User } from '@/types';
 import { Page } from '@/types/models/Page';
@@ -16,7 +23,6 @@ import { Workspace } from '@/types/models/Workspace';
 import { Switch } from '@headlessui/react';
 import { useForm } from '@inertiajs/react';
 import React, { useEffect } from 'react';
-import Select from 'react-select';
 
 interface PageFormDialogProps {
     open: boolean;
@@ -25,39 +31,6 @@ interface PageFormDialogProps {
     workspace: Workspace;
     users: User[];
 }
-
-// Custom styles for react-select to match your design system
-const selectStyles = {
-    control: (base: any, state: any) => ({
-        ...base,
-        borderColor: state.isFocused ? '#3b82f6' : '#e5e7eb',
-        boxShadow: state.isFocused
-            ? '0 0 0 2px rgba(59, 130, 246, 0.1)'
-            : 'none',
-        '&:hover': {
-            borderColor: '#3b82f6',
-        },
-        minHeight: '38px',
-        borderRadius: '0.375rem',
-    }),
-    option: (base: any, state: any) => ({
-        ...base,
-        backgroundColor: state.isSelected
-            ? '#3b82f6'
-            : state.isFocused
-              ? '#f3f4f6'
-              : 'white',
-        color: state.isSelected ? 'white' : '#111827',
-        cursor: 'pointer',
-        '&:active': {
-            backgroundColor: state.isSelected ? '#3b82f6' : '#e5e7eb',
-        },
-    }),
-    menu: (base: any) => ({
-        ...base,
-        zIndex: 50,
-    }),
-};
 
 export function PageFormDialog({
     open,
@@ -130,17 +103,8 @@ export function PageFormDialog({
         }
     };
 
-    // Transform users for react-select
-    const userOptions = users.map((user) => ({
-        value: user.id,
-        label: `${user.name}`,
-    }));
-
-    // Find the selected user
-    const selectedUser = userOptions.find(
-        (option) => option.value === data.owner_id,
-    );
-
+    // Find the selected user's name for display
+    const selectedUserName = users.find(user => user.id === data.owner_id)?.name || '';
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -345,7 +309,7 @@ export function PageFormDialog({
                             )}
                         </div>
 
-                        {/* Owner/User Selection */}
+                        {/* Owner/User Selection - Using shadcn/ui Select */}
                         <div className="grid gap-2">
                             <Label htmlFor="owner_id">
                                 Owner{' '}
@@ -354,19 +318,30 @@ export function PageFormDialog({
                                 </span>
                             </Label>
                             <Select
-                                id="owner_id"
-                                options={userOptions}
-                                value={selectedUser}
-                                onChange={(option) =>
-                                    setData('owner_id', option?.value || '')
-                                }
-                                placeholder="Search for a user..."
-                                isClearable
-                                isSearchable
-                                styles={selectStyles}
-                                noOptionsMessage={() => 'No users found'}
-                                aria-invalid={!!errors.owner_id}
-                            />
+                                value={data.owner_id}
+                                onValueChange={(value) => setData('owner_id', value)}
+                            >
+                                <SelectTrigger
+                                    id="owner_id"
+                                    aria-invalid={!!errors.owner_id}
+                                    className={errors.owner_id ? "border-destructive" : ""}
+                                >
+                                    <SelectValue placeholder="Search for a user..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {users.length === 0 ? (
+                                        <SelectItem value="" disabled>
+                                            No users available
+                                        </SelectItem>
+                                    ) : (
+                                        users.map((user) => (
+                                            <SelectItem key={user.id} value={user.id}>
+                                                {user.name}
+                                            </SelectItem>
+                                        ))
+                                    )}
+                                </SelectContent>
+                            </Select>
                             {errors.owner_id && (
                                 <p className="text-destructive text-sm">
                                     {errors.owner_id}
