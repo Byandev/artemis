@@ -211,7 +211,7 @@ const StatisticCard = ({
 
     return (
         <div
-            className={`rounded-md border border-gray-200 bg-white p-4 transition-all hover:shadow-sm dark:border-gray-800 dark:bg-white/[0.03] ${className}`}
+            className={`rounded-lg border border-gray-200 bg-white p-4 transition-all hover:shadow-sm dark:border-gray-800 dark:bg-white/[0.03] ${className}`}
         >
             <div className="flex items-start justify-between">
                 <div className="flex items-center gap-1.5">
