@@ -125,7 +125,7 @@ transition:0.3s;
 transform:translateY(-5px) scale(1.03);
 }
 
-/* CLEAN TOP 3 (NO ANIMATION) */
+/* NO ANIMATION TOP 3 */
 .card.first{
 border:1px solid rgba(255,255,255,0.3);
 box-shadow:0 0 15px rgba(168,85,247,0.4);
@@ -192,6 +192,18 @@ font-size:11px;
 font-weight:600;
 }
 
+/* ROW ANIMATION */
+@keyframes slideIn{
+from{
+opacity:0;
+transform:translateX(-20px);
+}
+to{
+opacity:1;
+transform:translateX(0);
+}
+}
+
 .row{
 display:grid;
 grid-template-columns:35px 1.5fr 60px 70px;
@@ -202,6 +214,9 @@ background:rgba(255,255,255,0.08);
 border-radius:6px;
 align-items:center;
 transition:0.3s;
+
+/* ANIMATION ACTIVE */
+animation:slideIn 0.4s ease forwards;
 }
 
 .row:hover{

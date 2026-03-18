@@ -65,6 +65,9 @@ dataset.slice(3).forEach((user,index)=>{
 const row=document.createElement("div")
 row.classList.add("row")
 
+/* STAGGER EFFECT */
+row.style.animationDelay = `${index * 0.05}s`
+
 row.innerHTML=`
 <span class="rank-circle">${index+4}</span>
 <span class="name">
