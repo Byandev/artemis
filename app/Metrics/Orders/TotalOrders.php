@@ -40,6 +40,21 @@ final class TotalOrders
             ->get();
     }
 
+    public function perUser(int $workspaceId, array $date_range, array $filter)
+    {
+        return $this->baseQuery($workspaceId, $date_range, $filter, true)
+            ->join('users', 'users.id', '=', 'pages.owner_id')
+            ->selectRaw('
+            users.id as user_id,
+            users.name as user_name,
+            COUNT(*) as value
+        ')
+            ->whereNotNull('pages.owner_id')
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc('value')
+            ->get();
+    }
+
     public function perShop(int $workspaceId, array $date_range, array $filter)
     {
         return $this->baseQuery($workspaceId, $date_range, $filter, true)

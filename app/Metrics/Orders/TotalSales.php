@@ -59,6 +59,20 @@ final class TotalSales
             ->get();
     }
 
+    public function perUser(int $workspaceId, array $date_range, array $filter)
+    {
+        return $this->baseQuery($workspaceId, $date_range, $filter, true)
+            ->join('users', 'users.id', '=', 'pages.owner_id')
+            ->selectRaw('
+            users.id as user_id,
+            users.name as user_name,
+            SUM(pancake_orders.final_amount) as value
+        ')
+            ->whereNotNull('pages.owner_id')
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc('value')
+            ->get();
+    }
     private function baseQuery(int $workspaceId, array $date_range, array $filter, bool $forceJoinPages = false)
     {
         return DB::table('pancake_orders')
