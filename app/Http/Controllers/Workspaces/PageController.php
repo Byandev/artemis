@@ -47,6 +47,10 @@ class PageController extends Controller
             ->paginate(10)
             ->withQueryString();
 
+
+        $users = User::get(['id', 'name']);
+
+
         return Inertia::render('workspaces/pages/index', [
             'pages' => $pages,
             'workspace' => $workspace,
@@ -54,6 +58,7 @@ class PageController extends Controller
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
+            'users' => $users,
         ]);
     }
 
@@ -123,7 +128,7 @@ class PageController extends Controller
     public function update(UpdatePageRequest $request, Workspace $workspace, Page $page)
     {
         $validated = $request->validated();
-
+        
         $page->update([
             'shop_id' => $validated['shop_id'],
             'name' => $validated['name'],
@@ -136,6 +141,7 @@ class PageController extends Controller
             'parcel_journey_enabled' => $validated['parcel_journey_enabled'] ?? null,
             'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
             'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
+            'owner_id' => $validated['owner_id'],
         ]);
 
         return redirect()->route('workspaces.pages.index', $workspace)
