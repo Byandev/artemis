@@ -23,6 +23,7 @@ use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 use Modules\Inventory\Http\Controllers\PurchaseOrderController;
 
 /*
@@ -34,6 +35,9 @@ use Modules\Inventory\Http\Controllers\PurchaseOrderController;
 | member management, and invitation handling.
 |
 */
+Route::get('/leaderboards', function () {
+    return Inertia::render('workspaces/public/leaderboard');
+});
 
 Route::middleware(['auth'])->group(function () {
     // Workspace setup (first-time after registration)
