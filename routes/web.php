@@ -7,6 +7,10 @@ Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
 
+Route::get('/csr-leaderboard', function () {
+    return redirect('/csr-leaderboards/index.html');
+})->name('csr-leaderboard.public');
+
 Route::get('/auth/facebook/callback', [\App\Http\Controllers\Integrations\FacebookController::class, 'callback']);
 
 Route::middleware(['auth'])->group(function () {

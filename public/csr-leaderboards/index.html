@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>CSR Leaderboard</title>
+
+<link rel="stylesheet" href="style.css">
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+</head>
+
+<body>
+
+<div class="ellipse ellipse-top-left"></div>
+<div class="ellipse ellipse-top-right"></div>
+<div class="ellipse ellipse-bottom-left"></div>
+<div class="ellipse ellipse-bottom-right"></div>
+
+<!-- LOADER -->
+<div id="loader">
+<h1 class="loader-title">CSR LEADERBOARD</h1>
+<div class="spinner"></div>
+</div>
+
+<div id="main-content">
+
+<h1 class="title">CSR LEADERBOARD</h1>
+
+<!-- TABS -->
+<div class="tabs">
+<button class="tab active">Daily</button>
+<button class="tab">Weekly</button>
+<button class="tab">Monthly</button>
+</div>
+
+<!-- PODIUM -->
+<div class="podium">
+
+<div class="card second">
+<div class="rank-badge silver">2</div>
+<div class="stars">⭐⭐</div>
+<img class="avatar">
+<h3 class="csr-name"></h3>
+<p class="orders"></p>
+<p class="sales"></p>
+</div>
+
+<div class="card first">
+<div class="rank-badge gold">1</div>
+<div class="stars">⭐⭐⭐</div>
+<img class="avatar">
+<h3 class="csr-name"></h3>
+<p class="orders"></p>
+<p class="sales"></p>
+</div>
+
+<div class="card third">
+<div class="rank-badge bronze">3</div>
+<div class="stars">⭐</div>
+<img class="avatar">
+<h3 class="csr-name"></h3>
+<p class="orders"></p>
+<p class="sales"></p>
+</div>
+
+</div>
+
+<!-- LEADERBOARD -->
+<div class="leaderboard-container">
+
+<div class="leaderboard-header">
+<span>Rank</span>
+<span>CSR</span>
+<span>Orders</span>
+<span>Sales</span>
+</div>
+
+<div class="leaderboard" id="leaderboard"></div>
+
+</div>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
