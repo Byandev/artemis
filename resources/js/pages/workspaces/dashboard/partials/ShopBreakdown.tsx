@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from 'react';
 import BarChartSkeleton from '@/components/charts/skeletons/BarChartSkeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { RefreshCcw } from 'lucide-react';
+import ComponentCard from '@/components/common/ComponentCard';
 
 interface Props {
     workspace: Workspace;
@@ -229,11 +230,13 @@ export default function ShopBreakdown({
                     </p>
                 </div>
             ) : (
-                <BarChart
-                    categories={categories}
-                    series={series}
-                    formatValue={formatValue}
-                />
+                <ComponentCard>
+                    <BarChart
+                        categories={categories}
+                        series={series}
+                        formatValue={formatValue}
+                    />
+                </ComponentCard>
             )}
         </div>
     );

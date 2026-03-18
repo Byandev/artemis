@@ -28,6 +28,7 @@ import {
     Wallet,
 } from 'lucide-react';
 import UserBreakdown from '@/pages/workspaces/dashboard/partials/UserBreakdown';
+import { formatDate } from 'date-fns';
 
 interface Props {
     workspace: Workspace;
@@ -121,11 +122,23 @@ const Dashboard = ({ workspace }: Props) => {
         },
     ];
 
+    console.log(dateRange);
+
     return (
         <AppLayout>
-            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+            <div className="m-4 rounded-xl border bg-white p-4 md:p-6">
                 <div className="mb-6 flex items-center justify-between gap-6">
-                    <h1 className="text-2xl font-bold">Dashboard</h1>
+                    <div className="flex flex-col">
+                        <h1 className="text-2xl font-bold">Dashboard</h1>
+
+                        <p className='text-sm font-light text-gray-500'>
+                            Performance overview from{' '}
+                            {formatDate(new Date(dateRange[0]), 'MMMM d yyyy')}{' '}
+                            to{' '}
+                            {formatDate(new Date(dateRange[1]), 'MMMM d yyyy')}
+                        </p>
+                    </div>
+
                     <div className="flex items-center gap-4">
                         {/* Optional: if your Filters supports disabled, pass it; otherwise just leave it */}
                         <Filters
@@ -149,7 +162,7 @@ const Dashboard = ({ workspace }: Props) => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:gap-4 xl:grid-cols-3">
                     {cards.map((card) => (
                         <StatisticCard
                             key={card.key}
@@ -164,7 +177,7 @@ const Dashboard = ({ workspace }: Props) => {
                         />
                     ))}
                 </div>
-                <ComponentCard className="mt-6">
+                <ComponentCard className="mt-12">
                     <StatisticBreakdown
                         filter={filter}
                         dateRange={dateRange}
@@ -172,7 +185,7 @@ const Dashboard = ({ workspace }: Props) => {
                     />
                 </ComponentCard>
 
-                <ComponentCard className="mt-6">
+                <ComponentCard className="mt-12">
                     <PageBreakdown
                         dateRange={dateRange}
                         workspace={workspace}

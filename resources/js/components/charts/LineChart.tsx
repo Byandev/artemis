@@ -4,24 +4,30 @@ import Chart from 'react-apexcharts';
 interface Props {
     series:
         | {
-              name: string;
-              data: number[];
-          }[]
+        name: string;
+        data: number[];
+    }[]
         | undefined;
     categories: string[];
-    formatValue: (value: number) => string;
+    leftAxisTitle: string;
+    rightAxisTitle: string;
+    leftFormatter: (value: number) => string;
+    rightFormatter: (value: number) => string;
 }
 
-export default function LineChartOne({
-    categories,
-    series,
-    formatValue,
-}: Props) {
+export default function LineChart({
+                                      categories,
+                                      series,
+                                      leftAxisTitle,
+                                      rightAxisTitle,
+                                      leftFormatter,
+                                      rightFormatter,
+                                  }: Props) {
     const options: ApexOptions = {
         legend: {
             show: true,
-            position: 'top',
-            horizontalAlign: 'left',
+            position: 'bottom',
+            horizontalAlign: 'center',
         },
         colors: ['#87c0a6', '#9CB9FF'],
         chart: {
@@ -41,7 +47,7 @@ export default function LineChartOne({
             gradient: {
                 shadeIntensity: 1,
                 inverseColors: false,
-                opacityFrom: 0.40,
+                opacityFrom: 0.4,
                 opacityTo: 0.02,
                 stops: [0, 90, 100],
             },
@@ -72,7 +78,11 @@ export default function LineChartOne({
         tooltip: {
             enabled: true,
             y: {
-                formatter: formatValue,
+                formatter: (value, { seriesIndex }) => {
+                    return seriesIndex === 0
+                        ? leftFormatter(value)
+                        : rightFormatter(value);
+                },
             },
         },
         xaxis: {
@@ -88,22 +98,47 @@ export default function LineChartOne({
                 enabled: false,
             },
         },
-        yaxis: {
-            min: 0,
-            labels: {
-                formatter: formatValue,
-                style: {
-                    fontSize: '12px',
-                    colors: ['#6B7280'],
+        yaxis: [
+            {
+                seriesName: series?.[0]?.name,
+                min: 0,
+                labels: {
+                    formatter: leftFormatter,
+                    style: {
+                        fontSize: '12px',
+                        colors: ['#6B7280'],
+                    },
+                },
+                title: {
+                    text: leftAxisTitle,
+                    style: {
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        color: '#6B7280',
+                    },
                 },
             },
-            title: {
-                text: '',
-                style: {
-                    fontSize: '0px',
+            {
+                seriesName: series?.[1]?.name,
+                min: 0,
+                opposite: true,
+                labels: {
+                    formatter: rightFormatter,
+                    style: {
+                        fontSize: '12px',
+                        colors: ['#6B7280'],
+                    },
+                },
+                title: {
+                    text: rightAxisTitle,
+                    style: {
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        color: '#6B7280',
+                    },
                 },
             },
-        },
+        ],
     };
 
     return (

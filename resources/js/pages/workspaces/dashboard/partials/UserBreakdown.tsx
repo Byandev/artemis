@@ -15,6 +15,7 @@ import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { RefreshCcw } from 'lucide-react';
+import ComponentCard from '@/components/common/ComponentCard';
 
 interface Props {
     workspace: Workspace;
@@ -213,11 +214,13 @@ export default function UserBreakdown({ workspace, dateRange, filter }: Props) {
                     </p>
                 </div>
             ) : (
-                <BarChart
-                    categories={categories}
-                    series={series}
-                    formatValue={formatValue}
-                />
+                <ComponentCard>
+                    <BarChart
+                        categories={categories}
+                        series={series}
+                        formatValue={formatValue}
+                    />
+                </ComponentCard>
             )}
         </div>
     );
