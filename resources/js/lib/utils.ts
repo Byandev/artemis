@@ -2,6 +2,7 @@ import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { format, differenceInDays } from 'date-fns';
 import { type DateRange } from 'react-day-picker';
+import { InertiaLinkProps } from '@inertiajs/react';
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -132,4 +133,8 @@ export function formatCompactCurrency(value: number){
     if (abs >= 1_000)     return `₱ ${fmt(abs / 1_000_000, "M")}`;
 
     return `₱ ${n}`;
+}
+
+export function toUrl(url: NonNullable<InertiaLinkProps['href']>): string {
+    return typeof url === 'string' ? url : url.url;
 }

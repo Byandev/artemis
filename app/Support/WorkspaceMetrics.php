@@ -126,8 +126,32 @@ final class WorkspaceMetrics
         );
     }
 
+
+    public function perUser(string $name)
+    {
+        $class = self::MAP[$name] ?? null;
+
+        if (! $class) {
+            throw new InvalidArgumentException("Unknown metric: {$name}");
+        }
+
+        $workspaceId = $this->workspace->id;
+
+        if (! method_exists($class, 'perUser')) {
+            throw new InvalidArgumentException("Metric {$name} does not support perUser.");
+        }
+
+        return app($class)->perUser(
+            $workspaceId,
+            $this->dateRange,
+            $this->filter
+        );
+    }
+
     public function keys(): array
     {
         return array_keys(self::MAP);
     }
+
+
 }

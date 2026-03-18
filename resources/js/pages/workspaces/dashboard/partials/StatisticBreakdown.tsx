@@ -1,4 +1,5 @@
 import LineChart from '@/components/charts/LineChart';
+import LineChartSkeleton from '@/components/charts/skeletons/LineChartSkeleton';
 import { FilterValue } from '@/components/filters/Filters';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,11 +9,17 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
+import { RefreshCcw } from 'lucide-react';
 import moment from 'moment/moment';
-import { useEffect, useState } from 'react';
-import LineChartSkeleton from '@/components/charts/skeletons/LineChartSkeleton';
+import { useEffect, useMemo, useState } from 'react';
+import ComponentCard from '@/components/common/ComponentCard';
 
 interface Props {
     workspace: Workspace;
@@ -21,11 +28,16 @@ interface Props {
 }
 
 export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
-    const [breakdown, setBreakdown] = useState<any[]>([]);
+    const [primaryBreakdown, setPrimaryBreakdown] = useState<any[]>([]);
+    const [secondaryBreakdown, setSecondaryBreakdown] = useState<any[]>([]);
+
     const [option, setOption] = useState('totalSales');
+    const [secondOption, setSecondOption] = useState('totalOrders');
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [group, setGroup] = useState('daily');
+    const [reload, setReload] = useState(false);
 
     const start = moment(dateRange[0]);
     const end = moment(dateRange[1]);
@@ -42,7 +54,6 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
         availableGroups.push('weekly', 'monthly', 'yearly');
     }
 
-    // Update group when available groups change
     useEffect(() => {
         if (!availableGroups.includes(group) && availableGroups.length > 0) {
             setGroup(availableGroups[0]);
@@ -61,11 +72,14 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
         avgShippedOutDays: 'Average Shipped Out Days',
     };
 
-    const formatValue = (value: number) => {
-        switch (option) {
+    const formatMetricValue = (metric: string, value: number) => {
+        switch (metric) {
             case 'totalSales':
             case 'avgLifetimeValue':
-                return `₱${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                return `₱${value.toLocaleString('en-PH', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                })}`;
             case 'rtsRate':
             case 'repeatOrderRatio':
                 return `${(value * 100).toFixed(1)}%`;
@@ -74,6 +88,10 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
             case 'avgShippedOutDays':
                 return `${value.toFixed(1)} hrs`;
             case 'aov':
+                return `₱${value.toLocaleString('en-PH', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                })}`;
             case 'totalOrders':
             default:
                 return value.toLocaleString();
@@ -85,49 +103,101 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
             setLoading(true);
             setError(null);
 
+            const commonParams = {
+                group: group,
+                'date_range[start_date]': start.format('YYYY-MM-DD'),
+                'date_range[end_date]': end.format('YYYY-MM-DD'),
+                'filter[team_ids]': filter.teamIds.join(','),
+                'filter[shop_ids]': filter.shopIds.join(','),
+                'filter[page_ids]': filter.pageIds.join(','),
+                'filter[user_ids]': filter.userIds.join(','),
+                'filter[product_ids]': filter.productIds.join(','),
+            };
+
             try {
-                const response = await axios.get(
-                    `/api/v1/workspace/analytics/breakdown`,
-                    {
+                const [primaryResponse, secondaryResponse] = await Promise.all([
+                    axios.get(`/api/v1/workspace/analytics/breakdown`, {
                         headers: {
                             'X-Workspace-Id': workspace.id,
                         },
                         params: {
+                            ...commonParams,
                             metric: option,
-                            group: group,
-                            'date_range[start_date]':
-                                start.format('YYYY-MM-DD'),
-                            'date_range[end_date]': end.format('YYYY-MM-DD'),
-                            'filter[team_ids]': filter.teamIds.join(','),
-                            'filter[shop_ids]': filter.shopIds.join(','),
-                            'filter[page_ids]': filter.pageIds.join(','),
-                            'filter[user_ids]': filter.userIds.join(','),
-                            'filter[product_ids]': filter.productIds.join(','),
                         },
-                    },
-                );
+                    }),
+                    axios.get(`/api/v1/workspace/analytics/breakdown`, {
+                        headers: {
+                            'X-Workspace-Id': workspace.id,
+                        },
+                        params: {
+                            ...commonParams,
+                            metric: secondOption,
+                        },
+                    }),
+                ]);
 
-                setBreakdown(response.data.data);
+                setPrimaryBreakdown(primaryResponse.data.data ?? []);
+                setSecondaryBreakdown(secondaryResponse.data.data ?? []);
             } catch (error) {
                 console.error('Failed to fetch breakdown:', error);
-                setError('Failed to load data. Please try again.');
+                setError('Failed to load data. Please try reload.');
             } finally {
                 setLoading(false);
             }
         };
 
         fetchData();
-    }, [workspace.id, option, group, dateRange, filter]);
+    }, [workspace.id, option, secondOption, group, dateRange, filter, reload]);
 
     const capitalizeFirstLetter = (str: string) =>
         str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 
+    const mergedChartData = useMemo(() => {
+        const allPeriods = Array.from(
+            new Set([
+                ...primaryBreakdown.map((item) => item.period),
+                ...secondaryBreakdown.map((item) => item.period),
+            ]),
+        );
+
+        const primaryMap = new Map(
+            primaryBreakdown.map((item) => [item.period, item.value]),
+        );
+
+        const secondaryMap = new Map(
+            secondaryBreakdown.map((item) => [item.period, item.value]),
+        );
+
+        return {
+            categories: allPeriods,
+            series: [
+                {
+                    name: optionLabels[option],
+                    data: allPeriods.map(
+                        (period) => primaryMap.get(period) ?? 0,
+                    ),
+                },
+                {
+                    name: optionLabels[secondOption],
+                    data: allPeriods.map(
+                        (period) => secondaryMap.get(period) ?? 0,
+                    ),
+                },
+            ],
+        };
+    }, [primaryBreakdown, secondaryBreakdown, option, secondOption]);
+
+    const hasData =
+        mergedChartData.series[0].data.length > 0 ||
+        mergedChartData.series[1].data.length > 0;
+
     return (
         <div className="space-y-4">
-            <div className="flex justify-between">
-                <h2 className="text-lg font-semibold">
-                    {optionLabels[option]} Breakdown
+            <div className="flex item-center justify-between">
+                <h2 className=" font-semibold">
+                    {optionLabels[option]} vs {optionLabels[secondOption]}
                 </h2>
+
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex rounded-lg bg-gray-100 p-1">
                         {availableGroups.map((g) => (
@@ -145,21 +215,58 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
                         ))}
                     </div>
 
-                    <div className="w-80">
-                        <Select value={option} onValueChange={setOption}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select options" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {Object.entries(optionLabels).map(
-                                    ([key, label]) => (
-                                        <SelectItem key={key} value={key}>
-                                            {label}
-                                        </SelectItem>
-                                    ),
-                                )}
-                            </SelectContent>
-                        </Select>
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="w-60">
+                            <Select value={option} onValueChange={setOption}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select first option" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {Object.entries(optionLabels).map(
+                                        ([key, label]) => (
+                                            <SelectItem key={key} value={key}>
+                                                {label}
+                                            </SelectItem>
+                                        ),
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="w-60">
+                            <Select
+                                value={secondOption}
+                                onValueChange={setSecondOption}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select second option" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {Object.entries(optionLabels).map(
+                                        ([key, label]) => (
+                                            <SelectItem key={key} value={key}>
+                                                {label}
+                                            </SelectItem>
+                                        ),
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    className="rounded-md bg-gray-100 p-2 hover:text-white"
+                                    onClick={() =>
+                                        setReload((prevState) => !prevState)
+                                    }
+                                >
+                                    <RefreshCcw className="h-5 w-5 text-gray-500" />
+                                </Button>
+                            </TooltipTrigger>
+
+                            <TooltipContent>Refresh</TooltipContent>
+                        </Tooltip>
                     </div>
                 </div>
             </div>
@@ -167,11 +274,11 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
             {loading ? (
                 <LineChartSkeleton />
             ) : error ? (
-                <div className="h-60 flex flex-col items-center justify-center space-y-4 rounded-lg border border-gray-200 bg-gray-50">
+                <div className="flex h-60 flex-col items-center justify-center space-y-4 rounded-lg border border-gray-200 bg-gray-50">
                     <p className="text-red-500">{error}</p>
                     <Button
                         variant="outline"
-                        onClick={() => window.location.reload()}
+                        onClick={() => setReload((prevState) => !prevState)}
                         className="gap-2"
                     >
                         <svg
@@ -190,8 +297,8 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
                         Try Again
                     </Button>
                 </div>
-            ) : !breakdown.length ? (
-                <div className="h-60 flex flex-col items-center justify-center space-y-2 rounded-lg border border-gray-200 bg-gray-50">
+            ) : !hasData ? (
+                <div className="flex h-60 flex-col items-center justify-center space-y-2 rounded-lg border border-gray-200 bg-gray-50">
                     <p className="text-gray-500">
                         No data available for the selected period
                     </p>
@@ -200,16 +307,20 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
                     </p>
                 </div>
             ) : (
-                <LineChart
-                    categories={breakdown.map((a) => a.period)}
-                    series={[
-                        {
-                            name: optionLabels[option],
-                            data: breakdown.map((a) => a.value),
-                        },
-                    ]}
-                    formatValue={formatValue}
-                />
+                <ComponentCard>
+                    <LineChart
+                        categories={mergedChartData.categories}
+                        series={mergedChartData.series}
+                        leftAxisTitle={optionLabels[option]}
+                        rightAxisTitle={optionLabels[secondOption]}
+                        leftFormatter={(value) =>
+                            formatMetricValue(option, value)
+                        }
+                        rightFormatter={(value) =>
+                            formatMetricValue(secondOption, value)
+                        }
+                    />
+                </ComponentCard>
             )}
         </div>
     );
