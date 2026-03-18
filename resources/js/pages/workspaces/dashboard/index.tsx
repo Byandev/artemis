@@ -126,7 +126,7 @@ const Dashboard = ({ workspace }: Props) => {
 
     return (
         <AppLayout>
-            <div className="m-4 rounded-xl border bg-white p-4 md:p-6">
+            <div className="p-4 md:p-6">
                 <div className="mb-6 flex items-center justify-between gap-6">
                     <div className="flex flex-col">
                         <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -162,7 +162,7 @@ const Dashboard = ({ workspace }: Props) => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:gap-4 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:gap-4 xl:grid-cols-4">
                     {cards.map((card) => (
                         <StatisticCard
                             key={card.key}
