@@ -1,10 +1,8 @@
 window.addEventListener("load",function(){
 
 setTimeout(function(){
-
 document.getElementById("loader").style.display="none";
 document.getElementById("main-content").style.display="block";
-
 },2000)
 
 })
@@ -28,48 +26,35 @@ return Math.floor(Math.random()*90000)+10000
 }
 
 function generateData(){
-
 let data=[]
-
 csrNames.forEach((name,i)=>{
-
 data.push({
 name:name,
 orders:randomOrders(),
 sales:randomSales(),
 img:`https://i.pravatar.cc/100?img=${i+10}`
 })
-
 })
-
 return data
 }
 
-/* LOAD DATA FROM STORAGE */
-
+/* STORAGE */
 let datasets=JSON.parse(localStorage.getItem("csrData"))
 
 if(!datasets){
-
 datasets={
 daily:generateData(),
 weekly:generateData(),
 monthly:generateData()
 }
-
-/* SAVE DATA */
-
 localStorage.setItem("csrData",JSON.stringify(datasets))
-
 }
 
 function formatPeso(value){
-
 return new Intl.NumberFormat('en-PH',{
 style:'currency',
 currency:'PHP'
 }).format(value)
-
 }
 
 function loadLeaderboard(dataset){
@@ -83,14 +68,14 @@ dataset.slice(3).forEach((user,index)=>{
 const row=document.createElement("div")
 row.classList.add("row")
 
+row.style.animationDelay = `${index * 0.05}s`
+
 row.innerHTML=`
 <span>${index+4}</span>
-
 <span class="name">
 <img src="${user.img}">
 ${user.name}
 </span>
-
 <span>${user.orders}</span>
 <span>${formatPeso(user.sales)}</span>
 `
@@ -104,7 +89,6 @@ leaderboard.appendChild(row)
 function updatePodium(dataset){
 
 const sorted=[...dataset].sort((a,b)=>b.sales-a.sales)
-
 const cards=document.querySelectorAll(".podium .card")
 
 cards[1].querySelector(".avatar").src=sorted[0].img
@@ -124,12 +108,11 @@ cards[2].querySelector(".sales").textContent=formatPeso(sorted[2].sales)
 
 }
 
+/* TABS */
 const tabs=document.querySelectorAll(".tab")
 
 tabs.forEach(tab=>{
-
 tab.addEventListener("click",()=>{
-
 tabs.forEach(t=>t.classList.remove("active"))
 tab.classList.add("active")
 
@@ -137,9 +120,7 @@ const type=tab.textContent.toLowerCase()
 
 loadLeaderboard(datasets[type])
 updatePodium(datasets[type])
-
 })
-
 })
 
 loadLeaderboard(datasets.daily)

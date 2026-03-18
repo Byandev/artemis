@@ -1,93 +1,90 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+window.addEventListener("load", function () {
 
-<title>CSR Leaderboard</title>
+setTimeout(() => {
+document.getElementById("loader").style.display = "none";
+document.getElementById("main-content").style.display = "block";
+}, 1000);
 
-<link rel="stylesheet" href="{{ asset('css/style.css') }}">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-</head>
+});
 
-<body>
+const leaderboard = document.getElementById("leaderboard");
 
-<div class="ellipse ellipse-top-left"></div>
-<div class="ellipse ellipse-top-right"></div>
-<div class="ellipse ellipse-bottom-left"></div>
-<div class="ellipse ellipse-bottom-right"></div>
+function formatPeso(value) {
+return new Intl.NumberFormat('en-PH', {
+style: 'currency',
+currency: 'PHP'
+}).format(value);
+}
 
-<!-- LOADER -->
-<div id="loader">
-<h1 class="loader-title">CSR LEADERBOARD</h1>
-<div class="spinner"></div>
-</div>
+async function fetchData(type) {
 
-<div id="main-content">
+const res = await fetch(`/api/csrs/${type}`);
+const data = await res.json();
 
-<h1 class="title">CSR LEADERBOARD</h1>
+loadLeaderboard(data);
+updatePodium(data);
 
-<!-- TABS -->
-<div class="tabs">
-<button class="tab active">Daily</button>
-<button class="tab">Weekly</button>
-<button class="tab">Monthly</button>
-</div>
+}
 
-<!-- PODIUM -->
-<div class="podium">
+function loadLeaderboard(dataset) {
 
-<div class="card second">
-<div class="rank-badge silver">2</div>
-<div class="stars">⭐⭐</div>
-<img class="avatar">
-<h3 class="csr-name"></h3>
-<p class="orders"></p>
-<p class="sales"></p>
-</div>
+leaderboard.innerHTML = "";
 
-<div class="card first">
-<div class="rank-badge gold">1</div>
-<div class="stars">⭐⭐⭐</div>
-<img class="avatar">
-<h3 class="csr-name"></h3>
-<p class="orders"></p>
-<p class="sales"></p>
-</div>
+dataset.slice(3).forEach((user, index) => {
 
-<div class="card third">
-<div class="rank-badge bronze">3</div>
-<div class="stars">⭐</div>
-<img class="avatar">
-<h3 class="csr-name"></h3>
-<p class="orders"></p>
-<p class="sales"></p>
-</div>
+const row = document.createElement("div");
+row.classList.add("row");
 
-</div>
+row.innerHTML = `
+<span>${index + 4}</span>
 
-<!-- LEADERBOARD -->
-<div class="leaderboard-container">
+<span class="name">
+<img src="${user.image}">
+${user.name}
+</span>
 
-<div class="leaderboard-header">
-<span>Rank</span>
-<span>CSR</span>
-<span>Orders</span>
-<span>Sales</span>
-</div>
+<span>${user.orders}</span>
+<span>${formatPeso(user.sales)}</span>
+`;
 
-<div class="leaderboard" id="leaderboard"></div>
+leaderboard.appendChild(row);
 
-</div>
+});
 
-</div>
+}
 
-<script src="{{ asset('js/script.js') }}"></script>
+function updatePodium(dataset) {
 
-</body>
-</html>
+const cards = document.querySelectorAll(".podium .card");
 
-<script src="{{ asset('js/script.js') }}"></script>
+cards[1].querySelector(".avatar").src = dataset[0].image;
+cards[1].querySelector(".csr-name").textContent = dataset[0].name;
+cards[1].querySelector(".orders").textContent = "Orders: " + dataset[0].orders;
+cards[1].querySelector(".sales").textContent = formatPeso(dataset[0].sales);
 
-</body>
-</html>
+cards[0].querySelector(".avatar").src = dataset[1].image;
+cards[0].querySelector(".csr-name").textContent = dataset[1].name;
+cards[0].querySelector(".orders").textContent = "Orders: " + dataset[1].orders;
+cards[0].querySelector(".sales").textContent = formatPeso(dataset[1].sales);
+
+cards[2].querySelector(".avatar").src = dataset[2].image;
+cards[2].querySelector(".csr-name").textContent = dataset[2].name;
+cards[2].querySelector(".orders").textContent = "Orders: " + dataset[2].orders;
+cards[2].querySelector(".sales").textContent = formatPeso(dataset[2].sales);
+
+}
+
+const tabs = document.querySelectorAll(".tab");
+
+tabs.forEach(tab => {
+tab.addEventListener("click", () => {
+
+tabs.forEach(t => t.classList.remove("active"));
+tab.classList.add("active");
+
+fetchData(tab.textContent.toLowerCase());
+
+});
+});
+
+fetchData("daily");
