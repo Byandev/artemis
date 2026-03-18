@@ -7,6 +7,38 @@ const WORKSPACE_SLUG = "developers-workspace";
 const ENDPOINT_BASE = `/api/public/workspaces/${WORKSPACE_SLUG}/csrs/performance`;
 const ENDPOINT_CSR_LIST = `/api/public/workspaces/${WORKSPACE_SLUG}/csrs`;
 
+function formatDateLocal(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+}
+
+function currentPeriodRange(period) {
+    const now = new Date();
+
+    if (period === "daily") {
+        const today = formatDateLocal(now);
+        return { startDate: today, endDate: today };
+    }
+
+    if (period === "weekly") {
+        const start = new Date(now);
+        const day = (start.getDay() + 6) % 7;
+        start.setDate(start.getDate() - day);
+
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+
+        return { startDate: formatDateLocal(start), endDate: formatDateLocal(end) };
+    }
+
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    return { startDate: formatDateLocal(start), endDate: formatDateLocal(end) };
+}
+
 function setLoading(isLoading) {
     if (isLoading) {
         loader.classList.remove("hide");
@@ -136,10 +168,11 @@ function renderLeaderboard(sorted) {
     others.forEach((item) => {
         const row = document.createElement("div");
         row.classList.add("row");
-        row.style.setProperty("--delay", `${Math.min((item.rank - 4) * 20, 220)}ms`);
+        row.style.animationDelay = `${Math.min((item.rank - 4) * 0.05, 0.5)}s`;
+        const rankClass = item.rank <= 10 ? "top-highlight" : "";
 
         row.innerHTML = `
-            <span>${item.rank}</span>
+            <span class="rank-circle ${rankClass}">${item.rank}</span>
             <span class="name">
                 <img src="${avatarFromName(item.name)}" alt="${item.name}">
                 ${item.name || "-"}
@@ -156,8 +189,9 @@ async function loadPeriod(period) {
     setLoading(true);
 
     try {
+        const { startDate, endDate } = currentPeriodRange(period);
         const [performanceResponse, csrResponse] = await Promise.all([
-            fetch(`${ENDPOINT_BASE}?period=${encodeURIComponent(period)}&sort_by=rank&sort_dir=desc`),
+            fetch(`${ENDPOINT_BASE}?period=${encodeURIComponent(period)}&sort_by=rank&sort_dir=desc&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`),
             fetch(ENDPOINT_CSR_LIST),
         ]);
 
