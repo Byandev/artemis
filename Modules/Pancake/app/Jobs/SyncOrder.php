@@ -42,6 +42,7 @@ class SyncOrder implements ShouldQueue
         $delivered_at = null;
         $shipped_at = null;
         $conferrer_id = null;
+        $confirmed_by = null;
 
         $confirmedHistory = collect($order['status_history'])->where('status', 1)->first();
         $shippedHistory = collect($order['status_history'])->where('status', 2)->first();
@@ -54,6 +55,7 @@ class SyncOrder implements ShouldQueue
             $confirmed_at = $confirmedAtUtc->setTimezone(config('app.timezone'))->toDateTimeString();
 
             $conferrer_id = $confirmedHistory['editor_fb'] ?: null;
+            $confirmed_by = $confirmedHistory['editor_id'] ?: null;
         }
 
         if ($shippedHistory) {
@@ -104,6 +106,7 @@ class SyncOrder implements ShouldQueue
             'customer_succeed_order_count' => $order['customer']['succeed_order_count'] ?: 0,
             'customer_returned_order_count' => $order['customer']['returned_order_count'] ?: 0,
             'conferrer_id' => $conferrer_id,
+            'confirmed_by' => $confirmed_by,
         ]);
 
         if (isset($order['items'])) {
@@ -153,11 +156,11 @@ class SyncOrder implements ShouldQueue
                                 $note = $item['status'];
 
                                 if (str_contains($note, 'is sending')) {
-                                    $item['status'] = "On Delivery";
+                                    $item['status'] = 'On Delivery';
                                 }
 
                                 if (str_contains($note, 'send package')) {
-                                    $item['status'] = "Arrival";
+                                    $item['status'] = 'Arrival';
                                 }
 
                                 $item['note'] = $note;
@@ -177,9 +180,7 @@ class SyncOrder implements ShouldQueue
                             }
                         }
 
-                        if ($this->page->parcel_journey_enabled && $isLatestUpdate && $savedOrder->status == 2 && in_array($update['status'], ['On Delivery', 'Departure', 'Arrival']) && Carbon::parse($update['updated_at'])->isToday()) {
-                            $isLatestUpdate = false;
-
+                        if (Carbon::parse($update['updated_at'])->isToday()) {
                             $parcelJourney = ParcelJourney::updateOrCreate([
                                 'order_id' => $savedOrder->id,
                                 'status' => $update['status'],
@@ -188,8 +189,12 @@ class SyncOrder implements ShouldQueue
                                 'created_at' => $update['updated_at'],
                             ]);
 
-                            if ($parcelJourney->notifications()->doesntExist()) {
-                                $this->sendParcelJourneyNotification($savedOrder, $parcelJourney);
+                            if ($this->page->parcel_journey_enabled && $isLatestUpdate && $savedOrder->status == 2 && in_array($update['status'], ['On Delivery', 'Departure', 'Arrival'])) {
+                                $isLatestUpdate = false;
+
+                                if ($parcelJourney->notifications()->doesntExist()) {
+                                    $this->sendParcelJourneyNotification($savedOrder, $parcelJourney);
+                                }
                             }
                         }
                     }
@@ -279,6 +284,11 @@ class SyncOrder implements ShouldQueue
                 $rider_mobile = "0{$last10}";
                 $data['rider_name'] = $rider_name;
                 $data['rider_mobile'] = $rider_mobile;
+
+                $parcelJourney->update([
+                    'rider_mobile' => $rider_mobile,
+                    'rider_name' =>  $rider_name,
+                ]);
 
                 ParcelJourneyNotification::create([
                     'order_id' => $order->id,
