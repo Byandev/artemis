@@ -1,25 +1,72 @@
-import React, { useEffect } from 'react';
-import { useForm } from '@inertiajs/react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Page } from '@/types/models/Page';
 import workspaces from '@/routes/workspaces';
+import { User } from '@/types';
+import { Page } from '@/types/models/Page';
 import { Workspace } from '@/types/models/Workspace';
 import { Switch } from '@headlessui/react';
-
+import { useForm } from '@inertiajs/react';
+import React, { useEffect } from 'react';
+import Select from 'react-select';
 
 interface PageFormDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     page?: Page;
     workspace: Workspace;
+    users: User[];
 }
 
-export function PageFormDialog({ open, onOpenChange, page, workspace }: PageFormDialogProps) {
-    const isEditing = !!page;
+// Custom styles for react-select to match your design system
+const selectStyles = {
+    control: (base: any, state: any) => ({
+        ...base,
+        borderColor: state.isFocused ? '#3b82f6' : '#e5e7eb',
+        boxShadow: state.isFocused
+            ? '0 0 0 2px rgba(59, 130, 246, 0.1)'
+            : 'none',
+        '&:hover': {
+            borderColor: '#3b82f6',
+        },
+        minHeight: '38px',
+        borderRadius: '0.375rem',
+    }),
+    option: (base: any, state: any) => ({
+        ...base,
+        backgroundColor: state.isSelected
+            ? '#3b82f6'
+            : state.isFocused
+              ? '#f3f4f6'
+              : 'white',
+        color: state.isSelected ? 'white' : '#111827',
+        cursor: 'pointer',
+        '&:active': {
+            backgroundColor: state.isSelected ? '#3b82f6' : '#e5e7eb',
+        },
+    }),
+    menu: (base: any) => ({
+        ...base,
+        zIndex: 50,
+    }),
+};
 
+export function PageFormDialog({
+    open,
+    onOpenChange,
+    page,
+    workspace,
+    users,
+}: PageFormDialogProps) {
+    const isEditing = !!page;
 
     const { data, setData, post, put, processing, errors, reset } = useForm({
         id: page?.id || '',
@@ -34,6 +81,7 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
         parcel_journey_custom_field_id:
             page?.parcel_journey_custom_field_id || '',
         parcel_journey_enabled: page?.parcel_journey_enabled || false,
+        owner_id: page?.owner_id || '',
     });
 
     // setData and reset from useForm are stable references
@@ -52,6 +100,7 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                 parcel_journey_custom_field_id:
                     page?.parcel_journey_custom_field_id || '',
                 parcel_journey_enabled: Boolean(page?.parcel_journey_enabled),
+                owner_id: page?.owner_id || '',
             });
         } else {
             reset();
@@ -68,7 +117,7 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                     onOpenChange(false);
                     reset();
                 },
-                onError: (e) => console.log(e)
+                onError: (e) => console.log(e),
             });
         } else {
             post(workspaces.pages.store.url({ workspace }), {
@@ -81,9 +130,21 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
         }
     };
 
+    // Transform users for react-select
+    const userOptions = users.map((user) => ({
+        value: user.id,
+        label: `${user.name}`,
+    }));
+
+    // Find the selected user
+    const selectedUser = userOptions.find(
+        (option) => option.value === data.owner_id,
+    );
+
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>
@@ -98,7 +159,7 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
 
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="shop_id">ID</Label>
+                            <Label htmlFor="id">ID</Label>
                             <Input
                                 id="id"
                                 type="number"
@@ -201,7 +262,7 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="parcel_journey_flow_id">
-                                Parcel Journey Flow Id
+                                Parcel Journey Flow ID
                             </Label>
                             <Input
                                 id="parcel_journey_flow_id"
@@ -212,7 +273,7 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                                         e.target.value,
                                     )
                                 }
-                                placeholder="Enter Parcel Journey Flow Id"
+                                placeholder="Enter Parcel Journey Flow ID"
                                 aria-invalid={!!errors.parcel_journey_flow_id}
                             />
                             {errors.parcel_journey_flow_id && (
@@ -224,7 +285,7 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
 
                         <div className="grid gap-2">
                             <Label htmlFor="parcel_journey_custom_field_id">
-                                Parcel Journey Custom Field Id
+                                Parcel Journey Custom Field ID
                             </Label>
                             <Input
                                 id="parcel_journey_custom_field_id"
@@ -235,7 +296,7 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                                         e.target.value,
                                     )
                                 }
-                                placeholder="Enter Parcel Journey Custom Field Id"
+                                placeholder="Enter Parcel Journey Custom Field ID"
                                 aria-invalid={
                                     !!errors.parcel_journey_custom_field_id
                                 }
@@ -283,13 +344,50 @@ export function PageFormDialog({ open, onOpenChange, page, workspace }: PageForm
                                 </p>
                             )}
                         </div>
+
+                        {/* Owner/User Selection */}
+                        <div className="grid gap-2">
+                            <Label htmlFor="owner_id">
+                                Owner{' '}
+                                <span className="ml-1 text-xs text-gray-400">
+                                    (Select a user)
+                                </span>
+                            </Label>
+                            <Select
+                                id="owner_id"
+                                options={userOptions}
+                                value={selectedUser}
+                                onChange={(option) =>
+                                    setData('owner_id', option?.value || '')
+                                }
+                                placeholder="Search for a user..."
+                                isClearable
+                                isSearchable
+                                styles={selectStyles}
+                                noOptionsMessage={() => 'No users found'}
+                                aria-invalid={!!errors.owner_id}
+                            />
+                            {errors.owner_id && (
+                                <p className="text-destructive text-sm">
+                                    {errors.owner_id}
+                                </p>
+                            )}
+                            {users.length === 0 && (
+                                <p className="text-sm text-amber-600">
+                                    No users available. Please add users first.
+                                </p>
+                            )}
+                        </div>
+
                         <div className="flex items-center justify-between gap-2">
                             <Label htmlFor="parcel_journey_enabled">
                                 Enable Parcel Journey
                             </Label>
                             <Switch
                                 checked={data.parcel_journey_enabled}
-                                onChange={(value) => setData('parcel_journey_enabled', value)}
+                                onChange={(value) =>
+                                    setData('parcel_journey_enabled', value)
+                                }
                                 className="group relative flex h-7 w-14 cursor-pointer rounded-full border bg-white/10 p-1 ease-in-out focus:not-data-focus:outline-none data-checked:bg-white/10 data-focus:outline data-focus:outline-white"
                             >
                                 <span
