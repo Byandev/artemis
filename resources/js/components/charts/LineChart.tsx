@@ -2,144 +2,98 @@ import { ApexOptions } from 'apexcharts';
 import Chart from 'react-apexcharts';
 
 interface Props {
-    series:
-        | {
-        name: string;
-        data: number[];
-    }[]
-        | undefined;
+    series: ApexNonAxisChartSeries | undefined;
     categories: string[];
-    leftAxisTitle: string;
-    rightAxisTitle: string;
-    leftFormatter: (value: number) => string;
-    rightFormatter: (value: number) => string;
+    formatValue: (value: number) => string;
 }
-
-export default function LineChart({
-                                      categories,
-                                      series,
-                                      leftAxisTitle,
-                                      rightAxisTitle,
-                                      leftFormatter,
-                                      rightFormatter,
-                                  }: Props) {
+export default function LineChartOne({categories, series, formatValue} : Props) {
     const options: ApexOptions = {
         legend: {
-            show: true,
-            position: 'bottom',
-            horizontalAlign: 'center',
+            show: false, // Hide legend
+            position: 'top',
+            horizontalAlign: 'left',
         },
-        colors: ['#87c0a6', '#9CB9FF'],
+        colors: ['#059669', '#9CB9FF'], // Define line colors
         chart: {
             fontFamily: 'Outfit, sans-serif',
             height: 310,
-            type: 'area',
+            type: 'line', // Set the chart type to 'line'
             toolbar: {
-                show: false,
+                show: false, // Hide chart toolbar
             },
         },
         stroke: {
-            curve: 'smooth',
-            width: 3,
+            curve: 'smooth', // Define the line style (straight, smooth, or step)
+            width: [1, 10], // Line width for each dataset
         },
+
         fill: {
             type: 'gradient',
             gradient: {
-                shadeIntensity: 1,
-                inverseColors: false,
-                opacityFrom: 0.4,
-                opacityTo: 0.02,
-                stops: [0, 90, 100],
+                opacityFrom: 0.55,
+                opacityTo: 0,
             },
         },
         markers: {
-            size: 3,
-            strokeColors: '#fff',
+            size: 0, // Size of the marker points
+            strokeColors: '#fff', // Marker border color
             strokeWidth: 2,
             hover: {
-                size: 6,
+                size: 6, // Marker size on hover
             },
         },
         grid: {
             xaxis: {
                 lines: {
-                    show: false,
+                    show: false, // Hide grid lines on x-axis
                 },
             },
             yaxis: {
                 lines: {
-                    show: true,
+                    show: true, // Show grid lines on y-axis
                 },
             },
         },
         dataLabels: {
-            enabled: false,
+            enabled: false, // Disable data labels
         },
         tooltip: {
-            enabled: true,
-            y: {
-                formatter: (value, { seriesIndex }) => {
-                    return seriesIndex === 0
-                        ? leftFormatter(value)
-                        : rightFormatter(value);
-                },
+            enabled: true, // Enable tooltip
+            x: {
+                format: 'dd MMM yyyy', // Format for x-axis tooltip
             },
         },
         xaxis: {
-            type: 'category',
-            categories,
+            type: 'category', // Category-based x-axis
+            categories: categories,
             axisBorder: {
-                show: false,
+                show: false, // Hide x-axis border
             },
             axisTicks: {
-                show: false,
+                show: false, // Hide x-axis ticks
             },
             tooltip: {
-                enabled: false,
+                enabled: false, // Disable tooltip for x-axis points
             },
         },
-        yaxis: [
-            {
-                seriesName: series?.[0]?.name,
-                min: 0,
-                labels: {
-                    formatter: leftFormatter,
-                    style: {
-                        fontSize: '12px',
-                        colors: ['#6B7280'],
-                    },
-                },
-                title: {
-                    text: leftAxisTitle,
-                    style: {
-                        fontSize: '12px',
-                        fontWeight: 500,
-                        color: '#6B7280',
-                    },
+        yaxis: {
+            min: 0,
+            labels: {
+                formatter: formatValue,
+                style: {
+                    fontSize: '12px', // Adjust font size for y-axis labels
+                    colors: ['#6B7280'], // Color of the labels
                 },
             },
-            {
-                seriesName: series?.[1]?.name,
-                min: 0,
-                opposite: true,
-                labels: {
-                    formatter: rightFormatter,
-                    style: {
-                        fontSize: '12px',
-                        colors: ['#6B7280'],
-                    },
-                },
-                title: {
-                    text: rightAxisTitle,
-                    style: {
-                        fontSize: '12px',
-                        fontWeight: 500,
-                        color: '#6B7280',
-                    },
+            title: {
+                text: '', // Remove y-axis title
+                style: {
+                    fontSize: '0px',
                 },
             },
-        ],
+        },
     };
+
 
     return (
         <div className="custom-scrollbar max-w-full overflow-x-auto">

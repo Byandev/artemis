@@ -1,45 +1,25 @@
+import React, { useEffect } from 'react';
+import { useForm } from '@inertiajs/react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import workspaces from '@/routes/workspaces';
-import { User } from '@/types';
 import { Page } from '@/types/models/Page';
+import workspaces from '@/routes/workspaces';
 import { Workspace } from '@/types/models/Workspace';
 import { Switch } from '@headlessui/react';
-import { useForm } from '@inertiajs/react';
-import React, { useEffect } from 'react';
+
 
 interface PageFormDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     page?: Page;
     workspace: Workspace;
-    users: User[];
 }
 
-export function PageFormDialog({
-    open,
-    onOpenChange,
-    page,
-    workspace,
-    users,
-}: PageFormDialogProps) {
+export function PageFormDialog({ open, onOpenChange, page, workspace }: PageFormDialogProps) {
     const isEditing = !!page;
+
 
     const { data, setData, post, put, processing, errors, reset } = useForm({
         id: page?.id || '',
@@ -54,7 +34,6 @@ export function PageFormDialog({
         parcel_journey_custom_field_id:
             page?.parcel_journey_custom_field_id || '',
         parcel_journey_enabled: page?.parcel_journey_enabled || false,
-        owner_id: page?.owner_id || '',
     });
 
     // setData and reset from useForm are stable references
@@ -73,7 +52,6 @@ export function PageFormDialog({
                 parcel_journey_custom_field_id:
                     page?.parcel_journey_custom_field_id || '',
                 parcel_journey_enabled: Boolean(page?.parcel_journey_enabled),
-                owner_id: page?.owner_id || '',
             });
         } else {
             reset();
@@ -90,7 +68,7 @@ export function PageFormDialog({
                     onOpenChange(false);
                     reset();
                 },
-                onError: (e) => console.log(e),
+                onError: (e) => console.log(e)
             });
         } else {
             post(workspaces.pages.store.url({ workspace }), {
@@ -105,7 +83,7 @@ export function PageFormDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[600px]">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>
@@ -120,7 +98,7 @@ export function PageFormDialog({
 
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="id">ID</Label>
+                            <Label htmlFor="shop_id">ID</Label>
                             <Input
                                 id="id"
                                 type="number"
@@ -223,7 +201,7 @@ export function PageFormDialog({
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="parcel_journey_flow_id">
-                                Parcel Journey Flow ID
+                                Parcel Journey Flow Id
                             </Label>
                             <Input
                                 id="parcel_journey_flow_id"
@@ -234,7 +212,7 @@ export function PageFormDialog({
                                         e.target.value,
                                     )
                                 }
-                                placeholder="Enter Parcel Journey Flow ID"
+                                placeholder="Enter Parcel Journey Flow Id"
                                 aria-invalid={!!errors.parcel_journey_flow_id}
                             />
                             {errors.parcel_journey_flow_id && (
@@ -246,7 +224,7 @@ export function PageFormDialog({
 
                         <div className="grid gap-2">
                             <Label htmlFor="parcel_journey_custom_field_id">
-                                Parcel Journey Custom Field ID
+                                Parcel Journey Custom Field Id
                             </Label>
                             <Input
                                 id="parcel_journey_custom_field_id"
@@ -257,7 +235,7 @@ export function PageFormDialog({
                                         e.target.value,
                                     )
                                 }
-                                placeholder="Enter Parcel Journey Custom Field ID"
+                                placeholder="Enter Parcel Journey Custom Field Id"
                                 aria-invalid={
                                     !!errors.parcel_journey_custom_field_id
                                 }
@@ -305,61 +283,13 @@ export function PageFormDialog({
                                 </p>
                             )}
                         </div>
-
-                        {/* Owner/User Selection - Using shadcn/ui Select */}
-                        <div className="grid gap-2">
-                            <Label htmlFor="owner_id">
-                                Owner{' '}
-                                <span className="ml-1 text-xs text-gray-400">
-                                    (Select a user)
-                                </span>
-                            </Label>
-                            <Select
-                                value={data.owner_id?.toString()}
-                                onValueChange={(value) => setData('owner_id', value)}
-                            >
-                                <SelectTrigger
-                                    id="owner_id"
-                                    aria-invalid={!!errors.owner_id}
-                                    className={errors.owner_id ? "border-destructive" : ""}
-                                >
-                                    <SelectValue placeholder="Search for a user..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {users.length === 0 ? (
-                                        <SelectItem value="" disabled>
-                                            No users available
-                                        </SelectItem>
-                                    ) : (
-                                        users.map((user) => (
-                                            <SelectItem key={user.id} value={user.id.toString()}>
-                                                {user.name}
-                                            </SelectItem>
-                                        ))
-                                    )}
-                                </SelectContent>
-                            </Select>
-                            {errors.owner_id && (
-                                <p className="text-destructive text-sm">
-                                    {errors.owner_id}
-                                </p>
-                            )}
-                            {users.length === 0 && (
-                                <p className="text-sm text-amber-600">
-                                    No users available. Please add users first.
-                                </p>
-                            )}
-                        </div>
-
                         <div className="flex items-center justify-between gap-2">
                             <Label htmlFor="parcel_journey_enabled">
                                 Enable Parcel Journey
                             </Label>
                             <Switch
                                 checked={data.parcel_journey_enabled}
-                                onChange={(value) =>
-                                    setData('parcel_journey_enabled', value)
-                                }
+                                onChange={(value) => setData('parcel_journey_enabled', value)}
                                 className="group relative flex h-7 w-14 cursor-pointer rounded-full border bg-white/10 p-1 ease-in-out focus:not-data-focus:outline-none data-checked:bg-white/10 data-focus:outline data-focus:outline-white"
                             >
                                 <span

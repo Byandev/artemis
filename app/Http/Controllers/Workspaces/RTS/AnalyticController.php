@@ -28,8 +28,6 @@ class AnalyticController extends Controller
             ->applyRtsFilters($request)
             ->first();
 
-
-
         // Count tracked orders (also filtered)
         $tracked_orders = Order::ofWorkspace($workspace)
             ->applyRtsFilters($request)
@@ -67,19 +65,19 @@ class AnalyticController extends Controller
         $query = Order::selectRaw('
             pages.id AS id,
             pages.name AS name,
-            SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
-            SUM(CASE WHEN pancake_orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
-            SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
+            SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
+            SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
+            SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
             ROUND(
-                (SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
-                NULLIF(SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
+                (SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
+                NULLIF(SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
                 2
             ) AS rts_rate_percentage
         ')
-            ->leftJoin('pages', 'pages.id', '=', 'pancake_orders.page_id')
+            ->leftJoin('pages', 'pages.id', '=', 'orders.page_id')
             ->ofWorkspace($workspace)
             ->applyRtsFilters($request)
-            ->groupBy('pancake_orders.page_id', 'pages.name', 'pages.id')
+            ->groupBy('orders.page_id', 'pages.name', 'pages.id')
             ->orderBy('total_orders', 'DESC');
 
         $filterOptions = (clone $query)
@@ -109,19 +107,19 @@ class AnalyticController extends Controller
         $query = Order::selectRaw('
             shops.id AS id,
             shops.name AS name,
-            SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
-            SUM(CASE WHEN pancake_orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
-            SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
+            SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
+            SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
+            SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
             ROUND(
-                (SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
-                NULLIF(SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
+                (SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
+                NULLIF(SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
                 2
             ) AS rts_rate_percentage
         ')
-            ->leftJoin('shops', 'shops.id', '=', 'pancake_orders.shop_id')
+            ->leftJoin('shops', 'shops.id', '=', 'orders.shop_id')
             ->ofWorkspace($workspace)
             ->applyRtsFilters($request)
-            ->groupBy('pancake_orders.shop_id', 'shops.name', 'shops.id')
+            ->groupBy('orders.shop_id', 'shops.name', 'shops.id')
             ->orderBy('total_orders', 'DESC');
 
         $filterOptions = (clone $query)
@@ -151,16 +149,16 @@ class AnalyticController extends Controller
         $query = Order::selectRaw('
             users.id AS id,
             users.name AS name,
-            SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
-            SUM(CASE WHEN pancake_orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
-            SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
+            SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
+            SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
+            SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
             ROUND(
-                (SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
-                NULLIF(SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
+                (SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
+                NULLIF(SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
                 2
             ) AS rts_rate_percentage
         ')
-            ->leftJoin('pages', 'pages.id', '=', 'pancake_orders.page_id')
+            ->leftJoin('pages', 'pages.id', '=', 'orders.page_id')
             ->leftJoin('users', 'users.id', '=', 'pages.owner_id')
             ->ofWorkspace($workspace)
             ->applyRtsFilters($request)
@@ -194,20 +192,20 @@ class AnalyticController extends Controller
         $query = Order::selectRaw('
             shipping_addresses.district_name AS city_name,
             shipping_addresses.province_name AS province_name,
-                SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
-            SUM(CASE WHEN pancake_orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
-            SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
+            SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
+            SUM(CASE WHEN orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
+            SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
             ROUND(
-                (SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
-                NULLIF(SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
+                (SUM(CASE WHEN orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
+                NULLIF(SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
                 2
             ) AS rts_rate_percentage
         ')
-            ->leftJoin('shipping_addresses', 'shipping_addresses.order_id', '=', 'pancake_orders.id')
+            ->leftJoin('shipping_addresses', 'shipping_addresses.order_id', '=', 'orders.id')
             ->ofWorkspace($workspace)
             ->applyRtsFilters($request)
             ->groupBy('shipping_addresses.district_name', 'shipping_addresses.province_name')
-            ->havingRaw('SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END) > 0') // Only include cities with orders
+            ->havingRaw('SUM(CASE WHEN orders.status IN (3,4,5) THEN 1 ELSE 0 END) > 0') // Only include cities with orders
             ->orderBy('total_orders', 'DESC');
 
         // If 'all' parameter is present, return all data without pagination (for heatmap)
@@ -219,8 +217,6 @@ class AnalyticController extends Controller
 
         // Otherwise, return paginated data (for table view)
         $grouped = $query->paginate($request->input('per_page', 15));
-
-
 
         return response()->json($grouped);
     }

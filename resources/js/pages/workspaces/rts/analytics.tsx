@@ -1,3 +1,4 @@
+import ComponentCard from '@/components/common/ComponentCard';
 import { Button } from '@/components/ui/button';
 import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
 import MetricsCard from '@/components/workspaces/MetricsCard';
@@ -13,8 +14,7 @@ import BreakdownPerCities from './partials/BreakdownPerCities';
 import BreakdownPerPages from './partials/BreakdownPerPages';
 import BreakdownPerShops from './partials/BreakdownPerShops';
 import BreakdownPerUsers from './partials/BreakdownPerUsers';
-import { formatDate } from 'date-fns';
-import { Bell, Package, RotateCcw, TrendingUp } from 'lucide-react';
+import RTSManagementLayout from './partials/Layout';
 
 type Props = {
     workspace: Workspace;
@@ -83,39 +83,13 @@ const Analytics = ({ workspace, filters, data }: Props) => {
     }, [workspace.slug, selectedPagesFilter, selectedUsersFilter, selectedShopFilter, dateRange, dateRangeStr]);
 
     // Analytics stat cards
-    const analytics = useMemo(
-        () => [
-            {
-                title: 'RTS Rate',
-                value: `${data.rts_rate_percentage}%`,
-                icon: <TrendingUp className="h-5 w-5" />,
-                tooltip: 'Return to Sender rate percentage',
-                color: 'purple' as const,
-            },
-            {
-                title: 'RTS Amount',
-                value: data.returned_amount,
-                icon: <RotateCcw className="h-5 w-5" />,
-                tooltip: 'Total value of returned items',
-                color: 'orange' as const,
-            },
-            {
-                title: 'Tracked Orders',
-                value: data.tracked_orders,
-                icon: <Package className="h-5 w-5" />,
-                tooltip: 'Number of orders currently being tracked',
-                color: 'blue' as const,
-            },
-            {
-                title: 'Parcel Updates Sent',
-                value: data.sent_parcel_journey_notifications,
-                icon: <Bell className="h-5 w-5" />,
-                tooltip: 'Total notifications sent for parcel journeys',
-                color: 'green' as const,
-            },
-        ],
-        [data],
-    );
+    const analytics = useMemo(() => [
+        { title: 'RTS Rate', value: `${data.rts_rate_percentage}%` },
+        { title: 'RTS Amount', value: data.returned_amount },
+        { title: 'Tracked Orders', value: data.tracked_orders },
+        { title: 'Parcel Updates Sent', value: data.sent_parcel_journey_notifications },
+    ], [data]);
+
     const clearFilters = () => {
         setSelectedPagesFilter([]);
         setSelectedUsersFilter([]);
@@ -134,80 +108,52 @@ const Analytics = ({ workspace, filters, data }: Props) => {
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Analytics`} />
-            <div className="p-4 md:p-6 space-y-6">
-                <div className="mb-6 flex flex-col items-start justify-between md:flex-row md:items-center">
-                    <div className="flex flex-col">
-                        <h1 className="text-2xl font-bold">RTS Analytics</h1>
+            <RTSManagementLayout workspace={workspace}>
+                <ComponentCard title="Track your RTS performance metrics">
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
+                        <div className="flex items-center justify-start w-full flex-wrap gap-2">
+                            <SimpleDateRangePicker useGlobalState />
 
-                        <p className="text-sm font-light text-gray-500">
-                            Performance overview from to{' '}
-                        </p>
+                            <AnalyticsFilters
+                                workspace={workspace}
+                                selectedPagesFilter={selectedPagesFilter}
+                                setSelectedPagesFilter={setSelectedPagesFilter}
+                                selectedUsersFilter={selectedUsersFilter}
+                                setSelectedUsersFilter={setSelectedUsersFilter}
+                                selectedShopFilter={selectedShopFilter}
+                                setSelectedShopFilter={setSelectedShopFilter}
+                            />
+
+                            {(selectedPagesFilter.length > 0 || selectedUsersFilter.length > 0 || selectedShopFilter.length > 0 || dateRangeStr.from !== moment().startOf('month').format('YYYY-MM-DD') || dateRangeStr.to !== moment().format('YYYY-MM-DD')) && (
+                                <Button
+                                    variant="outline"
+                                    onClick={clearFilters}
+                                >
+                                    Clear Filters
+                                </Button>
+                            )}
+                        </div>
                     </div>
-                    <div className="flex gap-4">
-                        <SimpleDateRangePicker useGlobalState />
 
-                        <AnalyticsFilters
-                            workspace={workspace}
-                            selectedPagesFilter={selectedPagesFilter}
-                            setSelectedPagesFilter={setSelectedPagesFilter}
-                            selectedUsersFilter={selectedUsersFilter}
-                            setSelectedUsersFilter={setSelectedUsersFilter}
-                            selectedShopFilter={selectedShopFilter}
-                            setSelectedShopFilter={setSelectedShopFilter}
-                        />
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        {analytics.map((item, key) => (
+                            <MetricsCard key={key} title={item.title} value={item.value} className='col-span-2 md:col-span-1' />
+                        ))}
+
+                        <div className='col-span-2 flex flex-col gap-5'>
+                            <BreakdownPerPages workspace={workspace} queryString={queryString} />
+
+                            <BreakdownPerShops workspace={workspace} queryString={queryString} />
+
+                            <BreakdownPerUsers workspace={workspace} queryString={queryString} />
+                        </div>
+
+                        <div className='col-span-2'>
+                            <BreakdownPerCities workspace={workspace} queryString={queryString} />
+                        </div>
                     </div>
-
-                    {(selectedPagesFilter.length > 0 ||
-                        selectedUsersFilter.length > 0 ||
-                        selectedShopFilter.length > 0 ||
-                        dateRangeStr.from !==
-                            moment().startOf('month').format('YYYY-MM-DD') ||
-                        dateRangeStr.to !== moment().format('YYYY-MM-DD')) && (
-                        <Button variant="outline" onClick={clearFilters}>
-                            Clear Filters
-                        </Button>
-                    )}
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {analytics.map((item, key) => (
-                        <MetricsCard
-                            key={key}
-                            title={item.title}
-                            value={item.value}
-                            icon={item.icon}
-                            tooltip={item.tooltip}
-                            color={item.color}
-                        />
-                    ))}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="col-span-1 md:col-span-2 ">
-                        <BreakdownPerPages
-                            workspace={workspace}
-                            queryString={queryString}
-                        />
-                    </div>
-                    <div className='h-full'>
-                        <BreakdownPerCities
-                            workspace={workspace}
-                            queryString={queryString}
-                        />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <BreakdownPerShops
-                        workspace={workspace}
-                        queryString={queryString}
-                    />
-                    <BreakdownPerUsers
-                        workspace={workspace}
-                        queryString={queryString}
-                    />
-                </div>
-            </div>
+                </ComponentCard>
+            </RTSManagementLayout>
         </AppLayout>
     );
 };

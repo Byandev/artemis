@@ -59,24 +59,16 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates }: Props) => {
 
     return (
         <AppLayout>
-            <div className="p-4">
-                <TemplateForm
-                    open={openForm}
-                    onOpenChange={setOpenForm}
-                    workspace={workspace}
-                    initialValue={selected}
-                />
+                <RTSManagementLayout workspace={workspace}>
+                    <TemplateForm open={openForm} onOpenChange={setOpenForm} workspace={workspace} initialValue={selected} />
 
-                <ComponentCard
-                    title={'Parcel Journey Notification Templates'}
-                    desc={
-                        'Modify the template of the messages for your parcel journey'
-                    }
-                    className='min-h-screen'
-                >
-                    <DataTable columns={columns} data={templates} />
-                </ComponentCard>
-            </div>
+                    <ComponentCard title={'Parcel Journey Notification Templates'} desc={"Modify the template of the messages for your parcel journey"}>
+                        <DataTable
+                            columns={columns}
+                            data={templates}
+                        />
+                    </ComponentCard>
+                </RTSManagementLayout>
         </AppLayout>
     );
 };

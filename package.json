@@ -71,7 +71,6 @@
         "react-apexcharts": "^1.9.0",
         "react-day-picker": "^9.12.0",
         "react-dom": "^19.0.0",
-        "react-select": "^5.10.2",
         "recharts": "^2.15.4",
         "tailwind-merge": "^3.0.1",
         "tailwindcss": "^4.0.0",

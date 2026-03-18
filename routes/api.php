@@ -22,5 +22,4 @@ Route::group(['prefix' => 'api/v1/workspace', 'as' => 'api.v1.workspace', 'middl
     Route::get('/analytics/breakdown', [AnalyticsController::class, 'breakdown'])->name('analytics.breakdown');
     Route::get('/analytics/per-page', [AnalyticsController::class, 'perPage'])->name('analytics.perPage');
     Route::get('/analytics/per-shop', [AnalyticsController::class, 'perShop'])->name('analytics.perShop');
-    Route::get('/analytics/per-user', [AnalyticsController::class, 'perUser'])->name('analytics.perUser');
 });

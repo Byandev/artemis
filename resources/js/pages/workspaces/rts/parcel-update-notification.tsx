@@ -178,8 +178,8 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Parcel Update Notification`} />
-            <div className='p-4'>
-                <ComponentCard title="List of Parcel Update Notifications" className='min-h-screen'>
+            <RTSManagementLayout workspace={workspace}>
+                <ComponentCard title="List of Parcel Update Notifications">
                     <div>
                         <ParcelUpdateNotificationFilters
                             pageNameSearch={pageNameSearch}
@@ -218,7 +218,7 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                         </div>
                     </div>
                 </ComponentCard>
-            </div>
+            </RTSManagementLayout>
         </AppLayout>
     );
 };
