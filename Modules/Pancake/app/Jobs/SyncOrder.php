@@ -180,9 +180,7 @@ class SyncOrder implements ShouldQueue
                             }
                         }
 
-                        if ($this->page->parcel_journey_enabled && $isLatestUpdate && $savedOrder->status == 2 && in_array($update['status'], ['On Delivery', 'Departure', 'Arrival']) && Carbon::parse($update['updated_at'])->isToday()) {
-                            $isLatestUpdate = false;
-
+                        if (Carbon::parse($update['updated_at'])->isToday()) {
                             $parcelJourney = ParcelJourney::updateOrCreate([
                                 'order_id' => $savedOrder->id,
                                 'status' => $update['status'],
@@ -191,8 +189,12 @@ class SyncOrder implements ShouldQueue
                                 'created_at' => $update['updated_at'],
                             ]);
 
-                            if ($parcelJourney->notifications()->doesntExist()) {
-                                $this->sendParcelJourneyNotification($savedOrder, $parcelJourney);
+                            if ($this->page->parcel_journey_enabled && $isLatestUpdate && $savedOrder->status == 2 && in_array($update['status'], ['On Delivery', 'Departure', 'Arrival'])) {
+                                $isLatestUpdate = false;
+
+                                if ($parcelJourney->notifications()->doesntExist()) {
+                                    $this->sendParcelJourneyNotification($savedOrder, $parcelJourney);
+                                }
                             }
                         }
                     }
@@ -282,6 +284,11 @@ class SyncOrder implements ShouldQueue
                 $rider_mobile = "0{$last10}";
                 $data['rider_name'] = $rider_name;
                 $data['rider_mobile'] = $rider_mobile;
+
+                $parcelJourney->update([
+                    'rider_mobile' => $rider_mobile,
+                    'rider_name' =>  $rider_name,
+                ]);
 
                 ParcelJourneyNotification::create([
                     'order_id' => $order->id,
