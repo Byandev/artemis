@@ -167,7 +167,7 @@ const BreakdownPerPages = ({ workspace, queryString }: Props) => {
 
     if (loading) {
         return (
-            <div className="rounded-xl border bg-card p-6 shadow-sm w-full">
+            <div className="rounded-lg border bg-card p-6 w-full">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold tracking-tight">Breakdown per Pages</h3>
                 </div>
@@ -180,7 +180,7 @@ const BreakdownPerPages = ({ workspace, queryString }: Props) => {
 
     if (data.length === 0) {
         return (
-            <div className="rounded-xl border bg-card p-6 shadow-sm w-full">
+            <div className="rounded-lg  border bg-card p-6 w-full">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold tracking-tight">Breakdown per Pages</h3>
                 </div>
@@ -192,7 +192,7 @@ const BreakdownPerPages = ({ workspace, queryString }: Props) => {
     }
 
     return (
-        <div className="rounded-xl border bg-card p-6 shadow-sm h-fit">
+        <div className="rounded-lg border bg-card p-6  h-fit">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
                     <h3 className="text-lg font-semibold tracking-tight">Breakdown per Pages</h3>

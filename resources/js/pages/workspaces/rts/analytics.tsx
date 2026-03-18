@@ -108,7 +108,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Analytics`} />
-            <RTSManagementLayout workspace={workspace}>
+            <div className=" p-4 ">
                 <ComponentCard title="Track your RTS performance metrics">
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
                         <div className="flex items-center justify-start w-full flex-wrap gap-2">
@@ -137,6 +137,7 @@ const Analytics = ({ workspace, filters, data }: Props) => {
 
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                         {analytics.map((item, key) => (
+
                             <MetricsCard key={key} title={item.title} value={item.value} className='col-span-2 md:col-span-1' />
                         ))}
 
@@ -149,11 +150,12 @@ const Analytics = ({ workspace, filters, data }: Props) => {
                         </div>
 
                         <div className='col-span-2'>
+
                             <BreakdownPerCities workspace={workspace} queryString={queryString} />
                         </div>
                     </div>
                 </ComponentCard>
-            </RTSManagementLayout>
+            </div>
         </AppLayout>
     );
 };

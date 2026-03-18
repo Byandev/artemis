@@ -127,6 +127,8 @@ const BreakdownPerCities = ({ workspace, queryString }: Props) => {
         );
     }
 
+    console.log(heatmapPoints);
+
     return (
         <div className="rounded-xl border bg-card p-6 shadow-sm h-fit">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
