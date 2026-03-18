@@ -153,11 +153,11 @@ class SyncOrder implements ShouldQueue
                                 $note = $item['status'];
 
                                 if (str_contains($note, 'is sending')) {
-                                    $item['status'] = "On Delivery";
+                                    $item['status'] = 'On Delivery';
                                 }
 
                                 if (str_contains($note, 'send package')) {
-                                    $item['status'] = "Arrival";
+                                    $item['status'] = 'Arrival';
                                 }
 
                                 $item['note'] = $note;

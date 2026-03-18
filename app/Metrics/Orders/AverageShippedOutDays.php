@@ -73,7 +73,6 @@ final class AverageShippedOutDays
             ->get();
     }
 
-
     public function perShop(int $workspaceId, array $date_range, array $filter)
     {
         return $this->baseQuery($workspaceId, $date_range, $filter, true)

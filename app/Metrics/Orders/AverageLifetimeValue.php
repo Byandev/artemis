@@ -196,7 +196,6 @@ final class AverageLifetimeValue
             ->get();
     }
 
-
     public function perShop(int $workspaceId, array $dateRange, array $filter)
     {
         $endExclusive = Carbon::parse($dateRange['end_date'])
@@ -211,14 +210,14 @@ final class AverageLifetimeValue
             ->where('pancake_orders.confirmed_at', '<', $endExclusive)
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(!empty($filter['page_ids']), function ($query) use ($filter) {
+            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
                 $pageIds = is_array($filter['page_ids'])
                     ? $filter['page_ids']
                     : explode(',', $filter['page_ids']);
 
                 $query->whereIn('pages.id', $pageIds);
             })
-            ->when(!empty($filter['shop_ids']), function ($query) use ($filter) {
+            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
                 $shopIds = is_array($filter['shop_ids'])
                     ? $filter['shop_ids']
                     : explode(',', $filter['shop_ids']);
@@ -240,7 +239,6 @@ final class AverageLifetimeValue
             ->orderByDesc('value')
             ->get();
     }
-
 
     private function baseOrdersQuery(
         int $workspaceId,
