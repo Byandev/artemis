@@ -17,8 +17,8 @@
 <a href="https://drive.google.com/file/d/1zvMCUdkb6InqlyQszmGR462QkQsUl7l_/view?usp=drive_link">Weekly CSR Leaderboards</a><br>
 <a href="https://drive.google.com/file/d/1ke2Aj658R4vzbIiyALqxEHXheh3n1Aab/view?usp=drive_link">Monthly CSR Leaderboards</a>
 
-<h3>Finished CSr Leaderboards</h3>
-<a href="http://localhost/csr-leaderboard/index.html">CSR Leaderboards</a>
+<h3>Finished CSR Leaderboards</h3>
+<b>http://localhost/csr-leaderboards/index.html</b><br>
 
 <h3>Updates / Patches </h3>
 <ul>
