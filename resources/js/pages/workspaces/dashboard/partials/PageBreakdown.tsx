@@ -55,9 +55,10 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
             case 'repeatOrderRatio':
                 return `${(value * 100).toFixed(1)}%`;
             case 'timeToFirstOrder':
+                return `${value.toFixed(1)} hrs`;
             case 'avgDeliveryDays':
             case 'avgShippedOutDays':
-                return `${value.toFixed(1)} hrs`;
+                return `${value.toFixed(1)} days`;
             case 'aov':
             case 'totalOrders':
             default:
