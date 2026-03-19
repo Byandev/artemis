@@ -7,6 +7,8 @@ use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Modules\Pancake\Models\User as PancakeUser;
 
 class CsrPerformanceController extends Controller
 {
@@ -34,7 +36,11 @@ class CsrPerformanceController extends Controller
 
     public function publicCsrIndex(Workspace $workspace)
     {
-        $data = DB::table('customer_service_representatives as csr')
+        $modelTable = (new PancakeUser())->getTable();
+        $csrTable = Schema::hasTable('pancake_user') ? 'pancake_user' : $modelTable;
+
+        $data = PancakeUser::query()
+            ->from("{$csrTable} as csr")
             ->leftJoin('page_customer_service_representative as pcsr', 'pcsr.customer_service_representative_id', '=', 'csr.id')
             ->leftJoin('pages', 'pages.id', '=', 'pcsr.page_id')
             ->where(function ($query) use ($workspace) {
