@@ -8,7 +8,6 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
-use Modules\Pancake\Models\Order as PancakeOrder;
 use Modules\Pancake\Models\User as PancakeUser;
 
 class CsrPerformanceController extends Controller
@@ -39,12 +38,17 @@ class CsrPerformanceController extends Controller
     public function publicCsrIndex(Workspace $workspace)
     {
         $data = PancakeUser::query()
-            ->selectRaw('id as csr_id, name')
+            ->select(['id', 'name'])
             ->whereHas('assignedOrders', function ($query) use ($workspace) {
                 $query->where('workspace_id', $workspace->id);
             })
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(fn ($user) => [
+                'csr_id' => (string) $user->id,
+                'name' => $user->name,
+            ])
+            ->values();
 
         return response()->json([
             'data' => $data,
@@ -53,10 +57,10 @@ class CsrPerformanceController extends Controller
 
     private function buildLeaderboard(Workspace $workspace, array $validated): Collection
     {
-
         $period = $validated['period'] ?? 'monthly';
         $sortBy = $validated['sort_by'] ?? 'rank';
         $sortDir = $validated['sort_dir'] ?? 'desc';
+
         $users = PancakeUser::query()
             ->select(['id', 'name', 'fb_id'])
             ->whereNotNull('fb_id')
@@ -105,17 +109,15 @@ class CsrPerformanceController extends Controller
 
     private function applyLeaderboardOrderFilters($query, Workspace $workspace, array $validated): void
     {
-        $table = (new PancakeOrder())->getTable();
-
-        $query->where("{$table}.workspace_id", $workspace->id)
-            ->whereNotNull("{$table}.confirmed_at")
+        $query->where('workspace_id', $workspace->id)
+            ->whereNotNull('confirmed_at')
             ->when(
                 ! empty($validated['start_date']),
-                fn ($q) => $q->whereDate("{$table}.confirmed_at", '>=', $validated['start_date'])
+                fn ($q) => $q->whereDate('confirmed_at', '>=', $validated['start_date'])
             )
             ->when(
                 ! empty($validated['end_date']),
-                fn ($q) => $q->whereDate("{$table}.confirmed_at", '<=', $validated['end_date'])
+                fn ($q) => $q->whereDate('confirmed_at', '<=', $validated['end_date'])
             );
     }
 
