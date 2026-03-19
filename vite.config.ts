@@ -14,7 +14,7 @@ export default defineConfig({
         react(),
         tailwindcss(),
         wayfinder({
-            // formVariants: true,
+            formVariants: true,
              // command: 'docker compose exec -T laravel.test php artisan wayfinder:generate --with-form',
         })
     ],
