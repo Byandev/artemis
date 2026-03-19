@@ -2,7 +2,7 @@ import { FilterValue } from '@/components/filters/Filters';
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
 import type { LucideIcon } from 'lucide-react';
-import { CircleHelp, Minus, TrendingDown, TrendingUp } from 'lucide-react';
+import { CircleHelp, Minus, TrendingDown, TrendingUp, Calendar } from 'lucide-react';
 import moment from 'moment/moment';
 import { useEffect, useState } from 'react';
 
@@ -27,9 +27,9 @@ export interface Props {
 type AnalyticsResponse = Record<string, number>;
 
 function CardSkeleton({
-    label,
-    icon: Icon,
-}: {
+                          label,
+                          icon: Icon,
+                      }: {
     label: string;
     icon?: LucideIcon;
 }) {
@@ -63,15 +63,15 @@ function CardSkeleton({
 }
 
 const StatisticCard = ({
-    metric,
-    label,
-    workspace,
-    dateRange,
-    filter,
-    formatter,
-    icon: Icon,
-    tooltipLabel,
-}: Props) => {
+                           metric,
+                           label,
+                           workspace,
+                           dateRange,
+                           filter,
+                           formatter,
+                           icon: Icon,
+                           tooltipLabel,
+                       }: Props) => {
     const [currentValue, setCurrentValue] = useState(0);
     const [previousValue, setPreviousValue] = useState(0);
 
@@ -153,8 +153,8 @@ const StatisticCard = ({
 
                 setError(
                     err?.response?.data?.message ??
-                        err?.message ??
-                        'Failed to load analytics.',
+                    err?.message ??
+                    'Failed to load analytics.',
                 );
             } finally {
                 if (!controller.signal.aborted) {
@@ -174,6 +174,14 @@ const StatisticCard = ({
             .startOf('day')
             .diff(moment(dateRange[0]).startOf('day'), 'days') + 1;
 
+    // Get previous period description
+    const getPreviousPeriodText = () => {
+        if (days === 1) return 'yesterday';
+        if (days === 7) return 'previous 7 days';
+        if (days === 30) return 'previous 30 days';
+        return `previous ${days} days`;
+    };
+
     const hasPreviousData = previousValue > 0;
     const difference = currentValue - previousValue;
 
@@ -186,20 +194,20 @@ const StatisticCard = ({
     const TrendIcon = isPositive
         ? TrendingUp
         : isNegative
-          ? TrendingDown
-          : Minus;
+            ? TrendingDown
+            : Minus;
 
     const trendTextClass = isPositive
         ? 'text-green-600'
         : isNegative
-          ? 'text-red-600'
-          : 'text-gray-500 dark:text-gray-400';
+            ? 'text-red-600'
+            : 'text-gray-500 dark:text-gray-400';
 
     const tooltipDescription = loadingComparison
         ? `Comparing ${label} with the previous ${days}-day period...`
         : hasPreviousData
-          ? `${label} is ${isPositive ? 'up' : isNegative ? 'down' : 'unchanged'} ${Math.abs(percent).toFixed(1)}% compared to the previous ${days}-day period. Current: ${formatter(currentValue)}. Previous: ${formatter(previousValue)}.`
-          : `${label} is currently ${formatter(currentValue)}. No previous data available for comparison.`;
+            ? `${label} is ${isPositive ? 'up' : isNegative ? 'down' : 'unchanged'} ${Math.abs(percent).toFixed(1)}% compared to the previous ${days}-day period. Current: ${formatter(currentValue)}. Previous: ${formatter(previousValue)}.`
+            : `${label} is currently ${formatter(currentValue)}. No previous data available for comparison.`;
 
     if (loadingCurrent) {
         return <CardSkeleton label={label} icon={Icon} />;
@@ -224,7 +232,7 @@ const StatisticCard = ({
                                 </button>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
-                                <div className="space-y-1">
+                                <div className="space-y-1.5">
                                     {tooltipLabel && <p>{tooltipLabel}</p>}
                                     <p>{tooltipDescription}</p>
                                 </div>
@@ -252,14 +260,21 @@ const StatisticCard = ({
                             <div className="h-3 w-24 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
                         </div>
                     ) : hasPreviousData ? (
-                        <p
-                            className={`mt-2 inline-flex items-center gap-1 text-xs font-medium ${trendTextClass}`}
-                        >
-                            <TrendIcon className="h-3.5 w-3.5" />
-                            {isNeutral
-                                ? '0.0%'
-                                : `${isPositive ? '+' : ''}${percent.toFixed(1)}%`}
-                        </p>
+                        <div className="mt-2 flex items-center gap-2">
+                            <p
+                                className={`inline-flex items-center gap-1 text-xs font-medium ${trendTextClass}`}
+                            >
+                                <TrendIcon className="h-3.5 w-3.5" />
+                                {isNeutral
+                                    ? '0.0%'
+                                    : `${isPositive ? '+' : ''}${percent.toFixed(1)}%`}
+                            </p>
+                            {/* Previous period indicator */}
+                            <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                <Calendar className="h-3 w-3" />
+                                from {getPreviousPeriodText()}
+                            </span>
+                        </div>
                     ) : (
                         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                             No comparison data
