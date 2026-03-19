@@ -4,10 +4,12 @@ namespace App\Http\Controllers\API\Workspace;
 
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Modules\Pancake\Models\User as PancakeUser;
 
 class CsrPerformanceController extends Controller
@@ -28,6 +30,7 @@ class CsrPerformanceController extends Controller
     public function publicIndex(Request $request, Workspace $workspace)
     {
         $validated = $this->validatedFilters($request);
+        $validated = $this->normalizePublicFilters($validated);
 
         return response()->json([
             'data' => $this->buildLeaderboard($workspace, $validated),
@@ -102,6 +105,46 @@ class CsrPerformanceController extends Controller
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date'],
         ]);
+    }
+
+    private function normalizePublicFilters(array $validated): array
+    {
+        $period = $validated['period'] ?? 'monthly';
+
+        $startDate = $validated['start_date'] ?? null;
+        $endDate = $validated['end_date'] ?? null;
+
+        if ($startDate === null && $endDate === null) {
+            [$startDate, $endDate] = match ($period) {
+                'daily' => [Carbon::today()->toDateString(), Carbon::today()->toDateString()],
+                'weekly' => [Carbon::now()->startOfWeek()->toDateString(), Carbon::now()->endOfWeek()->toDateString()],
+                default => [Carbon::now()->startOfMonth()->toDateString(), Carbon::now()->endOfMonth()->toDateString()],
+            };
+        } elseif ($startDate === null) {
+            $startDate = $endDate;
+        } elseif ($endDate === null) {
+            $endDate = $startDate;
+        }
+
+        $start = Carbon::parse($startDate)->startOfDay();
+        $end = Carbon::parse($endDate)->endOfDay();
+
+        if ($end->lt($start)) {
+            throw ValidationException::withMessages([
+                'end_date' => ['The end_date must be after or equal to start_date.'],
+            ]);
+        }
+
+        if ($start->diffInDays($end) > 92) {
+            throw ValidationException::withMessages([
+                'start_date' => ['Public queries are limited to a maximum 93-day date range.'],
+            ]);
+        }
+
+        $validated['start_date'] = $start->toDateString();
+        $validated['end_date'] = $end->toDateString();
+
+        return $validated;
     }
 
     private function rankRows(Collection $rows, string $period, string $sortBy, string $sortDir): Collection

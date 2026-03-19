@@ -17,3 +17,12 @@
 <a href="https://drive.google.com/file/d/1zvMCUdkb6InqlyQszmGR462QkQsUl7l_/view?usp=drive_link">Weekly CSR Leaderboards</a><br>
 <a href="https://drive.google.com/file/d/1ke2Aj658R4vzbIiyALqxEHXheh3n1Aab/view?usp=drive_link">Monthly CSR Leaderboards</a>
 
+<h3>Finished CSr Leaderboards</h3>
+<a href="http://localhost/csr-leaderboard/index.html">CSR Leaderboards</a>
+
+<h3>Updates / Patches </h3>
+<ul>
+    <li>Added public API endpoints for CSR performance and CSR list, with rate limiting to prevent abuse.</li>
+    <li>Added throttle middleware to limit the number of requests a client can make.</li>
+    <li>Added DoS protection to prevent abuse of the public API endpoints.</li>
+</ul>
