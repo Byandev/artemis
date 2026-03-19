@@ -14,7 +14,7 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { currencyFormatter } from '@/lib/utils';
 import workspaces from '@/routes/workspaces';
-import { PaginatedData } from '@/types';
+import { PaginatedData, User } from '@/types';
 import { Page } from '@/types/models/Page';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
@@ -41,6 +41,7 @@ interface PagesProps {
             search?: string
         }
     }
+    users: User[];
 }
 
 const StatusBadge = ({ isArchived }: { isArchived: boolean }) => {
@@ -73,7 +74,7 @@ const EnableBadge = ({ isEnabled }: { isEnabled: boolean }) => {
     );
 };
 
-const Pages = ({ pages, workspace, query }: PagesProps) => {
+const Pages = ({ pages, workspace, query, users }: PagesProps) => {
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
@@ -296,6 +297,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                     onOpenChange={setDialogOpen}
                     page={selectedPage}
                     workspace={workspace}
+                    users={users}
                 />
 
                 {/* Archive Confirmation Dialog */}

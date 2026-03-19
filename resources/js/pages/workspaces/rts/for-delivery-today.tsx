@@ -152,9 +152,8 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders, query }: ForDe
     return (
         <AppLayout>
             <Head title={`${workspace.name} - For Delivery Today`} />
-
-            <RTSManagementLayout workspace={workspace}>
-                <ComponentCard title="List of Orders for Delivery Today" >
+            <div className='p-4'>
+                <ComponentCard title="List of Orders for Delivery Today" className='min-h-screen'>
                     <div>
                         <OrderFilters
                             pageNameSearch={pageNameSearch}
@@ -195,7 +194,7 @@ const ForDeliveryToday = ({ workspace, orders, customers, riders, query }: ForDe
                         </div>
                     </div>
                 </ComponentCard>
-            </RTSManagementLayout>
+            </div>
         </AppLayout>
     );
 };
