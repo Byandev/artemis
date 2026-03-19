@@ -11,6 +11,7 @@ Route::get('/', function () {
 Route::get('/leaderboards', function () {
     return Inertia::render('workspaces/public/leaderboard');
 });
+
 Route::get('/auth/facebook/callback', [\App\Http\Controllers\Integrations\FacebookController::class, 'callback']);
 
 Route::middleware(['auth'])->group(function () {

@@ -296,7 +296,6 @@ export default function Leaderboard() {
     const topThree: User[] = sortedUsers.slice(0, 3);
     const restOfUsers: User[] = sortedUsers.slice(3);
 
-
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -379,7 +378,8 @@ export default function Leaderboard() {
 
                     <div className="flex items-end gap-4">
                         {topThree.map((user: User, index: number) => {
-                            const rank = index === 0 ? 2 : index === 1 ? 1 : 3;
+                            const rank = index === 0 ? 1 : index === 1 ? 2 : 3;
+
                             return (
                                 <LeaderboardCard
                                     key={user.id}
