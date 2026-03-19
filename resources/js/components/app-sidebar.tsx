@@ -59,28 +59,28 @@ export function AppSidebar() {
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
             icon: Users,
         },
-        {
-            title: 'RTS Management',
-            icon: TrendingUp,
-            items: [
-                {
-                    title: 'Analytics',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
-                },
-                {
-                    title: 'Delivery',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/for-delivery-today`,
-                },
-                {
-                    title: 'Parcel Updates',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/parcel-update-notification`,
-                },
-                {
-                    title: 'Parcel Updates Templates',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/parcel-journey-notification-templates`,
-                },
-            ],
-        },
+        // {
+        //     title: 'RTS Management',
+        //     icon: TrendingUp,
+        //     items: [
+        //         {
+        //             title: 'Analytics',
+        //             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
+        //         },
+        //         {
+        //             title: 'Delivery',
+        //             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/for-delivery-today`,
+        //         },
+        //         {
+        //             title: 'Parcel Updates',
+        //             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/parcel-update-notification`,
+        //         },
+        //         {
+        //             title: 'Parcel Updates Templates',
+        //             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/parcel-journey-notification-templates`,
+        //         },
+        //     ],
+        // },
     ];
 
     // const mainNavItems: NavItem[] = [
