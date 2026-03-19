@@ -60,6 +60,7 @@ class CsrPerformanceController extends Controller
         $period = $validated['period'] ?? 'monthly';
         $sortBy = $validated['sort_by'] ?? 'rank';
         $sortDir = $validated['sort_dir'] ?? 'desc';
+        $periodStart = $this->resolvedPeriodStart($validated, $period);
 
         $users = PancakeUser::query()
             ->select(['id', 'name', 'fb_id'])
@@ -67,40 +68,24 @@ class CsrPerformanceController extends Controller
             ->whereHas('assignedOrders', function ($query) use ($workspace, $validated) {
                 $this->applyLeaderboardOrderFilters($query, $workspace, $validated);
             })
-            ->with(['assignedOrders' => function ($query) use ($workspace, $validated) {
+            ->withCount(['assignedOrders as total_orders' => function ($query) use ($workspace, $validated) {
                 $this->applyLeaderboardOrderFilters($query, $workspace, $validated);
-                $query->select(['id', 'assignee_id', 'confirmed_at', 'final_amount']);
             }])
+            ->withSum(['assignedOrders as total_sales' => function ($query) use ($workspace, $validated) {
+                $this->applyLeaderboardOrderFilters($query, $workspace, $validated);
+            }], 'final_amount')
             ->get();
 
-        $aggregated = [];
-
-        foreach ($users as $user) {
-            foreach ($user->assignedOrders as $order) {
-                if (! $order->confirmed_at) {
-                    continue;
-                }
-
-                $periodStart = $this->periodStartFromDate($order->confirmed_at, $period);
-                $key = $periodStart.'|'.$user->id;
-
-                if (! isset($aggregated[$key])) {
-                    $aggregated[$key] = [
-                        'period_start' => $periodStart,
-                        'csr_id' => $user->id,
-                        'name' => $user->name,
-                        'total_orders' => 0,
-                        'total_sales' => 0.0,
-                    ];
-                }
-
-                $aggregated[$key]['total_orders']++;
-                $aggregated[$key]['total_sales'] += (float) $order->final_amount;
-            }
-        }
-
-        $rows = collect(array_values($aggregated))
-            ->map(fn (array $row) => (object) $row)
+        $rows = $users
+            ->map(function ($user) use ($periodStart) {
+                return (object) [
+                    'period_start' => $periodStart,
+                    'csr_id' => $user->id,
+                    'name' => $user->name,
+                    'total_orders' => (int) ($user->total_orders ?? 0),
+                    'total_sales' => (float) ($user->total_sales ?? 0),
+                ];
+            })
             ->sortBy('period_start')
             ->values();
 
@@ -230,14 +215,16 @@ class CsrPerformanceController extends Controller
         return $left <=> $right;
     }
 
-    private function periodStartFromDate($date, string $period): string
+    private function resolvedPeriodStart(array $validated, string $period): string
     {
-        $value = $date instanceof Carbon ? $date->copy() : Carbon::parse($date);
+        $base = ! empty($validated['start_date'])
+            ? Carbon::parse($validated['start_date'])
+            : Carbon::now();
 
         return match ($period) {
-            'daily' => $value->toDateString(),
-            'weekly' => $value->startOfWeek()->toDateString(),
-            default => $value->startOfMonth()->toDateString(),
+            'daily' => $base->toDateString(),
+            'weekly' => $base->startOfWeek()->toDateString(),
+            default => $base->startOfMonth()->toDateString(),
         };
     }
 }
