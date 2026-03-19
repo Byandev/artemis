@@ -1,3 +1,4 @@
+import { Head } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
 interface LeaderboardRow {
@@ -306,6 +307,8 @@ export default function Leaderboard() {
 
     return (
         <div className="relative h-screen overflow-hidden bg-violet-900">
+            <Head title="CSR Leaderboards" />
+
             <div className="absolute -top-20 -right-10 h-100 w-100">
                 <div className="absolute inset-0 rounded-full bg-linear-to-bl from-violet-900 via-violet-800 to-violet-300 opacity-80 blur-3xl"></div>
                 <div className="absolute inset-0 animate-pulse rounded-full border-2 border-white/30"></div>
