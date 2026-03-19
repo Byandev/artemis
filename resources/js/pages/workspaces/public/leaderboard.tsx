@@ -1,3 +1,7 @@
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+import error from 'eslint-plugin-react/lib/util/error';
+
 interface User {
     id: string;
     name: string;
@@ -257,6 +261,8 @@ const LeaderboardEntry = ({
 };
 
 export default function Leaderboard() {
+
+    const [ users, setUsers] = useState([]);
     const getInitials = (name: string): string => {
         return name
             .split(' ')
@@ -289,6 +295,24 @@ export default function Leaderboard() {
     );
     const topThree: User[] = sortedUsers.slice(0, 3);
     const restOfUsers: User[] = sortedUsers.slice(3);
+
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const response = await axios.get(
+                    '/api/public/leaderboards',
+                );
+                setUsers(response.data);
+            } catch (error) {
+                console.log(error);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    console.log(users)
 
     return (
         <div className="relative h-screen overflow-hidden bg-violet-900">
