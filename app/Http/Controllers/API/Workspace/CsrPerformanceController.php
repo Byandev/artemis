@@ -244,6 +244,9 @@ class CsrPerformanceController extends Controller
                     $query->whereBetween('confirmed_at', [$startDate, $endDate]);
                 }
             ], 'final_amount')
+            ->whereHas('orders', function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('confirmed_at', [$startDate, $endDate]);
+            })
             ->orderByDesc('sales')
             ->get();
     }
