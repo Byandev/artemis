@@ -7,9 +7,8 @@ use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
+use Modules\Pancake\Models\Order as PancakeOrder;
 use Modules\Pancake\Models\User as PancakeUser;
 
 class CsrPerformanceController extends Controller
@@ -39,25 +38,12 @@ class CsrPerformanceController extends Controller
 
     public function publicCsrIndex(Workspace $workspace)
     {
-        $modelTable = (new PancakeUser())->getTable();
-        $csrTable = Schema::hasTable('pancake_user') ? 'pancake_user' : $modelTable;
-
         $data = PancakeUser::query()
-            ->from("{$csrTable} as csr")
-            ->leftJoin('page_customer_service_representative as pcsr', 'pcsr.customer_service_representative_id', '=', 'csr.id')
-            ->leftJoin('pages', 'pages.id', '=', 'pcsr.page_id')
-            ->where(function ($query) use ($workspace) {
-                $query->where('pages.workspace_id', $workspace->id)
-                    ->orWhereExists(function ($exists) use ($workspace) {
-                        $exists->select(DB::raw(1))
-                            ->from('orders')
-                            ->whereColumn('orders.assignee_id', 'csr.id')
-                            ->where('orders.workspace_id', $workspace->id);
-                    });
+            ->selectRaw('id as csr_id, name')
+            ->whereHas('assignedOrders', function ($query) use ($workspace) {
+                $query->where('workspace_id', $workspace->id);
             })
-            ->select('csr.id as csr_id', 'csr.name')
-            ->distinct()
-            ->orderBy('csr.name')
+            ->orderBy('name')
             ->get();
 
         return response()->json([
@@ -71,29 +57,66 @@ class CsrPerformanceController extends Controller
         $period = $validated['period'] ?? 'monthly';
         $sortBy = $validated['sort_by'] ?? 'rank';
         $sortDir = $validated['sort_dir'] ?? 'desc';
-        $periodExpression = $this->periodExpression($period);
+        $users = PancakeUser::query()
+            ->select(['id', 'name', 'fb_id'])
+            ->whereNotNull('fb_id')
+            ->whereHas('assignedOrders', function ($query) use ($workspace, $validated) {
+                $this->applyLeaderboardOrderFilters($query, $workspace, $validated);
+            })
+            ->with(['assignedOrders' => function ($query) use ($workspace, $validated) {
+                $this->applyLeaderboardOrderFilters($query, $workspace, $validated);
+                $query->select(['id', 'assignee_id', 'confirmed_at', 'final_amount']);
+            }])
+            ->get();
 
-        $rows = DB::table('customer_service_representatives as csr')
-            ->join('orders', 'orders.assignee_id', '=', 'csr.id')
-            ->where('orders.workspace_id', $workspace->id)
-            ->whereNotNull('orders.confirmed_at')
+        $aggregated = [];
+
+        foreach ($users as $user) {
+            foreach ($user->assignedOrders as $order) {
+                if (! $order->confirmed_at) {
+                    continue;
+                }
+
+                $periodStart = $this->periodStartFromDate($order->confirmed_at, $period);
+                $key = $periodStart.'|'.$user->id;
+
+                if (! isset($aggregated[$key])) {
+                    $aggregated[$key] = [
+                        'period_start' => $periodStart,
+                        'csr_id' => $user->id,
+                        'name' => $user->name,
+                        'total_orders' => 0,
+                        'total_sales' => 0.0,
+                    ];
+                }
+
+                $aggregated[$key]['total_orders']++;
+                $aggregated[$key]['total_sales'] += (float) $order->final_amount;
+            }
+        }
+
+        $rows = collect(array_values($aggregated))
+            ->map(fn (array $row) => (object) $row)
+            ->sortBy('period_start')
+            ->values();
+
+        return $this->rankRows($rows, $period, $sortBy, $sortDir);
+    }
+
+    private function applyLeaderboardOrderFilters($query, Workspace $workspace, array $validated): void
+    {
+        $table = (new PancakeOrder())->getTable();
+
+        $query->where("{$table}.workspace_id", $workspace->id)
+            ->whereNotNull("{$table}.confirmed_at")
             ->when(
                 ! empty($validated['start_date']),
-                fn ($query) => $query->whereDate('orders.confirmed_at', '>=', $validated['start_date'])
+                fn ($q) => $q->whereDate("{$table}.confirmed_at", '>=', $validated['start_date'])
             )
             ->when(
                 ! empty($validated['end_date']),
-                fn ($query) => $query->whereDate('orders.confirmed_at', '<=', $validated['end_date'])
-            )
-            ->selectRaw("{$periodExpression} as period_start")
-            ->selectRaw('csr.id as csr_id, csr.name')
-            ->selectRaw('COUNT(orders.id) as total_orders')
-            ->selectRaw('COALESCE(SUM(orders.final_amount), 0) as total_sales')
-            ->groupBy(DB::raw($periodExpression), 'csr.id', 'csr.name')
-            ->orderBy('period_start')
-            ->get();
-
-        return $this->rankRows($rows, $period, $sortBy, $sortDir);
+                fn ($q) => $q->whereDate("{$table}.confirmed_at", '<=', $validated['end_date'])
+            );
     }
 
     private function validatedFilters(Request $request): array
@@ -156,7 +179,7 @@ class CsrPerformanceController extends Controller
                     ->values()
                     ->map(function ($row, int $index) use ($period) {
                         return [
-                            'csr_id' => (int) $row->csr_id,
+                            'csr_id' => (string) $row->csr_id,
                             'period' => $period,
                             'period_start' => $row->period_start,
                             'rank' => $index + 1,
@@ -205,26 +228,14 @@ class CsrPerformanceController extends Controller
         return $left <=> $right;
     }
 
-    private function periodExpression(string $period): string
+    private function periodStartFromDate($date, string $period): string
     {
-        $driver = DB::getDriverName();
+        $value = $date instanceof Carbon ? $date->copy() : Carbon::parse($date);
 
-        return match ($driver) {
-            'sqlite' => match ($period) {
-                'daily' => "date(orders.confirmed_at)",
-                'weekly' => "date(orders.confirmed_at, '-' || ((strftime('%w', orders.confirmed_at) + 6) % 7) || ' days')",
-                default => "strftime('%Y-%m-01', orders.confirmed_at)",
-            },
-            'pgsql' => match ($period) {
-                'daily' => 'DATE(orders.confirmed_at)',
-                'weekly' => "TO_CHAR(date_trunc('week', orders.confirmed_at), 'YYYY-MM-DD')",
-                default => "TO_CHAR(date_trunc('month', orders.confirmed_at), 'YYYY-MM-01')",
-            },
-            default => match ($period) {
-                'daily' => 'DATE(orders.confirmed_at)',
-                'weekly' => 'DATE(DATE_SUB(orders.confirmed_at, INTERVAL WEEKDAY(orders.confirmed_at) DAY))',
-                default => "DATE_FORMAT(orders.confirmed_at, '%Y-%m-01')",
-            },
+        return match ($period) {
+            'daily' => $value->toDateString(),
+            'weekly' => $value->startOfWeek()->toDateString(),
+            default => $value->startOfMonth()->toDateString(),
         };
     }
 }
