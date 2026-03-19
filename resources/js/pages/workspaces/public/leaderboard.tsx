@@ -1,14 +1,14 @@
-interface User {
-    id: string;
+import { useEffect, useMemo, useState } from 'react';
+
+interface LeaderboardRow {
+    csr_id: string;
     name: string;
-    fb_id: string;
-    email: string;
-    phone_number: string | null;
-    created_at: string;
-    updated_at: string;
-    orders_count: number;
-    sales: number;
+    total_orders: number;
+    total_sales: number;
+    rank: number;
 }
+
+type PeriodTab = 'Daily' | 'Weekly' | 'Monthly';
 
 interface MedalIconProps {
     rank: number;
@@ -30,118 +30,28 @@ interface LeaderboardEntryProps {
     orders: string;
 }
 
-const users: User[] = [
-    {
-        id: 'a1',
-        name: 'Maria Santos',
-        fb_id: '100000000000001',
-        email: 'maria.santos@example.com',
-        phone_number: '09171234567',
-        created_at: '2026-03-01T10:00:00.000Z',
-        updated_at: '2026-03-10T12:00:00.000Z',
-        orders_count: 2100,
-        sales: 1250000.0,
-    },
-    {
-        id: 'a2',
-        name: 'Juan Dela Cruz',
-        fb_id: '100000000000002',
-        email: 'juan.delacruz@example.com',
-        phone_number: '09181234567',
-        created_at: '2026-02-15T09:30:00.000Z',
-        updated_at: '2026-03-12T11:20:00.000Z',
-        orders_count: 1980,
-        sales: 1104500.0,
-    },
-    {
-        id: 'a3',
-        name: 'Ana Reyes',
-        fb_id: '100000000000003',
-        email: 'ana.reyes@example.com',
-        phone_number: null,
-        created_at: '2026-01-20T08:15:00.000Z',
-        updated_at: '2026-03-11T14:10:00.000Z',
-        orders_count: 1750,
-        sales: 985300.0,
-    },
-    {
-        id: 'a4',
-        name: 'Carlos Mendoza',
-        fb_id: '100000000000004',
-        email: 'carlos.mendoza@example.com',
-        phone_number: '09221234567',
-        created_at: '2026-01-05T13:45:00.000Z',
-        updated_at: '2026-03-09T16:00:00.000Z',
-        orders_count: 1600,
-        sales: 912000.0,
-    },
-    {
-        id: 'a5',
-        name: 'Liza Fernandez',
-        fb_id: '100000000000005',
-        email: 'liza.fernandez@example.com',
-        phone_number: '09331234567',
-        created_at: '2026-02-01T07:20:00.000Z',
-        updated_at: '2026-03-08T10:30:00.000Z',
-        orders_count: 1500,
-        sales: 870500.0,
-    },
-    {
-        id: 'a6',
-        name: 'Mark Villanueva',
-        fb_id: '100000000000006',
-        email: 'mark.v@example.com',
-        phone_number: null,
-        created_at: '2026-02-10T11:00:00.000Z',
-        updated_at: '2026-03-07T09:45:00.000Z',
-        orders_count: 1400,
-        sales: 820000.0,
-    },
-    {
-        id: 'a7',
-        name: 'Grace Bautista',
-        fb_id: '100000000000007',
-        email: 'grace.bautista@example.com',
-        phone_number: '09441234567',
-        created_at: '2026-01-25T15:10:00.000Z',
-        updated_at: '2026-03-06T13:25:00.000Z',
-        orders_count: 1300,
-        sales: 765200.0,
-    },
-    {
-        id: 'a8',
-        name: 'Paolo Garcia',
-        fb_id: '100000000000008',
-        email: 'paolo.garcia@example.com',
-        phone_number: '09551234567',
-        created_at: '2026-03-02T12:00:00.000Z',
-        updated_at: '2026-03-05T08:40:00.000Z',
-        orders_count: 1200,
-        sales: 702100.0,
-    },
-    {
-        id: 'a9',
-        name: 'Jessa Cruz',
-        fb_id: '100000000000009',
-        email: 'jessa.cruz@example.com',
-        phone_number: null,
-        created_at: '2026-02-18T14:30:00.000Z',
-        updated_at: '2026-03-04T17:15:00.000Z',
-        orders_count: 1100,
-        sales: 650000.0,
-    },
-    {
-        id: 'a10',
-        name: 'Ronnie Lopez',
-        fb_id: '100000000000010',
-        email: 'ronnie.lopez@example.com',
-        phone_number: '09661234567',
-        created_at: '2026-01-12T06:50:00.000Z',
-        updated_at: '2026-03-03T19:00:00.000Z',
-        orders_count: 1000,
-        sales: 590300.0,
-    },
-];
+const OldDesignLoader = ({ visible }: { visible: boolean }) => {
+    return (
+        <div
+            className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-linear-to-br from-[#0f001f] to-[#3b006a] transition-opacity duration-500 ${
+                visible ? 'opacity-100' : 'pointer-events-none opacity-0'
+            }`}
+        >
+            <h1
+                className={`text-4xl font-bold tracking-[0.25em] text-white transition-all duration-500 md:text-5xl ${
+                    visible ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'
+                }`}
+            >
+                CSR LEADERBOARD
+            </h1>
+            <div
+                className={`mt-5 h-[60px] w-[60px] animate-spin rounded-full border-[6px] border-white/20 border-t-violet-500 transition-all duration-500 ${
+                    visible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
+                }`}
+            ></div>
+        </div>
+    );
+};
 
 const MedalIcon = ({ rank }: MedalIconProps) => {
     const medals: Record<number, { color: string; icon: string }> = {
@@ -257,6 +167,26 @@ const LeaderboardEntry = ({
 };
 
 export default function Leaderboard() {
+    const [period, setPeriod] = useState<PeriodTab>('Daily');
+    const [users, setUsers] = useState<LeaderboardRow[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [loaderMounted, setLoaderMounted] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const workspaceSlug = useMemo(() => {
+        if (typeof window === 'undefined') return 'developers-workspace';
+        const slug = new URLSearchParams(window.location.search).get('workspace');
+        return slug || 'developers-workspace';
+    }, []);
+
+    const apiBase = useMemo(() => {
+        if (typeof window === 'undefined') return '';
+        const envBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+        if (envBase) return envBase.replace(/\/$/, '');
+        if (window.location.port === '5173') return 'http://localhost';
+        return '';
+    }, []);
+
     const getInitials = (name: string): string => {
         return name
             .split(' ')
@@ -273,22 +203,106 @@ export default function Leaderboard() {
         }).format(sales);
     };
 
-    const formatOrders = (orders: number): string => {
-        return orders.toString();
+    const formatOrders = (orders: number): string => orders.toString();
+
+    const formatDate = (date: Date): string => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
     };
 
-    const handleTabClick = (tab: string): void => {
-        console.log(`${tab} tab clicked`);
-        // if (tab === 'Daily') { sort by daily sales }
-        // if (tab === 'Weekly') { sort by weekly sales }
-        // if (tab === 'Monthly') { sort by monthly sales }
+    const periodDateRange = (tab: PeriodTab): { start: string; end: string } => {
+        const now = new Date();
+
+        if (tab === 'Daily') {
+            const today = formatDate(now);
+            return { start: today, end: today };
+        }
+
+        if (tab === 'Weekly') {
+            const start = new Date(now);
+            const day = (start.getDay() + 6) % 7;
+            start.setDate(start.getDate() - day);
+            const end = new Date(start);
+            end.setDate(start.getDate() + 6);
+            return { start: formatDate(start), end: formatDate(end) };
+        }
+
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        return { start: formatDate(start), end: formatDate(end) };
     };
 
-    const sortedUsers: User[] = [...users].sort(
-        (a: User, b: User) => b.sales - a.sales,
+    const parseJsonResponse = async (res: Response, label: string) => {
+        const text = await res.text();
+        if (!text) return {};
+        try {
+            return JSON.parse(text);
+        } catch {
+            const preview = text.slice(0, 80).replace(/\s+/g, ' ');
+            throw new Error(`${label} returned non-JSON response (${res.status}): ${preview}`);
+        }
+    };
+
+    useEffect(() => {
+        const load = async () => {
+            setLoading(true);
+            setError(null);
+
+            try {
+                const range = periodDateRange(period);
+                const perfUrl = `${apiBase}/api/public/workspaces/${workspaceSlug}/csrs/performance?start_date=${encodeURIComponent(range.start)}&end_date=${encodeURIComponent(range.end)}`;
+
+                const res = await fetch(perfUrl, {
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+
+                const json = await parseJsonResponse(res, 'Leaderboard API');
+                if (!res.ok) throw new Error(json.message || 'Failed to load leaderboard');
+
+                const rows = Array.isArray(json.data) ? json.data : [];
+                const normalized = rows.map((row: Partial<LeaderboardRow>) => ({
+                    csr_id: String(row.csr_id ?? ''),
+                    name: row.name || '-',
+                    total_orders: Number(row.total_orders || 0),
+                    total_sales: Number(row.total_sales || 0),
+                    rank: Number(row.rank || 0),
+                }));
+
+                setUsers(normalized);
+            } catch (err) {
+                const message = err instanceof Error ? err.message : 'Failed to load leaderboard';
+                setError(message);
+                setUsers([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        void load();
+    }, [period, workspaceSlug, apiBase]);
+
+    useEffect(() => {
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        if (loading) {
+            setLoaderMounted(true);
+        } else {
+            timeoutId = setTimeout(() => setLoaderMounted(false), 500);
+        }
+
+        return () => {
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, [loading]);
+
+    const topThree: LeaderboardRow[] = [users[1], users[0], users[2]].filter(
+        (user): user is LeaderboardRow => Boolean(user),
     );
-    const topThree: User[] = sortedUsers.slice(0, 3);
-    const restOfUsers: User[] = sortedUsers.slice(3);
+    const restOfUsers: LeaderboardRow[] = users.slice(3);
 
     return (
         <div className="relative h-screen overflow-hidden bg-violet-900">
@@ -336,12 +350,12 @@ export default function Leaderboard() {
 
                     <div className="mt-6 flex gap-4">
                         {(['Daily', 'Weekly', 'Monthly'] as const).map(
-                            (tab: string, index: number) => (
+                            (tab: PeriodTab) => (
                                 <button
                                     key={tab}
-                                    onClick={() => handleTabClick(tab)}
+                                    onClick={() => setPeriod(tab)}
                                     className={`relative overflow-hidden rounded-full border border-white/10 px-6 py-2 text-gray-200 transition-all hover:shadow-lg hover:shadow-white/10 ${
-                                        index === 0
+                                        period === tab
                                             ? 'bg-white/5 backdrop-blur-sm hover:bg-white/20'
                                             : 'hover:bg-white/5'
                                     }`}
@@ -353,36 +367,44 @@ export default function Leaderboard() {
                         )}
                     </div>
 
+                    {error && (
+                        <div className="mt-6 rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-100">
+                            {error}
+                        </div>
+                    )}
+
                     <div className="flex items-end gap-4">
-                        {topThree.map((user: User, index: number) => {
+                        {topThree.map((user: LeaderboardRow, index: number) => {
                             const rank = index === 0 ? 2 : index === 1 ? 1 : 3;
                             return (
                                 <LeaderboardCard
-                                    key={user.id}
+                                    key={user.csr_id}
                                     rank={rank}
                                     initials={getInitials(user.name)}
                                     name={user.name}
-                                    sales={formatSales(user.sales)}
-                                    orders={formatOrders(user.orders_count)}
+                                    sales={formatSales(user.total_sales)}
+                                    orders={formatOrders(user.total_orders)}
                                 />
                             );
                         })}
                     </div>
 
                     <div className="mt-8 w-full max-w-4xl space-y-2 px-4">
-                        {restOfUsers.map((user: User, index: number) => (
+                        {restOfUsers.map((user: LeaderboardRow, index: number) => (
                             <LeaderboardEntry
-                                key={user.id}
+                                key={user.csr_id}
                                 rank={index + 4}
                                 initials={getInitials(user.name)}
                                 name={user.name}
-                                amount={formatSales(user.sales)}
-                                orders={formatOrders(user.orders_count)}
+                                amount={formatSales(user.total_sales)}
+                                orders={formatOrders(user.total_orders)}
                             />
                         ))}
                     </div>
                 </div>
             </div>
+
+            {loaderMounted && <OldDesignLoader visible={loading} />}
         </div>
     );
 }
