@@ -20,6 +20,7 @@ import {
     Clock3,
     DollarSign,
     PackageCheck,
+    PhilippinePeso,
     ReceiptText,
     Repeat,
     ShoppingCart,
@@ -53,7 +54,7 @@ const Dashboard = ({ workspace }: Props) => {
             label: 'Total Sales',
             key: 'totalSales',
             formatter: currencyFormatter,
-            icon: DollarSign,
+            icon: PhilippinePeso,
             tooltipLabel:
                 'Total confirmed sales within the selected date range.',
         },

@@ -1,19 +1,36 @@
 <?php
 
 use App\Http\Controllers\API\Workspace\AnalyticsController;
+use App\Http\Controllers\API\Workspace\CsrPerformanceController;
 use App\Http\Controllers\API\Workspace\PageController;
 use App\Http\Controllers\API\Workspace\ProductController;
 use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
 
+Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {
+    Route::get('/workspaces/{workspace}/csrs/performance', [CsrPerformanceController::class, 'publicIndex'])
+        ->middleware('throttle:csr-public-performance')
+        ->name('workspaces.csrs.performance.index');
+
+    Route::get('/workspaces/{workspace}/csrs', [CsrPerformanceController::class, 'publicCsrIndex'])
+        ->middleware('throttle:csr-public-csrs')
+        ->name('workspaces.csrs.index');
+
+    Route::get('/leaderboards', [CsrPerformanceController::class, 'leaderboards']);
+
+
+});
+
 Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], function () {
     Route::group(['prefix' => 'workspaces/{workspace}', 'as' => 'workspaces.'], function () {
+        Route::get('/csrs/performance', [CsrPerformanceController::class, 'index'])->name('csrs.performance.index');
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
         Route::get('/pages', [PageController::class, 'index'])->name('pages.index');
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
+        Route::get('/leaderboards', [CsrPerformanceController::class, 'leaderboards'])->name('leaderboards.index');
     });
 });
 
