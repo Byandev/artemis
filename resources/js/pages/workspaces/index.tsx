@@ -4,7 +4,7 @@ import { Head } from '@inertiajs/react';
 import WorkspaceCard from '@/components/workspaces/WorkspaceCard';
 
 interface WorkspaceWithCount extends Workspace {
-    users_count: number;
+  users_count: number;
 }
 
 interface WorkSpacesProps {

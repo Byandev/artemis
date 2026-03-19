@@ -11,6 +11,7 @@ use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
+use App\Models\Role;
 
 class WorkspaceMemberController extends Controller
 {
@@ -20,7 +21,7 @@ class WorkspaceMemberController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -92,6 +93,10 @@ class WorkspaceMemberController extends Controller
             'members' => $members,
             'pendingInvitations' => $pendingInvitations,
             'isAdmin' => $isAdmin,
+
+            'roles' => Role::where('workspace_id', $workspace->id)
+                ->get(['id', 'role', 'display_name', 'description']),
+
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
@@ -102,16 +107,19 @@ class WorkspaceMemberController extends Controller
     /**
      * Update a member's role.
      */
-    public function update(Request $request, Workspace $workspace, User $user)
+    public function updateMember(Request $request, Workspace $workspace, User $user)
     {
-        // Only admins and owners can update roles
-        if (! $request->user()->isAdminOf($workspace)) {
+
+        if (!$request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to update member roles.');
         }
 
-        // Cannot change the owner's role
         if ($workspace->isOwner($user)) {
             return back()->withErrors(['error' => 'Cannot change the workspace owner\'s role.']);
+        }
+
+        if ($workspace->owner_id === $user->id) {
+            return back()->withErrors(['role' => 'Owner roles are protected.']);
         }
 
         $validated = $request->validate([
@@ -129,7 +137,7 @@ class WorkspaceMemberController extends Controller
     public function destroy(Request $request, Workspace $workspace, User $user)
     {
         // Only admins and owners can remove members
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (!$request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to remove members.');
         }
 
@@ -149,5 +157,33 @@ class WorkspaceMemberController extends Controller
         $workspace->removeMember($user);
 
         return back()->with('success', 'Member removed successfully.');
+    }
+
+
+    public function store(Request $request, Workspace $workspace)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'role' => 'required|string|exists:roles,role',
+        ]);
+
+        $workspace->invitations()->create([
+            'email' => $request->email,
+            'role' => $request->role,
+            'token' => \Illuminate\Support\Str::random(64),
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        return back();
+    }
+
+    public function edit(Workspace $workspace)
+    {
+        return Inertia::render('Workspaces/Members', [
+            'workspace' => $workspace,
+            'members' => $workspace->users()->get(),
+            // Item 4: Fetch roles filtered by the current workspace
+            'roles' => Role::where('workspace_id', $workspace->id)->get(),
+        ]);
     }
 }
