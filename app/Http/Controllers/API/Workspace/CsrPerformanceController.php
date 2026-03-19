@@ -230,10 +230,10 @@ class CsrPerformanceController extends Controller
 
     public function leaderboards()
     {
-        $startDate = Carbon::now()->startOfYear()->format('Y-m-d H:i:s');
-        $endDate = Carbon::now()->endOfYear()->format('Y-m-d H:i:s');
+        $startDate = Carbon::now()->startOfDay()->format('Y-m-d H:i:s');
+        $endDate = Carbon::now()->endOfDay()->format('Y-m-d H:i:s');
 
-        $users = PancakeUser::query()
+        return PancakeUser::query()
             ->withCount([
                 'orders' => function ($query) use ($startDate, $endDate) {
                     $query->whereBetween('confirmed_at', [$startDate, $endDate]);
@@ -246,7 +246,5 @@ class CsrPerformanceController extends Controller
             ], 'final_amount')
             ->orderByDesc('sales')
             ->get();
-
-        return $users;
     }
 }
