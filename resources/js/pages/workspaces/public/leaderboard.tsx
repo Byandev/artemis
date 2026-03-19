@@ -1,3 +1,7 @@
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+import error from 'eslint-plugin-react/lib/util/error';
+
 interface User {
     id: string;
     name: string;
@@ -257,6 +261,8 @@ const LeaderboardEntry = ({
 };
 
 export default function Leaderboard() {
+
+    const [ users, setUsers] = useState([]);
     const getInitials = (name: string): string => {
         return name
             .split(' ')
@@ -289,6 +295,23 @@ export default function Leaderboard() {
     );
     const topThree: User[] = sortedUsers.slice(0, 3);
     const restOfUsers: User[] = sortedUsers.slice(3);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const response = await axios.get(
+                    '/api/public/leaderboards',
+                );
+                setUsers(response.data);
+            } catch (error) {
+                console.log(error);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    console.log(users)
 
     return (
         <div className="relative h-screen overflow-hidden bg-violet-900">
@@ -355,7 +378,8 @@ export default function Leaderboard() {
 
                     <div className="flex items-end gap-4">
                         {topThree.map((user: User, index: number) => {
-                            const rank = index === 0 ? 2 : index === 1 ? 1 : 3;
+                            const rank = index === 0 ? 1 : index === 1 ? 2 : 3;
+
                             return (
                                 <LeaderboardCard
                                     key={user.id}

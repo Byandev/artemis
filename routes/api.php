@@ -16,6 +16,10 @@ Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {
     Route::get('/workspaces/{workspace}/csrs', [CsrPerformanceController::class, 'publicCsrIndex'])
         ->middleware('throttle:csr-public-csrs')
         ->name('workspaces.csrs.index');
+
+    Route::get('/leaderboards', [CsrPerformanceController::class, 'leaderboards']);
+
+
 });
 
 Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], function () {
@@ -26,6 +30,7 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
         Route::get('/pages', [PageController::class, 'index'])->name('pages.index');
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
+        Route::get('/leaderboards', [CsrPerformanceController::class, 'leaderboards'])->name('leaderboards.index');
     });
 });
 

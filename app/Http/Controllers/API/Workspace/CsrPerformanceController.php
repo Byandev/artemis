@@ -227,4 +227,24 @@ class CsrPerformanceController extends Controller
             default => $base->startOfMonth()->toDateString(),
         };
     }
+
+    public function leaderboards()
+    {
+        $startDate = Carbon::now()->startOfDay()->format('Y-m-d H:i:s');
+        $endDate = Carbon::now()->endOfDay()->format('Y-m-d H:i:s');
+
+        return PancakeUser::query()
+            ->withCount([
+                'orders' => function ($query) use ($startDate, $endDate) {
+                    $query->whereBetween('confirmed_at', [$startDate, $endDate]);
+                }
+            ])
+            ->withSum([
+                'orders as sales' => function ($query) use ($startDate, $endDate) {
+                    $query->whereBetween('confirmed_at', [$startDate, $endDate]);
+                }
+            ], 'final_amount')
+            ->orderByDesc('sales')
+            ->get();
+    }
 }
