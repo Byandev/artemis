@@ -20,78 +20,59 @@ import { RefreshCcw } from 'lucide-react';
 import moment from 'moment/moment';
 import { useEffect, useMemo, useState } from 'react';
 import ComponentCard from '@/components/common/ComponentCard';
-import { currencyFormatter, numberFormatter, percentageFormatter } from '@/lib/utils';
+import { metricConfigs, MetricKey } from '@/types/metrics';
 
 interface Props {
+    metrics: MetricKey[],
     workspace: Workspace;
     dateRange: string[];
     filter: FilterValue;
 }
 
-export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
-    const [primaryBreakdown, setPrimaryBreakdown] = useState<any[]>([]);
-    const [secondaryBreakdown, setSecondaryBreakdown] = useState<any[]>([]);
+interface Breakdown {
+    period: string;
+    value: number
+}
 
-    const [option, setOption] = useState('totalSales');
-    const [secondOption, setSecondOption] = useState('totalOrders');
+export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Props) {
+    const [primaryBreakdown, setPrimaryBreakdown] = useState<Breakdown[]>([]);
+    const [secondaryBreakdown, setSecondaryBreakdown] = useState<Breakdown[]>([]);
+
+    const [option, setOption] = useState<MetricKey>(metrics[0]);
+    const [secondOption, setSecondOption] = useState<MetricKey>(metrics[1]);
+
+    const metricOne = useMemo(
+        () => metricConfigs.find((m) => m.key === option),
+        [option],
+    );
+
+    const metricTwo = useMemo(
+        () => metricConfigs.find((m) => m.key === secondOption),
+        [secondOption],
+    );
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [group, setGroup] = useState('daily');
     const [reload, setReload] = useState(false);
 
-    const start = moment(dateRange[0]);
-    const end = moment(dateRange[1]);
-    const daysDiff = end.diff(start, 'days');
+    const daysDiff = useMemo(
+        () => moment(dateRange[1]).diff(moment(dateRange[0]), 'days'),
+        [dateRange],
+    );
 
-    const availableGroups: string[] = [];
-    if (daysDiff <= 7) {
-        availableGroups.push('daily');
-    } else if (daysDiff <= 30) {
-        availableGroups.push('daily', 'weekly');
-    } else if (daysDiff <= 365) {
-        availableGroups.push('weekly', 'monthly');
-    } else {
-        availableGroups.push('weekly', 'monthly', 'yearly');
-    }
+    const availableGroups = useMemo<string[]>(() => {
+        if (daysDiff <= 7) return ['daily'];
+        if (daysDiff <= 30) return ['daily', 'weekly'];
+        if (daysDiff <= 365) return ['weekly', 'monthly'];
+        return ['weekly', 'monthly', 'yearly'];
+    }, [daysDiff]);
 
     useEffect(() => {
         if (!availableGroups.includes(group) && availableGroups.length > 0) {
             setGroup(availableGroups[0]);
         }
     }, [availableGroups, group]);
-
-    const optionLabels: Record<string, string> = {
-        totalSales: 'Total Sales',
-        totalOrders: 'Total Orders',
-        aov: 'AOV',
-        rtsRate: 'RTS',
-        repeatOrderRatio: 'ROR',
-        timeToFirstOrder: 'Time to First Order',
-        avgLifetimeValue: 'Average Lifetime Value',
-        avgDeliveryDays: 'Average Delivery Days',
-        avgShippedOutDays: 'Average Shipped Out Days',
-    };
-
-    const formatMetricValue = (metric: string, value: number) => {
-        switch (metric) {
-            case 'aov':
-            case 'totalSales':
-            case 'avgLifetimeValue':
-                return currencyFormatter(value);
-            case 'rtsRate':
-            case 'repeatOrderRatio':
-                return percentageFormatter(value);
-            case 'timeToFirstOrder':
-                return `${value} hours`;
-            case 'avgDeliveryDays':
-            case 'avgShippedOutDays':
-                return `${value} days`;
-            case 'totalOrders':
-            default:
-                return numberFormatter(value);
-        }
-    };
 
     useEffect(() => {
         const fetchData = async () => {
@@ -100,8 +81,8 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
 
             const commonParams = {
                 group: group,
-                'date_range[start_date]': start.format('YYYY-MM-DD'),
-                'date_range[end_date]': end.format('YYYY-MM-DD'),
+                'date_range[start_date]': dateRange[0],
+                'date_range[end_date]': dateRange[1],
                 'filter[team_ids]': filter.teamIds.join(','),
                 'filter[shop_ids]': filter.shopIds.join(','),
                 'filter[page_ids]': filter.pageIds.join(','),
@@ -167,13 +148,13 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
             categories: allPeriods,
             series: [
                 {
-                    name: optionLabels[option],
+                    name: metricOne?.name,
                     data: allPeriods.map(
                         (period) => primaryMap.get(period) ?? 0,
                     ),
                 },
                 {
-                    name: optionLabels[secondOption],
+                    name: metricTwo?.name,
                     data: allPeriods.map(
                         (period) => secondaryMap.get(period) ?? 0,
                     ),
@@ -188,9 +169,9 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
 
     return (
         <div className="space-y-4">
-            <div className="flex item-center justify-between">
-                <h2 className=" font-semibold">
-                    {optionLabels[option]} vs {optionLabels[secondOption]}
+            <div className="item-center flex justify-between">
+                <h2 className="font-semibold">
+                    {metricOne?.name} vs {metricTwo?.name}
                 </h2>
 
                 <div className="flex items-center justify-between gap-4">
@@ -212,18 +193,26 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
 
                     <div className="flex items-center justify-between gap-2">
                         <div className="w-60">
-                            <Select value={option} onValueChange={setOption}>
+                            <Select
+                                value={option}
+                                onValueChange={(newValue: MetricKey) =>
+                                    setOption(newValue)
+                                }
+                            >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select first option" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {Object.entries(optionLabels).map(
-                                        ([key, label]) => (
-                                            <SelectItem key={key} value={key}>
-                                                {label}
+                                    {metricConfigs
+                                        .filter((m) => metrics.includes(m.key))
+                                        .map((item) => (
+                                            <SelectItem
+                                                key={item.key}
+                                                value={item.key}
+                                            >
+                                                {item.name}
                                             </SelectItem>
-                                        ),
-                                    )}
+                                        ))}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -231,19 +220,24 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
                         <div className="w-60">
                             <Select
                                 value={secondOption}
-                                onValueChange={setSecondOption}
+                                onValueChange={(newValue: MetricKey) =>
+                                    setSecondOption(newValue)
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select second option" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {Object.entries(optionLabels).map(
-                                        ([key, label]) => (
-                                            <SelectItem key={key} value={key}>
-                                                {label}
+                                    {metricConfigs
+                                        .filter((m) => metrics.includes(m.key))
+                                        .map((item) => (
+                                            <SelectItem
+                                                key={item.key}
+                                                value={item.key}
+                                            >
+                                                {item.name}
                                             </SelectItem>
-                                        ),
-                                    )}
+                                        ))}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -306,13 +300,17 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
                     <LineChart
                         categories={mergedChartData.categories}
                         series={mergedChartData.series}
-                        leftAxisTitle={optionLabels[option]}
-                        rightAxisTitle={optionLabels[secondOption]}
+                        leftAxisTitle={metricOne?.name ?? ''}
+                        rightAxisTitle={metricTwo?.name ?? ''}
                         leftFormatter={(value) =>
-                            formatMetricValue(option, value)
+                            metricOne?.formatter
+                                ? metricOne.formatter(value)
+                                : value.toString()
                         }
                         rightFormatter={(value) =>
-                            formatMetricValue(secondOption, value)
+                            metricTwo?.formatter
+                                ? metricTwo.formatter(value)
+                                : value.toString()
                         }
                     />
                 </ComponentCard>

@@ -308,14 +308,14 @@ final class RtsRate
 
     public function perUser(int $workspaceId, array $date_range, array $filter)
     {
-        $start = $date_range['start_date'] . ' 00:00:00';
-        $end = $date_range['end_date'] . ' 23:59:59';
+        $start = $date_range['start_date'].' 00:00:00';
+        $end = $date_range['end_date'].' 23:59:59';
 
-        $pageIds = !empty($filter['page_ids'])
+        $pageIds = ! empty($filter['page_ids'])
             ? (is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids']))
             : [];
 
-        $shopIds = !empty($filter['shop_ids'])
+        $shopIds = ! empty($filter['shop_ids'])
             ? (is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']))
             : [];
 
@@ -331,10 +331,10 @@ final class RtsRate
             ->where('pancake_orders.workspace_id', $workspaceId)
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->whereBetween('pancake_orders.returning_at', [$start, $end])
-            ->when(!empty($pageIds), function ($query) use ($pageIds) {
+            ->when(! empty($pageIds), function ($query) use ($pageIds) {
                 $query->whereIn('pages.id', $pageIds);
             })
-            ->when(!empty($shopIds), function ($query) use ($shopIds) {
+            ->when(! empty($shopIds), function ($query) use ($shopIds) {
                 $query->whereIn('pages.shop_id', $shopIds);
             })
             ->whereNotNull('pages.owner_id')
@@ -352,10 +352,10 @@ final class RtsRate
             ->where('pancake_orders.workspace_id', $workspaceId)
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->whereBetween('pancake_orders.delivered_at', [$start, $end])
-            ->when(!empty($pageIds), function ($query) use ($pageIds) {
+            ->when(! empty($pageIds), function ($query) use ($pageIds) {
                 $query->whereIn('pages.id', $pageIds);
             })
-            ->when(!empty($shopIds), function ($query) use ($shopIds) {
+            ->when(! empty($shopIds), function ($query) use ($shopIds) {
                 $query->whereIn('pages.shop_id', $shopIds);
             })
             ->whereNotNull('pages.owner_id')

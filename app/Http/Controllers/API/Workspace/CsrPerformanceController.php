@@ -237,12 +237,12 @@ class CsrPerformanceController extends Controller
             ->withCount([
                 'orders' => function ($query) use ($startDate, $endDate) {
                     $query->whereBetween('confirmed_at', [$startDate, $endDate]);
-                }
+                },
             ])
             ->withSum([
                 'orders as sales' => function ($query) use ($startDate, $endDate) {
                     $query->whereBetween('confirmed_at', [$startDate, $endDate]);
-                }
+                },
             ], 'final_amount')
             ->whereHas('orders', function ($query) use ($startDate, $endDate) {
                 $query->whereBetween('confirmed_at', [$startDate, $endDate]);

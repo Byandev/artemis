@@ -35,7 +35,7 @@ export function FilterGroup<T>({
             onOpenChange={setOpen}
             className="rounded-lg border bg-gray-50 p-4"
         >
-            <CollapsibleTrigger className="flex w-full items-center justify-between text-sm font-medium">
+            <CollapsibleTrigger className="flex w-full items-center justify-between text-xs font-semibold">
                 {name}
                 {open ? (
                     <ChevronUp className="h-4 w-4" />

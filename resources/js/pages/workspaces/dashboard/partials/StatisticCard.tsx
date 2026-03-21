@@ -4,7 +4,7 @@ import axios from 'axios';
 import type { LucideIcon } from 'lucide-react';
 import { CircleHelp, Minus, TrendingDown, TrendingUp } from 'lucide-react';
 import moment from 'moment/moment';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
     Tooltip,
@@ -20,18 +20,19 @@ export interface Props {
     filter: FilterValue;
     dateRange: string[];
     formatter: (value: number) => string;
-    icon?: LucideIcon;
+    icon?: LucideIcon | null;
     tooltipLabel?: string;
+    reverseTrend?: boolean;
 }
 
 type AnalyticsResponse = Record<string, number>;
 
 function CardSkeleton({
-    label,
-    icon: Icon,
-}: {
+                          label,
+                          icon: Icon,
+                      }: {
     label: string;
-    icon?: LucideIcon;
+    icon?: LucideIcon | null;
 }) {
     return (
         <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
@@ -63,21 +64,59 @@ function CardSkeleton({
 }
 
 const StatisticCard = ({
-    metric,
-    label,
-    workspace,
-    dateRange,
-    filter,
-    formatter,
-    icon: Icon,
-    tooltipLabel,
-}: Props) => {
+                           metric,
+                           label,
+                           workspace,
+                           dateRange,
+                           filter,
+                           formatter,
+                           icon: Icon,
+                           tooltipLabel,
+                           reverseTrend = false,
+                       }: Props) => {
     const [currentValue, setCurrentValue] = useState(0);
     const [previousValue, setPreviousValue] = useState(0);
 
     const [loadingCurrent, setLoadingCurrent] = useState(false);
     const [loadingComparison, setLoadingComparison] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+
+    const period = useMemo(() => {
+        const start = moment(dateRange[0]).startOf('day');
+        const end = moment(dateRange[1]).startOf('day');
+        const days = end.diff(start, 'days') + 1;
+
+        const prevEnd = start.clone().subtract(1, 'day');
+        const prevStart = prevEnd.clone().subtract(days - 1, 'days');
+
+        return {
+            start,
+            end,
+            days,
+            prevStart,
+            prevEnd,
+        };
+    }, [dateRange[0], dateRange[1]]);
+
+    const teamIds = useMemo(() => filter.teamIds.join(','), [filter.teamIds]);
+    const shopIds = useMemo(() => filter.shopIds.join(','), [filter.shopIds]);
+    const pageIds = useMemo(() => filter.pageIds.join(','), [filter.pageIds]);
+    const userIds = useMemo(() => filter.userIds.join(','), [filter.userIds]);
+    const productIds = useMemo(
+        () => filter.productIds.join(','),
+        [filter.productIds],
+    );
+
+    const commonParams = useMemo(
+        () => ({
+            'metric[]': metric,
+            'filter[team_ids]': teamIds,
+            'filter[shop_ids]': shopIds,
+            'filter[page_ids]': pageIds,
+            'filter[user_ids]': userIds,
+            'filter[product_ids]': productIds,
+        }),
+        [metric, teamIds, shopIds, pageIds, userIds, productIds],
+    );
 
     useEffect(() => {
         const controller = new AbortController();
@@ -86,26 +125,8 @@ const StatisticCard = ({
             try {
                 setLoadingCurrent(true);
                 setLoadingComparison(false);
-                setError(null);
                 setCurrentValue(0);
                 setPreviousValue(0);
-
-                const start = moment(dateRange[0]).startOf('day');
-                const end = moment(dateRange[1]).startOf('day');
-
-                const days = end.diff(start, 'days') + 1;
-
-                const prevEnd = start.clone().subtract(1, 'day');
-                const prevStart = prevEnd.clone().subtract(days - 1, 'days');
-
-                const commonParams = {
-                    'metric[]': metric,
-                    'filter[team_ids]': filter.teamIds.join(','),
-                    'filter[shop_ids]': filter.shopIds.join(','),
-                    'filter[page_ids]': filter.pageIds.join(','),
-                    'filter[user_ids]': filter.userIds.join(','),
-                    'filter[product_ids]': filter.productIds.join(','),
-                };
 
                 const currentRes = await axios.get<AnalyticsResponse>(
                     '/api/v1/workspace/analytics',
@@ -115,8 +136,9 @@ const StatisticCard = ({
                         params: {
                             ...commonParams,
                             'date_range[start_date]':
-                                start.format('YYYY-MM-DD'),
-                            'date_range[end_date]': end.format('YYYY-MM-DD'),
+                                period.start.format('YYYY-MM-DD'),
+                            'date_range[end_date]':
+                                period.end.format('YYYY-MM-DD'),
                         },
                     },
                 );
@@ -136,9 +158,9 @@ const StatisticCard = ({
                         params: {
                             ...commonParams,
                             'date_range[start_date]':
-                                prevStart.format('YYYY-MM-DD'),
+                                period.prevStart.format('YYYY-MM-DD'),
                             'date_range[end_date]':
-                                prevEnd.format('YYYY-MM-DD'),
+                                period.prevEnd.format('YYYY-MM-DD'),
                         },
                     },
                 );
@@ -150,12 +172,6 @@ const StatisticCard = ({
                 if (axios.isCancel?.(err) || err?.name === 'CanceledError') {
                     return;
                 }
-
-                setError(
-                    err?.response?.data?.message ??
-                        err?.message ??
-                        'Failed to load analytics.',
-                );
             } finally {
                 if (!controller.signal.aborted) {
                     setLoadingCurrent(false);
@@ -167,48 +183,81 @@ const StatisticCard = ({
         fetchData();
 
         return () => controller.abort();
-    }, [workspace.id, dateRange, filter, metric]);
+    }, [workspace.id, metric, commonParams, period]);
 
-    const days =
-        moment(dateRange[1])
-            .startOf('day')
-            .diff(moment(dateRange[0]).startOf('day'), 'days') + 1;
+    const previousPeriodText = useMemo(() => {
+        if (period.days === 1) return 'yesterday';
+        return `prev ${period.days} days`;
+    }, [period.days]);
 
-    // Get previous period description
-    const getPreviousPeriodText = () => {
-        if (days === 1) return 'yesterday';
-        if (days === 7) return 'prev 7 days';
-        if (days === 30) return 'pred 30 days';
-        return `prev ${days} days`;
-    };
+    const comparison = useMemo(() => {
+        const hasPreviousData = previousValue > 0;
+        const difference = currentValue - previousValue;
+        const percent = hasPreviousData
+            ? (difference / previousValue) * 100
+            : 0;
 
-    const hasPreviousData = previousValue > 0;
-    const difference = currentValue - previousValue;
+        const isPositive = difference > 0;
+        const isNegative = difference < 0;
+        const isNeutral = difference === 0;
 
-    const percent = hasPreviousData ? (difference / previousValue) * 100 : 0;
+        const TrendIcon = isPositive
+            ? TrendingUp
+            : isNegative
+                ? TrendingDown
+                : Minus;
 
-    const isPositive = difference > 0;
-    const isNegative = difference < 0;
-    const isNeutral = difference === 0;
+        const isGood = reverseTrend ? isNegative : isPositive;
+        const isBad = reverseTrend ? isPositive : isNegative;
 
-    const TrendIcon = isPositive
-        ? TrendingUp
-        : isNegative
-          ? TrendingDown
-          : Minus;
+        const trendClasses = isGood
+            ? 'text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-950/30'
+            : isBad
+                ? 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950/30'
+                : 'text-gray-500 bg-gray-50 dark:text-gray-400 dark:bg-gray-800';
 
-    // Combined classes for text color and background
-    const trendClasses = isPositive
-        ? 'text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-950/30'
-        : isNegative
-          ? 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950/30'
-          : 'text-gray-500 bg-gray-50 dark:text-gray-400 dark:bg-gray-800';
+        return {
+            hasPreviousData,
+            difference,
+            percent,
+            isPositive,
+            isNegative,
+            isNeutral,
+            isGood,
+            isBad,
+            TrendIcon,
+            trendClasses,
+        };
+    }, [currentValue, previousValue, reverseTrend]);
 
-    const tooltipDescription = loadingComparison
-        ? `Comparing ${label} with the previous ${days}-day period...`
-        : hasPreviousData
-          ? `${label} is ${isPositive ? 'up' : isNegative ? 'down' : 'unchanged'} ${Math.abs(percent).toFixed(1)}% compared to the previous ${days}-day period. Current: ${formatter(currentValue)}. Previous: ${formatter(previousValue)}.`
-          : `${label} is currently ${formatter(currentValue)}. No previous data available for comparison.`;
+    const tooltipDescription = useMemo(() => {
+        if (loadingComparison) {
+            return `Comparing ${label} with the previous ${period.days}-day period...`;
+        }
+
+        if (comparison.hasPreviousData) {
+            const status = comparison.isNeutral
+                ? 'unchanged'
+                : comparison.isGood
+                    ? 'improving'
+                    : 'worsening';
+
+            return `${label} is ${status} by ${Math.abs(comparison.percent).toFixed(1)}% compared to the previous ${period.days}-day period. Current: ${formatter(currentValue)}. Previous: ${formatter(previousValue)}.`;
+        }
+
+        return `${label} is currently ${formatter(currentValue)}. No previous data available for comparison.`;
+    }, [
+        loadingComparison,
+        label,
+        period.days,
+        comparison.hasPreviousData,
+        comparison.isNeutral,
+        comparison.isGood,
+        comparison.percent,
+        formatter,
+        currentValue,
+        previousValue,
+    ]);
 
     if (loadingCurrent) {
         return <CardSkeleton label={label} icon={Icon} />;
@@ -253,6 +302,7 @@ const StatisticCard = ({
                 <h4 className="text-2xl font-bold text-gray-800 dark:text-white/90">
                     {formatter(currentValue)}
                 </h4>
+
                 <div>
                     {loadingComparison ? (
                         <div className="mt-2 flex items-center gap-2">
@@ -260,19 +310,19 @@ const StatisticCard = ({
                             <div className="h-3 w-24 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
                         </div>
                     ) : (
-                        hasPreviousData && (
+                        comparison.hasPreviousData && (
                             <div className="mt-2 flex items-center gap-2">
-                                {/* Previous period indicator */}
-                                <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                                    {getPreviousPeriodText()}
-                                </span>
+                                {/*<span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">*/}
+                                {/*    {previousPeriodText}*/}
+                                {/*</span>*/}
+
                                 <p
-                                    className={`inline-flex items-center gap-1 rounded-xl border-0 px-2 py-1 text-xs font-medium ${trendClasses}`}
+                                    className={`inline-flex items-center gap-1 rounded-xl border-0 px-2 py-1 text-[10px] font-medium ${comparison.trendClasses}`}
                                 >
-                                    <TrendIcon className="h-3.5 w-3.5" />
-                                    {isNeutral
+                                    <comparison.TrendIcon className="h-3.5 w-3.5" />
+                                    {comparison.isNeutral
                                         ? '0.0%'
-                                        : `${isPositive ? '+' : ''}${percent.toFixed(1)}%`}
+                                        : `${comparison.isPositive ? '+' : ''}${comparison.percent.toFixed(1)}%`}
                                 </p>
                             </div>
                         )

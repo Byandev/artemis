@@ -18,7 +18,6 @@ import PageBreakdown from '@/pages/workspaces/dashboard/partials/PageBreakdown';
 import ShopBreakdown from '@/pages/workspaces/dashboard/partials/ShopBreakdown';
 import {
     Clock3,
-    DollarSign,
     PackageCheck,
     PhilippinePeso,
     ReceiptText,
@@ -30,6 +29,8 @@ import {
 } from 'lucide-react';
 import UserBreakdown from '@/pages/workspaces/dashboard/partials/UserBreakdown';
 import { formatDate } from 'date-fns';
+import MetricPicker from '@/components/metrics/MetricPicker';
+import { metricConfigs, MetricKey } from '@/types/metrics';
 
 interface Props {
     workspace: Workspace;
@@ -49,81 +50,13 @@ const Dashboard = ({ workspace }: Props) => {
         userIds: [],
     });
 
-    const cards = [
-        {
-            label: 'Total Sales',
-            key: 'totalSales',
-            formatter: currencyFormatter,
-            icon: PhilippinePeso,
-            tooltipLabel:
-                'Total confirmed sales within the selected date range.',
-        },
-        {
-            label: 'Total Orders',
-            key: 'totalOrders',
-            formatter: numberFormatter,
-            icon: ShoppingCart,
-            tooltipLabel:
-                'Total number of valid orders for the selected filters.',
-        },
-        {
-            label: 'AOV',
-            key: 'aov',
-            formatter: currencyFormatter,
-            icon: ReceiptText,
-            tooltipLabel:
-                'Average Order Value. Computed as total sales divided by total orders.',
-        },
-        {
-            label: 'RTS Rate',
-            key: 'rtsRate',
-            formatter: percentageFormatter,
-            icon: Undo2,
-            tooltipLabel:
-                'Return-to-sender rate based on returned amount versus total amount.',
-        },
-        {
-            label: 'Repeat Order Ratio',
-            key: 'repeatOrderRatio',
-            formatter: percentageFormatter,
-            icon: Repeat,
-            tooltipLabel: 'Percentage of orders coming from repeat customers.',
-        },
-        {
-            label: 'Time to First Order',
-            key: 'timeToFirstOrder',
-            formatter: (value: number) => `${value ?? 0} Hrs`,
-            icon: Clock3,
-            tooltipLabel:
-                'Average time from customer creation to first confirmed order.',
-        },
-        {
-            label: 'Avg. Lifetime Value',
-            key: 'avgLifetimeValue',
-            formatter: currencyFormatter,
-            icon: Wallet,
-            tooltipLabel:
-                'Average revenue generated per customer over their lifetime.',
-        },
-        {
-            label: 'Avg Delivery Days',
-            key: 'avgDeliveryDays',
-            formatter: (value: number) => `${value ?? 0} Days`,
-            icon: Truck,
-            tooltipLabel:
-                'Average number of days from shipped date to delivered date.',
-        },
-        {
-            label: 'Avg Shipped Out Days',
-            key: 'avgShippedOutDays',
-            formatter: (value: number) => `${value ?? 0} Days`,
-            icon: PackageCheck,
-            tooltipLabel:
-                'Average number of days from confirmed date to shipped out date.',
-        },
-    ];
+    const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>([
+        'totalSales',
+        'totalOrders',
+        'aov',
+        'rtsRate',
+    ]);
 
-    console.log(dateRange);
 
     return (
         <AppLayout>
@@ -141,7 +74,11 @@ const Dashboard = ({ workspace }: Props) => {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        {/* Optional: if your Filters supports disabled, pass it; otherwise just leave it */}
+                        <MetricPicker
+                            initialValue={selectedMetrics}
+                            onChange={(value) => setSelectedMetrics(value)}
+                        />
+
                         <Filters
                             workspace={workspace}
                             onChange={(value) => setFilter(value)}
@@ -164,22 +101,26 @@ const Dashboard = ({ workspace }: Props) => {
                 </div>
 
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:gap-4 xl:grid-cols-4">
-                    {cards.map((card) => (
-                        <StatisticCard
-                            key={card.key}
-                            label={card.label}
-                            metric={card.key}
-                            workspace={workspace}
-                            filter={filter}
-                            dateRange={dateRange}
-                            formatter={card.formatter}
-                            icon={card.icon}
-                            tooltipLabel={card.tooltipLabel}
-                        />
+                    {metricConfigs
+                        .filter(m => selectedMetrics.includes(m.key))
+                        .map((card) => (
+                            <StatisticCard
+                                key={card.key}
+                                label={card.name}
+                                metric={card.key}
+                                workspace={workspace}
+                                filter={filter}
+                                dateRange={dateRange}
+                                formatter={card.formatter}
+                                icon={card.icon}
+                                tooltipLabel={card.description}
+                                reverseTrend={card.reverse}
+                            />
                     ))}
                 </div>
                 <ComponentCard className="mt-12">
                     <StatisticBreakdown
+                        metrics={selectedMetrics}
                         filter={filter}
                         dateRange={dateRange}
                         workspace={workspace}

@@ -118,7 +118,7 @@ const Filters = ({
                     className="relative border  border-gray-300 gap-2 rounded-full px-4"
                 >
                     <SlidersHorizontal className="h-4 w-4" />
-                    Filter
+                    Filters
                     {activeFilterCount > 0 && (
                         <Badge
                             variant="secondary"
