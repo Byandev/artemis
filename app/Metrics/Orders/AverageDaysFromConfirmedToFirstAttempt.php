@@ -4,7 +4,7 @@ namespace App\Metrics\Orders;
 
 use Illuminate\Support\Facades\DB;
 
-final class AverageShippedOutDays
+final class AverageDaysFromConfirmedToFirstAttempt
 {
     /**
      * Compute average days from confirmed -> shipped
@@ -15,7 +15,7 @@ final class AverageShippedOutDays
             ->selectRaw('
                 ROUND(
                     COALESCE(
-                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.confirmed_at, pancake_orders.shipped_at)),
+                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.confirmed_at, pancake_orders.first_delivery_attempt)),
                         0
                     ),
                     2
@@ -32,10 +32,10 @@ final class AverageShippedOutDays
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
         $periodSql = match ($group) {
-            'daily' => 'DATE(pancake_orders.shipped_at)',
-            'weekly' => "DATE_FORMAT(pancake_orders.shipped_at, '%x-W%v')",
-            'monthly' => "DATE_FORMAT(pancake_orders.shipped_at, '%Y-%m')",
-            default => 'DATE(pancake_orders.shipped_at)',
+            'daily' => 'DATE(pancake_orders.first_delivery_attempt)',
+            'weekly' => "DATE_FORMAT(pancake_orders.first_delivery_attempt, '%x-W%v')",
+            'monthly' => "DATE_FORMAT(pancake_orders.first_delivery_attempt, '%Y-%m')",
+            default => 'DATE(pancake_orders.first_delivery_attempt)',
         };
 
         return $this->baseQuery($workspaceId, $date_range, $filter)
@@ -43,7 +43,7 @@ final class AverageShippedOutDays
                 $periodSql as period,
                 ROUND(
                     COALESCE(
-                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.confirmed_at, pancake_orders.shipped_at)),
+                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.confirmed_at, pancake_orders.first_delivery_attempt)),
                         0
                     ),
                     2
@@ -62,7 +62,7 @@ final class AverageShippedOutDays
                 pages.name as page_name,
                 ROUND(
                     COALESCE(
-                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.confirmed_at, pancake_orders.shipped_at)),
+                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.confirmed_at, pancake_orders.first_delivery_attempt)),
                         0
                     ),
                     2
@@ -82,7 +82,7 @@ final class AverageShippedOutDays
                 shops.name as shop_name,
                 ROUND(
                     COALESCE(
-                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.confirmed_at, pancake_orders.shipped_at)),
+                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.confirmed_at, pancake_orders.first_delivery_attempt)),
                         0
                     ),
                     2
@@ -94,16 +94,15 @@ final class AverageShippedOutDays
             ->get();
     }
 
-
     public function perUser(int $workspaceId, array $date_range, array $filter)
     {
         $users = DB::table('users')
             ->join('pages', 'pages.owner_id', '=', 'users.id')
             ->where('pages.workspace_id', $workspaceId)
-            ->when(!empty($filter['shop_ids']), function ($query) use ($filter) {
+            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
                 $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
             })
-            ->when(!empty($filter['page_ids']), function ($query) use ($filter) {
+            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
                 $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
             })
             ->select('users.id', 'users.name')
@@ -115,10 +114,10 @@ final class AverageShippedOutDays
             $userFilter['page_ids'] = DB::table('pages')
                 ->where('workspace_id', $workspaceId)
                 ->where('owner_id', $user->id)
-                ->when(!empty($filter['shop_ids']), function ($query) use ($filter) {
+                ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
                     $query->whereIn('shop_id', $this->parseIds($filter['shop_ids']));
                 })
-                ->when(!empty($filter['page_ids']), function ($query) use ($filter) {
+                ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
                     $query->whereIn('id', $this->parseIds($filter['page_ids']));
                 })
                 ->pluck('id')
@@ -128,7 +127,7 @@ final class AverageShippedOutDays
             return (object) [
                 'user_id' => $user->id,
                 'user_name' => $user->name,
-                'value' => !empty($userFilter['page_ids'])
+                'value' => ! empty($userFilter['page_ids'])
                     ? $this->compute($workspaceId, $date_range, $userFilter)
                     : 0,
             ];
@@ -166,8 +165,8 @@ final class AverageShippedOutDays
             ->where('pancake_orders.workspace_id', $workspaceId)
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->whereNotNull('pancake_orders.confirmed_at')
-            ->whereNotNull('pancake_orders.shipped_at')
-            ->whereBetween('pancake_orders.shipped_at', [
+            ->whereNotNull('pancake_orders.first_delivery_attempt')
+            ->whereBetween('pancake_orders.first_delivery_attempt', [
                 $date_range['start_date'].' 00:00:00',
                 $date_range['end_date'].' 23:59:59',
             ]);

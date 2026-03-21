@@ -11,8 +11,10 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Modules\Pancake\Models\Order;
 use Modules\Pancake\Models\OrderItem;
+use Modules\Pancake\Models\OrderPhoneNumberReport;
 use Modules\Pancake\Models\ParcelJourney;
 use Modules\Pancake\Models\ParcelJourneyNotification;
+use Modules\Pancake\Models\PhoneNumberReport;
 
 class SyncOrder implements ShouldQueue
 {
@@ -166,7 +168,7 @@ class SyncOrder implements ShouldQueue
                                 $item['note'] = $note;
                             }
 
-                            if(!isset($item['updated_at'])) {
+                            if (! isset($item['updated_at'])) {
                                 $item['updated_at'] = $item['update_at'];
                             }
 
@@ -201,6 +203,35 @@ class SyncOrder implements ShouldQueue
                             }
                         }
                     }
+                }
+            }
+        }
+
+        if (isset($order['reports_by_phone'])) {
+            foreach ($order['reports_by_phone'] as $phone => $report) {
+                $orderFail = $report['order_fail'] ?? 0;
+                $orderSuccess = $report['order_success'] ?? 0;
+                $warning = $report['warning'] ?? 0;
+
+                if ($orderFail > 0 || $orderSuccess > 0 || $warning > 0) {
+                    $formatted_phone = '0'.substr($phone, -10);
+
+                    PhoneNumberReport::updateOrCreate([
+                        'phone_number' => $formatted_phone,
+                    ], [
+                        'order_fail' => $orderFail,
+                        'order_success' => $orderSuccess,
+                        'warning' => $warning,
+                    ]);
+
+                    OrderPhoneNumberReport::firstOrCreate([
+                        'order_id' => $savedOrder->id,
+                        'phone_number' => $formatted_phone,
+                    ], [
+                        'order_fail' => $orderFail,
+                        'order_success' => $orderSuccess,
+                        'warning' => $warning,
+                    ]);
                 }
             }
         }
@@ -290,7 +321,7 @@ class SyncOrder implements ShouldQueue
 
                 $parcelJourney->update([
                     'rider_mobile' => $rider_mobile,
-                    'rider_name' =>  $rider_name,
+                    'rider_name' => $rider_name,
                 ]);
 
                 ParcelJourneyNotification::create([

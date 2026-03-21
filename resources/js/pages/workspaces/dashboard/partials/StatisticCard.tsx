@@ -20,7 +20,7 @@ export interface Props {
     filter: FilterValue;
     dateRange: string[];
     formatter: (value: number) => string;
-    icon?: LucideIcon;
+    icon?: LucideIcon | null;
     tooltipLabel?: string;
 }
 

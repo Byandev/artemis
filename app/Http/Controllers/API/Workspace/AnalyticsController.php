@@ -4,9 +4,7 @@ namespace App\Http\Controllers\API\Workspace;
 
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 
 class AnalyticsController extends Controller
 {
@@ -19,11 +17,8 @@ class AnalyticsController extends Controller
                 ->extract($request->array('metric'));
         });
 
-
         return response()->json($data);
     }
-
-
 
     public function breakdown(Request $request)
     {

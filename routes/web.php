@@ -7,7 +7,6 @@ Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
 
-
 Route::get('/leaderboards', function () {
     return Inertia::render('workspaces/public/leaderboard');
 });

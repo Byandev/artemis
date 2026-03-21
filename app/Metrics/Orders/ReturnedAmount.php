@@ -4,7 +4,7 @@ namespace App\Metrics\Orders;
 
 use Illuminate\Support\Facades\DB;
 
-final class TotalSales
+final class ReturnedAmount
 {
     public function compute(int $workspaceId, array $date_range, array $filter): float
     {
@@ -18,10 +18,10 @@ final class TotalSales
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
         $periodSql = match ($group) {
-            'daily' => 'DATE(pancake_orders.confirmed_at)',
-            'weekly' => "DATE_FORMAT(pancake_orders.confirmed_at, '%x-W%v')",
-            'monthly' => "DATE_FORMAT(pancake_orders.confirmed_at, '%Y-%m')",
-            default => 'DATE(pancake_orders.confirmed_at)',
+            'daily' => 'DATE(pancake_orders.returned_at)',
+            'weekly' => "DATE_FORMAT(pancake_orders.returned_at, '%x-W%v')",
+            'monthly' => "DATE_FORMAT(pancake_orders.returned_at, '%Y-%m')",
+            default => 'DATE(pancake_orders.returned_at)',
         };
 
         return $this->baseQuery($workspaceId, $date_range, $filter)
@@ -96,11 +96,10 @@ final class TotalSales
                 }
             )
             ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotNull('pancake_orders.confirmed_at')
-            ->whereBetween('pancake_orders.confirmed_at', [
+            ->whereNotNull('pancake_orders.returned_at')
+            ->whereBetween('pancake_orders.returned_at', [
                 $date_range['start_date'].' 00:00:00',
                 $date_range['end_date'].' 23:59:59',
-            ])
-            ->whereNotIn('pancake_orders.status', [6, 7]);
+            ]);
     }
 }

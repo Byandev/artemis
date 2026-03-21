@@ -1,215 +1,158 @@
-import { Button } from '@/components/ui/button';
-import { SimpleDateRangePicker } from '@/components/ui/simple-date-range-picker';
-import MetricsCard from '@/components/workspaces/MetricsCard';
-import { useDateRange } from '@/hooks/use-date-range';
-import AppLayout from '@/layouts/app-layout';
-import workspaces from '@/routes/workspaces';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
-import moment from 'moment';
-import { useEffect, useMemo, useState } from 'react';
-import AnalyticsFilters from './partials/AnalyticsFilters';
-import BreakdownPerCities from './partials/BreakdownPerCities';
-import BreakdownPerPages from './partials/BreakdownPerPages';
-import BreakdownPerShops from './partials/BreakdownPerShops';
-import BreakdownPerUsers from './partials/BreakdownPerUsers';
+import AppLayout from '@/layouts/app-layout';
+import { Head } from '@inertiajs/react';
+import { useState } from 'react';
+import moment from 'moment/moment';
+import Filters, { FilterValue } from '@/components/filters/Filters';
+import {
+    currencyFormatter,
+    numberFormatter,
+    percentageFormatter,
+} from '@/lib/utils';
+import { DollarSign, PackageCheck, Truck, Undo2 } from 'lucide-react';
 import { formatDate } from 'date-fns';
-import { Bell, Package, RotateCcw, TrendingUp } from 'lucide-react';
+import DatePicker from '@/components/ui/date-picker';
+import StatisticCard from '@/pages/workspaces/dashboard/partials/StatisticCard';
+import flatpickr from 'flatpickr';
+import DateOption = flatpickr.Options.DateOption;
+import { metricConfigs } from '@/types/metrics';
 
-type Props = {
-    workspace: Workspace;
-    filters: {
-        page_ids?: number[];
-        user_ids?: number[];
-        shop_ids?: number[];
-        start_date?: string;
-        end_date?: string;
-    };
-    data: {
-        rts_rate_percentage: number;
-        returned_count: number;
-        delivered_count: number;
-        returned_amount: number;
-        tracked_orders: number;
-        sent_parcel_journey_notifications: number;
-    };
-};
+interface Props {
+    workspace: Workspace
+}
 
-const Analytics = ({ workspace, filters, data }: Props) => {
-    // Filters
-    const [selectedPagesFilter, setSelectedPagesFilter] = useState<number[]>(filters.page_ids ?? []);
-    const [selectedUsersFilter, setSelectedUsersFilter] = useState<number[]>(filters.user_ids ?? []);
-    const [selectedShopFilter, setSelectedShopFilter] = useState<number[]>(filters.shop_ids ?? []);
+const Analytics = ({ workspace }: Props) => {
+    const [dateRange, setDateRange] = useState([
+        moment().startOf('month').format('YYYY-MM-DD'),
+        moment().endOf('month').format('YYYY-MM-DD'),
+    ]);
 
-    // Use global date range state with automatic initialization from URL filters
-    const { dateRange, setDateRange } = useDateRange({
-        startDate: filters.start_date,
-        endDate: filters.end_date
+    const [filter, setFilter] = useState<FilterValue>({
+        teamIds: [],
+        productIds: [],
+        shopIds: [],
+        pageIds: [],
+        userIds: [],
     });
 
-    const dateRangeStr = useMemo(() => ({
-        to: moment(dateRange?.to).format('YYYY-MM-DD'),
-        from: moment(dateRange?.from).format('YYYY-MM-DD'),
-    }), [dateRange])
-
-    // Build query string
-    const queryString = useMemo(() => {
-        const params = new URLSearchParams();
-        selectedPagesFilter.forEach((id) => params.append('page_ids[]', String(id)));
-        selectedUsersFilter.forEach((id) => params.append('user_ids[]', String(id)));
-        selectedShopFilter.forEach((id) => params.append('shop_ids[]', String(id)));
-        if (dateRange?.from) params.append('start_date', dateRangeStr.from);
-        if (dateRange?.to) params.append('end_date', dateRangeStr.to);
-        return params.toString();
-    }, [selectedPagesFilter, selectedUsersFilter, selectedShopFilter, dateRange, dateRangeStr]);
-
-    // Update URL and refetch data when filters change
-    useEffect(() => {
-        router.get(
-            workspaces.rts.analytics(workspace.slug),
-            {
-                page_ids: selectedPagesFilter.length > 0 ? selectedPagesFilter : undefined,
-                user_ids: selectedUsersFilter.length > 0 ? selectedUsersFilter : undefined,
-                shop_ids: selectedShopFilter.length > 0 ? selectedShopFilter : undefined,
-                start_date: dateRange?.from ? dateRangeStr.from : undefined,
-                end_date: dateRange?.to ? dateRangeStr.to : undefined,
-            },
-            {
-                preserveState: true,
-                preserveScroll: true,
-                only: ['data'] // Only reload the data prop
-            }
-        );
-    }, [workspace.slug, selectedPagesFilter, selectedUsersFilter, selectedShopFilter, dateRange, dateRangeStr]);
-
-    // Analytics stat cards
-    const analytics = useMemo(
-        () => [
-            {
-                title: 'RTS Rate',
-                value: `${data.rts_rate_percentage}%`,
-                icon: <TrendingUp className="h-5 w-5" />,
-                tooltip: 'Return to Sender rate percentage',
-                color: 'purple' as const,
-            },
-            {
-                title: 'RTS Amount',
-                value: data.returned_amount,
-                icon: <RotateCcw className="h-5 w-5" />,
-                tooltip: 'Total value of returned items',
-                color: 'orange' as const,
-            },
-            {
-                title: 'Tracked Orders',
-                value: data.tracked_orders,
-                icon: <Package className="h-5 w-5" />,
-                tooltip: 'Number of orders currently being tracked',
-                color: 'blue' as const,
-            },
-            {
-                title: 'Parcel Updates Sent',
-                value: data.sent_parcel_journey_notifications,
-                icon: <Bell className="h-5 w-5" />,
-                tooltip: 'Total notifications sent for parcel journeys',
-                color: 'green' as const,
-            },
-        ],
-        [data],
-    );
-    const clearFilters = () => {
-        setSelectedPagesFilter([]);
-        setSelectedUsersFilter([]);
-        setSelectedShopFilter([]);
-        setDateRange({
-            from: moment().startOf('month').toDate(),
-            to: moment().toDate()
-        });
-        router.get(
-            workspaces.rts.analytics(workspace.slug),
-            {},
-            { preserveState: true, preserveScroll: true }
-        );
-    };
+    const cards = [
+        {
+            label: 'RTS Rate',
+            key: 'rtsRate',
+            formatter: percentageFormatter,
+            icon: Undo2,
+            tooltipLabel:
+                'Return-to-sender rate based on returned amount versus total amount.',
+        },
+        {
+            label: 'Total Delivered',
+            key: 'deliveredAmount',
+            formatter: currencyFormatter,
+            icon: DollarSign,
+            tooltipLabel:
+                'Total delivered sales within the selected date range.',
+        },
+        {
+            label: 'Total Returning',
+            key: 'returningAmount',
+            formatter: currencyFormatter,
+            icon: DollarSign,
+            tooltipLabel:
+                'Total returning sales within the selected date range.',
+        },
+        {
+            label: 'Total Returned',
+            key: 'returnedAmount',
+            formatter: currencyFormatter,
+            icon: DollarSign,
+            tooltipLabel:
+                'Total returned sales within the selected date range.',
+        },
+        {
+            label: 'Avg Delivery Days',
+            key: 'avgDeliveryDays',
+            formatter: (value: number) => `${value ?? 0} Days`,
+            icon: Truck,
+            tooltipLabel:
+                'Average number of days from shipped date to delivered date.',
+        },
+        {
+            label: 'Avg Shipped Out Days',
+            key: 'avgShippedOutDays',
+            formatter: (value: number) => `${value ?? 0} Days`,
+            icon: PackageCheck,
+            tooltipLabel:
+                'Average number of days from confirmed date to shipped out date.',
+        },
+        {
+            label: 'Tracked Orders by PJ',
+            key: 'trackedOrdersCount',
+            formatter: numberFormatter,
+            icon: DollarSign,
+            tooltipLabel: 'Total orders tracked by parcel journey',
+        },
+    ];
 
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - Analytics`} />
-            <div className="p-4 md:p-6 space-y-6">
-                <div className="mb-6 flex flex-col items-start justify-between md:flex-row md:items-center">
-                    <div className="flex flex-col">
-                        <h1 className="text-2xl font-bold">RTS Analytics</h1>
 
-                        <p className="text-sm font-light text-gray-500">
-                            Performance overview from to{' '}
-                        </p>
-                    </div>
-                    <div className="flex gap-4">
-                        <SimpleDateRangePicker useGlobalState />
+            <Head title={`${workspace.name} - RTS Analytics`} />
 
-                        <AnalyticsFilters
-                            workspace={workspace}
-                            selectedPagesFilter={selectedPagesFilter}
-                            setSelectedPagesFilter={setSelectedPagesFilter}
-                            selectedUsersFilter={selectedUsersFilter}
-                            setSelectedUsersFilter={setSelectedUsersFilter}
-                            selectedShopFilter={selectedShopFilter}
-                            setSelectedShopFilter={setSelectedShopFilter}
-                        />
-                    </div>
+            <div className="p-4 md:p-6">
 
-                    {(selectedPagesFilter.length > 0 ||
-                        selectedUsersFilter.length > 0 ||
-                        selectedShopFilter.length > 0 ||
-                        dateRangeStr.from !==
-                            moment().startOf('month').format('YYYY-MM-DD') ||
-                        dateRangeStr.to !== moment().format('YYYY-MM-DD')) && (
-                        <Button variant="outline" onClick={clearFilters}>
-                            Clear Filters
-                        </Button>
-                    )}
+            <div className="mb-6 flex items-center justify-between gap-6">
+                <div className="flex flex-col">
+                    <h1 className="text-2xl font-bold">Dashboard</h1>
+
+                    <p className="text-sm font-light text-gray-500">
+                        Performance overview from{' '}
+                        {formatDate(new Date(dateRange[0]), 'MMMM d yyyy')} to{' '}
+                        {formatDate(new Date(dateRange[1]), 'MMMM d yyyy')}
+                    </p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {analytics.map((item, key) => (
-                        <MetricsCard
-                            key={key}
-                            title={item.title}
-                            value={item.value}
-                            icon={item.icon}
-                            tooltip={item.tooltip}
-                            color={item.color}
-                        />
-                    ))}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="col-span-1 md:col-span-2 ">
-                        <BreakdownPerPages
-                            workspace={workspace}
-                            queryString={queryString}
-                        />
-                    </div>
-                    <div className='h-full'>
-                        <BreakdownPerCities
-                            workspace={workspace}
-                            queryString={queryString}
-                        />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <BreakdownPerShops
+                <div className="flex items-center gap-4">
+                    {/* Optional: if your Filters supports disabled, pass it; otherwise just leave it */}
+                    <Filters
                         workspace={workspace}
-                        queryString={queryString}
+                        onChange={(value) => setFilter(value)}
                     />
-                    <BreakdownPerUsers
-                        workspace={workspace}
-                        queryString={queryString}
+
+                    <DatePicker
+                        id={'dashboard-date-range'}
+                        mode={'range'}
+                        onChange={(dates) => {
+                            if (dates.length === 2) {
+                                setDateRange([
+                                    moment(dates[0]).format('YYYY-MM-DD'),
+                                    moment(dates[1]).format('YYYY-MM-DD'),
+                                ]);
+                            }
+                        }}
+                        defaultDate={dateRange as never as DateOption}
                     />
                 </div>
             </div>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:gap-4 xl:grid-cols-4">
+                {metricConfigs.map((card) => (
+                    <StatisticCard
+                        key={card.key}
+                        label={card.name}
+                        metric={card.key}
+                        workspace={workspace}
+                        filter={filter}
+                        dateRange={dateRange}
+                        formatter={card.formatter}
+                        icon={card.icon}
+                        tooltipLabel={card.description}
+                    />
+                ))}
+            </div>
+
+            </div>
         </AppLayout>
     );
-};
+}
 
-export default Analytics;
+export default Analytics

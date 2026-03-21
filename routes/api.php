@@ -19,7 +19,6 @@ Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {
 
     Route::get('/leaderboards', [CsrPerformanceController::class, 'leaderboards']);
 
-
 });
 
 Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], function () {
