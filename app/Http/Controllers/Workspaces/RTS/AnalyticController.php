@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Workspaces\RTS;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
-use App\Models\ParcelJourneyNotification;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -13,51 +12,15 @@ class AnalyticController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
-        // Apply filters to summary stats
-        $rtsStats = Order::selectRaw('
-            ROUND(
-                (SUM(CASE WHEN status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
-                NULLIF(SUM(CASE WHEN status IN (3,4,5) THEN 1 ELSE 0 END), 0),
-                2
-            ) AS rts_rate_percentage,
-            SUM(CASE WHEN status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
-            SUM(CASE WHEN status IN (4,5) THEN total_amount ELSE 0 END) AS returned_amount,
-            SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) AS delivered_count
-        ')
-            ->ofWorkspace($workspace)
-            ->applyRtsFilters($request)
-            ->first();
-
-
-
-        // Count tracked orders (also filtered)
-        $tracked_orders = Order::ofWorkspace($workspace)
-            ->applyRtsFilters($request)
-            ->has('parcelJourneyNotifications')
-            ->count();
-
-        // Count sent PJN (also filtered)
-        $sent_parcel_journey_notifications = ParcelJourneyNotification::whereHas('order', function ($query) use ($workspace, $request) {
-            $query->ofWorkspace($workspace)->applyRtsFilters($request);
-        })->count();
-
         return Inertia::render('workspaces/rts/analytics', [
-            'workspace' => $workspace,
-            'filters' => [
-                'page_ids' => array_map('intval', (array) $request->input('page_ids', [])),
-                'shop_ids' => array_map('intval', (array) $request->input('shop_ids', [])),
-                'user_ids' => array_map('intval', (array) $request->input('user_ids', [])),
-                'start_date' => $request->input('start_date', null),
-                'end_date' => $request->input('end_date', null),
-            ],
-            'data' => [
-                'rts_rate_percentage' => optional($rtsStats)->rts_rate_percentage ?? 0,
-                'returned_count' => optional($rtsStats)->returned_count ?? 0,
-                'delivered_count' => optional($rtsStats)->delivered_count ?? 0,
-                'returned_amount' => optional($rtsStats)->returned_amount ?? 0,
-                'tracked_orders' => $tracked_orders,
-                'sent_parcel_journey_notifications' => $sent_parcel_journey_notifications,
-            ],
+            'workspace' => $workspace->loadMissing([
+                'shops' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                },
+                'pages' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                },
+            ]),
         ]);
     }
 
@@ -219,8 +182,6 @@ class AnalyticController extends Controller
 
         // Otherwise, return paginated data (for table view)
         $grouped = $query->paginate($request->input('per_page', 15));
-
-
 
         return response()->json($grouped);
     }

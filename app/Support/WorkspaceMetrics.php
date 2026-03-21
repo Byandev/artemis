@@ -3,14 +3,26 @@
 namespace App\Support;
 
 use App\Metrics\Orders\Aov;
-use App\Metrics\Orders\AverageDeliveryDays;
+use App\Metrics\Orders\AverageDaysFromConfirmedToDelivered;
+use App\Metrics\Orders\AverageDaysFromConfirmedToFirstAttempt;
+use App\Metrics\Orders\AverageDaysFromConfirmedToShipped;
+use App\Metrics\Orders\AverageDaysFromReturningToReturned;
+use App\Metrics\Orders\AverageDaysFromShippedToDelivered;
+use App\Metrics\Orders\AverageDaysFromShippedToFirstAttempt;
 use App\Metrics\Orders\AverageLifetimeValue;
-use App\Metrics\Orders\AverageShippedOutDays;
+use App\Metrics\Orders\DeliveredAmount;
+use App\Metrics\Orders\DeliveredAvgCustomerRts;
+use App\Metrics\Orders\DeliveredAvgDeliveryAttempts;
 use App\Metrics\Orders\RepeatOrderRatio;
+use App\Metrics\Orders\ReturnedAmount;
+use App\Metrics\Orders\ReturnedAvgCustomerRts;
+use App\Metrics\Orders\ReturnedAvgDeliveryAttempts;
+use App\Metrics\Orders\ReturningAmount;
 use App\Metrics\Orders\RtsRate;
 use App\Metrics\Orders\TimeToFirstOrder;
 use App\Metrics\Orders\TotalOrders;
 use App\Metrics\Orders\TotalSales;
+use App\Metrics\ParcelJourney\TrackedOrdersCount;
 use App\Models\Workspace;
 use InvalidArgumentException;
 
@@ -33,8 +45,20 @@ final class WorkspaceMetrics
         'repeatOrderRatio' => RepeatOrderRatio::class,
         'timeToFirstOrder' => TimeToFirstOrder::class,
         'avgLifetimeValue' => AverageLifetimeValue::class,
-        'avgDeliveryDays' => AverageDeliveryDays::class,
-        'avgShippedOutDays' => AverageShippedOutDays::class,
+        'averageDaysFromShippedToDelivered' => AverageDaysFromShippedToDelivered::class,
+        'averageDaysFromConfirmedToShipped' => AverageDaysFromConfirmedToShipped::class,
+        'averageDaysFromConfirmedToFirstAttempt' => AverageDaysFromConfirmedToFirstAttempt::class,
+        'averageDaysFromShippedToFirstAttempt' => AverageDaysFromShippedToFirstAttempt::class,
+        'averageDaysFromConfirmedToDelivered' => AverageDaysFromConfirmedToDelivered::class,
+        'averageDaysFromReturningToReturned' => AverageDaysFromReturningToReturned::class,
+        'deliveredAmount' => DeliveredAmount::class,
+        'returnedAmount' => ReturnedAmount::class,
+        'returningAmount' => ReturningAmount::class,
+        'trackedOrdersCount' => TrackedOrdersCount::class,
+        'deliveredAvgCustomerRts' => DeliveredAvgCustomerRts::class,
+        'returnedAvgCustomerRts' => ReturnedAvgCustomerRts::class,
+        'deliveredAvgDeliveryAttempts' => DeliveredAvgDeliveryAttempts::class,
+        'returnedAvgDeliveryAttempts' => ReturnedAvgDeliveryAttempts::class,
     ];
 
     /**
@@ -126,7 +150,6 @@ final class WorkspaceMetrics
         );
     }
 
-
     public function perUser(string $name)
     {
         $class = self::MAP[$name] ?? null;
@@ -152,6 +175,4 @@ final class WorkspaceMetrics
     {
         return array_keys(self::MAP);
     }
-
-
 }

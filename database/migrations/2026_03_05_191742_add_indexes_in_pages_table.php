@@ -25,7 +25,7 @@ return new class extends Migration
             // confirmed metrics (AOV, TotalSales, TotalOrders, LTV, Repeat, TimeToFirstOrder)
             $table->index(['page_id', 'customer_id', 'confirmed_at'], 'po_page_customer_confirmed_at_idx');
 
-            // delivery metrics (AverageDeliveryDays)
+            // delivery metrics (AverageDaysFromShippedToDelivered)
             $table->index(['page_id', 'delivered_at', 'shipped_at'], 'po_page_delivered_shipped_idx');
 
             // RTS metrics (returning_at filters)

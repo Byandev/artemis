@@ -132,14 +132,14 @@ final class TimeToFirstOrder
         $users = DB::table('users')
             ->join('pages', 'pages.owner_id', '=', 'users.id')
             ->where('pages.workspace_id', $workspaceId)
-            ->when(!empty($filter['shop_ids']), function ($query) use ($filter) {
+            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
                 $shopIds = is_array($filter['shop_ids'])
                     ? $filter['shop_ids']
                     : explode(',', $filter['shop_ids']);
 
                 $query->whereIn('pages.shop_id', $shopIds);
             })
-            ->when(!empty($filter['page_ids']), function ($query) use ($filter) {
+            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
                 $pageIds = is_array($filter['page_ids'])
                     ? $filter['page_ids']
                     : explode(',', $filter['page_ids']);
@@ -155,14 +155,14 @@ final class TimeToFirstOrder
             $userFilter['page_ids'] = DB::table('pages')
                 ->where('workspace_id', $workspaceId)
                 ->where('owner_id', $user->id)
-                ->when(!empty($filter['shop_ids']), function ($query) use ($filter) {
+                ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
                     $shopIds = is_array($filter['shop_ids'])
                         ? $filter['shop_ids']
                         : explode(',', $filter['shop_ids']);
 
                     $query->whereIn('shop_id', $shopIds);
                 })
-                ->when(!empty($filter['page_ids']), function ($query) use ($filter) {
+                ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
                     $pageIds = is_array($filter['page_ids'])
                         ? $filter['page_ids']
                         : explode(',', $filter['page_ids']);
@@ -176,7 +176,7 @@ final class TimeToFirstOrder
             return (object) [
                 'user_id' => $user->id,
                 'user_name' => $user->name,
-                'value' => !empty($userFilter['page_ids'])
+                'value' => ! empty($userFilter['page_ids'])
                     ? $this->compute($workspaceId, $date_range, $userFilter)
                     : 0,
             ];
