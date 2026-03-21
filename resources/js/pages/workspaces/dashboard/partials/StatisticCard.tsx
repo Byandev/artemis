@@ -312,12 +312,12 @@ const StatisticCard = ({
                     ) : (
                         comparison.hasPreviousData && (
                             <div className="mt-2 flex items-center gap-2">
-                                <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                                    {previousPeriodText}
-                                </span>
+                                {/*<span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">*/}
+                                {/*    {previousPeriodText}*/}
+                                {/*</span>*/}
 
                                 <p
-                                    className={`inline-flex items-center gap-1 rounded-xl border-0 px-2 py-1 text-xs font-medium ${comparison.trendClasses}`}
+                                    className={`inline-flex items-center gap-1 rounded-xl border-0 px-2 py-1 text-[10px] font-medium ${comparison.trendClasses}`}
                                 >
                                     <comparison.TrendIcon className="h-3.5 w-3.5" />
                                     {comparison.isNeutral
