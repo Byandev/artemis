@@ -164,6 +164,9 @@ class SyncOrder implements ShouldQueue
                                 }
 
                                 $item['note'] = $note;
+                            }
+
+                            if(!isset($item['updated_at'])) {
                                 $item['updated_at'] = $item['update_at'];
                             }
 
