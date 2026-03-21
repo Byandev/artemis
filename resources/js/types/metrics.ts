@@ -1,5 +1,9 @@
 import type { LucideIcon } from 'lucide-react';
-import { currencyFormatter, percentageFormatter } from '@/lib/utils';
+import {
+    currencyFormatter,
+    numberFormatter,
+    percentageFormatter,
+} from '@/lib/utils';
 
 type MetricKey =
     | 'aov'
@@ -20,7 +24,9 @@ type MetricKey =
     | 'returningAmount'
     | 'trackedOrdersCount'
     | 'deliveredAvgCustomerRts'
-    | 'returnedAvgCustomerRts';
+    | 'returnedAvgCustomerRts'
+    | 'deliveredAvgDeliveryAttempts'
+    | 'returnedAvgDeliveryAttempts';
 
 type MetricConfig = {
     key: MetricKey;
@@ -102,6 +108,23 @@ export const metricConfigs: MetricConfig[] = [
         key: 'returnedAvgCustomerRts',
         name: 'Returned Avg Customer RTS',
         description: 'Average historical customer RTS of returned orders.',
-        formatter: percentageFormatter
+        formatter: percentageFormatter,
+    },
+    {
+        key: 'deliveredAvgDeliveryAttempts',
+        name: 'Delivered Avg Delivery Attempts',
+        description: 'Average delivery attempts for delivered orders.',
+        formatter: numberFormatter,
+    },
+    {
+        key: 'returnedAvgDeliveryAttempts',
+        name: 'Returned Avg Delivery Attempts',
+        description: 'Average delivery attempts for returned orders.',
+        formatter: numberFormatter,
     },
 ];
+
+
+//
+// | 'deliveredAvgDeliveryAttempts'
+// | 'returnedAvgDeliveryAttempts';

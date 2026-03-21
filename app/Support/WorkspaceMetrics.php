@@ -12,9 +12,11 @@ use App\Metrics\Orders\AverageDaysFromShippedToFirstAttempt;
 use App\Metrics\Orders\AverageLifetimeValue;
 use App\Metrics\Orders\DeliveredAmount;
 use App\Metrics\Orders\DeliveredAvgCustomerRts;
+use App\Metrics\Orders\DeliveredAvgDeliveryAttempts;
 use App\Metrics\Orders\RepeatOrderRatio;
 use App\Metrics\Orders\ReturnedAmount;
 use App\Metrics\Orders\ReturnedAvgCustomerRts;
+use App\Metrics\Orders\ReturnedAvgDeliveryAttempts;
 use App\Metrics\Orders\ReturningAmount;
 use App\Metrics\Orders\RtsRate;
 use App\Metrics\Orders\TimeToFirstOrder;
@@ -55,6 +57,8 @@ final class WorkspaceMetrics
         'trackedOrdersCount' => TrackedOrdersCount::class,
         'deliveredAvgCustomerRts' => DeliveredAvgCustomerRts::class,
         'returnedAvgCustomerRts' => ReturnedAvgCustomerRts::class,
+        'deliveredAvgDeliveryAttempts' => DeliveredAvgDeliveryAttempts::class,
+        'returnedAvgDeliveryAttempts' => ReturnedAvgDeliveryAttempts::class,
     ];
 
     /**

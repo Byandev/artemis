@@ -13,7 +13,14 @@ class AnalyticController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
         return Inertia::render('workspaces/rts/analytics', [
-            'workspace' => $workspace,
+            'workspace' => $workspace->loadMissing([
+                'shops' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                },
+                'pages' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                },
+            ]),
         ]);
     }
 
