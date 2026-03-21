@@ -20,6 +20,7 @@ import { RefreshCcw } from 'lucide-react';
 import moment from 'moment/moment';
 import { useEffect, useMemo, useState } from 'react';
 import ComponentCard from '@/components/common/ComponentCard';
+import { currencyFormatter, numberFormatter, percentageFormatter } from '@/lib/utils';
 
 interface Props {
     workspace: Workspace;
@@ -74,27 +75,21 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
 
     const formatMetricValue = (metric: string, value: number) => {
         switch (metric) {
+            case 'aov':
             case 'totalSales':
             case 'avgLifetimeValue':
-                return `₱${value.toLocaleString('en-PH', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                })}`;
+                return currencyFormatter(value);
             case 'rtsRate':
             case 'repeatOrderRatio':
-                return `${(value * 100).toFixed(1)}%`;
+                return percentageFormatter(value);
             case 'timeToFirstOrder':
+                return `${value} hours`;
             case 'avgDeliveryDays':
             case 'avgShippedOutDays':
-                return `${value.toFixed(1)} hrs`;
-            case 'aov':
-                return `₱${value.toLocaleString('en-PH', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                })}`;
+                return `${value} days`;
             case 'totalOrders':
             default:
-                return value.toLocaleString();
+                return numberFormatter(value);
         }
     };
 
