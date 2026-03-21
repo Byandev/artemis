@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import axios, { AxiosResponse } from 'axios';
 
 import { PaginatedData } from '@/types';
@@ -81,10 +81,10 @@ export function EntityFilter<T>({
                         return (
                             <div
                                 key={idStr}
-                                className="flex items-center gap-x-2 text-sm"
+                                className="flex items-center gap-x-2 text-xs"
                             >
                                 <Checkbox id={idStr} name={idStr} checked={selected.includes(idStr)} onSelect={() => onSelect(idStr)}/>
-                                <Label htmlFor={idStr} className="text-sm text-gray-800">
+                                <Label htmlFor={idStr} className="text-xs text-gray-800">
                                     {getLabel(item)}
                                 </Label>
                             </div>
