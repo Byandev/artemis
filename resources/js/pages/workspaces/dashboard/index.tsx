@@ -106,24 +106,21 @@ const Dashboard = ({ workspace }: Props) => {
                 'Average revenue generated per customer over their lifetime.',
         },
         {
-            label: 'Avg Delivery Days',
-            key: 'avgDeliveryDays',
+            label: 'Ave. Confirmed - Delivered',
+            key: 'averageDaysFromConfirmedToDelivered',
             formatter: (value: number) => `${value ?? 0} Days`,
             icon: Truck,
-            tooltipLabel:
-                'Average number of days from shipped date to delivered date.',
+            tooltipLabel: 'Average time from confirmed to delivered',
         },
         {
-            label: 'Avg Shipped Out Days',
-            key: 'avgShippedOutDays',
+            label: 'Ave. Confirmed - Shipped',
+            key: 'averageDaysFromConfirmedToShipped',
             formatter: (value: number) => `${value ?? 0} Days`,
             icon: PackageCheck,
-            tooltipLabel:
-                'Average number of days from confirmed date to shipped out date.',
+            tooltipLabel: 'Average time from confirmed to shipped.',
         },
     ];
 
-    console.log(dateRange);
 
     return (
         <AppLayout>
