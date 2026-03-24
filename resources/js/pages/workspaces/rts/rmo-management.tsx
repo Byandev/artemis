@@ -1,37 +1,38 @@
-import AppLayout from '@/layouts/app-layout';
 import ComponentCard from '@/components/common/ComponentCard';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import { ColumnDef } from '@tanstack/react-table';
-import { Team } from '@/types/models/Team';
-import { PaginatedData } from '@/types';
-import {
-    ORDER_STATUSES,
-    OrderForDelivery,
-} from '@/types/models/OrderForDelivery';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, RefreshCcw } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useState } from 'react';
-import { router } from '@inertiajs/react';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import AppLayout from '@/layouts/app-layout';
+import { currencyFormatter } from '@/lib/utils';
+import { PaginatedData } from '@/types';
+import {
+    ORDER_STATUSES,
+    OrderForDelivery,
+    getStatusBadgeClass,
+    type orderStatus,
+} from '@/types/models/OrderForDelivery';
 import { Workspace } from '@/types/models/Workspace';
-
+import { router } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
+import { ChevronUp, Loader2, MapPin, Phone } from 'lucide-react';
+import { useState } from 'react';
 
 interface Props {
     orders: PaginatedData<OrderForDelivery>;
-    workspace: Workspace
+    workspace: Workspace;
 }
 
-
-
-export default function RmoManagement({orders, workspace} : Props){
-
-    const [ isLoadingID, setIsLoadingID ] = useState(null);
+export default function RmoManagement({ orders, workspace }: Props) {
+    const [isLoadingID, setIsLoadingID] = useState<number | null>(null);
 
     console.log(workspace);
 
@@ -48,9 +49,6 @@ export default function RmoManagement({orders, workspace} : Props){
             },
         );
     };
-
-
-
 
     const columns: ColumnDef<OrderForDelivery>[] = [
         {
@@ -87,9 +85,9 @@ export default function RmoManagement({orders, workspace} : Props){
             cell: ({ row }) => {
                 return (
                     <div className="flex flex-col">
-                        <p> {row.original.rider_name}</p>
-                        <p className="mt-1 text-xs text-gray-500">
-                            {' '}
+                        <p>{row.original.rider_name}</p>
+                        <p className="mt-1 flex items-center text-xs text-gray-500">
+                            <Phone className="m-0 mr-1 h-3 w-3" />
                             {row.original.rider_phone}{' '}
                         </p>
                     </div>
@@ -104,40 +102,28 @@ export default function RmoManagement({orders, workspace} : Props){
             ),
             cell: ({ row }) => {
                 return (
-                    <div className="flex flex-col">
-                        <p> {row.original.order.shipping_address.full_name}</p>
-                        <p className="mt-1 text-xs text-gray-500">
-                            {' '}
-                            {
-                                row.original.order.shipping_address.phone_number
-                            }{' '}
+                    <div className="flex flex-col text-gray-500">
+                        <p className="text-black">
+                            {row.original.order.shipping_address.full_name}
                         </p>
-                    </div>
-                );
-            },
-        },
-        {
-            accessorKey: 'order.shipping_address.full_address',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Address'} />
-            ),
-            cell: ({ row }) => {
-                return (
-                    <div className="flex flex-col">
+                        <p className="mt-1 flex items-center text-xs text-gray-500">
+                            <Phone className="m-0 mr-1 h-3 w-3" />
+                            {row.original.order.shipping_address.phone_number}
+                        </p>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <p className="w-40 truncate">
-                                    {' '}
-                                    {
-                                        row.original.order.shipping_address
-                                            .full_address
-                                    }
-                                </p>
+                                <div className="flex w-40 items-center truncate">
+                                    <MapPin className="mr-1 h-3 w-3 shrink-0" />
+                                    <span className="truncate">
+                                        {
+                                            row.original.order.shipping_address
+                                                .full_address
+                                        }
+                                    </span>
+                                </div>
                             </TooltipTrigger>
                             <TooltipContent>
-                                <p className="">
-                                    {' '}
+                                <p className="max-w-xs">
                                     {
                                         row.original.order.shipping_address
                                             .full_address
@@ -149,19 +135,22 @@ export default function RmoManagement({orders, workspace} : Props){
                 );
             },
         },
-
         {
             accessorKey: 'order.final_amount',
             enableSorting: true,
             header: ({ column }) => (
                 <SortableHeader column={column} title={'SRP'} />
             ),
+            cell: ({ row }) => {
+                const final_amount = row.original.order.final_amount;
+                return <p>{currencyFormatter(final_amount)}</p>;
+            },
         },
         {
             accessorKey: 'order.delivery_attempts',
             enableSorting: true,
             header: ({ column }) => (
-                <SortableHeader column={column} title={'# of Attemptss'} />
+                <SortableHeader column={column} title={'# of Attempts'} />
             ),
         },
         {
@@ -171,33 +160,60 @@ export default function RmoManagement({orders, workspace} : Props){
                 <SortableHeader column={column} title={'Status'} />
             ),
             cell: ({ row }) => {
-                const order_id = row.original.order_id;
+                const orderId = row.original.order_id;
+                const currentStatus = row.original.status;
+                const isLoading = isLoadingID === orderId;
+
                 return (
                     <>
-                        {' '}
-                        {isLoadingID === order_id ? (
-                            'Updating...'
+                        {isLoading ? (
+                            <div className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span className="text-xs text-gray-500">
+                                    Updating...
+                                </span>
+                            </div>
                         ) : (
                             <DropdownMenu>
-                                <DropdownMenuTrigger className="flex items-center gap-1 rounded-full border px-2 py-1 text-xs focus:outline">
-                                    {row.original.status}
+                                <DropdownMenuTrigger
+                                    className={[
+                                        'flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-all',
+                                        'hover:opacity-80 focus:outline-none',
+                                        getStatusBadgeClass(currentStatus),
+                                    ].join(' ')}
+                                >
+                                    {currentStatus}
+                                    <ChevronUp className="h-3 w-3" />
                                 </DropdownMenuTrigger>
-
-                                <DropdownMenuContent>
-                                    {ORDER_STATUSES.map((orderStatus) => (
-                                        <DropdownMenuItem
-                                            className="text-xs"
-                                            key={orderStatus}
-                                            onClick={() =>
-                                                handleChangeStatus(
-                                                    orderStatus,
-                                                    order_id,
-                                                )
-                                            }
-                                        >
-                                            {orderStatus}
-                                        </DropdownMenuItem>
-                                    ))}
+                                <DropdownMenuContent
+                                    align="end"
+                                    className="max-h-80 overflow-y-auto"
+                                >
+                                    {ORDER_STATUSES.map((orderStatus) => {
+                                        const statusClass = getStatusBadgeClass(
+                                            orderStatus,
+                                        );
+                                        return (
+                                            <DropdownMenuItem
+                                                className="p-0 focus:bg-transparent"
+                                                key={orderStatus}
+                                                onClick={() =>
+                                                    handleChangeStatus(
+                                                        orderStatus,
+                                                        orderId,
+                                                    )
+                                                }
+                                            >
+                                                <div className="w-full px-2 py-1.5 hover:bg-gray-100">
+                                                    <span
+                                                        className={statusClass}
+                                                    >
+                                                        {orderStatus}
+                                                    </span>
+                                                </div>
+                                            </DropdownMenuItem>
+                                        );
+                                    })}
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         )}
@@ -211,9 +227,8 @@ export default function RmoManagement({orders, workspace} : Props){
         <AppLayout>
             <div className="p-6">
                 <div className="">
-                    <div className="flex flex-col mb-6 ">
+                    <div className="mb-6 flex flex-col">
                         <h1 className="text-2xl font-bold">RMO Management</h1>
-
                         <p className="text-sm font-light text-gray-500">
                             Items that for delivery today.
                         </p>
