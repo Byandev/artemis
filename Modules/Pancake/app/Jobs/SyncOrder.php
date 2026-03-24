@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Modules\Pancake\Models\Order;
+use Modules\Pancake\Models\OrderForDelivery;
 use Modules\Pancake\Models\OrderItem;
 use Modules\Pancake\Models\OrderPhoneNumberReport;
 use Modules\Pancake\Models\ParcelJourney;
@@ -319,9 +320,18 @@ class SyncOrder implements ShouldQueue
                 $data['rider_name'] = $rider_name;
                 $data['rider_mobile'] = $rider_mobile;
 
-                $parcelJourney->update([
-                    'rider_mobile' => $rider_mobile,
+                OrderForDelivery::firstOrCreate([
+                    'order_id' => $order->id,
+                    'page_id' => $order->page_id,
+                    'shop_id' => $order->shop_id,
+                    'rider_phone' => $rider_mobile,
                     'rider_name' => $rider_name,
+                    'workspace_id' => $order->workspace_id,
+                    'conferrer_id' => $order->confirmed_by,
+                    'delivery_date' => Carbon::parse($parcelJourney->created_at)->format('Y-m-d'),
+                ], [
+                    'status' => 'PENDING',
+                    'created_at' => $parcelJourney->created_at,
                 ]);
 
                 ParcelJourneyNotification::create([

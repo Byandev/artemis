@@ -23,7 +23,7 @@ class Order extends Model
         return $this->hasOne(ParcelJourney::class);
     }
 
-    public function parcelJourneys(): \Illuminate\Database\Eloquent\Relations\HasOne|Order
+    public function parcelJourneys(): \Illuminate\Database\Eloquent\Relations\HasMany|Order
     {
         return $this->hasMany(ParcelJourney::class);
     }
