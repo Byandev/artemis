@@ -40,6 +40,7 @@ class ForDeliveryController extends Controller
             },
         ])->paginate(10);
 
+
         return Inertia::render('workspaces/rts/rmo-management', [
             'orders' => $items,
             'workspace' => $workspace,

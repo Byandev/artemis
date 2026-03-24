@@ -112,6 +112,7 @@ export interface OrderForDelivery {
 }
 
 interface Order {
+    items: Item[];
     id: number;
     order_number: string;
     status_name: string;
@@ -121,6 +122,12 @@ interface Order {
     delivery_attempts: number;
     shipping_address: ShippingAddress;
 }
+
+interface Item {
+    id: number;
+    name: string;
+}
+
 
 interface ShippingAddress {
     id: number;

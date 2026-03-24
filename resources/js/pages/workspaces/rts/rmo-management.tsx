@@ -23,8 +23,16 @@ import {
 import { Workspace } from '@/types/models/Workspace';
 import { router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import { ChevronUp, Loader2, MapPin, Phone } from 'lucide-react';
+import {
+    ChevronUp,
+    Loader2,
+    MapPin,
+    Phone,
+    Search,
+    UserRoundPlus,
+} from 'lucide-react';
 import { useState } from 'react';
+import { Input } from '@/components/ui/input';
 
 interface Props {
     orders: PaginatedData<OrderForDelivery>;
@@ -58,11 +66,30 @@ export default function RmoManagement({ orders, workspace }: Props) {
             ),
         },
         {
-            accessorKey: 'page.name',
+            accessorFn: (row) =>
+                row.order.items.map((item) => item.name).join(', '),
+            id: 'items',
+            enableSorting: true,
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Page'} />
+                <SortableHeader column={column} title={'Orders'} />
             ),
+            cell: ({ row }) => {
+                const items = row.original.order.items;
+                const page = row.original.page.name;
+
+                return (
+                    <div>
+                        <ul>
+                            {items.map((item, index) => (
+                                <li key={index}>{item.name}</li>
+                            ))}
+                        </ul>
+                        <p className="text-gray-500">{page}</p>
+                    </div>
+                );
+            },
         },
+
         {
             accessorKey: 'order.tracking_code',
             enableSorting: true,
@@ -136,6 +163,13 @@ export default function RmoManagement({ orders, workspace }: Props) {
             },
         },
         {
+            accessorKey: 'order.shipping_address.city_order_summary.rts_rate',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'# of Attempts'} />
+            ),
+        },
+        {
             accessorKey: 'order.final_amount',
             enableSorting: true,
             header: ({ column }) => (
@@ -153,6 +187,15 @@ export default function RmoManagement({ orders, workspace }: Props) {
                 <SortableHeader column={column} title={'# of Attempts'} />
             ),
         },
+
+        {
+            accessorKey: 'conferrer.name',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Confirmed By'} />
+            ),
+        },
+
         {
             accessorKey: 'status',
             enableSorting: true,
@@ -190,9 +233,8 @@ export default function RmoManagement({ orders, workspace }: Props) {
                                     className="max-h-80 overflow-y-auto"
                                 >
                                     {ORDER_STATUSES.map((orderStatus) => {
-                                        const statusClass = getStatusBadgeClass(
-                                            orderStatus,
-                                        );
+                                        const statusClass =
+                                            getStatusBadgeClass(orderStatus);
                                         return (
                                             <DropdownMenuItem
                                                 className="p-0 focus:bg-transparent"
@@ -221,6 +263,30 @@ export default function RmoManagement({ orders, workspace }: Props) {
                 );
             },
         },
+
+        {
+            accessorKey: 'created_at',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title={'Actions'}
+                    enabled={false}
+                />
+            ),
+            cell: ({ row }) => {
+                return (
+                    <div>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <UserRoundPlus className="h-4 w-4" />
+                            </TooltipTrigger>
+                            <TooltipContent>Assign to me</TooltipContent>
+                        </Tooltip>
+                    </div>
+                );
+            },
+        },
     ];
 
     return (
@@ -234,6 +300,21 @@ export default function RmoManagement({ orders, workspace }: Props) {
                         </p>
                     </div>
                     <ComponentCard>
+                        <div className="flex items-center justify-between">
+                            <h1>Items For Delivery Today.</h1>
+                            <div className="relative w-full sm:w-64">
+                                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                    <Search className="z-10 h-4 w-4 text-gray-400" />
+                                </div>
+
+                                <Input
+                                    type="text"
+
+                                    placeholder="Search orders..."
+                                    className="h-9 pl-8 text-sm"
+                                />
+                            </div>
+                        </div>
                         <DataTable columns={columns} data={orders.data} />
                     </ComponentCard>
                 </div>
