@@ -28,7 +28,9 @@ class TestFunction extends Command
     {
         $items = OrderForDelivery::with([
             'order'=> function ($query) {
-                $query->select(['id', 'order_number', 'status_name', 'final_amount', 'parcel_status', 'tracking_code']);
+                $query
+                    ->select(['id', 'order_number', 'status_name', 'final_amount', 'parcel_status', 'tracking_code', 'delivery_attempts'])
+                    ->with('shippingAddress');
             },
             'conferrer' => function ($query) {
                 $query->select(['id', 'name']);
