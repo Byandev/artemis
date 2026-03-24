@@ -37,4 +37,10 @@ class Order extends Model
     {
         return $this->hasMany(OrderPhoneNumberReport::class, 'order_id', 'id');
     }
+
+    public function items()
+    {
+        return $this->hasMany(OrderItem::class);
+    }
+    
 }
