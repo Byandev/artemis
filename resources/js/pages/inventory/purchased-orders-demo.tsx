@@ -1,8 +1,5 @@
 import { Head } from '@inertiajs/react';
-import { Calendar } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
-import { Workspace } from '@/types/models/Workspace';
+import { useEffect, useMemo, useState } from 'react';
 
 type StatusId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
@@ -21,10 +18,6 @@ interface PurchasedOrder {
 
 interface PaginatedResponse {
     data: PurchasedOrder[];
-}
-
-interface Props {
-    workspace: Workspace;
 }
 
 const STATUS_OPTIONS: Array<{ value: StatusId; label: string }> = [
@@ -50,7 +43,7 @@ const formatMoney = (amount: number): string => {
     }).format(amount || 0);
 };
 
-const Index = ({ workspace }: Props) => {
+export default function PurchasedOrdersDemo() {
     const [rows, setRows] = useState<PurchasedOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -59,8 +52,6 @@ const Index = ({ workspace }: Props) => {
     const [query, setQuery] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const startDateRef = useRef<HTMLInputElement | null>(null);
-    const endDateRef = useRef<HTMLInputElement | null>(null);
 
     const apiBase = useMemo(() => {
         if (typeof window === 'undefined') return '';
@@ -72,19 +63,9 @@ const Index = ({ workspace }: Props) => {
 
     const csrfToken = useMemo(() => {
         if (typeof document === 'undefined') return '';
-
-        const metaToken = document
+        return document
             .querySelector('meta[name="csrf-token"]')
-            ?.getAttribute('content');
-
-        if (metaToken) return metaToken;
-
-        const xsrfCookie = document.cookie
-            .split('; ')
-            .find((part) => part.startsWith('XSRF-TOKEN='))
-            ?.split('=')[1];
-
-        return xsrfCookie ? decodeURIComponent(xsrfCookie) : '';
+            ?.getAttribute('content') || '';
     }, []);
 
     const fetchRows = async () => {
@@ -99,7 +80,7 @@ const Index = ({ workspace }: Props) => {
             if (endDate) params.set('end_date', endDate);
             params.set('per_page', '100');
 
-            const url = `${apiBase}/api/workspaces/${workspace.slug}/inventory/purchased-orders?${params.toString()}`;
+            const url = `${apiBase}/api/inventory/purchased-orders?${params.toString()}`;
             const res = await fetch(url, {
                 credentials: 'include',
                 headers: {
@@ -128,21 +109,9 @@ const Index = ({ workspace }: Props) => {
         void fetchRows();
     }, [statusFilter, query, startDate, endDate]);
 
-    const openDatePicker = (ref: React.RefObject<HTMLInputElement | null>) => {
-        const input = ref.current;
-        if (!input) return;
-
-        if (typeof input.showPicker === 'function') {
-            input.showPicker();
-            return;
-        }
-
-        input.focus();
-    };
-
     const updateStatus = async (id: number, status: StatusId) => {
         try {
-            const url = `${apiBase}/api/workspaces/${workspace.slug}/inventory/purchased-orders/${id}/status`;
+            const url = `${apiBase}/api/inventory/purchased-orders/${id}/status`;
             const res = await fetch(url, {
                 method: 'PATCH',
                 credentials: 'include',
@@ -168,92 +137,54 @@ const Index = ({ workspace }: Props) => {
     };
 
     return (
-        <AppLayout>
-            <Head title={`${workspace.name} - Inventory Purchased Orders`} />
+        <div className="min-h-screen bg-white text-zinc-900">
+            <Head title="Inventory Purchased Orders" />
 
-            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+            <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
                 <header className="mb-6">
                     <h1 className="text-2xl font-semibold tracking-tight">Inventory Purchased Orders</h1>
-                    <p className="mt-1 text-sm text-zinc-500">Workspace-scoped list, filter, and status update demo.</p>
+                    <p className="mt-1 text-sm text-zinc-500">Minimal demo page to validate backend list, filters, and status updates.</p>
                 </header>
 
-                <section className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4 md:grid-cols-2 xl:grid-cols-4">
-                    <div className="space-y-1">
-                        <label className="text-xs font-medium text-zinc-600">Search</label>
-                        <input
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Delivery No / PO / Control / Item"
-                            className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none ring-0 focus:border-zinc-500"
-                        />
-                    </div>
+                <section className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4 md:grid-cols-4">
+                    <input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search Delivery No / PO / Control / Item"
+                        className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none ring-0 focus:border-zinc-500"
+                    />
 
-                    <div className="space-y-1">
-                        <label className="text-xs font-medium text-zinc-600">Status</label>
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-500"
-                        >
-                            <option value="all">All Status</option>
-                            {STATUS_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-500"
+                    >
+                        <option value="all">All Status</option>
+                        {STATUS_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                            </option>
+                        ))}
+                    </select>
 
-                    <div className="space-y-1">
-                        <label className="text-xs font-medium text-zinc-600">Start Date</label>
-                        <div className="relative">
-                            <input
-                                ref={startDateRef}
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                onKeyDown={(e) => e.preventDefault()}
-                                onPaste={(e) => e.preventDefault()}
-                                className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 pr-10 text-sm outline-none focus:border-zinc-500"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => openDatePicker(startDateRef)}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700"
-                                aria-label="Open start date picker"
-                            >
-                                <Calendar className="h-4 w-4" />
-                            </button>
-                        </div>
-                    </div>
+                    <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-500"
+                    />
 
-                    <div className="space-y-1">
-                        <label className="text-xs font-medium text-zinc-600">End Date</label>
-                        <div className="relative">
-                            <input
-                                ref={endDateRef}
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                onKeyDown={(e) => e.preventDefault()}
-                                onPaste={(e) => e.preventDefault()}
-                                className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 pr-10 text-sm outline-none focus:border-zinc-500"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => openDatePicker(endDateRef)}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700"
-                                aria-label="Open end date picker"
-                            >
-                                <Calendar className="h-4 w-4" />
-                            </button>
-                        </div>
-                    </div>
+                    <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-500"
+                    />
                 </section>
 
                 {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
-                <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+                <div className="overflow-x-auto rounded-lg border border-zinc-200">
                     <table className="min-w-full divide-y divide-zinc-200 text-sm">
                         <thead className="bg-zinc-50">
                             <tr className="text-left text-xs font-medium uppercase tracking-wide text-zinc-500">
@@ -312,9 +243,7 @@ const Index = ({ workspace }: Props) => {
                         </tbody>
                     </table>
                 </div>
-            </div>
-        </AppLayout>
+            </main>
+        </div>
     );
-};
-
-export default Index;
+}
