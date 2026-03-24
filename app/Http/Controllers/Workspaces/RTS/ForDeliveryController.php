@@ -10,6 +10,7 @@ use App\Models\Order;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Modules\Pancake\Models\OrderForDelivery;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -18,38 +19,33 @@ class ForDeliveryController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
-        // Build filtered and sorted query using QueryBuilder
-        $orders = QueryBuilder::for(Order::forDeliveryToday())
-            ->with([
-                'page:id,name',
-                'parcelJourney:id,order_id,note,status,rider_name,rider_mobile,created_at',
-                'shippingAddress:id,order_id,full_name,phone_number',
-            ])
-            ->allowedFilters([
-                AllowedFilter::scope('page_name', 'filterByPageName'),
-                AllowedFilter::scope('customer', 'filterByCustomer'),
-                AllowedFilter::scope('rider', 'filterByRider'),
-            ])
-            ->allowedSorts([
-                'tracking_code',
-                'status_name',
-                AllowedSort::custom('name', new PageNameSort),
-                AllowedSort::custom('page.name', new PageNameSort),
-                AllowedSort::custom('shipping_address.full_name', new CustomerNameSort),
-                AllowedSort::custom('parcel_journey.rider_name', new RiderNameSort),
-            ])
-            ->paginate(10)
-            ->withQueryString();
+        $items = OrderForDelivery::with([
+            'order'=> function ($query) {
+                $query
+                    ->select(['id', 'order_number', 'status_name', 'final_amount', 'parcel_status', 'tracking_code', 'delivery_attempts'])
+                    ->with('shippingAddress');
+            },
+            'conferrer' => function ($query) {
+                $query->select(['id', 'name']);
+            },
+            'page' => function ($query) {
+                $query->select(['id', 'name']);
+            },
+        ])->paginate(10);
 
-        return Inertia::render('workspaces/rts/for-delivery-today', [
+        return Inertia::render('workspaces/rts/rmo-management', [
+            'orders' => $items,
             'workspace' => $workspace,
-            'orders' => $orders,
-            'customers' => [],
-            'riders' => [],
-            'query' => [
-                ...$request->only(['sort', 'perPage', 'page']),
-                'filter' => $request->input('filter', []),
-            ],
         ]);
+    }
+
+    public function updateStatus( Workspace $workspace, $id, Request $request){
+        $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
+
+        $orderForDelivery->update([
+            'status' => $request->status,
+        ]);
+
+        return redirect()->back()->with('success', 'Status updated successfully');
     }
 }
