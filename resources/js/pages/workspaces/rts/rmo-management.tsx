@@ -31,7 +31,7 @@ interface Props {
 
 export default function RmoManagement({orders, workspace} : Props){
 
-    const [ isLoading, setIsLoading ] = useState(false);
+    const [ isLoadingID, setIsLoadingID ] = useState(null);
 
     console.log(workspace);
 
@@ -43,8 +43,8 @@ export default function RmoManagement({orders, workspace} : Props){
             },
             {
                 preserveScroll: true,
-                onStart: () => setIsLoading(true),
-                onFinish: () => setIsLoading(false),
+                onStart: () => setIsLoadingID(orderId),
+                onFinish: () => setIsLoadingID(null),
             },
         );
     };
@@ -173,28 +173,35 @@ export default function RmoManagement({orders, workspace} : Props){
             cell: ({ row }) => {
                 const order_id = row.original.order_id;
                 return (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger className="flex items-center gap-1 rounded-full border px-2 py-1 text-xs focus:outline" disabled={isLoading}>
-                            {row.original.status}
-                        </DropdownMenuTrigger>
+                    <>
+                        {' '}
+                        {isLoadingID === order_id ? (
+                            'Updating...'
+                        ) : (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger className="flex items-center gap-1 rounded-full border px-2 py-1 text-xs focus:outline">
+                                    {row.original.status}
+                                </DropdownMenuTrigger>
 
-                        <DropdownMenuContent>
-                            {ORDER_STATUSES.map((orderStatus) => (
-                                <DropdownMenuItem
-                                    className="text-xs"
-                                    key={orderStatus}
-                                    onClick={() =>
-                                        handleChangeStatus(
-                                            orderStatus,
-                                            order_id,
-                                        )
-                                    }
-                                >
-                                    {orderStatus}
-                                </DropdownMenuItem>
-                            ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                                <DropdownMenuContent>
+                                    {ORDER_STATUSES.map((orderStatus) => (
+                                        <DropdownMenuItem
+                                            className="text-xs"
+                                            key={orderStatus}
+                                            onClick={() =>
+                                                handleChangeStatus(
+                                                    orderStatus,
+                                                    order_id,
+                                                )
+                                            }
+                                        >
+                                            {orderStatus}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
+                    </>
                 );
             },
         },
