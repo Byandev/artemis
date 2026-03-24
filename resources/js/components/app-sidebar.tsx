@@ -80,6 +80,10 @@ export function AppSidebar() {
                 //     title: 'Parcel Updates Templates',
                 //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/parcel-journey-notification-templates`,
                 // },
+                {
+                    title: 'RMO Management',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/rmo-management`,
+                },
             ],
         },
     ];

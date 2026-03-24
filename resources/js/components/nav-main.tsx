@@ -56,7 +56,7 @@ export function NavMain({ items = [], group_label = '' }: NavMainProps) {
                                                 'text-gray-500 hover:bg-emerald-100 hover:text-emerald-500',
                                                 'border-l-4 border-transparent',
                                                 childActive
-                                                    ? 'ml-1 border-emerald-600 bg-emerald-50 font-medium text-emerald-600 transition-all'
+                                                    ? ' border-emerald-600 bg-emerald-50 font-medium text-emerald-600 transition-all'
                                                     : '',
                                             ].join(' ')}
                                         >
