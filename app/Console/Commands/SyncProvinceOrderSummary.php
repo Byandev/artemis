@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modules\Pancake\Models\CityOrderSummary;
 use Modules\Pancake\Models\Order;
 use Modules\Pancake\Models\ProvinceOrderSummary;
 
@@ -31,13 +30,13 @@ class SyncProvinceOrderSummary extends Command
         $items = Order::query()
             ->from('pancake_orders as po')
             ->leftJoin('shipping_addresses as sa', 'sa.order_id', '=', 'po.id')
-            ->selectRaw("
+            ->selectRaw('
                 sa.province_id,
                 sa.province_name,
                 COUNT(DISTINCT CASE WHEN po.delivered_at IS NOT NULL THEN po.id END) as delivered_orders,
                 COUNT(DISTINCT CASE WHEN po.returning_at IS NOT NULL THEN po.id END) as returned_orders
-            ")
-            ->whereIn('status', [3,4,5])
+            ')
+            ->whereIn('status', [3, 4, 5])
             ->whereNotNull('sa.province_id')
             ->groupBy(['sa.province_id', 'sa.province_name'])
             ->orderBy('sa.province_name')
@@ -51,7 +50,7 @@ class SyncProvinceOrderSummary extends Command
                         'name' => $item->province_name,
                         'delivered' => $item->delivered_orders,
                         'returned' => $item->returned_orders,
-                        'rts_rate' => $item->returned_orders / ($item->returned_orders + $item->delivered_orders)
+                        'rts_rate' => $item->returned_orders / ($item->returned_orders + $item->delivered_orders),
                     ]);
                 });
             });

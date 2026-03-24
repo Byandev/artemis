@@ -27,7 +27,7 @@ class TestFunction extends Command
     public function handle()
     {
         $items = OrderForDelivery::with([
-            'order'=> function ($query) {
+            'order' => function ($query) {
                 $query
                     ->select(['id', 'order_number', 'status_name', 'final_amount', 'parcel_status', 'tracking_code', 'delivery_attempts'])
                     ->with('shippingAddress');

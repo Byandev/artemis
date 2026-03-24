@@ -33,8 +33,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('pancake_order_phone_number_reports', function (Blueprint $table) {
-
-        });
+        Schema::table('pancake_order_phone_number_reports', function (Blueprint $table) {});
     }
 };

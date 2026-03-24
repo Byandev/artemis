@@ -12,14 +12,13 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
-import { currencyFormatter } from '@/lib/utils';
+import { currencyFormatter, percentageFormatter } from '@/lib/utils';
 import { PaginatedData } from '@/types';
 import {
     ORDER_STATUSES,
     OrderForDelivery,
     getStatusBadgeClass,
-    type orderStatus,
-} from '@/types/models/OrderForDelivery';
+} from '@/types/models/Pancake/OrderForDelivery';
 import { Workspace } from '@/types/models/Workspace';
 import { router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
@@ -29,10 +28,11 @@ import {
     MapPin,
     Phone,
     Search,
-    UserRoundPlus,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
+import { omit } from 'lodash';
+import { toFrontendSort } from '@/lib/sort';
 
 interface Props {
     orders: PaginatedData<OrderForDelivery>;
@@ -41,8 +41,9 @@ interface Props {
 
 export default function RmoManagement({ orders, workspace }: Props) {
     const [isLoadingID, setIsLoadingID] = useState<number | null>(null);
-
-    console.log(workspace);
+    // const initialSorting = useMemo(() => {
+    //     return toFrontendSort(query?.sort ?? null);
+    // }, [query?.sort]);
 
     const handleChangeStatus = (status: string, orderId: number) => {
         router.post(
@@ -60,21 +61,22 @@ export default function RmoManagement({ orders, workspace }: Props) {
 
     const columns: ColumnDef<OrderForDelivery>[] = [
         {
-            accessorKey: 'order_id',
+            accessorKey: 'order_number',
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Order Number'} />
             ),
+            cell: ({ row }) => row.original.order.order_number
         },
         {
             accessorFn: (row) =>
-                row.order.items.map((item) => item.name).join(', '),
+                (row.order.items ?? []).map((item) => item.name).join(', '),
             id: 'items',
-            enableSorting: true,
+            enableSorting: false,
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Orders'} />
+                <SortableHeader enabled={false} column={column} title={'Orders'} />
             ),
             cell: ({ row }) => {
-                const items = row.original.order.items;
+                const items = row.original.order.items ?? [];
                 const page = row.original.page.name;
 
                 return (
@@ -89,7 +91,6 @@ export default function RmoManagement({ orders, workspace }: Props) {
                 );
             },
         },
-
         {
             accessorKey: 'order.tracking_code',
             enableSorting: true,
@@ -131,11 +132,11 @@ export default function RmoManagement({ orders, workspace }: Props) {
                 return (
                     <div className="flex flex-col text-gray-500">
                         <p className="text-black">
-                            {row.original.order.shipping_address.full_name}
+                            {row.original.order.shipping_address?.full_name}
                         </p>
                         <p className="mt-1 flex items-center text-xs text-gray-500">
                             <Phone className="m-0 mr-1 h-3 w-3" />
-                            {row.original.order.shipping_address.phone_number}
+                            {row.original.order.shipping_address?.phone_number}
                         </p>
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -144,7 +145,7 @@ export default function RmoManagement({ orders, workspace }: Props) {
                                     <span className="truncate">
                                         {
                                             row.original.order.shipping_address
-                                                .full_address
+                                                ?.full_address
                                         }
                                     </span>
                                 </div>
@@ -152,8 +153,7 @@ export default function RmoManagement({ orders, workspace }: Props) {
                             <TooltipContent>
                                 <p className="max-w-xs">
                                     {
-                                        row.original.order.shipping_address
-                                            .full_address
+                                        row.original.order.shipping_address?.full_address
                                     }
                                 </p>
                             </TooltipContent>
@@ -166,8 +166,9 @@ export default function RmoManagement({ orders, workspace }: Props) {
             accessorKey: 'order.shipping_address.city_order_summary.rts_rate',
             enableSorting: true,
             header: ({ column }) => (
-                <SortableHeader column={column} title={'# of Attempts'} />
+                <SortableHeader column={column} title={'Location RTS'} />
             ),
+            cell: ({ row }) => percentageFormatter(row.original.order?.shipping_address?.city_order_summary?.rts_rate ?? 0)
         },
         {
             accessorKey: 'order.final_amount',
@@ -263,30 +264,29 @@ export default function RmoManagement({ orders, workspace }: Props) {
                 );
             },
         },
-
-        {
-            accessorKey: 'created_at',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader
-                    column={column}
-                    title={'Actions'}
-                    enabled={false}
-                />
-            ),
-            cell: ({ row }) => {
-                return (
-                    <div>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <UserRoundPlus className="h-4 w-4" />
-                            </TooltipTrigger>
-                            <TooltipContent>Assign to me</TooltipContent>
-                        </Tooltip>
-                    </div>
-                );
-            },
-        },
+        // {
+        //     accessorKey: 'created_at',
+        //     enableSorting: true,
+        //     header: ({ column }) => (
+        //         <SortableHeader
+        //             column={column}
+        //             title={'Actions'}
+        //             enabled={false}
+        //         />
+        //     ),
+        //     cell: ({ row }) => {
+        //         return (
+        //             <div>
+        //                 <Tooltip>
+        //                     <TooltipTrigger asChild>
+        //                         <UserRoundPlus className="h-4 w-4" />
+        //                     </TooltipTrigger>
+        //                     <TooltipContent>Assign to me</TooltipContent>
+        //                 </Tooltip>
+        //             </div>
+        //         );
+        //     },
+        // },
     ];
 
     return (
@@ -309,13 +309,34 @@ export default function RmoManagement({ orders, workspace }: Props) {
 
                                 <Input
                                     type="text"
-
                                     placeholder="Search orders..."
                                     className="h-9 pl-8 text-sm"
                                 />
                             </div>
                         </div>
-                        <DataTable columns={columns} data={orders.data} />
+                        <DataTable
+                            columns={columns}
+                            enableInternalPagination={false}
+                            data={orders.data || []}
+                            // initialSorting={initialSorting}
+                            meta={{ ...omit(orders, ['data']) }}
+                            onFetch={(params) => {
+                                router.get(
+                                    `/workspaces/${workspace.slug}/rts/rmo-management`,
+                                    {
+                                        sort: params?.sort,
+                                        // 'filter[search]':
+                                        //     searchValue || undefined,
+                                        page: params?.page ?? 1,
+                                    },
+                                    {
+                                        preserveState: true,
+                                        replace: true,
+                                        preserveScroll: true,
+                                    },
+                                );
+                            }}
+                        />
                     </ComponentCard>
                 </div>
             </div>

@@ -101,12 +101,12 @@ Route::middleware(['auth'])->group(function () {
     })->name('workspaces.rts');
     Route::get('/workspaces/{workspace}/rts/analytics', [AnalyticController::class, 'index'])->name('workspaces.rts.analytics');
     Route::get('/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'index'])->name('workspaces.rts.rmo-management');
-        Route::post('/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'updateStatus'])->name('workspaces.rts.rmo-updateStatus');
+    Route::post('/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'updateStatus'])->name('workspaces.rts.rmo-updateStatus');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/pages', [AnalyticController::class, 'groupByPages'])->name('workspaces.rts.analytics.group-by-pages');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/shops', [AnalyticController::class, 'groupByShops'])->name('workspaces.rts.analytics.group-by-shops');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/users', [AnalyticController::class, 'groupByUsers'])->name('workspaces.rts.analytics.group-by-users');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/cities', [AnalyticController::class, 'groupByCities'])->name('workspaces.rts.analytics.group-by-cities');
-//    Route::get('/workspaces/{workspace}/rts/for-delivery-today', [ForDeliveryController::class, 'index'])->name('workspaces.rts.for-delivery-today');
+    //    Route::get('/workspaces/{workspace}/rts/for-delivery-today', [ForDeliveryController::class, 'index'])->name('workspaces.rts.for-delivery-today');
     Route::get('/workspaces/{workspace}/rts/parcel-update-notification', [ParcelUpdateNotificationController::class, 'index'])->name('workspaces.rts.parcel-update-notification');
     Route::get('/workspaces/{workspace}/rts/parcel-journey-notification-templates', [ParcelUpdateNotificationTemplateController::class, 'index'])->name('workspaces.rts.parcel-journey-notification-templates.index');
     Route::put('/workspaces/{workspace}/rts/parcel-journey-notification-templates/{template}', [ParcelUpdateNotificationTemplateController::class, 'update'])->name('workspaces.rts.parcel-journey-notification-templates.update');

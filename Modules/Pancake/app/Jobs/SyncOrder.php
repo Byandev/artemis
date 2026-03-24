@@ -281,8 +281,6 @@ class SyncOrder implements ShouldQueue
             ];
         }
 
-
-
         if ($this->page->parcel_journey_enabled && $parcelJourney->status === 'Departure') {
             preg_match_all('/【(.*?)】/', $parcelJourney->note, $matches);
 

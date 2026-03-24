@@ -1,3 +1,7 @@
+import { Order } from '@/types/models/Pancake/Order';
+import { Page } from '@/types/models/Page';
+import { User } from '@/types/models/Pancake/User';
+
 export const ORDER_STATUSES = [
     'PENDING',
     'DELIVERED',
@@ -13,8 +17,7 @@ export const ORDER_STATUSES = [
     'IN TRANSIT'
 ] as const;
 
-export type orderStatus = (typeof ORDER_STATUSES)[number];
-
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const STATUS_COLORS: Record<
     OrderStatus,
@@ -91,13 +94,14 @@ export function getStatusPillClass(status: OrderStatus): string {
     const colors = STATUS_COLORS[status];
     return `${colors.bg} ${colors.text} ${colors.border} border px-3 py-1 rounded-full text-xs font-medium`;
 }
+
 export interface OrderForDelivery {
     id: number;
     order_id: number;
     page_id: number;
     shop_id: number;
     workspace_id: number;
-    status: string;
+    status: OrderStatus;
     rider_name: string;
     rider_phone: string;
     caller_id: string | null;
@@ -107,43 +111,6 @@ export interface OrderForDelivery {
     updated_at: string; // ISO datetime;
 
     order: Order;
-    conferrer: any | null;
+    conferrer?: User
     page: Page;
-}
-
-interface Order {
-    items: Item[];
-    id: number;
-    order_number: string;
-    status_name: string;
-    final_amount: number;
-    parcel_status: string;
-    tracking_code: string;
-    delivery_attempts: number;
-    shipping_address: ShippingAddress;
-}
-
-interface Item {
-    id: number;
-    name: string;
-}
-
-
-interface ShippingAddress {
-    id: number;
-    order_id: number;
-    province_name: string;
-    district_name: string;
-    commune_name: string;
-    address: string;
-    full_address: string;
-    full_name: string;
-    phone_number: string;
-    created_at: string;
-    updated_at: string;
-}
-
-interface Page {
-    id: number;
-    name: string;
 }

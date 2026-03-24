@@ -30,15 +30,15 @@ class SyncCityOrderSummary extends Command
         $items = Order::query()
             ->from('pancake_orders as po')
             ->leftJoin('shipping_addresses as sa', 'sa.order_id', '=', 'po.id')
-            ->selectRaw("
+            ->selectRaw('
                 sa.district_id,
                 sa.district_name,
                 sa.province_id,
                 sa.province_name,
                 COUNT(DISTINCT CASE WHEN po.delivered_at IS NOT NULL THEN po.id END) as delivered_orders,
                 COUNT(DISTINCT CASE WHEN po.returning_at IS NOT NULL THEN po.id END) as returned_orders
-            ")
-            ->whereIn('status', [3,4,5])
+            ')
+            ->whereIn('status', [3, 4, 5])
             ->whereNotNull('sa.district_id')
             ->groupBy(['sa.district_id', 'sa.district_name', 'sa.province_id', 'sa.province_name'])
             ->orderBy('sa.district_name')
@@ -54,7 +54,7 @@ class SyncCityOrderSummary extends Command
                         'name' => $item->district_name,
                         'delivered' => $item->delivered_orders,
                         'returned' => $item->returned_orders,
-                        'rts_rate' => $item->returned_orders / ($item->returned_orders + $item->delivered_orders)
+                        'rts_rate' => $item->returned_orders / ($item->returned_orders + $item->delivered_orders),
                     ]);
                 });
             });
