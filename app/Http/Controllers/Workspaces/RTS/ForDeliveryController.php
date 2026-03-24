@@ -23,7 +23,14 @@ class ForDeliveryController extends Controller
             'order'=> function ($query) {
                 $query
                     ->select(['id', 'order_number', 'status_name', 'final_amount', 'parcel_status', 'tracking_code', 'delivery_attempts'])
-                    ->with('shippingAddress');
+                    ->with([
+                        'shippingAddress' => function ($subQuery) {
+                            $subQuery->with(['cityOrderSummary']);
+                        },
+                        'items' => function ($subQuery) {
+                            $subQuery->select(['order_id', 'quantity', 'name']);
+                        }
+                        ]);
             },
             'conferrer' => function ($query) {
                 $query->select(['id', 'name']);

@@ -137,6 +137,11 @@ class SyncOrder implements ShouldQueue
                 'full_name' => $order['shipping_address']['full_name'],
                 'full_address' => $order['shipping_address']['full_address'],
                 'phone_number' => $order['shipping_address']['phone_number'],
+                'province_id' => $order['shipping_address']['province_id'] ??
+                    null,
+                'new_province_id' => $order['shipping_address']['new_province_id'] ?? null,
+                'district_id' => $order['shipping_address']['district_id'] ?? null,
+                'commune_id' => $order['shipping_address']['commune_id'] ?? null,
             ]);
         }
 
@@ -348,7 +353,7 @@ class SyncOrder implements ShouldQueue
                     'rider_name' => $rider_name,
                     'workspace_id' => $order->workspace_id,
                     'conferrer_id' => $order->confirmed_by,
-                    'delivery_date' => $date,
+                    'delivery_date' => Carbon::parse($parcelJourney->created_at)->format('Y-m-d'),
                 ], [
                     'status' => 'PENDING',
                     'created_at' => $parcelJourney->created_at,
