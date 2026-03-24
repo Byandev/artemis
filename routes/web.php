@@ -14,6 +14,7 @@ Route::get('/leaderboards', function () {
 Route::get('/csr-leaderboard', function () {
     return redirect()->route('leaderboards.public');
 })->name('csr-leaderboard.public');
+
 Route::get('/auth/facebook/callback', [\App\Http\Controllers\Integrations\FacebookController::class, 'callback']);
 
 Route::middleware(['auth'])->group(function () {
