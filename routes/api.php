@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\API\Workspace\AnalyticsController;
+use App\Http\Controllers\API\InventoryPurchasedOrderController;
 use App\Http\Controllers\API\Workspace\CsrPerformanceController;
 use App\Http\Controllers\API\Workspace\PageController;
 use App\Http\Controllers\API\Workspace\ProductController;
@@ -14,6 +15,9 @@ Route::group(['prefix' => 'api/public', 'as' => 'api.public.', 'middleware' => [
 
 Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], function () {
     Route::group(['prefix' => 'workspaces/{workspace}', 'as' => 'workspaces.'], function () {
+        Route::get('/inventory/purchased-orders', [InventoryPurchasedOrderController::class, 'index'])->name('inventory.purchased-orders.index');
+        Route::patch('/inventory/purchased-orders/{order}/status', [InventoryPurchasedOrderController::class, 'updateStatus'])->name('inventory.purchased-orders.update-status');
+
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
@@ -26,3 +30,4 @@ Route::group(['prefix' => 'api/v1/workspace', 'as' => 'api.v1.workspace', 'middl
     Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
     Route::get('/analytics/breakdown', [AnalyticsController::class, 'breakdown'])->name('analytics.breakdown');
 });
+ 
