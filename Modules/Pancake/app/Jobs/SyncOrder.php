@@ -195,7 +195,7 @@ class SyncOrder implements ShouldQueue
                                 'created_at' => $update['updated_at'],
                             ]);
 
-                            if ($this->page->parcel_journey_enabled && $isLatestUpdate && $savedOrder->status == 2 && in_array($update['status'], ['On Delivery', 'Departure', 'Arrival'])) {
+                            if ($isLatestUpdate && $savedOrder->status == 2 && in_array($update['status'], ['On Delivery', 'Departure', 'Arrival'])) {
                                 $isLatestUpdate = false;
 
                                 if ($parcelJourney->notifications()->doesntExist()) {
@@ -228,6 +228,17 @@ class SyncOrder implements ShouldQueue
                     OrderPhoneNumberReport::firstOrCreate([
                         'order_id' => $savedOrder->id,
                         'phone_number' => $formatted_phone,
+                        'type' => 'initial',
+                    ], [
+                        'order_fail' => $orderFail,
+                        'order_success' => $orderSuccess,
+                        'warning' => $warning,
+                    ]);
+
+                    OrderPhoneNumberReport::updateOrCreate([
+                        'order_id' => $savedOrder->id,
+                        'phone_number' => $formatted_phone,
+                        'type' => 'latest',
                     ], [
                         'order_fail' => $orderFail,
                         'order_success' => $orderSuccess,
@@ -245,20 +256,29 @@ class SyncOrder implements ShouldQueue
 
     private function sendParcelJourneyNotification(Order $order, ParcelJourney $parcelJourney): void
     {
-        $order->loadMissing(['shippingAddress', 'page']);
-
         [$page, $psid] = explode('_', $order->fb_id);
         $date = Carbon::parse($parcelJourney->created_at)->format('F d');
 
         $data = [
             'date' => $date,
-            'page_name' => $order->page->name,
-            'customer_name' => $order->shippingAddress->full_name,
             'tracking_code' => $order->tracking_code,
-            'shipping_address' => $order->shippingAddress->full_address,
         ];
 
-        if ($parcelJourney->status === 'Departure') {
+        if ($this->page->parcel_journey_enabled) {
+            $order->loadMissing(['shippingAddress', 'page']);
+
+            $data = [
+                'date' => $date,
+                'page_name' => $order->page->name,
+                'customer_name' => $order->shippingAddress?->full_name,
+                'tracking_code' => $order->tracking_code,
+                'shipping_address' => $order->shippingAddress?->full_address,
+            ];
+        }
+
+
+
+        if ($this->page->parcel_journey_enabled && $parcelJourney->status === 'Departure') {
             preg_match_all('/【(.*?)】/', $parcelJourney->note, $matches);
 
             $nextLocation = $matches[1][1];
@@ -282,7 +302,7 @@ class SyncOrder implements ShouldQueue
             ]);
         }
 
-        if ($parcelJourney->status === 'Arrival') {
+        if ($this->page->parcel_journey_enabled && $parcelJourney->status === 'Arrival') {
             preg_match_all('/【(.*?)】/', $parcelJourney->note, $matches);
             $currentLocation = $matches[1][0];
             $data['current_location'] = $currentLocation;
@@ -328,38 +348,40 @@ class SyncOrder implements ShouldQueue
                     'rider_name' => $rider_name,
                     'workspace_id' => $order->workspace_id,
                     'conferrer_id' => $order->confirmed_by,
-                    'delivery_date' => Carbon::parse($parcelJourney->created_at)->format('Y-m-d'),
+                    'delivery_date' => $date,
                 ], [
                     'status' => 'PENDING',
                     'created_at' => $parcelJourney->created_at,
                 ]);
 
-                ParcelJourneyNotification::create([
-                    'order_id' => $order->id,
-                    'parcel_journey_id' => $parcelJourney->id,
-                    'message' => $this->renderMessage('sms', 'for-delivery', 'rider', $data),
-                    'type' => 'sms',
-                    'receiver_name' => $rider_name,
-                    'receiver_identity' => $rider_mobile,
-                ]);
+                if ($this->page->parcel_journey_enabled) {
+                    ParcelJourneyNotification::create([
+                        'order_id' => $order->id,
+                        'parcel_journey_id' => $parcelJourney->id,
+                        'message' => $this->renderMessage('sms', 'for-delivery', 'rider', $data),
+                        'type' => 'sms',
+                        'receiver_name' => $rider_name,
+                        'receiver_identity' => $rider_mobile,
+                    ]);
 
-                ParcelJourneyNotification::create([
-                    'order_id' => $order->id,
-                    'parcel_journey_id' => $parcelJourney->id,
-                    'message' => $this->renderMessage('sms', 'for-delivery', 'customer', $data),
-                    'type' => 'sms',
-                    'receiver_name' => $order->shippingAddress->full_name,
-                    'receiver_identity' => $order->shippingAddress->phone_number,
-                ]);
+                    ParcelJourneyNotification::create([
+                        'order_id' => $order->id,
+                        'parcel_journey_id' => $parcelJourney->id,
+                        'message' => $this->renderMessage('sms', 'for-delivery', 'customer', $data),
+                        'type' => 'sms',
+                        'receiver_name' => $order->shippingAddress->full_name,
+                        'receiver_identity' => $order->shippingAddress->phone_number,
+                    ]);
 
-                ParcelJourneyNotification::create([
-                    'order_id' => $order->id,
-                    'parcel_journey_id' => $parcelJourney->id,
-                    'message' => $this->renderMessage('chat', 'for-delivery', 'customer', $data),
-                    'type' => 'chat',
-                    'receiver_name' => $order->shippingAddress->full_name,
-                    'receiver_identity' => $psid,
-                ]);
+                    ParcelJourneyNotification::create([
+                        'order_id' => $order->id,
+                        'parcel_journey_id' => $parcelJourney->id,
+                        'message' => $this->renderMessage('chat', 'for-delivery', 'customer', $data),
+                        'type' => 'chat',
+                        'receiver_name' => $order->shippingAddress->full_name,
+                        'receiver_identity' => $psid,
+                    ]);
+                }
             }
         }
     }
