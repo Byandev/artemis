@@ -103,6 +103,28 @@ class WorkspaceController extends Controller
     }
 
     /**
+     * Update the specified workspace in storage.
+     */
+    public function update(Request $request, Workspace $workspace)
+    {
+        // Only owner and admins can update workspace
+        if (! $request->user()->isAdminOf($workspace)) {
+            abort(403, 'You do not have permission to update this workspace.');
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $workspace->update($validated);
+
+        return redirect()->route('workspaces.show', $workspace->slug)
+            ->with('success', 'Workspace updated successfully.');
+    }
+
+
+    /**
      * Remove the specified workspace from storage.
      */
     public function destroy(Request $request, Workspace $workspace)
