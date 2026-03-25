@@ -152,7 +152,7 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                     <h2
-                        className="text-xl font-semibold text-gray-800 dark:text-white/90"
+                        className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100"
                         x-text="pageName"
                     >
                         Teams

@@ -71,20 +71,18 @@ export default function Index({ roles, workspace }: Props) {
     const columns: ColumnDef<Role>[] = [
         {
             accessorKey: 'name',
-            header: () => <div className="font-extrabold text-sm text-gray-900 py-2 text-center">Role Name</div>,
+            header: () => <div className="font-mono font-medium text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Role Name</div>,
             cell: ({ row }) => (
-                <div className="flex flex-col items-center">
-                    <span className="font-bold text-gray-900">{row.original.name}</span>
-                </div>
+                <span className="text-[13px] font-medium text-gray-700 dark:text-gray-300">{row.original.name}</span>
             ),
         },
         {
             accessorKey: 'description',
-            header: () => <div className="font-extrabold text-sm text-gray-900 py-2">Description</div>,
+            header: () => <div className="font-mono font-medium text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Description</div>,
             cell: ({ row }) => (
                 <div className="max-w-[400px]">
-                    <p className="text-sm text-gray-600">
-                        {row.original.description || <span className="text-gray-300 italic">No description provided</span>}
+                    <p className="text-[13px] text-gray-500 dark:text-gray-400">
+                        {row.original.description || <span className="text-gray-300 dark:text-gray-600 italic">No description provided</span>}
                     </p>
                 </div>
             ),
@@ -106,7 +104,7 @@ export default function Index({ roles, workspace }: Props) {
         // },
         {
             id: 'actions',
-            header: () => <div className="text-center font-bold text-sm text-gray-900">Actions</div>,
+            header: () => <div className="font-mono font-medium text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600 text-center">Actions</div>,
             cell: ({ row }) => (
                 <div className="flex items-center justify-center gap-2">
                     {!row.original.deleted_at ? (
@@ -167,16 +165,16 @@ export default function Index({ roles, workspace }: Props) {
             <div className="w-full space-y-6 p-6 lg:p-8">
                 <div className="flex w-full items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+                        <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">
                             Role Management
                         </h1>
-                        <p className="mt-1 text-sm text-gray-500">
+                        <p className="mt-1 text-[13px] text-gray-500 dark:text-gray-400">
                             Define and manage access levels for your workspace
                         </p>
                     </div>
 
                     <Button
-                        className="bg-[#2dd4bf] font-bold text-white hover:bg-[#26b2a1]"
+                        className="bg-emerald-600 dark:bg-emerald-500 hover:bg-emerald-700 dark:hover:bg-emerald-400 text-white px-4 py-2 rounded-lg text-xs font-medium transition-colors"
                         onClick={() => setOpenFormModal(true)}
                     >
                         Add New Role
@@ -184,8 +182,8 @@ export default function Index({ roles, workspace }: Props) {
                 </div>
 
                 <ComponentCard desc="Configure the roles available in this workspace.">
-                    <div className="w-full overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
-                        <div className="border-gray-0 flex flex-col gap-4 border-b bg-white p-5 md:flex-row md:items-center">
+                    <div className="w-full overflow-hidden">
+                        <div className="flex flex-col gap-4 border-b border-black/6 dark:border-white/6 px-4 py-3 md:flex-row md:items-center">
                             <div className="relative max-w-sm flex-1">
                                 <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
                                 <input
@@ -195,7 +193,7 @@ export default function Index({ roles, workspace }: Props) {
                                     onChange={(e) =>
                                         setSearchQuery(e.target.value)
                                     }
-                                    className="w-full rounded-lg border border-gray-200 py-2 pr-4 pl-10 text-sm transition-all outline-none focus:border-[#2dd4bf] focus:ring-2 focus:ring-[#2dd4bf]/20"
+                                    className="w-full pl-10 pr-4 py-2.5 bg-stone-100 dark:bg-zinc-800 border border-black/6 dark:border-white/6 rounded-[10px] text-[13px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
                                 />
                             </div>
 

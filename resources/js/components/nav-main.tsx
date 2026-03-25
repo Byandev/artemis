@@ -29,7 +29,7 @@ export function NavMain({ items = [], group_label = '' }: NavMainProps) {
     return (
         <SidebarGroup>
             {group_label && (
-                <SidebarGroupLabel className="text-xs tracking-wide text-gray-400 uppercase">
+                <SidebarGroupLabel className="text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-300 dark:text-gray-600 px-3.5 mb-2">
                     {group_label}
                 </SidebarGroupLabel>
             )}
@@ -52,11 +52,12 @@ export function NavMain({ items = [], group_label = '' }: NavMainProps) {
                                             isActive={childActive}
                                             tooltip={{ children: item.title }}
                                             className={[
-                                                'relative h-11 justify-between rounded-md',
-                                                'text-gray-500 hover:bg-emerald-100 hover:text-emerald-500',
-                                                'border-l-4 border-transparent',
+                                                'relative h-9 justify-between rounded-[10px] text-[13px]',
+                                                'text-gray-400 dark:text-gray-500',
+                                                'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]',
+                                                'transition-colors',
                                                 childActive
-                                                    ? ' border-emerald-600 bg-emerald-50 font-medium text-emerald-600 transition-all'
+                                                    ? 'bg-emerald-500/[0.08] text-emerald-600 dark:text-emerald-400 font-medium hover:bg-emerald-500/[0.08]'
                                                     : '',
                                             ].join(' ')}
                                         >
@@ -85,9 +86,11 @@ export function NavMain({ items = [], group_label = '' }: NavMainProps) {
                                                             asChild
                                                             isActive={subActive}
                                                             className={[
-                                                                'h-9 rounded-md text-gray-500 hover:bg-emerald-100 hover:text-emerald-500',
+                                                                'h-8 rounded-[10px] text-[12px] text-gray-400 dark:text-gray-500',
+                                                                'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]',
+                                                                'transition-colors',
                                                                 subActive
-                                                                    ? 'bg-emerald-50 font-medium text-emerald-600'
+                                                                    ? 'bg-emerald-500/[0.08] text-emerald-600 dark:text-emerald-400 font-medium hover:bg-emerald-500/[0.08]'
                                                                     : '',
                                                             ].join(' ')}
                                                         >
@@ -119,11 +122,12 @@ export function NavMain({ items = [], group_label = '' }: NavMainProps) {
                                 isActive={active}
                                 tooltip={{ children: item.title }}
                                 className={[
-                                    'relative h-11 justify-start rounded-md',
-                                    'text-gray-500 hover:bg-emerald-100 hover:text-emerald-500',
-                                    'border-l-4 border-transparent',
+                                    'relative h-9 justify-start rounded-[10px] text-[13px]',
+                                    'text-gray-400 dark:text-gray-500',
+                                    'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]',
+                                    'transition-colors',
                                     active
-                                        ? 'ml-1 border-emerald-600 bg-emerald-50 font-medium text-emerald-600 transition-all'
+                                        ? 'bg-emerald-500/[0.08] text-emerald-600 dark:text-emerald-400 font-medium hover:bg-emerald-500/[0.08]'
                                         : '',
                                 ].join(' ')}
                             >

@@ -125,7 +125,7 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                     <h2
-                        className="text-xl font-semibold text-gray-800 dark:text-white/90"
+                        className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100"
                         x-text="pageName"
                     >
                         Shops
@@ -135,9 +135,9 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                 <div className="space-y-5 sm:space-y-6">
                     <ComponentCard desc="List of shop">
                         <div>
-                            <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.05]">
+                            <div className="flex flex-col gap-2 border-b border-black/6 dark:border-white/6 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                                 <input
-                                    className="w-full max-w-sm appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/20 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                                    className="w-full max-w-sm px-3 py-2.5 bg-stone-100 dark:bg-zinc-800 border border-black/6 dark:border-white/6 rounded-[10px] text-[13px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
                                     placeholder="Search shop name"
                                     value={searchValue}
                                     onChange={(e) =>

@@ -13,7 +13,7 @@ export default function AppSidebarLayout({
     return (
         <AppShell variant="sidebar">
             <AppSidebar />
-            <AppContent variant="sidebar" className="overflow-x-hidden bg-gray-50">
+            <AppContent variant="sidebar" className="overflow-x-hidden bg-stone-50 dark:bg-[#0F0F11]">
                 <AppSidebarHeader />
                 {children}
             </AppContent>

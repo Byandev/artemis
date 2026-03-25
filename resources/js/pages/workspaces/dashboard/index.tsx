@@ -63,9 +63,9 @@ const Dashboard = ({ workspace }: Props) => {
             <div className="p-4 md:p-6">
                 <div className="mb-6 flex items-center justify-between gap-6">
                     <div className="flex flex-col">
-                        <h1 className="text-2xl font-bold">Dashboard</h1>
+                        <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">Dashboard</h1>
 
-                        <p className='text-sm font-light text-gray-500'>
+                        <p className='text-[13px] text-gray-500 dark:text-gray-400'>
                             Performance overview from{' '}
                             {formatDate(new Date(dateRange[0]), 'MMMM d yyyy')}{' '}
                             to{' '}
