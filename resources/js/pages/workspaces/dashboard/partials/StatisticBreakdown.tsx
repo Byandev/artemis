@@ -2,13 +2,7 @@ import LineChart from '@/components/charts/LineChart';
 import LineChartSkeleton from '@/components/charts/skeletons/LineChartSkeleton';
 import { FilterValue } from '@/components/filters/Filters';
 import { Button } from '@/components/ui/button';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
     Tooltip,
     TooltipContent,
@@ -16,7 +10,7 @@ import {
 } from '@/components/ui/tooltip';
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
-import { RefreshCcw } from 'lucide-react';
+import { Check, ChevronDown, RefreshCcw } from 'lucide-react';
 import moment from 'moment/moment';
 import { useEffect, useMemo, useState } from 'react';
 import ComponentCard from '@/components/common/ComponentCard';
@@ -40,6 +34,8 @@ export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Pr
 
     const [option, setOption] = useState<MetricKey>(metrics[0]);
     const [secondOption, setSecondOption] = useState<MetricKey>(metrics[1]);
+    const [openOne, setOpenOne] = useState(false);
+    const [openTwo, setOpenTwo] = useState(false);
 
     const metricOne = useMemo(
         () => metricConfigs.find((m) => m.key === option),
@@ -175,14 +171,14 @@ export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Pr
                 </h2>
 
                 <div className="flex items-center justify-between gap-4">
-                    <div className="flex rounded-lg bg-gray-100 p-1">
+                    <div className="flex rounded-[10px] bg-stone-100 dark:bg-zinc-800 border border-black/6 dark:border-white/6 p-0.5">
                         {availableGroups.map((g) => (
                             <button
                                 key={g}
-                                className={`rounded-md px-4 py-1 text-sm transition-all ${
+                                className={`rounded-[8px] px-3 py-1 text-[12px] font-medium transition-all ${
                                     group === g
-                                        ? 'bg-white text-gray-950 shadow-sm'
-                                        : 'text-gray-400 hover:text-gray-600'
+                                        ? 'bg-white dark:bg-zinc-700 text-gray-800 dark:text-gray-100 shadow-sm'
+                                        : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
                                 }`}
                                 onClick={() => setGroup(g)}
                             >
@@ -192,65 +188,67 @@ export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Pr
                     </div>
 
                     <div className="flex items-center justify-between gap-2">
-                        <div className="w-60">
-                            <Select
-                                value={option}
-                                onValueChange={(newValue: MetricKey) =>
-                                    setOption(newValue)
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select first option" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {metricConfigs
-                                        .filter((m) => metrics.includes(m.key))
-                                        .map((item) => (
-                                            <SelectItem
-                                                key={item.key}
-                                                value={item.key}
-                                            >
-                                                {item.name}
-                                            </SelectItem>
-                                        ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        <Popover open={openOne} onOpenChange={setOpenOne}>
+                            <PopoverTrigger asChild>
+                                <button className={`flex h-8 items-center overflow-hidden rounded-[10px] border transition-all ${openOne ? 'border-emerald-500 ring-2 ring-emerald-500/15' : 'border-black/6 dark:border-white/6 hover:border-black/12 dark:hover:border-white/12'} bg-stone-100 dark:bg-zinc-800`}>
+                                    <span className="flex h-full items-center justify-center border-r border-black/6 dark:border-white/6 px-2.5 text-gray-400 dark:text-gray-500">
+                                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${openOne ? 'rotate-180 text-emerald-500' : ''}`} />
+                                    </span>
+                                    <span className="px-3 text-[13px] font-medium text-gray-700 dark:text-gray-200">
+                                        {metricOne?.name ?? 'Select metric'}
+                                    </span>
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent align="start" className="w-52 overflow-hidden rounded-[12px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900 p-1 shadow-lg dark:shadow-black/30">
+                                {metricConfigs.filter((m) => metrics.includes(m.key)).map((item) => (
+                                    <button
+                                        key={item.key}
+                                        className={`flex w-full items-center justify-between rounded-[8px] px-3 py-1.5 text-[13px] transition-colors ${option === item.key ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-medium' : 'text-gray-700 dark:text-gray-200 hover:bg-stone-50 dark:hover:bg-zinc-800'}`}
+                                        onClick={() => { setOption(item.key as MetricKey); setOpenOne(false); }}
+                                    >
+                                        {item.name}
+                                        {option === item.key && <Check className="h-3.5 w-3.5 text-emerald-500" />}
+                                    </button>
+                                ))}
+                            </PopoverContent>
+                        </Popover>
 
-                        <div className="w-60">
-                            <Select
-                                value={secondOption}
-                                onValueChange={(newValue: MetricKey) =>
-                                    setSecondOption(newValue)
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select second option" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {metricConfigs
-                                        .filter((m) => metrics.includes(m.key))
-                                        .map((item) => (
-                                            <SelectItem
-                                                key={item.key}
-                                                value={item.key}
-                                            >
-                                                {item.name}
-                                            </SelectItem>
-                                        ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        <Popover open={openTwo} onOpenChange={setOpenTwo}>
+                            <PopoverTrigger asChild>
+                                <button className={`flex h-8 items-center overflow-hidden rounded-[10px] border transition-all ${openTwo ? 'border-emerald-500 ring-2 ring-emerald-500/15' : 'border-black/6 dark:border-white/6 hover:border-black/12 dark:hover:border-white/12'} bg-stone-100 dark:bg-zinc-800`}>
+                                    <span className="flex h-full items-center justify-center border-r border-black/6 dark:border-white/6 px-2.5 text-gray-400 dark:text-gray-500">
+                                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${openTwo ? 'rotate-180 text-emerald-500' : ''}`} />
+                                    </span>
+                                    <span className="px-3 text-[13px] font-medium text-gray-700 dark:text-gray-200">
+                                        {metricTwo?.name ?? 'Select metric'}
+                                    </span>
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent align="start" className="w-52 overflow-hidden rounded-[12px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900 p-1 shadow-lg dark:shadow-black/30">
+                                {metricConfigs.filter((m) => metrics.includes(m.key)).map((item) => (
+                                    <button
+                                        key={item.key}
+                                        className={`flex w-full items-center justify-between rounded-[8px] px-3 py-1.5 text-[13px] transition-colors ${secondOption === item.key ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-medium' : 'text-gray-700 dark:text-gray-200 hover:bg-stone-50 dark:hover:bg-zinc-800'}`}
+                                        onClick={() => { setSecondOption(item.key as MetricKey); setOpenTwo(false); }}
+                                    >
+                                        {item.name}
+                                        {secondOption === item.key && <Check className="h-3.5 w-3.5 text-emerald-500" />}
+                                    </button>
+                                ))}
+                            </PopoverContent>
+                        </Popover>
 
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button
-                                    className="rounded-md bg-gray-100 p-2 hover:text-white"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 p-0 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-stone-200 dark:hover:bg-zinc-700"
                                     onClick={() =>
                                         setReload((prevState) => !prevState)
                                     }
                                 >
-                                    <RefreshCcw className="h-5 w-5 text-gray-500" />
+                                    <RefreshCcw className="h-3.5 w-3.5" />
                                 </Button>
                             </TooltipTrigger>
 
