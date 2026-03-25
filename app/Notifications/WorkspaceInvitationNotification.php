@@ -35,6 +35,9 @@ class WorkspaceInvitationNotification extends Notification implements ShouldQueu
      */
     public function toMail(object $notifiable): MailMessage
     {
+
+        $this->invitation->loadMissing(['role', 'workspace', 'inviter']);
+
         $workspace = $this->invitation->workspace;
         $inviter = $this->invitation->inviter;
         $acceptUrl = URL::route('workspaces.invitations.accept', ['token' => $this->invitation->token]);
@@ -43,7 +46,7 @@ class WorkspaceInvitationNotification extends Notification implements ShouldQueu
             ->subject("You've been invited to join {$workspace->name}")
             ->greeting('Hello!')
             ->line("{$inviter->name} has invited you to join the \"{$workspace->name}\" workspace.")
-            ->line("As a {$this->invitation->role}, you'll be able to collaborate with the team.")
+            ->line("As a {$this->invitation->role->name}, you'll be able to collaborate with the team.")
             ->action('Accept Invitation', $acceptUrl)
             ->line('This invitation will expire on '.$this->invitation->expires_at->format('F j, Y \a\t g:i A').'.')
             ->line('If you did not expect this invitation, no further action is required.');

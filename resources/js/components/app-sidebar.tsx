@@ -22,6 +22,7 @@ import {
     LogOut,
     Settings,
     User,
+    ShieldIcon,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -85,6 +86,11 @@ export function AppSidebar() {
                     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/rmo-management`,
                 },
             ],
+        },
+        {
+            title: 'Roles',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/roles`,
+            icon: ShieldIcon,
         },
     ];
 
@@ -190,9 +196,9 @@ export function AppSidebar() {
                 <NavMain items={accountNavItems} group_label="Account" />
             </SidebarContent>
 
-                <SidebarFooter>
-                    <NavFooter items={footerNavItems} className="mt-auto" />
-                </SidebarFooter>
+            <SidebarFooter>
+                <NavFooter items={footerNavItems} className="mt-auto" />
+            </SidebarFooter>
         </Sidebar>
     );
 }

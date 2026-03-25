@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
+use App\Models\WorkspaceUser;
 use App\Notifications\WorkspaceInvitationNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class WorkspaceInvitationController extends Controller
@@ -26,11 +28,15 @@ class WorkspaceInvitationController extends Controller
 
         $validated = $request->validate([
             'email' => ['required', 'email', 'max:255'],
-            'role' => ['required', 'in:admin,member'],
+            'role_id' => [
+                'required',
+                Rule::exists('roles', 'id')->where('workspace_id', $workspace->id),
+            ],
         ]);
 
         // Check if user is already a member
         $existingUser = User::where('email', $validated['email'])->first();
+
         if ($existingUser && $workspace->hasMember($existingUser)) {
             return back()->withErrors(['email' => 'This user is already a member of the workspace.']);
         }
@@ -51,7 +57,7 @@ class WorkspaceInvitationController extends Controller
             'workspace_id' => $workspace->id,
             'invited_by' => $request->user()->id,
             'email' => $validated['email'],
-            'role' => $validated['role'],
+            'role_id' => $validated['role_id'],
         ]);
 
         // Send the invitation email
@@ -172,7 +178,11 @@ class WorkspaceInvitationController extends Controller
             $workspace = $invitation->workspace;
 
             // Add user to workspace
-            $workspace->addMember($request->user(), $invitation->role);
+            WorkspaceUser::create([
+                'workspace_id' => $workspace->id,
+                'user_id' => $request->user()->id,
+                'role_id' => $invitation->role_id,
+            ]);
 
             // Mark invitation as accepted
             $invitation->markAsAccepted();

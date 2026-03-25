@@ -12,18 +12,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { PaginatedData } from '@/types';
+import { PaginatedData, User } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import { Edit, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-
-interface User {
-    id: number;
-    name: string;
-    email: string;
-}
+import { Workspace } from '@/types/models/Workspace';
 
 interface Team {
     id: number;
@@ -32,11 +27,6 @@ interface Team {
     members: User[];
 }
 
-interface Workspace {
-    id: number;
-    name: string;
-    slug: string;
-}
 
 interface Props {
     workspace: Workspace;
