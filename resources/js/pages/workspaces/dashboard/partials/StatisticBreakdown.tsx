@@ -163,10 +163,12 @@ export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Pr
 
     return (
         <div className="space-y-4">
-            <div className="item-center flex justify-between">
-                <h2 className="font-semibold">
-                    {metricOne?.name} vs {metricTwo?.name}
-                </h2>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h2 className="text-[14px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
+                        {metricOne?.name} <span className="text-gray-300 dark:text-gray-600">vs</span> {metricTwo?.name}
+                    </h2>
+                </div>
 
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex h-8 items-center gap-0.5 rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 p-0.5">
@@ -260,24 +262,22 @@ export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Pr
                     </p>
                 </div>
             ) : (
-                <ComponentCard>
-                    <LineChart
-                        categories={mergedChartData.categories}
-                        series={mergedChartData.series}
-                        leftAxisTitle={metricOne?.name ?? ''}
-                        rightAxisTitle={metricTwo?.name ?? ''}
-                        leftFormatter={(value) =>
-                            metricOne?.formatter
-                                ? metricOne.formatter(value)
-                                : value.toString()
-                        }
-                        rightFormatter={(value) =>
-                            metricTwo?.formatter
-                                ? metricTwo.formatter(value)
-                                : value.toString()
-                        }
-                    />
-                </ComponentCard>
+                <LineChart
+                    categories={mergedChartData.categories}
+                    series={mergedChartData.series}
+                    leftAxisTitle={metricOne?.name ?? ''}
+                    rightAxisTitle={metricTwo?.name ?? ''}
+                    leftFormatter={(value) =>
+                        metricOne?.formatter
+                            ? metricOne.formatter(value)
+                            : value.toString()
+                    }
+                    rightFormatter={(value) =>
+                        metricTwo?.formatter
+                            ? metricTwo.formatter(value)
+                            : value.toString()
+                    }
+                />
             )}
         </div>
     );

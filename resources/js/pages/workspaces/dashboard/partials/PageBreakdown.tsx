@@ -142,9 +142,11 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
 
             <div className="space-y-4">
                 <div className="flex items-center justify-between gap-4">
-                    <h2 className=" font-semibold">
-                        {optionLabels[option]} Per Page
-                    </h2>
+                    <div>
+                        <h2 className="text-[14px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
+                            {optionLabels[option]} <span className="text-gray-300 dark:text-gray-600">·</span> Per Page
+                        </h2>
+                    </div>
 
                     <div className="flex items-center gap-4">
                         <DropdownSelect
@@ -210,13 +212,11 @@ export default function PageBreakdown({ workspace, dateRange, filter }: Props) {
                         </p>
                     </div>
                 ) : (
-                    <ComponentCard>
-                        <BarChart
-                            categories={categories}
-                            series={series}
-                            formatValue={formatValue}
-                        />
-                    </ComponentCard>
+                    <BarChart
+                        categories={categories}
+                        series={series}
+                        formatValue={formatValue}
+                    />
                 )}
             </div>
 

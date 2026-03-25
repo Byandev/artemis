@@ -147,9 +147,11 @@ export default function UserBreakdown({ workspace, dateRange, filter }: Props) {
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between gap-4">
-                <h2 className="text-lg font-semibold">
-                    {optionLabels[option]} Per User
-                </h2>
+                <div>
+                    <h2 className="text-[14px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
+                        {optionLabels[option]} <span className="text-gray-300 dark:text-gray-600">·</span> Per User
+                    </h2>
+                </div>
 
                 <div className="flex items-center gap-4">
                     <DropdownSelect
@@ -201,13 +203,11 @@ export default function UserBreakdown({ workspace, dateRange, filter }: Props) {
                     </p>
                 </div>
             ) : (
-                <ComponentCard>
-                    <BarChart
-                        categories={categories}
-                        series={series}
-                        formatValue={formatValue}
-                    />
-                </ComponentCard>
+                <BarChart
+                    categories={categories}
+                    series={series}
+                    formatValue={formatValue}
+                />
             )}
         </div>
     );

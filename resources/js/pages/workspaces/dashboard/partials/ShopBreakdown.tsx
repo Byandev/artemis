@@ -151,9 +151,11 @@ export default function ShopBreakdown({
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between gap-4">
-                <h2 className="text-lg font-semibold">
-                    {optionLabels[option]} Per Shop
-                </h2>
+                <div>
+                    <h2 className="text-[14px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
+                        {optionLabels[option]} <span className="text-gray-300 dark:text-gray-600">·</span> Per Shop
+                    </h2>
+                </div>
                 <div className="flex items-center gap-4">
                     <DropdownSelect
                         value={option}
@@ -217,13 +219,11 @@ export default function ShopBreakdown({
                     </p>
                 </div>
             ) : (
-                <ComponentCard>
-                    <BarChart
-                        categories={categories}
-                        series={series}
-                        formatValue={formatValue}
-                    />
-                </ComponentCard>
+                <BarChart
+                    categories={categories}
+                    series={series}
+                    formatValue={formatValue}
+                />
             )}
         </div>
     );
