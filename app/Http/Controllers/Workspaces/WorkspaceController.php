@@ -25,9 +25,8 @@ class WorkspaceController extends Controller
             ->latest()
             ->get();
 
-        return Inertia::render('workspaces/members', [
-            'workspace' => $workspaces,
-            'members' => null,
+        return Inertia::render('workspaces/index', [
+            'workspaces' => $workspaces,
         ]);
     }
 
