@@ -57,7 +57,7 @@ const RoleFormDialog = ({ workspace, open, onOpenChange, role }: Props) => {
             <DialogContent>
                 <DialogTitle>{isEditing ? 'Update role' : 'Create role'}</DialogTitle>
 
-                <form onSubmit={handleSubmit} className="space-y-4 p-6">
+                <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-1.5">
                         <label className="ml-1 text-xs font-bold text-gray-700">
                             Role Identifier

@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import ComponentCard from '@/components/common/ComponentCard';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import {
     Pencil,
@@ -12,10 +12,9 @@ import {
     AlertTriangle,
     ShieldCheck
 } from 'lucide-react';
-import { useState, useMemo, useEffect } from 'react';
+import { useState } from 'react';
 import { toast, Toaster } from 'sonner';
 import { Workspace } from '@/types/models/Workspace';
-import { type SharedData, User } from '@/types';
 import { Role } from '@/types/models/Role';
 import RoleFormDialog from '@/components/roles/role-form-dialog'; // Added Toaster here
 
@@ -27,37 +26,35 @@ interface Props {
 
 export default function Index({ roles, workspace }: Props) {
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+    const [selectedRole, setSelectedRole] = useState<Role | undefined>(
+        undefined,
+    );
 
     const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
-    const [roleToArchive, setRoleToArchive] = useState<Role | null>(null);
-
     const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
-    const [roleToRestore, setRoleToRestore] = useState<Role | null>(null);
-
     const [openFormModal, setOpenFormModal] = useState(false);
 
 
     const handleConfirmArchive = () => {
-        if (!roleToArchive) return;
-        router.patch(`/workspaces/${workspace.slug}/roles/${roleToArchive.id}/archive`, {}, {
+        if (!selectedRole) return;
+        router.patch(`/workspaces/${workspace.slug}/roles/${selectedRole.id}/archive`, {}, {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success(`${roleToArchive.role} has been archived.`);
+                toast.success(`${selectedRole.role} has been archived.`);
                 setIsArchiveModalOpen(false);
-                setRoleToArchive(null);
+                setSelectedRole(null);
             },
         });
     };
 
     const handleConfirmRestore = () => {
-        if (!roleToRestore) return;
-        router.post(`/workspaces/${workspace.slug}/roles/${roleToRestore.id}/restore`, {}, {
+        if (!selectedRole) return;
+        router.post(`/workspaces/${workspace.slug}/roles/${selectedRole.id}/restore`, {}, {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success(`${roleToRestore.role} has been restored.`);
+                toast.success(`${selectedRole.role} has been restored.`);
                 setIsRestoreModalOpen(false);
-                setRoleToRestore(null);
+                setSelectedRole(undefined);
             },
         });
     };
@@ -132,7 +129,7 @@ export default function Index({ roles, workspace }: Props) {
                                 size="sm"
                                 className="h-8 px-3 text-xs font-bold text-red-500 hover:text-red-700 hover:bg-red-50 flex items-center gap-2"
                                 onClick={() => {
-                                    setRoleToArchive(row.original);
+                                    setSelectedRole(row.original);
                                     setIsArchiveModalOpen(true);
                                 }}
                             >
@@ -146,7 +143,7 @@ export default function Index({ roles, workspace }: Props) {
                             size="sm"
                             className="h-8 px-3 text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 flex items-center gap-2"
                             onClick={() => {
-                                setRoleToRestore(row.original);
+                                setSelectedRole(row.original);
                                 setIsRestoreModalOpen(true);
                             }}
                         >
@@ -249,7 +246,7 @@ export default function Index({ roles, workspace }: Props) {
                             <p className="mb-5 text-sm text-slate-500">
                                 Are you sure you want to archive the{' '}
                                 <span className="font-semibold text-slate-900">
-                                    "{roleToArchive?.role}"
+                                    "{selectedRole?.role}"
                                 </span>{' '}
                                 role?
                             </p>
@@ -282,7 +279,7 @@ export default function Index({ roles, workspace }: Props) {
 
             {/* Restore Modal */}
             {isRestoreModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
                     <div
                         className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px]"
                         onClick={() => setIsRestoreModalOpen(false)}
@@ -298,7 +295,7 @@ export default function Index({ roles, workspace }: Props) {
                             <p className="mb-5 text-sm text-slate-500">
                                 Do you want to restore the{' '}
                                 <span className="font-semibold text-slate-900">
-                                    "{roleToRestore?.display_name}"
+                                    "{selectedRole?.role}"
                                 </span>{' '}
                                 role to active status?
                             </p>
