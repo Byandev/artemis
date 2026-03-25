@@ -191,7 +191,7 @@ export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Pr
                         <DropdownSelect
                             value={option}
                             onChange={(val) => setOption(val as MetricKey)}
-                            options={metricConfigs.filter((m) => metrics.includes(m.key)).map((m) => ({ key: m.key, label: m.name }))}
+                            options={metricConfigs.filter((m) => metrics.includes(m.key) && m.key !== secondOption).map((m) => ({ key: m.key, label: m.name }))}
                             label="Metric"
                             align="start"
                             width="w-52"
@@ -200,7 +200,7 @@ export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Pr
                         <DropdownSelect
                             value={secondOption}
                             onChange={(val) => setSecondOption(val as MetricKey)}
-                            options={metricConfigs.filter((m) => metrics.includes(m.key)).map((m) => ({ key: m.key, label: m.name }))}
+                            options={metricConfigs.filter((m) => metrics.includes(m.key) && m.key !== option).map((m) => ({ key: m.key, label: m.name }))}
                             label="Metric"
                             align="start"
                             width="w-52"
