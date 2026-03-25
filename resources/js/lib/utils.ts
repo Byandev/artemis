@@ -44,6 +44,9 @@ export function percentageFormatter(
     value: number,
     options?: Intl.NumberFormatOptions
 ): string {
+    const percent = value * 100;
+    const compact = compactNumber(percent);
+    if (compact) return `${compact}%`;
     return new Intl.NumberFormat('en-US', {
         style: 'percent',
         minimumFractionDigits: 0,

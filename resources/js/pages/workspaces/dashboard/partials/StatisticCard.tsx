@@ -12,6 +12,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { percentageFormatter } from '@/lib/utils';
 
 export interface Props {
     label: string;
@@ -95,7 +96,7 @@ const StatisticCard = ({
             prevStart,
             prevEnd,
         };
-    }, [dateRange[0], dateRange[1]]);
+    }, [dateRange]);
 
     const teamIds = useMemo(() => filter.teamIds.join(','), [filter.teamIds]);
     const shopIds = useMemo(() => filter.shopIds.join(','), [filter.shopIds]);
@@ -185,16 +186,11 @@ const StatisticCard = ({
         return () => controller.abort();
     }, [workspace.id, metric, commonParams, period]);
 
-    const previousPeriodText = useMemo(() => {
-        if (period.days === 1) return 'yesterday';
-        return `prev ${period.days} days`;
-    }, [period.days]);
-
     const comparison = useMemo(() => {
         const hasPreviousData = previousValue > 0;
         const difference = currentValue - previousValue;
         const percent = hasPreviousData
-            ? (difference / previousValue) * 100
+            ? (difference / previousValue)
             : 0;
 
         const isPositive = difference > 0;
@@ -242,7 +238,7 @@ const StatisticCard = ({
                     ? 'improving'
                     : 'worsening';
 
-            return `${label} is ${status} by ${Math.abs(comparison.percent).toFixed(1)}% compared to the previous ${period.days}-day period. Current: ${formatter(currentValue)}. Previous: ${formatter(previousValue)}.`;
+            return `${label} is ${status} by ${percentageFormatter(comparison.percent)} compared to the previous ${period.days}-day period. Current: ${formatter(currentValue)}. Previous: ${formatter(previousValue)}.`;
         }
 
         return `${label} is currently ${formatter(currentValue)}. No previous data available for comparison.`;
@@ -322,7 +318,7 @@ const StatisticCard = ({
                                     <comparison.TrendIcon className="h-3.5 w-3.5" />
                                     {comparison.isNeutral
                                         ? '0.0%'
-                                        : `${comparison.isPositive ? '+' : ''}${comparison.percent.toFixed(1)}%`}
+                                        : `${comparison.isPositive ? '+' : ''}${percentageFormatter(comparison.percent)}`}
                                 </p>
                             </div>
                         )
