@@ -56,7 +56,7 @@ export function NavMain({ items = [], group_label = '' }: NavMainProps) {
                                                 'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]',
                                                 'transition-colors',
                                                 childActive
-                                                    ? 'bg-emerald-500/[0.08] text-emerald-600 dark:text-emerald-400 font-medium hover:bg-emerald-500/[0.08]'
+                                                    ? '!bg-emerald-600 dark:!bg-emerald-500 !text-white font-medium hover:!bg-emerald-600 dark:hover:!bg-emerald-500'
                                                     : '',
                                             ].join(' ')}
                                         >
@@ -89,7 +89,7 @@ export function NavMain({ items = [], group_label = '' }: NavMainProps) {
                                                                 'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]',
                                                                 'transition-colors',
                                                                 subActive
-                                                                    ? 'bg-emerald-500/[0.08] text-emerald-600 dark:text-emerald-400 font-medium hover:bg-emerald-500/[0.08]'
+                                                                    ? '!bg-emerald-600 dark:!bg-emerald-500 !text-white font-medium hover:!bg-emerald-600 dark:hover:!bg-emerald-500'
                                                                     : '',
                                                             ].join(' ')}
                                                         >
@@ -125,7 +125,7 @@ export function NavMain({ items = [], group_label = '' }: NavMainProps) {
                                     'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]',
                                     'transition-colors',
                                     active
-                                        ? 'bg-emerald-500/[0.08] text-emerald-600 dark:text-emerald-400 font-medium hover:bg-emerald-500/[0.08]'
+                                        ? '!bg-emerald-600 dark:!bg-emerald-500 !text-white font-medium hover:!bg-emerald-600 dark:hover:!bg-emerald-500'
                                         : '',
                                 ].join(' ')}
                             >
