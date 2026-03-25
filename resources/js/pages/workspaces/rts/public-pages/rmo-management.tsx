@@ -20,7 +20,7 @@ import {
     getStatusBadgeClass,
 } from '@/types/models/Pancake/OrderForDelivery';
 import { Workspace } from '@/types/models/Workspace';
-import { router, useForm } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import {
     ChevronUp,
@@ -34,6 +34,7 @@ import { Input } from '@/components/ui/input';
 import { omit } from 'lodash';
 import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
+import publicPage from '@/routes/public-page';
 
 
 interface Props {
@@ -104,7 +105,7 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
             const currentSort = query?.sort;
 
             router.get(
-                workspaces.rts.rmoManagement({ workspace }),
+                publicPage.rmoManagement({ workspace }),
                 {
                     sort: currentSort,
                     'filter[search]': searchValue || undefined,
@@ -395,13 +396,13 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
     ];
 
     return (
-        <AppLayout>
+        <div>
             <div className="p-6">
                 <div className="">
                     <div className="mb-6 flex flex-col">
                         <h1 className="text-2xl font-bold">RMO Management</h1>
                         <p className="text-sm font-light text-gray-500">
-                            Items that for delivery today.
+                            Items scheduled for delivery today.
                         </p>
                     </div>
                     <ComponentCard>
@@ -423,140 +424,168 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 {/* Page Filter Dropdown */}
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger className="flex items-center gap-1 rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
-                                        {uniquePages.find(
-                                            (p) => p.id === selectedPageId,
-                                        )?.name || 'All Pages'}
-                                        <ChevronUp className="h-3 w-3" />
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                        align="end"
-                                        className="max-h-80 overflow-y-auto"
-                                    >
-                                        <DropdownMenuItem
-                                            className="p-0 focus:bg-transparent"
-                                            onClick={() =>
-                                                handlePageFilterChange('ALL')
-                                            }
+                                <div className="flex items-center gap-2">
+                                    <p className="text-sm text-gray-600">
+                                        Pages
+                                    </p>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger className="flex items-center justify-between min-w-40 rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
+                                            {uniquePages.find(
+                                                (p) => p.id === selectedPageId,
+                                            )?.name || 'All'}
+                                            <ChevronUp className="h-3 w-3" />
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent
+                                            align="end"
+                                            className="max-h-80 overflow-y-auto"
                                         >
-                                            <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
-                                                <span>All Pages</span>
-                                            </div>
-                                        </DropdownMenuItem>
-                                        {uniquePages.map((page) => {
-                                            return (
-                                                <DropdownMenuItem
-                                                    className="p-0 focus:bg-transparent"
-                                                    key={page.id}
-                                                    onClick={() =>
-                                                        handlePageFilterChange(
-                                                            page.id,
-                                                        )
-                                                    }
-                                                >
-                                                    <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
-                                                        <span>{page.name}</span>
-                                                    </div>
-                                                </DropdownMenuItem>
-                                            );
-                                        })}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-
-                                {/* J&T Status Filter Dropdown */}
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger className="flex items-center gap-1 rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
-                                        {selectedParcelStatus || 'J&T Status'}
-                                        <ChevronUp className="h-3 w-3" />
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                        align="end"
-                                        className="max-h-80 overflow-y-auto"
-                                    >
-                                        <DropdownMenuItem
-                                            className="p-0 focus:bg-transparent"
-                                            onClick={() =>
-                                                handleParcelStatusFilterChange(
-                                                    'ALL',
-                                                )
-                                            }
-                                        >
-                                            <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
-                                                <span>All Status</span>
-                                            </div>
-                                        </DropdownMenuItem>
-                                        {parcelStatusOptions.map(
-                                            (parcelStatus) => {
+                                            <DropdownMenuItem
+                                                className="p-0 focus:bg-transparent"
+                                                onClick={() =>
+                                                    handlePageFilterChange(
+                                                        'ALL',
+                                                    )
+                                                }
+                                            >
+                                                <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
+                                                    <span>All Pages</span>
+                                                </div>
+                                            </DropdownMenuItem>
+                                            {uniquePages.map((page) => {
                                                 return (
                                                     <DropdownMenuItem
                                                         className="p-0 focus:bg-transparent"
-                                                        key={parcelStatus}
+                                                        key={page.id}
                                                         onClick={() =>
-                                                            handleParcelStatusFilterChange(
-                                                                parcelStatus,
+                                                            handlePageFilterChange(
+                                                                page.id,
                                                             )
                                                         }
                                                     >
                                                         <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
-                                                            <span
-                                                                className={`rounded-lg px-2 py-0.5 text-xs ${getParcelStatusBadgeClass(parcelStatus)}`}
-                                                            >
-                                                                {parcelStatus}
+                                                            <span>
+                                                                {page.name}
                                                             </span>
                                                         </div>
                                                     </DropdownMenuItem>
                                                 );
-                                            },
-                                        )}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                            })}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
 
-                                {/* Status Filter Dropdown */}
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger className="flex items-center gap-1 rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
-                                        {selectedStatus || 'Order Status'}
-                                        <ChevronUp className="h-3 w-3" />
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                        align="end"
-                                        className="max-h-80 overflow-y-auto"
-                                    >
-                                        <DropdownMenuItem
-                                            className="p-0 focus:bg-transparent"
-                                            onClick={() =>
-                                                handleStatusFilterChange('ALL')
-                                            }
+                                <div className="flex items-center gap-2">
+                                    <p className="text-sm text-gray-600">
+                                        J&T Status
+                                    </p>
+                                    {/* J&T Status Filter Dropdown */}
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger className="flex items-center min-w-40 justify-between rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
+                                            {selectedParcelStatus ||
+                                                'All'}
+                                            <ChevronUp className="h-3 w-3" />
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent
+                                            align="end"
+                                            className="max-h-80 overflow-y-auto"
                                         >
-                                            <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
-                                                <span>All Status</span>
-                                            </div>
-                                        </DropdownMenuItem>
-                                        {ORDER_STATUSES.map((orderStatus) => {
-                                            return (
-                                                <DropdownMenuItem
-                                                    className="p-0 focus:bg-transparent"
-                                                    key={orderStatus}
-                                                    onClick={() =>
-                                                        handleStatusFilterChange(
-                                                            orderStatus,
-                                                        )
-                                                    }
-                                                >
-                                                    <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
-                                                        <span
-                                                            className={getStatusBadgeClass(
-                                                                orderStatus,
-                                                            )}
+                                            <DropdownMenuItem
+                                                className="p-0 focus:bg-transparent"
+                                                onClick={() =>
+                                                    handleParcelStatusFilterChange(
+                                                        'ALL',
+                                                    )
+                                                }
+                                            >
+                                                <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
+                                                    <span>All Status</span>
+                                                </div>
+                                            </DropdownMenuItem>
+                                            {parcelStatusOptions.map(
+                                                (parcelStatus) => {
+                                                    return (
+                                                        <DropdownMenuItem
+                                                            className="p-0 focus:bg-transparent"
+                                                            key={parcelStatus}
+                                                            onClick={() =>
+                                                                handleParcelStatusFilterChange(
+                                                                    parcelStatus,
+                                                                )
+                                                            }
                                                         >
-                                                            {orderStatus}
-                                                        </span>
-                                                    </div>
-                                                </DropdownMenuItem>
-                                            );
-                                        })}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                                            <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
+                                                                <span
+                                                                    className={`rounded-lg px-2 py-0.5 text-xs ${getParcelStatusBadgeClass(parcelStatus)}`}
+                                                                >
+                                                                    {
+                                                                        parcelStatus
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        </DropdownMenuItem>
+                                                    );
+                                                },
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <p className="text-sm text-gray-600">
+                                        Order Status
+                                    </p>
+                                    {/* Status Filter Dropdown */}
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger className="flex min-w-40 items-center justify-between rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
+                                            {selectedStatus || 'All'}
+                                            <ChevronUp className="h-3 w-3" />
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent
+                                            align="end"
+                                            className="max-h-80 overflow-y-auto"
+                                        >
+                                            <DropdownMenuItem
+                                                className="p-0 focus:bg-transparent"
+                                                onClick={() =>
+                                                    handleStatusFilterChange(
+                                                        'ALL',
+                                                    )
+                                                }
+                                            >
+                                                <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
+                                                    <span>All Status</span>
+                                                </div>
+                                            </DropdownMenuItem>
+                                            {ORDER_STATUSES.map(
+                                                (orderStatus) => {
+                                                    return (
+                                                        <DropdownMenuItem
+                                                            className="p-0 focus:bg-transparent"
+                                                            key={orderStatus}
+                                                            onClick={() =>
+                                                                handleStatusFilterChange(
+                                                                    orderStatus,
+                                                                )
+                                                            }
+                                                        >
+                                                            <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
+                                                                <span
+                                                                    className={getStatusBadgeClass(
+                                                                        orderStatus,
+                                                                    )}
+                                                                >
+                                                                    {
+                                                                        orderStatus
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        </DropdownMenuItem>
+                                                    );
+                                                },
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
 
                                 {/* Clear Filters Button */}
                                 {(selectedStatus ||
@@ -580,7 +609,7 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
                             meta={{ ...omit(orders, ['data']) }}
                             onFetch={(params) => {
                                 router.get(
-                                    workspaces.rts.rmoManagement({ workspace }),
+                                    publicPage.rmoManagement({ workspace }),
                                     {
                                         sort: params?.sort,
                                         'filter[search]':
@@ -606,6 +635,6 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
                     </ComponentCard>
                 </div>
             </div>
-        </AppLayout>
+        </div>
     );
 }
