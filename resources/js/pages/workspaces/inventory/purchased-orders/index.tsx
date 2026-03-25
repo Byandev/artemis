@@ -21,6 +21,10 @@ interface PurchasedOrder {
 
 interface PaginatedResponse {
     data: PurchasedOrder[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
 }
 
 interface Props {
@@ -50,17 +54,40 @@ const formatMoney = (amount: number): string => {
     }).format(amount || 0);
 };
 
+const toInputDate = (date: Date): string => {
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 10);
+};
+
+const getDefaultDateRange = (): { startDate: string; endDate: string } => {
+    const today = new Date();
+    const oneWeekBefore = new Date(today);
+    oneWeekBefore.setDate(today.getDate() - 7);
+
+    return {
+        startDate: toInputDate(oneWeekBefore),
+        endDate: toInputDate(today),
+    };
+};
+
 const Index = ({ workspace }: Props) => {
     const [rows, setRows] = useState<PurchasedOrder[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [lastPage, setLastPage] = useState(1);
+    const [totalRows, setTotalRows] = useState(0);
 
+    const defaultDateRangeRef = useRef(getDefaultDateRange());
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [query, setQuery] = useState('');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
+    const [startDate, setStartDate] = useState(defaultDateRangeRef.current.startDate);
+    const [endDate, setEndDate] = useState(defaultDateRangeRef.current.endDate);
     const startDateRef = useRef<HTMLInputElement | null>(null);
     const endDateRef = useRef<HTMLInputElement | null>(null);
+    const requestSerialRef = useRef(0);
+    const maxSelectableDate = toInputDate(new Date());
 
     const apiBase = useMemo(() => {
         if (typeof window === 'undefined') return '';
@@ -87,9 +114,15 @@ const Index = ({ workspace }: Props) => {
         return xsrfCookie ? decodeURIComponent(xsrfCookie) : '';
     }, []);
 
-    const fetchRows = async () => {
-        setLoading(true);
-        setError(null);
+    const fetchRows = async (page = 1, append = false) => {
+        const requestSerial = ++requestSerialRef.current;
+
+        if (append) {
+            setLoadingMore(true);
+        } else {
+            setLoading(true);
+            setError(null);
+        }
 
         try {
             const params = new URLSearchParams();
@@ -97,7 +130,9 @@ const Index = ({ workspace }: Props) => {
             if (query.trim()) params.set('q', query.trim());
             if (startDate) params.set('start_date', startDate);
             if (endDate) params.set('end_date', endDate);
-            params.set('per_page', '100');
+            params.set('page', String(page));
+            params.set('per_page', '50');
+            params.set('show_all', '1');
 
             const url = `${apiBase}/api/workspaces/${workspace.slug}/inventory/purchased-orders?${params.toString()}`;
             const res = await fetch(url, {
@@ -115,18 +150,47 @@ const Index = ({ workspace }: Props) => {
                 throw new Error((json as { message?: string }).message || 'Failed to fetch purchased orders.');
             }
 
-            setRows(Array.isArray((json as PaginatedResponse).data) ? (json as PaginatedResponse).data : []);
+            const payload = json as PaginatedResponse;
+            const nextRows = Array.isArray(payload.data) ? payload.data : [];
+
+            if (requestSerial !== requestSerialRef.current) {
+                return;
+            }
+
+            setRows((prev) => (append ? [...prev, ...nextRows] : nextRows));
+            setCurrentPage(Number(payload.current_page || page));
+            setLastPage(Number(payload.last_page || page));
+            setTotalRows(Number(payload.total || nextRows.length));
         } catch (err) {
-            setRows([]);
+            if (requestSerial !== requestSerialRef.current) {
+                return;
+            }
+
+            if (!append) {
+                setRows([]);
+                setCurrentPage(1);
+                setLastPage(1);
+                setTotalRows(0);
+            }
             setError(err instanceof Error ? err.message : 'Failed to fetch purchased orders.');
         } finally {
-            setLoading(false);
+            if (append) {
+                setLoadingMore(false);
+            } else {
+                setLoading(false);
+            }
         }
     };
 
     useEffect(() => {
-        void fetchRows();
+        if (!startDate || !endDate) {
+            return;
+        }
+
+        void fetchRows(1, false);
     }, [statusFilter, query, startDate, endDate]);
+
+    const hasMore = rows.length < totalRows && currentPage < lastPage;
 
     const openDatePicker = (ref: React.RefObject<HTMLInputElement | null>) => {
         const input = ref.current;
@@ -138,6 +202,14 @@ const Index = ({ workspace }: Props) => {
         }
 
         input.focus();
+    };
+
+    const resetFilters = () => {
+        const defaults = getDefaultDateRange();
+        setQuery('');
+        setStatusFilter('all');
+        setStartDate(defaults.startDate);
+        setEndDate(defaults.endDate);
     };
 
     const updateStatus = async (id: number, status: StatusId) => {
@@ -211,7 +283,14 @@ const Index = ({ workspace }: Props) => {
                                 ref={startDateRef}
                                 type="date"
                                 value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
+                                max={maxSelectableDate}
+                                onChange={(e) => {
+                                    const nextValue = e.target.value > maxSelectableDate ? maxSelectableDate : e.target.value;
+                                    setStartDate(nextValue);
+                                    if (endDate && nextValue > endDate) {
+                                        setEndDate(nextValue);
+                                    }
+                                }}
                                 onKeyDown={(e) => e.preventDefault()}
                                 onPaste={(e) => e.preventDefault()}
                                 className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 pr-10 text-sm outline-none focus:border-zinc-500"
@@ -234,7 +313,14 @@ const Index = ({ workspace }: Props) => {
                                 ref={endDateRef}
                                 type="date"
                                 value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
+                                max={maxSelectableDate}
+                                onChange={(e) => {
+                                    const nextValue = e.target.value > maxSelectableDate ? maxSelectableDate : e.target.value;
+                                    setEndDate(nextValue);
+                                    if (startDate && startDate > nextValue) {
+                                        setStartDate(nextValue);
+                                    }
+                                }}
                                 onKeyDown={(e) => e.preventDefault()}
                                 onPaste={(e) => e.preventDefault()}
                                 className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 pr-10 text-sm outline-none focus:border-zinc-500"
@@ -248,6 +334,16 @@ const Index = ({ workspace }: Props) => {
                                 <Calendar className="h-4 w-4" />
                             </button>
                         </div>
+                    </div>
+
+                    <div className="space-y-1 md:col-span-2 xl:col-span-4">
+                        <button
+                            type="button"
+                            onClick={resetFilters}
+                            className="h-10 rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
+                        >
+                            Restore Default Filters
+                        </button>
                     </div>
                 </section>
 
@@ -310,6 +406,28 @@ const Index = ({ workspace }: Props) => {
                                 ))
                             )}
                         </tbody>
+                        {!loading && rows.length > 0 && (
+                            <tfoot className="border-t border-zinc-200 bg-zinc-50 text-sm text-zinc-600">
+                                <tr>
+                                    <td colSpan={9} className="px-3 py-3">
+                                        {hasMore ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => void fetchRows(currentPage + 1, true)}
+                                                disabled={loadingMore}
+                                                className="cursor-pointer font-medium text-zinc-800 underline underline-offset-2 disabled:cursor-not-allowed disabled:text-zinc-400"
+                                            >
+                                                {loadingMore
+                                                    ? 'Loading more...'
+                                                    : `Showed ${rows.length} of ${totalRows} Datas.. Click here to show more`}
+                                            </button>
+                                        ) : (
+                                            <span>{`Showed ${rows.length} of ${totalRows} Datas.`}</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        )}
                     </table>
                 </div>
             </div>
