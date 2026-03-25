@@ -5,7 +5,9 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryPurchasedOrder;
 use App\Models\Workspace;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class InventoryPurchasedOrderController extends Controller
 {
@@ -20,10 +22,33 @@ class InventoryPurchasedOrderController extends Controller
             'q' => ['nullable', 'string', 'max:120'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
+            'per_page' => ['nullable', 'integer', 'min:1'],
+            'show_all' => ['nullable', 'boolean'],
         ]);
 
+        if (! empty($validated['start_date']) && ! empty($validated['end_date'])) {
+            $start = Carbon::parse($validated['start_date']);
+            $end = Carbon::parse($validated['end_date']);
+            if ($start->diffInDays($end) > 93) {
+                throw ValidationException::withMessages([
+                    'end_date' => ['Date range cannot exceed 93 days.'],
+                ]);
+            }
+        }
+
         $query = InventoryPurchasedOrder::query()
+            ->select([
+                'id',
+                'issue_date',
+                'delivery_no',
+                'cust_po_no',
+                'control_no',
+                'item',
+                'cog_amount',
+                'delivery_fee',
+                'total_amount',
+                'status',
+            ])
             ->where('user_id', $request->user()->id);
 
         if (isset($validated['status'])) {
@@ -48,7 +73,19 @@ class InventoryPurchasedOrderController extends Controller
             $query->whereDate('issue_date', '<=', $validated['end_date']);
         }
 
-        $perPage = $validated['per_page'] ?? 20;
+        if (! empty($validated['show_all'])) {
+            $allRows = $query->orderByDesc('issue_date')->orderByDesc('id')->get();
+
+            return response()->json([
+                'data' => $allRows,
+                'current_page' => 1,
+                'last_page' => 1,
+                'per_page' => $allRows->count(),
+                'total' => $allRows->count(),
+            ]);
+        }
+
+        $perPage = (int) ($validated['per_page'] ?? 50);
 
         return response()->json(
             $query->orderByDesc('issue_date')->orderByDesc('id')->paginate($perPage)
@@ -69,6 +106,13 @@ class InventoryPurchasedOrderController extends Controller
             ->where('id', $order)
             ->where('user_id', $request->user()->id)
             ->firstOrFail();
+
+        if ((int) $ownedOrder->status === (int) $validated['status']) {
+            return response()->json([
+                'message' => 'Status unchanged.',
+                'data' => $ownedOrder,
+            ]);
+        }
 
         $ownedOrder->update([
             'status' => $validated['status'],
