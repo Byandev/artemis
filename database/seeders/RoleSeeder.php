@@ -11,17 +11,14 @@ class RoleSeeder extends Seeder
     {
         $roles = [
             [
-                'display_name' => 'Administrator',
                 'role' => 'admin', // This is the identifier/slug
                 'description' => 'Full access to all workspace settings and members.',
             ],
             [
-                'display_name' => 'Editor',
                 'role' => 'editor',
                 'description' => 'Can edit content but cannot manage workspace settings.',
             ],
             [
-                'display_name' => 'Member',
                 'role' => 'member',
                 'description' => 'Standard access to workspace features.',
             ],

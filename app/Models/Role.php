@@ -16,7 +16,6 @@ class Role extends Model
 
     protected $fillable = [
         'workspace_id',
-        'display_name',
         'role',
         'description',
     ];
