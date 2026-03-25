@@ -18,13 +18,13 @@ interface Props {
 
 const RoleFormDialog = ({ workspace, open, onOpenChange, role }: Props) => {
     const { data, setData, post, processing, errors, reset, patch } = useForm({
-        role: '',
+        name: '',
         description: '',
     });
 
     useEffect(() => {
         if (role) {
-            setData('role', role.role);
+            setData('name', role.name);
             setData('description', role.description)
         } else {
             reset()
@@ -64,18 +64,18 @@ const RoleFormDialog = ({ workspace, open, onOpenChange, role }: Props) => {
                         </label>
                         <input
                             type="text"
-                            value={data.role}
-                            onChange={(e) => setData('role', e.target.value)}
+                            value={data.name}
+                            onChange={(e) => setData('name', e.target.value)}
                             placeholder="e.g. moderator"
                             className={`w-full rounded-lg border px-4 py-2.5 text-sm transition-all outline-none focus:border-[#2dd4bf] focus:ring-4 focus:ring-[#2dd4bf]/10 ${
-                                errors.role
+                                errors.name
                                     ? 'border-red-500'
                                     : 'border-gray-200'
                             }`}
                         />
-                        {errors.role && (
+                        {errors.name && (
                             <p className="text-[10px] font-semibold text-red-500">
-                                {errors.role}
+                                {errors.name}
                             </p>
                         )}
                     </div>

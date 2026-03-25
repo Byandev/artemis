@@ -40,7 +40,7 @@ export default function Index({ roles, workspace }: Props) {
         router.patch(`/workspaces/${workspace.slug}/roles/${selectedRole.id}/archive`, {}, {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success(`${selectedRole.role} has been archived.`);
+                toast.success(`${selectedRole.name} has been archived.`);
                 setIsArchiveModalOpen(false);
                 setSelectedRole(null);
             },
@@ -52,7 +52,7 @@ export default function Index({ roles, workspace }: Props) {
         router.post(`/workspaces/${workspace.slug}/roles/${selectedRole.id}/restore`, {}, {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success(`${selectedRole.role} has been restored.`);
+                toast.success(`${selectedRole.name} has been restored.`);
                 setIsRestoreModalOpen(false);
                 setSelectedRole(undefined);
             },
@@ -70,11 +70,11 @@ export default function Index({ roles, workspace }: Props) {
 
     const columns: ColumnDef<Role>[] = [
         {
-            accessorKey: 'role',
+            accessorKey: 'name',
             header: () => <div className="font-extrabold text-sm text-gray-900 py-2 text-center">Role Name</div>,
             cell: ({ row }) => (
                 <div className="flex flex-col items-center">
-                    <span className="font-bold text-gray-900">{row.original.role}</span>
+                    <span className="font-bold text-gray-900">{row.original.name}</span>
                 </div>
             ),
         },
@@ -246,7 +246,7 @@ export default function Index({ roles, workspace }: Props) {
                             <p className="mb-5 text-sm text-slate-500">
                                 Are you sure you want to archive the{' '}
                                 <span className="font-semibold text-slate-900">
-                                    "{selectedRole?.role}"
+                                    "{selectedRole?.name}"
                                 </span>{' '}
                                 role?
                             </p>
@@ -295,7 +295,7 @@ export default function Index({ roles, workspace }: Props) {
                             <p className="mb-5 text-sm text-slate-500">
                                 Do you want to restore the{' '}
                                 <span className="font-semibold text-slate-900">
-                                    "{selectedRole?.role}"
+                                    "{selectedRole?.name}"
                                 </span>{' '}
                                 role to active status?
                             </p>

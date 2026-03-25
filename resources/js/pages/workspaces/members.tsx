@@ -137,7 +137,7 @@ export default function WorkspaceMembers({
     const editRoleForm = useForm({ role: '' });
     const inviteForm = useForm({
         email: '',
-        role: (roles || []).find(r => r.role === 'member')?.role || roles?.[0]?.role || '',
+        role: (roles || []).find(r => r.name === 'member')?.name || roles?.[0]?.name || '',
     });
 
     useEffect(() => {
@@ -228,7 +228,7 @@ export default function WorkspaceMembers({
             ),
             cell: ({ row }) => {
                 const roleSlug = row.original.pivot.role;
-                const roleData = roles.find(r => r.role === roleSlug || r.name === roleSlug);
+                const roleData = roles.find(r => r.name === roleSlug);
 
                 return (
                     <div className="flex justify-center">
@@ -471,7 +471,7 @@ export default function WorkspaceMembers({
                                 </SelectTrigger>
                                 <SelectContent>
                                     {roles.map((r) => (
-                                        <SelectItem key={r.id} value={r.role}>{r.display_name}</SelectItem>
+                                        <SelectItem key={r.id} value={r.name}>{r.display_name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>

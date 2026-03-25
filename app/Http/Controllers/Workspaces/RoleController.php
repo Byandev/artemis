@@ -27,11 +27,11 @@ class RoleController extends Controller
     public function store(Request $request, Workspace $workspace)
     {
         $validated = $request->validate([
-            'role' => [
+            'name' => [
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('roles', 'role')->where('workspace_id', $workspace->id),
+                Rule::unique('roles', 'name')->where('workspace_id', $workspace->id),
             ],
             'description' => 'nullable|string',
         ]);
@@ -44,7 +44,7 @@ class RoleController extends Controller
     public function update(Request $request, Workspace $workspace, Role $role)
     {
         $validated = $request->validate([
-            'role' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'description' => 'nullable|string',
         ]);
 
