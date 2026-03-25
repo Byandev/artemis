@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\WorkspaceInvitation;
+use App\Models\WorkspaceUser;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,8 @@ class RegisteredUserController extends Controller
         if ($request->has('invitation')) {
             $invitation = WorkspaceInvitation::with(['workspace'])
                 ->valid($request->invitation)
-                ->first();
+                ->first()
+                ->load('role');
         }
 
         return Inertia::render('auth/register', [
@@ -72,7 +74,13 @@ class RegisteredUserController extends Controller
                 // Auto-accept the invitation for consistency with login flow
                 DB::transaction(function () use ($invitation, $user) {
                     $workspace = $invitation->workspace;
-                    $workspace->addMember($user, $invitation->role);
+
+                    WorkspaceUser::create([
+                        'workspace_id' => $workspace->id,
+                        'user_id' => $user->id,
+                        'role_id' => $invitation->role_id,
+                    ]);
+
                     $invitation->markAsAccepted();
                 });
 

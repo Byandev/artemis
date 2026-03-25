@@ -1,5 +1,6 @@
 import { InertiaLinkProps } from '@inertiajs/react';
 import { LucideIcon } from 'lucide-react';
+import { Role } from '@/types/models/Role';
 
 export interface Auth {
     user: User;
@@ -40,6 +41,10 @@ export interface User {
     created_at: string;
     updated_at: string;
     [key: string]: unknown; // This allows for additional properties...
+    pivot?: {
+        role: string;
+        created_at: string;
+    };
 }
 
 export interface PaginationLinks {
