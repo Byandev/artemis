@@ -18,7 +18,6 @@ class WorkspaceController extends Controller
      */
     public function index(Request $request)
     {
-        // 1. You are fetching multiple workspaces here ($workspaces is a Collection)
         $workspaces = $request->user()
             ->workspaces()
             ->with('owner')
@@ -26,17 +25,9 @@ class WorkspaceController extends Controller
             ->latest()
             ->get();
 
-        // 2. Fix the Role query: Only select columns that exist in your DB
-        // If 'name' is missing from your table, remove it from the array
-        $availableRoles = Role::all(['id', 'display_name', 'role']);
-
         return Inertia::render('workspaces/members', [
             'workspace' => $workspaces,
             'members' => null,
-            // WARNING: $workspaces is a Collection, so $workspaces->users() will fail!
-            // You likely need to find a specific workspace first.
-            'roles' => $availableRoles,
-            'isAdmin' => auth()->user()->can('update', $workspaces->first()),
         ]);
     }
 
