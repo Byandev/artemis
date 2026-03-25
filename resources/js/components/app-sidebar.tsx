@@ -74,31 +74,17 @@ export function AppSidebar() {
             href: `/workspaces/${slug}/teams`,
             icon: Users,
         },
-    ];
-
-    mainNavItems.push({
-        title: 'RTS Management',
-        href: `/workspaces/${slug}/rts`,
-        icon: TrendingUp,
-    });
-
-    if (auth.user.role === 'superadmin' || auth.user.role === 'admin' || true) {
-        mainNavItems.push({
+        {
+            title: 'RTS Management',
+            href: `/workspaces/${slug}/rts`,
+            icon: TrendingUp,
+        },
+        {
             title: 'Role Management',
-            href: '#',
+            href: `/workspaces/${slug}/roles`,
             icon: ShieldCheck,
-            items: [
-                {
-                    title: 'Add Roles',
-                    href: `/workspaces/${slug}/roles/create`,
-                },
-                {
-                    title: 'View All Roles',
-                    href: `/workspaces/${slug}/roles`,
-                },
-            ],
-        });
-    }
+        },
+    ];
 
     return (
         <Sidebar collapsible="icon" variant="sidebar">

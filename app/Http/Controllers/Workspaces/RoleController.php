@@ -24,13 +24,6 @@ class RoleController extends Controller
         ]);
     }
 
-    public function create(Workspace $workspace)
-    {
-        return Inertia::render('roles/create', [
-            'workspace' => $workspace,
-        ]);
-    }
-
     public function store(Request $request, Workspace $workspace)
     {
         $validated = $request->validate([
@@ -46,15 +39,6 @@ class RoleController extends Controller
         $workspace->roles()->create($validated);
 
         return back()->with('success', 'Role created successfully!');
-    }
-
-    // Edit Role Definition
-    public function edit(Workspace $workspace, Role $role)
-    {
-        return Inertia::render('roles/edit', [
-            'workspace' => $workspace,
-            'role' => $role,
-        ]);
     }
 
     public function update(Request $request, Workspace $workspace, Role $role)

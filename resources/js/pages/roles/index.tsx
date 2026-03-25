@@ -16,7 +16,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { toast, Toaster } from 'sonner';
 import { Workspace } from '@/types/models/Workspace';
 import { type SharedData, User } from '@/types';
-import { Role } from '@/types/models/Role'; // Added Toaster here
+import { Role } from '@/types/models/Role';
+import RoleFormDialog from '@/components/roles/role-form-dialog'; // Added Toaster here
 
 
 interface Props {
@@ -26,12 +27,15 @@ interface Props {
 
 export default function Index({ roles, workspace }: Props) {
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
     const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
     const [roleToArchive, setRoleToArchive] = useState<Role | null>(null);
 
     const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
     const [roleToRestore, setRoleToRestore] = useState<Role | null>(null);
+
+    const [openFormModal, setOpenFormModal] = useState(false);
 
 
     const handleConfirmArchive = () => {
@@ -114,12 +118,15 @@ export default function Index({ roles, workspace }: Props) {
                                 variant="ghost"
                                 size="sm"
                                 className="h-8 px-3 text-xs font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-100 flex items-center gap-2"
-                                onClick={() => router.get(`/workspaces/${workspace.slug}/roles/${row.original.id}/edit`)}
+                                onClick={() => {
+                                    setSelectedRole(row.original)
+                                    setOpenFormModal(true)
+                                }}
                             >
                                 <Pencil className="w-3.5 h-3.5" />
                                 Edit
                             </Button>
-                            <div className="h-4 w-[1px] bg-gray-200 mx-1" />
+                            <div className="h-4 w-px bg-gray-200 mx-1" />
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -158,6 +165,8 @@ export default function Index({ roles, workspace }: Props) {
             {/* Added Toaster component here */}
             <Toaster position="top-right" richColors />
 
+            <RoleFormDialog workspace={workspace} open={openFormModal} onOpenChange={setOpenFormModal} role={selectedRole} />
+
             <div className="w-full space-y-6 p-6 lg:p-8">
                 <div className="flex w-full items-center justify-between">
                     <div>
@@ -171,11 +180,7 @@ export default function Index({ roles, workspace }: Props) {
 
                     <Button
                         className="bg-[#2dd4bf] font-bold text-white hover:bg-[#26b2a1]"
-                        onClick={() =>
-                            router.get(
-                                `/workspaces/${workspace.slug}/roles/add`,
-                            )
-                        }
+                        onClick={() => setOpenFormModal(true)}
                     >
                         Add New Role
                     </Button>
