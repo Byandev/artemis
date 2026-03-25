@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import ComponentCard from '@/components/common/ComponentCard';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import {
     Pencil,
@@ -14,39 +14,21 @@ import {
     ShieldCheck
 } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
-import { toast, Toaster } from 'sonner'; // Added Toaster here
+import { toast, Toaster } from 'sonner';
+import { Workspace } from '@/types/models/Workspace';
+import { type SharedData, User } from '@/types';
+import { Role } from '@/types/models/Role'; // Added Toaster here
 
-interface User {
-    id: number;
-    name: string;
-    email: string;
-    role: string;
-}
-
-interface Role {
-    id: number;
-    display_name: string;
-    role: string;
-    description: string;
-    deleted_at?: string | null;
-}
-
-interface Workspace {
-    id: number;
-    name: string;
-    slug: string;
-}
 
 interface Props {
     users: User[];
     roles: Role[];
     workspace: Workspace;
-    auth: {
-        user: User;
-    };
 }
 
-export default function Index({ users, roles, workspace, auth }: Props) {
+export default function Index({ users, roles, workspace }: Props) {
+    const { auth } = usePage<SharedData>().props;
+
     const [searchQuery, setSearchQuery] = useState('');
     const [showArchived, setShowArchived] = useState(false);
 

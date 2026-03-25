@@ -14,24 +14,19 @@ class RoleController extends Controller
 {
     public function index(Workspace $workspace)
     {
-        $users = User::select('id', 'name', 'email', 'role')->get();
-
-        $availableRoles = Role::withTrashed()
+        $roles = Role::withTrashed()
             ->where('workspace_id', $workspace->id)
             ->get();
 
         return Inertia::render('roles/index', [
-            'users' => $users,
             'workspace' => $workspace,
-            'roles' => $availableRoles,
-            'auth' => ['user' => auth()->user()],
+            'roles' => $roles,
         ]);
     }
     public function create(Workspace $workspace)
     {
         return Inertia::render('roles/create', [
             'workspace' => $workspace,
-            'auth' => ['user' => auth()->user()],
         ]);
     }
 

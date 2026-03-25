@@ -2,13 +2,11 @@
 
 namespace App\Http\Controllers\API\Workspace;
 
-use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Workspace;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
-use App\Models\WorkspaceUser;
 
 class UserController extends Controller
 {
@@ -16,8 +14,7 @@ class UserController extends Controller
     {
         return QueryBuilder::for(User::class)
             ->whereHas('workspaces', function ($query) use ($workspace) {
-                $query->where('workspaces.id', $workspace->id)
-                    ->withTrashed();
+                $query->where('workspaces.id', $workspace->id);
             })
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),
