@@ -12,6 +12,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { percentageFormatter } from '@/lib/utils';
 
 export interface Props {
     label: string;
@@ -35,18 +36,18 @@ function CardSkeleton({
     icon?: LucideIcon | null;
 }) {
     return (
-        <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
+        <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900 p-[18px]">
             <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
                     <div>
-                        <p className="text-theme-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
                             {label}
                         </p>
                         <div className="mt-2 h-3 w-20 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
                     </div>
                 </div>
 
-                <div className="rounded-lg bg-gray-100 p-2 dark:bg-gray-800">
+                <div className="rounded-lg bg-stone-100 p-2 dark:bg-zinc-800">
                     {Icon ? (
                         <Icon className="h-5 w-5 text-gray-300 dark:text-gray-600" />
                     ) : (
@@ -95,7 +96,7 @@ const StatisticCard = ({
             prevStart,
             prevEnd,
         };
-    }, [dateRange[0], dateRange[1]]);
+    }, [dateRange]);
 
     const teamIds = useMemo(() => filter.teamIds.join(','), [filter.teamIds]);
     const shopIds = useMemo(() => filter.shopIds.join(','), [filter.shopIds]);
@@ -185,16 +186,11 @@ const StatisticCard = ({
         return () => controller.abort();
     }, [workspace.id, metric, commonParams, period]);
 
-    const previousPeriodText = useMemo(() => {
-        if (period.days === 1) return 'yesterday';
-        return `prev ${period.days} days`;
-    }, [period.days]);
-
     const comparison = useMemo(() => {
         const hasPreviousData = previousValue > 0;
         const difference = currentValue - previousValue;
         const percent = hasPreviousData
-            ? (difference / previousValue) * 100
+            ? (difference / previousValue)
             : 0;
 
         const isPositive = difference > 0;
@@ -242,7 +238,7 @@ const StatisticCard = ({
                     ? 'improving'
                     : 'worsening';
 
-            return `${label} is ${status} by ${Math.abs(comparison.percent).toFixed(1)}% compared to the previous ${period.days}-day period. Current: ${formatter(currentValue)}. Previous: ${formatter(previousValue)}.`;
+            return `${label} is ${status} by ${percentageFormatter(comparison.percent)} compared to the previous ${period.days}-day period. Current: ${formatter(currentValue)}. Previous: ${formatter(previousValue)}.`;
         }
 
         return `${label} is currently ${formatter(currentValue)}. No previous data available for comparison.`;
@@ -264,10 +260,10 @@ const StatisticCard = ({
     }
 
     return (
-        <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
+        <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900 p-[18px]">
             <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
-                    <p className="text-theme-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
                         {label}
                     </p>
 
@@ -292,14 +288,14 @@ const StatisticCard = ({
                 </div>
 
                 {Icon && (
-                    <div className="rounded-lg bg-gray-100 p-2 dark:bg-gray-800">
+                    <div className="rounded-lg bg-stone-100 p-2 dark:bg-zinc-800">
                         <Icon className="h-5 w-5 text-gray-700 dark:text-white/90" />
                     </div>
                 )}
             </div>
 
             <div className="mt-3 flex flex-row justify-between">
-                <h4 className="text-2xl font-bold text-gray-800 dark:text-white/90">
+                <h4 className="text-[22px] font-semibold font-mono tracking-tight tabular-nums text-gray-900 dark:text-gray-100">
                     {formatter(currentValue)}
                 </h4>
 
@@ -322,7 +318,7 @@ const StatisticCard = ({
                                     <comparison.TrendIcon className="h-3.5 w-3.5" />
                                     {comparison.isNeutral
                                         ? '0.0%'
-                                        : `${comparison.isPositive ? '+' : ''}${comparison.percent.toFixed(1)}%`}
+                                        : `${comparison.isPositive ? '+' : ''}${percentageFormatter(comparison.percent)}`}
                                 </p>
                             </div>
                         )

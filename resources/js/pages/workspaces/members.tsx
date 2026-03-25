@@ -1,4 +1,5 @@
 import ComponentCard from '@/components/common/ComponentCard';
+import PageHeader from '@/components/common/PageHeader';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -326,14 +327,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
         <AppLayout>
             <Head title={`${workspace.name} - Members`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                    <h2
-                        className="text-xl font-semibold text-gray-800 dark:text-white/90"
-                        x-text="pageName"
-                    >
-                        Members
-                    </h2>
-
+                <PageHeader title="Members" description="Manage workspace members and their roles">
                     {isAdmin && (
                         <Dialog
                             open={inviteDialogOpen}
@@ -425,7 +419,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                             </DialogContent>
                         </Dialog>
                     )}
-                </div>
+                </PageHeader>
 
                 <div className="space-y-5 sm:space-y-6">
                     {/* Members Table */}

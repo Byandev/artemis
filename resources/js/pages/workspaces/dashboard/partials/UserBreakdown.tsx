@@ -1,14 +1,8 @@
 import BarChart from '@/components/charts/BarChart';
 import BarChartSkeleton from '@/components/charts/skeletons/BarChartSkeleton';
 import { FilterValue } from '@/components/filters/Filters';
+import DropdownSelect from '@/components/common/DropdownSelect';
 import { Button } from '@/components/ui/button';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
 import moment from 'moment';
@@ -34,7 +28,7 @@ export default function UserBreakdown({ workspace, dateRange, filter }: Props) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [option, setOption] = useState('totalSales');
-    const [ reload, setReload] = useState(false);
+    const [reload, setReload] = useState(false);
 
     const startDate = moment(dateRange[0]).format('YYYY-MM-DD');
     const endDate = moment(dateRange[1]).format('YYYY-MM-DD');
@@ -153,36 +147,31 @@ export default function UserBreakdown({ workspace, dateRange, filter }: Props) {
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between gap-4">
-                <h2 className="text-lg font-semibold">
-                    {optionLabels[option]} Per User
-                </h2>
+                <div>
+                    <h2 className="text-[14px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
+                        {optionLabels[option]} <span className="text-gray-300 dark:text-gray-600">·</span> Per User
+                    </h2>
+                </div>
 
                 <div className="flex items-center gap-4">
-                    <div className="w-80">
-                        <Select value={option} onValueChange={setOption}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select options" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {Object.entries(optionLabels).map(
-                                    ([key, label]) => (
-                                        <SelectItem key={key} value={key}>
-                                            {label}
-                                        </SelectItem>
-                                    ),
-                                )}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    <DropdownSelect
+                        value={option}
+                        onChange={setOption}
+                        options={Object.entries(optionLabels).map(([key, label]) => ({ key, label }))}
+                        label="Metric"
+                        align="end"
+                    />
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
-                                className="rounded-md bg-gray-100 p-2 hover:text-white"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 p-0 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-stone-200 dark:hover:bg-zinc-700"
                                 onClick={() =>
                                     setReload((prevState) => !prevState)
                                 }
                             >
-                                <RefreshCcw className="h-5 w-5 text-gray-500" />
+                                <RefreshCcw className="h-3.5 w-3.5" />
                             </Button>
                         </TooltipTrigger>
 
@@ -214,13 +203,11 @@ export default function UserBreakdown({ workspace, dateRange, filter }: Props) {
                     </p>
                 </div>
             ) : (
-                <ComponentCard>
-                    <BarChart
-                        categories={categories}
-                        series={series}
-                        formatValue={formatValue}
-                    />
-                </ComponentCard>
+                <BarChart
+                    categories={categories}
+                    series={series}
+                    formatValue={formatValue}
+                />
             )}
         </div>
     );

@@ -1,4 +1,5 @@
 import ComponentCard from '@/components/common/ComponentCard';
+import PageHeader from '@/components/common/PageHeader';
 import { ArchivePageDialog } from '@/components/pages/archive-page-dialog';
 import { PageFormDialog } from '@/components/pages/page-form-dialog';
 import { Button } from '@/components/ui/button';
@@ -241,17 +242,11 @@ const Pages = ({ pages, workspace, query, users }: PagesProps) => {
         <AppLayout>
             <Head title={`${workspace.name} - Pages`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                    <h2
-                        className="text-xl font-semibold text-gray-800 dark:text-white/90"
-                        x-text="pageName"
-                    >
-                        Pages
-                    </h2>
+                <PageHeader title="Pages" description="Manage your shop pages and their connected stores">
                     <Button size="sm" onClick={handleCreate}>
                         Add New Page
                     </Button>
-                </div>
+                </PageHeader>
 
                 <div className="space-y-5 sm:space-y-6">
                     <ComponentCard desc="List of shop pages and their connected stores">

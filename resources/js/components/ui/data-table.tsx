@@ -71,12 +71,12 @@ export function DataTable<TData, TValue>({
         <>
             <div className="max-w-full overflow-x-auto custom-scrollbar">
                 <Table>
-                    <TableHeader className="border-t border-gray-100 dark:border-white/[0.05]">
+                    <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
                                     return (
-                                        <TableHead key={header.id} className="px-4 py-3 border border-gray-100 dark:border-white/[0.05]">
+                                        <TableHead key={header.id} className="px-4 py-2.5 text-[10px] font-mono font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600 border-b border-black/6 dark:border-white/6">
                                             {header.isPlaceholder
                                                 ? null
                                                 : flexRender(
@@ -95,9 +95,10 @@ export function DataTable<TData, TValue>({
                                 <TableRow
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
+                                    className="hover:bg-emerald-500/[0.03] transition-colors"
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id} className='px-4 py-4 border border-gray-100 dark:border-white/[0.05]text-gray-700 text-theme-xs dark:text-gray-400'>
+                                        <TableCell key={cell.id} className='px-4 py-3 text-[13px] text-gray-500 dark:text-gray-400 border-b border-black/6 dark:border-white/6'>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}
@@ -116,7 +117,7 @@ export function DataTable<TData, TValue>({
 
             {
                 meta?.links?.length &&
-                <div className="border border-t-0 rounded-b-xl border-gray-100 py-4 pl-[18px] pr-4 dark:border-white/[0.05]">
+                <div className="border-t border-black/6 dark:border-white/6 py-3 pl-[18px] pr-4">
                     <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
                         <div className="pb-3 xl:pb-0">
                             <p className="pb-3 text-sm font-medium text-center text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
@@ -155,7 +156,7 @@ export function SortableHeader<TData>({ column, title, enabled = true, className
                 }
             }}
         >
-            <p className="font-medium text-gray-700 text-theme-xs dark:text-gray-400">
+            <p className="font-mono font-medium text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">
                 {title}
             </p>
             {enabled && <button className="flex flex-col">

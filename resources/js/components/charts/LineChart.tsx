@@ -23,79 +23,98 @@ export default function LineChart({
                                       leftFormatter,
                                       rightFormatter,
                                   }: Props) {
+    const colors = ['#10b981', '#818cf8'];
+
     const options: ApexOptions = {
-        legend: {
-            show: true,
-            position: 'bottom',
-            horizontalAlign: 'center',
-        },
-        colors: ['#87c0a6', '#9CB9FF'],
+        colors,
         chart: {
-            fontFamily: 'Outfit, sans-serif',
+            fontFamily: 'DM Sans, sans-serif',
             height: 310,
             type: 'area',
-            toolbar: {
-                show: false,
+            toolbar: { show: false },
+            zoom: { enabled: false },
+        },
+        legend: {
+            show: true,
+            position: 'top',
+            horizontalAlign: 'right',
+            fontSize: '12px',
+            fontFamily: 'DM Sans, sans-serif',
+            fontWeight: 500,
+            labels: {
+                colors: '#6B7280',
             },
+            markers: {
+                size: 6,
+                shape: 'circle',
+                strokeWidth: 0,
+                offsetX: -2,
+            },
+            itemMargin: { horizontal: 12 },
         },
         stroke: {
             curve: 'smooth',
-            width: 3,
+            width: 2.5,
         },
         fill: {
             type: 'gradient',
             gradient: {
                 shadeIntensity: 1,
                 inverseColors: false,
-                opacityFrom: 0.4,
-                opacityTo: 0.02,
-                stops: [0, 90, 100],
+                opacityFrom: 0.18,
+                opacityTo: 0,
+                stops: [0, 100],
             },
         },
         markers: {
-            size: 3,
-            strokeColors: '#fff',
-            strokeWidth: 2,
-            hover: {
-                size: 6,
-            },
+            size: 0,
+            hover: { size: 5, sizeOffset: 2 },
         },
         grid: {
-            xaxis: {
-                lines: {
-                    show: false,
-                },
-            },
-            yaxis: {
-                lines: {
-                    show: true,
-                },
-            },
+            borderColor: 'rgba(0,0,0,0.05)',
+            strokeDashArray: 4,
+            xaxis: { lines: { show: false } },
+            yaxis: { lines: { show: true } },
+            padding: { top: 0, right: 16, bottom: 0, left: 8 },
         },
-        dataLabels: {
-            enabled: false,
-        },
+        dataLabels: { enabled: false },
         tooltip: {
             enabled: true,
-            y: {
-                formatter: (value, { seriesIndex }) => {
-                    return seriesIndex === 0
-                        ? leftFormatter(value)
-                        : rightFormatter(value);
-                },
+            shared: true,
+            intersect: false,
+            custom: ({ dataPointIndex, w }) => {
+                const category = w.globals.categoryLabels[dataPointIndex] ?? w.globals.labels[dataPointIndex] ?? '';
+                const rows = w.globals.seriesNames.map((name: string, i: number) => {
+                    const val = w.globals.series[i][dataPointIndex];
+                    const fmt = i === 0 ? leftFormatter(val) : rightFormatter(val);
+                    return `
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:20px;margin-top:6px;">
+                            <div style="display:flex;align-items:center;gap:7px;">
+                                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colors[i]};flex-shrink:0;"></span>
+                                <span style="font-size:12px;color:#6B7280;font-weight:500;">${name}</span>
+                            </div>
+                            <span style="font-size:12px;color:#111827;font-weight:600;font-family:'DM Mono',monospace;">${fmt}</span>
+                        </div>`;
+                }).join('');
+                return `
+                    <div style="background:#fff;border:1px solid rgba(0,0,0,0.07);border-radius:12px;padding:12px 14px;box-shadow:0 4px 24px rgba(0,0,0,0.09);font-family:'DM Sans',sans-serif;min-width:200px;">
+                        <p style="font-family:'DM Mono',monospace;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.08em;color:#9CA3AF;margin:0 0 2px;">${category}</p>
+                        ${rows}
+                    </div>`;
             },
         },
         xaxis: {
             type: 'category',
             categories,
-            axisBorder: {
-                show: false,
-            },
-            axisTicks: {
-                show: false,
-            },
-            tooltip: {
-                enabled: false,
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+            tooltip: { enabled: false },
+            labels: {
+                style: {
+                    fontSize: '11px',
+                    fontFamily: 'DM Mono, monospace',
+                    colors: '#9CA3AF',
+                },
             },
         },
         yaxis: [
@@ -105,17 +124,14 @@ export default function LineChart({
                 labels: {
                     formatter: leftFormatter,
                     style: {
-                        fontSize: '12px',
-                        colors: ['#6B7280'],
+                        fontSize: '11px',
+                        fontFamily: 'DM Mono, monospace',
+                        colors: ['#9CA3AF'],
                     },
                 },
                 title: {
                     text: leftAxisTitle,
-                    style: {
-                        fontSize: '12px',
-                        fontWeight: 500,
-                        color: '#6B7280',
-                    },
+                    style: { fontSize: '11px', fontWeight: 500, color: '#9CA3AF' },
                 },
             },
             {
@@ -125,17 +141,14 @@ export default function LineChart({
                 labels: {
                     formatter: rightFormatter,
                     style: {
-                        fontSize: '12px',
-                        colors: ['#6B7280'],
+                        fontSize: '11px',
+                        fontFamily: 'DM Mono, monospace',
+                        colors: ['#9CA3AF'],
                     },
                 },
                 title: {
                     text: rightAxisTitle,
-                    style: {
-                        fontSize: '12px',
-                        fontWeight: 500,
-                        color: '#6B7280',
-                    },
+                    style: { fontSize: '11px', fontWeight: 500, color: '#9CA3AF' },
                 },
             },
         ],
