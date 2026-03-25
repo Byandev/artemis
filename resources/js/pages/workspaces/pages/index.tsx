@@ -79,6 +79,7 @@ const Pages = ({ pages, workspace, query, users }: PagesProps) => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
 
+
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [dialogOpen, setDialogOpen] = useState(false);
     const [selectedPage, setSelectedPage] = useState<Page | undefined>(undefined);

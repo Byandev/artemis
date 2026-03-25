@@ -48,6 +48,24 @@ class ForDeliveryController extends Controller
             ->allowedFilters([
                 AllowedFilter::exact('page_id'),
                 AllowedFilter::exact('shop_id'),
+                AllowedFilter::exact('status'),
+                AllowedFilter::callback('parcel_status', function ($query, $value) {
+                    $query->whereHas('order', function ($orderQuery) use ($value) {
+                        $orderQuery->where('parcel_status', $value);
+                    });
+                }),
+                AllowedFilter::callback('search', function ($query, $value) {
+                    $query->where(function ($q) use ($value) {
+                        $q->whereHas('order', function ($orderQuery) use ($value) {
+                            $orderQuery->where('order_number', 'LIKE', "%{$value}%")
+                                ->orWhere('tracking_code', 'LIKE', "%{$value}%");
+                        })
+                            ->orWhere('rider_name', 'LIKE', "%{$value}%")
+                            ->orWhereHas('conferrer', function ($conferrerQuery) use ($value) {
+                                $conferrerQuery->where('name', 'LIKE', "%{$value}%");
+                            });
+                    });
+                }),
             ])
             ->allowedSorts([
                 'status',
@@ -66,6 +84,11 @@ class ForDeliveryController extends Controller
         return Inertia::render('workspaces/rts/rmo-management', [
             'orders' => $items,
             'workspace' => $workspace,
+            'query' => [
+                ...$request->only(['sort', 'perPage', 'page',]),
+                'filter' => $request->input('filter', []),
+            ]
+
         ]);
     }
 

@@ -20,7 +20,7 @@ import {
     getStatusBadgeClass,
 } from '@/types/models/Pancake/OrderForDelivery';
 import { Workspace } from '@/types/models/Workspace';
-import { router } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import {
     ChevronUp,
@@ -29,21 +29,109 @@ import {
     Phone,
     Search,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { omit } from 'lodash';
 import { toFrontendSort } from '@/lib/sort';
+import workspaces from '@/routes/workspaces';
+
 
 interface Props {
     orders: PaginatedData<OrderForDelivery>;
     workspace: Workspace;
+    query?: {
+        sort?: string | null;
+        filter?: {
+            search?: string;
+            status?: string;
+            page_id?: string;
+            shop_id?: string;
+        };
+        page?: number;
+        perPage?: number;
+    };
 }
 
-export default function RmoManagement({ orders, workspace }: Props) {
+export default function RmoManagement({ orders, workspace, query }: Props) {
     const [isLoadingID, setIsLoadingID] = useState<number | null>(null);
-    // const initialSorting = useMemo(() => {
-    //     return toFrontendSort(query?.sort ?? null);
-    // }, [query?.sort]);
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [selectedStatus, setSelectedStatus] = useState<string>(query?.filter?.status ?? '');
+    const [selectedPageId, setSelectedPageId] = useState<string>(query?.filter?.page_id ?? '');
+    const [selectedParcelStatus, setSelectedParcelStatus] = useState<string>('');
+
+    const initialSorting = useMemo(() => {
+        return toFrontendSort(query?.sort ?? null);
+    }, [query?.sort]);
+
+    // Static J&T Status Options
+    const parcelStatusOptions = [
+        'DELIVERED',
+        'PENDING',
+        'RETURNED',
+        'UNDELIVERABLE',
+        'CANCELLED',
+        'SHIPPED',
+        'OUT FOR DELIVERY'
+    ];
+
+    // Get unique pages with their IDs and names
+    const uniquePages = useMemo(() => {
+        const pagesMap = new Map();
+        orders.data?.forEach(order => {
+            if (order.page?.id && order.page?.name) {
+                pagesMap.set(order.page.id, order.page.name);
+            }
+        });
+        return Array.from(pagesMap.entries()).map(([id, name]) => ({ id: String(id), name }));
+    }, [orders.data]);
+
+    // Function to get badge class for parcel status
+    const getParcelStatusBadgeClass = (status: string) => {
+        const statusUpper = status?.toUpperCase() || '';
+        if (statusUpper === 'DELIVERED') return 'bg-green-100 text-green-800';
+        if (statusUpper === 'RETURNED') return 'bg-red-100 text-red-800';
+        if (statusUpper === 'PENDING') return 'bg-yellow-100 text-yellow-800';
+        if (statusUpper === 'UNDELIVERABLE') return 'bg-orange-100 text-orange-800';
+        if (statusUpper === 'CANCELLED') return 'bg-gray-100 text-gray-800';
+        if (statusUpper === 'SHIPPED') return 'bg-blue-100 text-blue-800';
+        if (statusUpper === 'OUT FOR DELIVERY') return 'bg-purple-100 text-purple-800';
+        return 'bg-gray-100 text-gray-800';
+    };
+
+   
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            const currentSort = query?.sort;
+
+            router.get(
+                workspaces.rts.rmoManagement({ workspace }),
+                {
+                    sort: currentSort,
+                    'filter[search]': searchValue || undefined,
+                    'filter[status]': selectedStatus || undefined,
+                    'filter[page_id]': selectedPageId || undefined,
+                    'filter[parcel_status]': selectedParcelStatus || undefined,
+                    'filter[shop_id]': query?.filter?.shop_id || undefined,
+                    page: (searchValue || selectedStatus || selectedPageId || selectedParcelStatus) ? 1 : (query?.page ?? 1),
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['orders'],
+                },
+            );
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [
+        searchValue,
+        selectedStatus,
+        selectedPageId,
+        selectedParcelStatus,
+        query?.sort,
+        query?.filter?.shop_id,
+    ]);
 
     const handleChangeStatus = (status: string, orderId: number) => {
         router.post(
@@ -59,13 +147,36 @@ export default function RmoManagement({ orders, workspace }: Props) {
         );
     };
 
+    // Handle status filter change
+    const handleStatusFilterChange = (status: string) => {
+        setSelectedStatus(status === 'ALL' ? '' : status);
+    };
+
+    // Handle page filter change - now using page ID instead of name
+    const handlePageFilterChange = (pageId: string) => {
+        setSelectedPageId(pageId === 'ALL' ? '' : pageId);
+    };
+
+    // Handle parcel status filter change
+    const handleParcelStatusFilterChange = (parcelStatus: string) => {
+        setSelectedParcelStatus(parcelStatus === 'ALL' ? '' : parcelStatus);
+    };
+
+    // Clear all filters
+    const clearFilters = () => {
+        setSearchValue('');
+        setSelectedStatus('');
+        setSelectedPageId('');
+        setSelectedParcelStatus('');
+    };
+
     const columns: ColumnDef<OrderForDelivery>[] = [
         {
             accessorKey: 'order_number',
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Order Number'} />
             ),
-            cell: ({ row }) => row.original.order.order_number
+            cell: ({ row }) => row.original.order.order_number,
         },
         {
             accessorFn: (row) =>
@@ -73,7 +184,11 @@ export default function RmoManagement({ orders, workspace }: Props) {
             id: 'items',
             enableSorting: false,
             header: ({ column }) => (
-                <SortableHeader enabled={false} column={column} title={'Orders'} />
+                <SortableHeader
+                    enabled={false}
+                    column={column}
+                    title={'Orders'}
+                />
             ),
             cell: ({ row }) => {
                 const items = row.original.order.items ?? [];
@@ -104,6 +219,14 @@ export default function RmoManagement({ orders, workspace }: Props) {
             header: ({ column }) => (
                 <SortableHeader column={column} title={'J&T Status'} />
             ),
+            cell: ({ row }) => {
+                const parcelStatus = row.original.order.parcel_status;
+                return (
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${getParcelStatusBadgeClass(parcelStatus)}`}>
+                        {parcelStatus || 'N/A'}
+                    </span>
+                );
+            },
         },
         {
             accessorKey: 'rider_name',
@@ -153,7 +276,8 @@ export default function RmoManagement({ orders, workspace }: Props) {
                             <TooltipContent>
                                 <p className="max-w-xs">
                                     {
-                                        row.original.order.shipping_address?.full_address
+                                        row.original.order.shipping_address
+                                            ?.full_address
                                     }
                                 </p>
                             </TooltipContent>
@@ -168,7 +292,11 @@ export default function RmoManagement({ orders, workspace }: Props) {
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Location RTS'} />
             ),
-            cell: ({ row }) => percentageFormatter(row.original.order?.shipping_address?.city_order_summary?.rts_rate ?? 0)
+            cell: ({ row }) =>
+                percentageFormatter(
+                    row.original.order?.shipping_address?.city_order_summary
+                        ?.rts_rate ?? 0,
+                ),
         },
         {
             accessorKey: 'order.final_amount',
@@ -264,29 +392,6 @@ export default function RmoManagement({ orders, workspace }: Props) {
                 );
             },
         },
-        // {
-        //     accessorKey: 'created_at',
-        //     enableSorting: true,
-        //     header: ({ column }) => (
-        //         <SortableHeader
-        //             column={column}
-        //             title={'Actions'}
-        //             enabled={false}
-        //         />
-        //     ),
-        //     cell: ({ row }) => {
-        //         return (
-        //             <div>
-        //                 <Tooltip>
-        //                     <TooltipTrigger asChild>
-        //                         <UserRoundPlus className="h-4 w-4" />
-        //                     </TooltipTrigger>
-        //                     <TooltipContent>Assign to me</TooltipContent>
-        //                 </Tooltip>
-        //             </div>
-        //         );
-        //     },
-        // },
     ];
 
     return (
@@ -300,33 +405,194 @@ export default function RmoManagement({ orders, workspace }: Props) {
                         </p>
                     </div>
                     <ComponentCard>
-                        <div className="flex items-center justify-between">
-                            <h1>Items For Delivery Today.</h1>
-                            <div className="relative w-full sm:w-64">
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+                            <div className="relative w-80 sm:w-64">
                                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                                     <Search className="z-10 h-4 w-4 text-gray-400" />
                                 </div>
 
                                 <Input
                                     type="text"
-                                    placeholder="Search orders..."
-                                    className="h-9 pl-8 text-sm"
+                                    placeholder="Search by order #, tracking #, rider, or conferrer."
+                                    className="h-9 w-80 pl-8 text-sm"
+                                    value={searchValue}
+                                    onChange={(e) =>
+                                        setSearchValue(e.target.value)
+                                    }
                                 />
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {/* Page Filter Dropdown */}
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger className="flex items-center gap-1 rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
+                                        {uniquePages.find(
+                                            (p) => p.id === selectedPageId,
+                                        )?.name || 'All Pages'}
+                                        <ChevronUp className="h-3 w-3" />
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                        align="end"
+                                        className="max-h-80 overflow-y-auto"
+                                    >
+                                        <DropdownMenuItem
+                                            className="p-0 focus:bg-transparent"
+                                            onClick={() =>
+                                                handlePageFilterChange('ALL')
+                                            }
+                                        >
+                                            <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
+                                                <span>All Pages</span>
+                                            </div>
+                                        </DropdownMenuItem>
+                                        {uniquePages.map((page) => {
+                                            return (
+                                                <DropdownMenuItem
+                                                    className="p-0 focus:bg-transparent"
+                                                    key={page.id}
+                                                    onClick={() =>
+                                                        handlePageFilterChange(
+                                                            page.id,
+                                                        )
+                                                    }
+                                                >
+                                                    <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
+                                                        <span>{page.name}</span>
+                                                    </div>
+                                                </DropdownMenuItem>
+                                            );
+                                        })}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+
+                                {/* J&T Status Filter Dropdown */}
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger className="flex items-center gap-1 rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
+                                        {selectedParcelStatus || 'J&T Status'}
+                                        <ChevronUp className="h-3 w-3" />
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                        align="end"
+                                        className="max-h-80 overflow-y-auto"
+                                    >
+                                        <DropdownMenuItem
+                                            className="p-0 focus:bg-transparent"
+                                            onClick={() =>
+                                                handleParcelStatusFilterChange(
+                                                    'ALL',
+                                                )
+                                            }
+                                        >
+                                            <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
+                                                <span>All Status</span>
+                                            </div>
+                                        </DropdownMenuItem>
+                                        {parcelStatusOptions.map(
+                                            (parcelStatus) => {
+                                                return (
+                                                    <DropdownMenuItem
+                                                        className="p-0 focus:bg-transparent"
+                                                        key={parcelStatus}
+                                                        onClick={() =>
+                                                            handleParcelStatusFilterChange(
+                                                                parcelStatus,
+                                                            )
+                                                        }
+                                                    >
+                                                        <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
+                                                            <span
+                                                                className={`rounded-lg px-2 py-0.5 text-xs ${getParcelStatusBadgeClass(parcelStatus)}`}
+                                                            >
+                                                                {parcelStatus}
+                                                            </span>
+                                                        </div>
+                                                    </DropdownMenuItem>
+                                                );
+                                            },
+                                        )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+
+                                {/* Status Filter Dropdown */}
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger className="flex items-center gap-1 rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
+                                        {selectedStatus || 'Order Status'}
+                                        <ChevronUp className="h-3 w-3" />
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                        align="end"
+                                        className="max-h-80 overflow-y-auto"
+                                    >
+                                        <DropdownMenuItem
+                                            className="p-0 focus:bg-transparent"
+                                            onClick={() =>
+                                                handleStatusFilterChange('ALL')
+                                            }
+                                        >
+                                            <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
+                                                <span>All Status</span>
+                                            </div>
+                                        </DropdownMenuItem>
+                                        {ORDER_STATUSES.map((orderStatus) => {
+                                            return (
+                                                <DropdownMenuItem
+                                                    className="p-0 focus:bg-transparent"
+                                                    key={orderStatus}
+                                                    onClick={() =>
+                                                        handleStatusFilterChange(
+                                                            orderStatus,
+                                                        )
+                                                    }
+                                                >
+                                                    <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
+                                                        <span
+                                                            className={getStatusBadgeClass(
+                                                                orderStatus,
+                                                            )}
+                                                        >
+                                                            {orderStatus}
+                                                        </span>
+                                                    </div>
+                                                </DropdownMenuItem>
+                                            );
+                                        })}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+
+                                {/* Clear Filters Button */}
+                                {(selectedStatus ||
+                                    selectedPageId ||
+                                    selectedParcelStatus ||
+                                    searchValue) && (
+                                    <button
+                                        onClick={clearFilters}
+                                        className="rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:bg-gray-50"
+                                    >
+                                        Clear Filters
+                                    </button>
+                                )}
                             </div>
                         </div>
                         <DataTable
                             columns={columns}
                             enableInternalPagination={false}
                             data={orders.data || []}
-                            // initialSorting={initialSorting}
+                            initialSorting={initialSorting}
                             meta={{ ...omit(orders, ['data']) }}
                             onFetch={(params) => {
                                 router.get(
-                                    `/workspaces/${workspace.slug}/rts/rmo-management`,
+                                    workspaces.rts.rmoManagement({ workspace }),
                                     {
                                         sort: params?.sort,
-                                        // 'filter[search]':
-                                        //     searchValue || undefined,
+                                        'filter[search]':
+                                            searchValue || undefined,
+                                        'filter[status]':
+                                            selectedStatus || undefined,
+                                        'filter[page_id]':
+                                            selectedPageId || undefined,
+                                        'filter[parcel_status]':
+                                            selectedParcelStatus || undefined,
+                                        'filter[shop_id]':
+                                            query?.filter?.shop_id || undefined,
                                         page: params?.page ?? 1,
                                     },
                                     {
