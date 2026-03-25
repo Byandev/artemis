@@ -44,13 +44,6 @@ Route::middleware(['auth'])->group(function () {
 
     // Workspace dashboard
     Route::get('/workspaces/{workspace}/dashboard', [WorkspaceController::class, 'dashboard'])->name('workspace.dashboard');
-    Route::get('/workspaces/{workspace}/roles', [RoleController::class, 'index'])
-        ->middleware('admin')
-        ->name('roles.index');
-    Route::post('/workspaces/{workspace}/roles', [RoleController::class, 'store'])
-        ->middleware('admin')
-        ->name('roles.store');
-
     Route::get('/workspaces/{workspace}/chart-data', [WorkspaceController::class, 'getChartData'])->name('workspace.chart-data');
 
 
@@ -174,28 +167,12 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
 
 
     Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
-    Route::get('/roles/add', [RoleController::class, 'add'])->name('roles.add');
-    // For assigning a user (create.tsx)
     Route::get('/roles/create', [RoleController::class, 'create'])->name('roles.create');
     Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
-
-    // For adding a new role definition (add.tsx)
-    Route::get('/roles/add', [RoleController::class, 'add'])->name('roles.add');
-    Route::post('/roles/add', [RoleController::class, 'storeRole'])->name('roles.storeRole');
 
     // THE FIX: Do not add "/workspaces/{workspace}" again here
     Route::get('/roles/{role}/edit', [RoleController::class, 'edit'])->name('roles.edit');
     Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
-
-    Route::get('/users/{user}/edit', [RoleController::class, 'editUserRole'])->name('workspace.users.edit');
-    Route::patch('/users/{user}', [RoleController::class, 'updateUserRole'])->name('workspace.users.update');
-
-    // Change the URL slightly so it doesn't clash with standard user profile updates
-    Route::patch('/users/{user}/role', [RoleController::class, 'updateUserRole'])->name('workspace.users.update-role');
-
-
-
-
 
 });
 

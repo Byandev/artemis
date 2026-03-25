@@ -82,7 +82,7 @@ export function AppSidebar() {
         icon: TrendingUp,
     });
 
-    if (auth.user.role === 'superadmin' || auth.user.role === 'admin') {
+    if (auth.user.role === 'superadmin' || auth.user.role === 'admin' || true) {
         mainNavItems.push({
             title: 'Role Management',
             href: '#',
@@ -90,7 +90,7 @@ export function AppSidebar() {
             items: [
                 {
                     title: 'Add Roles',
-                    href: `/workspaces/${slug}/roles/add`,
+                    href: `/workspaces/${slug}/roles/create`,
                 },
                 {
                     title: 'View All Roles',

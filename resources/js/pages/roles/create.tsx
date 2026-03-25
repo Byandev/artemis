@@ -1,113 +1,139 @@
+import React, { useState } from 'react';
+import { Head, useForm, Link } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm, Link, usePage } from '@inertiajs/react';
-import { UserPlus, ArrowLeft } from 'lucide-react';
-import { route } from 'ziggy-js';
+import ComponentCard from '@/components/common/ComponentCard';
+import { Button } from '@/components/ui/button';
+import { ShieldPlus, Check, ChevronLeft } from 'lucide-react';
 
-interface Props {
-    workspace: {
-        id: number;
-        name: string;
-        slug: string;
-    };
+interface Workspace {
+    id: number;
+    name: string;
+    slug: string;
 }
 
-export default function Create({ workspace }: Props) {
-    const { ziggy } = usePage().props as any;
+interface Props {
+    workspace: Workspace;
+}
 
-    const { data, setData, post, processing, errors } = useForm({
-        email: '',
-        role: 'user',
+export default function AddRole({ workspace }: Props) {
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+    const { data, setData, post, processing, errors, reset } = useForm({
+        role: '',
+        description: '',
     });
 
-    const submit = (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        // Casting 'route' as any bypasses the 'This expression is not callable' TS error
-        post((route as any)('roles.store', { workspace: workspace.slug }, true, ziggy));
+
+        post(`/workspaces/${workspace.slug}/roles`, {
+            onSuccess: () => {
+                setShowSuccessModal(true);
+                reset();
+            },
+        });
     };
 
     return (
         <AppLayout>
-            <Head title="Assign New Role" />
+            <Head title={`Add Role - ${workspace.name}`} />
 
-            <div className="flex flex-1 flex-col items-center justify-center p-6 min-h-screen w-full">
-                <div className="bg-white border rounded-[40px] shadow-2xl p-10 max-w-2xl w-full transform transition-all scale-100">
-
-                    {/* Header Section */}
-                    <div className="text-center space-y-2 mb-8">
-                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Invite a Member</h1>
-                        <p className="text-sm text-gray-500">
-                            Send an invitation to join <strong>{workspace.name}</strong>
-                        </p>
+            <div className="h-[calc(100vh-64px)] flex flex-col items-center justify-center p-4">
+                <div className="w-full max-w-3xl space-y-4">
+                    <div className="space-y-0.5 px-2">
+                        <div className="flex items-center gap-2">
+                            <Link href={`/workspaces/${workspace.slug}/roles`} className="group">
+                                <ChevronLeft className="w-5 h-5 text-gray-400 group-hover:text-gray-900 transition-colors" />
+                            </Link>
+                            <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">Define New Role</h1>
+                        </div>
+                        <p className="text-xs text-gray-500 font-medium ml-7">Configure permissions for {workspace.name}</p>
                     </div>
 
-                    {/* Visual Cue Section */}
-                    <div className="flex flex-col items-center gap-2 mb-8 text-gray-700 border-b border-gray-100 pb-6">
-                        <div className="bg-teal-50 p-4 rounded-full">
-                            <UserPlus className="w-6 h-6 text-[#2dd4bf]" />
-                        </div>
-                        <h2 className="font-semibold text-lg">Invitation Details</h2>
-                    </div>
-
-                    <form onSubmit={submit} className="space-y-6">
-                        {/* Email Input */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700 ml-1">Email Address</label>
-                            <input
-                                type="email"
-                                value={data.email}
-                                onChange={e => setData('email', e.target.value)}
-                                placeholder="colleague@example.com"
-                                className={`w-full px-4 py-3 border rounded-xl text-sm focus:ring-2 focus:ring-[#2dd4bf] outline-none transition-all shadow-sm ${errors.email ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white'
-                                    }`}
-                            />
-                            {errors.email && <p className="text-red-500 text-xs mt-1 ml-1 font-medium">{errors.email}</p>}
-                        </div>
-
-                        {/* Role Selection */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700 ml-1">Workspace Role</label>
-                            <select
-                                value={data.role}
-                                onChange={e => setData('role', e.target.value)}
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-[#2dd4bf] outline-none transition-all shadow-sm cursor-pointer"
-                            >
-                                <option value="user">Member (Standard Access)</option>
-                                <option value="admin">Admin (Full Management)</option>
-                                <option value="super-admin">Super Admin (System Owner)</option>
-                            </select>
-
-                            {/* Dynamic Helper Text */}
-                            <p className="min-h-[1.25rem] px-1 text-xs text-gray-500 italic leading-relaxed">
-                                {data.role === 'user' && 'Members can view and edit shared data but cannot change workspace settings.'}
-                                {data.role === 'admin' && 'Admins can manage members, billing, and all workspace settings.'}
-                                {data.role === 'super-admin' && 'Super Admins have total control over system-wide configuration.'}
-                            </p>
-
-                            {errors.role && <p className="text-red-500 text-xs mt-1 ml-1 font-medium">{errors.role}</p>}
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div className="pt-6 space-y-4">
-                            <button
-                                type="submit"
-                                disabled={processing}
-                                className="w-full inline-flex items-center justify-center gap-2 px-8 py-4 bg-[#2dd4bf] hover:bg-[#26b2a1] text-white text-sm font-bold rounded-full transition-all shadow-lg shadow-teal-100 disabled:opacity-50 active:scale-95"
-                            >
-                                {processing ? 'Sending...' : 'Send Invitation'}
-                            </button>
-
-                            <div className="text-center">
-                                <Link
-                                    href={`/workspaces/${workspace.slug}/roles`}
-                                    className="text-xs text-gray-400 hover:text-gray-600 font-medium transition-colors underline underline-offset-4"
-                                >
-                                    Cancel and return to list
-                                </Link>
+                    <ComponentCard desc="Enter the details below to create a new workspace role">
+                        <div className="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+                            <div className="p-4 border-b border-gray-50 bg-slate-50/30">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-white p-1.5 rounded-lg border border-gray-100 shadow-sm">
+                                        <ShieldPlus className="w-4 h-4 text-[#2dd4bf]" />
+                                    </div>
+                                    <span className="font-bold text-gray-800 text-xs uppercase tracking-widest">Role Configuration</span>
+                                </div>
                             </div>
+
+                            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-gray-700 ml-1">Role Identifier</label>
+                                    <input
+                                        type="text"
+                                        value={data.role}
+                                        onChange={(e) => setData('role', e.target.value)}
+                                        placeholder="e.g. moderator"
+                                        className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:ring-4 focus:ring-[#2dd4bf]/10 focus:border-[#2dd4bf] outline-none transition-all ${errors.role ? 'border-red-500' : 'border-gray-200'
+                                            }`}
+                                    />
+                                    {errors.role && <p className="text-red-500 text-[10px] font-semibold">{errors.role}</p>}
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-gray-700 ml-1">Description</label>
+                                    <textarea
+                                        rows={3}
+                                        value={data.description}
+                                        onChange={(e) => setData('description', e.target.value)}
+                                        placeholder="Briefly describe the responsibilities..."
+                                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-4 focus:ring-[#2dd4bf]/10 focus:border-[#2dd4bf] outline-none transition-all resize-none"
+                                    />
+                                </div>
+
+                                <div className="pt-4 flex flex-col items-center gap-3">
+                                    <Button
+                                        type="submit"
+                                        disabled={processing}
+                                        className="w-full sm:w-56 bg-[#2dd4bf] hover:bg-[#26b2a1] text-white font-bold py-5 rounded-lg shadow-md shadow-teal-100 transition-transform active:scale-95"
+                                    >
+                                        {processing ? 'Saving...' : 'Save Role'}
+                                    </Button>
+
+                                    <Link
+                                        href={`/workspaces/${workspace.slug}/roles`}
+                                        className="text-xs font-bold text-gray-400 hover:text-gray-800 transition-colors"
+                                    >
+                                        Cancel and go back
+                                    </Link>
+                                </div>
+                            </form>
                         </div>
-                    </form>
+                    </ComponentCard>
                 </div>
             </div>
+
+            {showSuccessModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-[24px] p-8 max-w-sm w-full text-center shadow-2xl">
+                        <div className="bg-emerald-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Check className="text-emerald-500 w-8 h-8" />
+                        </div>
+                        <h2 className="text-xl font-black text-gray-900 mb-1">Role Created!</h2>
+                        <p className="text-xs text-gray-500 mb-6 font-medium">Successfully registered to your workspace.</p>
+
+                        <div className="flex flex-col gap-2">
+                            <Button
+                                onClick={() => setShowSuccessModal(false)}
+                                className="w-full bg-[#2dd4bf] text-white font-bold py-5 rounded-lg hover:bg-[#26b2a1]"
+                            >
+                                Create Another
+                            </Button>
+                            <Link
+                                href={`/workspaces/${workspace.slug}/roles`}
+                                className="w-full py-2 text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                Back to List
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            )}
         </AppLayout>
     );
 }
