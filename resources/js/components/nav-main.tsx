@@ -48,11 +48,10 @@ export function NavMain({ items = [], group_label = '' }: NavMainProps) {
                                 <Collapsible defaultOpen={childActive}>
                                     <CollapsibleTrigger asChild>
                                         <SidebarMenuButton
-                                            size="lg"
                                             isActive={childActive}
                                             tooltip={{ children: item.title }}
                                             className={[
-                                                'relative h-9 justify-between rounded-[10px] text-[13px]',
+                                                'relative h-9 justify-between rounded-[10px] !text-[13px]',
                                                 'text-gray-400 dark:text-gray-500',
                                                 'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]',
                                                 'transition-colors',
@@ -118,11 +117,10 @@ export function NavMain({ items = [], group_label = '' }: NavMainProps) {
                         <SidebarMenuItem key={item.title}>
                             <SidebarMenuButton
                                 asChild
-                                size="lg"
                                 isActive={active}
                                 tooltip={{ children: item.title }}
                                 className={[
-                                    'relative h-9 justify-start rounded-[10px] text-[13px]',
+                                    'relative h-9 justify-start rounded-[10px] !text-[13px]',
                                     'text-gray-400 dark:text-gray-500',
                                     'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]',
                                     'transition-colors',
