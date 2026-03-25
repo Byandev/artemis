@@ -121,6 +121,7 @@ const Dashboard = ({ workspace }: Props) => {
                         dateRange={dateRange}
                         workspace={workspace}
                         filter={filter}
+                        metrics={selectedMetrics}
                     />
                 </ComponentCard>
 
@@ -129,6 +130,7 @@ const Dashboard = ({ workspace }: Props) => {
                         filter={filter}
                         dateRange={dateRange}
                         workspace={workspace}
+                        metrics={selectedMetrics}
                     />
                 </ComponentCard>
                 <ComponentCard className="mt-6">
@@ -136,6 +138,7 @@ const Dashboard = ({ workspace }: Props) => {
                         filter={filter}
                         dateRange={dateRange}
                         workspace={workspace}
+                        metrics={selectedMetrics}
                     />
                 </ComponentCard>
             </div>

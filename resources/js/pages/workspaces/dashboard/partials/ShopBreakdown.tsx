@@ -10,11 +10,13 @@ import BarChartSkeleton from '@/components/charts/skeletons/BarChartSkeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { RefreshCcw } from 'lucide-react';
 import ComponentCard from '@/components/common/ComponentCard';
+import { metricConfigs, MetricKey } from '@/types/metrics';
 
 interface Props {
     workspace: Workspace;
     dateRange: string[];
     filter: FilterValue;
+    metrics?: MetricKey[];
 }
 
 interface BreakdownItem {
@@ -27,11 +29,12 @@ export default function ShopBreakdown({
                                           workspace,
                                           dateRange,
                                           filter,
+                                          metrics,
                                       }: Props) {
     const [breakdown, setBreakdown] = useState<BreakdownItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [option, setOption] = useState('totalSales');
+    const [option, setOption] = useState(metrics?.[0] ?? 'totalSales');
     const [reload, setReload] = useState(false);
 
     const startDate = moment(dateRange[0]).format('YYYY-MM-DD');
@@ -43,44 +46,24 @@ export default function ShopBreakdown({
     const userIds = filter.userIds.join(',');
     const productIds = filter.productIds.join(',');
 
-    const optionLabels: Record<string, string> = {
-        totalSales: 'Total Sales',
-        totalOrders: 'Total Orders',
-        aov: 'AOV',
-        rtsRate: 'RTS',
-        repeatOrderRatio: 'ROR',
-        timeToFirstOrder: 'Time to First Order',
-        avgLifetimeValue: 'Average Lifetime Value',
-        avgDeliveryDays: 'Average Delivery Days',
-        avgShippedOutDays: 'Average Shipped Out Days',
-    };
+    const activeMetric = useMemo(
+        () => metricConfigs.find((m) => m.key === option),
+        [option],
+    );
 
-    const formatValue = (value: number) => {
-        switch (option) {
-            case 'totalSales':
-            case 'aov':
-            case 'avgLifetimeValue':
-                return `₱${value.toLocaleString('en-PH', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                })}`;
+    const filteredOptions = useMemo(() => {
+        if (!metrics || metrics.length === 0) return metricConfigs;
+        return metricConfigs.filter((m) => metrics.includes(m.key));
+    }, [metrics]);
 
-            case 'rtsRate':
-            case 'repeatOrderRatio':
-                return `${(value * 100).toFixed(1)}%`;
-
-            case 'timeToFirstOrder':
-                return `${value.toFixed(1)} hrs`;
-
-            case 'avgDeliveryDays':
-            case 'avgShippedOutDays':
-                return `${value.toFixed(1)} days`;
-
-            case 'totalOrders':
-            default:
-                return value.toLocaleString();
+    useEffect(() => {
+        if (filteredOptions.length > 0 && !filteredOptions.find((m) => m.key === option)) {
+            setOption(filteredOptions[0].key);
         }
-    };
+    }, [filteredOptions]);
+
+    const formatValue = (value: number) =>
+        activeMetric?.formatter ? activeMetric.formatter(value) : value.toLocaleString();
 
     useEffect(() => {
         const controller = new AbortController();
@@ -142,7 +125,7 @@ export default function ShopBreakdown({
     const series = useMemo(() => {
         return [
             {
-                name: optionLabels[option] ?? 'Value',
+                name: activeMetric?.name ?? 'Value',
                 data: breakdown.map((item) => Number(item.value)),
             },
         ];
@@ -153,14 +136,14 @@ export default function ShopBreakdown({
             <div className="flex items-center justify-between gap-4">
                 <div>
                     <h2 className="text-[14px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
-                        {optionLabels[option]} <span className="text-gray-300 dark:text-gray-600">·</span> Per Shop
+                        {activeMetric?.name} <span className="text-gray-300 dark:text-gray-600">·</span> Per Shop
                     </h2>
                 </div>
                 <div className="flex items-center gap-4">
                     <DropdownSelect
                         value={option}
                         onChange={setOption}
-                        options={Object.entries(optionLabels).map(([key, label]) => ({ key, label }))}
+                        options={filteredOptions.map((m) => ({ key: m.key, label: m.name }))}
                         label="Metric"
                         align="end"
                     />

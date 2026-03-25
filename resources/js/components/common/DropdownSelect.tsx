@@ -57,6 +57,7 @@ export default function DropdownSelect({
                 <p className="px-3 pb-1.5 pt-2 font-mono text-[10px] font-medium uppercase tracking-widest text-gray-400 dark:text-gray-500">
                     {label}
                 </p>
+                <div className="max-h-72 overflow-y-auto">
                 {options.map((option) => (
                     <button
                         key={option.key}
@@ -74,6 +75,7 @@ export default function DropdownSelect({
                         {value === option.key && <Check className="h-3 w-3 text-emerald-500" />}
                     </button>
                 ))}
+                </div>
             </PopoverContent>
         </Popover>
     );

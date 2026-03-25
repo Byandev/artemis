@@ -71,17 +71,7 @@ export default function BarChart({ categories, series, formatValue }: Props) {
                 const category = w.globals.labels[dataPointIndex] ?? '';
                 const val = w.globals.series[0][dataPointIndex];
                 const fmt = formatValue(val);
-                return `
-                    <div style="background:#fff;border:1px solid rgba(0,0,0,0.07);border-radius:12px;padding:12px 14px;box-shadow:0 4px 24px rgba(0,0,0,0.09);font-family:'DM Sans',sans-serif;min-width:160px;">
-                        <p style="font-family:'DM Mono',monospace;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.08em;color:#9CA3AF;margin:0 0 6px;">${category}</p>
-                        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
-                            <div style="display:flex;align-items:center;gap:7px;">
-                                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></span>
-                                <span style="font-size:12px;color:#6B7280;font-weight:500;">Value</span>
-                            </div>
-                            <span style="font-size:12px;color:#111827;font-weight:600;font-family:'DM Mono',monospace;">${fmt}</span>
-                        </div>
-                    </div>`;
+                return `<div style="background:#fff;border:1px solid rgba(0,0,0,0.07);border-radius:12px;padding:11px 14px;box-shadow:0 4px 20px rgba(0,0,0,0.08);font-family:'DM Sans',sans-serif;min-width:160px;"><p style="font-family:'DM Mono',monospace;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.08em;color:#9CA3AF;margin:0 0 5px;">${category}</p><div style="display:flex;align-items:center;"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${color};flex-shrink:0;margin-right:6px;"></span><span style="font-size:12px;color:#6B7280;font-weight:500;flex:1;">Value</span><span style="font-size:12px;color:#111827;font-weight:600;font-family:'DM Mono',monospace;margin-left:16px;">${fmt}</span></div></div>`;
             },
         },
     };
