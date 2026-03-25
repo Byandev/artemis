@@ -1,5 +1,5 @@
 import { Head } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type StatusId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
@@ -18,6 +18,9 @@ interface PurchasedOrder {
 
 interface PaginatedResponse {
     data: PurchasedOrder[];
+    current_page: number;
+    last_page: number;
+    total: number;
 }
 
 const STATUS_OPTIONS: Array<{ value: StatusId; label: string }> = [
@@ -43,15 +46,38 @@ const formatMoney = (amount: number): string => {
     }).format(amount || 0);
 };
 
+const toInputDate = (date: Date): string => {
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 10);
+};
+
+const getDefaultDateRange = (): { startDate: string; endDate: string } => {
+    const today = new Date();
+    const oneWeekBefore = new Date(today);
+    oneWeekBefore.setDate(today.getDate() - 7);
+
+    return {
+        startDate: toInputDate(oneWeekBefore),
+        endDate: toInputDate(today),
+    };
+};
+
 export default function PurchasedOrdersDemo() {
     const [rows, setRows] = useState<PurchasedOrder[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [lastPage, setLastPage] = useState(1);
+    const [totalRows, setTotalRows] = useState(0);
 
+    const defaultDateRangeRef = useRef(getDefaultDateRange());
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [query, setQuery] = useState('');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
+    const [startDate, setStartDate] = useState(defaultDateRangeRef.current.startDate);
+    const [endDate, setEndDate] = useState(defaultDateRangeRef.current.endDate);
+    const requestSerialRef = useRef(0);
+    const maxSelectableDate = toInputDate(new Date());
 
     const apiBase = useMemo(() => {
         if (typeof window === 'undefined') return '';
@@ -61,6 +87,12 @@ export default function PurchasedOrdersDemo() {
         return '';
     }, []);
 
+    const workspaceSlug = useMemo(() => {
+        if (typeof window === 'undefined') return '';
+        const match = window.location.pathname.match(/^\/workspaces\/([^/]+)/);
+        return match?.[1] ?? '';
+    }, []);
+
     const csrfToken = useMemo(() => {
         if (typeof document === 'undefined') return '';
         return document
@@ -68,9 +100,15 @@ export default function PurchasedOrdersDemo() {
             ?.getAttribute('content') || '';
     }, []);
 
-    const fetchRows = async () => {
-        setLoading(true);
-        setError(null);
+    const fetchRows = async (page = 1, append = false) => {
+        const requestSerial = ++requestSerialRef.current;
+
+        if (append) {
+            setLoadingMore(true);
+        } else {
+            setLoading(true);
+            setError(null);
+        }
 
         try {
             const params = new URLSearchParams();
@@ -78,9 +116,15 @@ export default function PurchasedOrdersDemo() {
             if (query.trim()) params.set('q', query.trim());
             if (startDate) params.set('start_date', startDate);
             if (endDate) params.set('end_date', endDate);
-            params.set('per_page', '100');
+            params.set('page', String(page));
+            params.set('per_page', '50');
+            params.set('show_all', '1');
 
-            const url = `${apiBase}/api/inventory/purchased-orders?${params.toString()}`;
+            if (!workspaceSlug) {
+                throw new Error('Workspace context is missing in URL.');
+            }
+
+            const url = `${apiBase}/api/workspaces/${workspaceSlug}/inventory/purchased-orders?${params.toString()}`;
             const res = await fetch(url, {
                 credentials: 'include',
                 headers: {
@@ -96,22 +140,55 @@ export default function PurchasedOrdersDemo() {
                 throw new Error((json as { message?: string }).message || 'Failed to fetch purchased orders.');
             }
 
-            setRows(Array.isArray((json as PaginatedResponse).data) ? (json as PaginatedResponse).data : []);
+            const payload = json as PaginatedResponse;
+            const nextRows = Array.isArray(payload.data) ? payload.data : [];
+
+            if (requestSerial !== requestSerialRef.current) {
+                return;
+            }
+
+            setRows((prev) => (append ? [...prev, ...nextRows] : nextRows));
+            setCurrentPage(Number(payload.current_page || page));
+            setLastPage(Number(payload.last_page || page));
+            setTotalRows(Number(payload.total || nextRows.length));
         } catch (err) {
-            setRows([]);
+            if (requestSerial !== requestSerialRef.current) {
+                return;
+            }
+
+            if (!append) {
+                setRows([]);
+                setCurrentPage(1);
+                setLastPage(1);
+                setTotalRows(0);
+            }
             setError(err instanceof Error ? err.message : 'Failed to fetch purchased orders.');
         } finally {
-            setLoading(false);
+            if (append) {
+                setLoadingMore(false);
+            } else {
+                setLoading(false);
+            }
         }
     };
 
     useEffect(() => {
-        void fetchRows();
+        if (!startDate || !endDate) {
+            return;
+        }
+
+        void fetchRows(1, false);
     }, [statusFilter, query, startDate, endDate]);
+
+    const hasMore = rows.length < totalRows && currentPage < lastPage;
 
     const updateStatus = async (id: number, status: StatusId) => {
         try {
-            const url = `${apiBase}/api/inventory/purchased-orders/${id}/status`;
+            if (!workspaceSlug) {
+                throw new Error('Workspace context is missing in URL.');
+            }
+
+            const url = `${apiBase}/api/workspaces/${workspaceSlug}/inventory/purchased-orders/${id}/status`;
             const res = await fetch(url, {
                 method: 'PATCH',
                 credentials: 'include',
@@ -134,6 +211,14 @@ export default function PurchasedOrdersDemo() {
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to update status.');
         }
+    };
+
+    const resetFilters = () => {
+        const defaults = getDefaultDateRange();
+        setQuery('');
+        setStatusFilter('all');
+        setStartDate(defaults.startDate);
+        setEndDate(defaults.endDate);
     };
 
     return (
@@ -170,16 +255,38 @@ export default function PurchasedOrdersDemo() {
                     <input
                         type="date"
                         value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
+                        max={maxSelectableDate}
+                        onChange={(e) => {
+                            const nextValue = e.target.value > maxSelectableDate ? maxSelectableDate : e.target.value;
+                            setStartDate(nextValue);
+                            if (endDate && nextValue > endDate) {
+                                setEndDate(nextValue);
+                            }
+                        }}
                         className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-500"
                     />
 
                     <input
                         type="date"
                         value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
+                        max={maxSelectableDate}
+                        onChange={(e) => {
+                            const nextValue = e.target.value > maxSelectableDate ? maxSelectableDate : e.target.value;
+                            setEndDate(nextValue);
+                            if (startDate && startDate > nextValue) {
+                                setStartDate(nextValue);
+                            }
+                        }}
                         className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-500"
                     />
+
+                    <button
+                        type="button"
+                        onClick={resetFilters}
+                        className="h-10 rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
+                    >
+                        Restore Default Filters
+                    </button>
                 </section>
 
                 {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
@@ -241,6 +348,28 @@ export default function PurchasedOrdersDemo() {
                                 ))
                             )}
                         </tbody>
+                        {!loading && rows.length > 0 && (
+                            <tfoot className="border-t border-zinc-200 bg-zinc-50 text-sm text-zinc-600">
+                                <tr>
+                                    <td colSpan={9} className="px-3 py-3">
+                                        {hasMore ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => void fetchRows(currentPage + 1, true)}
+                                                disabled={loadingMore}
+                                                className="cursor-pointer font-medium text-zinc-800 underline underline-offset-2 disabled:cursor-not-allowed disabled:text-zinc-400"
+                                            >
+                                                {loadingMore
+                                                    ? 'Loading more...'
+                                                    : `Showed ${rows.length} of ${totalRows} Datas.. Click here to show more`}
+                                            </button>
+                                        ) : (
+                                            <span>{`Showed ${rows.length} of ${totalRows} Datas.`}</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        )}
                     </table>
                 </div>
             </main>
