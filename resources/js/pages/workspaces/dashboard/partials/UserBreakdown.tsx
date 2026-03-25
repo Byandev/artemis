@@ -1,14 +1,14 @@
 import BarChart from '@/components/charts/BarChart';
 import BarChartSkeleton from '@/components/charts/skeletons/BarChartSkeleton';
 import { FilterValue } from '@/components/filters/Filters';
+import DropdownSelect from '@/components/common/DropdownSelect';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Check, ChevronDown, RefreshCcw } from 'lucide-react';
+import { RefreshCcw } from 'lucide-react';
 import ComponentCard from '@/components/common/ComponentCard';
 
 interface Props {
@@ -29,7 +29,6 @@ export default function UserBreakdown({ workspace, dateRange, filter }: Props) {
     const [error, setError] = useState<string | null>(null);
     const [option, setOption] = useState('totalSales');
     const [reload, setReload] = useState(false);
-    const [openDropdown, setOpenDropdown] = useState(false);
 
     const startDate = moment(dateRange[0]).format('YYYY-MM-DD');
     const endDate = moment(dateRange[1]).format('YYYY-MM-DD');
@@ -153,30 +152,13 @@ export default function UserBreakdown({ workspace, dateRange, filter }: Props) {
                 </h2>
 
                 <div className="flex items-center gap-4">
-                    <Popover open={openDropdown} onOpenChange={setOpenDropdown}>
-                        <PopoverTrigger asChild>
-                            <button className={`flex h-8 items-center overflow-hidden rounded-[10px] border transition-all ${openDropdown ? 'border-emerald-500 ring-2 ring-emerald-500/15' : 'border-black/6 dark:border-white/6 hover:border-black/12 dark:hover:border-white/12'} bg-stone-100 dark:bg-zinc-800`}>
-                                <span className="flex h-full items-center justify-center border-r border-black/6 dark:border-white/6 px-2.5 text-gray-400 dark:text-gray-500">
-                                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${openDropdown ? 'rotate-180 text-emerald-500' : ''}`} />
-                                </span>
-                                <span className="px-3 text-[13px] font-medium text-gray-700 dark:text-gray-200">
-                                    {optionLabels[option]}
-                                </span>
-                            </button>
-                        </PopoverTrigger>
-                        <PopoverContent align="end" className="w-56 overflow-hidden rounded-[12px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900 p-1 shadow-lg dark:shadow-black/30">
-                            {Object.entries(optionLabels).map(([key, label]) => (
-                                <button
-                                    key={key}
-                                    className={`flex w-full items-center justify-between rounded-[8px] px-3 py-1.5 text-[13px] transition-colors ${option === key ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-medium' : 'text-gray-700 dark:text-gray-200 hover:bg-stone-50 dark:hover:bg-zinc-800'}`}
-                                    onClick={() => { setOption(key); setOpenDropdown(false); }}
-                                >
-                                    {label}
-                                    {option === key && <Check className="h-3.5 w-3.5 text-emerald-500" />}
-                                </button>
-                            ))}
-                        </PopoverContent>
-                    </Popover>
+                    <DropdownSelect
+                        value={option}
+                        onChange={setOption}
+                        options={Object.entries(optionLabels).map(([key, label]) => ({ key, label }))}
+                        label="Metric"
+                        align="end"
+                    />
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
