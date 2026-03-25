@@ -1,3 +1,4 @@
+import PageHeader from '@/components/common/PageHeader'
 import { Workspace } from '@/types/models/Workspace'
 import { type PropsWithChildren } from 'react'
 import RtsNavigation from './RtsNavigation'
@@ -9,14 +10,7 @@ interface RTSManagementLayoutProps {
 const RTSManagementLayout = ({ workspace, children }: PropsWithChildren<RTSManagementLayoutProps>) => {
     return (
         <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                <h2
-                    className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100"
-                    x-text="pageName"
-                >
-                    RTS Management
-                </h2>
-            </div>
+            <PageHeader title="RTS Management" description="Track and manage return-to-sender orders across your workspace" />
 
             <div className="">
                 <RtsNavigation workspace={workspace} />

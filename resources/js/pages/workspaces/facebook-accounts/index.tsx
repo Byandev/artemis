@@ -1,4 +1,5 @@
 import ComponentCard from '@/components/common/ComponentCard';
+import PageHeader from '@/components/common/PageHeader';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import AppLayout from '@/layouts/app-layout';
@@ -108,18 +109,11 @@ const FacebookAccounts = ({
     return (
         <AppLayout>
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                    <h2
-                        className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100"
-                        x-text="pageName"
-                    >
-                        Facebook Accounts
-                    </h2>
-
+                <PageHeader title="Facebook Accounts" description="Connect and manage your Facebook business accounts">
                     <button onClick={connectFacebookAccount} className="bg-brand-500 text-white px-4 py-2 rounded-xl font-medium text-theme-sm">
                         Connect Facebook Account
                     </button>
-                </div>
+                </PageHeader>
 
                 <div className="space-y-5 sm:space-y-6">
                     <ComponentCard desc="List of  connected facebook accounts">

@@ -17,6 +17,7 @@ import { toast, Toaster } from 'sonner';
 import { Workspace } from '@/types/models/Workspace';
 import { Role } from '@/types/models/Role';
 import RoleFormDialog from '@/components/roles/role-form-dialog'; // Added Toaster here
+import PageHeader from '@/components/common/PageHeader';
 
 
 interface Props {
@@ -162,24 +163,15 @@ export default function Index({ roles, workspace }: Props) {
 
             <RoleFormDialog workspace={workspace} open={openFormModal} onOpenChange={setOpenFormModal} role={selectedRole} />
 
-            <div className="w-full space-y-6 p-6 lg:p-8">
-                <div className="flex w-full items-center justify-between">
-                    <div>
-                        <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-                            Role Management
-                        </h1>
-                        <p className="mt-1 text-[13px] text-gray-500 dark:text-gray-400">
-                            Define and manage access levels for your workspace
-                        </p>
-                    </div>
-
+            <div className="w-full space-y-6 p-4 md:p-6">
+                <PageHeader title="Role Management" description="Define and manage access levels for your workspace">
                     <Button
                         className="bg-emerald-600 dark:bg-emerald-500 hover:bg-emerald-700 dark:hover:bg-emerald-400 text-white px-4 py-2 rounded-lg text-xs font-medium transition-colors"
                         onClick={() => setOpenFormModal(true)}
                     >
                         Add New Role
                     </Button>
-                </div>
+                </PageHeader>
 
                 <ComponentCard desc="Configure the roles available in this workspace.">
                     <div className="w-full overflow-hidden">

@@ -7,6 +7,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { Head } from '@inertiajs/react';
 import ComponentCard from '@/components/common/ComponentCard';
+import PageHeader from '@/components/common/PageHeader';
 import { omit } from 'lodash';
 import { Workspace } from '@/types/models/Workspace';
 import { numberFormatter, percentageFormatter } from '@/lib/utils';
@@ -84,14 +85,7 @@ const Flows = ({ workspace }: {workspace: Workspace}) => {
         <AppLayout>
             <Head title={`${workspace.name} - Botcake Flows`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                    <h2
-                        className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100"
-                        x-text="pageName"
-                    >
-                        Flows
-                    </h2>
-                </div>
+                <PageHeader title="Flows" description="Automate customer interactions with messenger flows" />
 
                 <div className="space-y-5 sm:space-y-6">
                     <ComponentCard desc="Manage workspace teams and their members">

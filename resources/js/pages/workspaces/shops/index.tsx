@@ -1,4 +1,5 @@
 import ComponentCard from '@/components/common/ComponentCard';
+import PageHeader from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -123,14 +124,7 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
         <AppLayout>
             <Head title={`${workspace.name} - Shops`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                    <h2
-                        className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100"
-                        x-text="pageName"
-                    >
-                        Shops
-                    </h2>
-                </div>
+                <PageHeader title="Shops" description="Manage connected shops and sync customer data" />
 
                 <div className="space-y-5 sm:space-y-6">
                     <ComponentCard desc="List of shop">

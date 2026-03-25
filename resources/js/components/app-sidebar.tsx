@@ -171,7 +171,7 @@ export function AppSidebar() {
 
             <SidebarContent className="p-3">
                 <NavMain items={mainNavItems} group_label="Main" />
-                <NavMain items={accountNavItems} group_label="Account" />
+                {/*<NavMain items={accountNavItems} group_label="Account" />*/}
             </SidebarContent>
 
             <SidebarFooter>

@@ -1,4 +1,5 @@
 import ComponentCard from '@/components/common/ComponentCard';
+import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     DropdownMenu,
@@ -291,14 +292,9 @@ export default function RmoManagement({ orders, workspace }: Props) {
 
     return (
         <AppLayout>
-            <div className="p-6">
+            <div className="p-4 md:p-6">
                 <div className="">
-                    <div className="mb-6 flex flex-col">
-                        <h1 className="text-2xl font-bold">RMO Management</h1>
-                        <p className="text-sm font-light text-gray-500">
-                            Items that for delivery today.
-                        </p>
-                    </div>
+                    <PageHeader title="RMO Management" description="Track and update delivery status for items out today" />
                     <ComponentCard>
                         <div className="flex items-center justify-between">
                             <h1>Items For Delivery Today.</h1>
