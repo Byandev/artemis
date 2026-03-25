@@ -5,9 +5,14 @@ import { usePage } from '@inertiajs/react';
 interface AppShellProps {
     children: React.ReactNode;
     variant?: 'header' | 'sidebar';
+    user?: any; // Added this line
 }
 
-export function AppShell({ children, variant = 'header' }: AppShellProps) {
+export function AppShell({
+    children,
+    variant = 'sidebar',
+    user
+}: AppShellProps) {
     const isOpen = usePage<SharedData>().props.sidebarOpen;
 
     if (variant === 'header') {
@@ -16,5 +21,9 @@ export function AppShell({ children, variant = 'header' }: AppShellProps) {
         );
     }
 
-    return <SidebarProvider defaultOpen={isOpen}>{children}</SidebarProvider>;
+    return (
+        <SidebarProvider defaultOpen={isOpen}>
+            {children}
+        </SidebarProvider>
+    );
 }

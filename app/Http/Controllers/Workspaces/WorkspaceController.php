@@ -65,7 +65,7 @@ class WorkspaceController extends Controller
     public function show(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -91,7 +91,7 @@ class WorkspaceController extends Controller
     public function edit(Request $request, Workspace $workspace)
     {
         // Only owner and admins can edit workspace
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (!$request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to edit this workspace.');
         }
 
@@ -106,7 +106,7 @@ class WorkspaceController extends Controller
     public function update(Request $request, Workspace $workspace)
     {
         // Only owner and admins can update workspace
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (!$request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to update this workspace.');
         }
 
@@ -127,7 +127,7 @@ class WorkspaceController extends Controller
     public function destroy(Request $request, Workspace $workspace)
     {
         // Only the owner can delete the workspace
-        if (! $request->user()->ownsWorkspace($workspace)) {
+        if (!$request->user()->ownsWorkspace($workspace)) {
             abort(403, 'Only the workspace owner can delete it.');
         }
 
@@ -143,7 +143,7 @@ class WorkspaceController extends Controller
     public function switch(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -159,7 +159,7 @@ class WorkspaceController extends Controller
      */
     public function dashboard(Request $request, Workspace $workspace)
     {
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -181,7 +181,7 @@ class WorkspaceController extends Controller
     public function getChartData(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -191,7 +191,7 @@ class WorkspaceController extends Controller
         $endDate = $request->query('end_date');
 
         // If no date range provided, default to last N days
-        if (! $startDate && ! $endDate) {
+        if (!$startDate && !$endDate) {
             $endDate = now()->format('Y-m-d');
             $startDate = now()->subDays($days)->format('Y-m-d');
         }
@@ -277,4 +277,5 @@ class WorkspaceController extends Controller
             'chartData' => $chartData,
         ]);
     }
+
 }

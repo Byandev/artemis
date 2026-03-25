@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
+
 class Workspace extends Model
 {
     use HasFactory;
@@ -37,7 +38,7 @@ class Workspace extends Model
                 $originalSlug = $workspace->slug;
                 $count = 1;
                 while (static::where('slug', $workspace->slug)->exists()) {
-                    $workspace->slug = $originalSlug.'-'.$count;
+                    $workspace->slug = $originalSlug . '-' . $count;
                     $count++;
                 }
             }
@@ -63,11 +64,12 @@ class Workspace extends Model
     /**
      * Get all users in the workspace.
      */
-    public function users(): BelongsToMany
+    public function users()
     {
         return $this->belongsToMany(User::class, 'workspace_user')
+            ->withTimestamps()
             ->withPivot('role')
-            ->withTimestamps();
+            ->using(WorkspaceUser::class);
     }
 
     /**
@@ -128,7 +130,7 @@ class Workspace extends Model
      */
     public function addMember(User $user, string $role = 'member'): void
     {
-        if (! $this->hasMember($user)) {
+        if (!$this->hasMember($user)) {
             $this->users()->attach($user->id, ['role' => $role]);
         }
     }
@@ -173,4 +175,19 @@ class Workspace extends Model
     {
         return $this->hasMany(Page::class);
     }
+
+    public function roles()
+    {
+        return $this->hasMany(Role::class);
+    }
+
+    public function isAdmin(User $user): bool
+    {
+        return $this->users()
+            ->where('user_id', $user->id)
+            ->wherePivot('role', 'admin')
+            ->exists();
+    }
+
+
 }

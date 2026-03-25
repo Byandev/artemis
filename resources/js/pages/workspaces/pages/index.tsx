@@ -1,6 +1,5 @@
 import ComponentCard from '@/components/common/ComponentCard';
 import { ArchivePageDialog } from '@/components/pages/archive-page-dialog';
-import { PageFormDialog } from '@/components/pages/page-form-dialog';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -12,7 +11,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { currencyFormatter } from '@/lib/utils';
 import workspaces from '@/routes/workspaces';
 import { PaginatedData } from '@/types';
 import { Page } from '@/types/models/Page';
@@ -79,8 +77,6 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
     }, [query?.sort]);
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [selectedPage, setSelectedPage] = useState<Page | undefined>(undefined);
     const [pageToArchive, setPageToArchive] = useState<Page | null>(null);
 
     const { post, processing } = useForm({});
@@ -106,14 +102,13 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
         return () => clearTimeout(timer);
     }, [searchValue]);
 
+    // FIXED: Navigation-based handlers
     const handleEdit = (page: Page) => {
-        setSelectedPage(page);
-        setDialogOpen(true);
+        router.get(workspaces.pages.edit.url({ workspace, page }));
     };
 
     const handleCreate = () => {
-        setSelectedPage(undefined);
-        setDialogOpen(true);
+        router.get(workspaces.pages.create.url({ workspace }));
     };
 
     const refresh = (page: Page) => {
@@ -148,13 +143,6 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             ),
             cell: ({ row }) => row.original.owner?.name || '-',
         },
-        // {
-        //     accessorKey: 'current_budget',
-        //     header: ({ column }) => (
-        //         <SortableHeader column={column} title={'Current Budget'} enabled={false} />
-        //     ),
-        //     cell: ({ row }) => currencyFormatter(row.original.current_budget ?? 0),
-        // },
         {
             accessorKey: 'orders_last_synced_at',
             header: ({ column }) => (
@@ -182,11 +170,13 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             ),
             cell: ({ row }) => {
                 const isEnabled = Boolean(row.original.parcel_journey_enabled);
-
                 return <EnableBadge isEnabled={isEnabled} />;
             },
         },
         {
+            
+
+
             id: 'actions',
             cell: ({ row }) => {
                 const page = row.original;
@@ -241,14 +231,11 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             <Head title={`${workspace.name} - Pages`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                    <h2
-                        className="text-xl font-semibold text-gray-800 dark:text-white/90"
-                        x-text="pageName"
-                    >
+                    <h2 className="text-xl font-semibold text-gray-800 dark:text-white/90">
                         Pages
                     </h2>
                     <Button size="sm" onClick={handleCreate}>
-                        Add New Page
+                        Add New Page    
                     </Button>
                 </div>
 
@@ -290,15 +277,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                     </ComponentCard>
                 </div>
 
-                {/* Page Form Dialog */}
-                <PageFormDialog
-                    open={dialogOpen}
-                    onOpenChange={setDialogOpen}
-                    page={selectedPage}
-                    workspace={workspace}
-                />
-
-                {/* Archive Confirmation Dialog */}
+                {/* Archive Confirmation Dialog - Kept for UX */}
                 <ArchivePageDialog
                     page={pageToArchive}
                     workspace={workspace}

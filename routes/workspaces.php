@@ -25,6 +25,7 @@ use App\Http\Controllers\Workspaces\RoleController;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Modules\Inventory\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\API\Workspace\UserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -46,6 +47,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/roles', [RoleController::class, 'index'])
         ->middleware('admin')
         ->name('roles.index');
+    Route::post('/workspaces/{workspace}/roles', [RoleController::class, 'store'])
+        ->middleware('admin')
+        ->name('roles.store');
+
     Route::get('/workspaces/{workspace}/chart-data', [WorkspaceController::class, 'getChartData'])->name('workspace.chart-data');
 
 
@@ -76,7 +81,9 @@ Route::middleware(['auth'])->group(function () {
     //    Route::post('/workspaces/{workspace}/products', [ProductController::class, 'store'])->name('workspaces.products.store');
 
     Route::get('/workspaces/{workspace}/pages', [PageController::class, 'index'])->name('workspaces.pages.index');
+    Route::get('/workspaces/{workspace}/pages/create', [PageController::class, 'create'])->name('workspaces.pages.create');
     Route::post('/workspaces/{workspace}/pages', [PageController::class, 'store'])->name('workspaces.pages.store');
+    Route::get('/workspaces/{workspace}/pages/{page}/edit', [PageController::class, 'edit'])->name('workspaces.pages.edit');
     Route::put('/workspaces/{workspace}/pages/{page}', [PageController::class, 'update'])->name('workspaces.pages.update');
     Route::post('/workspaces/{workspace}/pages/{page}/refresh', [PageController::class, 'refresh'])->name('workspaces.pages.refresh');
     Route::post('/workspaces/{workspace}/pages/{page}/archive', [PageController::class, 'archive'])->name('workspaces.pages.archive');
@@ -155,3 +162,41 @@ Route::middleware(['auth'])->group(function () {
 // Public invitation routes (guest or authenticated)
 Route::get('/workspaces/invitations/{token}', [WorkspaceInvitationController::class, 'show'])->name('workspaces.invitations.show');
 Route::get('/workspaces/invitations/{token}/accept', [WorkspaceInvitationController::class, 'accept'])->name('workspaces.invitations.accept');
+
+
+Route::prefix('/workspaces/{workspace:slug}')->group(function () {
+
+    // Archive & Restore Logic
+    // Ensure this is PATCH
+    Route::patch('/roles/{role}/archive', [RoleController::class, 'archive'])->name('roles.archive');
+    Route::post('/roles/{role}/restore', [RoleController::class, 'restore'])
+        ->withTrashed()
+        ->name('roles.restore');
+
+
+    Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
+    Route::get('/roles/add', [RoleController::class, 'add'])->name('roles.add');
+    // For assigning a user (create.tsx)
+    Route::get('/roles/create', [RoleController::class, 'create'])->name('roles.create');
+    Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
+
+    // For adding a new role definition (add.tsx)
+    Route::get('/roles/add', [RoleController::class, 'add'])->name('roles.add');
+    Route::post('/roles/add', [RoleController::class, 'storeRole'])->name('roles.storeRole');
+
+    // THE FIX: Do not add "/workspaces/{workspace}" again here
+    Route::get('/roles/{role}/edit', [RoleController::class, 'edit'])->name('roles.edit');
+    Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
+
+    Route::get('/users/{user}/edit', [RoleController::class, 'editUserRole'])->name('workspace.users.edit');
+    Route::patch('/users/{user}', [RoleController::class, 'updateUserRole'])->name('workspace.users.update');
+
+    // Change the URL slightly so it doesn't clash with standard user profile updates
+    Route::patch('/users/{user}/role', [RoleController::class, 'updateUserRole'])->name('workspace.users.update-role');
+
+
+
+
+
+});
+
