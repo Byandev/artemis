@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Workspaces;
 use App\Http\Controllers\Controller;
 use App\Models\AdRecord;
 use App\Models\Order;
+use App\Models\Role;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use App\Models\User;
-use App\Models\Role;
 
 class WorkspaceController extends Controller
 {
@@ -77,7 +77,7 @@ class WorkspaceController extends Controller
     public function show(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -103,7 +103,7 @@ class WorkspaceController extends Controller
     public function edit(Request $request, Workspace $workspace)
     {
         // Only owner and admins can edit workspace
-        if (!$request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to edit this workspace.');
         }
 
@@ -117,7 +117,7 @@ class WorkspaceController extends Controller
         // 1. Fetch roles specifically for this workspace
         $roles = \App\Models\Role::where('workspace_id', $workspace->id)->get();
 
-        // 2. SAFETY CHECK: If roles are still empty for some reason, 
+        // 2. SAFETY CHECK: If roles are still empty for some reason,
         // fetch them by the raw ID just to be absolutely sure.
         if ($roles->isEmpty()) {
             $roles = \App\Models\Role::where('workspace_id', 11)->get();
@@ -126,12 +126,13 @@ class WorkspaceController extends Controller
         return Inertia::render('workspaces/members', [
             'workspace' => $workspace->load([
                 'owner',
-                'users' => fn($q) => $q->withPivot('role', 'created_at')->latest()
+                'users' => fn ($q) => $q->withPivot('role', 'created_at')->latest(),
             ]),
             'roles' => $roles,
             'isAdmin' => $request->user()->isAdminOf($workspace),
         ]);
     }
+
     /**
      * Update the specified workspace in storage.
      */
@@ -141,7 +142,7 @@ class WorkspaceController extends Controller
     public function updateMember(Request $request, Workspace $workspace, User $user)
     {
         // 1. Authorization: Only Admins/Owners can change roles
-        if (!$request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to modify members.');
         }
 
@@ -170,7 +171,7 @@ class WorkspaceController extends Controller
     public function destroy(Request $request, Workspace $workspace)
     {
         // Only the owner can delete the workspace
-        if (!$request->user()->ownsWorkspace($workspace)) {
+        if (! $request->user()->ownsWorkspace($workspace)) {
             abort(403, 'Only the workspace owner can delete it.');
         }
 
@@ -186,7 +187,7 @@ class WorkspaceController extends Controller
     public function switch(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -202,7 +203,7 @@ class WorkspaceController extends Controller
      */
     public function dashboard(Request $request, Workspace $workspace)
     {
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -224,7 +225,7 @@ class WorkspaceController extends Controller
     public function getChartData(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -234,7 +235,7 @@ class WorkspaceController extends Controller
         $endDate = $request->query('end_date');
 
         // If no date range provided, default to last N days
-        if (!$startDate && !$endDate) {
+        if (! $startDate && ! $endDate) {
             $endDate = now()->format('Y-m-d');
             $startDate = now()->subDays($days)->format('Y-m-d');
         }
@@ -320,5 +321,4 @@ class WorkspaceController extends Controller
             'chartData' => $chartData,
         ]);
     }
-
 }

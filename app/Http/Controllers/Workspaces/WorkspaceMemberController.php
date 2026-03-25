@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\WorkspaceInvitation\InviterNameSort;
+use App\Models\Role;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
@@ -11,7 +12,6 @@ use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
-use App\Models\Role;
 
 class WorkspaceMemberController extends Controller
 {
@@ -21,7 +21,7 @@ class WorkspaceMemberController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -110,7 +110,7 @@ class WorkspaceMemberController extends Controller
     public function updateMember(Request $request, Workspace $workspace, User $user)
     {
 
-        if (!$request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to update member roles.');
         }
 
@@ -137,7 +137,7 @@ class WorkspaceMemberController extends Controller
     public function destroy(Request $request, Workspace $workspace, User $user)
     {
         // Only admins and owners can remove members
-        if (!$request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to remove members.');
         }
 
@@ -158,7 +158,6 @@ class WorkspaceMemberController extends Controller
 
         return back()->with('success', 'Member removed successfully.');
     }
-
 
     public function store(Request $request, Workspace $workspace)
     {

@@ -12,6 +12,7 @@ use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\Record\RTSController;
 use App\Http\Controllers\Workspaces\Record\SalesController;
+use App\Http\Controllers\Workspaces\RoleController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
@@ -21,11 +22,9 @@ use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
-use App\Http\Controllers\Workspaces\RoleController;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Modules\Inventory\Http\Controllers\PurchaseOrderController;
-use App\Http\Controllers\API\Workspace\UserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,7 +44,6 @@ Route::middleware(['auth'])->group(function () {
     // Workspace dashboard
     Route::get('/workspaces/{workspace}/dashboard', [WorkspaceController::class, 'dashboard'])->name('workspace.dashboard');
     Route::get('/workspaces/{workspace}/chart-data', [WorkspaceController::class, 'getChartData'])->name('workspace.chart-data');
-
 
     // Workspace CRUD routes
     Route::get('/workspaces', [WorkspaceController::class, 'index'])->name('workspaces.index');
@@ -155,7 +153,6 @@ Route::middleware(['auth'])->group(function () {
 Route::get('/workspaces/invitations/{token}', [WorkspaceInvitationController::class, 'show'])->name('workspaces.invitations.show');
 Route::get('/workspaces/invitations/{token}/accept', [WorkspaceInvitationController::class, 'accept'])->name('workspaces.invitations.accept');
 
-
 Route::prefix('/workspaces/{workspace:slug}')->group(function () {
 
     // Archive & Restore Logic
@@ -164,7 +161,6 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
     Route::post('/roles/{role}/restore', [RoleController::class, 'restore'])
         ->withTrashed()
         ->name('roles.restore');
-
 
     Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
     Route::get('/roles/create', [RoleController::class, 'create'])->name('roles.create');
@@ -175,4 +171,3 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
     Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
 
 });
-

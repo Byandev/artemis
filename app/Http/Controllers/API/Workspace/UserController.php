@@ -22,6 +22,4 @@ class UserController extends Controller
             ->allowedSorts(['name', 'id'])
             ->paginate();
     }
-
-
 }
