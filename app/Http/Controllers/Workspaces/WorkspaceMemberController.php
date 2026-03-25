@@ -93,10 +93,7 @@ class WorkspaceMemberController extends Controller
             'members' => $members,
             'pendingInvitations' => $pendingInvitations,
             'isAdmin' => $isAdmin,
-
-            'roles' => Role::where('workspace_id', $workspace->id)
-                ->get(['id', 'role', 'display_name', 'description']),
-
+            'roles' => Role::where('workspace_id', $workspace->id)->get(),
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
