@@ -98,7 +98,7 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
         return 'bg-gray-100 text-gray-800';
     };
 
-
+    // Update the useEffect to properly handle all filters
     useEffect(() => {
         const timer = setTimeout(() => {
             const currentSort = query?.sort;

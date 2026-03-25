@@ -11,7 +11,6 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import AppLayout from '@/layouts/app-layout';
 import { currencyFormatter, percentageFormatter } from '@/lib/utils';
 import { PaginatedData } from '@/types';
 import {
@@ -28,13 +27,16 @@ import {
     MapPin,
     Phone,
     Search,
+    User as UserIcon
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { omit } from 'lodash';
 import { toFrontendSort } from '@/lib/sort';
-import workspaces from '@/routes/workspaces';
 import publicPage from '@/routes/public-page';
+import { Button } from '@/components/ui/button';
+import FormModal from './formModal';
+import { User } from '@/types/models/Pancake/User';
 
 
 interface Props {
@@ -51,14 +53,17 @@ interface Props {
         page?: number;
         perPage?: number;
     };
+    users: User[];
 }
 
-export default function RmoManagement({ orders, workspace, query }: Props) {
+export default function RmoManagement({ orders, workspace, query, users }: Props) {
     const [isLoadingID, setIsLoadingID] = useState<number | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [selectedStatus, setSelectedStatus] = useState<string>(query?.filter?.status ?? '');
     const [selectedPageId, setSelectedPageId] = useState<string>(query?.filter?.page_id ?? '');
     const [selectedParcelStatus, setSelectedParcelStatus] = useState<string>('');
+    const [userName, setUserName] = useState(false);
+    const [ isOpen, setIsOpen ] = useState(false);
 
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
@@ -101,6 +106,14 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
 
 
     useEffect(() => {
+        const name = localStorage.getItem('user_name');
+        if (name) {
+            setUserName(name);
+        }
+    }, []);
+
+
+    useEffect(() => {
         const timer = setTimeout(() => {
             const currentSort = query?.sort;
 
@@ -135,10 +148,15 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
     ]);
 
     const handleChangeStatus = (status: string, orderId: number) => {
-        router.post(
-            `/workspaces/${workspace.slug}/rts/rmo-management/${orderId}`,
+
+        console.log(orderId);
+        const userId = localStorage.getItem('user_id');
+
+        router.put(
+            `/public/workspaces/${workspace.slug}/rts/rmo-management/${orderId}`,
             {
                 status,
+                userId,
             },
             {
                 preserveScroll: true,
@@ -397,13 +415,33 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
 
     return (
         <div>
+            <FormModal open={isOpen} onOpenChange={setIsOpen} users={users} />
             <div className="p-6">
                 <div className="">
                     <div className="mb-6 flex flex-col">
-                        <h1 className="text-2xl font-bold">RMO Management</h1>
-                        <p className="text-sm font-light text-gray-500">
-                            Items scheduled for delivery today.
-                        </p>
+                        <div className="flex justify-between">
+                            <div className="flex flex-col">
+                                <h1 className="text-2xl font-bold">
+                                    RMO Management
+                                </h1>
+                                <p className="text-sm font-light text-gray-500">
+                                    Items scheduled for delivery today.
+                                </p>
+                            </div>
+                            {userName ? (
+                                <button
+                                    onClick={() => setIsOpen(true)}
+                                    className="flex items-center gap-2 rounded-lg border px-3 py-0   text-sm font-medium hover:bg-gray-100"
+                                >
+                                    <UserIcon className='h-4 w-4' />
+                                    {userName}
+                                </button>
+                            ) : (
+                                <Button onClick={() => setIsOpen(true)}>
+                                    Assign To Me
+                                </Button>
+                            )}
+                        </div>
                     </div>
                     <ComponentCard>
                         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
@@ -429,7 +467,7 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
                                         Pages
                                     </p>
                                     <DropdownMenu>
-                                        <DropdownMenuTrigger className="flex items-center justify-between min-w-40 rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
+                                        <DropdownMenuTrigger className="flex min-w-40 items-center justify-between rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
                                             {uniquePages.find(
                                                 (p) => p.id === selectedPageId,
                                             )?.name || 'All'}
@@ -480,9 +518,8 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
                                     </p>
                                     {/* J&T Status Filter Dropdown */}
                                     <DropdownMenu>
-                                        <DropdownMenuTrigger className="flex items-center min-w-40 justify-between rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
-                                            {selectedParcelStatus ||
-                                                'All'}
+                                        <DropdownMenuTrigger className="flex min-w-40 items-center justify-between rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
+                                            {selectedParcelStatus || 'All'}
                                             <ChevronUp className="h-3 w-3" />
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent

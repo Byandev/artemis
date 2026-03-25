@@ -15,6 +15,7 @@ use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Pancake\Models\OrderForDelivery;
+use Modules\Pancake\Models\User;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -103,6 +104,29 @@ class ForDeliveryController extends Controller
         return redirect()->back()->with('success', 'Status updated successfully');
     }
 
+    public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
+    {
+        // Check if userId is provided
+        if (!$request->has('userId') || !$request->userId) {
+            return redirect()->back()->with('error', 'Please select a user before updating.');
+        }
+
+        // Find the order
+        $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
+
+        if (!$orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        // Update status and assignee
+        $orderForDelivery->update([
+            'status' => $request->status,
+            'assignee_id' => $request->userId,
+        ]);
+
+        return redirect()->back()->with('success', 'Status updated successfully');
+    }
+
     public function public(Request $request, Workspace $workspace)
     {
         $items = QueryBuilder::for(OrderForDelivery::class)
@@ -163,14 +187,16 @@ class ForDeliveryController extends Controller
             ])
             ->paginate(10);
 
+        $users = User::get(['id', 'name']);
+
         return Inertia::render('workspaces/rts/public-pages/rmo-management', [
             'orders' => $items,
             'workspace' => $workspace,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page',]),
                 'filter' => $request->input('filter', []),
-            ]
-
+            ],
+            'users' => $users,
         ]);
     }
 }
