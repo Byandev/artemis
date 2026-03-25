@@ -102,59 +102,6 @@ class WorkspaceController extends Controller
         ]);
     }
 
-    public function members(Request $request, Workspace $workspace)
-    {
-        // 1. Fetch roles specifically for this workspace
-        $roles = \App\Models\Role::where('workspace_id', $workspace->id)->get();
-
-        // 2. SAFETY CHECK: If roles are still empty for some reason,
-        // fetch them by the raw ID just to be absolutely sure.
-        if ($roles->isEmpty()) {
-            $roles = \App\Models\Role::where('workspace_id', 11)->get();
-        }
-
-        return Inertia::render('workspaces/members', [
-            'workspace' => $workspace->load([
-                'owner',
-                'users' => fn ($q) => $q->withPivot('role', 'created_at')->latest(),
-            ]),
-            'roles' => $roles,
-            'isAdmin' => $request->user()->isAdminOf($workspace),
-        ]);
-    }
-
-    /**
-     * Update the specified workspace in storage.
-     */
-    /**
-     * Update a member's role within the workspace.
-     */
-    public function updateMember(Request $request, Workspace $workspace, User $user)
-    {
-        // 1. Authorization: Only Admins/Owners can change roles
-        if (! $request->user()->isAdminOf($workspace)) {
-            abort(403, 'You do not have permission to modify members.');
-        }
-
-        // 2. Validation
-        $validated = $request->validate([
-            'role' => ['required', 'string', 'in:admin,member'],
-        ]);
-
-        // 3. Prevent changing the Owner's role (Safety check)
-        if ($workspace->owner_id === $user->id) {
-            return back()->with('error', 'The workspace owner\'s role cannot be changed.');
-        }
-
-        // 4. Update the Pivot Table
-        // This updates the 'role' column on the 'workspace_user' table
-        $workspace->members()->updateExistingPivot($user->id, [
-            'role' => $validated['role'],
-        ]);
-
-        return back()->with('success', "Updated {$user->name}'s role to {$validated['role']}.");
-    }
-
     /**
      * Remove the specified workspace from storage.
      */
