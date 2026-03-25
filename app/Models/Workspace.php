@@ -67,7 +67,7 @@ class Workspace extends Model
     {
         return $this->belongsToMany(User::class, 'workspace_user')
             ->withTimestamps()
-            ->withPivot('role')
+            ->withPivot('role', 'role_id')
             ->using(WorkspaceUser::class);
     }
 
@@ -145,10 +145,10 @@ class Workspace extends Model
     /**
      * Update a member's role.
      */
-    public function updateMemberRole(User $user, string $role)
+    public function updateMemberRole(User $user, int $roleId)
     {
         return $this->users()->updateExistingPivot($user->id, [
-            'role' => $role,
+            'role_id' => $roleId,
         ]);
     }
 

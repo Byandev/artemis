@@ -42,7 +42,8 @@ export interface User {
     updated_at: string;
     [key: string]: unknown; // This allows for additional properties...
     pivot?: {
-        role: string;
+        role_id: number | null;
+        role: string | null;
         created_at: string;
     };
 }

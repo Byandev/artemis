@@ -115,10 +115,10 @@ class WorkspaceMemberController extends Controller
         }
 
         $validated = $request->validate([
-            'role' => ['required', 'in:admin,member'],
+            'role_id' => ['required', 'exists:roles,id'],
         ]);
 
-        $workspace->updateMemberRole($user, $validated['role']);
+        $workspace->updateMemberRole($user, $validated['role_id']);
 
         return back()->with('success', 'Member role updated successfully.');
     }

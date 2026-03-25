@@ -44,7 +44,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { MoreHorizontal, Send, Trash2, UserMinus, CopyleftIcon } from 'lucide-react';
+import { MoreHorizontal, Send, Trash2, UserMinus, CopyleftIcon, UserCog } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Role } from '@/types/models/Role';
 
@@ -82,12 +82,32 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
 
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
+    const [memberToUpdateRole, setMemberToUpdateRole] = useState<User | null>(null);
     const [invitationToRevoke, setInvitationToRevoke] = useState<Invitation | null>(null);
 
     const inviteForm = useForm({
         email: '',
         role_id: '',
     });
+
+    const updateRoleForm = useForm({
+        role_id: '',
+    });
+
+    const handleUpdateRole = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!memberToUpdateRole) return;
+        updateRoleForm.put(
+            workspaces.members.update.url({ workspace: workspace.slug, user: memberToUpdateRole.id }),
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setMemberToUpdateRole(null);
+                    updateRoleForm.reset();
+                },
+            }
+        );
+    };
 
     const handleInvite = (e: React.FormEvent) => {
         e.preventDefault();
@@ -192,6 +212,16 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                                onClick={() => {
+                                    setMemberToUpdateRole(member);
+                                    updateRoleForm.setData('role_id', member.pivot?.role_id?.toString() ?? '');
+                                }}
+                            >
+                                <UserCog className="mr-2 h-4 w-4" />
+                                Change Role
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
                                 onClick={() => setMemberToRemove(member)}
                                 className="text-destructive focus:text-destructive"
@@ -477,6 +507,51 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Update Member Role Dialog */}
+            <Dialog open={!!memberToUpdateRole} onOpenChange={(open) => { if (!open) { setMemberToUpdateRole(null); updateRoleForm.reset(); } }}>
+                <DialogContent>
+                    <form onSubmit={handleUpdateRole}>
+                        <DialogHeader>
+                            <DialogTitle>Change Role</DialogTitle>
+                            <DialogDescription>
+                                Update the role for <strong>{memberToUpdateRole?.name}</strong>
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="update-role">Role</Label>
+                                <Select
+                                    value={updateRoleForm.data.role_id}
+                                    onValueChange={(value) => updateRoleForm.setData('role_id', value)}
+                                >
+                                    <SelectTrigger id="update-role">
+                                        <SelectValue placeholder="Select a role" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {roles.map((role) => (
+                                            <SelectItem key={role.id} value={role.id.toString()}>
+                                                {role.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {updateRoleForm.errors.role_id && (
+                                    <p className="text-destructive text-sm">{updateRoleForm.errors.role_id}</p>
+                                )}
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => { setMemberToUpdateRole(null); updateRoleForm.reset(); }}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={updateRoleForm.processing}>
+                                {updateRoleForm.processing ? 'Saving...' : 'Save'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             {/* Revoke Invitation Confirmation Dialog */}
             <AlertDialog
