@@ -31,7 +31,7 @@ class FetchPageOrders implements ShouldQueue
 
         $pancake = new Pancake($this->page->shop_id, $this->page->pos_token);
 
-        $response = $pancake->listProducts("&page_size=100&page_number=$page_number&order_sources[]=-1&order_sources[]={$this->page->id}&startDateTime=$this->startTime&endDateTime=$this->endTime&updateStatus=updated_at");
+        $response = $pancake->listProducts("&page_size=100&page_number=$page_number&order_sources[]=-1&order_sources[]={$this->page->id}&startDateTime=$this->startTime&endDateTime=$this->endTime&updateStatus=updated_at&extra_fields[]=return_rate");
 
         $totalPages = $response['total_pages'];
 
@@ -44,7 +44,7 @@ class FetchPageOrders implements ShouldQueue
         if ($totalPages > $this->page_number) {
             dispatch(new FetchPageOrders($this->page, $page_number + 1, $this->startTime, $this->endTime))->delay(now()->addSecond(5))->onQueue('pancake');
         } else {
-            $this->page->update(['orders_last_synced_at' => Carbon::createFromTimestamp($this->endTime)->subHours(8)]);
+            $this->page->update(['orders_last_synced_at' => Carbon::createFromTimestamp($this->endTime)->subMinute(15)]);
         }
     }
 }

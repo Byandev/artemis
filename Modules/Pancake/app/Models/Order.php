@@ -23,8 +23,23 @@ class Order extends Model
         return $this->hasOne(ParcelJourney::class);
     }
 
+    public function parcelJourneys(): \Illuminate\Database\Eloquent\Relations\HasMany|Order
+    {
+        return $this->hasMany(ParcelJourney::class);
+    }
+
     public function page(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Page::class);
+    }
+
+    public function phoneNumberReports(): Order|\Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(OrderPhoneNumberReport::class, 'order_id', 'id');
+    }
+
+    public function items()
+    {
+        return $this->hasMany(OrderItem::class);
     }
 }

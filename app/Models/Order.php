@@ -9,6 +9,8 @@ class Order extends Model
 {
     use HasFactory;
 
+    protected $table = 'pancake_orders';
+
     protected $guarded = [];
 
     public function shippingAddress(): \Illuminate\Database\Eloquent\Relations\HasOne|Order
@@ -46,12 +48,12 @@ class Order extends Model
 
         // Filter by page IDs
         if ($pageIds) {
-            $query->whereIn('orders.page_id', is_array($pageIds) ? $pageIds : explode(',', $pageIds));
+            $query->whereIn('pancake_orders.page_id', is_array($pageIds) ? $pageIds : explode(',', $pageIds));
         }
 
         // Filter by shops IDs
         if ($shopIds) {
-            $query->whereIn('orders.shop_id', is_array($shopIds) ? $shopIds : explode(',', $shopIds));
+            $query->whereIn('pancake_orders.shop_id', is_array($shopIds) ? $shopIds : explode(',', $shopIds));
         }
 
         // Filter by product IDs (via pages)
@@ -89,12 +91,12 @@ class Order extends Model
     {
         // Filter by Page IDs
         if ($request->filled('page_ids')) {
-            $query->whereIn('orders.page_id', (array) $request->page_ids);
+            $query->whereIn('pancake_orders.page_id', (array) $request->page_ids);
         }
 
         // Filter by Shop IDs
         if ($request->filled('shop_ids')) {
-            $query->whereIn('orders.shop_id', (array) $request->shop_ids);
+            $query->whereIn('pancake_orders.shop_id', (array) $request->shop_ids);
         }
 
         // Filter by User IDs (via pages.owner_id)
@@ -106,7 +108,7 @@ class Order extends Model
 
         // Date range filter
         if ($request->filled('start_date') && $request->filled('end_date')) {
-            $query->whereBetween('orders.confirmed_at', [
+            $query->whereBetween('pancake_orders.confirmed_at', [
                 $request->start_date,
                 $request->end_date,
             ]);
@@ -173,25 +175,25 @@ class Order extends Model
         switch ($sortBy) {
             case 'name':
             case 'page.name':
-                return $builder->leftJoin('pages', 'orders.page_id', '=', 'pages.id')
-                    ->select('orders.*')
+                return $builder->leftJoin('pages', 'pancake_orders.page_id', '=', 'pages.id')
+                    ->select('pancake_orders.*')
                     ->orderBy('pages.name', $sortDir);
 
             case 'tracking_code':
-                return $builder->orderBy('orders.tracking_code', $sortDir);
+                return $builder->orderBy('pancake_orders.tracking_code', $sortDir);
 
             case 'shipping_address.full_name':
-                return $builder->leftJoin('shipping_addresses', 'shipping_addresses.order_id', '=', 'orders.id')
-                    ->select('orders.*')
+                return $builder->leftJoin('shipping_addresses', 'shipping_addresses.order_id', '=', 'pancake_orders.id')
+                    ->select('pancake_orders.*')
                     ->orderBy('shipping_addresses.full_name', $sortDir);
 
             case 'parcel_journey.rider_name':
-                return $builder->leftJoin('parcel_journeys', 'parcel_journeys.order_id', '=', 'orders.id')
-                    ->select('orders.*')
+                return $builder->leftJoin('parcel_journeys', 'parcel_journeys.order_id', '=', 'pancake_orders.id')
+                    ->select('pancake_orders.*')
                     ->orderBy('parcel_journeys.rider_name', $sortDir);
 
             case 'status_name':
-                return $builder->orderBy('orders.status_name', $sortDir);
+                return $builder->orderBy('pancake_orders.status_name', $sortDir);
 
             default:
                 return $builder->orderBy($sortBy, $sortDir);

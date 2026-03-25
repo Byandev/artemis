@@ -21,7 +21,7 @@ return new class extends Migration
                 'po_page_status_confirmed_customer_idx'
             );
 
-            // Delivery metric (AverageDeliveryDays)
+            // Delivery metric (AverageDaysFromShippedToDelivered)
             $table->index(
                 ['page_id', 'status', 'delivered_at', 'shipped_at'],
                 'po_page_status_delivered_shipped_idx'

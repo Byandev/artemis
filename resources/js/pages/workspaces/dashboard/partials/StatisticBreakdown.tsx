@@ -1,4 +1,7 @@
 import LineChart from '@/components/charts/LineChart';
+import LineChartSkeleton from '@/components/charts/skeletons/LineChartSkeleton';
+import { FilterValue } from '@/components/filters/Filters';
+import { Button } from '@/components/ui/button';
 import {
     Select,
     SelectContent,
@@ -6,120 +9,180 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { RefreshCcw } from 'lucide-react';
 import moment from 'moment/moment';
-import { FilterValue } from '@/components/filters/Filters';
+import { useEffect, useMemo, useState } from 'react';
+import ComponentCard from '@/components/common/ComponentCard';
+import { metricConfigs, MetricKey } from '@/types/metrics';
 
 interface Props {
+    metrics: MetricKey[],
     workspace: Workspace;
     dateRange: string[];
     filter: FilterValue;
 }
 
+interface Breakdown {
+    period: string;
+    value: number
+}
 
-export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
-    const [breakdown, setBreakdown] = useState<any[]>([]);
-    const [option, setOption] = useState('totalSales');
+export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Props) {
+    const [primaryBreakdown, setPrimaryBreakdown] = useState<Breakdown[]>([]);
+    const [secondaryBreakdown, setSecondaryBreakdown] = useState<Breakdown[]>([]);
+
+    const [option, setOption] = useState<MetricKey>(metrics[0]);
+    const [secondOption, setSecondOption] = useState<MetricKey>(metrics[1]);
+
+    const metricOne = useMemo(
+        () => metricConfigs.find((m) => m.key === option),
+        [option],
+    );
+
+    const metricTwo = useMemo(
+        () => metricConfigs.find((m) => m.key === secondOption),
+        [secondOption],
+    );
+
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [group, setGroup] = useState('daily');
+    const [reload, setReload] = useState(false);
 
-    const start = moment(dateRange[0]);
-    const end = moment(dateRange[1]);
-    const daysDiff = end.diff(start, 'days');
+    const daysDiff = useMemo(
+        () => moment(dateRange[1]).diff(moment(dateRange[0]), 'days'),
+        [dateRange],
+    );
 
-    const availableGroups: string[] = [];
-    if (daysDiff <= 7) {
-        availableGroups.push('daily');
-    } else if (daysDiff <= 30) {
-        availableGroups.push('daily', 'weekly');
-    } else if (daysDiff <= 365) {
-        availableGroups.push(
-
-
-
-
-
-
-            'weekly', 'monthly');
-    } else {
-        availableGroups.push( 'weekly', 'monthly', 'yearly');
-    }
-
-    const optionLabels: Record<string, string> = {
-        totalSales: 'Sales',
-        totalOrders: 'Orders',
-        aov: 'AOV',
-        rtsRate: 'RTS',
-        repeatOrderRatio: 'ROR',
-        timeToFirstOrder: 'Time to First Order',
-        avgLifetimeValue: 'Average Lifetime Value',
-        avgDeliveryDays: 'Average Delivery Days',
-        avgShippedOutDays: 'Average Shipped Out Days',
-    };
-
-    const formatValue = (value: number) => {
-        switch (option) {
-            case 'totalSales':
-            case 'avgLifetimeValue':
-                return `₱${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-            case 'rtsRate':
-            case 'repeatOrderRatio':
-                return `${(value * 100).toFixed(1)}%`;
-            case 'timeToFirstOrder':
-            case 'avgDeliveryDays':
-            case 'avgShippedOutDays':
-                return `${value.toFixed(1)} hrs`;
-            case 'aov':
-            case 'totalOrders':
-            default:
-                return value.toLocaleString();
-        }
-    };
+    const availableGroups = useMemo<string[]>(() => {
+        if (daysDiff <= 7) return ['daily'];
+        if (daysDiff <= 30) return ['daily', 'weekly'];
+        if (daysDiff <= 365) return ['weekly', 'monthly'];
+        return ['weekly', 'monthly', 'yearly'];
+    }, [daysDiff]);
 
     useEffect(() => {
-        setLoading(true);
-        axios
-            .get(`/api/v1/workspace/analytics/breakdown`, {
-                headers: {
-                    'X-Workspace-Id': workspace.id,
-                },
-                params: {
-                    metric: option,
-                    group: group,
-                    'date_range[start_date]': start.format('YYYY-MM-DD'),
-                    'date_range[end_date]': end.format('YYYY-MM-DD'),
-                    'filter[team_ids]': filter.teamIds.join(','),
-                    'filter[shop_ids]': filter.shopIds.join(','),
-                    'filter[page_ids]': filter.pageIds.join(','),
-                    'filter[user_ids]': filter.userIds.join(','),
-                    'filter[product_ids]': filter.productIds.join(','),
-                },
-            })
-            .then((response) => setBreakdown(response.data.data))
-            .catch((error) => console.error(error))
-            .finally(() => setLoading(false));
-    }, [workspace.id, option, group, dateRange, filter]);
+        if (!availableGroups.includes(group) && availableGroups.length > 0) {
+            setGroup(availableGroups[0]);
+        }
+    }, [availableGroups, group]);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            setError(null);
+
+            const commonParams = {
+                group: group,
+                'date_range[start_date]': dateRange[0],
+                'date_range[end_date]': dateRange[1],
+                'filter[team_ids]': filter.teamIds.join(','),
+                'filter[shop_ids]': filter.shopIds.join(','),
+                'filter[page_ids]': filter.pageIds.join(','),
+                'filter[user_ids]': filter.userIds.join(','),
+                'filter[product_ids]': filter.productIds.join(','),
+            };
+
+            try {
+                const [primaryResponse, secondaryResponse] = await Promise.all([
+                    axios.get(`/api/v1/workspace/analytics/breakdown`, {
+                        headers: {
+                            'X-Workspace-Id': workspace.id,
+                        },
+                        params: {
+                            ...commonParams,
+                            metric: option,
+                        },
+                    }),
+                    axios.get(`/api/v1/workspace/analytics/breakdown`, {
+                        headers: {
+                            'X-Workspace-Id': workspace.id,
+                        },
+                        params: {
+                            ...commonParams,
+                            metric: secondOption,
+                        },
+                    }),
+                ]);
+
+                setPrimaryBreakdown(primaryResponse.data.data ?? []);
+                setSecondaryBreakdown(secondaryResponse.data.data ?? []);
+            } catch (error) {
+                console.error('Failed to fetch breakdown:', error);
+                setError('Failed to load data. Please try reload.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [workspace.id, option, secondOption, group, dateRange, filter, reload]);
 
     const capitalizeFirstLetter = (str: string) =>
         str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 
+    const mergedChartData = useMemo(() => {
+        const allPeriods = Array.from(
+            new Set([
+                ...primaryBreakdown.map((item) => item.period),
+                ...secondaryBreakdown.map((item) => item.period),
+            ]),
+        );
+
+        const primaryMap = new Map(
+            primaryBreakdown.map((item) => [item.period, item.value]),
+        );
+
+        const secondaryMap = new Map(
+            secondaryBreakdown.map((item) => [item.period, item.value]),
+        );
+
+        return {
+            categories: allPeriods,
+            series: [
+                {
+                    name: metricOne?.name,
+                    data: allPeriods.map(
+                        (period) => primaryMap.get(period) ?? 0,
+                    ),
+                },
+                {
+                    name: metricTwo?.name,
+                    data: allPeriods.map(
+                        (period) => secondaryMap.get(period) ?? 0,
+                    ),
+                },
+            ],
+        };
+    }, [primaryBreakdown, secondaryBreakdown, option, secondOption]);
+
+    const hasData =
+        mergedChartData.series[0].data.length > 0 ||
+        mergedChartData.series[1].data.length > 0;
+
     return (
         <div className="space-y-4">
-            <div className="flex justify-between">
-                <h2 className="text-lg font-semibold">
-                    {optionLabels[option]} Breakdown
+            <div className="item-center flex justify-between">
+                <h2 className="font-semibold">
+                    {metricOne?.name} vs {metricTwo?.name}
                 </h2>
+
                 <div className="flex items-center justify-between gap-4">
-                    <div className="flex rounded-lg bg-gray-100 p-1.5">
+                    <div className="flex rounded-lg bg-gray-100 p-1">
                         {availableGroups.map((g) => (
                             <button
                                 key={g}
-                                className={`px-4 py-1 text-sm text-gray-400 ${
+                                className={`rounded-md px-4 py-1 text-sm transition-all ${
                                     group === g
-                                        ? 'rounded-md bg-white text-gray-950'
-                                        : ''
+                                        ? 'bg-white text-gray-950 shadow-sm'
+                                        : 'text-gray-400 hover:text-gray-600'
                                 }`}
                                 onClick={() => setGroup(g)}
                             >
@@ -128,38 +191,129 @@ export function StatisticBreakdown({ workspace, dateRange, filter }: Props) {
                         ))}
                     </div>
 
-                    <div className="w-80">
-                        <Select value={option} onValueChange={setOption}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select options" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {Object.entries(optionLabels).map(
-                                    ([key, label]) => (
-                                        <SelectItem key={key} value={key}>
-                                            {label}
-                                        </SelectItem>
-                                    ),
-                                )}
-                            </SelectContent>
-                        </Select>
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="w-60">
+                            <Select
+                                value={option}
+                                onValueChange={(newValue: MetricKey) =>
+                                    setOption(newValue)
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select first option" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {metricConfigs
+                                        .filter((m) => metrics.includes(m.key))
+                                        .map((item) => (
+                                            <SelectItem
+                                                key={item.key}
+                                                value={item.key}
+                                            >
+                                                {item.name}
+                                            </SelectItem>
+                                        ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="w-60">
+                            <Select
+                                value={secondOption}
+                                onValueChange={(newValue: MetricKey) =>
+                                    setSecondOption(newValue)
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select second option" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {metricConfigs
+                                        .filter((m) => metrics.includes(m.key))
+                                        .map((item) => (
+                                            <SelectItem
+                                                key={item.key}
+                                                value={item.key}
+                                            >
+                                                {item.name}
+                                            </SelectItem>
+                                        ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    className="rounded-md bg-gray-100 p-2 hover:text-white"
+                                    onClick={() =>
+                                        setReload((prevState) => !prevState)
+                                    }
+                                >
+                                    <RefreshCcw className="h-5 w-5 text-gray-500" />
+                                </Button>
+                            </TooltipTrigger>
+
+                            <TooltipContent>Refresh</TooltipContent>
+                        </Tooltip>
                     </div>
                 </div>
             </div>
 
             {loading ? (
-                <div className="m-8 h-120 bg-gray-50"></div>
+                <LineChartSkeleton />
+            ) : error ? (
+                <div className="flex h-60 flex-col items-center justify-center space-y-4 rounded-lg border border-gray-200 bg-gray-50">
+                    <p className="text-red-500">{error}</p>
+                    <Button
+                        variant="outline"
+                        onClick={() => setReload((prevState) => !prevState)}
+                        className="gap-2"
+                    >
+                        <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                            />
+                        </svg>
+                        Try Again
+                    </Button>
+                </div>
+            ) : !hasData ? (
+                <div className="flex h-60 flex-col items-center justify-center space-y-2 rounded-lg border border-gray-200 bg-gray-50">
+                    <p className="text-gray-500">
+                        No data available for the selected period
+                    </p>
+                    <p className="text-sm text-gray-400">
+                        Try adjusting your filters or date range
+                    </p>
+                </div>
             ) : (
-                <LineChart
-                    categories={breakdown.map((a) => a.period)}
-                    series={[
-                        {
-                            name: optionLabels[option],
-                            data: breakdown.map((a) => a.value),
-                        },
-                    ]}
-                    formatValue={formatValue}
-                />
+                <ComponentCard>
+                    <LineChart
+                        categories={mergedChartData.categories}
+                        series={mergedChartData.series}
+                        leftAxisTitle={metricOne?.name ?? ''}
+                        rightAxisTitle={metricTwo?.name ?? ''}
+                        leftFormatter={(value) =>
+                            metricOne?.formatter
+                                ? metricOne.formatter(value)
+                                : value.toString()
+                        }
+                        rightFormatter={(value) =>
+                            metricTwo?.formatter
+                                ? metricTwo.formatter(value)
+                                : value.toString()
+                        }
+                    />
+                </ComponentCard>
             )}
         </div>
     );

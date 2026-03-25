@@ -1,4 +1,9 @@
 import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
     SidebarGroup,
     SidebarGroupLabel,
     SidebarMenu,
@@ -8,63 +13,101 @@ import {
     SidebarMenuSubButton,
     SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-// 1. Import the base type
-import { type NavItem as BaseNavItem } from '@/types';
-import { Link, usePage } from '@inertiajs/react';
-import { ChevronRight } from 'lucide-react';
+import { useCurrentUrl } from '@/hooks/use-current-url';
+import type { NavItem } from '@/types';
+import { Link } from '@inertiajs/react';
+import { ChevronDown } from 'lucide-react';
 
-// 2. Define the extended type locally so the 'items' property is recognized
-interface ExtendedNavItem extends BaseNavItem {
-    items?: {
-        title: string;
-        href: string;
-    }[];
-}
+type NavMainProps = {
+    items?: NavItem[];
+    group_label?: string;
+};
 
-// 3. Update the component props to use the ExtendedNavItem
-export function NavMain({ items = [] }: { items: ExtendedNavItem[] }) {
-    const page = usePage();
-    const currentPath = page.url.split('?')[0];
+export function NavMain({ items = [], group_label = '' }: NavMainProps) {
+    const { isCurrentUrl } = useCurrentUrl();
 
     return (
-        <SidebarGroup className="px-2 py-0">
-            <SidebarGroupLabel>Menu</SidebarGroupLabel>
-            <SidebarMenu>
+        <SidebarGroup>
+            {group_label && (
+                <SidebarGroupLabel className="text-xs tracking-wide text-gray-400 uppercase">
+                    {group_label}
+                </SidebarGroupLabel>
+            )}
+
+            <SidebarMenu className="mt-2">
                 {items.map((item) => {
-                    // This handles both string and object-based hrefs safely
-                    const itemHref = typeof item.href === 'string' ? item.href : (item.href as any).url;
-                    const isActive = currentPath === itemHref || currentPath.startsWith(itemHref + '/');
+                    const hasChildren = !!item.items?.length;
+                    const active = item.href ? isCurrentUrl(item.href) : false;
+                    const childActive = item.items?.some((sub) =>
+                        sub.href ? isCurrentUrl(sub.href) : false,
+                    );
 
-                    // The red line on 'item.items' should now be gone
-                    const hasItems = item.items && item.items.length > 0;
-
-                    if (hasItems) {
+                    if (hasChildren) {
                         return (
-                            <Collapsible key={item.title} asChild defaultOpen={isActive} className="group/collapsible">
-                                <SidebarMenuItem>
+                            <SidebarMenuItem key={item.title}>
+                                <Collapsible defaultOpen={childActive}>
                                     <CollapsibleTrigger asChild>
-                                        <SidebarMenuButton tooltip={item.title} isActive={isActive}>
-                                            {item.icon && <item.icon />}
-                                            <span>{item.title}</span>
-                                            <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                                        <SidebarMenuButton
+                                            size="lg"
+                                            isActive={childActive}
+                                            tooltip={{ children: item.title }}
+                                            className={[
+                                                'relative h-11 justify-between rounded-md',
+                                                'text-gray-500 hover:bg-emerald-100 hover:text-emerald-500',
+                                                'border-l-4 border-transparent',
+                                                childActive
+                                                    ? ' border-emerald-600 bg-emerald-50 font-medium text-emerald-600 transition-all'
+                                                    : '',
+                                            ].join(' ')}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                {item.icon && (
+                                                    <item.icon className="h-4 w-4" />
+                                                )}
+                                                <span>{item.title}</span>
+                                            </div>
+                                            <ChevronDown className="h-4 w-4 shrink-0" />
                                         </SidebarMenuButton>
                                     </CollapsibleTrigger>
+
                                     <CollapsibleContent>
-                                        <SidebarMenuSub>
-                                            {item.items?.map((subItem) => (
-                                                <SidebarMenuSubItem key={subItem.title}>
-                                                    <SidebarMenuSubButton asChild isActive={currentPath === subItem.href}>
-                                                        <Link href={subItem.href}>
-                                                            <span>{subItem.title}</span>
-                                                        </Link>
-                                                    </SidebarMenuSubButton>
-                                                </SidebarMenuSubItem>
-                                            ))}
+                                        <SidebarMenuSub className="mt-1">
+                                            {item.items?.map((sub) => {
+                                                const subActive = sub.href
+                                                    ? isCurrentUrl(sub.href)
+                                                    : false;
+
+                                                return (
+                                                    <SidebarMenuSubItem
+                                                        key={sub.title}
+                                                    >
+                                                        <SidebarMenuSubButton
+                                                            asChild
+                                                            isActive={subActive}
+                                                            className={[
+                                                                'h-9 rounded-md text-gray-500 hover:bg-emerald-100 hover:text-emerald-500',
+                                                                subActive
+                                                                    ? 'bg-emerald-50 font-medium text-emerald-600'
+                                                                    : '',
+                                                            ].join(' ')}
+                                                        >
+                                                            <Link
+                                                                href={sub.href!}
+                                                                prefetch
+                                                                className="flex items-center gap-2"
+                                                            >
+                                                                <span>
+                                                                    {sub.title}
+                                                                </span>
+                                                            </Link>
+                                                        </SidebarMenuSubButton>
+                                                    </SidebarMenuSubItem>
+                                                );
+                                            })}
                                         </SidebarMenuSub>
                                     </CollapsibleContent>
-                                </SidebarMenuItem>
-                            </Collapsible>
+                                </Collapsible>
+                            </SidebarMenuItem>
                         );
                     }
 
@@ -72,12 +115,26 @@ export function NavMain({ items = [] }: { items: ExtendedNavItem[] }) {
                         <SidebarMenuItem key={item.title}>
                             <SidebarMenuButton
                                 asChild
-                                isActive={isActive}
+                                size="lg"
+                                isActive={active}
                                 tooltip={{ children: item.title }}
-                                className={`p-3 ${isActive ? 'bg-gray-100 text-primary' : ''}`}
+                                className={[
+                                    'relative h-11 justify-start rounded-md',
+                                    'text-gray-500 hover:bg-emerald-100 hover:text-emerald-500',
+                                    'border-l-4 border-transparent',
+                                    active
+                                        ? 'ml-1 border-emerald-600 bg-emerald-50 font-medium text-emerald-600 transition-all'
+                                        : '',
+                                ].join(' ')}
                             >
-                                <Link href={item.href} prefetch>
-                                    {item.icon && <item.icon />}
+                                <Link
+                                    href={item.href!}
+                                    prefetch
+                                    className="flex items-center gap-3"
+                                >
+                                    {item.icon && (
+                                        <item.icon className="h-4 w-4" />
+                                    )}
                                     <span>{item.title}</span>
                                 </Link>
                             </SidebarMenuButton>

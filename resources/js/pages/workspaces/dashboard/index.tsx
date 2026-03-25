@@ -14,8 +14,23 @@ import DateOption = flatpickr.Options.DateOption;
 import StatisticCard from '@/pages/workspaces/dashboard/partials/StatisticCard';
 import { StatisticBreakdown } from '@/pages/workspaces/dashboard/partials/StatisticBreakdown';
 import ComponentCard from '@/components/common/ComponentCard';
-import StatisticsCards from '@/pages/workspaces/dashboard/partials/StatisticsCards';
 import PageBreakdown from '@/pages/workspaces/dashboard/partials/PageBreakdown';
+import ShopBreakdown from '@/pages/workspaces/dashboard/partials/ShopBreakdown';
+import {
+    Clock3,
+    PackageCheck,
+    PhilippinePeso,
+    ReceiptText,
+    Repeat,
+    ShoppingCart,
+    Truck,
+    Undo2,
+    Wallet,
+} from 'lucide-react';
+import UserBreakdown from '@/pages/workspaces/dashboard/partials/UserBreakdown';
+import { formatDate } from 'date-fns';
+import MetricPicker from '@/components/metrics/MetricPicker';
+import { metricConfigs, MetricKey } from '@/types/metrics';
 
 interface Props {
     workspace: Workspace;
@@ -35,67 +50,40 @@ const Dashboard = ({ workspace }: Props) => {
         userIds: [],
     });
 
-    const cards = [
-        {
-            label: 'Total Sales',
-            key: 'totalSales',
-            formatter: currencyFormatter,
-        },
-        {
-            label: 'Total Orders',
-            key: 'totalOrders',
-            formatter: numberFormatter,
-        },
-        {
-            label: 'AOV',
-            key: 'aov',
-            formatter: currencyFormatter,
-        },
-        {
-            label: 'RTS Rate',
-            key: 'rtsRate',
-            formatter: percentageFormatter,
-        },
-        {
-            label: 'Repeat Order Ratio',
-            key: 'repeatOrderRatio',
-            formatter: percentageFormatter,
-        },
-        {
-            label: 'Time to first Order',
-            key: 'timeToFirstOrder',
-            formatter: (value: number) => `${value ?? 0} Hrs`,
-        },
-        {
-            label: 'Avg. Lifetime Value',
-            key: 'avgLifetimeValue',
-            formatter: currencyFormatter,
-        },
-        {
-            label: 'Avg Delivery Days',
-            key: 'avgDeliveryDays',
-            formatter: (value: number) => `${value ?? 0} Days`,
-        },
-        {
-            label: 'Avg Shipped Out Days',
-            key: 'avgShippedOutDays',
-            formatter: (value: number) => `${value ?? 0} Days`,
-        },
-    ];
+    const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>([
+        'totalSales',
+        'totalOrders',
+        'aov',
+        'rtsRate',
+    ]);
+
 
     return (
         <AppLayout>
-            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:gap-6 xl:grid-cols-4">
-                    <div className="sm:col-start-1 md:col-start-2 xl:col-start-3">
-                        {/* Optional: if your Filters supports disabled, pass it; otherwise just leave it */}
+            <div className="p-4 md:p-6">
+                <div className="mb-6 flex items-center justify-between gap-6">
+                    <div className="flex flex-col">
+                        <h1 className="text-2xl font-bold">Dashboard</h1>
+
+                        <p className='text-sm font-light text-gray-500'>
+                            Performance overview from{' '}
+                            {formatDate(new Date(dateRange[0]), 'MMMM d yyyy')}{' '}
+                            to{' '}
+                            {formatDate(new Date(dateRange[1]), 'MMMM d yyyy')}
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        <MetricPicker
+                            initialValue={selectedMetrics}
+                            onChange={(value) => setSelectedMetrics(value)}
+                        />
+
                         <Filters
                             workspace={workspace}
                             onChange={(value) => setFilter(value)}
                         />
-                    </div>
 
-                    <div className="sm:col-start-2 md:col-start-3 xl:col-start-4">
                         <DatePicker
                             id={'dashboard-date-range'}
                             mode={'range'}
@@ -112,28 +100,55 @@ const Dashboard = ({ workspace }: Props) => {
                     </div>
                 </div>
 
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
-                    {cards.map((card) => (
-                        <StatisticCard
-                            key={card.key}
-                            filter={filter}
-                            metric={card.key}
-                            label={card.label}
-                            workspace={workspace}
-                            dateRange={dateRange}
-                            formatter={card.formatter}
-                        />
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:gap-4 xl:grid-cols-4">
+                    {metricConfigs
+                        .filter(m => selectedMetrics.includes(m.key))
+                        .map((card) => (
+                            <StatisticCard
+                                key={card.key}
+                                label={card.name}
+                                metric={card.key}
+                                workspace={workspace}
+                                filter={filter}
+                                dateRange={dateRange}
+                                formatter={card.formatter}
+                                icon={card.icon}
+                                tooltipLabel={card.description}
+                                reverseTrend={card.reverse}
+                            />
                     ))}
                 </div>
-                <ComponentCard className="mt-6">
-                    <StatisticBreakdown filter={filter} dateRange={dateRange}  workspace={workspace}/>
+                <ComponentCard className="mt-12">
+                    <StatisticBreakdown
+                        metrics={selectedMetrics}
+                        filter={filter}
+                        dateRange={dateRange}
+                        workspace={workspace}
+                    />
+                </ComponentCard>
+
+                <ComponentCard className="mt-12">
+                    <PageBreakdown
+                        dateRange={dateRange}
+                        workspace={workspace}
+                        filter={filter}
+                    />
                 </ComponentCard>
 
                 <ComponentCard className="mt-6">
-                    <PageBreakdown dateRange={dateRange} workspace={workspace} filter={filter}/>
+                    <ShopBreakdown
+                        filter={filter}
+                        dateRange={dateRange}
+                        workspace={workspace}
+                    />
                 </ComponentCard>
-
+                <ComponentCard className="mt-6">
+                    <UserBreakdown
+                        filter={filter}
+                        dateRange={dateRange}
+                        workspace={workspace}
+                    />
+                </ComponentCard>
             </div>
         </AppLayout>
     );

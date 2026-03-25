@@ -163,7 +163,7 @@ final class AverageLifetimeValue
 
     public function perPage(int $workspaceId, array $dateRange, array $filter)
     {
-        $endExclusive = \Carbon\Carbon::parse($dateRange['end_date'])
+        $endExclusive = Carbon::parse($dateRange['end_date'])
             ->addDay()
             ->startOfDay()
             ->toDateTimeString();
@@ -175,25 +175,102 @@ final class AverageLifetimeValue
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.id', explode(',', $filter['page_ids']));
+                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
             })
             ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
+                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
             })
             ->selectRaw('
-            pages.id as page_id,
-            pages.name as page_name,
-            ROUND(
-                COALESCE(
-                    SUM(pancake_orders.final_amount) / NULLIF(COUNT(DISTINCT pancake_orders.customer_id), 0),
-                    0
-                ),
-                2
-            ) as value
-        ')
+                pages.id as page_id,
+                pages.name as page_name,
+                ROUND(
+                    COALESCE(
+                        SUM(pancake_orders.final_amount) / NULLIF(COUNT(DISTINCT pancake_orders.customer_id), 0),
+                        0
+                    ),
+                    2
+                ) as value
+            ')
             ->groupBy('pages.id', 'pages.name')
             ->orderByDesc('value')
             ->get();
+    }
+
+    public function perShop(int $workspaceId, array $dateRange, array $filter)
+    {
+        $endExclusive = Carbon::parse($dateRange['end_date'])
+            ->addDay()
+            ->startOfDay()
+            ->toDateTimeString();
+
+        return DB::table('pancake_orders')
+            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
+            ->join('shops', 'shops.id', '=', 'pages.shop_id')
+            ->where('pancake_orders.workspace_id', $workspaceId)
+            ->where('pancake_orders.confirmed_at', '<', $endExclusive)
+            ->whereNotNull('pancake_orders.customer_id')
+            ->whereNotIn('pancake_orders.status', [6, 7])
+            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
+                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
+            })
+            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
+                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
+            })
+            ->selectRaw('
+                shops.id as shop_id,
+                shops.name as shop_name,
+                ROUND(
+                    COALESCE(
+                        SUM(pancake_orders.final_amount) / NULLIF(COUNT(DISTINCT pancake_orders.customer_id), 0),
+                        0
+                    ),
+                    2
+                ) as value
+            ')
+            ->groupBy('shops.id', 'shops.name')
+            ->orderByDesc('value')
+            ->get();
+    }
+
+    public function perUser(int $workspaceId, array $dateRange, array $filter)
+    {
+        $users = DB::table('users')
+            ->join('pages', 'pages.owner_id', '=', 'users.id')
+            ->where('pages.workspace_id', $workspaceId)
+            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
+                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
+            })
+            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
+                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
+            })
+            ->select('users.id', 'users.name')
+            ->distinct()
+            ->get();
+
+        return $users->map(function ($user) use ($workspaceId, $dateRange, $filter) {
+            $userFilter = $filter;
+
+            $userFilter['page_ids'] = DB::table('pages')
+                ->where('workspace_id', $workspaceId)
+                ->where('owner_id', $user->id)
+                ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
+                    $query->whereIn('shop_id', $this->parseIds($filter['shop_ids']));
+                })
+                ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
+                    $query->whereIn('id', $this->parseIds($filter['page_ids']));
+                })
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            return (object) [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'value' => ! empty($userFilter['page_ids'])
+                    ? $this->compute($workspaceId, $dateRange, $userFilter)
+                    : 0,
+            ];
+        })->sortByDesc('value')->values();
     }
 
     private function baseOrdersQuery(
@@ -217,10 +294,10 @@ final class AverageLifetimeValue
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->when(! empty($filter['page_ids']), function (Builder $query) use ($filter) {
-                $query->whereIn('pages.id', explode(',', $filter['page_ids']));
+                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
             })
             ->when(! empty($filter['shop_ids']), function (Builder $query) use ($filter) {
-                $query->whereIn('pages.shop_id', explode(',', $filter['shop_ids']));
+                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
             });
     }
 
@@ -287,5 +364,10 @@ final class AverageLifetimeValue
     private function needsPagesJoin(array $filter): bool
     {
         return ! empty($filter['page_ids']) || ! empty($filter['shop_ids']);
+    }
+
+    private function parseIds(array|string $value): array
+    {
+        return is_array($value) ? $value : array_filter(explode(',', $value));
     }
 }
