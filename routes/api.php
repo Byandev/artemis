@@ -8,6 +8,7 @@ use App\Http\Controllers\API\Workspace\ProductController;
 use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
+use Illuminate\Support\Facades\Route;
 
 Route::group(['prefix' => 'api/public', 'as' => 'api.public.', 'middleware' => ['throttle:60,1']], function () {
     Route::get('/workspaces/{workspace}/csrs/performance', [CsrPerformanceController::class, 'publicIndex'])->name('workspaces.csrs.performance.index');
@@ -15,8 +16,12 @@ Route::group(['prefix' => 'api/public', 'as' => 'api.public.', 'middleware' => [
 
 Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], function () {
     Route::group(['prefix' => 'workspaces/{workspace}', 'as' => 'workspaces.'], function () {
-        Route::get('/inventory/purchased-orders', [InventoryPurchasedOrderController::class, 'index'])->name('inventory.purchased-orders.index');
-        Route::patch('/inventory/purchased-orders/{order}/status', [InventoryPurchasedOrderController::class, 'updateStatus'])->name('inventory.purchased-orders.update-status');
+        Route::get('/inventory/purchased-orders', [InventoryPurchasedOrderController::class, 'index'])
+            ->middleware('throttle:120,1')
+            ->name('inventory.purchased-orders.index');
+        Route::patch('/inventory/purchased-orders/{order}/status', [InventoryPurchasedOrderController::class, 'updateStatus'])
+            ->middleware('throttle:30,1')
+            ->name('inventory.purchased-orders.update-status'); 
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
