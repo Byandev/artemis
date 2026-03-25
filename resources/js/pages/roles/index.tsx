@@ -1,5 +1,4 @@
 import AppLayout from '@/layouts/app-layout';
-import ComponentCard from '@/components/common/ComponentCard';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { Head, router } from '@inertiajs/react';
@@ -173,49 +172,26 @@ export default function Index({ roles, workspace }: Props) {
                     </Button>
                 </PageHeader>
 
-                <ComponentCard desc="Configure the roles available in this workspace.">
-                    <div className="w-full overflow-hidden">
-                        <div className="flex flex-col gap-4 border-b border-black/6 dark:border-white/6 px-4 py-3 md:flex-row md:items-center">
-                            <div className="relative max-w-sm flex-1">
-                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Search roles..."
-                                    value={searchQuery}
-                                    onChange={(e) =>
-                                        setSearchQuery(e.target.value)
-                                    }
-                                    className="w-full pl-10 pr-4 py-2.5 bg-stone-100 dark:bg-zinc-800 border border-black/6 dark:border-white/6 rounded-[10px] text-[13px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
-                                />
-                            </div>
-
-                            <div className="hidden flex-1 md:block"></div>
-
-                            {/*{(isSuperAdmin || isWorkspaceAdmin) && (*/}
-                            {/*    <div className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer group border border-transparent hover:border-slate-200">*/}
-                            {/*        <input*/}
-                            {/*            type="checkbox"*/}
-                            {/*            id="archived-toggle"*/}
-                            {/*            checked={showArchived}*/}
-                            {/*            onChange={(e) => setShowArchived(e.target.checked)}*/}
-                            {/*            className="rounded border-gray-300 text-[#2dd4bf] focus:ring-[#2dd4bf] h-4 w-4 cursor-pointer"*/}
-                            {/*        />*/}
-                            {/*        <label htmlFor="archived-toggle" className="text-xs font-bold text-slate-500 group-hover:text-slate-700 cursor-pointer select-none">*/}
-                            {/*            Show Archived Roles*/}
-                            {/*        </label>*/}
-                            {/*    </div>*/}
-                            {/*)}*/}
-                        </div>
-
-                        <div className="w-full">
-                            <DataTable
-                                columns={columns}
-                                data={roles}
-                                enableInternalPagination={true}
-                            />
-                        </div>
+                <div className="mb-3 flex items-center gap-2">
+                    <div className="relative w-full max-w-xs">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <input
+                            type="text"
+                            placeholder="Search roles..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-[family-name:--font-dm-mono] text-[12px] text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
+                        />
                     </div>
-                </ComponentCard>
+                </div>
+
+                <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                    <DataTable
+                        columns={columns}
+                        data={roles}
+                        enableInternalPagination={true}
+                    />
+                </div>
             </div>
 
             {/* Archive Modal */}

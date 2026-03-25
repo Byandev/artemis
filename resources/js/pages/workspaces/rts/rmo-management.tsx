@@ -1,4 +1,3 @@
-import ComponentCard from '@/components/common/ComponentCard';
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -31,7 +30,6 @@ import {
     Search,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Input } from '@/components/ui/input';
 import { omit } from 'lodash';
 import { toFrontendSort } from '@/lib/sort';
 
@@ -295,34 +293,28 @@ export default function RmoManagement({ orders, workspace }: Props) {
             <div className="p-4 md:p-6">
                 <div className="">
                     <PageHeader title="RMO Management" description="Track and update delivery status for items out today" />
-                    <ComponentCard>
-                        <div className="flex items-center justify-between">
-                            <h1>Items For Delivery Today.</h1>
-                            <div className="relative w-full sm:w-64">
-                                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                    <Search className="z-10 h-4 w-4 text-gray-400" />
-                                </div>
-
-                                <Input
-                                    type="text"
-                                    placeholder="Search orders..."
-                                    className="h-9 pl-8 text-sm"
-                                />
-                            </div>
+                    <div className="mb-3 flex items-center gap-2">
+                        <div className="relative w-full max-w-xs">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                            <input
+                                type="text"
+                                className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-[family-name:--font-dm-mono] text-[12px] text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
+                                placeholder="Search orders..."
+                            />
                         </div>
+                    </div>
+
+                    <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
                         <DataTable
                             columns={columns}
                             enableInternalPagination={false}
                             data={orders.data || []}
-                            // initialSorting={initialSorting}
                             meta={{ ...omit(orders, ['data']) }}
                             onFetch={(params) => {
                                 router.get(
                                     `/workspaces/${workspace.slug}/rts/rmo-management`,
                                     {
                                         sort: params?.sort,
-                                        // 'filter[search]':
-                                        //     searchValue || undefined,
                                         page: params?.page ?? 1,
                                     },
                                     {
@@ -333,7 +325,7 @@ export default function RmoManagement({ orders, workspace }: Props) {
                                 );
                             }}
                         />
-                    </ComponentCard>
+                    </div>
                 </div>
             </div>
         </AppLayout>

@@ -51,12 +51,15 @@ const Dashboard = ({ workspace }: Props) => {
         userIds: [],
     });
 
-    const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>([
-        'totalSales',
-        'totalOrders',
-        'aov',
-        'rtsRate',
-    ]);
+    const STORAGE_KEY = `dashboard_metrics_${workspace.id}`;
+
+    const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>(() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) return JSON.parse(saved) as MetricKey[];
+        } catch {}
+        return ['totalSales', 'totalOrders', 'aov', 'rtsRate'];
+    });
 
 
     return (
@@ -68,7 +71,10 @@ const Dashboard = ({ workspace }: Props) => {
                 >
                     <MetricPicker
                         initialValue={selectedMetrics}
-                        onChange={(value) => setSelectedMetrics(value)}
+                        onChange={(value) => {
+                            setSelectedMetrics(value);
+                            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(value)); } catch {}
+                        }}
                     />
                     <Filters
                         workspace={workspace}

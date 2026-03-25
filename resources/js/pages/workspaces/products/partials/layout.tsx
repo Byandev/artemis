@@ -5,14 +5,17 @@ import { Workspace } from '@/types/models/Workspace';
 
 interface LayoutProps {
     children: ReactNode;
-    workspace: Workspace
+    workspace: Workspace;
+    headerActions?: ReactNode;
 }
 
-const Layout = ({  children, workspace }: LayoutProps) => {
+const Layout = ({  children, workspace, headerActions }: LayoutProps) => {
     return (
         <AppLayout>
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <PageHeader title="Products" description="Manage your product catalog and track performance" />
+                <PageHeader title="Products" description="Manage your product catalog and track performance">
+                    {headerActions}
+                </PageHeader>
 
                 <div>
                     {children}
