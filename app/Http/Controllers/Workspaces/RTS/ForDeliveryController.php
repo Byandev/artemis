@@ -114,5 +114,5 @@ class ForDeliveryController extends Controller
             'stats' => $stats,
         ]);
     }
-    
+
 }
