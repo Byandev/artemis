@@ -65,25 +65,6 @@ class ForDeliveryController extends Controller
             ])
             ->paginate(10);
 
-        return Inertia::render('workspaces/rts/rmo-management', [
-            'orders' => $items,
-            'workspace' => $workspace,
-        ]);
-    }
-
-    public function updateStatus(Workspace $workspace, $id, Request $request)
-    {
-        $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
-
-        $orderForDelivery->update([
-            'status' => $request->status,
-        ]);
-
-        return redirect()->back()->with('success', 'Status updated successfully');
-    }
-
-    public  function analytics(Workspace $workspace, Request $request)
-    {
 
         $stats = OrderForDelivery::query()
             ->from('pancake_order_for_delivery as ofd')
@@ -109,10 +90,23 @@ class ForDeliveryController extends Controller
     ")
             ->first();
 
-        return Inertia::render('workspaces/rts/rmo-management/analytics', [
+
+        return Inertia::render('workspaces/rts/rmo-management', [
+            'orders' => $items,
             'workspace' => $workspace,
             'stats' => $stats,
         ]);
+    }
+
+    public function updateStatus(Workspace $workspace, $id, Request $request)
+    {
+        $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
+
+        $orderForDelivery->update([
+            'status' => $request->status,
+        ]);
+
+        return redirect()->back()->with('success', 'Status updated successfully');
     }
 
 }

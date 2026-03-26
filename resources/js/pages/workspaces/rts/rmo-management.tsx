@@ -23,23 +23,103 @@ import { Workspace } from '@/types/models/Workspace';
 import { router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import {
+    CheckCircleIcon,
     ChevronUp,
+    ClipboardListIcon,
+    ClockIcon,
     Loader2,
     MapPin,
     Phone,
+    PhoneIcon,
+    RotateCcw,
     Search,
+    TruckIcon,
+    XCircleIcon,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { omit } from 'lodash';
 import { toFrontendSort } from '@/lib/sort';
 
+
+interface RmoStats {
+    assigned_orders: number;
+    total_called: number;
+    total_pending: number;
+    total_delivered: number;
+    total_returning: number;
+    total_undeliverable: number;
+    total_out_for_delivery: number;
+}
 interface Props {
     orders: PaginatedData<OrderForDelivery>;
     workspace: Workspace;
+    stats: RmoStats;
 }
 
-export default function RmoManagement({ orders, workspace }: Props) {
+interface StatCardProps {
+    title: string;
+    value: number;
+    icon: React.ComponentType<{ className?: string }>;
+}
+
+function StatCard({ title, value }: StatCardProps) {
+    return (
+        <div className="rounded-[14px] border border-black/6 bg-white p-[18px] dark:border-white/6 dark:bg-zinc-900">
+            <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
+                    {title}
+                </span>
+            </div>
+            <span className="font-mono text-[22px] font-semibold tracking-tight text-gray-900 tabular-nums dark:text-gray-100">
+                {value.toLocaleString()}
+            </span>
+        </div>
+    );
+}
+
+
+export default function RmoManagement({ orders, workspace, stats }: Props) {
     const [isLoadingID, setIsLoadingID] = useState<number | null>(null);
+    const currentStats = Array.isArray(stats) ? stats[0] : stats;
+
+    const statCards = [
+        {
+            title: 'Assigned Orders',
+            value: currentStats?.assigned_orders || 0,
+            icon: ClipboardListIcon,
+        },
+        {
+            title: 'Total Called',
+            value: currentStats?.total_called || 0,
+            icon: PhoneIcon,
+        },
+        {
+            title: 'Total Pending',
+            value: currentStats?.total_pending || 0,
+            icon: ClockIcon,
+        },
+        {
+            title: 'Total Delivered',
+            value: currentStats?.total_delivered || 0,
+            icon: CheckCircleIcon,
+        },
+        {
+            title: 'Total Returning',
+            value: currentStats?.total_returning || 0,
+            icon: RotateCcw,
+        },
+        {
+            title: 'Total Undeliverable',
+            value: currentStats?.total_undeliverable || 0,
+            icon: XCircleIcon,
+        },
+        {
+            title: 'Out for Delivery',
+            value: currentStats?.total_out_for_delivery || 0,
+            icon: TruckIcon,
+        },
+    ];
+
     // const initialSorting = useMemo(() => {
     //     return toFrontendSort(query?.sort ?? null);
     // }, [query?.sort]);
@@ -292,19 +372,27 @@ export default function RmoManagement({ orders, workspace }: Props) {
         <AppLayout>
             <div className="p-4 md:p-6">
                 <div className="">
-                    <PageHeader title="RMO Management" description="Track and update delivery status for items out today" />
+                    <PageHeader
+                        title="RMO Management"
+                        description="Track and update delivery status for items out today"
+                    />
+                    <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {statCards.map((card, index) => (
+                            <StatCard key={index} {...card} />
+                        ))}
+                    </div>
                     <div className="mb-3 flex items-center gap-2">
                         <div className="relative w-full max-w-xs">
-                            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                            <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                             <input
                                 type="text"
-                                className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-[family-name:--font-dm-mono] text-[12px] text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
+                                className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-[family-name:--font-dm-mono] text-[12px] text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                                 placeholder="Search orders..."
                             />
                         </div>
                     </div>
 
-                    <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                    <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                         <DataTable
                             columns={columns}
                             enableInternalPagination={false}
