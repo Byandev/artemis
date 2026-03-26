@@ -68,6 +68,7 @@ export function createRmoColumns({
             },
         },
         {
+            id: 'order_tracking_code',
             accessorKey: 'order.tracking_code',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Tracking #" />,
@@ -78,6 +79,7 @@ export function createRmoColumns({
             ),
         },
         {
+            id: 'order_parcel_status',
             accessorKey: 'order.parcel_status',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="J&T Status" />,
@@ -110,6 +112,7 @@ export function createRmoColumns({
             ),
         },
         {
+            id: 'order_shipping_address_full_name',
             accessorKey: 'order.shipping_address.full_name',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Customer" />,
@@ -129,7 +132,7 @@ export function createRmoColumns({
                         {addr?.full_address && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <p className="flex max-w-[160px] cursor-default items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
+                                    <p className="flex max-w-40 cursor-default items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
                                         <MapPin className="h-3 w-3 shrink-0" />
                                         <span className="truncate">{addr.full_address}</span>
                                     </p>
@@ -144,6 +147,7 @@ export function createRmoColumns({
             },
         },
         {
+            id: 'order_shipping_address_city_order_summary_rts_rate',
             accessorKey: 'order.shipping_address.city_order_summary.rts_rate',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Loc. RTS" />,
@@ -158,6 +162,24 @@ export function createRmoColumns({
             },
         },
         {
+            id: 'cx_rts_rate',
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Cx. RTS" />,
+            cell: ({ row }) => {
+                const rate = row.original.order?.cx_rts_rate ?? null;
+                if (rate === null) {
+                    return <span className="text-[12px] text-gray-300 dark:text-gray-600">—</span>;
+                }
+                const isHigh = rate >= 0.4;
+                return (
+                    <span className={`text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                        {percentageFormatter(rate)}
+                    </span>
+                );
+            },
+        },
+        {
+            id: 'order_final_amount',
             accessorKey: 'order.final_amount',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="SRP" />,
@@ -168,6 +190,7 @@ export function createRmoColumns({
             ),
         },
         {
+            id: 'order_delivery_attempts',
             accessorKey: 'order.delivery_attempts',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Attempts" />,
@@ -186,6 +209,7 @@ export function createRmoColumns({
             },
         },
         {
+            id: 'conferrer_name',
             accessorKey: 'conferrer.name',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Confirmed By" />,

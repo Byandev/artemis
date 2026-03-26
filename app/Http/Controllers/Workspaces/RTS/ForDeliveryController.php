@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Workspaces\RTS;
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\Order\ForDelivery\ConferrerNameSort;
 use App\Http\Sorts\Order\ForDelivery\CustomerNameSort;
+use App\Http\Sorts\Order\ForDelivery\CustomerRtsSort;
 use App\Http\Sorts\Order\ForDelivery\LocationRtsRateSort;
 use App\Http\Sorts\Order\ForDelivery\OrderAmountSort;
 use App\Http\Sorts\Order\ForDelivery\OrderDeliveryAttemptSort;
@@ -29,7 +30,15 @@ class ForDeliveryController extends Controller
             ->with([
                 'order' => function ($query) {
                     $query
-                        ->select(['id', 'order_number', 'status_name', 'final_amount', 'parcel_status', 'tracking_code', 'delivery_attempts'])
+                        ->selectRaw("
+                            id, order_number, status_name, final_amount, parcel_status, tracking_code, delivery_attempts,
+                            (
+                                SELECT SUM(order_fail) / NULLIF(SUM(order_fail) + SUM(order_success), 0)
+                                FROM pancake_order_phone_number_reports
+                                WHERE order_id = pancake_orders.id
+                                and pancake_order_phone_number_reports.type = 'latest'
+                            ) AS cx_rts_rate
+                        ")
                         ->with([
                             'shippingAddress' => function ($subQuery) {
                                 $subQuery->with(['cityOrderSummary']);
@@ -82,6 +91,7 @@ class ForDeliveryController extends Controller
                 AllowedSort::custom('order_final_amount', new OrderAmountSort),
                 AllowedSort::custom('order_shipping_address_full_name', new CustomerNameSort),
                 AllowedSort::custom('order_shipping_address_city_order_summary_rts_rate', new LocationRtsRateSort),
+                AllowedSort::custom('cx_rts_rate', new CustomerRtsSort),
             ])
             ->paginate(10);
 
@@ -92,7 +102,6 @@ class ForDeliveryController extends Controller
                 ...$request->only(['sort', 'perPage', 'page',]),
                 'filter' => $request->input('filter', []),
             ]
-
         ]);
     }
 
@@ -139,7 +148,17 @@ class ForDeliveryController extends Controller
             ->with([
                 'order' => function ($query) {
                     $query
-                        ->select(['id', 'order_number', 'status_name', 'final_amount', 'parcel_status', 'tracking_code', 'delivery_attempts'])
+                        ->selectRaw('
+                            id, order_number, status_name, final_amount, parcel_status, tracking_code, delivery_attempts,
+                            (
+                                SELECT ROUND(
+                                    SUM(order_fail) * 100.0 / NULLIF(SUM(order_fail) + SUM(order_success), 0),
+                                    0
+                                )
+                                FROM pancake_order_phone_number_reports
+                                WHERE order_id = pancake_orders.id
+                            ) AS cx_rts_rate
+                        ')
                         ->with([
                             'shippingAddress' => function ($subQuery) {
                                 $subQuery->with(['cityOrderSummary']);
@@ -192,6 +211,7 @@ class ForDeliveryController extends Controller
                 AllowedSort::custom('order_final_amount', new OrderAmountSort),
                 AllowedSort::custom('order_shipping_address_full_name', new CustomerNameSort),
                 AllowedSort::custom('order_shipping_address_city_order_summary_rts_rate', new LocationRtsRateSort),
+                AllowedSort::custom('cx_rts_rate', new CustomerRtsSort),
             ])
             ->paginate(10);
 
