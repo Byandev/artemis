@@ -16,12 +16,13 @@ import {
     LayoutDashboard,
     Package,
     Store,
-    TrendingUp,
+    PhoneCall,
     Users,
     BookOpenIcon,
     LogOut,
     Settings,
     User,
+    ShieldIcon,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -51,7 +52,7 @@ export function AppSidebar() {
         },
         {
             title: 'Products',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products/list`,
             icon: Package,
         },
         {
@@ -60,31 +61,14 @@ export function AppSidebar() {
             icon: Users,
         },
         {
-            title: 'RTS Management',
-            icon: TrendingUp,
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts`,
-            items: [
-                {
-                    title: 'Analytics',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
-                },
-                // {
-                //     title: 'Delivery',
-                //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/for-delivery-today`,
-                // },
-                // {
-                //     title: 'Parcel Updates',
-                //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/parcel-update-notification`,
-                // },
-                // {
-                //     title: 'Parcel Updates Templates',
-                //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/parcel-journey-notification-templates`,
-                // },
-                {
-                    title: 'RMO Management',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/rmo-management`,
-                },
-            ],
+            title: 'RMO Management',
+            icon: PhoneCall,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/rmo-management`,
+        },
+        {
+            title: 'Roles',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/roles`,
+            icon: ShieldIcon,
         },
     ];
 
@@ -169,7 +153,7 @@ export function AppSidebar() {
 
     return (
         <Sidebar
-            className="bg-white"
+            className="bg-white dark:bg-zinc-900"
             collapsible="icon"
             variant="sidebar"
         >
@@ -187,12 +171,12 @@ export function AppSidebar() {
 
             <SidebarContent className="p-3">
                 <NavMain items={mainNavItems} group_label="Main" />
-                <NavMain items={accountNavItems} group_label="Account" />
+                {/*<NavMain items={accountNavItems} group_label="Account" />*/}
             </SidebarContent>
 
-                <SidebarFooter>
-                    <NavFooter items={footerNavItems} className="mt-auto" />
-                </SidebarFooter>
+            <SidebarFooter>
+                <NavFooter items={footerNavItems} className="mt-auto" />
+            </SidebarFooter>
         </Sidebar>
     );
 }

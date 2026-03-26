@@ -1,4 +1,4 @@
-import ComponentCard from '@/components/common/ComponentCard';
+import PageHeader from '@/components/common/PageHeader';
 import { ArchivePageDialog } from '@/components/pages/archive-page-dialog';
 import { PageFormDialog } from '@/components/pages/page-form-dialog';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,8 @@ import {
     Edit,
     MoreHorizontal,
     RefreshCw,
-    RotateCcw
+    RotateCcw,
+    Search,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -48,13 +49,14 @@ const StatusBadge = ({ isArchived }: { isArchived: boolean }) => {
     return (
         <span
             className={clsx(
-                "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset",
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
                 isArchived
-                    ? "bg-slate-50 text-slate-700 ring-slate-200"
-                    : "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                    ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
             )}
         >
-            {isArchived ? "ARCHIVED" : "ACTIVE"}
+            <span className={clsx('h-1.5 w-1.5 rounded-full', isArchived ? 'bg-slate-400' : 'bg-emerald-500')} />
+            {isArchived ? 'Archived' : 'Active'}
         </span>
     );
 };
@@ -63,13 +65,14 @@ const EnableBadge = ({ isEnabled }: { isEnabled: boolean }) => {
     return (
         <span
             className={clsx(
-                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset',
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
                 isEnabled
-                    ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                    : 'bg-red-50 text-red-700 ring-red-200',
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+                    : 'bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400',
             )}
         >
-            {isEnabled ? 'ENABLED' : 'DISABLED'}
+            <span className={clsx('h-1.5 w-1.5 rounded-full', isEnabled ? 'bg-emerald-500' : 'bg-red-500')} />
+            {isEnabled ? 'Enabled' : 'Disabled'}
         </span>
     );
 };
@@ -242,54 +245,47 @@ const Pages = ({ pages, workspace, query, users }: PagesProps) => {
         <AppLayout>
             <Head title={`${workspace.name} - Pages`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                    <h2
-                        className="text-xl font-semibold text-gray-800 dark:text-white/90"
-                        x-text="pageName"
-                    >
-                        Pages
-                    </h2>
+                <PageHeader title="Pages" description="Manage your shop pages and their connected stores">
                     <Button size="sm" onClick={handleCreate}>
                         Add New Page
                     </Button>
+                </PageHeader>
+
+                <div className="mb-3 flex items-center gap-2">
+                    <div className="relative w-full max-w-xs">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <input
+                            className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-[family-name:--font-dm-mono] text-[12px] text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
+                            placeholder="Search page name..."
+                            value={searchValue}
+                            onChange={(e) => setSearchValue(e.target.value)}
+                        />
+                    </div>
                 </div>
 
-                <div className="space-y-5 sm:space-y-6">
-                    <ComponentCard desc="List of shop pages and their connected stores">
-                        <div>
-                            <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.05]">
-                                <input
-                                    className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900  dark:placeholder:text-white/30  bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800"
-                                    placeholder="Search page name"
-                                    value={searchValue}
-                                    onChange={(e) => setSearchValue(e.target.value)}
-                                />
-                            </div>
-
-                            <DataTable
-                                columns={columns}
-                                enableInternalPagination={false}
-                                data={pages.data || []}
-                                initialSorting={initialSorting}
-                                meta={{ ...omit(pages, ['data']) }}
-                                onFetch={(params) => {
-                                    router.get(
-                                        workspaces.pages.index({ workspace }),
-                                        {
-                                            sort: params?.sort,
-                                            'filter[search]': searchValue || undefined,
-                                            page: params?.page ?? 1
-                                        },
-                                        {
-                                            preserveState: true,
-                                            replace: true,
-                                            preserveScroll: true,
-                                        },
-                                    );
-                                }}
-                            />
-                        </div>
-                    </ComponentCard>
+                <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                    <DataTable
+                        columns={columns}
+                        enableInternalPagination={false}
+                        data={pages.data || []}
+                        initialSorting={initialSorting}
+                        meta={{ ...omit(pages, ['data']) }}
+                        onFetch={(params) => {
+                            router.get(
+                                workspaces.pages.index({ workspace }),
+                                {
+                                    sort: params?.sort,
+                                    'filter[search]': searchValue || undefined,
+                                    page: params?.page ?? 1
+                                },
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true,
+                                },
+                            );
+                        }}
+                    />
                 </div>
 
                 {/* Page Form Dialog */}

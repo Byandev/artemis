@@ -1,4 +1,3 @@
-import ComponentCard from '@/components/common/ComponentCard';
 import { DeleteProductDialog } from '@/components/products/delete-product-dialog';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
@@ -22,6 +21,7 @@ import { omit } from 'lodash';
 import {
     Edit,
     MoreHorizontal,
+    Search,
     Trash2,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -150,53 +150,54 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
     ];
 
     return (
-        <ProductLayout workspace={workspace}>
-            <Head title={`${workspace.name} - Products`} />
-            <div className="flex flex-wrap items-center justify-end gap-3 mb-4">
+        <ProductLayout
+            workspace={workspace}
+            headerActions={
                 <Button
                     size="sm"
                     onClick={() => router.get(workspaces.products.create({ workspace }))}
                 >
                     Add Product
                 </Button>
+            }
+        >
+            <Head title={`${workspace.name} - Products`} />
+
+            <div className="mb-3 flex items-center gap-2">
+                <div className="relative w-full max-w-xs">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                    <input
+                        className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-[family-name:--font-dm-mono] text-[12px] text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
+                        placeholder="Search product name or code..."
+                        value={searchValue}
+                        onChange={(e) => setSearchValue(e.target.value)}
+                    />
+                </div>
             </div>
 
-            <div className="space-y-5 sm:space-y-6">
-                <ComponentCard desc="Manage your product inventory and pricing">
-                    <div>
-                        <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.05]">
-                            <input
-                                className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900  dark:placeholder:text-white/30  bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800"
-                                placeholder="Search product name or code"
-                                value={searchValue}
-                                onChange={(e) => setSearchValue(e.target.value)}
-                            />
-                        </div>
-
-                        <DataTable
-                            columns={columns}
-                            enableInternalPagination={false}
-                            data={products.data || []}
-                            initialSorting={initialSorting}
-                            meta={{ ...omit(products, ['data']) }}
-                            onFetch={(params) => {
-                                router.get(
-                                    workspaces.products.index({ workspace }),
-                                    {
-                                        sort: params?.sort,
-                                        'filter[search]': searchValue || undefined,
-                                        page: params?.page ?? 1
-                                    },
-                                    {
-                                        preserveState: false,
-                                        replace: true,
-                                        preserveScroll: true,
-                                    },
-                                );
-                            }}
-                        />
-                    </div>
-                </ComponentCard>
+            <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                <DataTable
+                    columns={columns}
+                    enableInternalPagination={false}
+                    data={products.data || []}
+                    initialSorting={initialSorting}
+                    meta={{ ...omit(products, ['data']) }}
+                    onFetch={(params) => {
+                        router.get(
+                            workspaces.products.index({ workspace }),
+                            {
+                                sort: params?.sort,
+                                'filter[search]': searchValue || undefined,
+                                page: params?.page ?? 1
+                            },
+                            {
+                                preserveState: false,
+                                replace: true,
+                                preserveScroll: true,
+                            },
+                        );
+                    }}
+                />
             </div>
 
             {/* Delete Confirmation Dialog */}

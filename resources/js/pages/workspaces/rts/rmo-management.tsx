@@ -1,4 +1,4 @@
-import ComponentCard from '@/components/common/ComponentCard';
+import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     DropdownMenu,
@@ -396,13 +396,18 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
 
     return (
         <AppLayout>
-            <div className="p-6">
+            <div className="p-4 md:p-6">
                 <div className="">
-                    <div className="mb-6 flex flex-col">
-                        <h1 className="text-2xl font-bold">RMO Management</h1>
-                        <p className="text-sm font-light text-gray-500">
-                            Items that for delivery today.
-                        </p>
+                    <PageHeader title="RMO Management" description="Track and update delivery status for items out today" />
+                    <div className="mb-3 flex items-center gap-2">
+                        <div className="relative w-full max-w-xs">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                            <input
+                                type="text"
+                                className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-[family-name:--font-dm-mono] text-[12px] text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
+                                placeholder="Search orders..."
+                            />
+                        </div>
                     </div>
                     <ComponentCard>
                         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
@@ -603,7 +608,7 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
                                 );
                             }}
                         />
-                    </ComponentCard>
+                    </div>
                 </div>
             </div>
         </AppLayout>

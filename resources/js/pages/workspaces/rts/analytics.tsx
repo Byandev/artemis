@@ -1,4 +1,5 @@
 import { Workspace } from '@/types/models/Workspace';
+import PageHeader from '@/components/common/PageHeader';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import { useState } from 'react';
@@ -100,19 +101,11 @@ const Analytics = ({ workspace }: Props) => {
 
             <div className="p-4 md:p-6">
 
-            <div className="mb-6 flex items-center justify-between gap-6">
-                <div className="flex flex-col">
-                    <h1 className="text-2xl font-bold">Dashboard</h1>
-
-                    <p className="text-sm font-light text-gray-500">
-                        Performance overview from{' '}
-                        {formatDate(new Date(dateRange[0]), 'MMMM d yyyy')} to{' '}
-                        {formatDate(new Date(dateRange[1]), 'MMMM d yyyy')}
-                    </p>
-                </div>
-
+            <PageHeader
+                title="RTS Analytics"
+                description={`Performance overview · ${formatDate(new Date(dateRange[0]), 'MMM d')} – ${formatDate(new Date(dateRange[1]), 'MMM d, yyyy')}`}
+            >
                 <div className="flex items-center gap-4">
-                    {/* Optional: if your Filters supports disabled, pass it; otherwise just leave it */}
                     <Filters
                         workspace={workspace}
                         onChange={(value) => setFilter(value)}
@@ -132,7 +125,7 @@ const Analytics = ({ workspace }: Props) => {
                         defaultDate={dateRange as never as DateOption}
                     />
                 </div>
-            </div>
+            </PageHeader>
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:gap-4 xl:grid-cols-4">
                 {metricConfigs.map((card) => (

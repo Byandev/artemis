@@ -26,9 +26,9 @@ const WorkspaceCard = ({ workspace }: WorkspaceCardProps) => {
                 </div>
                 <div>
                     <h2 className="text-xl font-semibold">{workspace.name}</h2>
-                <p className="text-sm text-gray-500">
-                    {workspace.users_count} {workspace.users_count === 1 ? 'member' : 'members'}
-                </p>
+                    <p className="text-sm text-gray-500">
+                        {workspace.users_count} {workspace.users_count === 1 ? 'member' : 'members'}
+                    </p>
                 </div>
             </div>
 

@@ -1,4 +1,4 @@
-import ComponentCard from '@/components/common/ComponentCard';
+import PageHeader from '@/components/common/PageHeader';
 import { DeleteTeamDialog } from '@/components/teams/delete-team-dialog';
 import { TeamFormDialog } from '@/components/teams/team-form-dialog';
 import { Button } from '@/components/ui/button';
@@ -12,18 +12,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { PaginatedData } from '@/types';
+import { PaginatedData, User } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { Edit, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Edit, MoreHorizontal, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-
-interface User {
-    id: number;
-    name: string;
-    email: string;
-}
+import { Workspace } from '@/types/models/Workspace';
 
 interface Team {
     id: number;
@@ -32,11 +27,6 @@ interface Team {
     members: User[];
 }
 
-interface Workspace {
-    id: number;
-    name: string;
-    slug: string;
-}
 
 interface Props {
     workspace: Workspace;
@@ -160,56 +150,49 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
         <AppLayout>
             <Head title={`${workspace.name} - Teams`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                    <h2
-                        className="text-xl font-semibold text-gray-800 dark:text-white/90"
-                        x-text="pageName"
-                    >
-                        Teams
-                    </h2>
+                <PageHeader title="Teams" description="Organize members into teams for better collaboration">
                     {isAdmin && (
                         <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
                             Create Team
                         </Button>
                     )}
+                </PageHeader>
+
+                <div className="mb-3 flex items-center gap-2">
+                    <div className="relative w-full max-w-xs">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <input
+                            className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-[family-name:--font-dm-mono] text-[12px] text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
+                            placeholder="Search team name..."
+                            value={searchValue}
+                            onChange={(e) => setSearchValue(e.target.value)}
+                        />
+                    </div>
                 </div>
 
-                <div className="space-y-5 sm:space-y-6">
-                    <ComponentCard desc="Manage workspace teams and their members">
-                        <div>
-                            <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.05]">
-                                <input
-                                    className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900  dark:placeholder:text-white/30  bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800"
-                                    placeholder="Search team name"
-                                    value={searchValue}
-                                    onChange={(e) => setSearchValue(e.target.value)}
-                                />
-                            </div>
-
-                            <DataTable
-                                columns={columns}
-                                enableInternalPagination={false}
-                                data={teams.data || []}
-                                initialSorting={initialSorting}
-                                meta={{ ...omit(teams, ['data']) }}
-                                onFetch={(params) => {
-                                    router.get(
-                                        `/workspaces/${workspace.slug}/teams`,
-                                        {
-                                            sort: params?.sort,
-                                            'filter[search]': searchValue || undefined,
-                                            page: params?.page ?? 1
-                                        },
-                                        {
-                                            preserveState: true,
-                                            replace: true,
-                                            preserveScroll: true,
-                                        },
-                                    );
-                                }}
-                            />
-                        </div>
-                    </ComponentCard>
+                <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                    <DataTable
+                        columns={columns}
+                        enableInternalPagination={false}
+                        data={teams.data || []}
+                        initialSorting={initialSorting}
+                        meta={{ ...omit(teams, ['data']) }}
+                        onFetch={(params) => {
+                            router.get(
+                                `/workspaces/${workspace.slug}/teams`,
+                                {
+                                    sort: params?.sort,
+                                    'filter[search]': searchValue || undefined,
+                                    page: params?.page ?? 1
+                                },
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true,
+                                },
+                            );
+                        }}
+                    />
                 </div>
 
                 {/* Create/Edit Team Dialog */}

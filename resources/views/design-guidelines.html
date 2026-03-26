@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artemis Design Guide v2.0</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ─── RESET ─── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+/* ─── TOKENS: LIGHT ─── */
+:root{
+  --bg:#F8F8F6;--surface:#FFFFFF;--surface-2:#F2F2EF;--sidebar:#FAFAF8;
+  --border:rgba(0,0,0,0.06);--border-h:rgba(0,0,0,0.10);
+  --t1:#1A1A1D;--t2:#6B6B6F;--t3:#9D9DA1;--t4:#C5C5C9;
+  --accent:#1A9E64;--accent-h:#158553;--accent-s:rgba(26,158,100,0.08);
+  --danger:#DC2626;--warning:#D97706;--success:#059669;--info:#3B82F6;
+  --status-ok-bg:#ECFDF5;--status-ok:#047857;
+  --status-err-bg:#FEF2F2;--status-err:#B91C1C;
+  --status-warn-bg:#FFFBEB;--status-warn:#92400E;
+  --status-neut-bg:#F3F4F6;--status-neut:#6B7280;
+  --shadow:0 1px 3px rgba(0,0,0,0.04);
+  --shadow-drop:0 8px 30px rgba(0,0,0,0.08),0 1px 3px rgba(0,0,0,0.04);
+  --sans:'DM Sans',system-ui,sans-serif;
+  --mono:'DM Mono',monospace;
+}
+
+/* ─── TOKENS: DARK ─── */
+.dark{
+  --bg:#0F0F11;--surface:#18181B;--surface-2:#222225;--sidebar:#141416;
+  --border:rgba(255,255,255,0.06);--border-h:rgba(255,255,255,0.12);
+  --t1:#F0F0EC;--t2:#8E8E93;--t3:#5C5C61;--t4:#3A3A3E;
+  --accent:#34D399;--accent-h:#2BC48C;--accent-s:rgba(52,211,153,0.08);
+  --danger:#F87171;--warning:#FBBF24;--success:#34D399;--info:#60A5FA;
+  --status-ok-bg:rgba(16,185,129,0.1);--status-ok:#34D399;
+  --status-err-bg:rgba(239,68,68,0.1);--status-err:#F87171;
+  --status-warn-bg:rgba(245,158,11,0.1);--status-warn:#FBBF24;
+  --status-neut-bg:rgba(255,255,255,0.06);--status-neut:#9CA3AF;
+  --shadow:0 1px 3px rgba(0,0,0,0.3);
+  --shadow-drop:0 8px 30px rgba(0,0,0,0.4);
+}
+
+/* ─── BASE ─── */
+body{font-family:var(--sans);background:var(--bg);color:var(--t1);line-height:1.6;transition:background .35s,color .35s}
+a{color:var(--accent);text-decoration:none}
+
+/* ─── LAYOUT ─── */
+.shell{max-width:1080px;margin:0 auto;display:flex;gap:40px;padding:0 32px}
+.side-nav{width:170px;flex-shrink:0;position:sticky;top:64px;height:calc(100vh - 64px);overflow-y:auto;padding:24px 0}
+.side-nav a{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;font-size:12px;color:var(--t3);transition:all .15s;text-decoration:none}
+.side-nav a:hover{color:var(--t2);background:var(--accent-s)}
+.side-nav a .num{font-family:var(--mono);font-size:10px;opacity:.5;width:18px}
+.main{flex:1;min-width:0;padding-bottom:80px}
+
+/* ─── HEADER ─── */
+.top-bar{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);transition:background .35s}
+.top-bar-inner{max-width:1080px;margin:0 auto;padding:12px 32px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:28px;height:28px;border-radius:7px;background:var(--t1);display:flex;align-items:center;justify-content:center}
+.logo-text{font-size:14px;font-weight:600;letter-spacing:-0.01em}
+.logo-sub{font-size:11px;color:var(--t3);margin-left:8px}
+
+/* ─── TOGGLE ─── */
+.theme-toggle{width:46px;height:24px;border-radius:12px;background:var(--border-h);border:none;cursor:pointer;position:relative;transition:background .25s;padding:0}
+.dark .theme-toggle{background:var(--accent)}
+.theme-toggle .knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:10px;background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.15);transition:transform .25s cubic-bezier(.4,0,.2,1);display:flex;align-items:center;justify-content:center;font-size:11px}
+.dark .theme-toggle .knob{transform:translateX(22px)}
+
+/* ─── SECTION ─── */
+.section{padding-top:52px}
+.section-head{margin-bottom:20px}
+.section-num{font-size:11px;font-family:var(--mono);color:var(--accent);font-weight:500;margin-right:8px}
+.section-title{font-size:20px;font-weight:600;color:var(--t1);letter-spacing:-0.02em;display:inline}
+.section-sub{font-size:13px;color:var(--t3);margin-top:4px;margin-left:30px;line-height:1.6}
+.section-bar{width:32px;height:2px;background:var(--accent);border-radius:2px;margin-top:10px;margin-left:30px}
+
+/* ─── CARD ─── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:16px;transition:border-color .2s}
+.card:hover{border-color:var(--border-h)}
+
+/* ─── CODE ─── */
+.code-label{font-size:10px;font-family:var(--mono);color:var(--t4);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center}
+.copy-btn{background:none;border:none;font-size:11px;font-family:var(--mono);color:var(--t3);cursor:pointer;padding:2px 6px;border-radius:4px;transition:color .2s}
+.copy-btn:hover{color:var(--accent)}
+pre.code{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;font-size:12px;line-height:1.7;color:var(--t2);font-family:var(--mono);overflow-x:auto;white-space:pre-wrap;word-break:break-word;margin-top:4px;margin-bottom:12px}
+
+/* ─── SWATCH ─── */
+.swatch-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.swatch{display:flex;flex-direction:column;align-items:center;gap:4px}
+.swatch-box{width:44px;height:44px;border-radius:8px;border:1px solid var(--border)}
+.swatch-hex{font-size:10px;font-family:var(--mono);color:var(--t3)}
+.swatch-name{font-size:9px;color:var(--t4)}
+.swatch-tw{font-size:9px;color:var(--accent);font-family:var(--mono)}
+
+/* ─── TOKEN TABLE ─── */
+.token-table{width:100%;font-size:12px;border-collapse:collapse}
+.token-table th{text-align:left;font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;color:var(--t4);padding:0 0 8px;border-bottom:1px solid var(--border)}
+.token-table td{padding:10px 0;border-bottom:1px solid var(--border);vertical-align:middle}
+.token-table .tok{font-family:var(--mono);font-size:11px;color:var(--t2);width:28%}
+.token-table .col-preview{width:14px;height:14px;border-radius:4px;display:inline-block;vertical-align:middle;margin-right:6px}
+.token-table .col-hex{font-size:10px;font-family:var(--mono);color:var(--t3)}
+.token-table .col-tw{font-size:11px;font-family:var(--mono);color:var(--accent)}
+
+/* ─── TYPE SCALE ─── */
+.type-row{display:flex;align-items:baseline;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border)}
+.type-row:last-child{border-bottom:none}
+.type-sample{display:flex;align-items:baseline;gap:12px}
+.type-role{font-size:11px;color:var(--t4)}
+.type-class{font-size:10px;font-family:var(--mono);color:var(--accent);background:var(--accent-s);padding:3px 8px;border-radius:5px;white-space:nowrap}
+
+/* ─── SPACING ─── */
+.spacing-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
+.spacing-row:last-child{border-bottom:none}
+.spacing-label{color:var(--t2)}
+.spacing-val{font-size:11px;font-family:var(--mono);color:var(--t3);margin-right:16px}
+.spacing-tw{font-size:10px;font-family:var(--mono);color:var(--accent);background:var(--accent-s);padding:3px 8px;border-radius:5px}
+
+/* ─── SURFACE PREVIEW ─── */
+.surface-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px}
+.surface-preview{border-radius:12px;padding:20px;min-height:80px;display:flex;flex-direction:column;justify-content:flex-end}
+.surface-preview span{font-size:11px;font-weight:500;color:var(--t2)}
+
+/* ─── SIDEBAR PREVIEW ─── */
+.sidebar-preview{width:200px;background:var(--surface-2);border-radius:12px;padding:16px 10px;flex-shrink:0}
+.nav-label{font-size:10px;font-family:var(--mono);color:var(--t4);text-transform:uppercase;letter-spacing:0.08em;padding:0 10px;margin-bottom:8px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;font-size:12px;margin-bottom:2px}
+.nav-item.active{background:var(--accent-s);color:var(--accent);font-weight:500}
+.nav-item:not(.active){color:var(--t3)}
+
+/* ─── BUTTONS PREVIEW ─── */
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.btn{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:500;font-family:var(--sans);cursor:pointer;border:none;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-h)}
+.btn-secondary{background:var(--surface);color:var(--t2);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--border-h);color:var(--t1)}
+.btn-ghost{background:none;color:var(--t3)}
+.btn-ghost:hover{color:var(--t1);background:var(--accent-s)}
+.btn-danger{background:var(--status-err-bg);color:var(--danger)}
+
+/* ─── INPUT PREVIEW ─── */
+.input-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.input-label{font-size:11px;font-weight:500;color:var(--t3);margin-bottom:6px}
+.input-field{width:100%;padding:9px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--t1);font-family:var(--sans);outline:none;transition:all .2s}
+.input-field:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-s)}
+.input-field::placeholder{color:var(--t4)}
+.input-search{padding-left:34px}
+
+/* ─── TABLE PREVIEW ─── */
+.table-preview{width:100%;border-collapse:collapse;font-size:13px}
+.table-preview th{text-align:left;padding:10px 18px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:var(--t4);border-bottom:1px solid var(--border);font-family:var(--mono)}
+.table-preview td{padding:12px 18px;border-bottom:1px solid var(--border);color:var(--t2)}
+.table-preview tr:last-child td{border-bottom:none}
+.table-preview tr:hover td{background:var(--accent-s)}
+.table-preview .mono{font-family:var(--mono);font-size:12px}
+.table-preview .bold{color:var(--t1);font-weight:500}
+
+/* ─── BADGES ─── */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500}
+.badge-dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.6}
+.badge-ok{background:var(--status-ok-bg);color:var(--status-ok)}
+.badge-err{background:var(--status-err-bg);color:var(--status-err)}
+.badge-warn{background:var(--status-warn-bg);color:var(--status-warn)}
+.badge-neut{background:var(--status-neut-bg);color:var(--status-neut)}
+.badge-info{background:var(--accent-s);color:var(--info)}
+.badge-violet{background:rgba(139,92,246,0.08);color:#8B5CF6}
+.badges-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+
+/* ─── METRIC CARD ─── */
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px}
+.metric-top{display:flex;justify-content:space-between;margin-bottom:8px}
+.metric-label{font-size:11px;font-weight:500;color:var(--t3)}
+.metric-change{font-size:11px;font-weight:500;display:flex;align-items:center;gap:3px}
+.metric-change.up{color:var(--success)}
+.metric-change.down{color:var(--danger)}
+.metric-value{font-size:22px;font-weight:600;font-family:var(--mono);letter-spacing:-0.02em;color:var(--t1)}
+
+/* ─── DO / DONT ─── */
+.rule-row{display:flex;align-items:flex-start;gap:8px;padding:8px 0;font-size:13px;line-height:1.5}
+.rule-icon{flex-shrink:0;margin-top:2px;width:16px;height:16px}
+.rule-do{color:var(--t1)}
+.rule-dont{color:var(--t2)}
+.divider{height:1px;background:var(--border);margin:12px 0}
+
+/* ─── CHART SECTION ─── */
+.chart-palette{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.chart-swatch{display:flex;flex-direction:column;align-items:center;gap:4px}
+.chart-swatch-box{width:44px;height:44px;border-radius:10px;border:1px solid var(--border)}
+.chart-swatch-hex{font-size:10px;font-family:var(--mono);color:var(--t3)}
+.chart-swatch-role{font-size:9px;color:var(--t4)}
+.theme-boxes{display:flex;gap:12px;margin-bottom:16px}
+.theme-box{flex:1;background:var(--surface-2);border-radius:8px;padding:10px 14px}
+.theme-box-label{font-size:10px;font-weight:500;color:var(--t4);margin-bottom:4px}
+.theme-box-val{font-size:11px;color:var(--t2);font-family:var(--mono);line-height:1.8}
+.chart-preview{background:var(--surface-2);border-radius:12px;padding:20px;margin-bottom:16px}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.chart-title{font-size:13px;font-weight:500;color:var(--t1)}
+.legend-dot{width:8px;height:3px;border-radius:2px;display:inline-block;margin-right:5px}
+.legend-item{font-size:11px;color:var(--t3);margin-left:12px}
+.toggle-group{display:flex;gap:2px;background:var(--surface);border-radius:7px;padding:2px}
+.toggle-item{padding:4px 10px;border-radius:5px;font-size:11px;border:none;background:none;color:var(--t3);cursor:pointer;font-family:var(--sans)}
+.toggle-item.active{background:var(--accent-s);color:var(--accent);font-weight:500}
+
+/* ─── TOOLTIP PREVIEW ─── */
+.tooltip-preview{display:flex;justify-content:center;margin-bottom:16px}
+.tooltip-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;min-width:200px;box-shadow:var(--shadow-drop)}
+.tooltip-date{font-size:11px;color:var(--t4);font-family:var(--mono);margin-bottom:8px}
+.tooltip-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.tooltip-dot{width:6px;height:6px;border-radius:3px;flex-shrink:0}
+.tooltip-name{font-size:12px;color:var(--t2);flex:1}
+.tooltip-val{font-size:12px;font-family:var(--mono);font-weight:500;color:var(--t1)}
+
+/* ─── DONUT PREVIEW ─── */
+.donut-wrap{display:flex;align-items:center;gap:32px}
+.donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.donut-center-val{font-size:20px;font-weight:600;font-family:var(--mono);color:var(--t1);letter-spacing:-0.02em}
+.donut-center-label{font-size:10px;color:var(--t4)}
+.donut-legend{display:flex;flex-direction:column;gap:8px}
+.donut-legend-row{display:flex;align-items:center;gap:10px}
+.donut-legend-dot{width:8px;height:8px;border-radius:3px;flex-shrink:0}
+.donut-legend-name{font-size:12px;color:var(--t2);width:70px}
+.donut-legend-pct{font-size:11px;font-family:var(--mono);color:var(--t3);width:36px;text-align:right}
+.donut-legend-val{font-size:11px;font-family:var(--mono);color:var(--t4)}
+
+/* ─── SMALL NOTE ─── */
+.note{background:var(--surface-2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--t2);line-height:1.6;margin-top:8px;margin-bottom:12px}
+.note strong{color:var(--t1)}
+.subtitle{font-size:12px;font-weight:600;color:var(--t1);margin-bottom:12px}
+.sub-text{font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:16px}
+</style>
+</head>
+<body>
+
+<!-- ─── TOP BAR ─── -->
+<header class="top-bar">
+  <div class="top-bar-inner">
+    <div class="logo">
+      <div class="logo-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3L7 7L3 5L5 9L1 12L5 15L3 19L7 17L12 21L17 17L21 19L19 15L23 12L19 9L21 5L17 7L12 3Z" fill="#34D399"/></svg></div>
+      <span class="logo-text">Artemis</span>
+      <span class="logo-sub">Design Guide v2.0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:11px;color:var(--t4);font-family:var(--mono)">Tailwind CSS · Laravel</span>
+      <button class="theme-toggle" onclick="document.documentElement.classList.toggle('dark')">
+        <span class="knob">☀</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <!-- ─── SIDE NAV ─── -->
+  <nav class="side-nav">
+    <a href="#foundations"><span class="num">01</span>Foundations</a>
+    <a href="#colors"><span class="num">02</span>Colors</a>
+    <a href="#typography"><span class="num">03</span>Typography</a>
+    <a href="#spacing"><span class="num">04</span>Spacing</a>
+    <a href="#surfaces"><span class="num">05</span>Surfaces & cards</a>
+    <a href="#sidebar"><span class="num">06</span>Sidebar</a>
+    <a href="#buttons"><span class="num">07</span>Buttons</a>
+    <a href="#inputs"><span class="num">08</span>Inputs</a>
+    <a href="#tables"><span class="num">09</span>Tables</a>
+    <a href="#badges"><span class="num">10</span>Status badges</a>
+    <a href="#metrics"><span class="num">11</span>Metric cards</a>
+    <a href="#charts"><span class="num">12</span>Charts</a>
+    <a href="#motion"><span class="num">13</span>Motion</a>
+    <a href="#rules"><span class="num">14</span>Do's & don'ts</a>
+  </nav>
+
+  <!-- ─── MAIN CONTENT ─── -->
+  <main class="main">
+
+    <!-- 01 ── FOUNDATIONS -->
+    <div class="section" id="foundations">
+      <div class="section-head">
+        <span class="section-num">01</span><span class="section-title">Foundations</span>
+        <div class="section-sub">Core philosophy and font stack for the Artemis platform.</div>
+        <div class="section-bar"></div>
+      </div>
+      <div class="card">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px">
+          <div style="background:var(--surface-2);border-radius:10px;padding:16px">
+            <div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:4px">Minimal</div>
+            <div style="font-size:12px;color:var(--t3)">Strip away visual noise. Every pixel earns its place.</div>
+          </div>
+          <div style="background:var(--surface-2);border-radius:10px;padding:16px">
+            <div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:4px">Premium</div>
+            <div style="font-size:12px;color:var(--t3)">Warm neutrals, refined type, quiet confidence.</div>
+          </div>
+          <div style="background:var(--surface-2);border-radius:10px;padding:16px">
+            <div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:4px">Functional</div>
+            <div style="font-size:12px;color:var(--t3)">Design serves the task. Clarity above decoration.</div>
+          </div>
+        </div>
+        <div class="code-label">Font stack — add to &lt;head&gt;<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre class="code">&lt;link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"&gt;</pre>
+        <div class="code-label">tailwind.config.js<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre class="code">module.exports = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
+        mono: ['"DM Mono"', 'monospace'],
+      },
+      borderRadius: {
+        card: '14px',
+        input: '10px',
+        btn: '8px',
+      },
+    },
+  },
+}</pre>
+      </div>
+    </div>
+
+    <!-- 02 ── COLORS -->
+    <div class="section" id="colors">
+      <div class="section-head">
+        <span class="section-num">02</span><span class="section-title">Colors</span>
+        <div class="section-sub">Neutral-dominant palette. Color is used sparingly — only for accent, status, and data.</div>
+        <div class="section-bar"></div>
+      </div>
+      <div class="card">
+        <div class="subtitle">Primary — Emerald accent</div>
+        <div class="swatch-row">
+          <div class="swatch"><div class="swatch-box" style="background:#E8FAF0"></div><span class="swatch-hex">#E8FAF0</span><span class="swatch-name">50</span><span class="swatch-tw">emerald-50</span></div>
+          <div class="swatch"><div class="swatch-box" style="background:#8FE0B6"></div><span class="swatch-hex">#8FE0B6</span><span class="swatch-name">200</span><span class="swatch-tw">emerald-200</span></div>
+          <div class="swatch"><div class="swatch-box" style="background:#1A9E64"></div><span class="swatch-hex">#1A9E64</span><span class="swatch-name">light</span><span class="swatch-tw">emerald-600</span></div>
+          <div class="swatch"><div class="swatch-box" style="background:#34D399"></div><span class="swatch-hex">#34D399</span><span class="swatch-name">dark</span><span class="swatch-tw">emerald-400</span></div>
+          <div class="swatch"><div class="swatch-box" style="background:#0A4D30"></div><span class="swatch-hex">#0A4D30</span><span class="swatch-name">800</span><span class="swatch-tw">emerald-800</span></div>
+        </div>
+        <div class="subtitle">Neutrals — warm grays</div>
+        <div class="swatch-row">
+          <div class="swatch"><div class="swatch-box" style="background:#F8F8F6"></div><span class="swatch-hex">#F8F8F6</span><span class="swatch-name">page</span></div>
+          <div class="swatch"><div class="swatch-box" style="background:#F2F2EF"></div><span class="swatch-hex">#F2F2EF</span><span class="swatch-name">subtle</span></div>
+          <div class="swatch"><div class="swatch-box" style="background:#FFFFFF"></div><span class="swatch-hex">#FFFFFF</span><span class="swatch-name">surface</span></div>
+          <div class="swatch"><div class="swatch-box" style="background:#C5C5C9"></div><span class="swatch-hex">#C5C5C9</span><span class="swatch-name">quaternary</span></div>
+          <div class="swatch"><div class="swatch-box" style="background:#9D9DA1"></div><span class="swatch-hex">#9D9DA1</span><span class="swatch-name">tertiary</span></div>
+          <div class="swatch"><div class="swatch-box" style="background:#6B6B6F"></div><span class="swatch-hex">#6B6B6F</span><span class="swatch-name">secondary</span></div>
+          <div class="swatch"><div class="swatch-box" style="background:#1A1A1D"></div><span class="swatch-hex">#1A1A1D</span><span class="swatch-name">primary</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="subtitle">Token mapping — Light vs Dark</div>
+        <table class="token-table">
+          <tr><th style="width:28%">Token</th><th style="width:20%">Light</th><th style="width:20%">Dark</th><th>Tailwind</th></tr>
+          <tr><td class="tok">--page-bg</td><td><span class="col-preview" style="background:#F8F8F6;border:1px solid rgba(0,0,0,0.08)"></span><span class="col-hex">#F8F8F6</span></td><td><span class="col-preview" style="background:#0F0F11;border:1px solid rgba(255,255,255,0.08)"></span><span class="col-hex">#0F0F11</span></td><td class="col-tw">bg-stone-50 dark:bg-[#0F0F11]</td></tr>
+          <tr><td class="tok">--surface</td><td><span class="col-preview" style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.08)"></span><span class="col-hex">#FFFFFF</span></td><td><span class="col-preview" style="background:#18181B;border:1px solid rgba(255,255,255,0.08)"></span><span class="col-hex">#18181B</span></td><td class="col-tw">bg-white dark:bg-zinc-900</td></tr>
+          <tr><td class="tok">--surface-subtle</td><td><span class="col-preview" style="background:#F2F2EF;border:1px solid rgba(0,0,0,0.08)"></span><span class="col-hex">#F2F2EF</span></td><td><span class="col-preview" style="background:#222225;border:1px solid rgba(255,255,255,0.08)"></span><span class="col-hex">#222225</span></td><td class="col-tw">bg-stone-100 dark:bg-zinc-800</td></tr>
+          <tr><td class="tok">--border</td><td><span class="col-preview" style="background:rgba(0,0,0,0.06);border:1px solid rgba(0,0,0,0.08)"></span><span class="col-hex">black/6</span></td><td><span class="col-preview" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08)"></span><span class="col-hex">white/6</span></td><td class="col-tw">border-black/6 dark:border-white/6</td></tr>
+          <tr><td class="tok">--text-primary</td><td><span class="col-preview" style="background:#1A1A1D"></span><span class="col-hex">#1A1A1D</span></td><td><span class="col-preview" style="background:#F0F0EC"></span><span class="col-hex">#F0F0EC</span></td><td class="col-tw">text-gray-900 dark:text-gray-100</td></tr>
+          <tr><td class="tok">--text-secondary</td><td><span class="col-preview" style="background:#6B6B6F"></span><span class="col-hex">#6B6B6F</span></td><td><span class="col-preview" style="background:#8E8E93"></span><span class="col-hex">#8E8E93</span></td><td class="col-tw">text-gray-500 dark:text-gray-400</td></tr>
+          <tr><td class="tok">--text-tertiary</td><td><span class="col-preview" style="background:#9D9DA1"></span><span class="col-hex">#9D9DA1</span></td><td><span class="col-preview" style="background:#5C5C61"></span><span class="col-hex">#5C5C61</span></td><td class="col-tw">text-gray-400 dark:text-gray-500</td></tr>
+          <tr><td class="tok">--accent</td><td><span class="col-preview" style="background:#1A9E64"></span><span class="col-hex">#1A9E64</span></td><td><span class="col-preview" style="background:#34D399"></span><span class="col-hex">#34D399</span></td><td class="col-tw">text-emerald-600 dark:text-emerald-400</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 03 ── TYPOGRAPHY -->
+    <div class="section" id="typography">
+      <div class="section-head">
+        <span class="section-num">03</span><span class="section-title">Typography</span>
+        <div class="section-sub">Two weights for UI text (400, 500). Semibold (600) reserved for page titles and large metric values only.</div>
+        <div class="section-bar"></div>
+      </div>
+      <div class="card">
+        <div class="type-row"><div class="type-sample"><span style="font-size:22px;font-weight:600;letter-spacing:-0.02em">Dashboard</span><span class="type-role">Page title</span></div><span class="type-class">text-[22px] font-semibold tracking-tight</span></div>
+        <div class="type-row"><div class="type-sample"><span style="font-size:14px;font-weight:500">Sales vs Orders</span><span class="type-role">Section heading</span></div><span class="type-class">text-sm font-medium</span></div>
+        <div class="type-row"><div class="type-sample"><span style="font-size:13px;color:var(--t2)">Performance overview from March 1 to 31</span><span class="type-role">Body</span></div><span class="type-class">text-[13px] text-gray-500</span></div>
+        <div class="type-row"><div class="type-sample"><span style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:var(--t4)">TOTAL SALES</span><span class="type-role">Label / Header</span></div><span class="type-class">text-[11px] font-medium uppercase tracking-wider</span></div>
+        <div class="type-row"><div class="type-sample"><span style="font-size:22px;font-weight:600;font-family:var(--mono);letter-spacing:-0.02em">₱1,388,889.00</span><span class="type-role">Metric value</span></div><span class="type-class">text-[22px] font-semibold font-mono tabular-nums</span></div>
+        <div class="type-row"><div class="type-sample"><span style="font-size:11px;font-family:var(--mono);color:var(--t4)">JT0015312978732</span><span class="type-role">ID / Tracking</span></div><span class="type-class">text-[11px] font-mono text-gray-400</span></div>
+        <div class="note"><strong>Rule:</strong> All numeric data (prices, counts, percentages, IDs, timestamps) uses <code style="font-family:var(--mono);color:var(--accent)">font-mono tabular-nums</code>.</div>
+      </div>
+    </div>
+
+    <!-- 04 ── SPACING -->
+    <div class="section" id="spacing">
+      <div class="section-head">
+        <span class="section-num">04</span><span class="section-title">Spacing</span>
+        <div class="section-sub">Base unit is 4px. Use consistent spacing tokens across all views.</div>
+        <div class="section-bar"></div>
+      </div>
+      <div class="card">
+        <div class="spacing-row"><span class="spacing-label">Page padding</span><div><span class="spacing-val">28px</span><span class="spacing-tw">p-7</span></div></div>
+        <div class="spacing-row"><span class="spacing-label">Card padding</span><div><span class="spacing-val">24px</span><span class="spacing-tw">p-6</span></div></div>
+        <div class="spacing-row"><span class="spacing-label">Between sections</span><div><span class="spacing-val">20px</span><span class="spacing-tw">gap-5</span></div></div>
+        <div class="spacing-row"><span class="spacing-label">Between cards (grid)</span><div><span class="spacing-val">14px</span><span class="spacing-tw">gap-3.5</span></div></div>
+        <div class="spacing-row"><span class="spacing-label">Inside card rows</span><div><span class="spacing-val">12px</span><span class="spacing-tw">gap-3</span></div></div>
+        <div class="spacing-row"><span class="spacing-label">Inline elements</span><div><span class="spacing-val">8px</span><span class="spacing-tw">gap-2</span></div></div>
+        <div class="spacing-row"><span class="spacing-label">Tight (icon + text)</span><div><span class="spacing-val">6px</span><span class="spacing-tw">gap-1.5</span></div></div>
+      </div>
+    </div>
+
+    <!-- 05 ── SURFACES -->
+    <div class="section" id="surfaces">
+      <div class="section-head">
+        <span class="section-num">05</span><span class="section-title">Surfaces & cards</span>
+        <div class="section-sub">Three surface levels. Cards are the primary container. No drop-shadows except floating panels.</div>
+        <div class="section-bar"></div>
+      </div>
+      <div class="card">
+        <div class="surface-grid">
+          <div class="surface-preview" style="background:var(--bg);border:1px dashed var(--border)"><span>Page background</span></div>
+          <div class="surface-preview" style="background:var(--surface);border:1px solid var(--border)"><span>Card / Surface</span></div>
+          <div class="surface-preview" style="background:var(--surface-2)"><span>Subtle / Inset</span></div>
+        </div>
+        <div class="code-label">Card component<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre class="code">&lt;div class="bg-white dark:bg-zinc-900
+  border border-black/6 dark:border-white/6
+  rounded-[14px] p-6
+  transition-colors hover:border-black/10 dark:hover:border-white/10"&gt;
+  &lt;!-- content --&gt;
+&lt;/div&gt;
+
+&lt;!-- Floating panel (dropdown) — add shadow --&gt;
+&lt;div class="... shadow-[0_8px_30px_rgba(0,0,0,0.08)]
+  dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)]"&gt;</pre>
+      </div>
+    </div>
+
+    <!-- 06 ── SIDEBAR -->
+    <div class="section" id="sidebar">
+      <div class="section-head">
+        <span class="section-num">06</span><span class="section-title">Sidebar</span>
+        <div class="section-sub">Fixed left, 240px. Quiet by default, accent on active.</div>
+        <div class="section-bar"></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;gap:24px">
+          <div class="sidebar-preview">
+            <div class="nav-label">Main</div>
+            <div class="nav-item active"><span style="width:4px;height:4px;border-radius:2px;background:var(--accent)"></span>Dashboard</div>
+            <div class="nav-item"><span style="width:4px;height:4px;border-radius:2px;background:transparent"></span>Shops</div>
+            <div class="nav-item"><span style="width:4px;height:4px;border-radius:2px;background:transparent"></span>Pages</div>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div class="code-label">Nav item classes<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <pre class="code">&lt;!-- Section label --&gt;
+&lt;span class="text-[10px] font-mono font-medium uppercase
+  tracking-[0.08em] text-gray-300 dark:text-gray-600
+  px-3.5 mb-2 block"&gt;Main&lt;/span&gt;
+
+&lt;!-- Active item --&gt;
+&lt;a class="flex items-center gap-2.5 px-3.5 py-2
+  rounded-[10px] text-[13px] font-medium
+  bg-emerald-500/8 text-emerald-600 dark:text-emerald-400"&gt;
+
+&lt;!-- Inactive item --&gt;
+&lt;a class="flex items-center gap-2.5 px-3.5 py-2
+  rounded-[10px] text-[13px] text-gray-400 dark:text-gray-500
+  hover:text-gray-500 dark:hover:text-gray-400
+  hover:bg-black/[0.02] dark:hover:bg-white/[0.02]
+  transition-colors"&gt;</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 07 ── BUTTONS -->
+    <div class="section" id="buttons">
+      <div class="section-head">
+        <span class="section-num">07</span><span class="section-title">Buttons</span>
+        <div class="section-sub">Three tiers: primary, secondary, ghost. All rounded-lg, text-xs, font-medium.</div>
+        <div class="section-bar"></div>
+      </div>
+      <div class="card">
+        <div class="btn-row">
+          <button class="btn btn-primary">Primary action</button>
+          <button class="btn btn-secondary">Secondary</button>
+          <button class="btn btn-ghost">Ghost</button>
+          <button class="btn btn-danger">Danger</button>
+        </div>
+        <div class="code-label">Tailwind classes<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre class="code">&lt;!-- Primary --&gt;
+&lt;button class="bg-emerald-600 dark:bg-emerald-500
+  hover:bg-emerald-700 dark:hover:bg-emerald-400
+  text-white px-4 py-2 rounded-lg text-xs font-medium
+  transition-colors"&gt;
+
+&lt;!-- Secondary --&gt;
+&lt;button class="bg-white dark:bg-zinc-900
+  border border-black/6 dark:border-white/6
+  text-gray-500 px-3.5 py-1.5 rounded-lg text-xs font-medium
+  hover:border-black/10 dark:hover:border-white/10
+  transition-colors"&gt;
+
+&lt;!-- Ghost --&gt;
+&lt;button class="text-gray-400 hover:text-gray-600
+  dark:hover:text-gray-300 hover:bg-black/[0.03]
+  px-3.5 py-1.5 rounded-lg text-xs font-medium
+  transition-colors"&gt;
+
+&lt;!-- Danger --&gt;
+&lt;button class="bg-red-50 dark:bg-red-500/10
+  text-red-600 dark:text-red-400
+  hover:bg-red-100 dark:hover:bg-red-500/15
+  px-4 py-2 rounded-lg text-xs font-medium
+  transition-colors"&gt;</pre>
+      </div>
+    </div>
+
+    <!-- 08 ── INPUTS -->
+    <div class="section" id="inputs">
+      <div class="section-head">
+        <span class="section-num">08</span><span class="section-title">Inputs</span>
+        <div class="section-sub">Subtle resting state with bg-subtle fill. Emerald focus ring.</div>
+        <div class="section-bar"></div>
+      </div>
+      <div class="card">
+        <div class="input-grid">
+          <div>
+            <div class="input-label">Search</div>
+            <input class="input-field input-search" placeholder="Search orders..." readonly>
+          </div>
+          <div>
+            <div class="input-label">Select</div>
+            <input class="input-field" value="Total Sales" readonly>
+          </div>
+        </div>
+        <div class="code-label">Input classes<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre class="code">&lt;input class="w-full px-3 py-2.5
+  bg-stone-100 dark:bg-zinc-800
+  border border-black/6 dark:border-white/6
+  rounded-[10px] text-[13px] text-gray-900 dark:text-gray-100
+  placeholder:text-gray-300 dark:placeholder:text-gray-600
+  outline-none transition-all
+  focus:border-emerald-500 dark:focus:border-emerald-400
+  focus:ring-2 focus:ring-emerald-500/15" /&gt;</pre>
+      </div>
+    </div>
+
+    <!-- 09 ── TABLES -->
+    <div class="section" id="tables">
+      <div class="section-head">
+        <span class="section-num">09</span><span class="section-title">Tables</span>
+        <div class="section-sub">Minimal borders. Uppercase headers. Hover tint on rows. Monospace for IDs and numbers.</div>
+        <div class="section-bar"></div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table class="table-preview">
+          <thead><tr><th>Order</th><th>Customer</th><th>SRP</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="mono bold">#2101</td><td class="bold">Delia Ascaño</td><td class="mono">₱549.00</td><td><span class="badge badge-err"><span class="badge-dot"></span>Wrong segment</span></td></tr>
+            <tr><td class="mono bold">#1471</td><td class="bold">Fatima Reyes</td><td class="mono">₱549.00</td><td><span class="badge badge-ok"><span class="badge-dot"></span>Delivered</span></td></tr>
+            <tr><td class="mono bold">#2099</td><td class="bold">Marilou Alacon</td><td class="mono">₱549.00</td><td><span class="badge badge-neut"><span class="badge-dot"></span>Pending</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="code-label">Table classes<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre class="code">&lt;!-- Table header --&gt;
+&lt;th class="text-left px-4 py-2.5 text-[10px] font-mono
+  font-medium uppercase tracking-wider
+  text-gray-300 dark:text-gray-600
+  border-b border-black/6 dark:border-white/6"&gt;
+
+&lt;!-- Table cell --&gt;
+&lt;td class="px-4 py-3 text-[13px] text-gray-500
+  border-b border-black/6 dark:border-white/6"&gt;
+
+&lt;!-- Row hover --&gt;
+&lt;tr class="hover:bg-emerald-500/[0.03] transition-colors"&gt;</pre>
+    </div>
+
+    <!-- 10 ── BADGES -->
+    <div class="section" id="badges">
+      <div class="section-head">
+        <span class="section-num">10</span><span class="section-title">Status badges</span>
+        <div class="section-sub">Pill shape. Dot indicator + label. Consistent color mapping.</div>
+        <div class="section-bar"></div>
+      </div>
+      <div class="card">
+        <div class="badges-row">
+          <span class="badge badge-ok"><span class="badge-dot"></span>Delivered</span>
+          <span class="badge badge-neut"><span class="badge-dot"></span>Pending</span>
+          <span class="badge badge-info"><span class="badge-dot"></span>Shipped</span>
+          <span class="badge badge-err"><span class="badge-dot"></span>Wrong segment</span>
+          <span class="badge badge-warn"><span class="badge-dot"></span>Rider CBR</span>
+          <span class="badge badge-violet"><span class="badge-dot"></span>Returning</span>
+        </div>
+        <div class="code-label">Badge pattern<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre class="code">&lt;span class="inline-flex items-center gap-1.5 px-3 py-1
+  rounded-full text-[11px] font-medium"&gt;
+  &lt;span class="w-1.5 h-1.5 rounded-full bg-current opacity-60"&gt;&lt;/span&gt;
+  Delivered
+&lt;/span&gt;
+
+&lt;!-- Color map:
+  Delivered     → text-emerald-600 dark:text-emerald-400 bg-emerald-500/8
+  Pending       → text-gray-400    dark:text-gray-500    bg-gray-500/8
+  Shipped       → text-blue-500    dark:text-blue-400    bg-blue-500/8
+  Wrong segment → text-red-600     dark:text-red-400     bg-red-500/8
+  Rider CBR     → text-amber-600   dark:text-amber-400   bg-amber-500/8
+  Returning     → text-violet-500  dark:text-violet-400  bg-violet-500/8
+--&gt;</pre>
+      </div>
+    </div>
+
+    <!-- 11 ── METRICS -->
+    <div class="section" id="metrics">
+      <div class="section-head">
+        <span class="section-num">11</span><span class="section-title">Metric cards</span>
+        <div class="section-sub">Top-of-page KPI row. Monospace values, change indicator with arrow.</div>
+        <div class="section-bar"></div>
+      </div>
+      <div class="card">
+        <div class="metric-grid">
+          <div class="metric"><div class="metric-top"><span class="metric-label">Total sales</span><span class="metric-change up">▲ +28.7%</span></div><span class="metric-value">₱1,388,889</span></div>
+          <div class="metric"><div class="metric-top"><span class="metric-label">RTS rate</span><span class="metric-change down">▼ -2.3%</span></div><span class="metric-value">12.05%</span></div>
+        </div>
+        <div class="code-label">Metric card<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre class="code">&lt;div class="bg-white dark:bg-zinc-900
+  border border-black/6 dark:border-white/6
+  rounded-[14px] p-[18px]"&gt;
+  &lt;div class="flex items-center justify-between mb-2"&gt;
+    &lt;span class="text-[11px] font-medium text-gray-400
+      dark:text-gray-500"&gt;Total sales&lt;/span&gt;
+    &lt;span class="text-[11px] font-medium text-emerald-600
+      dark:text-emerald-400 flex items-center gap-1"&gt;
+      &lt;span class="text-[9px]"&gt;▲&lt;/span&gt;+28.7%
+    &lt;/span&gt;
+  &lt;/div&gt;
+  &lt;span class="text-[22px] font-semibold font-mono
+    tracking-tight tabular-nums
+    text-gray-900 dark:text-gray-100"&gt;
+    ₱1,388,889
+  &lt;/span&gt;
+&lt;/div&gt;</pre>
+      </div>
+    </div>
+
+    <!-- 12 ── CHARTS -->
+    <div class="section" id="charts">
+      <div class="section-head">
+        <span class="section-num">12</span><span class="section-title">Charts (ApexCharts)</span>
+        <div class="section-sub">Unified ApexCharts configuration for bar, line/area, and donut charts.</div>
+        <div class="section-bar"></div>
+      </div>
+
+      <!-- Color palette -->
+      <div class="card">
+        <div class="subtitle">Chart color palette</div>
+        <div class="sub-text">Primary series always uses emerald. Additional series pull from this ordered sequence.</div>
+        <div class="chart-palette">
+          <div class="chart-swatch"><div class="chart-swatch-box" style="background:#1A9E64"></div><span class="chart-swatch-hex">#1A9E64</span><span class="chart-swatch-role">Series 1 · Emerald</span></div>
+          <div class="chart-swatch"><div class="chart-swatch-box" style="background:#3B82F6"></div><span class="chart-swatch-hex">#3B82F6</span><span class="chart-swatch-role">Series 2 · Blue</span></div>
+          <div class="chart-swatch"><div class="chart-swatch-box" style="background:#8B5CF6"></div><span class="chart-swatch-hex">#8B5CF6</span><span class="chart-swatch-role">Series 3 · Violet</span></div>
+          <div class="chart-swatch"><div class="chart-swatch-box" style="background:#F59E0B"></div><span class="chart-swatch-hex">#F59E0B</span><span class="chart-swatch-role">Series 4 · Amber</span></div>
+          <div class="chart-swatch"><div class="chart-swatch-box" style="background:#EF4444"></div><span class="chart-swatch-hex">#EF4444</span><span class="chart-swatch-role">Series 5 · Red</span></div>
+          <div class="chart-swatch"><div class="chart-swatch-box" style="background:#6B7280"></div><span class="chart-swatch-hex">#6B7280</span><span class="chart-swatch-role">Series 6 · Gray</span></div>
+        </div>
+        <div class="theme-boxes">
+          <div class="theme-box"><div class="theme-box-label">Light mode</div><div class="theme-box-val">Grid: rgba(0,0,0,0.04)<br>Labels: #9D9DA1<br>Tooltip bg: #FFFFFF</div></div>
+          <div class="theme-box"><div class="theme-box-label">Dark mode</div><div class="theme-box-val">Grid: rgba(255,255,255,0.04)<br>Labels: #5C5C61<br>Tooltip bg: #222225</div></div>
+        </div>
+        <div class="code-label">Color constants<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre class="code">// chartTheme.js — drop into resources/js/
+
+const CHART_COLORS = [
+  '#1A9E64', '#3B82F6', '#8B5CF6',
+  '#F59E0B', '#EF4444', '#6B7280',
+];
+const CHART_COLORS_DARK = [
+  '#34D399', '#60A5FA', '#A78BFA',
+  '#FBBF24', '#F87171', '#9CA3AF',
+];</pre>
+      </div>
+
+      <!-- Base config -->
+      <div class="card">
+        <div class="subtitle">Base configuration (shared by all charts)</div>
+        <div class="code-label">getBaseOptions(isDark)<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre class="code">function getBaseOptions(isDark) {
+  return {
+    chart: {
+      fontFamily: '"DM Sans", system-ui, sans-serif',
+      toolbar: { show: false },
+      zoom: { enabled: false },
+      background: 'transparent',
+      animations: {
+        enabled: true, speed: 600,
+        easing: 'easeinout',
+        dynamicAnimation: { speed: 400 },
+      },
+    },
+    colors: isDark ? CHART_COLORS_DARK : CHART_COLORS,
+    grid: {
+      borderColor: isDark
+        ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
+      strokeDashArray: 0,
+      xaxis: { lines: { show: false } },
+      yaxis: { lines: { show: true } },
+      padding: { top: 0, right: 4, bottom: 0, left: 8 },
+    },
+    xaxis: {
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+      labels: {
+        style: {
+          fontFamily: '"DM Mono", monospace',
+          fontSize: '11px', fontWeight: 400,
+          colors: isDark ? '#5C5C61' : '#9D9DA1',
+        },
+      },
+    },
+    yaxis: {
+      labels: {
+        style: {
+          fontFamily: '"DM Mono", monospace',
+          fontSize: '11px', fontWeight: 400,
+          colors: isDark ? '#5C5C61' : '#9D9DA1',
+        },
+        formatter: (val) =&gt; formatCompact(val),
+      },
+    },
+    tooltip: {
+      theme: isDark ? 'dark' : 'light',
+      style: { fontFamily: '"DM Sans", sans-serif', fontSize: '12px' },
+      y: { formatter: (val) =&gt; formatCurrency(val) },
+    },
+    dataLabels: { enabled: false },
+    legend: {
+      fontFamily: '"DM Sans", sans-serif',
+      fontSize: '12px', fontWeight: 500,
+      labels: { colors: isDark ? '#8E8E93' : '#6B6B6F' },
+      markers: { size: 4, shape: 'circle', offsetX: -2 },
+      itemMargin: { horizontal: 16, vertical: 4 },
+    },
+    states: {
+      hover: { filter: { type: 'darken', value: 0.05 } },
+      active: { filter: { type: 'darken', value: 0.1 } },
+    },
+  };
+}</pre>
+      </div>
+
+      <!-- Line / Area -->
+      <div class="card">
+        <div class="subtitle">Line / Area chart</div>
+        <div class="sub-text">Smooth curves, gradient area fill, primary solid + secondary dashed.</div>
+        <div class="chart-preview">
+          <div class="chart-header">
+            <div style="display:flex;align-items:center;gap:14px">
+              <span class="chart-title">Total sales vs Total orders</span>
+              <span class="legend-item"><span class="legend-dot" style="background:var(--accent)"></span>Sales</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#3B82F6"></span>Orders</span>
+            </div>
+            <div class="toggle-group"><span class="toggle-item">Daily</span><span class="toggle-item active">Weekly</span></div>
+          </div>
+          <svg viewBox="0 0 500 140" style="width:100%;height:140px" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="ag1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity="0.2"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient>
+              <linearGradient id="ag2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3B82F6" stop-opacity="0.1"/><stop offset="100%" stop-color="#3B82F6" stop-opacity="0"/></linearGradient>
+            </defs>
+            <path d="M0,140 L0,110 C40,105 80,90 140,75 C200,60 260,50 320,40 C370,32 420,26 460,22 C480,20 500,18 500,16 L500,140Z" fill="url(#ag1)"/>
+            <path d="M0,140 L0,120 C40,118 80,110 140,100 C200,90 260,80 320,70 C370,62 420,56 460,52 C480,50 500,48 500,46 L500,140Z" fill="url(#ag2)"/>
+            <path d="M0,110 C40,105 80,90 140,75 C200,60 260,50 320,40 C370,32 420,26 460,22 C480,20 500,18 500,16" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M0,120 C40,118 80,110 140,100 C200,90 260,80 320,70 C370,62 420,56 460,52 C480,50 500,48 500,46" fill="none" stroke="#3B82F6" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="4 3"/>
+          </svg>
+        </div>
+        <div class="code-label">Line / Area options<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre class="code">function getLineAreaOptions(isDark) {
+  const base = getBaseOptions(isDark);
+  return {
+    ...base,
+    chart: { ...base.chart, type: 'area' },
+    stroke: {
+      curve: 'smooth',
+      width: [2.5, 2],       // primary thicker
+      dashArray: [0, 4],     // secondary dashed
+    },
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.2, opacityTo: 0,
+        stops: [0, 100],
+      },
+    },
+    markers: {
+      size: 0,               // hidden by default
+      hover: { size: 5, sizeOffset: 2 },
+    },
+    tooltip: {
+      ...base.tooltip,
+      shared: true, intersect: false,
+      x: { format: 'MMM dd, yyyy' },
+    },
+    xaxis: { ...base.xaxis, type: 'datetime' },
+  };
+}</pre>
+      </div>
+
+      <!-- Bar -->
+      <div class="card">
+        <div class="subtitle">Bar chart</div>
+        <div class="sub-text">Rounded caps, gradient fill, 55% column width.</div>
+        <div class="chart-preview">
+          <div class="chart-header"><span class="chart-title">Total sales per page</span></div>
+          <div style="display:flex;align-items:flex-end;gap:10px;height:120px;padding:0 10px">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center"><div style="width:70%;height:100%;background:linear-gradient(180deg,var(--accent),rgba(26,158,100,0.5));border-radius:5px 5px 2px 2px"></div><span style="font-size:10px;font-family:var(--mono);color:var(--t4);margin-top:6px">Page 1</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center"><div style="width:70%;height:72%;background:linear-gradient(180deg,var(--accent),rgba(26,158,100,0.5));border-radius:5px 5px 2px 2px"></div><span style="font-size:10px;font-family:var(--mono);color:var(--t4);margin-top:6px">Page 2</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center"><div style="width:70%;height:52%;background:linear-gradient(180deg,var(--accent),rgba(26,158,100,0.5));border-radius:5px 5px 2px 2px"></div><span style="font-size:10px;font-family:var(--mono);color:var(--t4);margin-top:6px">Page 3</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center"><div style="width:70%;height:36%;background:linear-gradient(180deg,var(--accent),rgba(26,158,100,0.5));border-radius:5px 5px 2px 2px"></div><span style="font-size:10px;font-family:var(--mono);color:var(--t4);margin-top:6px">Page 4</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center"><div style="width:70%;height:20%;background:linear-gradient(180deg,var(--accent),rgba(26,158,100,0.5));border-radius:5px 5px 2px 2px;min-height:6px"></div><span style="font-size:10px;font-family:var(--mono);color:var(--t4);margin-top:6px">Page 5</span></div>
+          </div>
+        </div>
+        <div class="code-label">Bar options<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre class="code">function getBarOptions(isDark) {
+  const base = getBaseOptions(isDark);
+  return {
+    ...base,
+    chart: { ...base.chart, type: 'bar' },
+    plotOptions: {
+      bar: {
+        borderRadius: 5,
+        borderRadiusApplication: 'end',
+        columnWidth: '55%',
+        distributed: false,
+      },
+    },
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shade: isDark ? 'dark' : 'light',
+        type: 'vertical',
+        shadeIntensity: 0.2,
+        opacityFrom: 1, opacityTo: 0.7,
+        stops: [0, 100],
+      },
+    },
+    tooltip: {
+      ...base.tooltip,
+      shared: false, intersect: true,
+    },
+  };
+}</pre>
+      </div>
+
+      <!-- Donut -->
+      <div class="card">
+        <div class="subtitle">Donut chart</div>
+        <div class="sub-text">Always donut (never filled pie). 72% hole with center label.</div>
+        <div class="chart-preview">
+          <div class="donut-wrap">
+            <div style="position:relative;width:160px;height:160px;flex-shrink:0">
+              <svg viewBox="0 0 160 160" width="160" height="160" id="donut-svg"></svg>
+              <div class="donut-center"><div class="donut-center-val">2,261</div><div class="donut-center-label">Total orders</div></div>
+            </div>
+            <div class="donut-legend">
+              <div class="donut-legend-row"><span class="donut-legend-dot" style="background:var(--accent)"></span><span class="donut-legend-name">Delivered</span><span class="donut-legend-pct">42%</span><span class="donut-legend-val">949</span></div>
+              <div class="donut-legend-row"><span class="donut-legend-dot" style="background:#3B82F6"></span><span class="donut-legend-name">Shipped</span><span class="donut-legend-pct">25%</span><span class="donut-legend-val">565</span></div>
+              <div class="donut-legend-row"><span class="donut-legend-dot" style="background:#8B5CF6"></span><span class="donut-legend-name">Pending</span><span class="donut-legend-pct">18%</span><span class="donut-legend-val">407</span></div>
+              <div class="donut-legend-row"><span class="donut-legend-dot" style="background:#F59E0B"></span><span class="donut-legend-name">RTS</span><span class="donut-legend-pct">10%</span><span class="donut-legend-val">226</span></div>
+              <div class="donut-legend-row"><span class="donut-legend-dot" style="background:#6B7280"></span><span class="donut-legend-name">Other</span><span class="donut-legend-pct">5%</span><span class="donut-legend-val">114</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="code-label">Donut options<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre class="code">function getDonutOptions(isDark, totalLabel = 'Total') {
+  return {
+    chart: {
+      type: 'donut',
+      fontFamily: '"DM Sans", system-ui, sans-serif',
+      background: 'transparent',
+      animations: { enabled: true, speed: 600,
+        animateGradually: { enabled: true, delay: 80 } },
+    },
+    colors: isDark ? CHART_COLORS_DARK : CHART_COLORS,
+    stroke: {
+      show: true, width: 2,
+      colors: [isDark ? '#18181B' : '#FFFFFF'],
+    },
+    plotOptions: {
+      pie: {
+        donut: {
+          size: '72%',
+          labels: {
+            show: true,
+            name: {
+              show: true, fontSize: '12px',
+              fontFamily: '"DM Sans", sans-serif',
+              fontWeight: 500,
+              color: isDark ? '#8E8E93' : '#6B6B6F',
+              offsetY: -8,
+            },
+            value: {
+              show: true, fontSize: '22px',
+              fontFamily: '"DM Mono", monospace',
+              fontWeight: 600,
+              color: isDark ? '#F0F0EC' : '#1A1A1D',
+              offsetY: 4,
+              formatter: (v) =&gt; Number(v).toLocaleString(),
+            },
+            total: {
+              show: true, showAlways: true,
+              label: totalLabel,
+              fontSize: '11px',
+              fontFamily: '"DM Sans", sans-serif',
+              color: isDark ? '#5C5C61' : '#9D9DA1',
+              formatter: (w) =&gt;
+                w.globals.seriesTotals
+                  .reduce((a, b) =&gt; a + b, 0)
+                  .toLocaleString(),
+            },
+          },
+        },
+      },
+    },
+    legend: {
+      position: 'right',
+      fontFamily: '"DM Sans"', fontSize: '12px',
+      fontWeight: 500,
+      labels: { colors: isDark ? '#8E8E93' : '#6B6B6F' },
+      markers: { size: 4, shape: 'square', offsetX: -4 },
+      itemMargin: { horizontal: 0, vertical: 4 },
+    },
+    dataLabels: { enabled: false },
+    states: {
+      hover: { filter: { type: 'darken', value: 0.06 } },
+      active: { filter: { type: 'darken', value: 0.12 } },
+    },
+  };
+}</pre>
+      </div>
+
+      <!-- Custom tooltip -->
+      <div class="card">
+        <div class="subtitle">Custom tooltip</div>
+        <div class="tooltip-preview">
+          <div class="tooltip-card">
+            <div class="tooltip-date">Mar 15, 2026</div>
+            <div class="tooltip-row"><span class="tooltip-dot" style="background:var(--accent)"></span><span class="tooltip-name">Total Sales</span><span class="tooltip-val">₱125,400</span></div>
+            <div class="tooltip-row"><span class="tooltip-dot" style="background:#3B82F6"></span><span class="tooltip-name">Total Orders</span><span class="tooltip-val">215</span></div>
+          </div>
+        </div>
+        <div class="code-label">Custom tooltip function<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre class="code">// Use in: tooltip: { custom: buildCustomTooltip }
+
+function buildCustomTooltip({ series, dataPointIndex, w }) {
+  const isDark = document.documentElement.classList.contains('dark');
+  const bg     = isDark ? '#222225' : '#FFFFFF';
+  const border = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const t1     = isDark ? '#F0F0EC' : '#1A1A1D';
+  const t2     = isDark ? '#8E8E93' : '#6B6B6F';
+  const t4     = isDark ? '#3A3A3E' : '#C5C5C9';
+  const shadow  = isDark
+    ? '0 8px 24px rgba(0,0,0,0.4)'
+    : '0 8px 24px rgba(0,0,0,0.08)';
+
+  const label = w.globals.categoryLabels?.[dataPointIndex]
+    || w.globals.labels?.[dataPointIndex] || '';
+
+  let rows = '';
+  w.globals.seriesNames.forEach((name, i) =&gt; {
+    const color = w.config.colors[i];
+    const val = series[i]?.[dataPointIndex];
+    if (val == null) return;
+    rows += '&lt;div style="display:flex;align-items:center;'
+      + 'gap:8px;margin-top:4px"&gt;'
+      + '&lt;span style="width:6px;height:6px;border-radius:3px;'
+      + 'background:' + color + '"&gt;&lt;/span&gt;'
+      + '&lt;span style="font-size:12px;color:' + t2
+      + ';flex:1"&gt;' + name + '&lt;/span&gt;'
+      + '&lt;span style="font-size:12px;font-family:DM Mono,monospace;'
+      + 'font-weight:500;color:' + t1 + '"&gt;'
+      + Number(val).toLocaleString() + '&lt;/span&gt;&lt;/div&gt;';
+  });
+
+  return '&lt;div style="background:' + bg
+    + ';border:1px solid ' + border
+    + ';border-radius:10px;padding:10px 14px;'
+    + 'min-width:180px;box-shadow:' + shadow + '"&gt;'
+    + '&lt;div style="font-size:11px;color:' + t4
+    + ';font-family:DM Mono,monospace;margin-bottom:6px"&gt;'
+    + label + '&lt;/div&gt;' + rows + '&lt;/div&gt;';
+}</pre>
+      </div>
+
+      <!-- Chart rules -->
+      <div class="card">
+        <div class="subtitle">Chart do's & don'ts</div>
+        <div class="rule-row rule-do"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Use the shared base config — never configure fonts or grid per-chart</div>
+        <div class="rule-row rule-do"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Use gradient fill on area charts — opacityFrom: 0.2, opacityTo: 0</div>
+        <div class="rule-row rule-do"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Use DM Mono for axis labels, tooltip values, and data labels</div>
+        <div class="rule-row rule-do"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Use borderRadius: 5 on bar charts with borderRadiusApplication: 'end'</div>
+        <div class="rule-row rule-do"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Use donut (not pie) — size: '72%' for the hole</div>
+        <div class="rule-row rule-do"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Pass isDark flag and swap CHART_COLORS ↔ CHART_COLORS_DARK</div>
+        <div class="divider"></div>
+        <div class="rule-row rule-dont"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>Show the ApexCharts toolbar — always toolbar: { show: false }</div>
+        <div class="rule-row rule-dont"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>Use 3D effects, drop shadows, or outer glow on chart elements</div>
+        <div class="rule-row rule-dont"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>Use more than 5 colors in a single chart — group into "Other"</div>
+        <div class="rule-row rule-dont"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>Use filled pie — always donut. Filled pie looks heavy</div>
+        <div class="rule-row rule-dont"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>Show markers by default on line charts — only on hover</div>
+      </div>
+    </div>
+
+    <!-- 13 ── MOTION -->
+    <div class="section" id="motion">
+      <div class="section-head">
+        <span class="section-num">13</span><span class="section-title">Motion</span>
+        <div class="section-sub">Restrained, purposeful. Page entry uses staggered fade-up.</div>
+        <div class="section-bar"></div>
+      </div>
+      <div class="card">
+        <div class="code-label">Page entry animation<button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre class="code">@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-in {
+  animation: fadeInUp 0.4s cubic-bezier(.4,0,.2,1) both;
+}
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.10s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.20s; }
+
+/* Loading skeleton */
+&lt;div class="bg-stone-100 dark:bg-zinc-800 rounded-lg
+  animate-pulse h-4 w-32"&gt;&lt;/div&gt;</pre>
+      </div>
+    </div>
+
+    <!-- 14 ── DO'S & DON'TS -->
+    <div class="section" id="rules">
+      <div class="section-head">
+        <span class="section-num">14</span><span class="section-title">Do's & don'ts</span>
+        <div class="section-sub">Quick reference for the most common mistakes.</div>
+        <div class="section-bar"></div>
+      </div>
+      <div class="card">
+        <div class="rule-row rule-do"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Use warm off-white page background (#F8F8F6), not pure white or cold gray</div>
+        <div class="rule-row rule-do"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Use font-mono for all numbers, IDs, timestamps, and tracking codes</div>
+        <div class="rule-row rule-do"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Use 1px border at 6% opacity for card borders — no box-shadow</div>
+        <div class="rule-row rule-do"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Use rounded-[14px] for cards, rounded-[10px] for inputs, rounded-lg for buttons</div>
+        <div class="rule-row rule-do"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Use uppercase + tracking-wider + text-[10px] for table headers</div>
+        <div class="rule-row rule-do"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Use dot + label for status badges, not colored background alone</div>
+        <div class="rule-row rule-do"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Always test both light and dark — use the dark: prefix consistently</div>
+        <div class="divider"></div>
+        <div class="rule-row rule-dont"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>Use font-bold (700) anywhere — max is font-semibold (600)</div>
+        <div class="rule-row rule-dont"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>Use heavy borders between table rows — use 1px at 6% opacity</div>
+        <div class="rule-row rule-dont"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>Use box-shadow on cards — only on floating panels</div>
+        <div class="rule-row rule-dont"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>Use pure black (#000) or white (#FFF) for dark mode backgrounds</div>
+        <div class="rule-row rule-dont"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>Use spinners for loading — use skeleton placeholders instead</div>
+        <div class="rule-row rule-dont"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>Mix font-sans and font-mono in the same label</div>
+        <div class="rule-row rule-dont"><svg class="rule-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>Use more than 2 accent colors per view besides neutral</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// Copy code block
+function copyCode(btn) {
+  const pre = btn.closest('.code-label')?.nextElementSibling
+    || btn.parentElement.nextElementSibling;
+  if (!pre) return;
+  navigator.clipboard?.writeText(pre.textContent);
+  btn.textContent = 'copied';
+  setTimeout(() => btn.textContent = 'copy', 1200);
+}
+
+// Dark mode toggle emoji
+const obs = new MutationObserver(() => {
+  const knob = document.querySelector('.theme-toggle .knob');
+  if (knob) knob.textContent = document.documentElement.classList.contains('dark') ? '☾' : '☀';
+});
+obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+// Draw donut SVG
+(function drawDonut() {
+  const svg = document.getElementById('donut-svg');
+  if (!svg) return;
+  const data = [42, 25, 18, 10, 5];
+  const colors = ['var(--accent)', '#3B82F6', '#8B5CF6', '#F59E0B', '#6B7280'];
+  const r = 60, cx = 80, cy = 80, sw = 22, circ = 2 * Math.PI * r;
+  let offset = -circ / 4;
+  data.forEach((pct, i) => {
+    const dash = (pct / 100) * circ;
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', cx);
+    circle.setAttribute('cy', cy);
+    circle.setAttribute('r', r);
+    circle.setAttribute('fill', 'none');
+    circle.setAttribute('stroke', colors[i]);
+    circle.setAttribute('stroke-width', sw);
+    circle.setAttribute('stroke-dasharray', `${dash} ${circ - dash}`);
+    circle.setAttribute('stroke-dashoffset', -offset);
+    circle.style.transition = 'stroke-dasharray 0.6s ease';
+    svg.appendChild(circle);
+    offset += dash;
+  });
+})();
+</script>
+</body>
+</html>

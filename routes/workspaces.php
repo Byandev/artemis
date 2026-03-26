@@ -12,6 +12,7 @@ use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\Record\RTSController;
 use App\Http\Controllers\Workspaces\Record\SalesController;
+use App\Http\Controllers\Workspaces\RoleController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
@@ -60,7 +61,8 @@ Route::middleware(['auth'])->group(function () {
 
     // Member management routes
     Route::get('/workspaces/{workspace}/members', [WorkspaceMemberController::class, 'index'])->name('workspaces.members.index');
-    Route::put('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'update'])->name('workspaces.members.update');
+    //    Route::put('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'update'])->name('workspaces.members.update');
+    Route::put('/workspaces/{workspace:slug}/members/{user}', [WorkspaceMemberController::class, 'updateMember'])->name('workspaces.members.update');
     Route::delete('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'destroy'])->name('workspaces.members.destroy');
 
     // Invitation routes (authenticated users)
@@ -154,3 +156,18 @@ Route::middleware(['auth'])->group(function () {
 // Public invitation routes (guest or authenticated)
 Route::get('/workspaces/invitations/{token}', [WorkspaceInvitationController::class, 'show'])->name('workspaces.invitations.show');
 Route::get('/workspaces/invitations/{token}/accept', [WorkspaceInvitationController::class, 'accept'])->name('workspaces.invitations.accept');
+
+Route::prefix('/workspaces/{workspace:slug}')->group(function () {
+
+    // Archive & Restore Logic
+    // Ensure this is PATCH
+    Route::patch('/roles/{role}/archive', [RoleController::class, 'archive'])->name('roles.archive');
+    Route::post('/roles/{role}/restore', [RoleController::class, 'restore'])
+        ->withTrashed()
+        ->name('roles.restore');
+
+    Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
+    Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
+    Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
+
+});
