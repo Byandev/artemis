@@ -79,4 +79,39 @@ class ForDeliveryController extends Controller
 
         return redirect()->back()->with('success', 'Status updated successfully');
     }
+
+    public  function analytics(Workspace $workspace, Request $request)
+    {
+
+        $stats = OrderForDelivery::query()
+            ->from('pancake_order_for_delivery as ofd')
+            ->join('pancake_orders as o', 'o.id', '=', 'ofd.order_id')
+            ->where('ofd.workspace_id', $workspace->id)
+            ->selectRaw("
+        SUM(ofd.assignee_id IS NOT NULL) as assigned_orders,
+
+        SUM(CASE
+            WHEN ofd.status IN ('CX RINGING', 'RIDER RINGING')
+            THEN 1 ELSE 0
+        END) as total_called,
+
+        SUM(CASE WHEN ofd.status = 'PENDING' THEN 1 ELSE 0 END) as total_pending,
+
+        SUM(CASE WHEN o.parcel_status = 'delivered' THEN 1 ELSE 0 END) as total_delivered,
+
+        SUM(CASE WHEN ofd.status = 'RETURNING' THEN 1 ELSE 0 END) as total_returning,
+
+        SUM(CASE WHEN o.parcel_status = 'undeliverable' THEN 1 ELSE 0 END) as total_undeliverable,
+
+        SUM(CASE WHEN o.parcel_status = 'out_for_delivery' THEN 1 ELSE 0 END) as total_out_for_delivery
+    ")
+            ->first();
+
+
+
+        return Inertia::render('workspaces/rts/rmo-management/analytics', [
+            'workspace' => $workspace,
+            'stats' => $stats,
+        ]);
+    }
 }

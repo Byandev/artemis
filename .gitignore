@@ -26,3 +26,5 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+resources/js/pages/workspaces/rts/rmo-management/partials/BreakdownPerCategory.tsx

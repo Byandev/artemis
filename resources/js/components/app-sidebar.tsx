@@ -23,6 +23,8 @@ import {
     Settings,
     User,
     ShieldIcon,
+    XCircle,
+    CheckCircle,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -60,10 +62,23 @@ export function AppSidebar() {
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
             icon: Users,
         },
+
         {
-            title: 'RMO Management',
-            icon: PhoneCall,
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/rmo-management`,
+            title: 'RTS Management',
+            icon: Users,
+            items: [
+                {
+                    title: 'RMO Management',
+                    icon: PhoneCall,
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/rmo-management`,
+                },
+                {
+                    title: 'RMO Analytics',
+                    icon: CheckCircle,
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/rmo-management/analytics`,
+                },
+
+            ],
         },
         {
             title: 'Roles',
