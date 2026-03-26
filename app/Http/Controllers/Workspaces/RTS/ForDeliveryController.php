@@ -195,6 +195,30 @@ class ForDeliveryController extends Controller
             ])
             ->paginate(10);
 
+        $stats = OrderForDelivery::query()
+            ->from('pancake_order_for_delivery as ofd')
+            ->join('pancake_orders as o', 'o.id', '=', 'ofd.order_id')
+            ->where('ofd.workspace_id', $workspace->id)
+            ->selectRaw("
+        SUM(ofd.assignee_id IS NOT NULL) as assigned_orders,
+
+        SUM(CASE
+            WHEN ofd.status IN ('CX RINGING', 'RIDER RINGING')
+            THEN 1 ELSE 0
+        END) as total_called,
+
+        SUM(CASE WHEN ofd.status = 'PENDING' THEN 1 ELSE 0 END) as total_pending,
+
+        SUM(CASE WHEN o.parcel_status = 'delivered' THEN 1 ELSE 0 END) as total_delivered,
+
+        SUM(CASE WHEN o.status = 'returning' THEN 1 ELSE 0 END) as total_returning,
+
+        SUM(CASE WHEN o.parcel_status = 'undeliverable' THEN 1 ELSE 0 END) as total_undeliverable,
+
+        SUM(CASE WHEN o.parcel_status = 'out_for_delivery' THEN 1 ELSE 0 END) as total_out_for_delivery
+    ")
+            ->first();
+
         $users = User::get(['id', 'name']);
 
         return Inertia::render('workspaces/rts/public-pages/rmo-management', [
@@ -205,6 +229,27 @@ class ForDeliveryController extends Controller
                 'filter' => $request->input('filter', []),
             ],
             'users' => $users,
+            'stats' => $stats,
         ]);
+    }
+
+    public function myAssignedCount(Request $request, Workspace $workspace)
+    {
+        $userId = $request->query('user_id');
+
+        if (!$userId) {
+            return response()->json(['assigned' => 0, 'called' => 0]);
+        }
+
+        $assigned = OrderForDelivery::where('workspace_id', $workspace->id)
+            ->where('assignee_id', $userId)
+            ->count();
+
+        $called = OrderForDelivery::where('workspace_id', $workspace->id)
+            ->where('caller_id', $userId)
+            ->whereIn('status', ['CX RINGING', 'RIDER RINGING'])
+            ->count();
+
+        return response()->json(['assigned' => $assigned, 'called' => $called]);
     }
 }

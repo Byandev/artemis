@@ -37,6 +37,7 @@ use Modules\Inventory\Http\Controllers\PurchaseOrderController;
 */
 Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'publicUpdateStatus'])->name('public-page.rmo-management.updateStatus');
+Route::get('/public/workspaces/{workspace}/rts/rmo-management/my-assigned-count', [ForDeliveryController::class, 'myAssignedCount'])->name('public-page.rmo-management.my-assigned-count');
 
 Route::middleware(['auth'])->group(function () {
     // Workspace setup (first-time after registration)
