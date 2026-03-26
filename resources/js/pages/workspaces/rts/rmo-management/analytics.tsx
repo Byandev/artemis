@@ -1,9 +1,10 @@
-import { Card } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import BreakdownPerCategory from '@/pages/workspaces/rts/rmo-management/partials/BreakdownPerCategory';
+import DeliveryTrend from '@/pages/workspaces/rts/rmo-management/partials/DeliveryTrend';
+import PerPageBreakdown from '@/pages/workspaces/rts/rmo-management/partials/PerPageBreakdown';
+import StatusBreakdown from '@/pages/workspaces/rts/rmo-management/partials/StatusBreakdown';
+import TopAssignees from '@/pages/workspaces/rts/rmo-management/partials/TopAssignees';
 import { Workspace } from '@/types/models/Workspace';
 import {
-
     CheckCircleIcon,
     ClipboardListIcon,
     ClockIcon,
@@ -25,26 +26,22 @@ interface RmoStats {
 }
 
 interface Props {
-    workspace: Workspace[]; // or Workspace if it's a single object
-    stats: RmoStats[]; // or RmoStats if it's a single object
+    workspace: Workspace;
+    stats: RmoStats;
 }
 
 interface StatCardProps {
     title: string;
     value: number;
     icon: React.ComponentType<{ className?: string }>;
-    color: string;
 }
 
-function StatCard({ title, value, icon: Icon }: StatCardProps) {
+function StatCard({ title, value }: StatCardProps) {
     return (
         <div className="rounded-[14px] border border-black/6 bg-white p-[18px] dark:border-white/6 dark:bg-zinc-900">
             <div className="mb-2 flex items-center justify-between">
                 <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
                     {title}
-                </span>
-                <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                    <span className="text-[9px]">▲</span>+28.7%
                 </span>
             </div>
             <span className="font-mono text-[22px] font-semibold tracking-tight text-gray-900 tabular-nums dark:text-gray-100">
@@ -55,7 +52,6 @@ function StatCard({ title, value, icon: Icon }: StatCardProps) {
 }
 
 export default function Analytics({ workspace, stats }: Props) {
-    // Get the first stats object if it's an array, or handle accordingly
     const currentStats = Array.isArray(stats) ? stats[0] : stats;
 
     const statCards = [
@@ -96,16 +92,6 @@ export default function Analytics({ workspace, stats }: Props) {
         },
     ];
 
-    // Calculate summary metrics
-    const totalOrders = Object.values(currentStats || {}).reduce(
-        (sum, val) => sum + (typeof val === 'number' ? val : 0),
-        0,
-    );
-
-    const completionRate = currentStats?.total_delivered
-        ? ((currentStats.total_delivered / totalOrders) * 100).toFixed(1)
-        : 0;
-
     return (
         <AppLayout>
             <div className="px-6 py-6">
@@ -126,17 +112,20 @@ export default function Analytics({ workspace, stats }: Props) {
                     ))}
                 </div>
 
-                {/* Detailed Breakdown Section */}
-                <div className="mt-8">
-                    <div className="mb-4">
-                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                            Category Breakdown
-                        </h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                            Detailed analysis by category and region
-                        </p>
+                {/* Charts Row 1: Delivery Trend + Status Breakdown */}
+                <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+                    <div className="lg:col-span-2">
+                        <DeliveryTrend workspace={workspace} />
                     </div>
-                    <BreakdownPerCategory />
+                    <div>
+                        <StatusBreakdown workspace={workspace} />
+                    </div>
+                </div>
+
+                {/* Charts Row 2: Top Assignees + Per Page */}
+                <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    <TopAssignees workspace={workspace} />
+                    <PerPageBreakdown workspace={workspace} />
                 </div>
             </div>
         </AppLayout>
