@@ -79,119 +79,119 @@ export function RmoFilterBar({
             <div className="h-4 w-px bg-black/8 dark:bg-white/8" />
 
             {/* Filter group */}
-            <div className="flex items-center gap-1">
+            {/*<div className="flex items-center gap-1">*/}
 
-                {/* Page filter */}
-                <DropdownMenu>
-                    <DropdownMenuTrigger className={cn(triggerBase, selectedPageId ? triggerActive : triggerIdle)}>
-                        <span className={cn('font-normal', selectedPageId ? 'text-emerald-400 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-500')}>
-                            Page
-                        </span>
-                        <span className={cn('h-3 w-px', selectedPageId ? 'bg-emerald-200 dark:bg-emerald-500/30' : 'bg-black/8 dark:bg-white/8')} />
-                        <span className="max-w-[120px] truncate">
-                            {uniquePages.find((p) => p.id === selectedPageId)?.name ?? 'All'}
-                        </span>
-                        <ChevronDown className="h-3 w-3 opacity-30" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-48 max-h-72 overflow-y-auto p-1">
-                        <DropdownMenuItem
-                            onClick={() => onPageChange('')}
-                            className={cn(itemBase, !selectedPageId && 'font-semibold text-gray-800 dark:text-gray-200')}
-                        >
-                            All Pages
-                        </DropdownMenuItem>
-                        {uniquePages.map((page) => (
-                            <DropdownMenuItem
-                                key={page.id}
-                                onClick={() => onPageChange(page.id)}
-                                className={cn(itemBase, selectedPageId === page.id && 'font-semibold text-gray-800 dark:text-gray-200')}
-                            >
-                                {page.name}
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
+            {/*    /!* Page filter *!/*/}
+            {/*    <DropdownMenu>*/}
+            {/*        <DropdownMenuTrigger className={cn(triggerBase, selectedPageId ? triggerActive : triggerIdle)}>*/}
+            {/*            <span className={cn('font-normal', selectedPageId ? 'text-emerald-400 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-500')}>*/}
+            {/*                Page*/}
+            {/*            </span>*/}
+            {/*            <span className={cn('h-3 w-px', selectedPageId ? 'bg-emerald-200 dark:bg-emerald-500/30' : 'bg-black/8 dark:bg-white/8')} />*/}
+            {/*            <span className="max-w-[120px] truncate">*/}
+            {/*                {uniquePages.find((p) => p.id === selectedPageId)?.name ?? 'All'}*/}
+            {/*            </span>*/}
+            {/*            <ChevronDown className="h-3 w-3 opacity-30" />*/}
+            {/*        </DropdownMenuTrigger>*/}
+            {/*        <DropdownMenuContent align="start" className="w-48 max-h-72 overflow-y-auto p-1">*/}
+            {/*            <DropdownMenuItem*/}
+            {/*                onClick={() => onPageChange('')}*/}
+            {/*                className={cn(itemBase, !selectedPageId && 'font-semibold text-gray-800 dark:text-gray-200')}*/}
+            {/*            >*/}
+            {/*                All Pages*/}
+            {/*            </DropdownMenuItem>*/}
+            {/*            {uniquePages.map((page) => (*/}
+            {/*                <DropdownMenuItem*/}
+            {/*                    key={page.id}*/}
+            {/*                    onClick={() => onPageChange(page.id)}*/}
+            {/*                    className={cn(itemBase, selectedPageId === page.id && 'font-semibold text-gray-800 dark:text-gray-200')}*/}
+            {/*                >*/}
+            {/*                    {page.name}*/}
+            {/*                </DropdownMenuItem>*/}
+            {/*            ))}*/}
+            {/*        </DropdownMenuContent>*/}
+            {/*    </DropdownMenu>*/}
 
-                {/* J&T Status filter */}
-                <DropdownMenu>
-                    <DropdownMenuTrigger className={cn(triggerBase, selectedParcelStatus ? triggerActive : triggerIdle)}>
-                        <span className={cn('font-normal', selectedParcelStatus ? 'text-emerald-400 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-500')}>
-                            J&amp;T
-                        </span>
-                        <span className={cn('h-3 w-px', selectedParcelStatus ? 'bg-emerald-200 dark:bg-emerald-500/30' : 'bg-black/8 dark:bg-white/8')} />
-                        {selectedParcelStatus ? (
-                            <span className="flex items-center gap-1.5">
-                                <span className={`h-1.5 w-1.5 rounded-full ${parcelStatusConfig[selectedParcelStatus]?.dot}`} />
-                                {parcelStatusConfig[selectedParcelStatus]?.label}
-                            </span>
-                        ) : (
-                            <span>All</span>
-                        )}
-                        <ChevronDown className="h-3 w-3 opacity-30" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-44 max-h-72 overflow-y-auto p-1">
-                        <DropdownMenuItem
-                            onClick={() => onParcelStatusChange('')}
-                            className={cn(itemBase, !selectedParcelStatus && 'font-semibold text-gray-800 dark:text-gray-200')}
-                        >
-                            All Status
-                        </DropdownMenuItem>
-                        {parcelStatusOptions.map((s) => {
-                            const cfg = parcelStatusConfig[s];
-                            return (
-                                <DropdownMenuItem
-                                    key={s}
-                                    onClick={() => onParcelStatusChange(s)}
-                                    className={cn(itemBase, selectedParcelStatus === s && 'font-semibold text-gray-800 dark:text-gray-200')}
-                                >
-                                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cfg.dot}`} />
-                                    {cfg.label}
-                                </DropdownMenuItem>
-                            );
-                        })}
-                    </DropdownMenuContent>
-                </DropdownMenu>
+            {/*    /!* J&T Status filter *!/*/}
+            {/*    <DropdownMenu>*/}
+            {/*        <DropdownMenuTrigger className={cn(triggerBase, selectedParcelStatus ? triggerActive : triggerIdle)}>*/}
+            {/*            <span className={cn('font-normal', selectedParcelStatus ? 'text-emerald-400 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-500')}>*/}
+            {/*                J&amp;T*/}
+            {/*            </span>*/}
+            {/*            <span className={cn('h-3 w-px', selectedParcelStatus ? 'bg-emerald-200 dark:bg-emerald-500/30' : 'bg-black/8 dark:bg-white/8')} />*/}
+            {/*            {selectedParcelStatus ? (*/}
+            {/*                <span className="flex items-center gap-1.5">*/}
+            {/*                    <span className={`h-1.5 w-1.5 rounded-full ${parcelStatusConfig[selectedParcelStatus]?.dot}`} />*/}
+            {/*                    {parcelStatusConfig[selectedParcelStatus]?.label}*/}
+            {/*                </span>*/}
+            {/*            ) : (*/}
+            {/*                <span>All</span>*/}
+            {/*            )}*/}
+            {/*            <ChevronDown className="h-3 w-3 opacity-30" />*/}
+            {/*        </DropdownMenuTrigger>*/}
+            {/*        <DropdownMenuContent align="start" className="w-44 max-h-72 overflow-y-auto p-1">*/}
+            {/*            <DropdownMenuItem*/}
+            {/*                onClick={() => onParcelStatusChange('')}*/}
+            {/*                className={cn(itemBase, !selectedParcelStatus && 'font-semibold text-gray-800 dark:text-gray-200')}*/}
+            {/*            >*/}
+            {/*                All Status*/}
+            {/*            </DropdownMenuItem>*/}
+            {/*            {parcelStatusOptions.map((s) => {*/}
+            {/*                const cfg = parcelStatusConfig[s];*/}
+            {/*                return (*/}
+            {/*                    <DropdownMenuItem*/}
+            {/*                        key={s}*/}
+            {/*                        onClick={() => onParcelStatusChange(s)}*/}
+            {/*                        className={cn(itemBase, selectedParcelStatus === s && 'font-semibold text-gray-800 dark:text-gray-200')}*/}
+            {/*                    >*/}
+            {/*                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cfg.dot}`} />*/}
+            {/*                        {cfg.label}*/}
+            {/*                    </DropdownMenuItem>*/}
+            {/*                );*/}
+            {/*            })}*/}
+            {/*        </DropdownMenuContent>*/}
+            {/*    </DropdownMenu>*/}
 
-                {/* Order Status filter */}
-                <DropdownMenu>
-                    <DropdownMenuTrigger className={cn(triggerBase, selectedStatus ? triggerActive : triggerIdle)}>
-                        <span className={cn('font-normal', selectedStatus ? 'text-emerald-400 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-500')}>
-                            Status
-                        </span>
-                        <span className={cn('h-3 w-px', selectedStatus ? 'bg-emerald-200 dark:bg-emerald-500/30' : 'bg-black/8 dark:bg-white/8')} />
-                        {selectedStatus ? (
-                            <span className="flex items-center gap-1.5">
-                                <span className={`h-1.5 w-1.5 rounded-full ${orderStatusConfig[selectedStatus]?.dot ?? 'bg-gray-400'}`} />
-                                {selectedStatus}
-                            </span>
-                        ) : (
-                            <span>All</span>
-                        )}
-                        <ChevronDown className="h-3 w-3 opacity-30" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-52 max-h-72 overflow-y-auto p-1">
-                        <DropdownMenuItem
-                            onClick={() => onStatusChange('')}
-                            className={cn(itemBase, !selectedStatus && 'font-semibold text-gray-800 dark:text-gray-200')}
-                        >
-                            All Status
-                        </DropdownMenuItem>
-                        {ORDER_STATUSES.map((s) => {
-                            const dot = orderStatusConfig[s]?.dot ?? 'bg-gray-400';
-                            return (
-                                <DropdownMenuItem
-                                    key={s}
-                                    onClick={() => onStatusChange(s)}
-                                    className={cn(itemBase, selectedStatus === s && 'font-semibold text-gray-800 dark:text-gray-200')}
-                                >
-                                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
-                                    {s}
-                                </DropdownMenuItem>
-                            );
-                        })}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
+            {/*    /!* Order Status filter *!/*/}
+            {/*    <DropdownMenu>*/}
+            {/*        <DropdownMenuTrigger className={cn(triggerBase, selectedStatus ? triggerActive : triggerIdle)}>*/}
+            {/*            <span className={cn('font-normal', selectedStatus ? 'text-emerald-400 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-500')}>*/}
+            {/*                Status*/}
+            {/*            </span>*/}
+            {/*            <span className={cn('h-3 w-px', selectedStatus ? 'bg-emerald-200 dark:bg-emerald-500/30' : 'bg-black/8 dark:bg-white/8')} />*/}
+            {/*            {selectedStatus ? (*/}
+            {/*                <span className="flex items-center gap-1.5">*/}
+            {/*                    <span className={`h-1.5 w-1.5 rounded-full ${orderStatusConfig[selectedStatus]?.dot ?? 'bg-gray-400'}`} />*/}
+            {/*                    {selectedStatus}*/}
+            {/*                </span>*/}
+            {/*            ) : (*/}
+            {/*                <span>All</span>*/}
+            {/*            )}*/}
+            {/*            <ChevronDown className="h-3 w-3 opacity-30" />*/}
+            {/*        </DropdownMenuTrigger>*/}
+            {/*        <DropdownMenuContent align="start" className="w-52 max-h-72 overflow-y-auto p-1">*/}
+            {/*            <DropdownMenuItem*/}
+            {/*                onClick={() => onStatusChange('')}*/}
+            {/*                className={cn(itemBase, !selectedStatus && 'font-semibold text-gray-800 dark:text-gray-200')}*/}
+            {/*            >*/}
+            {/*                All Status*/}
+            {/*            </DropdownMenuItem>*/}
+            {/*            {ORDER_STATUSES.map((s) => {*/}
+            {/*                const dot = orderStatusConfig[s]?.dot ?? 'bg-gray-400';*/}
+            {/*                return (*/}
+            {/*                    <DropdownMenuItem*/}
+            {/*                        key={s}*/}
+            {/*                        onClick={() => onStatusChange(s)}*/}
+            {/*                        className={cn(itemBase, selectedStatus === s && 'font-semibold text-gray-800 dark:text-gray-200')}*/}
+            {/*                    >*/}
+            {/*                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />*/}
+            {/*                        {s}*/}
+            {/*                    </DropdownMenuItem>*/}
+            {/*                );*/}
+            {/*            })}*/}
+            {/*        </DropdownMenuContent>*/}
+            {/*    </DropdownMenu>*/}
+            {/*</div>*/}
 
             {/* Clear filters */}
             {hasActiveFilters && (

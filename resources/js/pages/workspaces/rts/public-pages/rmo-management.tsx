@@ -35,8 +35,6 @@ interface Props {
 }
 
 export default function RmoManagement({ orders, workspace, query, users }: Props) {
-    const [isLoadingID, setIsLoadingID] = useState<number | null>(null);
-    const [assigningOrderId, setAssigningOrderId] = useState<number | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [selectedStatus, setSelectedStatus] = useState<string>(query?.filter?.status ?? '');
     const [selectedPageId, setSelectedPageId] = useState<string>(query?.filter?.page_id ?? '');
@@ -68,17 +66,18 @@ export default function RmoManagement({ orders, workspace, query, users }: Props
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
-                    'filter[status]': selectedStatus || undefined,
-                    'filter[page_id]': selectedPageId || undefined,
-                    'filter[parcel_status]': selectedParcelStatus || undefined,
-                    'filter[shop_id]': query?.filter?.shop_id || undefined,
-                    page: (searchValue || selectedStatus || selectedPageId || selectedParcelStatus) ? 1 : (query?.page ?? 1),
+                    page: searchValue ? 1 : (query?.page ?? 1),
                 },
-                { preserveState: true, replace: true, preserveScroll: true, only: ['orders'] },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['orders'],
+                },
             );
         }, 500);
         return () => clearTimeout(timer);
-    }, [searchValue, selectedStatus, selectedPageId, selectedParcelStatus, query?.sort, query?.filter?.shop_id]);
+    }, [searchValue]);
 
     const doAssign = (orderId: number, currentStatus: string, userId: string | null) => {
         const payload = userId === null
@@ -89,8 +88,6 @@ export default function RmoManagement({ orders, workspace, query, users }: Props
             payload,
             {
                 preserveScroll: true,
-                onStart: () => setAssigningOrderId(orderId),
-                onFinish: () => setAssigningOrderId(null),
             },
         );
     };
@@ -102,8 +99,6 @@ export default function RmoManagement({ orders, workspace, query, users }: Props
             { status, userId },
             {
                 preserveScroll: true,
-                onStart: () => setIsLoadingID(orderId),
-                onFinish: () => setIsLoadingID(null),
             },
         );
     };
@@ -133,15 +128,14 @@ export default function RmoManagement({ orders, workspace, query, users }: Props
         doAssign(orderId, currentStatus, null);
     };
 
-    const columns = useMemo(() => createRmoColumns({
-        isLoadingID,
+    const columns = createRmoColumns({
         onChangeStatus: handleChangeStatus,
         parcelStatusConfig: publicParcelStatusConfig,
         normalizeParcelStatus: (s) => s?.toUpperCase(),
         onAssignToMe: handleAssignToMe,
         onRemoveAssignee: handleRemoveAssignee,
-        assigningOrderId,
-    }), [isLoadingID, assigningOrderId]);
+        disableStatusChange: !userName,
+    });
 
     return (
         <div className="min-h-screen bg-stone-50 dark:bg-zinc-950">
@@ -206,7 +200,7 @@ export default function RmoManagement({ orders, workspace, query, users }: Props
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 {/* Page title */}
                 <div className="mb-6">
-                    <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+                    <h1 className="my-0! text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">
                         RMO Management
                     </h1>
                     <p className="mt-0.5 text-[13px] text-gray-400 dark:text-gray-500">
@@ -241,10 +235,6 @@ export default function RmoManagement({ orders, workspace, query, users }: Props
                                 {
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
-                                    'filter[status]': selectedStatus || undefined,
-                                    'filter[page_id]': selectedPageId || undefined,
-                                    'filter[parcel_status]': selectedParcelStatus || undefined,
-                                    'filter[shop_id]': query?.filter?.shop_id || undefined,
                                     page: params?.page ?? 1,
                                 },
                                 { preserveState: true, replace: true, preserveScroll: true },
