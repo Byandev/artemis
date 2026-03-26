@@ -61,6 +61,11 @@ export function AppSidebar() {
             icon: Users,
         },
         {
+            title: 'Employees',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/employees`,
+            icon: User,
+        },
+        {
             title: 'RMO Management',
             icon: PhoneCall,
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/rmo-management`,

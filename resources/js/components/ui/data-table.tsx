@@ -20,6 +20,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { Inbox } from 'lucide-react';
 import { toBackendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { TriangleDownIcon, TriangleUpIcon } from '@radix-ui/react-icons';
@@ -105,9 +106,17 @@ export function DataTable<TData, TValue>({
                                 </TableRow>
                             ))
                         ) : (
-                            <TableRow>
-                                <TableCell colSpan={columns.length} className="h-24 text-center">
-                                    No results.
+                            <TableRow className="hover:bg-transparent">
+                                <TableCell colSpan={columns.length} className="py-16 text-center">
+                                    <div className="flex flex-col items-center gap-3">
+                                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-stone-100 dark:bg-zinc-800">
+                                            <Inbox className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="font-mono text-[12px] font-medium text-gray-600 dark:text-gray-400">No results found</p>
+                                            <p className="font-mono text-[11px] text-gray-400 dark:text-gray-600">Try adjusting your search or filters</p>
+                                        </div>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         )}

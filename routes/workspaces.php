@@ -17,6 +17,7 @@ use App\Http\Controllers\Workspaces\RTS\AnalyticController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
+use App\Http\Controllers\Workspaces\EmployeeController;
 use App\Http\Controllers\Workspaces\TeamController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
@@ -139,6 +140,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'show'])->name('workspaces.api.optimization-rules.show');
     Route::put('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'update'])->name('workspaces.api.optimization-rules.update');
     Route::delete('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'destroy'])->name('workspaces.api.optimization-rules.destroy');
+
+    // Employee routes
+    Route::get('/workspaces/{workspace}/employees', [EmployeeController::class, 'index'])->name('workspaces.employees.index');
 
     // Team routes
     Route::get('/workspaces/{workspace}/teams', [TeamController::class, 'index'])->name('workspaces.teams.index');
