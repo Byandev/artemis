@@ -98,7 +98,7 @@ export function DataTable<TData, TValue>({
                                     className="hover:bg-emerald-500/[0.03] transition-colors"
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id} className='px-4 py-3 text-[13px] text-gray-500 dark:text-gray-400 border-b border-black/6 dark:border-white/6'>
+                                        <TableCell key={cell.id} className='px-4 py-3  text-[12px] text-black dark:text-gray-400 border-b border-black/6 dark:border-white/6 align-top'>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}
@@ -117,10 +117,10 @@ export function DataTable<TData, TValue>({
 
             {
                 meta?.links?.length &&
-                <div className="border-t border-black/6 dark:border-white/6 py-3 pl-[18px] pr-4">
+                <div className=" border-black/6 dark:border-white/6 py-3 pl-[18px] pr-4">
                     <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
-                        <div className="pb-3 xl:pb-0">
-                            <p className="pb-3 text-sm font-medium text-center text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
+                        <div className="">
+                            <p className="font-mono text-xs font-light   text-center text-gray-400 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
                                 Showing {meta?.from} to {meta?.to} of {meta?.total} entries
                             </p>
                         </div>
