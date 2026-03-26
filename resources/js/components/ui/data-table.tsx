@@ -98,7 +98,7 @@ export function DataTable<TData, TValue>({
                                     className="hover:bg-emerald-500/[0.03] transition-colors"
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id} className='px-4 py-3 text-[13px] text-gray-500 dark:text-gray-400 border-b border-black/6 dark:border-white/6'>
+                                        <TableCell key={cell.id} className='px-4 py-3  text-[12px] text-black dark:text-gray-400 border-b border-black/6 dark:border-white/6 align-top'>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}
