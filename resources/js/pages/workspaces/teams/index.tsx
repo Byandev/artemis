@@ -2,6 +2,13 @@ import PageHeader from '@/components/common/PageHeader';
 import { DeleteTeamDialog } from '@/components/teams/delete-team-dialog';
 import { TeamFormDialog } from '@/components/teams/team-form-dialog';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData, User } from '@/types';
@@ -9,7 +16,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { Pencil, Search, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 interface Team {
@@ -86,27 +93,29 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
         },
         {
             id: 'actions',
-            header: () => <div className="text-center font-mono text-[10px] font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600">Actions</div>,
             cell: ({ row }) => {
                 if (!isAdmin) return null;
                 const team = row.original;
                 return (
-                    <div className="flex items-center justify-center gap-1">
-                        <button
-                            onClick={() => setEditingTeam(team)}
-                            className="flex h-7 items-center gap-1.5 rounded-lg border border-black/6 bg-stone-50 px-2.5 font-mono! text-[11px]! font-medium text-gray-600 transition-all hover:border-black/12 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:border-white/12 dark:hover:bg-zinc-700"
-                        >
-                            <Pencil className="h-3 w-3" />
-                            Edit
-                        </button>
-                        <div className="h-4 w-px bg-black/6 dark:bg-white/6" />
-                        <button
-                            onClick={() => setTeamToDelete(team)}
-                            className="flex h-7 items-center gap-1.5 rounded-lg border border-black/6 bg-stone-50 px-2.5 font-mono! text-[11px]! font-medium text-red-400 transition-all hover:border-red-200 hover:bg-red-50 dark:border-white/6 dark:bg-zinc-800 dark:text-red-400 dark:hover:border-red-500/20 dark:hover:bg-red-500/10"
-                        >
-                            <Trash2 className="h-3 w-3" />
-                            Delete
-                        </button>
+                    <div className="flex justify-end">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
+                                    <MoreHorizontal className="h-3.5 w-3.5" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-36">
+                                <DropdownMenuItem onClick={() => setEditingTeam(team)}>
+                                    <Pencil />
+                                    Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem variant="destructive" onClick={() => setTeamToDelete(team)}>
+                                    <Trash2 />
+                                    Delete
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 );
             },

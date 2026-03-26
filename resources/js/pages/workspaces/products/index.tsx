@@ -125,21 +125,18 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
                 return (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                            </Button>
+                            <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
+                                <MoreHorizontal className="h-3.5 w-3.5" />
+                            </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                        <DropdownMenuContent align="end" className="w-36">
                             <DropdownMenuItem onClick={() => handleEdit(product)}>
-                                <Edit className="mr-2 h-4 w-4" />
+                                <Edit />
                                 Edit
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onClick={() => setProductToDelete(product)}
-                                className="text-destructive focus:text-destructive"
-                            >
-                                <Trash2 className="mr-2 h-4 w-4" />
+                            <DropdownMenuItem variant="destructive" onClick={() => setProductToDelete(product)}>
+                                <Trash2 />
                                 Delete
                             </DropdownMenuItem>
                         </DropdownMenuContent>

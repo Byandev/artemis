@@ -4,12 +4,20 @@ import { DataTable } from '@/components/ui/data-table';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
     Pencil,
     Archive,
     RefreshCcw,
     Search,
     AlertTriangle,
-    ShieldCheck
+    ShieldCheck,
+    MoreHorizontal,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast, Toaster } from 'sonner';
@@ -104,51 +112,35 @@ export default function Index({ roles, workspace }: Props) {
         // },
         {
             id: 'actions',
-            header: () => <div className="font-mono font-medium text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600 text-center">Actions</div>,
             cell: ({ row }) => (
-                <div className="flex items-center justify-center gap-2">
-                    {!row.original.deleted_at ? (
-                        <>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-3 text-xs font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-100 flex items-center gap-2"
-                                onClick={() => {
-                                    setSelectedRole(row.original)
-                                    setOpenFormModal(true)
-                                }}
-                            >
-                                <Pencil className="w-3.5 h-3.5" />
-                                Edit
-                            </Button>
-                            <div className="h-4 w-px bg-gray-200 mx-1" />
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-3 text-xs font-bold text-red-500 hover:text-red-700 hover:bg-red-50 flex items-center gap-2"
-                                onClick={() => {
-                                    setSelectedRole(row.original);
-                                    setIsArchiveModalOpen(true);
-                                }}
-                            >
-                                <Archive className="w-3.5 h-3.5" />
-                                Archive
-                            </Button>
-                        </>
-                    ) : (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-3 text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 flex items-center gap-2"
-                            onClick={() => {
-                                setSelectedRole(row.original);
-                                setIsRestoreModalOpen(true);
-                            }}
-                        >
-                            <RefreshCcw className="w-3.5 h-3.5" />
-                            Restore
-                        </Button>
-                    )}
+                <div className="flex justify-end">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
+                                <MoreHorizontal className="h-3.5 w-3.5" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                            {!row.original.deleted_at ? (
+                                <>
+                                    <DropdownMenuItem onClick={() => { setSelectedRole(row.original); setOpenFormModal(true); }}>
+                                        <Pencil />
+                                        Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem variant="destructive" onClick={() => { setSelectedRole(row.original); setIsArchiveModalOpen(true); }}>
+                                        <Archive />
+                                        Archive
+                                    </DropdownMenuItem>
+                                </>
+                            ) : (
+                                <DropdownMenuItem onClick={() => { setSelectedRole(row.original); setIsRestoreModalOpen(true); }}>
+                                    <RefreshCcw />
+                                    Restore
+                                </DropdownMenuItem>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             )
         }
