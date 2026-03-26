@@ -113,6 +113,10 @@ const BreakdownPerPages = ({ workspace, queryString }: Props) => {
             axisTicks: {
                 show: false,
             },
+            labels: {
+                formatter: (val: string) =>
+                    val.split(/\s+/).map((w) => w[0]?.toUpperCase() ?? '').join(''),
+            },
         },
         legend: {
             show: true,
