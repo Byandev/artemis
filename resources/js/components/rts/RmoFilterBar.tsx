@@ -5,9 +5,9 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { ORDER_STATUSES, getStatusBadgeClass } from '@/types/models/Pancake/OrderForDelivery';
+import { ORDER_STATUSES } from '@/types/models/Pancake/OrderForDelivery';
 import { ChevronDown, Search, X } from 'lucide-react';
-import { ParcelStatusEntry } from './rmo-config';
+import { orderStatusConfig, ParcelStatusEntry } from './rmo-config';
 
 export interface UniquePage {
     id: string;
@@ -30,6 +30,14 @@ interface Props {
     selectedStatus: string;
     onStatusChange: (status: string) => void;
 }
+
+// Shared trigger classes
+const triggerBase = 'flex h-8 items-center gap-2 rounded-lg border px-3 font-mono! text-[12px]! font-medium outline-none transition-all cursor-pointer';
+const triggerIdle = 'border-black/6 bg-stone-100 text-gray-700 hover:border-black/12 hover:bg-stone-200/60 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:border-white/12 dark:hover:bg-zinc-700/60';
+const triggerActive = 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400';
+
+// Shared dropdown item classes
+const itemBase = 'flex items-center gap-2 rounded-md px-2.5 py-1.5 font-mono! text-[12px]! cursor-pointer text-gray-600 dark:text-gray-400';
 
 export function RmoFilterBar({
     searchValue,
@@ -56,11 +64,11 @@ export function RmoFilterBar({
     return (
         <div className="mb-3 flex flex-wrap items-center gap-2">
             {/* Search */}
-            <div className="relative w-64">
+            <div className="relative w-60">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                 <input
                     type="text"
-                    className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-mono! text-[12px]! text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
+                    className="h-8 w-full rounded-lg border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-mono! text-[12px]! text-gray-700 dark:text-gray-300 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
                     placeholder="Search orders…"
                     value={searchValue}
                     onChange={(e) => onSearchChange(e.target.value)}
@@ -68,31 +76,36 @@ export function RmoFilterBar({
             </div>
 
             {/* Divider */}
-            <div className="h-5 w-px bg-black/8 dark:bg-white/8" />
+            <div className="h-4 w-px bg-black/8 dark:bg-white/8" />
 
             {/* Filter group */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
+
                 {/* Page filter */}
                 <DropdownMenu>
-                    <DropdownMenuTrigger className={cn(
-                        'flex h-8 items-center gap-2 rounded-lg border px-2.5 text-[12px] font-medium outline-none transition-all',
-                        selectedPageId
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400'
-                            : 'border-black/6 bg-stone-100 text-gray-600 hover:border-black/12 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:border-white/12',
-                    )}>
-                        <span className={cn('text-[11px] font-normal', selectedPageId ? 'text-emerald-500 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-500')}>
+                    <DropdownMenuTrigger className={cn(triggerBase, selectedPageId ? triggerActive : triggerIdle)}>
+                        <span className={cn('font-normal', selectedPageId ? 'text-emerald-400 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-500')}>
                             Page
                         </span>
-                        <span className={cn('h-3 w-px', selectedPageId ? 'bg-emerald-200 dark:bg-emerald-500/30' : 'bg-gray-200 dark:bg-gray-700')} />
+                        <span className={cn('h-3 w-px', selectedPageId ? 'bg-emerald-200 dark:bg-emerald-500/30' : 'bg-black/8 dark:bg-white/8')} />
                         <span className="max-w-[120px] truncate">
-                            {uniquePages.find((p) => p.id === selectedPageId)?.name || 'All'}
+                            {uniquePages.find((p) => p.id === selectedPageId)?.name ?? 'All'}
                         </span>
-                        <ChevronDown className="h-3 w-3 opacity-40" />
+                        <ChevronDown className="h-3 w-3 opacity-30" />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
-                        <DropdownMenuItem onClick={() => onPageChange('')}>All Pages</DropdownMenuItem>
+                    <DropdownMenuContent align="start" className="w-48 max-h-72 overflow-y-auto p-1">
+                        <DropdownMenuItem
+                            onClick={() => onPageChange('')}
+                            className={cn(itemBase, !selectedPageId && 'font-semibold text-gray-800 dark:text-gray-200')}
+                        >
+                            All Pages
+                        </DropdownMenuItem>
                         {uniquePages.map((page) => (
-                            <DropdownMenuItem key={page.id} onClick={() => onPageChange(page.id)}>
+                            <DropdownMenuItem
+                                key={page.id}
+                                onClick={() => onPageChange(page.id)}
+                                className={cn(itemBase, selectedPageId === page.id && 'font-semibold text-gray-800 dark:text-gray-200')}
+                            >
                                 {page.name}
                             </DropdownMenuItem>
                         ))}
@@ -101,29 +114,38 @@ export function RmoFilterBar({
 
                 {/* J&T Status filter */}
                 <DropdownMenu>
-                    <DropdownMenuTrigger className={cn(
-                        'flex h-8 items-center gap-2 rounded-lg border px-2.5 text-[12px] font-medium outline-none transition-all',
-                        selectedParcelStatus
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400'
-                            : 'border-black/6 bg-stone-100 text-gray-600 hover:border-black/12 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:border-white/12',
-                    )}>
-                        <span className={cn('text-[11px] font-normal', selectedParcelStatus ? 'text-emerald-500 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-500')}>
+                    <DropdownMenuTrigger className={cn(triggerBase, selectedParcelStatus ? triggerActive : triggerIdle)}>
+                        <span className={cn('font-normal', selectedParcelStatus ? 'text-emerald-400 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-500')}>
                             J&amp;T
                         </span>
-                        <span className={cn('h-3 w-px', selectedParcelStatus ? 'bg-emerald-200 dark:bg-emerald-500/30' : 'bg-gray-200 dark:bg-gray-700')} />
-                        <span>{selectedParcelStatus ? parcelStatusConfig[selectedParcelStatus]?.label : 'All'}</span>
-                        <ChevronDown className="h-3 w-3 opacity-40" />
+                        <span className={cn('h-3 w-px', selectedParcelStatus ? 'bg-emerald-200 dark:bg-emerald-500/30' : 'bg-black/8 dark:bg-white/8')} />
+                        {selectedParcelStatus ? (
+                            <span className="flex items-center gap-1.5">
+                                <span className={`h-1.5 w-1.5 rounded-full ${parcelStatusConfig[selectedParcelStatus]?.dot}`} />
+                                {parcelStatusConfig[selectedParcelStatus]?.label}
+                            </span>
+                        ) : (
+                            <span>All</span>
+                        )}
+                        <ChevronDown className="h-3 w-3 opacity-30" />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
-                        <DropdownMenuItem onClick={() => onParcelStatusChange('')}>All Status</DropdownMenuItem>
+                    <DropdownMenuContent align="start" className="w-44 max-h-72 overflow-y-auto p-1">
+                        <DropdownMenuItem
+                            onClick={() => onParcelStatusChange('')}
+                            className={cn(itemBase, !selectedParcelStatus && 'font-semibold text-gray-800 dark:text-gray-200')}
+                        >
+                            All Status
+                        </DropdownMenuItem>
                         {parcelStatusOptions.map((s) => {
                             const cfg = parcelStatusConfig[s];
                             return (
-                                <DropdownMenuItem key={s} onClick={() => onParcelStatusChange(s)}>
-                                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${cfg.pill}`}>
-                                        <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-                                        {cfg.label}
-                                    </span>
+                                <DropdownMenuItem
+                                    key={s}
+                                    onClick={() => onParcelStatusChange(s)}
+                                    className={cn(itemBase, selectedParcelStatus === s && 'font-semibold text-gray-800 dark:text-gray-200')}
+                                >
+                                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cfg.dot}`} />
+                                    {cfg.label}
                                 </DropdownMenuItem>
                             );
                         })}
@@ -132,26 +154,41 @@ export function RmoFilterBar({
 
                 {/* Order Status filter */}
                 <DropdownMenu>
-                    <DropdownMenuTrigger className={cn(
-                        'flex h-8 items-center gap-2 rounded-lg border px-2.5 text-[12px] font-medium outline-none transition-all',
-                        selectedStatus
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400'
-                            : 'border-black/6 bg-stone-100 text-gray-600 hover:border-black/12 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:border-white/12',
-                    )}>
-                        <span className={cn('text-[11px] font-normal', selectedStatus ? 'text-emerald-500 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-500')}>
+                    <DropdownMenuTrigger className={cn(triggerBase, selectedStatus ? triggerActive : triggerIdle)}>
+                        <span className={cn('font-normal', selectedStatus ? 'text-emerald-400 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-500')}>
                             Status
                         </span>
-                        <span className={cn('h-3 w-px', selectedStatus ? 'bg-emerald-200 dark:bg-emerald-500/30' : 'bg-gray-200 dark:bg-gray-700')} />
-                        <span>{selectedStatus || 'All'}</span>
-                        <ChevronDown className="h-3 w-3 opacity-40" />
+                        <span className={cn('h-3 w-px', selectedStatus ? 'bg-emerald-200 dark:bg-emerald-500/30' : 'bg-black/8 dark:bg-white/8')} />
+                        {selectedStatus ? (
+                            <span className="flex items-center gap-1.5">
+                                <span className={`h-1.5 w-1.5 rounded-full ${orderStatusConfig[selectedStatus]?.dot ?? 'bg-gray-400'}`} />
+                                {selectedStatus}
+                            </span>
+                        ) : (
+                            <span>All</span>
+                        )}
+                        <ChevronDown className="h-3 w-3 opacity-30" />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
-                        <DropdownMenuItem onClick={() => onStatusChange('')}>All Status</DropdownMenuItem>
-                        {ORDER_STATUSES.map((s) => (
-                            <DropdownMenuItem key={s} onClick={() => onStatusChange(s)}>
-                                <span className={getStatusBadgeClass(s)}>{s}</span>
-                            </DropdownMenuItem>
-                        ))}
+                    <DropdownMenuContent align="start" className="w-52 max-h-72 overflow-y-auto p-1">
+                        <DropdownMenuItem
+                            onClick={() => onStatusChange('')}
+                            className={cn(itemBase, !selectedStatus && 'font-semibold text-gray-800 dark:text-gray-200')}
+                        >
+                            All Status
+                        </DropdownMenuItem>
+                        {ORDER_STATUSES.map((s) => {
+                            const dot = orderStatusConfig[s]?.dot ?? 'bg-gray-400';
+                            return (
+                                <DropdownMenuItem
+                                    key={s}
+                                    onClick={() => onStatusChange(s)}
+                                    className={cn(itemBase, selectedStatus === s && 'font-semibold text-gray-800 dark:text-gray-200')}
+                                >
+                                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
+                                    {s}
+                                </DropdownMenuItem>
+                            );
+                        })}
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
@@ -160,9 +197,9 @@ export function RmoFilterBar({
             {hasActiveFilters && (
                 <button
                     onClick={clearFilters}
-                    className="flex h-8 items-center gap-1.5 rounded-lg border border-black/6 dark:border-white/6 px-2.5 text-[12px] font-medium text-gray-400 dark:text-gray-500 transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-500 dark:hover:border-red-500/20 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                    className="flex h-8 items-center gap-1.5 rounded-lg border border-black/6 dark:border-white/6 px-2.5 font-mono! text-[12px]! font-medium text-gray-400 dark:text-gray-500 transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-500 dark:hover:border-red-500/20 dark:hover:bg-red-500/10 dark:hover:text-red-400"
                 >
-                    <X className="h-3.5 w-3.5" />
+                    <X className="h-3 w-3" />
                     Clear
                 </button>
             )}
