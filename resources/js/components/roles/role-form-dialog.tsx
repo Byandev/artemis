@@ -1,19 +1,14 @@
 import { Workspace } from '@/types/models/Workspace';
 import { Role } from '@/types/models/Role';
-import {
-    Dialog,
-    DialogContent,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@headlessui/react';
-import {  useForm } from '@inertiajs/react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { useForm } from '@inertiajs/react';
 import React, { useEffect, useMemo } from 'react';
 
 interface Props {
-    workspace: Workspace
+    workspace: Workspace;
     role?: Role;
     open: boolean;
-    onOpenChange: (value: boolean) => void
+    onOpenChange: (value: boolean) => void;
 }
 
 const RoleFormDialog = ({ workspace, open, onOpenChange, role }: Props) => {
@@ -25,89 +20,93 @@ const RoleFormDialog = ({ workspace, open, onOpenChange, role }: Props) => {
     useEffect(() => {
         if (role) {
             setData('name', role.name);
-            setData('description', role.description)
+            setData('description', role.description);
         } else {
-            reset()
+            reset();
         }
     }, [reset, role, setData]);
 
-    const isEditing = useMemo(() => !!role, [role])
+    const isEditing = useMemo(() => !!role, [role]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-
         if (isEditing) {
             patch(`/workspaces/${workspace.slug}/roles/${role?.id}`, {
-                onSuccess: () => {
-                    onOpenChange(false);
-                }
+                onSuccess: () => onOpenChange(false),
             });
         } else {
             post(`/workspaces/${workspace.slug}/roles`, {
-                onSuccess: () => {
-                    reset();
-                    onOpenChange(false);
-                },
+                onSuccess: () => { reset(); onOpenChange(false); },
             });
         }
     };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogTitle>{isEditing ? 'Update role' : 'Create role'}</DialogTitle>
+            <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+                <div className="px-5 pt-5 pb-4 border-b border-black/6 dark:border-white/6">
+                    <DialogHeader>
+                        <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
+                            {isEditing ? 'Edit Role' : 'Create Role'}
+                        </DialogTitle>
+                        <DialogDescription className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5">
+                            {isEditing ? 'Update the role name and description' : 'Define a new access level for your workspace'}
+                        </DialogDescription>
+                    </DialogHeader>
+                </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-1.5">
-                        <label className="ml-1 text-xs font-bold text-gray-700">
-                            Role Identifier
-                        </label>
-                        <input
-                            type="text"
-                            value={data.name}
-                            onChange={(e) => setData('name', e.target.value)}
-                            placeholder="e.g. moderator"
-                            className={`w-full rounded-lg border px-4 py-2.5 text-sm transition-all outline-none focus:border-[#2dd4bf] focus:ring-4 focus:ring-[#2dd4bf]/10 ${
-                                errors.name
-                                    ? 'border-red-500'
-                                    : 'border-gray-200'
-                            }`}
-                        />
-                        {errors.name && (
-                            <p className="text-[10px] font-semibold text-red-500">
-                                {errors.name}
-                            </p>
-                        )}
+                <form onSubmit={handleSubmit}>
+                    <div className="space-y-5 px-5 py-4">
+                        <div className="space-y-1.5">
+                            <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                Role Name <span className="text-red-400">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                autoFocus
+                                value={data.name}
+                                onChange={(e) => setData('name', e.target.value)}
+                                placeholder="e.g. Sales Agent"
+                                className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                            />
+                            {errors.name && <p className="font-mono text-[11px] text-red-500">{errors.name}</p>}
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                Description
+                            </label>
+                            <textarea
+                                rows={3}
+                                value={data.description}
+                                onChange={(e) => setData('description', e.target.value)}
+                                placeholder="Briefly describe the responsibilities…"
+                                className="w-full resize-none rounded-[10px] border border-black/8 bg-stone-50 px-3 py-2.5 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                            />
+                            {errors.description && <p className="font-mono text-[11px] text-red-500">{errors.description}</p>}
+                        </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                        <label className="ml-1 text-xs font-bold text-gray-700">
-                            Description
-                        </label>
-                        <textarea
-                            rows={3}
-                            value={data.description}
-                            onChange={(e) =>
-                                setData('description', e.target.value)
-                            }
-                            placeholder="Briefly describe the responsibilities..."
-                            className="w-full resize-none rounded-lg border border-gray-200 px-4 py-2.5 text-sm transition-all outline-none focus:border-[#2dd4bf] focus:ring-4 focus:ring-[#2dd4bf]/10"
-                        />
-                    </div>
-
-                    <div className="flex flex-col items-center gap-3 pt-4">
-                        <Button
+                    <div className="flex items-center justify-end gap-2 border-t border-black/6 dark:border-white/6 px-5 py-3">
+                        <button
+                            type="button"
+                            onClick={() => onOpenChange(false)}
+                            className="flex h-9 items-center rounded-lg border border-black/8 bg-stone-100 px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+                        >
+                            Cancel
+                        </button>
+                        <button
                             type="submit"
                             disabled={processing}
-                            className="w-full rounded-lg bg-[#2dd4bf] py-5 font-bold text-white shadow-md shadow-teal-100 transition-transform hover:bg-[#26b2a1] active:scale-95 sm:w-56"
+                            className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                         >
-                            {processing ? 'Submitting...' : 'Submit'}
-                        </Button>
+                            {processing ? (isEditing ? 'Saving…' : 'Creating…') : (isEditing ? 'Save Changes' : 'Create Role')}
+                        </button>
                     </div>
                 </form>
             </DialogContent>
         </Dialog>
     );
-}
+};
 
 export default RoleFormDialog;

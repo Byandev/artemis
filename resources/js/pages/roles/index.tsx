@@ -172,12 +172,12 @@ export default function Index({ roles, workspace }: Props) {
                     title="Role Management"
                     description="Define and manage access levels for your workspace"
                 >
-                    <Button
-                        size={'sm'}
+                    <button
                         onClick={() => setOpenFormModal(true)}
+                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
                     >
                         Add New Role
-                    </Button>
+                    </button>
                 </PageHeader>
 
                 <div className="mb-3 flex items-center gap-2">

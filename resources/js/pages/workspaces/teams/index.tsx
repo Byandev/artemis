@@ -1,24 +1,16 @@
 import PageHeader from '@/components/common/PageHeader';
 import { DeleteTeamDialog } from '@/components/teams/delete-team-dialog';
 import { TeamFormDialog } from '@/components/teams/team-form-dialog';
-import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData, User } from '@/types';
+import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { Edit, MoreHorizontal, Search, Trash2 } from 'lucide-react';
+import { Pencil, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Workspace } from '@/types/models/Workspace';
 
 interface Team {
     id: number;
@@ -26,7 +18,6 @@ interface Team {
     members_count: number;
     members: User[];
 }
-
 
 interface Props {
     workspace: Workspace;
@@ -37,16 +28,12 @@ interface Props {
         sort?: string | null;
         perPage?: number | string;
         page?: number | string;
-        filter?: {
-            search?: string;
-        };
+        filter?: { search?: string };
     };
 }
 
 export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin, query }: Props) {
-    const initialSorting = useMemo(() => {
-        return toFrontendSort(query?.sort ?? null);
-    }, [query?.sort]);
+    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
 
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [editingTeam, setEditingTeam] = useState<Team | null>(null);
@@ -60,87 +47,67 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
-                    page: searchValue ? 1 : query?.page ?? 1
+                    page: searchValue ? 1 : query?.page ?? 1,
                 },
-                {
-                    preserveState: true,
-                    replace: true,
-                    preserveScroll: true,
-                    only: ['teams'],
-                },
+                { preserveState: true, replace: true, preserveScroll: true, only: ['teams'] },
             );
         }, 500);
-
         return () => clearTimeout(timer);
     }, [searchValue]);
 
-    const handleEdit = (team: Team) => {
-        setEditingTeam(team);
-    };
-
-    const handleDelete = (team: Team) => {
-        setTeamToDelete(team);
-    };
-
     const columns: ColumnDef<Team>[] = [
-        {
-            accessorKey: 'id',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'ID'} />
-            ),
-        },
         {
             accessorKey: 'name',
             enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Team Name'} />
+            header: ({ column }) => <SortableHeader column={column} title="Team Name" />,
+            cell: ({ row }) => (
+                <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200">{row.original.name}</span>
             ),
         },
         {
             accessorKey: 'members_count',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Members'} />
-            ),
+            header: ({ column }) => <SortableHeader column={column} title="Members" />,
             cell: ({ row }) => {
                 const count = row.original.members_count;
-                const memberNames = row.original.members?.map(m => m.name).join(', ') || 'No members';
+                const names = row.original.members?.map((m) => m.name).join(', ');
                 return (
-                    <div>
-                        <span className="font-medium">{count} {count === 0 || count === 1 ? 'member' : 'members'}</span>
-                        {count > 0 && <span className="text-xs text-muted-foreground ml-2">({memberNames.length > 50 ? memberNames.substring(0, 50) + '...' : memberNames})</span>}
+                    <div className="space-y-0.5">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-400">
+                            {count} {count === 1 ? 'member' : 'members'}
+                        </span>
+                        {count > 0 && (
+                            <p className="max-w-[260px] truncate font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                                {names}
+                            </p>
+                        )}
                     </div>
                 );
             },
         },
         {
             id: 'actions',
+            header: () => <div className="text-center font-mono text-[10px] font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600">Actions</div>,
             cell: ({ row }) => {
-                const team = row.original;
-
                 if (!isAdmin) return null;
-
+                const team = row.original;
                 return (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEdit(team)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onClick={() => handleDelete(team)}
-                                className="text-destructive focus:text-destructive"
-                            >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex items-center justify-center gap-1">
+                        <button
+                            onClick={() => setEditingTeam(team)}
+                            className="flex h-7 items-center gap-1.5 rounded-lg border border-black/6 bg-stone-50 px-2.5 font-mono! text-[11px]! font-medium text-gray-600 transition-all hover:border-black/12 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:border-white/12 dark:hover:bg-zinc-700"
+                        >
+                            <Pencil className="h-3 w-3" />
+                            Edit
+                        </button>
+                        <div className="h-4 w-px bg-black/6 dark:bg-white/6" />
+                        <button
+                            onClick={() => setTeamToDelete(team)}
+                            className="flex h-7 items-center gap-1.5 rounded-lg border border-black/6 bg-stone-50 px-2.5 font-mono! text-[11px]! font-medium text-red-400 transition-all hover:border-red-200 hover:bg-red-50 dark:border-white/6 dark:bg-zinc-800 dark:text-red-400 dark:hover:border-red-500/20 dark:hover:bg-red-500/10"
+                        >
+                            <Trash2 className="h-3 w-3" />
+                            Delete
+                        </button>
+                    </div>
                 );
             },
         },
@@ -150,26 +117,23 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
         <AppLayout>
             <Head title={`${workspace.name} - Teams`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <PageHeader
-                    title="Teams"
-                    description="Organize members into teams for better collaboration"
-                >
+                <PageHeader title="Teams" description="Organize members into teams for better collaboration">
                     {isAdmin && (
-                        <Button
-                            size="sm"
+                        <button
                             onClick={() => setCreateDialogOpen(true)}
+                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
                         >
                             Create Team
-                        </Button>
+                        </button>
                     )}
                 </PageHeader>
 
                 <div className="mb-3 flex items-center gap-2">
                     <div className="relative w-full max-w-xs">
-                        <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
-                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
-                            placeholder="Search team name..."
+                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pl-8 pr-3 font-mono! text-[12px]! text-gray-800 outline-none transition-all placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                            placeholder="Search teams…"
                             value={searchValue}
                             onChange={(e) => setSearchValue(e.target.value)}
                         />
@@ -191,31 +155,22 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                                     'filter[search]': searchValue || undefined,
                                     page: params?.page ?? 1,
                                 },
-                                {
-                                    preserveState: true,
-                                    replace: true,
-                                    preserveScroll: true,
-                                },
+                                { preserveState: true, replace: true, preserveScroll: true },
                             );
                         }}
                     />
                 </div>
 
-                {/* Create/Edit Team Dialog */}
                 <TeamFormDialog
                     open={createDialogOpen || editingTeam !== null}
                     onOpenChange={(open) => {
-                        if (!open) {
-                            setCreateDialogOpen(false);
-                            setEditingTeam(null);
-                        }
+                        if (!open) { setCreateDialogOpen(false); setEditingTeam(null); }
                     }}
                     team={editingTeam}
                     workspace={workspace}
                     workspaceMembers={workspaceMembers}
                 />
 
-                {/* Delete Confirmation Dialog */}
                 <DeleteTeamDialog
                     team={teamToDelete}
                     workspace={workspace}
