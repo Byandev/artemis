@@ -112,21 +112,21 @@ export default function Analytics({ workspace, stats }: Props) {
                     ))}
                 </div>
 
-                {/* Charts Row 1: Delivery Trend + Status Breakdown */}
-                <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <div className="lg:col-span-2">
-                        <DeliveryTrend workspace={workspace} />
-                    </div>
-                    <div>
-                        <StatusBreakdown workspace={workspace} />
-                    </div>
-                </div>
+                {/*/!* Charts Row 1: Delivery Trend + Status Breakdown *!/*/}
+                {/*<div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">*/}
+                {/*    <div className="lg:col-span-2">*/}
+                {/*        <DeliveryTrend workspace={workspace} />*/}
+                {/*    </div>*/}
+                {/*    <div>*/}
+                {/*        <StatusBreakdown workspace={workspace} />*/}
+                {/*    </div>*/}
+                {/*</div>*/}
 
-                {/* Charts Row 2: Top Assignees + Per Page */}
-                <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <TopAssignees workspace={workspace} />
-                    <PerPageBreakdown workspace={workspace} />
-                </div>
+                {/*/!* Charts Row 2: Top Assignees + Per Page *!/*/}
+                {/*<div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">*/}
+                {/*    <TopAssignees workspace={workspace} />*/}
+                {/*    <PerPageBreakdown workspace={workspace} />*/}
+                {/*</div>*/}
             </div>
         </AppLayout>
     );
