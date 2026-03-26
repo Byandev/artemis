@@ -12,7 +12,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
-import { currencyFormatter, percentageFormatter } from '@/lib/utils';
+import { cn, currencyFormatter, percentageFormatter } from '@/lib/utils';
 import { PaginatedData } from '@/types';
 import {
     ORDER_STATUSES,
@@ -20,17 +20,18 @@ import {
     getStatusBadgeClass,
 } from '@/types/models/Pancake/OrderForDelivery';
 import { Workspace } from '@/types/models/Workspace';
-import { router, useForm } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import {
-    ChevronUp,
+    Check,
+    ChevronDown,
     Loader2,
     MapPin,
     Phone,
     Search,
+    X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Input } from '@/components/ui/input';
 import { omit } from 'lodash';
 import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
@@ -52,6 +53,32 @@ interface Props {
     };
 }
 
+const parcelStatusConfig: Record<string, { label: string; dot: string; pill: string }> = {
+    delivered:        { label: 'Delivered',        dot: 'bg-emerald-500', pill: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' },
+    returning:        { label: 'Returning',        dot: 'bg-orange-400',  pill: 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400' },
+    returned:         { label: 'Returned',         dot: 'bg-red-500',     pill: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400' },
+    undeliverable:    { label: 'Undeliverable',    dot: 'bg-rose-500',    pill: 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' },
+    on_the_way:       { label: 'On the Way',       dot: 'bg-blue-500',    pill: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400' },
+    out_for_delivery: { label: 'Out for Delivery', dot: 'bg-violet-500',  pill: 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400' },
+};
+
+const parcelStatusOptions = Object.keys(parcelStatusConfig);
+
+const orderStatusConfig: Record<string, { dot: string; text: string }> = {
+    'PENDING':            { dot: 'bg-yellow-400',  text: 'text-yellow-700 dark:text-yellow-400' },
+    'DELIVERED':          { dot: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-400' },
+    'RIDER OTW':          { dot: 'bg-blue-500',    text: 'text-blue-700 dark:text-blue-400' },
+    'RETURNING':          { dot: 'bg-orange-400',  text: 'text-orange-700 dark:text-orange-400' },
+    'RESCHEDULED':        { dot: 'bg-purple-400',  text: 'text-purple-700 dark:text-purple-400' },
+    'CX CBR':             { dot: 'bg-red-500',     text: 'text-red-700 dark:text-red-400' },
+    'RIDER CBR':          { dot: 'bg-red-500',     text: 'text-red-700 dark:text-red-400' },
+    'CANCELLED':          { dot: 'bg-gray-400',    text: 'text-gray-500 dark:text-gray-400' },
+    'WRONG SEGMENT CODE': { dot: 'bg-rose-500',    text: 'text-rose-700 dark:text-rose-400' },
+    'CX RINGING':         { dot: 'bg-amber-400',   text: 'text-amber-700 dark:text-amber-400' },
+    'RIDER RINGING':      { dot: 'bg-amber-400',   text: 'text-amber-700 dark:text-amber-400' },
+    'IN TRANSIT':         { dot: 'bg-cyan-500',    text: 'text-cyan-700 dark:text-cyan-400' },
+};
+
 export default function RmoManagement({ orders, workspace, query }: Props) {
     const [isLoadingID, setIsLoadingID] = useState<number | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
@@ -63,18 +90,6 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
 
-    // Static J&T Status Options
-    const parcelStatusOptions = [
-        'DELIVERED',
-        'PENDING',
-        'RETURNED',
-        'UNDELIVERABLE',
-        'CANCELLED',
-        'SHIPPED',
-        'OUT FOR DELIVERY'
-    ];
-
-    // Get unique pages with their IDs and names
     const uniquePages = useMemo(() => {
         const pagesMap = new Map();
         orders.data?.forEach(order => {
@@ -85,28 +100,12 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
         return Array.from(pagesMap.entries()).map(([id, name]) => ({ id: String(id), name }));
     }, [orders.data]);
 
-    // Function to get badge class for parcel status
-    const getParcelStatusBadgeClass = (status: string) => {
-        const statusUpper = status?.toUpperCase() || '';
-        if (statusUpper === 'DELIVERED') return 'bg-green-100 text-green-800';
-        if (statusUpper === 'RETURNED') return 'bg-red-100 text-red-800';
-        if (statusUpper === 'PENDING') return 'bg-yellow-100 text-yellow-800';
-        if (statusUpper === 'UNDELIVERABLE') return 'bg-orange-100 text-orange-800';
-        if (statusUpper === 'CANCELLED') return 'bg-gray-100 text-gray-800';
-        if (statusUpper === 'SHIPPED') return 'bg-blue-100 text-blue-800';
-        if (statusUpper === 'OUT FOR DELIVERY') return 'bg-purple-100 text-purple-800';
-        return 'bg-gray-100 text-gray-800';
-    };
-
-    // Update the useEffect to properly handle all filters
     useEffect(() => {
         const timer = setTimeout(() => {
-            const currentSort = query?.sort;
-
             router.get(
                 workspaces.rts.rmoManagement({ workspace }),
                 {
-                    sort: currentSort,
+                    sort: query?.sort,
                     'filter[search]': searchValue || undefined,
                     'filter[status]': selectedStatus || undefined,
                     'filter[page_id]': selectedPageId || undefined,
@@ -124,21 +123,12 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [
-        searchValue,
-        selectedStatus,
-        selectedPageId,
-        selectedParcelStatus,
-        query?.sort,
-        query?.filter?.shop_id,
-    ]);
+    }, [searchValue, selectedStatus, selectedPageId, selectedParcelStatus, query?.sort, query?.filter?.shop_id]);
 
     const handleChangeStatus = (status: string, orderId: number) => {
         router.post(
             `/workspaces/${workspace.slug}/rts/rmo-management/${orderId}`,
-            {
-                status,
-            },
+            { status },
             {
                 preserveScroll: true,
                 onStart: () => setIsLoadingID(orderId),
@@ -147,22 +137,8 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
         );
     };
 
-    // Handle status filter change
-    const handleStatusFilterChange = (status: string) => {
-        setSelectedStatus(status === 'ALL' ? '' : status);
-    };
+    const hasActiveFilters = !!(selectedStatus || selectedPageId || selectedParcelStatus || searchValue);
 
-    // Handle page filter change - now using page ID instead of name
-    const handlePageFilterChange = (pageId: string) => {
-        setSelectedPageId(pageId === 'ALL' ? '' : pageId);
-    };
-
-    // Handle parcel status filter change
-    const handleParcelStatusFilterChange = (parcelStatus: string) => {
-        setSelectedParcelStatus(parcelStatus === 'ALL' ? '' : parcelStatus);
-    };
-
-    // Clear all filters
     const clearFilters = () => {
         setSearchValue('');
         setSelectedStatus('');
@@ -174,34 +150,34 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
         {
             accessorKey: 'order_number',
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Order Number'} />
+                <SortableHeader column={column} title="Order #" />
             ),
-            cell: ({ row }) => row.original.order.order_number,
+            cell: ({ row }) => (
+                <span className="font-mono text-[12px] text-gray-500 dark:text-gray-400">
+                    {row.original.order.order_number}
+                </span>
+            ),
         },
         {
-            accessorFn: (row) =>
-                (row.order.items ?? []).map((item) => item.name).join(', '),
+            accessorFn: (row) => (row.order.items ?? []).map((item) => item.name).join(', '),
             id: 'items',
             enableSorting: false,
             header: ({ column }) => (
-                <SortableHeader
-                    enabled={false}
-                    column={column}
-                    title={'Orders'}
-                />
+                <SortableHeader enabled={false} column={column} title="Items" />
             ),
             cell: ({ row }) => {
                 const items = row.original.order.items ?? [];
-                const page = row.original.page.name;
-
+                const pageName = row.original.page?.name;
                 return (
-                    <div>
-                        <ul>
-                            {items.map((item, index) => (
-                                <li key={index}>{item.name}</li>
-                            ))}
-                        </ul>
-                        <p className="text-gray-500">{page}</p>
+                    <div className="space-y-0.5">
+                        {items.map((item, i) => (
+                            <p key={i} className="text-[12px] font-medium text-gray-800 dark:text-gray-200 leading-snug">
+                                {item.name}
+                            </p>
+                        ))}
+                        {pageName && (
+                            <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{pageName}</p>
+                        )}
                     </div>
                 );
             },
@@ -210,20 +186,27 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
             accessorKey: 'order.tracking_code',
             enableSorting: true,
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Tracking Number'} />
+                <SortableHeader column={column} title="Tracking #" />
+            ),
+            cell: ({ row }) => (
+                <span className="font-mono text-[12px] text-gray-500 dark:text-gray-400">
+                    {row.original.order.tracking_code ?? '—'}
+                </span>
             ),
         },
         {
             accessorKey: 'order.parcel_status',
             enableSorting: true,
             header: ({ column }) => (
-                <SortableHeader column={column} title={'J&T Status'} />
+                <SortableHeader column={column} title="J&T Status" />
             ),
             cell: ({ row }) => {
-                const parcelStatus = row.original.order.parcel_status;
+                const key = row.original.order.parcel_status?.toLowerCase();
+                const cfg = parcelStatusConfig[key];
                 return (
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${getParcelStatusBadgeClass(parcelStatus)}`}>
-                        {parcelStatus || 'N/A'}
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${cfg?.pill ?? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${cfg?.dot ?? 'bg-gray-400'}`} />
+                        {cfg?.label ?? key ?? '—'}
                     </span>
                 );
             },
@@ -231,57 +214,54 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
         {
             accessorKey: 'rider_name',
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Rider'} />
+                <SortableHeader column={column} title="Rider" />
             ),
-            cell: ({ row }) => {
-                return (
-                    <div className="flex flex-col">
-                        <p>{row.original.rider_name}</p>
-                        <p className="mt-1 flex items-center text-xs text-gray-500">
-                            <Phone className="m-0 mr-1 h-3 w-3" />
-                            {row.original.rider_phone}{' '}
+            cell: ({ row }) => (
+                <div className="space-y-0.5">
+                    <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
+                        {row.original.rider_name || '—'}
+                    </p>
+                    {row.original.rider_phone && (
+                        <p className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
+                            <Phone className="h-3 w-3 shrink-0" />
+                            {row.original.rider_phone}
                         </p>
-                    </div>
-                );
-            },
+                    )}
+                </div>
+            ),
         },
         {
             accessorKey: 'order.shipping_address.full_name',
             enableSorting: true,
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Customer'} />
+                <SortableHeader column={column} title="Customer" />
             ),
             cell: ({ row }) => {
+                const addr = row.original.order.shipping_address;
                 return (
-                    <div className="flex flex-col text-gray-500">
-                        <p className="text-black">
-                            {row.original.order.shipping_address?.full_name}
+                    <div className="space-y-0.5">
+                        <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
+                            {addr?.full_name || '—'}
                         </p>
-                        <p className="mt-1 flex items-center text-xs text-gray-500">
-                            <Phone className="m-0 mr-1 h-3 w-3" />
-                            {row.original.order.shipping_address?.phone_number}
-                        </p>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <div className="flex w-40 items-center truncate">
-                                    <MapPin className="mr-1 h-3 w-3 shrink-0" />
-                                    <span className="truncate">
-                                        {
-                                            row.original.order.shipping_address
-                                                ?.full_address
-                                        }
-                                    </span>
-                                </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p className="max-w-xs">
-                                    {
-                                        row.original.order.shipping_address
-                                            ?.full_address
-                                    }
-                                </p>
-                            </TooltipContent>
-                        </Tooltip>
+                        {addr?.phone_number && (
+                            <p className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
+                                <Phone className="h-3 w-3 shrink-0" />
+                                {addr.phone_number}
+                            </p>
+                        )}
+                        {addr?.full_address && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <p className="flex max-w-[160px] items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500 cursor-default">
+                                        <MapPin className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">{addr.full_address}</span>
+                                    </p>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                    <p className="max-w-xs text-xs">{addr.full_address}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        )}
                     </div>
                 );
             },
@@ -290,105 +270,121 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
             accessorKey: 'order.shipping_address.city_order_summary.rts_rate',
             enableSorting: true,
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Location RTS'} />
+                <SortableHeader column={column} title="Loc. RTS" />
             ),
-            cell: ({ row }) =>
-                percentageFormatter(
-                    row.original.order?.shipping_address?.city_order_summary
-                        ?.rts_rate ?? 0,
-                ),
+            cell: ({ row }) => {
+                const rate = row.original.order?.shipping_address?.city_order_summary?.rts_rate ?? 0;
+                const isHigh = rate >= 0.4;
+                return (
+                    <span className={`text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                        {percentageFormatter(rate)}
+                    </span>
+                );
+            },
         },
         {
             accessorKey: 'order.final_amount',
             enableSorting: true,
             header: ({ column }) => (
-                <SortableHeader column={column} title={'SRP'} />
+                <SortableHeader column={column} title="SRP" />
             ),
-            cell: ({ row }) => {
-                const final_amount = row.original.order.final_amount;
-                return <p>{currencyFormatter(final_amount)}</p>;
-            },
+            cell: ({ row }) => (
+                <span className="font-mono text-[12px] text-gray-700 dark:text-gray-300 tabular-nums">
+                    {currencyFormatter(row.original.order.final_amount)}
+                </span>
+            ),
         },
         {
             accessorKey: 'order.delivery_attempts',
             enableSorting: true,
             header: ({ column }) => (
-                <SortableHeader column={column} title={'# of Attempts'} />
+                <SortableHeader column={column} title="Attempts" />
             ),
+            cell: ({ row }) => {
+                const attempts = row.original.order.delivery_attempts ?? 0;
+                const isMultiple = attempts > 1;
+                return (
+                    <span className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums ${
+                        isMultiple
+                            ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+                            : 'text-gray-500 dark:text-gray-400'
+                    }`}>
+                        {attempts}
+                    </span>
+                );
+            },
         },
-
         {
             accessorKey: 'conferrer.name',
             enableSorting: true,
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Confirmed By'} />
+                <SortableHeader column={column} title="Confirmed By" />
+            ),
+            cell: ({ row }) => (
+                <span className="text-[12px] text-gray-600 dark:text-gray-400">
+                    {row.original.conferrer?.name ?? <span className="italic text-gray-300 dark:text-gray-600">—</span>}
+                </span>
             ),
         },
-
         {
             accessorKey: 'status',
             enableSorting: true,
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Status'} />
+                <SortableHeader column={column} title="Status" />
             ),
             cell: ({ row }) => {
                 const orderId = row.original.order_id;
                 const currentStatus = row.original.status;
                 const isLoading = isLoadingID === orderId;
 
+                if (isLoading) {
+                    return (
+                        <div className="flex items-center gap-2 rounded-lg border border-black/6 dark:border-white/6 bg-stone-50 dark:bg-zinc-800/50 px-2.5 py-1.5 text-[12px] text-gray-400 dark:text-gray-500">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Updating…
+                        </div>
+                    );
+                }
+
+                const cfg = orderStatusConfig[currentStatus];
+
                 return (
-                    <>
-                        {isLoading ? (
-                            <div className="flex items-center gap-2">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                <span className="text-xs text-gray-500">
-                                    Updating...
-                                </span>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger className="group flex items-center gap-2 rounded-lg border border-black/8 dark:border-white/8 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-[12px] font-medium text-gray-700 dark:text-gray-200 shadow-xs outline-none transition-all hover:border-black/15 dark:hover:border-white/15 hover:shadow-sm">
+                            <span className={`h-2 w-2 shrink-0 rounded-full ${cfg?.dot ?? 'bg-gray-400'}`} />
+                            <span className="max-w-[110px] truncate">{currentStatus}</span>
+                            <ChevronDown className="h-3 w-3 shrink-0 text-gray-400 transition-colors group-hover:text-gray-600 dark:group-hover:text-gray-300" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52 overflow-hidden p-1">
+                            <p className="px-2 pb-1.5 pt-1 font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                Change status
+                            </p>
+                            <div className="max-h-72 overflow-y-auto">
+                                {ORDER_STATUSES.map((s) => {
+                                    const sCfg = orderStatusConfig[s];
+                                    const isActive = s === currentStatus;
+                                    return (
+                                        <DropdownMenuItem
+                                            key={s}
+                                            onClick={() => handleChangeStatus(s, orderId)}
+                                            className={cn(
+                                                'flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-[12px]',
+                                                isActive
+                                                    ? 'bg-gray-50 dark:bg-zinc-800'
+                                                    : 'text-gray-600 dark:text-gray-400',
+                                            )}
+                                        >
+                                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${sCfg?.dot ?? 'bg-gray-400'}`} />
+                                            <span className={cn('flex-1', isActive ? `font-semibold ${sCfg?.text ?? ''}` : '')}>
+                                                {s}
+                                            </span>
+                                            {isActive && <Check className="h-3 w-3 text-emerald-500" />}
+                                        </DropdownMenuItem>
+                                    );
+                                })}
                             </div>
-                        ) : (
-                            <DropdownMenu>
-                                <DropdownMenuTrigger
-                                    className={[
-                                        'flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-all',
-                                        'hover:opacity-80 focus:outline-none',
-                                        getStatusBadgeClass(currentStatus),
-                                    ].join(' ')}
-                                >
-                                    {currentStatus}
-                                    <ChevronUp className="h-3 w-3" />
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent
-                                    align="end"
-                                    className="max-h-80 overflow-y-auto"
-                                >
-                                    {ORDER_STATUSES.map((orderStatus) => {
-                                        const statusClass =
-                                            getStatusBadgeClass(orderStatus);
-                                        return (
-                                            <DropdownMenuItem
-                                                className="p-0 focus:bg-transparent"
-                                                key={orderStatus}
-                                                onClick={() =>
-                                                    handleChangeStatus(
-                                                        orderStatus,
-                                                        orderId,
-                                                    )
-                                                }
-                                            >
-                                                <div className="w-full px-2 py-1.5 hover:bg-gray-100">
-                                                    <span
-                                                        className={statusClass}
-                                                    >
-                                                        {orderStatus}
-                                                    </span>
-                                                </div>
-                                            </DropdownMenuItem>
-                                        );
-                                    })}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        )}
-                    </>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 );
             },
         },
@@ -396,219 +392,153 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
 
     return (
         <AppLayout>
-            <div className="p-4 md:p-6">
-                <div className="">
-                    <PageHeader title="RMO Management" description="Track and update delivery status for items out today" />
-                    <div className="mb-3 flex items-center gap-2">
-                        <div className="relative w-full max-w-xs">
-                            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-                            <input
-                                type="text"
-                                className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-mono! text-[12px]! text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
-                                placeholder="Search orders..."
-                            />
-                        </div>
-                    </div>
-                    <ComponentCard>
-                        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-                            <div className="relative w-80 sm:w-64">
-                                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                    <Search className="z-10 h-4 w-4 text-gray-400" />
-                                </div>
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+                <PageHeader
+                    title="RMO Management"
+                    description="Track and update delivery status for items out today"
+                />
 
-                                <Input
-                                    type="text"
-                                    placeholder="Search by order #, tracking #, rider, or conferrer."
-                                    className="h-9 w-80 pl-8 text-sm"
-                                    value={searchValue}
-                                    onChange={(e) =>
-                                        setSearchValue(e.target.value)
-                                    }
-                                />
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                {/* Page Filter Dropdown */}
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger className="flex items-center gap-1 rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
-                                        {uniquePages.find(
-                                            (p) => p.id === selectedPageId,
-                                        )?.name || 'All Pages'}
-                                        <ChevronUp className="h-3 w-3" />
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                        align="end"
-                                        className="max-h-80 overflow-y-auto"
-                                    >
-                                        <DropdownMenuItem
-                                            className="p-0 focus:bg-transparent"
-                                            onClick={() =>
-                                                handlePageFilterChange('ALL')
-                                            }
-                                        >
-                                            <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
-                                                <span>All Pages</span>
-                                            </div>
-                                        </DropdownMenuItem>
-                                        {uniquePages.map((page) => {
-                                            return (
-                                                <DropdownMenuItem
-                                                    className="p-0 focus:bg-transparent"
-                                                    key={page.id}
-                                                    onClick={() =>
-                                                        handlePageFilterChange(
-                                                            page.id,
-                                                        )
-                                                    }
-                                                >
-                                                    <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
-                                                        <span>{page.name}</span>
-                                                    </div>
-                                                </DropdownMenuItem>
-                                            );
-                                        })}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-
-                                {/* J&T Status Filter Dropdown */}
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger className="flex items-center gap-1 rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
-                                        {selectedParcelStatus || 'J&T Status'}
-                                        <ChevronUp className="h-3 w-3" />
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                        align="end"
-                                        className="max-h-80 overflow-y-auto"
-                                    >
-                                        <DropdownMenuItem
-                                            className="p-0 focus:bg-transparent"
-                                            onClick={() =>
-                                                handleParcelStatusFilterChange(
-                                                    'ALL',
-                                                )
-                                            }
-                                        >
-                                            <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
-                                                <span>All Status</span>
-                                            </div>
-                                        </DropdownMenuItem>
-                                        {parcelStatusOptions.map(
-                                            (parcelStatus) => {
-                                                return (
-                                                    <DropdownMenuItem
-                                                        className="p-0 focus:bg-transparent"
-                                                        key={parcelStatus}
-                                                        onClick={() =>
-                                                            handleParcelStatusFilterChange(
-                                                                parcelStatus,
-                                                            )
-                                                        }
-                                                    >
-                                                        <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
-                                                            <span
-                                                                className={`rounded-lg px-2 py-0.5 text-xs ${getParcelStatusBadgeClass(parcelStatus)}`}
-                                                            >
-                                                                {parcelStatus}
-                                                            </span>
-                                                        </div>
-                                                    </DropdownMenuItem>
-                                                );
-                                            },
-                                        )}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-
-                                {/* Status Filter Dropdown */}
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger className="flex items-center gap-1 rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:opacity-80">
-                                        {selectedStatus || 'Order Status'}
-                                        <ChevronUp className="h-3 w-3" />
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                        align="end"
-                                        className="max-h-80 overflow-y-auto"
-                                    >
-                                        <DropdownMenuItem
-                                            className="p-0 focus:bg-transparent"
-                                            onClick={() =>
-                                                handleStatusFilterChange('ALL')
-                                            }
-                                        >
-                                            <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
-                                                <span>All Status</span>
-                                            </div>
-                                        </DropdownMenuItem>
-                                        {ORDER_STATUSES.map((orderStatus) => {
-                                            return (
-                                                <DropdownMenuItem
-                                                    className="p-0 focus:bg-transparent"
-                                                    key={orderStatus}
-                                                    onClick={() =>
-                                                        handleStatusFilterChange(
-                                                            orderStatus,
-                                                        )
-                                                    }
-                                                >
-                                                    <div className="w-full px-2 py-1.5 text-xs hover:bg-gray-100">
-                                                        <span
-                                                            className={getStatusBadgeClass(
-                                                                orderStatus,
-                                                            )}
-                                                        >
-                                                            {orderStatus}
-                                                        </span>
-                                                    </div>
-                                                </DropdownMenuItem>
-                                            );
-                                        })}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-
-                                {/* Clear Filters Button */}
-                                {(selectedStatus ||
-                                    selectedPageId ||
-                                    selectedParcelStatus ||
-                                    searchValue) && (
-                                    <button
-                                        onClick={clearFilters}
-                                        className="rounded-lg border px-2.5 py-2 text-xs font-medium transition-all hover:bg-gray-50"
-                                    >
-                                        Clear Filters
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                        <DataTable
-                            columns={columns}
-                            enableInternalPagination={false}
-                            data={orders.data || []}
-                            initialSorting={initialSorting}
-                            meta={{ ...omit(orders, ['data']) }}
-                            onFetch={(params) => {
-                                router.get(
-                                    workspaces.rts.rmoManagement({ workspace }),
-                                    {
-                                        sort: params?.sort,
-                                        'filter[search]':
-                                            searchValue || undefined,
-                                        'filter[status]':
-                                            selectedStatus || undefined,
-                                        'filter[page_id]':
-                                            selectedPageId || undefined,
-                                        'filter[parcel_status]':
-                                            selectedParcelStatus || undefined,
-                                        'filter[shop_id]':
-                                            query?.filter?.shop_id || undefined,
-                                        page: params?.page ?? 1,
-                                    },
-                                    {
-                                        preserveState: true,
-                                        replace: true,
-                                        preserveScroll: true,
-                                    },
-                                );
-                            }}
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                    {/* Search */}
+                    <div className="relative w-64">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <input
+                            type="text"
+                            className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-mono! text-[12px]! text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
+                            placeholder="Search orders…"
+                            value={searchValue}
+                            onChange={(e) => setSearchValue(e.target.value)}
                         />
                     </div>
+
+                    {/* Divider */}
+                    <div className="h-5 w-px bg-black/8 dark:bg-white/8" />
+
+                    {/* Filter group */}
+                    <div className="flex items-center gap-1.5">
+                        {/* Page filter */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger className={cn(
+                                'flex h-8 items-center gap-2 rounded-lg border px-2.5 text-[12px] font-medium outline-none transition-all',
+                                selectedPageId
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                    : 'border-black/6 bg-stone-100 text-gray-600 hover:border-black/12 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:border-white/12',
+                            )}>
+                                <span className={cn('text-[11px] font-normal', selectedPageId ? 'text-emerald-500 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-500')}>
+                                    Page
+                                </span>
+                                <span className={cn('h-3 w-px', selectedPageId ? 'bg-emerald-200 dark:bg-emerald-500/30' : 'bg-gray-200 dark:bg-gray-700')} />
+                                <span className="max-w-[120px] truncate">
+                                    {uniquePages.find((p) => p.id === selectedPageId)?.name || 'All'}
+                                </span>
+                                <ChevronDown className="h-3 w-3 opacity-40" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
+                                <DropdownMenuItem onClick={() => setSelectedPageId('')}>All Pages</DropdownMenuItem>
+                                {uniquePages.map((page) => (
+                                    <DropdownMenuItem key={page.id} onClick={() => setSelectedPageId(page.id)}>
+                                        {page.name}
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* J&T Status filter */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger className={cn(
+                                'flex h-8 items-center gap-2 rounded-lg border px-2.5 text-[12px] font-medium outline-none transition-all',
+                                selectedParcelStatus
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                    : 'border-black/6 bg-stone-100 text-gray-600 hover:border-black/12 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:border-white/12',
+                            )}>
+                                <span className={cn('text-[11px] font-normal', selectedParcelStatus ? 'text-emerald-500 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-500')}>
+                                    J&amp;T
+                                </span>
+                                <span className={cn('h-3 w-px', selectedParcelStatus ? 'bg-emerald-200 dark:bg-emerald-500/30' : 'bg-gray-200 dark:bg-gray-700')} />
+                                <span>{selectedParcelStatus ? parcelStatusConfig[selectedParcelStatus]?.label : 'All'}</span>
+                                <ChevronDown className="h-3 w-3 opacity-40" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
+                                <DropdownMenuItem onClick={() => setSelectedParcelStatus('')}>All Status</DropdownMenuItem>
+                                {parcelStatusOptions.map((s) => {
+                                    const cfg = parcelStatusConfig[s];
+                                    return (
+                                        <DropdownMenuItem key={s} onClick={() => setSelectedParcelStatus(s)}>
+                                            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${cfg.pill}`}>
+                                                <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+                                                {cfg.label}
+                                            </span>
+                                        </DropdownMenuItem>
+                                    );
+                                })}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Order status filter */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger className={cn(
+                                'flex h-8 items-center gap-2 rounded-lg border px-2.5 text-[12px] font-medium outline-none transition-all',
+                                selectedStatus
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                    : 'border-black/6 bg-stone-100 text-gray-600 hover:border-black/12 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:border-white/12',
+                            )}>
+                                <span className={cn('text-[11px] font-normal', selectedStatus ? 'text-emerald-500 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-500')}>
+                                    Status
+                                </span>
+                                <span className={cn('h-3 w-px', selectedStatus ? 'bg-emerald-200 dark:bg-emerald-500/30' : 'bg-gray-200 dark:bg-gray-700')} />
+                                <span>{selectedStatus || 'All'}</span>
+                                <ChevronDown className="h-3 w-3 opacity-40" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
+                                <DropdownMenuItem onClick={() => setSelectedStatus('')}>All Status</DropdownMenuItem>
+                                {ORDER_STATUSES.map((s) => (
+                                    <DropdownMenuItem key={s} onClick={() => setSelectedStatus(s)}>
+                                        <span className={getStatusBadgeClass(s)}>{s}</span>
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+
+                    {/* Clear filters */}
+                    {hasActiveFilters && (
+                        <button
+                            onClick={clearFilters}
+                            className="flex h-8 items-center gap-1.5 rounded-lg border border-black/6 dark:border-white/6 px-2.5 text-[12px] font-medium text-gray-400 dark:text-gray-500 transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-500 dark:hover:border-red-500/20 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                        >
+                            <X className="h-3.5 w-3.5" />
+                            Clear
+                        </button>
+                    )}
+                </div>
+
+                <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                    <DataTable
+                        columns={columns}
+                        enableInternalPagination={false}
+                        data={orders.data || []}
+                        initialSorting={initialSorting}
+                        meta={{ ...omit(orders, ['data']) }}
+                        onFetch={(params) => {
+                            router.get(
+                                workspaces.rts.rmoManagement({ workspace }),
+                                {
+                                    sort: params?.sort,
+                                    'filter[search]': searchValue || undefined,
+                                    'filter[status]': selectedStatus || undefined,
+                                    'filter[page_id]': selectedPageId || undefined,
+                                    'filter[parcel_status]': selectedParcelStatus || undefined,
+                                    'filter[shop_id]': query?.filter?.shop_id || undefined,
+                                    page: params?.page ?? 1,
+                                },
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true,
+                                },
+                            );
+                        }}
+                    />
                 </div>
             </div>
         </AppLayout>
