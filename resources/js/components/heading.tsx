@@ -6,10 +6,10 @@ export default function Heading({
     description?: string;
 }) {
     return (
-        <div className="mb-8 space-y-0.5">
-            <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+        <div className="pb-5 mb-6 border-b border-black/6 dark:border-white/6">
+            <h1 className="text-[18px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">{title}</h1>
             {description && (
-                <p className="text-sm text-muted-foreground">{description}</p>
+                <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">{description}</p>
             )}
         </div>
     );

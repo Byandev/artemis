@@ -2,9 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Shop;
 use Illuminate\Console\Command;
-use Modules\Pancake\Jobs\FetchShopCustomers;
+use Modules\Pancake\Models\OrderForDelivery;
 
 class TestFunction extends Command
 {
@@ -27,8 +26,20 @@ class TestFunction extends Command
      */
     public function handle()
     {
-        $shop = Shop::first();
+        $items = OrderForDelivery::with([
+            'order' => function ($query) {
+                $query
+                    ->select(['id', 'order_number', 'status_name', 'final_amount', 'parcel_status', 'tracking_code', 'delivery_attempts'])
+                    ->with('shippingAddress');
+            },
+            'conferrer' => function ($query) {
+                $query->select(['id', 'name']);
+            },
+            'page' => function ($query) {
+                $query->select(['id', 'name']);
+            },
+        ])->paginate();
 
-        dispatch(new FetchShopCustomers($shop, 1));
+        dd($items->toArray());
     }
 }

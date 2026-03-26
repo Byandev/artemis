@@ -20,6 +20,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { Inbox } from 'lucide-react';
 import { toBackendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { TriangleDownIcon, TriangleUpIcon } from '@radix-ui/react-icons';
@@ -71,12 +72,12 @@ export function DataTable<TData, TValue>({
         <>
             <div className="max-w-full overflow-x-auto custom-scrollbar">
                 <Table>
-                    <TableHeader className="border-t border-gray-100 dark:border-white/[0.05]">
+                    <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
                                     return (
-                                        <TableHead key={header.id} className="px-4 py-3 border border-gray-100 dark:border-white/[0.05]">
+                                        <TableHead key={header.id} className="px-4 py-2.5 text-[10px] font-mono font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600 border-b border-black/6 dark:border-white/6">
                                             {header.isPlaceholder
                                                 ? null
                                                 : flexRender(
@@ -95,18 +96,27 @@ export function DataTable<TData, TValue>({
                                 <TableRow
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
+                                    className="hover:bg-emerald-500/[0.03] transition-colors"
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id} className='px-4 py-4 border border-gray-100 dark:border-white/[0.05]text-gray-700 text-theme-xs dark:text-gray-400'>
+                                        <TableCell key={cell.id} className='px-4 py-3  text-[12px] text-black dark:text-gray-400 border-b border-black/6 dark:border-white/6 align-top'>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}
                                 </TableRow>
                             ))
                         ) : (
-                            <TableRow>
-                                <TableCell colSpan={columns.length} className="h-24 text-center">
-                                    No results.
+                            <TableRow className="hover:bg-transparent">
+                                <TableCell colSpan={columns.length} className="py-16 text-center">
+                                    <div className="flex flex-col items-center gap-3">
+                                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-stone-100 dark:bg-zinc-800">
+                                            <Inbox className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="font-mono text-[12px] font-medium text-gray-600 dark:text-gray-400">No results found</p>
+                                            <p className="font-mono text-[11px] text-gray-400 dark:text-gray-600">Try adjusting your search or filters</p>
+                                        </div>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         )}
@@ -116,10 +126,10 @@ export function DataTable<TData, TValue>({
 
             {
                 meta?.links?.length &&
-                <div className="border border-t-0 rounded-b-xl border-gray-100 py-4 pl-[18px] pr-4 dark:border-white/[0.05]">
+                <div className=" border-black/6 dark:border-white/6 py-3 pl-[18px] pr-4">
                     <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
-                        <div className="pb-3 xl:pb-0">
-                            <p className="pb-3 text-sm font-medium text-center text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
+                        <div className="">
+                            <p className="font-mono text-xs font-light   text-center text-gray-400 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
                                 Showing {meta?.from} to {meta?.to} of {meta?.total} entries
                             </p>
                         </div>
@@ -155,7 +165,7 @@ export function SortableHeader<TData>({ column, title, enabled = true, className
                 }
             }}
         >
-            <p className="font-medium text-gray-700 text-theme-xs dark:text-gray-400">
+            <p className="font-mono font-medium text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">
                 {title}
             </p>
             {enabled && <button className="flex flex-col">

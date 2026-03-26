@@ -157,7 +157,7 @@ export const metricConfigs: MetricConfig[] = [
         name: 'Time to First Order',
         description:
             'Average time it takes for a customer to place their first order.',
-        formatter: (value: number) => `${value} days`,
+        formatter: (value: number) => `${value} hrs`,
         reverse: true,
     },
     {

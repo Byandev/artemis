@@ -12,10 +12,12 @@ use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\Record\RTSController;
 use App\Http\Controllers\Workspaces\Record\SalesController;
+use App\Http\Controllers\Workspaces\RoleController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
+use App\Http\Controllers\Workspaces\EmployeeController;
 use App\Http\Controllers\Workspaces\TeamController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
@@ -34,11 +36,13 @@ use Modules\Inventory\Http\Controllers\PurchaseOrderController;
 | member management, and invitation handling.
 |
 */
+Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
+Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'publicUpdateStatus'])->name('public-page.rmo-management.updateStatus');
 
 Route::middleware(['auth'])->group(function () {
     // Workspace setup (first-time after registration)
     Route::get('/workspaces/setup', [WorkspaceSetupController::class, 'create'])->name('workspaces.setup');
-    Route::post('/workspaces/setup', [WorkspaceSetupController::class, 'store'])->name('workspaces.setup.store');
+    Route::put('/workspaces/setup', [WorkspaceSetupController::class, 'store'])->name('workspaces.setup.store');
 
     // Workspace dashboard
     Route::get('/workspaces/{workspace}/dashboard', [WorkspaceController::class, 'dashboard'])->name('workspace.dashboard');
@@ -58,7 +62,8 @@ Route::middleware(['auth'])->group(function () {
 
     // Member management routes
     Route::get('/workspaces/{workspace}/members', [WorkspaceMemberController::class, 'index'])->name('workspaces.members.index');
-    Route::put('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'update'])->name('workspaces.members.update');
+    //    Route::put('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'update'])->name('workspaces.members.update');
+    Route::put('/workspaces/{workspace:slug}/members/{user}', [WorkspaceMemberController::class, 'updateMember'])->name('workspaces.members.update');
     Route::delete('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'destroy'])->name('workspaces.members.destroy');
 
     // Invitation routes (authenticated users)
@@ -71,7 +76,9 @@ Route::middleware(['auth'])->group(function () {
     //    Route::post('/workspaces/{workspace}/products', [ProductController::class, 'store'])->name('workspaces.products.store');
 
     Route::get('/workspaces/{workspace}/pages', [PageController::class, 'index'])->name('workspaces.pages.index');
+    Route::get('/workspaces/{workspace}/pages/create', [PageController::class, 'create'])->name('workspaces.pages.create');
     Route::post('/workspaces/{workspace}/pages', [PageController::class, 'store'])->name('workspaces.pages.store');
+    Route::get('/workspaces/{workspace}/pages/{page}/edit', [PageController::class, 'edit'])->name('workspaces.pages.edit');
     Route::put('/workspaces/{workspace}/pages/{page}', [PageController::class, 'update'])->name('workspaces.pages.update');
     Route::post('/workspaces/{workspace}/pages/{page}/refresh', [PageController::class, 'refresh'])->name('workspaces.pages.refresh');
     Route::post('/workspaces/{workspace}/pages/{page}/archive', [PageController::class, 'archive'])->name('workspaces.pages.archive');
@@ -100,11 +107,13 @@ Route::middleware(['auth'])->group(function () {
         return redirect()->route('workspaces.rts.analytics', $workspace);
     })->name('workspaces.rts');
     Route::get('/workspaces/{workspace}/rts/analytics', [AnalyticController::class, 'index'])->name('workspaces.rts.analytics');
+    Route::get('/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'index'])->name('workspaces.rts.rmo-management');
+    Route::post('/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'updateStatus'])->name('workspaces.rts.rmo-updateStatus');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/pages', [AnalyticController::class, 'groupByPages'])->name('workspaces.rts.analytics.group-by-pages');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/shops', [AnalyticController::class, 'groupByShops'])->name('workspaces.rts.analytics.group-by-shops');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/users', [AnalyticController::class, 'groupByUsers'])->name('workspaces.rts.analytics.group-by-users');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/cities', [AnalyticController::class, 'groupByCities'])->name('workspaces.rts.analytics.group-by-cities');
-    Route::get('/workspaces/{workspace}/rts/for-delivery-today', [ForDeliveryController::class, 'index'])->name('workspaces.rts.for-delivery-today');
+    //    Route::get('/workspaces/{workspace}/rts/for-delivery-today', [ForDeliveryController::class, 'index'])->name('workspaces.rts.for-delivery-today');
     Route::get('/workspaces/{workspace}/rts/parcel-update-notification', [ParcelUpdateNotificationController::class, 'index'])->name('workspaces.rts.parcel-update-notification');
     Route::get('/workspaces/{workspace}/rts/parcel-journey-notification-templates', [ParcelUpdateNotificationTemplateController::class, 'index'])->name('workspaces.rts.parcel-journey-notification-templates.index');
     Route::put('/workspaces/{workspace}/rts/parcel-journey-notification-templates/{template}', [ParcelUpdateNotificationTemplateController::class, 'update'])->name('workspaces.rts.parcel-journey-notification-templates.update');
@@ -132,6 +141,9 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'update'])->name('workspaces.api.optimization-rules.update');
     Route::delete('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'destroy'])->name('workspaces.api.optimization-rules.destroy');
 
+    // Employee routes
+    Route::get('/workspaces/{workspace}/employees', [EmployeeController::class, 'index'])->name('workspaces.employees.index');
+
     // Team routes
     Route::get('/workspaces/{workspace}/teams', [TeamController::class, 'index'])->name('workspaces.teams.index');
     Route::post('/workspaces/{workspace}/teams', [TeamController::class, 'store'])->name('workspaces.teams.store');
@@ -150,3 +162,18 @@ Route::middleware(['auth'])->group(function () {
 // Public invitation routes (guest or authenticated)
 Route::get('/workspaces/invitations/{token}', [WorkspaceInvitationController::class, 'show'])->name('workspaces.invitations.show');
 Route::get('/workspaces/invitations/{token}/accept', [WorkspaceInvitationController::class, 'accept'])->name('workspaces.invitations.accept');
+
+Route::prefix('/workspaces/{workspace:slug}')->group(function () {
+
+    // Archive & Restore Logic
+    // Ensure this is PATCH
+    Route::patch('/roles/{role}/archive', [RoleController::class, 'archive'])->name('roles.archive');
+    Route::post('/roles/{role}/restore', [RoleController::class, 'restore'])
+        ->withTrashed()
+        ->name('roles.restore');
+
+    Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
+    Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
+    Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
+
+});

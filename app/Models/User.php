@@ -18,11 +18,7 @@ class User extends Authenticatable implements MustVerifyEmail
      *
      * @var list<string>
      */
-    protected $fillable = [
-        'name',
-        'email',
-        'password',
-    ];
+    protected $fillable = ['name', 'email', 'password', 'role'];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -106,9 +102,14 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isAdminOf(Workspace $workspace): bool
     {
+        // If they are a global superadmin, they are an admin of everything
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         return $this->workspaces()
             ->where('workspace_id', $workspace->id)
-            ->whereIn('role', ['owner', 'admin'])
+            ->whereIn('workspace_user.role', ['owner', 'admin'])
             ->exists();
     }
 
@@ -118,5 +119,31 @@ class User extends Authenticatable implements MustVerifyEmail
     public function ownsWorkspace(Workspace $workspace): bool
     {
         return $workspace->owner_id === $this->id;
+    }
+
+    public function hasWorkspaceRole(Workspace $workspace, string $role): bool
+    {
+        return $this->workspaces()
+            ->where('workspace_id', $workspace->id)
+            ->where('workspace_user.role', $role)
+            ->exists();
+    }
+
+    /**
+     * Check if the user is a global Super Admin.
+     */
+    public function isSuperAdmin(): bool
+    {
+        // This checks the 'role' column on the 'users' table
+        return $this->role === 'superadmin';
+    }
+
+    public function hasReach(string $requiredRole): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        return $this->role === $requiredRole;
     }
 }
