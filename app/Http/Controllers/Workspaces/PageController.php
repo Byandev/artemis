@@ -60,6 +60,35 @@ class PageController extends Controller
         ]);
     }
 
+    public function create(Request $request, Workspace $workspace)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $users = User::get(['id', 'name']);
+
+        return Inertia::render('workspaces/pages/create', [
+            'workspace' => $workspace,
+            'users' => $users,
+        ]);
+    }
+
+    public function edit(Request $request, Workspace $workspace, Page $page)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $users = User::get(['id', 'name']);
+
+        return Inertia::render('workspaces/pages/edit', [
+            'workspace' => $workspace,
+            'page' => $page,
+            'users' => $users,
+        ]);
+    }
+
     public function store(StorePageRequest $request, Workspace $workspace)
     {
 

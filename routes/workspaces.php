@@ -75,7 +75,9 @@ Route::middleware(['auth'])->group(function () {
     //    Route::post('/workspaces/{workspace}/products', [ProductController::class, 'store'])->name('workspaces.products.store');
 
     Route::get('/workspaces/{workspace}/pages', [PageController::class, 'index'])->name('workspaces.pages.index');
+    Route::get('/workspaces/{workspace}/pages/create', [PageController::class, 'create'])->name('workspaces.pages.create');
     Route::post('/workspaces/{workspace}/pages', [PageController::class, 'store'])->name('workspaces.pages.store');
+    Route::get('/workspaces/{workspace}/pages/{page}/edit', [PageController::class, 'edit'])->name('workspaces.pages.edit');
     Route::put('/workspaces/{workspace}/pages/{page}', [PageController::class, 'update'])->name('workspaces.pages.update');
     Route::post('/workspaces/{workspace}/pages/{page}/refresh', [PageController::class, 'refresh'])->name('workspaces.pages.refresh');
     Route::post('/workspaces/{workspace}/pages/{page}/archive', [PageController::class, 'archive'])->name('workspaces.pages.archive');

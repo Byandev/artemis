@@ -1,6 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
 import { ArchivePageDialog } from '@/components/pages/archive-page-dialog';
-import { PageFormDialog } from '@/components/pages/page-form-dialog';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -12,9 +11,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { currencyFormatter } from '@/lib/utils';
 import workspaces from '@/routes/workspaces';
-import { PaginatedData, User } from '@/types';
+import { PaginatedData } from '@/types';
 import { Page } from '@/types/models/Page';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
@@ -42,7 +40,6 @@ interface PagesProps {
             search?: string
         }
     }
-    users: User[];
 }
 
 const StatusBadge = ({ isArchived }: { isArchived: boolean }) => {
@@ -77,15 +74,13 @@ const EnableBadge = ({ isEnabled }: { isEnabled: boolean }) => {
     );
 };
 
-const Pages = ({ pages, workspace, query, users }: PagesProps) => {
+const Pages = ({ pages, workspace, query }: PagesProps) => {
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
 
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [selectedPage, setSelectedPage] = useState<Page | undefined>(undefined);
     const [pageToArchive, setPageToArchive] = useState<Page | null>(null);
 
     const { post, processing } = useForm({});
@@ -112,13 +107,11 @@ const Pages = ({ pages, workspace, query, users }: PagesProps) => {
     }, [searchValue]);
 
     const handleEdit = (page: Page) => {
-        setSelectedPage(page);
-        setDialogOpen(true);
+        router.get(`/workspaces/${workspace.slug}/pages/${page.id}/edit`);
     };
 
     const handleCreate = () => {
-        setSelectedPage(undefined);
-        setDialogOpen(true);
+        router.get(`/workspaces/${workspace.slug}/pages/create`);
     };
 
     const refresh = (page: Page) => {
@@ -287,15 +280,6 @@ const Pages = ({ pages, workspace, query, users }: PagesProps) => {
                         }}
                     />
                 </div>
-
-                {/* Page Form Dialog */}
-                <PageFormDialog
-                    open={dialogOpen}
-                    onOpenChange={setDialogOpen}
-                    page={selectedPage}
-                    workspace={workspace}
-                    users={users}
-                />
 
                 {/* Archive Confirmation Dialog */}
                 <ArchivePageDialog
