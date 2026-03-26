@@ -1,0 +1,72 @@
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import {
+    ORDER_STATUSES,
+    OrderStatus,
+    getStatusBadgeClass,
+} from '@/types/models/Pancake/OrderForDelivery';
+import { Check, ChevronDown, Loader2 } from 'lucide-react';
+import { orderStatusConfig } from './rmo-config';
+
+interface Props {
+    currentStatus: OrderStatus;
+    isLoading: boolean;
+    onChangeStatus: (status: string) => void;
+}
+
+export function RmoStatusPicker({ currentStatus, isLoading, onChangeStatus }: Props) {
+    const cfg = orderStatusConfig[currentStatus];
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center gap-2 rounded-lg border border-black/6 dark:border-white/6 bg-stone-50 dark:bg-zinc-800/50 px-2.5 py-1.5 text-[12px] text-gray-400 dark:text-gray-500">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Updating…
+            </div>
+        );
+    }
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger className="group flex items-center gap-2 rounded-lg border border-black/8 dark:border-white/8 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-[12px] font-medium text-gray-700 dark:text-gray-200 shadow-xs outline-none transition-all hover:border-black/15 dark:hover:border-white/15 hover:shadow-sm">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${cfg?.dot ?? 'bg-gray-400'}`} />
+                <span className="max-w-[110px] truncate">{currentStatus}</span>
+                <ChevronDown className="h-3 w-3 shrink-0 text-gray-400 transition-colors group-hover:text-gray-600 dark:group-hover:text-gray-300" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52 overflow-hidden p-1">
+                <p className="px-2 pb-1.5 pt-1 font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    Change status
+                </p>
+                <div className="max-h-72 overflow-y-auto">
+                    {ORDER_STATUSES.map((s) => {
+                        const sCfg = orderStatusConfig[s];
+                        const isActive = s === currentStatus;
+                        return (
+                            <DropdownMenuItem
+                                key={s}
+                                onClick={() => onChangeStatus(s)}
+                                className={cn(
+                                    'flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-[12px]',
+                                    isActive
+                                        ? 'bg-gray-50 dark:bg-zinc-800'
+                                        : 'text-gray-600 dark:text-gray-400',
+                                )}
+                            >
+                                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${sCfg?.dot ?? 'bg-gray-400'}`} />
+                                <span className={cn('flex-1', isActive ? `font-semibold ${sCfg?.text ?? ''}` : '')}>
+                                    {s}
+                                </span>
+                                {isActive && <Check className="h-3 w-3 text-emerald-500" />}
+                            </DropdownMenuItem>
+                        );
+                    })}
+                </div>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}

@@ -5,7 +5,6 @@ namespace App\Http\Controllers\API\Workspace;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
-use Modules\Pancake\Models\Order;
 
 class AnalyticsController extends Controller
 {
@@ -13,9 +12,9 @@ class AnalyticsController extends Controller
     {
         $workspace = Workspace::find($request->workspace->id);
 
-        $data = \Cache::remember(json_encode($request->only(['date_range', 'filter'])), 5 * 60, function () use ($request, $workspace) {
+        $data = \Cache::remember(json_encode($request->only(['date_range', 'filter', 'metric'])), 5 * 60, function () use ($request, $workspace) {
             return $workspace->metrics($request->array('date_range', []), $request->array('filter', []))
-                ->extract(['rtsRate', 'aov', 'totalSales', 'totalOrders', 'repeatOrderRatio', 'timeToFirstOrder', 'avgLifetimeValue', 'avgDeliveryDays', 'avgShippedOutDays']);
+                ->extract($request->array('metric'));
         });
 
         return response()->json($data);
@@ -23,24 +22,58 @@ class AnalyticsController extends Controller
 
     public function breakdown(Request $request)
     {
-        $group = $request->input('group', 'monthly');
+        $workspace = Workspace::find($request->workspace->id);
 
-        $base = Order::query()
-            ->whereHas('page', fn ($q) => $q->where('workspace_id', $request->workspace->id))
-            ->whereNotNull('confirmed_at');
+        $data = $workspace->metrics(
+            $request->array('date_range', []),
+            $request->array('filter', [])
+        )->breakdown(
+            $request->input('metric', 'totalSales'),
+            $request->input('group', 'daily')
+        );
 
-        $periodSql = match ($group) {
-            'weekly' => "DATE_FORMAT(confirmed_at, '%x-W%v')",
-            'monthly' => "DATE_FORMAT(confirmed_at, '%Y-%m')",
-            default => 'DATE(confirmed_at)',
-        };
+        return response()->json(['data' => $data]);
+    }
 
-        $totals = (clone $base)
-            ->selectRaw("$periodSql as period, COUNT(*) as value")
-            ->groupByRaw($periodSql)
-            ->orderByRaw($periodSql)
-            ->get();
+    public function perPage(Request $request)
+    {
+        $workspace = Workspace::findOrFail($request->workspace->id);
 
-        return response()->json(['data' => $totals]);
+        $data = $workspace->metrics(
+            $request->array('date_range', []),
+            $request->array('filter', [])
+        )->perPage(
+            $request->input('metric', 'totalSales')
+        );
+
+        return response()->json(['data' => $data]);
+    }
+
+    public function perShop(Request $request)
+    {
+        $workspace = Workspace::findOrFail($request->workspace->id);
+
+        $data = $workspace->metrics(
+            $request->array('date_range', []),
+            $request->array('filter', [])
+        )->perShop(
+            $request->input('metric', 'totalSales')
+        );
+
+        return response()->json(['data' => $data]);
+    }
+
+    public function perUser(Request $request)
+    {
+        $workspace = Workspace::findOrFail($request->workspace->id);
+
+        $data = $workspace->metrics(
+            $request->array('date_range', []),
+            $request->array('filter', [])
+        )->perUser(
+            $request->input('metric', 'totalSales')
+        );
+
+        return response()->json(['data' => $data]);
     }
 }

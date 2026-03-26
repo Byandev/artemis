@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import PageHeader from '@/components/common/PageHeader';
 import { Workspace } from '@/types/models/Workspace';
 import { type PropsWithChildren } from 'react';
 
@@ -10,14 +11,7 @@ const DashboardLayout = ({ workspace, children }: PropsWithChildren<DashboardLay
     return (
         <AppLayout>
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                    <h2
-                        className="text-xl font-semibold text-gray-800 dark:text-white/90"
-                        x-text="pageName"
-                    >
-                        Dashboard
-                    </h2>
-                </div>
+                <PageHeader title="Dashboard" description="Overview of your workspace performance and key metrics" />
 
                 <div className="">
                     {children}

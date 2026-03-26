@@ -2,27 +2,30 @@ import { NavMain } from '@/components/nav-main';
 import {
     Sidebar,
     SidebarContent,
+    SidebarFooter,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard } from '@/routes';
+import { dashboard, logout } from '@/routes';
 import workspace from '@/routes/workspace';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
-    CreditCard,
-    FacebookIcon,
     LayoutDashboard,
     Package,
     Store,
-    MousePointerClickIcon,
-    TrendingUp,
+    PhoneCall,
     Users,
-    BookOpenIcon
+    BookOpenIcon,
+    LogOut,
+    Settings,
+    User,
+    ShieldIcon,
 } from 'lucide-react';
 import AppLogo from './app-logo';
+import { NavFooter } from '@/components/nav-footer';
 
 export function AppSidebar() {
     const { currentWorkspace } = usePage().props;
@@ -37,11 +40,6 @@ export function AppSidebar() {
             href: dashboardUrl,
             icon: LayoutDashboard,
         },
-        // {
-        //     title: 'Ads Manager',
-        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ads-manager`,
-        //     icon: Target,
-        // },
         {
             title: 'Shops',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/shops`,
@@ -54,43 +52,121 @@ export function AppSidebar() {
         },
         {
             title: 'Products',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products/list`,
             icon: Package,
         },
-        // {
-        //     title: 'Facebook Accounts',
-        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/facebook-accounts`,
-        //     icon: FacebookIcon,
-        // },
-        // {
-        //     title: 'Ad Accounts',
-        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ad-accounts`,
-        //     icon: CreditCard,
-        // },
         {
             title: 'Teams',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
             icon: Users,
         },
         {
-            title: 'RTS Management',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts`,
-            icon: TrendingUp,
+            title: 'Employees',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/employees`,
+            icon: User,
         },
-        // {
-        //     title: 'Botcake',
-        //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/botcake`,
-        //     icon: MousePointerClickIcon,
-        // },
+        {
+            title: 'RMO Management',
+            icon: PhoneCall,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/rmo-management`,
+        },
+        {
+            title: 'Roles',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/roles`,
+            icon: ShieldIcon,
+        },
     ];
 
+    // const mainNavItems: NavItem[] = [
+    //     {
+    //         title: 'Dashboard',
+    //         href: dashboardUrl,
+    //         icon: LayoutDashboard,
+    //     },
+    //     // {
+    //     //     title: 'Ads Manager',
+    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ads-manager`,
+    //     //     icon: Target,
+    //     // },
+    //     {
+    //         title: 'Shops',
+    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/shops`,
+    //         icon: Store,
+    //     },
+    //     {
+    //         title: 'Pages',
+    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
+    //         icon: BookOpenIcon,
+    //     },
+    //     {
+    //         title: 'Products',
+    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products`,
+    //         icon: Package,
+    //     },
+    //     // {
+    //     //     title: 'Facebook Accounts',
+    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/facebook-accounts`,
+    //     //     icon: FacebookIcon,
+    //     // },
+    //     // {
+    //     //     title: 'Ad Accounts',
+    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ad-accounts`,
+    //     //     icon: CreditCard,
+    //     // },
+    //     {
+    //         title: 'Teams',
+    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
+    //         icon: Users,
+    //     },
+    //     {
+    //         title: 'RTS Management',
+    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts`,
+    //         icon: TrendingUp,
+    //     },
+    //     // {
+    //     //     title: 'Botcake',
+    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/botcake`,
+    //     //     icon: MousePointerClickIcon,
+    //     // },
+    // ];
+
+    const accountNavItems: NavItem[] = [
+        {
+            title: 'Profile',
+            href: '/profile',
+            icon: User,
+        },
+
+        {
+            title: 'Settings',
+            href: `/settings`,
+            icon: Settings,
+        },
+    ];
+
+    const footerNavItems: NavItem[] = [
+
+        {
+            title: 'Logout',
+            href: logout(),
+            icon: LogOut,
+        },
+    ];
+
+
+
+
     return (
-        <Sidebar collapsible="icon" variant="sidebar">
+        <Sidebar
+            className="bg-white dark:bg-zinc-900"
+            collapsible="icon"
+            variant="sidebar"
+        >
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboardUrl} prefetch>
+                            <Link href={dashboard()} prefetch>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
@@ -98,12 +174,14 @@ export function AppSidebar() {
                 </SidebarMenu>
             </SidebarHeader>
 
-            <SidebarContent>
-                <NavMain items={mainNavItems} />
+            <SidebarContent className="p-3">
+                <NavMain items={mainNavItems} group_label="Main" />
+                {/*<NavMain items={accountNavItems} group_label="Account" />*/}
             </SidebarContent>
 
-            {/* <SidebarFooter>
-            </SidebarFooter> */}
+            <SidebarFooter>
+                <NavFooter items={footerNavItems} className="mt-auto" />
+            </SidebarFooter>
         </Sidebar>
     );
 }

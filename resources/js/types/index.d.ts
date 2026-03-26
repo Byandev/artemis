@@ -1,5 +1,6 @@
 import { InertiaLinkProps } from '@inertiajs/react';
 import { LucideIcon } from 'lucide-react';
+import { Role } from '@/types/models/Role';
 
 export interface Auth {
     user: User;
@@ -20,6 +21,7 @@ export interface NavItem {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    items?: NavItem[]
 }
 
 export interface SharedData {
@@ -40,6 +42,11 @@ export interface User {
     created_at: string;
     updated_at: string;
     [key: string]: unknown; // This allows for additional properties...
+    pivot?: {
+        role_id: number | null;
+        role: string | null;
+        created_at: string;
+    };
 }
 
 export interface PaginationLinks {

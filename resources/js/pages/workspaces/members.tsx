@@ -1,4 +1,5 @@
 import ComponentCard from '@/components/common/ComponentCard';
+import PageHeader from '@/components/common/PageHeader';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -39,29 +40,19 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
-import { PaginatedData } from '@/types';
+import { PaginatedData, User } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import clsx from 'clsx';
 import { omit } from 'lodash';
-import { MoreHorizontal, Send, Trash2, UserMinus } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-
-interface User {
-    id: number;
-    name: string;
-    email: string;
-    pivot: {
-        role: string;
-        created_at: string;
-    };
-}
+import { MoreHorizontal, Send, Trash2, UserMinus, CopyleftIcon, UserCog } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Role } from '@/types/models/Role';
 
 interface Invitation {
     id: number;
     email: string;
-    role: string;
+    role: Role;
     token: string;
     expires_at: string;
     inviter: {
@@ -72,6 +63,7 @@ interface Invitation {
 interface Props {
     workspace: Workspace;
     members: PaginatedData<User>;
+    roles: Role[];
     pendingInvitations: PaginatedData<Invitation>;
     isAdmin: boolean;
     query?: {
@@ -84,67 +76,39 @@ interface Props {
     };
 }
 
-type RoleBadgeConfig = {
-    label: string;
-    className: string;
-};
-
-const ROLE_BADGE_CONFIG: Record<string, RoleBadgeConfig> = {
-    owner: { label: 'OWNER', className: 'bg-indigo-50 text-indigo-700 ring-indigo-200' },
-    admin: { label: 'ADMIN', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-    member: { label: 'MEMBER', className: 'bg-zinc-50 text-zinc-700 ring-zinc-200' },
-};
-
-const RoleBadge = ({ role }: { role: string }) => {
-    const config = ROLE_BADGE_CONFIG[role] ?? { label: role.toUpperCase(), className: 'bg-gray-50 text-gray-700 ring-gray-200' };
-
-    return (
-        <span
-            className={clsx(
-                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset',
-                config.className
-            )}
-        >
-            {config.label}
-        </span>
-    );
-};
-
-export default function WorkspaceMembers({ workspace, members, pendingInvitations, isAdmin, query }: Props) {
+export default function WorkspaceMembers({ workspace, members, pendingInvitations, isAdmin, query, roles }: Props) {
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
 
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
+    const [memberToUpdateRole, setMemberToUpdateRole] = useState<User | null>(null);
     const [invitationToRevoke, setInvitationToRevoke] = useState<Invitation | null>(null);
-    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
     const inviteForm = useForm({
         email: '',
-        role: 'member',
+        role_id: '',
     });
 
-    // Debounced search effect
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            router.get(
-                `/workspaces/${workspace.slug}/members`,
-                {
-                    sort: query?.sort,
-                    'filter[search]': searchValue || undefined,
-                    page: 1,
-                },
-                {
-                    preserveState: true,
-                    replace: true,
-                    preserveScroll: true,
-                },
-            );
-        }, 500);
+    const updateRoleForm = useForm({
+        role_id: '',
+    });
 
-        return () => clearTimeout(timer);
-    }, [searchValue]);
+    const handleUpdateRole = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!memberToUpdateRole) return;
+        updateRoleForm.put(
+            workspaces.members.update.url({ workspace: workspace.slug, user: memberToUpdateRole.id }),
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setMemberToUpdateRole(null);
+                    updateRoleForm.reset();
+                },
+            }
+        );
+    };
 
     const handleInvite = (e: React.FormEvent) => {
         e.preventDefault();
@@ -157,13 +121,18 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
         });
     };
 
-    const handleRoleChange = (userId: number, newRole: string) => {
-        router.put(
-            workspaces.members.update.url({ workspace: workspace.slug, user: userId }),
-            { role: newRole },
-            { preserveScroll: true }
-        );
-    };
+    const copyInviteUrl = async (invitation: Invitation) => {
+        try {
+            const domain = window.location.origin;
+
+            await navigator.clipboard.writeText(
+                `${domain}/workspaces/invitations/${invitation.token}/accept`,
+            );
+            alert('Copied!');
+        } catch (error) {
+            console.error('Failed to copy:', error);
+        }
+    }
 
     const handleRemoveMember = () => {
         if (!memberToRemove) return;
@@ -218,28 +187,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Role'} />
             ),
-            cell: ({ row }) => {
-                const member = row.original;
-
-                if (isAdmin && member.pivot.role !== 'owner') {
-                    return (
-                        <Select
-                            value={member.pivot.role}
-                            onValueChange={(value) => handleRoleChange(member.id, value)}
-                        >
-                            <SelectTrigger className="w-[110px]">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="member">Member</SelectItem>
-                                <SelectItem value="admin">Admin</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    );
-                }
-
-                return <RoleBadge role={member.pivot.role} />;
-            },
+            cell: ({ row }) => row.original?.pivot?.role ?? 'Owner',
         },
         {
             accessorKey: 'pivot.created_at',
@@ -247,7 +195,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                 <SortableHeader column={column} title={'Joined'} />
             ),
             cell: ({ row }) => {
-                return new Date(row.original.pivot.created_at).toLocaleDateString();
+                return new Date(row.original.pivot?.created_at as string).toLocaleDateString();
             },
         },
         {
@@ -255,7 +203,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
             cell: ({ row }) => {
                 const member = row.original;
 
-                if (!isAdmin || member.pivot.role === 'owner') return null;
+                if (!isAdmin || member.pivot?.role === 'owner') return null;
 
                 return (
                     <DropdownMenu>
@@ -265,6 +213,16 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                                onClick={() => {
+                                    setMemberToUpdateRole(member);
+                                    updateRoleForm.setData('role_id', member.pivot?.role_id?.toString() ?? '');
+                                }}
+                            >
+                                <UserCog className="mr-2 h-4 w-4" />
+                                Change Role
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
                                 onClick={() => setMemberToRemove(member)}
                                 className="text-destructive focus:text-destructive"
@@ -298,7 +256,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Role'} />
             ),
-            cell: ({ row }) => <RoleBadge role={row.original.role} />,
+            cell: ({ row }) => row.original.role?.name,
         },
         {
             id: 'inviter_name',
@@ -332,17 +290,31 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleResendInvitation(invitation.id)}>
+                            <DropdownMenuItem
+                                onClick={() =>
+                                    handleResendInvitation(invitation.id)
+                                }
+                            >
                                 <Send className="mr-2 h-4 w-4" />
                                 Resend
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                                onClick={() => setInvitationToRevoke(invitation)}
+                                onClick={() =>
+                                    setInvitationToRevoke(invitation)
+                                }
                                 className="text-destructive focus:text-destructive"
                             >
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Revoke
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                                onClick={() => copyInviteUrl(invitation)}
+                                className="text-destructive focus:text-destructive"
+                            >
+                                <CopyleftIcon className="mr-2 h-4 w-4" />
+                                Copy
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -355,15 +327,12 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
         <AppLayout>
             <Head title={`${workspace.name} - Members`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                    <h2
-                        className="text-xl font-semibold text-gray-800 dark:text-white/90"
-                        x-text="pageName"
-                    >
-                        Members
-                    </h2>
+                <PageHeader title="Members" description="Manage workspace members and their roles">
                     {isAdmin && (
-                        <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+                        <Dialog
+                            open={inviteDialogOpen}
+                            onOpenChange={setInviteDialogOpen}
+                        >
                             <DialogTrigger asChild>
                                 <Button size="sm">Invite Member</Button>
                             </DialogTrigger>
@@ -372,40 +341,58 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                                     <DialogHeader>
                                         <DialogTitle>Invite Member</DialogTitle>
                                         <DialogDescription>
-                                            Send an invitation to join this workspace
+                                            Send an invitation to join this
+                                            workspace
                                         </DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-4 py-4">
                                         <div className="space-y-2">
-                                            <Label htmlFor="email">Email Address</Label>
+                                            <Label htmlFor="email">
+                                                Email Address
+                                            </Label>
                                             <Input
                                                 id="email"
                                                 type="email"
                                                 placeholder="colleague@example.com"
                                                 value={inviteForm.data.email}
-                                                onChange={(e) => inviteForm.setData('email', e.target.value)}
+                                                onChange={(e) =>
+                                                    inviteForm.setData(
+                                                        'email',
+                                                        e.target.value,
+                                                    )
+                                                }
                                                 required
                                             />
                                             {inviteForm.errors.email && (
-                                                <p className="text-sm text-destructive">{inviteForm.errors.email}</p>
+                                                <p className="text-destructive text-sm">
+                                                    {inviteForm.errors.email}
+                                                </p>
                                             )}
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="role">Role</Label>
+
                                             <Select
-                                                value={inviteForm.data.role}
-                                                onValueChange={(value) => inviteForm.setData('role', value)}
+                                            value={inviteForm.data.role_id}
+                                            onValueChange={(value) => inviteForm.setData('role_id', value)}
                                             >
                                                 <SelectTrigger>
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="member">Member</SelectItem>
-                                                    <SelectItem value="admin">Admin</SelectItem>
+                                                    {roles.map((role) => (
+                                                        <SelectItem
+                                                            key={role.id}
+                                                            value={role.id.toString()}
+                                                        >
+                                                            {role.name}
+                                                        </SelectItem>
+                                                    ))}
                                                 </SelectContent>
                                             </Select>
                                             <p className="text-sm text-muted-foreground">
-                                                Admins can manage members and settings
+                                                Admins can manage members and
+                                                settings
                                             </p>
                                         </div>
                                     </div>
@@ -413,96 +400,97 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                                         <Button
                                             type="button"
                                             variant="outline"
-                                            onClick={() => setInviteDialogOpen(false)}
+                                            onClick={() =>
+                                                setInviteDialogOpen(false)
+                                            }
                                         >
                                             Cancel
                                         </Button>
-                                        <Button type="submit" disabled={inviteForm.processing}>
-                                            {inviteForm.processing ? 'Sending...' : 'Send Invitation'}
+                                        <Button
+                                            type="submit"
+                                            disabled={inviteForm.processing}
+                                        >
+                                            {inviteForm.processing
+                                                ? 'Sending...'
+                                                : 'Send Invitation'}
                                         </Button>
                                     </DialogFooter>
                                 </form>
                             </DialogContent>
                         </Dialog>
                     )}
-                </div>
+                </PageHeader>
 
                 <div className="space-y-5 sm:space-y-6">
                     {/* Members Table */}
                     <ComponentCard desc="Manage workspace members and their roles">
-                        <div>
-                            <div className="flex flex-col gap-2 rounded-t-xl border border-b-0 border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/5">
-                                <input
-                                    className="max-w-sm border w-full rounded-lg appearance-none px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900  dark:placeholder:text-white/30  bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800"
-                                    placeholder="Search members"
-                                    value={searchValue}
-                                    onChange={(e) => setSearchValue(e.target.value)}
-                                />
-                            </div>
-
-                            <DataTable
-                                columns={membersColumns}
-                                enableInternalPagination={false}
-                                data={members.data || []}
-                                initialSorting={initialSorting}
-                                meta={{ ...omit(members, ['data']) }}
-                                onFetch={(params) => {
-                                    router.get(
-                                        `/workspaces/${workspace.slug}/members`,
-                                        {
-                                            sort: params?.sort,
-                                            'filter[search]': searchValue || undefined,
-                                            page: params?.page ?? 1
-                                        },
-                                        {
-                                            preserveState: false,
-                                            replace: true,
-                                            preserveScroll: true,
-                                        },
-                                    );
-                                }}
-                            />
-                        </div>
+                        <DataTable
+                            columns={membersColumns}
+                            enableInternalPagination={false}
+                            data={members.data || []}
+                            initialSorting={initialSorting}
+                            meta={{ ...omit(members, ['data']) }}
+                            onFetch={(params) => {
+                                router.get(
+                                    `/workspaces/${workspace.slug}/members`,
+                                    {
+                                        sort: params?.sort,
+                                        page: params?.page ?? 1,
+                                    },
+                                    {
+                                        preserveState: false,
+                                        replace: true,
+                                        preserveScroll: true,
+                                    },
+                                );
+                            }}
+                        />
                     </ComponentCard>
 
                     {/* Pending Invitations */}
-                    {pendingInvitations.data && pendingInvitations.data.length > 0 && (
-                        <ComponentCard desc="Pending workspace invitations">
-                            <DataTable
-                                columns={invitationsColumns}
-                                enableInternalPagination={false}
-                                data={pendingInvitations.data || []}
-                                initialSorting={initialSorting}
-                                meta={{ ...omit(pendingInvitations, ['data']) }}
-                                onFetch={(params) => {
-                                    router.get(
-                                        `/workspaces/${workspace.slug}/members`,
-                                        {
-                                            sort: params?.sort,
-                                            'filter[search]': searchValue || undefined,
-                                            page: params?.page ?? 1
-                                        },
-                                        {
-                                            preserveState: false,
-                                            replace: true,
-                                            preserveScroll: true,
-                                        },
-                                    );
-                                }}
-                            />
-                        </ComponentCard>
-                    )}
+                    {pendingInvitations.data &&
+                        pendingInvitations.data.length > 0 && (
+                            <ComponentCard desc="Pending workspace invitations">
+                                <DataTable
+                                    columns={invitationsColumns}
+                                    enableInternalPagination={false}
+                                    data={pendingInvitations.data || []}
+                                    initialSorting={initialSorting}
+                                    meta={{
+                                        ...omit(pendingInvitations, ['data']),
+                                    }}
+                                    onFetch={(params) => {
+                                        router.get(
+                                            `/workspaces/${workspace.slug}/members`,
+                                            {
+                                                sort: params?.sort,
+                                                page: params?.page ?? 1,
+                                            },
+                                            {
+                                                preserveState: false,
+                                                replace: true,
+                                                preserveScroll: true,
+                                            },
+                                        );
+                                    }}
+                                />
+                            </ComponentCard>
+                        )}
                 </div>
             </div>
 
             {/* Remove Member Confirmation Dialog */}
-            <AlertDialog open={!!memberToRemove} onOpenChange={() => setMemberToRemove(null)}>
+            <AlertDialog
+                open={!!memberToRemove}
+                onOpenChange={() => setMemberToRemove(null)}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Remove Member</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Are you sure you want to remove {memberToRemove?.name} from this workspace?
-                            They will lose access to all workspace resources.
+                            Are you sure you want to remove{' '}
+                            {memberToRemove?.name} from this workspace? They
+                            will lose access to all workspace resources.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -514,14 +502,63 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                 </AlertDialogContent>
             </AlertDialog>
 
+            {/* Update Member Role Dialog */}
+            <Dialog open={!!memberToUpdateRole} onOpenChange={(open) => { if (!open) { setMemberToUpdateRole(null); updateRoleForm.reset(); } }}>
+                <DialogContent>
+                    <form onSubmit={handleUpdateRole}>
+                        <DialogHeader>
+                            <DialogTitle>Change Role</DialogTitle>
+                            <DialogDescription>
+                                Update the role for <strong>{memberToUpdateRole?.name}</strong>
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="update-role">Role</Label>
+                                <Select
+                                    value={updateRoleForm.data.role_id}
+                                    onValueChange={(value) => updateRoleForm.setData('role_id', value)}
+                                >
+                                    <SelectTrigger id="update-role">
+                                        <SelectValue placeholder="Select a role" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {roles.map((role) => (
+                                            <SelectItem key={role.id} value={role.id.toString()}>
+                                                {role.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {updateRoleForm.errors.role_id && (
+                                    <p className="text-destructive text-sm">{updateRoleForm.errors.role_id}</p>
+                                )}
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => { setMemberToUpdateRole(null); updateRoleForm.reset(); }}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={updateRoleForm.processing}>
+                                {updateRoleForm.processing ? 'Saving...' : 'Save'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
             {/* Revoke Invitation Confirmation Dialog */}
-            <AlertDialog open={!!invitationToRevoke} onOpenChange={() => setInvitationToRevoke(null)}>
+            <AlertDialog
+                open={!!invitationToRevoke}
+                onOpenChange={() => setInvitationToRevoke(null)}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Revoke Invitation</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Are you sure you want to revoke the invitation for {invitationToRevoke?.email}?
-                            The invitation link will no longer be valid.
+                            Are you sure you want to revoke the invitation for{' '}
+                            {invitationToRevoke?.email}? The invitation link
+                            will no longer be valid.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

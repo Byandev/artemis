@@ -27,4 +27,11 @@ class Pancake
             ->throw()
             ->json();
     }
+
+    public function listUsers(?string $params = '')
+    {
+        return Http::get('https://pos.pages.fm/api/v1/shops/'.$this->shop_id.'/users?api_key='.$this->api_key."&$params")
+            ->throw()
+            ->json();
+    }
 }

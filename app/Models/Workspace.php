@@ -63,11 +63,12 @@ class Workspace extends Model
     /**
      * Get all users in the workspace.
      */
-    public function users(): BelongsToMany
+    public function users()
     {
         return $this->belongsToMany(User::class, 'workspace_user')
-            ->withPivot('role')
-            ->withTimestamps();
+            ->withTimestamps()
+            ->withPivot('role', 'role_id')
+            ->using(WorkspaceUser::class);
     }
 
     /**
@@ -144,9 +145,11 @@ class Workspace extends Model
     /**
      * Update a member's role.
      */
-    public function updateMemberRole(User $user, string $role): void
+    public function updateMemberRole(User $user, int $roleId)
     {
-        $this->users()->updateExistingPivot($user->id, ['role' => $role]);
+        return $this->users()->updateExistingPivot($user->id, [
+            'role_id' => $roleId,
+        ]);
     }
 
     public function parcelJourneyNotificationTemplates(): HasMany
@@ -172,5 +175,18 @@ class Workspace extends Model
     public function pages(): HasMany|Workspace
     {
         return $this->hasMany(Page::class);
+    }
+
+    public function roles()
+    {
+        return $this->hasMany(Role::class);
+    }
+
+    public function isAdmin(User $user): bool
+    {
+        return $this->users()
+            ->where('user_id', $user->id)
+            ->wherePivot('role', 'admin')
+            ->exists();
     }
 }

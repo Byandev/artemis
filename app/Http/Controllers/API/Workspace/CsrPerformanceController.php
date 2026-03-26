@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Workspace;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use Carbon\Carbon;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,7 @@ class CsrPerformanceController extends Controller
     public function publicIndex(Request $request, Workspace $workspace)
     {
         $validated = $this->validatedFilters($request);
+        $validated = $this->normalizePublicFilters($validated);
 
         return response()->json([
             'data' => $this->buildLeaderboard($workspace, $validated),

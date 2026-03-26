@@ -59,6 +59,10 @@ class HandleInertiaRequests extends Middleware
             'workspaces' => $workspaces,
             'currentWorkspace' => $currentWorkspace,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            // Minimal Ziggy config just for current location tracking
+            'ziggy' => [
+                'location' => $request->url(),
+            ],
         ];
     }
 }
