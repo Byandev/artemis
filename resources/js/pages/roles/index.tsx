@@ -173,7 +173,7 @@ export default function Index({ roles, workspace }: Props) {
                     description="Define and manage access levels for your workspace"
                 >
                     <Button
-                        className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+                        size={'sm'}
                         onClick={() => setOpenFormModal(true)}
                     >
                         Add New Role
