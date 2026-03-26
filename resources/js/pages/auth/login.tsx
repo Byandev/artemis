@@ -11,17 +11,9 @@ import { register } from '@/routes';
 import { request } from '@/routes/password';
 import { Form, Head, usePage } from '@inertiajs/react';
 import { Info, LoaderCircle } from 'lucide-react';
+import { WorkspaceInvitation } from '@/types/models/WorkspaceInvitation';
 
-interface WorkspaceInvitation {
-    id: number;
-    workspace_id: number;
-    email: string;
-    role: string;
-    workspace: {
-        name: string;
-        slug: string;
-    };
-}
+
 
 interface LoginProps {
     status?: string;

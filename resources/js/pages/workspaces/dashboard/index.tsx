@@ -31,6 +31,7 @@ import UserBreakdown from '@/pages/workspaces/dashboard/partials/UserBreakdown';
 import { formatDate } from 'date-fns';
 import MetricPicker from '@/components/metrics/MetricPicker';
 import { metricConfigs, MetricKey } from '@/types/metrics';
+import PageHeader from '@/components/common/PageHeader';
 
 interface Props {
     workspace: Workspace;
@@ -50,55 +51,49 @@ const Dashboard = ({ workspace }: Props) => {
         userIds: [],
     });
 
-    const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>([
-        'totalSales',
-        'totalOrders',
-        'aov',
-        'rtsRate',
-    ]);
+    const STORAGE_KEY = `dashboard_metrics_${workspace.id}`;
+
+    const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>(() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) return JSON.parse(saved) as MetricKey[];
+        } catch {}
+        return ['totalSales', 'totalOrders', 'aov', 'rtsRate'];
+    });
 
 
     return (
         <AppLayout>
             <div className="p-4 md:p-6">
-                <div className="mb-6 flex items-center justify-between gap-6">
-                    <div className="flex flex-col">
-                        <h1 className="text-2xl font-bold">Dashboard</h1>
-
-                        <p className='text-sm font-light text-gray-500'>
-                            Performance overview from{' '}
-                            {formatDate(new Date(dateRange[0]), 'MMMM d yyyy')}{' '}
-                            to{' '}
-                            {formatDate(new Date(dateRange[1]), 'MMMM d yyyy')}
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                        <MetricPicker
-                            initialValue={selectedMetrics}
-                            onChange={(value) => setSelectedMetrics(value)}
-                        />
-
-                        <Filters
-                            workspace={workspace}
-                            onChange={(value) => setFilter(value)}
-                        />
-
-                        <DatePicker
-                            id={'dashboard-date-range'}
-                            mode={'range'}
-                            onChange={(dates) => {
-                                if (dates.length === 2) {
-                                    setDateRange([
-                                        moment(dates[0]).format('YYYY-MM-DD'),
-                                        moment(dates[1]).format('YYYY-MM-DD'),
-                                    ]);
-                                }
-                            }}
-                            defaultDate={dateRange as never as DateOption}
-                        />
-                    </div>
-                </div>
+                <PageHeader
+                    title="Dashboard"
+                    description={`Performance overview · ${formatDate(new Date(dateRange[0]), 'MMM d')} – ${formatDate(new Date(dateRange[1]), 'MMM d, yyyy')}`}
+                >
+                    <MetricPicker
+                        initialValue={selectedMetrics}
+                        onChange={(value) => {
+                            setSelectedMetrics(value);
+                            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(value)); } catch {}
+                        }}
+                    />
+                    <Filters
+                        workspace={workspace}
+                        onChange={(value) => setFilter(value)}
+                    />
+                    <DatePicker
+                        id={'dashboard-date-range'}
+                        mode={'range'}
+                        onChange={(dates) => {
+                            if (dates.length === 2) {
+                                setDateRange([
+                                    moment(dates[0]).format('YYYY-MM-DD'),
+                                    moment(dates[1]).format('YYYY-MM-DD'),
+                                ]);
+                            }
+                        }}
+                        defaultDate={dateRange as never as DateOption}
+                    />
+                </PageHeader>
 
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:gap-4 xl:grid-cols-4">
                     {metricConfigs
@@ -132,6 +127,7 @@ const Dashboard = ({ workspace }: Props) => {
                         dateRange={dateRange}
                         workspace={workspace}
                         filter={filter}
+                        metrics={selectedMetrics}
                     />
                 </ComponentCard>
 
@@ -140,6 +136,7 @@ const Dashboard = ({ workspace }: Props) => {
                         filter={filter}
                         dateRange={dateRange}
                         workspace={workspace}
+                        metrics={selectedMetrics}
                     />
                 </ComponentCard>
                 <ComponentCard className="mt-6">
@@ -147,6 +144,7 @@ const Dashboard = ({ workspace }: Props) => {
                         filter={filter}
                         dateRange={dateRange}
                         workspace={workspace}
+                        metrics={selectedMetrics}
                     />
                 </ComponentCard>
             </div>

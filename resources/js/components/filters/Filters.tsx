@@ -1,12 +1,10 @@
 import { useState, useCallback, useMemo } from 'react';
 import { SlidersHorizontal, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { Badge } from '@/components/ui/badge'; // You may need to create this
 import { Workspace } from '@/types/models/Workspace';
 import ShopFilter from '@/components/filters/ShopFilter';
 import PageFilter from '@/components/filters/PageFilter';
@@ -22,8 +20,8 @@ export interface FilterValue {
 interface Props {
     workspace: Workspace;
     onChange: (value: FilterValue) => void;
-    initialValue?: FilterValue; // Allow external control
-    onClear?: () => void; // Optional clear callback
+    initialValue?: FilterValue;
+    onClear?: () => void;
 }
 
 const INITIAL_FILTER_VALUE: FilterValue = {
@@ -44,12 +42,11 @@ const Filters = ({
     const [localValue, setLocalValue] = useState<FilterValue>(initialValue);
     const [hasChanges, setHasChanges] = useState(false);
 
-    // Check if any filters are active
-    const hasActiveFilters = useMemo(() => {
-        return Object.values(localValue).some((arr) => arr.length > 0);
-    }, [localValue]);
+    const hasActiveFilters = useMemo(() =>
+        Object.values(localValue).some((arr) => arr.length > 0),
+        [localValue],
+    );
 
-    // Handle filter changes efficiently
     const handleFilterChange = useCallback(
         (type: keyof FilterValue, id: string | number) => {
             setLocalValue((prev) => {
@@ -57,36 +54,28 @@ const Filters = ({
                 const newArray = currentArray.includes(id)
                     ? currentArray.filter((item) => item !== id)
                     : [...currentArray, id];
-
                 setHasChanges(true);
-                return {
-                    ...prev,
-                    [type]: newArray,
-                };
+                return { ...prev, [type]: newArray };
             });
         },
         [],
     );
 
-    // Handle apply button click
     const handleApply = useCallback(() => {
         onChange(localValue);
         setHasChanges(false);
         setIsOpen(false);
     }, [localValue, onChange]);
 
-    // Handle clear all filters
     const handleClearAll = useCallback(() => {
         setLocalValue(INITIAL_FILTER_VALUE);
         setHasChanges(true);
         onClear?.();
     }, [onClear]);
 
-    // Handle popover close without applying
     const handleOpenChange = useCallback(
         (open: boolean) => {
             if (!open && hasChanges) {
-                // Optionally show a confirmation dialog here
                 const shouldDiscard = window.confirm('Discard changes?');
                 if (shouldDiscard) {
                     setLocalValue(initialValue);
@@ -101,61 +90,93 @@ const Filters = ({
         [hasChanges, initialValue],
     );
 
-    // Get active filter count for badge
-    const activeFilterCount = useMemo(() => {
-        return Object.values(localValue).reduce(
-            (acc, arr) => acc + arr.length,
-            0,
-        );
-    }, [localValue]);
+    const activeFilterCount = useMemo(() =>
+        Object.values(localValue).reduce((acc, arr) => acc + arr.length, 0),
+        [localValue],
+    );
 
     return (
         <Popover open={isOpen} onOpenChange={handleOpenChange}>
             <PopoverTrigger asChild>
-                <Button
-                    variant="outline"
-                    size="default"
-                    className="relative border  border-gray-300 gap-2 rounded-full px-4"
+                <button
+                    className={[
+                        'inline-flex h-9 items-center overflow-hidden rounded-[10px] border transition-all duration-150',
+                        'bg-white dark:bg-zinc-900',
+                        'shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none',
+                        isOpen
+                            ? 'border-emerald-500/40 ring-2 ring-emerald-500/10 dark:border-emerald-500/30'
+                            : activeFilterCount > 0
+                              ? 'border-emerald-500/30 hover:border-emerald-500/50 dark:border-emerald-500/20 dark:hover:border-emerald-500/30'
+                              : 'border-black/8 hover:border-black/14 dark:border-white/8 dark:hover:border-white/14',
+                    ].join(' ')}
                 >
-                    <SlidersHorizontal className="h-4 w-4" />
-                    Filters
-                    {activeFilterCount > 0 && (
-                        <Badge
-                            variant="secondary"
-                            className="ml-1 h-5 w-5 rounded-full p-0 text-xs"
+                    {/* Icon cell */}
+                    <span
+                        className={[
+                            'flex h-full w-9 shrink-0 items-center justify-center rounded-l-[10px] border-r transition-colors duration-150',
+                            activeFilterCount > 0
+                                ? 'border-emerald-500/20 bg-emerald-500/[0.07] dark:border-emerald-500/15 dark:bg-emerald-500/10'
+                                : 'border-black/6 bg-stone-50 dark:border-white/6 dark:bg-white/3',
+                        ].join(' ')}
+                    >
+                        <SlidersHorizontal
+                            className={[
+                                'h-3.5 w-3.5 transition-colors duration-150',
+                                activeFilterCount > 0
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-gray-400 dark:text-gray-500',
+                            ].join(' ')}
+                        />
+                    </span>
+
+                    {/* Label + badge */}
+                    <span className="flex items-center gap-2 px-3">
+                        <span
+                            className={[
+                                'text-xs font-medium transition-colors duration-150',
+                                activeFilterCount > 0
+                                    ? 'text-gray-700 dark:text-gray-200'
+                                    : 'text-gray-500 dark:text-gray-400',
+                            ].join(' ')}
                         >
-                            {activeFilterCount}
-                        </Badge>
-                    )}
-                </Button>
+                            Filters
+                        </span>
+                        {activeFilterCount > 0 && (
+                            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500/[0.10] px-1 text-[10px] font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">
+                                {activeFilterCount}
+                            </span>
+                        )}
+                    </span>
+                </button>
             </PopoverTrigger>
 
             <PopoverContent
-                className="w-[calc(100vw-2rem)] rounded-2xl p-4 sm:w-80"
+                className="w-[calc(100vw-2rem)] overflow-hidden rounded-[14px] border border-black/6 bg-white p-0 shadow-[0_8px_30px_rgba(0,0,0,0.08)] sm:w-72 dark:border-white/6 dark:bg-zinc-900 dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)]"
                 align="start"
             >
-                <div className="mb-3 flex items-center justify-between">
-                    <h3 className="text-sm font-medium">Filters</h3>
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-black/6 px-4 py-3 dark:border-white/6">
+                    <span className="text-[13px] font-medium text-gray-900 dark:text-gray-100">
+                        Filters
+                    </span>
                     {hasActiveFilters && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
+                        <button
                             onClick={handleClearAll}
-                            className="h-8 px-2 text-xs"
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
                         >
-                            <X className="mr-1 h-3 w-3" />
+                            <X className="h-3 w-3" />
                             Clear all
-                        </Button>
+                        </button>
                     )}
                 </div>
 
-                <div className="max-h-72 space-y-3 overflow-y-auto">
+                {/* Filter groups */}
+                <div className="max-h-72 space-y-1 overflow-y-auto p-2">
                     <PageFilter
                         workspace={workspace}
                         selected={localValue.pageIds}
                         onSelect={(id) => handleFilterChange('pageIds', id)}
                     />
-
                     <ShopFilter
                         workspace={workspace}
                         selected={localValue.shopIds}
@@ -163,26 +184,25 @@ const Filters = ({
                     />
                 </div>
 
-                <div className="mt-4 flex gap-2">
-                    <Button
-                        size="sm"
+                {/* Footer */}
+                <div className="flex gap-2 border-t border-black/6 px-4 py-3 dark:border-white/6">
+                    <button
                         onClick={handleApply}
                         disabled={!hasChanges}
-                        className="flex-1"
+                        className="flex-1 rounded-lg bg-emerald-600 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-emerald-500 dark:hover:bg-emerald-400"
                     >
                         Apply
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant="outline"
+                    </button>
+                    <button
                         onClick={() => {
                             setLocalValue(initialValue);
                             setHasChanges(false);
                             setIsOpen(false);
                         }}
+                        className="rounded-lg border border-black/6 bg-white px-4 py-2 text-xs font-medium text-gray-500 transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-400 dark:hover:border-white/10"
                     >
                         Cancel
-                    </Button>
+                    </button>
                 </div>
             </PopoverContent>
         </Popover>

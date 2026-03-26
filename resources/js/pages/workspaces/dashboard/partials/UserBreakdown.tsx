@@ -1,14 +1,8 @@
 import BarChart from '@/components/charts/BarChart';
 import BarChartSkeleton from '@/components/charts/skeletons/BarChartSkeleton';
 import { FilterValue } from '@/components/filters/Filters';
+import DropdownSelect from '@/components/common/DropdownSelect';
 import { Button } from '@/components/ui/button';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
 import moment from 'moment';
@@ -16,11 +10,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { RefreshCcw } from 'lucide-react';
 import ComponentCard from '@/components/common/ComponentCard';
+import { metricConfigs, MetricKey } from '@/types/metrics';
 
 interface Props {
     workspace: Workspace;
     dateRange: string[];
     filter: FilterValue;
+    metrics?: MetricKey[];
 }
 
 interface BreakdownItem {
@@ -29,12 +25,12 @@ interface BreakdownItem {
     value: number | string;
 }
 
-export default function UserBreakdown({ workspace, dateRange, filter }: Props) {
+export default function UserBreakdown({ workspace, dateRange, filter, metrics }: Props) {
     const [breakdown, setBreakdown] = useState<BreakdownItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [option, setOption] = useState('totalSales');
-    const [ reload, setReload] = useState(false);
+    const [option, setOption] = useState(metrics?.[0] ?? 'totalSales');
+    const [reload, setReload] = useState(false);
 
     const startDate = moment(dateRange[0]).format('YYYY-MM-DD');
     const endDate = moment(dateRange[1]).format('YYYY-MM-DD');
@@ -45,44 +41,24 @@ export default function UserBreakdown({ workspace, dateRange, filter }: Props) {
     const userIds = filter.userIds.join(',');
     const productIds = filter.productIds.join(',');
 
-    const optionLabels: Record<string, string> = {
-        totalSales: 'Total Sales',
-        totalOrders: 'Total Orders',
-        aov: 'AOV',
-        rtsRate: 'RTS',
-        repeatOrderRatio: 'ROR',
-        timeToFirstOrder: 'Time to First Order',
-        avgLifetimeValue: 'Average Lifetime Value',
-        avgDeliveryDays: 'Average Delivery Days',
-        avgShippedOutDays: 'Average Shipped Out Days',
-    };
+    const activeMetric = useMemo(
+        () => metricConfigs.find((m) => m.key === option),
+        [option],
+    );
 
-    const formatValue = (value: number) => {
-        switch (option) {
-            case 'totalSales':
-            case 'aov':
-            case 'avgLifetimeValue':
-                return `₱${value.toLocaleString('en-PH', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                })}`;
+    const filteredOptions = useMemo(() => {
+        if (!metrics || metrics.length === 0) return metricConfigs;
+        return metricConfigs.filter((m) => metrics.includes(m.key));
+    }, [metrics]);
 
-            case 'rtsRate':
-            case 'repeatOrderRatio':
-                return `${(value * 100).toFixed(1)}%`;
-
-            case 'timeToFirstOrder':
-                return `${value.toFixed(1)} hrs`;
-
-            case 'avgDeliveryDays':
-            case 'avgShippedOutDays':
-                return `${value.toFixed(1)} days`;
-
-            case 'totalOrders':
-            default:
-                return value.toLocaleString();
+    useEffect(() => {
+        if (filteredOptions.length > 0 && !filteredOptions.find((m) => m.key === option)) {
+            setOption(filteredOptions[0].key);
         }
-    };
+    }, [filteredOptions]);
+
+    const formatValue = (value: number) =>
+        activeMetric?.formatter ? activeMetric.formatter(value) : value.toLocaleString();
 
     useEffect(() => {
         const controller = new AbortController();
@@ -144,7 +120,7 @@ export default function UserBreakdown({ workspace, dateRange, filter }: Props) {
     const series = useMemo(() => {
         return [
             {
-                name: optionLabels[option] ?? 'Value',
+                name: activeMetric?.name ?? 'Value',
                 data: breakdown.map((item) => Number(item.value)),
             },
         ];
@@ -153,36 +129,31 @@ export default function UserBreakdown({ workspace, dateRange, filter }: Props) {
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between gap-4">
-                <h2 className="text-lg font-semibold">
-                    {optionLabels[option]} Per User
-                </h2>
+                <div>
+                    <h2 className="text-[14px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
+                        {activeMetric?.name} <span className="text-gray-300 dark:text-gray-600">·</span> Per User
+                    </h2>
+                </div>
 
                 <div className="flex items-center gap-4">
-                    <div className="w-80">
-                        <Select value={option} onValueChange={setOption}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select options" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {Object.entries(optionLabels).map(
-                                    ([key, label]) => (
-                                        <SelectItem key={key} value={key}>
-                                            {label}
-                                        </SelectItem>
-                                    ),
-                                )}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    <DropdownSelect
+                        value={option}
+                        onChange={setOption}
+                        options={filteredOptions.map((m) => ({ key: m.key, label: m.name }))}
+                        label="Metric"
+                        align="end"
+                    />
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
-                                className="rounded-md bg-gray-100 p-2 hover:text-white"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 p-0 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-stone-200 dark:hover:bg-zinc-700"
                                 onClick={() =>
                                     setReload((prevState) => !prevState)
                                 }
                             >
-                                <RefreshCcw className="h-5 w-5 text-gray-500" />
+                                <RefreshCcw className="h-3.5 w-3.5" />
                             </Button>
                         </TooltipTrigger>
 
@@ -214,13 +185,11 @@ export default function UserBreakdown({ workspace, dateRange, filter }: Props) {
                     </p>
                 </div>
             ) : (
-                <ComponentCard>
-                    <BarChart
-                        categories={categories}
-                        series={series}
-                        formatValue={formatValue}
-                    />
-                </ComponentCard>
+                <BarChart
+                    categories={categories}
+                    series={series}
+                    formatValue={formatValue}
+                />
             )}
         </div>
     );

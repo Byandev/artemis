@@ -2,21 +2,18 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 class WorkspaceInvitation extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'workspace_id',
         'invited_by',
         'email',
         'token',
-        'role',
+        'role_id',
         'expires_at',
         'accepted_at',
     ];
@@ -117,5 +114,10 @@ class WorkspaceInvitation extends Model
         return $query->where('token', $token)
             ->whereNull('accepted_at')
             ->where('expires_at', '>', now());
+    }
+
+    public function role(): BelongsTo
+    {
+        return $this->belongsTo(Role::class);
     }
 }

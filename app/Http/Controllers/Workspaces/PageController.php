@@ -17,6 +17,7 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Modules\Pancake\Jobs\FetchPageOrders;
 use Modules\Pancake\Jobs\FetchShopCustomers;
+use Modules\Pancake\Jobs\FetchShopUsers;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -56,6 +57,35 @@ class PageController extends Controller
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
+            'users' => $users,
+        ]);
+    }
+
+    public function create(Request $request, Workspace $workspace)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $users = User::get(['id', 'name']);
+
+        return Inertia::render('workspaces/pages/create', [
+            'workspace' => $workspace,
+            'users' => $users,
+        ]);
+    }
+
+    public function edit(Request $request, Workspace $workspace, Page $page)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $users = User::get(['id', 'name']);
+
+        return Inertia::render('workspaces/pages/edit', [
+            'workspace' => $workspace,
+            'page' => $page,
             'users' => $users,
         ]);
     }
@@ -118,6 +148,7 @@ class PageController extends Controller
 
         dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear(1)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
         dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subYear(1)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
 
         return redirect()->route('workspaces.pages.index', $workspace)
             ->with('success', 'Page created successfully.');
@@ -158,7 +189,10 @@ class PageController extends Controller
             abort(403);
         }
 
-        $page->update(['orders_last_synced_at' => null]);
+        $page->update([
+            'orders_last_synced_at' => null,
+            'is_sync_logic_updated' => true
+        ]);
 
         dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
 

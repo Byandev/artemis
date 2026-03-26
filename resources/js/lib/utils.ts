@@ -8,6 +8,13 @@ export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
+function compactNumber(value: number): string | null {
+    if (value >= 1_000_000_000) return `${+(value / 1_000_000_000).toFixed(2)}B`;
+    if (value >= 1_000_000)     return `${+(value / 1_000_000).toFixed(2)}M`;
+    if (value >= 10_000)        return `${+(value / 1_000).toFixed(1)}K`;
+    return null;
+}
+
 /**
  * Format a number with locale-specific formatting
  * @param value - The number to format
@@ -18,6 +25,8 @@ export function numberFormatter(
     value: number,
     options?: Intl.NumberFormatOptions
 ): string {
+    const compact = compactNumber(value);
+    if (compact) return compact;
     return new Intl.NumberFormat('en-US', {
         minimumFractionDigits: 0,
         maximumFractionDigits: 2,
@@ -35,6 +44,9 @@ export function percentageFormatter(
     value: number,
     options?: Intl.NumberFormatOptions
 ): string {
+    const percent = value * 100;
+    const compact = compactNumber(percent);
+    if (compact) return `${compact}%`;
     return new Intl.NumberFormat('en-US', {
         style: 'percent',
         minimumFractionDigits: 0,
@@ -53,6 +65,8 @@ export function currencyFormatter(
     value: number,
     options?: Intl.NumberFormatOptions
 ): string {
+    const compact = compactNumber(value);
+    if (compact) return `₱${compact}`;
     return new Intl.NumberFormat('en-PH', {
         style: 'currency',
         currency: 'PHP',
