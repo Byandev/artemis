@@ -28,4 +28,9 @@ class OrderForDelivery extends Model
     {
         return $this->belongsTo(User::class, 'conferrer_id');
     }
+
+    public function assignee(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assignee_id');
+    }
 }

@@ -150,9 +150,15 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
         <AppLayout>
             <Head title={`${workspace.name} - Teams`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <PageHeader title="Teams" description="Organize members into teams for better collaboration">
+                <PageHeader
+                    title="Teams"
+                    description="Organize members into teams for better collaboration"
+                >
                     {isAdmin && (
-                        <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
+                        <Button
+                            size="sm"
+                            onClick={() => setCreateDialogOpen(true)}
+                        >
                             Create Team
                         </Button>
                     )}
@@ -160,9 +166,9 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
 
                 <div className="mb-3 flex items-center gap-2">
                     <div className="relative w-full max-w-xs">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
-                            className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-[family-name:--font-dm-mono] text-[12px] text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
+                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                             placeholder="Search team name..."
                             value={searchValue}
                             onChange={(e) => setSearchValue(e.target.value)}
@@ -170,7 +176,7 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                     </div>
                 </div>
 
-                <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         columns={columns}
                         enableInternalPagination={false}
@@ -183,7 +189,7 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                                 {
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
-                                    page: params?.page ?? 1
+                                    page: params?.page ?? 1,
                                 },
                                 {
                                     preserveState: true,

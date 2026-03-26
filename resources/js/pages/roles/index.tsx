@@ -73,7 +73,7 @@ export default function Index({ roles, workspace }: Props) {
             accessorKey: 'name',
             header: () => <div className="font-mono font-medium text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Role Name</div>,
             cell: ({ row }) => (
-                <span className="text-[13px] font-medium text-gray-700 dark:text-gray-300">{row.original.name}</span>
+                <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">{row.original.name}</span>
             ),
         },
         {
@@ -81,7 +81,7 @@ export default function Index({ roles, workspace }: Props) {
             header: () => <div className="font-mono font-medium text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Description</div>,
             cell: ({ row }) => (
                 <div className="max-w-[400px]">
-                    <p className="text-[13px] text-gray-500 dark:text-gray-400">
+                    <p className="text-[12px] text-gray-500 dark:text-gray-400">
                         {row.original.description || <span className="text-gray-300 dark:text-gray-600 italic">No description provided</span>}
                     </p>
                 </div>
@@ -160,12 +160,20 @@ export default function Index({ roles, workspace }: Props) {
             {/* Added Toaster component here */}
             <Toaster position="top-right" richColors />
 
-            <RoleFormDialog workspace={workspace} open={openFormModal} onOpenChange={setOpenFormModal} role={selectedRole} />
+            <RoleFormDialog
+                workspace={workspace}
+                open={openFormModal}
+                onOpenChange={setOpenFormModal}
+                role={selectedRole}
+            />
 
             <div className="w-full space-y-6 p-4 md:p-6">
-                <PageHeader title="Role Management" description="Define and manage access levels for your workspace">
+                <PageHeader
+                    title="Role Management"
+                    description="Define and manage access levels for your workspace"
+                >
                     <Button
-                        className="bg-emerald-600 dark:bg-emerald-500 hover:bg-emerald-700 dark:hover:bg-emerald-400 text-white px-4 py-2 rounded-lg text-xs font-medium transition-colors"
+                        className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
                         onClick={() => setOpenFormModal(true)}
                     >
                         Add New Role
@@ -174,18 +182,18 @@ export default function Index({ roles, workspace }: Props) {
 
                 <div className="mb-3 flex items-center gap-2">
                     <div className="relative w-full max-w-xs">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
                             type="text"
                             placeholder="Search roles..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-[family-name:--font-dm-mono] text-[12px] text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
+                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                         />
                     </div>
                 </div>
 
-                <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         columns={columns}
                         data={roles}

@@ -111,6 +111,7 @@ export interface OrderForDelivery {
     updated_at: string; // ISO datetime;
 
     order: Order;
-    conferrer?: User
+    conferrer?: User;
+    assignee?: User;
     page: Page;
 }
