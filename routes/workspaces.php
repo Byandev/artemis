@@ -108,10 +108,6 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'updateStatus'])->name('workspaces.rts.rmo-updateStatus');
     Route::get('/workspaces/{workspace}/rts/rmo-management/analytics', [ForDeliveryController::class, 'analytics'])->name('workspaces.rts.rmo-analytics');
 
-    Route::get('/workspaces/{workspace}/rts/rmo-management/analytics/status-breakdown', [ForDeliveryController::class, 'analyticsStatusBreakdown'])->name('workspaces.rts.rmo-analytics.status-breakdown');
-    Route::get('/workspaces/{workspace}/rts/rmo-management/analytics/delivery-trend', [ForDeliveryController::class, 'analyticsDeliveryTrend'])->name('workspaces.rts.rmo-analytics.delivery-trend');
-    Route::get('/workspaces/{workspace}/rts/rmo-management/analytics/per-page', [ForDeliveryController::class, 'analyticsPerPage'])->name('workspaces.rts.rmo-analytics.per-page');
-
 
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/pages', [AnalyticController::class, 'groupByPages'])->name('workspaces.rts.analytics.group-by-pages');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/shops', [AnalyticController::class, 'groupByShops'])->name('workspaces.rts.analytics.group-by-shops');
