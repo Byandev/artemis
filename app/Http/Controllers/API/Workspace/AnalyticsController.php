@@ -12,7 +12,9 @@ class AnalyticsController extends Controller
     {
         $workspace = Workspace::find($request->workspace->id);
 
-        $data = \Cache::remember(json_encode($request->only(['date_range', 'filter', 'metric'])), 5 * 60, function () use ($request, $workspace) {
+        $cacheKey = 'analytics:' . $workspace->id . ':' . json_encode($request->only(['date_range', 'filter', 'metric']));
+
+        $data = \Cache::remember($cacheKey, 5 * 60, function () use ($request, $workspace) {
             return $workspace->metrics($request->array('date_range', []), $request->array('filter', []))
                 ->extract($request->array('metric'));
         });
@@ -24,13 +26,17 @@ class AnalyticsController extends Controller
     {
         $workspace = Workspace::find($request->workspace->id);
 
-        $data = $workspace->metrics(
-            $request->array('date_range', []),
-            $request->array('filter', [])
-        )->breakdown(
-            $request->input('metric', 'totalSales'),
-            $request->input('group', 'daily')
-        );
+        $cacheKey = 'analytics:' . $workspace->id . ':breakdown:' . json_encode($request->only(['date_range', 'filter', 'metric', 'group']));
+
+        $data = \Cache::remember($cacheKey, 5 * 60, function () use ($request, $workspace) {
+            return $workspace->metrics(
+                $request->array('date_range', []),
+                $request->array('filter', [])
+            )->breakdown(
+                $request->input('metric', 'totalSales'),
+                $request->input('group', 'daily')
+            );
+        });
 
         return response()->json(['data' => $data]);
     }
@@ -39,12 +45,16 @@ class AnalyticsController extends Controller
     {
         $workspace = Workspace::findOrFail($request->workspace->id);
 
-        $data = $workspace->metrics(
-            $request->array('date_range', []),
-            $request->array('filter', [])
-        )->perPage(
-            $request->input('metric', 'totalSales')
-        );
+        $cacheKey = 'analytics:' . $workspace->id . ':per-page:' . json_encode($request->only(['date_range', 'filter', 'metric']));
+
+        $data = \Cache::remember($cacheKey, 5 * 60, function () use ($request, $workspace) {
+            return $workspace->metrics(
+                $request->array('date_range', []),
+                $request->array('filter', [])
+            )->perPage(
+                $request->input('metric', 'totalSales')
+            );
+        });
 
         return response()->json(['data' => $data]);
     }
@@ -53,12 +63,16 @@ class AnalyticsController extends Controller
     {
         $workspace = Workspace::findOrFail($request->workspace->id);
 
-        $data = $workspace->metrics(
-            $request->array('date_range', []),
-            $request->array('filter', [])
-        )->perShop(
-            $request->input('metric', 'totalSales')
-        );
+        $cacheKey = 'analytics:' . $workspace->id . ':per-shop:' . json_encode($request->only(['date_range', 'filter', 'metric']));
+
+        $data = \Cache::remember($cacheKey, 5 * 60, function () use ($request, $workspace) {
+            return $workspace->metrics(
+                $request->array('date_range', []),
+                $request->array('filter', [])
+            )->perShop(
+                $request->input('metric', 'totalSales')
+            );
+        });
 
         return response()->json(['data' => $data]);
     }
@@ -67,12 +81,16 @@ class AnalyticsController extends Controller
     {
         $workspace = Workspace::findOrFail($request->workspace->id);
 
-        $data = $workspace->metrics(
-            $request->array('date_range', []),
-            $request->array('filter', [])
-        )->perUser(
-            $request->input('metric', 'totalSales')
-        );
+        $cacheKey = 'analytics:' . $workspace->id . ':per-user:' . json_encode($request->only(['date_range', 'filter', 'metric']));
+
+        $data = \Cache::remember($cacheKey, 5 * 60, function () use ($request, $workspace) {
+            return $workspace->metrics(
+                $request->array('date_range', []),
+                $request->array('filter', [])
+            )->perUser(
+                $request->input('metric', 'totalSales')
+            );
+        });
 
         return response()->json(['data' => $data]);
     }

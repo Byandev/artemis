@@ -42,7 +42,7 @@ Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}', [ForDelive
 Route::middleware(['auth'])->group(function () {
     // Workspace setup (first-time after registration)
     Route::get('/workspaces/setup', [WorkspaceSetupController::class, 'create'])->name('workspaces.setup');
-    Route::put('/workspaces/setup', [WorkspaceSetupController::class, 'store'])->name('workspaces.setup.store');
+    Route::post('/workspaces/setup', [WorkspaceSetupController::class, 'store'])->name('workspaces.setup.store');
 
     // Workspace dashboard
     Route::get('/workspaces/{workspace}/dashboard', [WorkspaceController::class, 'dashboard'])->name('workspace.dashboard');
