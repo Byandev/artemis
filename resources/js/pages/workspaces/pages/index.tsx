@@ -49,13 +49,14 @@ const StatusBadge = ({ isArchived }: { isArchived: boolean }) => {
     return (
         <span
             className={clsx(
-                "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset",
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
                 isArchived
-                    ? "bg-slate-50 text-slate-700 ring-slate-200"
-                    : "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                    ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
             )}
         >
-            {isArchived ? "ARCHIVED" : "ACTIVE"}
+            <span className={clsx('h-1.5 w-1.5 rounded-full', isArchived ? 'bg-slate-400' : 'bg-emerald-500')} />
+            {isArchived ? 'Archived' : 'Active'}
         </span>
     );
 };
@@ -64,13 +65,14 @@ const EnableBadge = ({ isEnabled }: { isEnabled: boolean }) => {
     return (
         <span
             className={clsx(
-                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset',
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
                 isEnabled
-                    ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                    : 'bg-red-50 text-red-700 ring-red-200',
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+                    : 'bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400',
             )}
         >
-            {isEnabled ? 'ENABLED' : 'DISABLED'}
+            <span className={clsx('h-1.5 w-1.5 rounded-full', isEnabled ? 'bg-emerald-500' : 'bg-red-500')} />
+            {isEnabled ? 'Enabled' : 'Disabled'}
         </span>
     );
 };
