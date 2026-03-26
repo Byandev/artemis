@@ -42,6 +42,9 @@ class ForDeliveryController extends Controller
                 'conferrer' => function ($query) {
                     $query->select(['id', 'name']);
                 },
+                'assignee' => function ($query) {
+                    $query->select(['id', 'name']);
+                },
                 'page' => function ($query) {
                     $query->select(['id', 'name']);
                 },
@@ -106,8 +109,10 @@ class ForDeliveryController extends Controller
 
     public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
     {
-        // Check if userId is provided
-        if (!$request->has('userId') || !$request->userId) {
+        $isRemoving = $request->has('removeAssignee') && $request->removeAssignee;
+
+        // Require userId unless explicitly removing the assignee
+        if (!$isRemoving && (!$request->has('userId') || !$request->userId)) {
             return redirect()->back()->with('error', 'Please select a user before updating.');
         }
 
@@ -121,7 +126,7 @@ class ForDeliveryController extends Controller
         // Update status and assignee
         $orderForDelivery->update([
             'status' => $request->status,
-            'assignee_id' => $request->userId,
+            'assignee_id' => $isRemoving ? null : $request->userId,
         ]);
 
         return redirect()->back()->with('success', 'Status updated successfully');
@@ -145,6 +150,9 @@ class ForDeliveryController extends Controller
                         ]);
                 },
                 'conferrer' => function ($query) {
+                    $query->select(['id', 'name']);
+                },
+                'assignee' => function ($query) {
                     $query->select(['id', 'name']);
                 },
                 'page' => function ($query) {

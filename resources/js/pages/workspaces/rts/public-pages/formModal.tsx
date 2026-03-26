@@ -3,174 +3,162 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
 import { User } from '@/types/models/Pancake/User';
-import React, { useEffect, useRef, useState } from 'react';
-import Select from 'react-select';
+import { Check, Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     users: User[];
-    onSubmit?: (userId: number) => void;
-    autoAssignIfSaved?: boolean; // New prop to control auto-assign behavior
+    onSubmit?: (userId: string) => void;
 }
 
-interface SelectOption {
-    value: number;
-    label: string;
-}
+export default function FormModal({ open, onOpenChange, users, onSubmit }: Props) {
+    const [search, setSearch] = useState('');
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-export default function FormModal({
-    open,
-    onOpenChange,
-    users,
-    onSubmit,
-    autoAssignIfSaved = false, // Default to false to prevent auto-closing
-}: Props) {
-    const [selectedUser, setSelectedUser] = useState<SelectOption | null>(null);
-    const modalContentRef = useRef<HTMLDivElement>(null);
-
-    const userOptions: SelectOption[] = users.map((user) => ({
-        value: user.id,
-        label: user.name,
-    }));
-
-
-    // Load saved user if exists
+    // Pre-select saved user when modal opens
     useEffect(() => {
-        if (open) {
-            const savedId = localStorage.getItem('user_id');
-            const savedName = localStorage.getItem('user_name');
-
-            if (savedId && savedName) {
-                const user = {
-                    value: Number(savedId),
-                    label: savedName,
-                };
-
-                console.log('FormModal - Found saved user:', user);
-                setSelectedUser(user);
-
-                // Only auto-assign and close if explicitly enabled
-                if (autoAssignIfSaved && onSubmit) {
-                    console.log('FormModal - Auto-assigning and closing modal');
-                    onSubmit(user.value);
-                    onOpenChange(false);
-                } else {
-                    console.log(
-                        'FormModal - Saved user loaded but not auto-assigning',
-                    );
-                }
-            } else {
-                console.log('FormModal - No saved user found');
-            }
+        if (!open) return;
+        const savedId = localStorage.getItem('user_id');
+        if (savedId) {
+            const found = users.find((u) => String(u.id) === savedId);
+            if (found) setSelectedUser(found);
         }
-    }, [open, autoAssignIfSaved, onSubmit, onOpenChange]);
+        setSearch('');
+    }, [open, users]);
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        console.log('FormModal - Form submitted with user:', selectedUser);
+    const filtered = users.filter((u) =>
+        u.name.toLowerCase().includes(search.toLowerCase()),
+    );
 
+    const handleSubmit = () => {
         if (!selectedUser) return;
-
-        // Save to localStorage
-        localStorage.setItem('user_id', selectedUser.value.toString());
-        localStorage.setItem('user_name', selectedUser.label);
-        console.log('FormModal - Saved user to localStorage');
-
-        if (onSubmit) {
-            onSubmit(selectedUser.value);
-        }
-
+        localStorage.setItem('user_id', String(selectedUser.id));
+        localStorage.setItem('user_name', selectedUser.name);
+        onSubmit?.(String(selectedUser.id));
         onOpenChange(false);
     };
 
-    const handleCancel = () => {
-        console.log('FormModal - Cancel clicked');
-        onOpenChange(false);
-    };
-
-    // Don't render if no users are available
-    if (users.length === 0) {
-        console.warn('FormModal - No users available to display');
-        return null;
-    }
+    if (users.length === 0) return null;
 
     return (
-        <Dialog
-            open={open}
-            onOpenChange={(newOpen) => {
-                console.log(
-                    'FormModal - Dialog onOpenChange triggered:',
-                    newOpen,
-                );
-                onOpenChange(newOpen);
-            }}
-        >
-            <DialogContent
-                ref={modalContentRef}
-                className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]"
-            >
-                <form onSubmit={handleSubmit}>
-                    <DialogHeader>
-                        <DialogTitle>Assign to me</DialogTitle>
-                        <DialogDescription>
-                            Select your profile from the list below to assign
-                            this item to yourself
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-sm p-0 gap-0 overflow-hidden">
+                <div className="px-5 pt-5 pb-4 border-b border-black/6 dark:border-white/6">
+                    <DialogHeader className="mb-4">
+                        <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
+                            Who are you?
+                        </DialogTitle>
+                        <DialogDescription className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5">
+                            Select your name to track actions in this session.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="grid gap-4 py-4">
-                        <Select
-                            options={userOptions}
-                            value={selectedUser}
-                            onChange={(option) => {
-                                console.log(
-                                    'FormModal - User selected:',
-                                    option,
-                                );
-                                setSelectedUser(option as SelectOption);
-                            }}
-                            placeholder="Select a user..."
-                            isClearable
-                            className="react-select-container"
-                            classNamePrefix="react-select"
-                            menuPortal={
-                                modalContentRef.current
-                                    ? modalContentRef.current.parentElement
-                                    : null
-                            }
-                            menuPosition="fixed"
-                            styles={{
-                                menuPortal: (base) => ({
-                                    ...base,
-                                    zIndex: 9999,
-                                }),
-                                menu: (base) => ({
-                                    ...base,
-                                    zIndex: 9999,
-                                }),
-                            }}
+                    {/* Current selection preview */}
+                    {selectedUser && (
+                        <div className="mb-3 flex items-center gap-3 rounded-xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-2.5">
+                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[11px] font-bold text-white">
+                                {selectedUser.name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
+                            </span>
+                            <div className="flex flex-col">
+                                <span className="font-mono text-[9px] uppercase tracking-wider text-emerald-500 dark:text-emerald-400">
+                                    Selected
+                                </span>
+                                <span className="text-[13px] font-semibold text-emerald-800 dark:text-emerald-300 leading-tight">
+                                    {selectedUser.name}
+                                </span>
+                            </div>
+                            <Check className="ml-auto h-4 w-4 text-emerald-500" />
+                        </div>
+                    )}
+
+                    {/* Search */}
+                    <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <input
+                            autoFocus
+                            type="text"
+                            placeholder="Search name…"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-mono! text-[12px]! text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
                         />
                     </div>
+                </div>
 
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleCancel}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={!selectedUser}>
-                            Assign
-                        </Button>
-                    </DialogFooter>
-                </form>
+                {/* User list */}
+                <div className="max-h-64 overflow-y-auto p-1.5">
+                    {filtered.length === 0 ? (
+                        <p className="py-6 text-center text-[12px] text-gray-400 dark:text-gray-500">
+                            No users found
+                        </p>
+                    ) : (
+                        filtered.map((user) => {
+                            const isSelected = selectedUser?.id === user.id;
+                            const initials = user.name
+                                .split(' ')
+                                .slice(0, 2)
+                                .map((w) => w[0])
+                                .join('')
+                                .toUpperCase();
+                            return (
+                                <button
+                                    key={user.id}
+                                    onClick={() => setSelectedUser(user)}
+                                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
+                                        isSelected
+                                            ? 'bg-emerald-50 dark:bg-emerald-500/10'
+                                            : 'hover:bg-stone-50 dark:hover:bg-zinc-800'
+                                    }`}
+                                >
+                                    <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
+                                        isSelected
+                                            ? 'bg-emerald-500 text-white'
+                                            : 'bg-stone-200 text-gray-600 dark:bg-zinc-700 dark:text-gray-300'
+                                    }`}>
+                                        {initials}
+                                    </span>
+                                    <span className={`flex-1 text-[13px] font-medium ${
+                                        isSelected
+                                            ? 'text-emerald-700 dark:text-emerald-400'
+                                            : 'text-gray-700 dark:text-gray-300'
+                                    }`}>
+                                        {user.name}
+                                    </span>
+                                    {isSelected && (
+                                        <Check className="h-3.5 w-3.5 text-emerald-500" />
+                                    )}
+                                </button>
+                            );
+                        })
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-end gap-2 border-t border-black/6 dark:border-white/6 px-4 py-3">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onOpenChange(false)}
+                        className="text-[12px]"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        size="sm"
+                        disabled={!selectedUser}
+                        onClick={handleSubmit}
+                        className="bg-emerald-600 text-[12px] text-white hover:bg-emerald-700 disabled:opacity-40"
+                    >
+                        Confirm
+                    </Button>
+                </div>
             </DialogContent>
         </Dialog>
     );
