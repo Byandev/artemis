@@ -24,7 +24,7 @@ export function RmoStatusPicker({ currentStatus, isLoading, onChangeStatus }: Pr
 
     if (isLoading) {
         return (
-            <div className="flex items-center gap-2 rounded-lg border border-black/6 dark:border-white/6 bg-stone-50 dark:bg-zinc-800/50 px-2.5 py-1.5 text-[12px] text-gray-400 dark:text-gray-500">
+            <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium bg-stone-100 text-gray-400 dark:bg-zinc-800 dark:text-gray-500">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Updating…
             </div>
@@ -33,10 +33,13 @@ export function RmoStatusPicker({ currentStatus, isLoading, onChangeStatus }: Pr
 
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger className="group flex items-center gap-2 rounded-lg border border-black/8 dark:border-white/8 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-[12px] font-medium text-gray-700 dark:text-gray-200 shadow-xs outline-none transition-all hover:border-black/15 dark:hover:border-white/15 hover:shadow-sm">
-                <span className={`h-2 w-2 shrink-0 rounded-full ${cfg?.dot ?? 'bg-gray-400'}`} />
+            <DropdownMenuTrigger className={cn(
+                'group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium outline-none transition-all hover:opacity-80',
+                cfg?.pill ?? 'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400',
+            )}>
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cfg?.dot ?? 'bg-gray-400'}`} />
                 <span className="max-w-[110px] truncate">{currentStatus}</span>
-                <ChevronDown className="h-3 w-3 shrink-0 text-gray-400 transition-colors group-hover:text-gray-600 dark:group-hover:text-gray-300" />
+                <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52 overflow-hidden p-1">
                 <p className="px-2 pb-1.5 pt-1 font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
