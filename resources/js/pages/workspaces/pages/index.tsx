@@ -258,6 +258,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                         initialSorting={initialSorting}
                         meta={{ ...omit(pages, ['data']) }}
                         onFetch={(params) => {
+                            console.log(params)
                             router.get(
                                 workspaces.pages.index({ workspace }),
                                 {

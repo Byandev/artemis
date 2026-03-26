@@ -32,13 +32,14 @@ interface Props {
 }
 
 export default function RmoManagement({ orders, workspace, query }: Props) {
-    const [isLoadingID, setIsLoadingID] = useState<number | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [selectedStatus, setSelectedStatus] = useState<string>(query?.filter?.status ?? '');
     const [selectedPageId, setSelectedPageId] = useState<string>(query?.filter?.page_id ?? '');
     const [selectedParcelStatus, setSelectedParcelStatus] = useState<string>('');
 
-    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
+    const initialSorting = useMemo(() => {
+        return toFrontendSort(query?.sort ?? null);
+    }, [query?.sort]);
 
     const uniquePages = useMemo(() => {
         const map = new Map<number, string>();
@@ -55,17 +56,18 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
-                    'filter[status]': selectedStatus || undefined,
-                    'filter[page_id]': selectedPageId || undefined,
-                    'filter[parcel_status]': selectedParcelStatus || undefined,
-                    'filter[shop_id]': query?.filter?.shop_id || undefined,
-                    page: (searchValue || selectedStatus || selectedPageId || selectedParcelStatus) ? 1 : (query?.page ?? 1),
+                    page: searchValue ? 1 : (query?.page ?? 1),
                 },
-                { preserveState: true, replace: true, preserveScroll: true, only: ['orders'] },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['rmo-management'],
+                },
             );
         }, 500);
         return () => clearTimeout(timer);
-    }, [searchValue, selectedStatus, selectedPageId, selectedParcelStatus, query?.sort, query?.filter?.shop_id]);
+    }, [searchValue]);
 
     const handleChangeStatus = (status: string, orderId: number) => {
         router.post(
@@ -73,18 +75,15 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
             { status },
             {
                 preserveScroll: true,
-                onStart: () => setIsLoadingID(orderId),
-                onFinish: () => setIsLoadingID(null),
             },
         );
     };
 
-    const columns = useMemo(() => createRmoColumns({
-        isLoadingID,
+    const columns = createRmoColumns({
         onChangeStatus: handleChangeStatus,
         parcelStatusConfig: authParcelStatusConfig,
         normalizeParcelStatus: (s) => s?.toLowerCase(),
-    }), [isLoadingID]);
+    });
 
     return (
         <AppLayout>
@@ -116,18 +115,19 @@ export default function RmoManagement({ orders, workspace, query }: Props) {
                         initialSorting={initialSorting}
                         meta={{ ...omit(orders, ['data']) }}
                         onFetch={(params) => {
+                            console.log(params)
                             router.get(
                                 workspaces.rts.rmoManagement({ workspace }),
                                 {
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
-                                    'filter[status]': selectedStatus || undefined,
-                                    'filter[page_id]': selectedPageId || undefined,
-                                    'filter[parcel_status]': selectedParcelStatus || undefined,
-                                    'filter[shop_id]': query?.filter?.shop_id || undefined,
                                     page: params?.page ?? 1,
                                 },
-                                { preserveState: true, replace: true, preserveScroll: true },
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true
+                                },
                             );
                         }}
                     />

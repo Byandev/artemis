@@ -12,7 +12,6 @@ import { RmoStatusPicker } from './RmoStatusPicker';
 import { ParcelStatusEntry } from './rmo-config';
 
 interface CreateRmoColumnsOptions {
-    isLoadingID: number | null;
     onChangeStatus: (status: string, orderId: number) => void;
     /** Parcel status config — authenticated uses snake_case keys, public uses UPPERCASE. */
     parcelStatusConfig: Record<string, ParcelStatusEntry>;
@@ -22,21 +21,21 @@ interface CreateRmoColumnsOptions {
     onAssignToMe?: (orderId: number, currentStatus: string) => void;
     /** Public view only — called when the × is clicked to clear an assignee. */
     onRemoveAssignee?: (orderId: number, currentStatus: string) => void;
-    /** Order ID currently being assigned (shows spinner). */
-    assigningOrderId?: number | null;
+    /** Disable the status picker (e.g. public view with no identity set). */
+    disableStatusChange?: boolean;
 }
 
 export function createRmoColumns({
-    isLoadingID,
     onChangeStatus,
     parcelStatusConfig,
     normalizeParcelStatus = (s) => s?.toLowerCase(),
     onAssignToMe,
     onRemoveAssignee,
-    assigningOrderId = null,
+    disableStatusChange = false,
 }: CreateRmoColumnsOptions): ColumnDef<OrderForDelivery>[] {
     return [
         {
+            id: 'order_number',
             accessorKey: 'order_number',
             header: ({ column }) => <SortableHeader column={column} title="Order #" />,
             cell: ({ row }) => (
@@ -227,16 +226,6 @@ export function createRmoColumns({
                 const assignee = row.original.assignee;
                 const orderId = row.original.order_id;
                 const currentStatus = row.original.status;
-                const isAssigning = assigningOrderId === orderId;
-
-                if (isAssigning) {
-                    return (
-                        <div className="flex items-center gap-1.5 text-[12px] text-gray-400 dark:text-gray-500">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            Assigning…
-                        </div>
-                    );
-                }
 
                 if (!assignee) {
                     if (onAssignToMe) {
@@ -279,8 +268,8 @@ export function createRmoColumns({
                 return (
                     <RmoStatusPicker
                         currentStatus={row.original.status as OrderStatus}
-                        isLoading={isLoadingID === orderId}
                         onChangeStatus={(status) => onChangeStatus(status, orderId)}
+                        disabled={disableStatusChange}
                     />
                 );
             },

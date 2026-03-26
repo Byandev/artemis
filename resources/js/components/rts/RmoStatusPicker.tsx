@@ -8,37 +8,42 @@ import { cn } from '@/lib/utils';
 import {
     ORDER_STATUSES,
     OrderStatus,
-    getStatusBadgeClass,
 } from '@/types/models/Pancake/OrderForDelivery';
 import { Check, ChevronDown, Loader2 } from 'lucide-react';
 import { orderStatusConfig } from './rmo-config';
+import { useMemo, useState } from 'react';
 
 interface Props {
     currentStatus: OrderStatus;
-    isLoading: boolean;
     onChangeStatus: (status: string) => void;
+    disabled?: boolean;
 }
 
-export function RmoStatusPicker({ currentStatus, isLoading, onChangeStatus }: Props) {
-    const cfg = orderStatusConfig[currentStatus];
+export function RmoStatusPicker({ currentStatus, onChangeStatus, disabled = false }: Props) {
+    const [status, setStatus] = useState(currentStatus)
 
-    if (isLoading) {
+    const cfg = useMemo(() => orderStatusConfig[status], [status]);
+
+    if (disabled) {
         return (
-            <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium bg-stone-100 text-gray-400 dark:bg-zinc-800 dark:text-gray-500">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Updating…
-            </div>
+            <span className={cn(
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium opacity-60 cursor-not-allowed',
+                cfg?.pill ?? 'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400',
+            )}>
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cfg?.dot ?? 'bg-gray-400'}`} />
+                <span className="max-w-[110px] truncate">{status}</span>
+            </span>
         );
     }
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger className={cn(
-                'group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium outline-none transition-all hover:opacity-80',
+                'group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium font-[inherit] outline-none transition-all hover:opacity-80',
                 cfg?.pill ?? 'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400',
             )}>
                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cfg?.dot ?? 'bg-gray-400'}`} />
-                <span className="max-w-[110px] truncate">{currentStatus}</span>
+                <span className="max-w-[110px] truncate">{status}</span>
                 <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52 overflow-hidden p-1">
@@ -52,7 +57,10 @@ export function RmoStatusPicker({ currentStatus, isLoading, onChangeStatus }: Pr
                         return (
                             <DropdownMenuItem
                                 key={s}
-                                onClick={() => onChangeStatus(s)}
+                                onClick={() => {
+                                    setStatus(s)
+                                    onChangeStatus(s);
+                                }}
                                 className={cn(
                                     'flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-[12px]',
                                     isActive

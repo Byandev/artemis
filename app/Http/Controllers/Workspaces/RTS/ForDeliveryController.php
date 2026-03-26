@@ -148,17 +148,15 @@ class ForDeliveryController extends Controller
             ->with([
                 'order' => function ($query) {
                     $query
-                        ->selectRaw('
+                        ->selectRaw("
                             id, order_number, status_name, final_amount, parcel_status, tracking_code, delivery_attempts,
                             (
-                                SELECT ROUND(
-                                    SUM(order_fail) * 100.0 / NULLIF(SUM(order_fail) + SUM(order_success), 0),
-                                    0
-                                )
+                                SELECT SUM(order_fail) / NULLIF(SUM(order_fail) + SUM(order_success), 0)
                                 FROM pancake_order_phone_number_reports
                                 WHERE order_id = pancake_orders.id
+                                and pancake_order_phone_number_reports.type = 'latest'
                             ) AS cx_rts_rate
-                        ')
+                        ")
                         ->with([
                             'shippingAddress' => function ($subQuery) {
                                 $subQuery->with(['cityOrderSummary']);
