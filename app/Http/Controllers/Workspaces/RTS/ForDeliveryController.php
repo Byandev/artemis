@@ -54,8 +54,10 @@ class ForDeliveryController extends Controller
                 AllowedFilter::exact('shop_id'),
                 AllowedFilter::exact('status'),
                 AllowedFilter::callback('parcel_status', function ($query, $value) {
-                    $query->whereHas('order', function ($orderQuery) use ($value) {
-                        $orderQuery->where('parcel_status', strtolower($value));
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $values = array_map('strtolower', $values);
+                    $query->whereHas('order', function ($orderQuery) use ($values) {
+                        $orderQuery->whereIn('parcel_status', $values);
                     });
                 }),
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -160,12 +162,20 @@ class ForDeliveryController extends Controller
                 },
             ])
             ->allowedFilters([
-                AllowedFilter::exact('page_id'),
+                AllowedFilter::callback('page_id', function ($query, $value) {
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $query->whereIn('page_id', $values);
+                }),
                 AllowedFilter::exact('shop_id'),
-                AllowedFilter::exact('status'),
+                AllowedFilter::callback('status', function ($query, $value) {
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $query->whereIn('status', $values);
+                }),
                 AllowedFilter::callback('parcel_status', function ($query, $value) {
-                    $query->whereHas('order', function ($orderQuery) use ($value) {
-                        $orderQuery->where('parcel_status', strtolower($value));
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $values = array_map('strtolower', $values);
+                    $query->whereHas('order', function ($orderQuery) use ($values) {
+                        $orderQuery->whereIn('parcel_status', $values);
                     });
                 }),
                 AllowedFilter::callback('search', function ($query, $value) {

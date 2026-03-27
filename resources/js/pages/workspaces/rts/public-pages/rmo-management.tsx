@@ -40,10 +40,10 @@ interface Props {
         sort?: string | null;
         filter?: {
             search?: string;
-            status?: string;
-            page_id?: string;
+            status?: string | string[];
+            page_id?: string | string[];
             shop_id?: string;
-            parcel_status?: string;
+            parcel_status?: string | string[];
         };
         page?: number;
         perPage?: number;
@@ -70,9 +70,21 @@ export default function RmoManagement({ orders, workspace, query, users, stats }
     const [isLoadingID, setIsLoadingID] = useState<number | null>(null);
     const [assigningOrderId, setAssigningOrderId] = useState<number | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
-    const [selectedStatus, setSelectedStatus] = useState<string>(query?.filter?.status ?? '');
-    const [selectedPageId, setSelectedPageId] = useState<string>(query?.filter?.page_id ?? '');
-    const [selectedParcelStatus, setSelectedParcelStatus] = useState<string>(query?.filter?.parcel_status ?? '');
+    const [selectedStatuses, setSelectedStatuses] = useState<string[]>(() => {
+        const v = query?.filter?.status;
+        if (!v) return [];
+        return Array.isArray(v) ? v : v.split(',').filter(Boolean);
+    });
+    const [selectedPageIds, setSelectedPageIds] = useState<string[]>(() => {
+        const v = query?.filter?.page_id;
+        if (!v) return [];
+        return Array.isArray(v) ? v : v.split(',').filter(Boolean);
+    });
+    const [selectedParcelStatuses, setSelectedParcelStatuses] = useState<string[]>(() => {
+        const v = query?.filter?.parcel_status;
+        if (!v) return [];
+        return Array.isArray(v) ? v : v.split(',').filter(Boolean);
+    });
     const [userName, setUserName] = useState<string | false>(false);
     const [isOpen, setIsOpen] = useState(false);
     const [showStats, setShowStats] = useState(() => localStorage.getItem('rmo_show_stats') === 'true');
@@ -96,22 +108,24 @@ export default function RmoManagement({ orders, workspace, query, users, stats }
 
     useEffect(() => {
         const timer = setTimeout(() => {
+            const params: Record<string, unknown> = {
+                sort: query?.sort,
+                'filter[search]': searchValue || undefined,
+                'filter[shop_id]': query?.filter?.shop_id || undefined,
+                page: (searchValue || selectedStatuses.length || selectedPageIds.length || selectedParcelStatuses.length) ? 1 : (query?.page ?? 1),
+            };
+            if (selectedStatuses.length) params['filter[status]'] = selectedStatuses.join(',');
+            if (selectedPageIds.length) params['filter[page_id]'] = selectedPageIds.join(',');
+            if (selectedParcelStatuses.length) params['filter[parcel_status]'] = selectedParcelStatuses.join(',');
+
             router.get(
                 publicPage.rmoManagement({ workspace }),
-                {
-                    sort: query?.sort,
-                    'filter[search]': searchValue || undefined,
-                    'filter[status]': selectedStatus || undefined,
-                    'filter[page_id]': selectedPageId || undefined,
-                    'filter[parcel_status]': selectedParcelStatus || undefined,
-                    'filter[shop_id]': query?.filter?.shop_id || undefined,
-                    page: (searchValue || selectedStatus || selectedPageId || selectedParcelStatus) ? 1 : (query?.page ?? 1),
-                },
+                params,
                 { preserveState: true, replace: true, preserveScroll: true, only: ['orders'] },
             );
         }, 500);
         return () => clearTimeout(timer);
-    }, [searchValue, selectedStatus, selectedPageId, selectedParcelStatus, query?.sort, query?.filter?.shop_id]);
+    }, [searchValue, selectedStatuses, selectedPageIds, selectedParcelStatuses, query?.sort, query?.filter?.shop_id]);
 
     const doAssign = (orderId: number, currentStatus: string, userId: string | null) => {
         const payload = userId === null
@@ -190,7 +204,7 @@ export default function RmoManagement({ orders, workspace, query, users, stats }
 
             {/* Top bar */}
             <div className="border-b border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
-                <div className="mx-auto flex w-full max-w-(--breakpoint-2xl) items-center justify-between px-4 py-3 md:px-6">
+                <div className="mx-auto flex w-full  items-center justify-between px-4 py-3 md:px-6">
                     {/* Brand + date */}
                     <div className="flex items-center gap-3">
                         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600">
@@ -236,7 +250,7 @@ export default function RmoManagement({ orders, workspace, query, users, stats }
                 </div>
             </div>
 
-            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+            <div className="mx-auto w-full p-4 md:p-6">
                 {/* Page title + stats toggle */}
                 <div className="mb-6 flex items-start justify-between">
                     <div>
@@ -276,14 +290,14 @@ export default function RmoManagement({ orders, workspace, query, users, stats }
                     searchValue={searchValue}
                     onSearchChange={setSearchValue}
                     uniquePages={uniquePages}
-                    selectedPageId={selectedPageId}
-                    onPageChange={setSelectedPageId}
+                    selectedPageIds={selectedPageIds}
+                    onPageChange={setSelectedPageIds}
                     parcelStatusConfig={publicParcelStatusConfig}
                     parcelStatusOptions={parcelStatusOptions}
-                    selectedParcelStatus={selectedParcelStatus}
-                    onParcelStatusChange={setSelectedParcelStatus}
-                    selectedStatus={selectedStatus}
-                    onStatusChange={setSelectedStatus}
+                    selectedParcelStatuses={selectedParcelStatuses}
+                    onParcelStatusChange={setSelectedParcelStatuses}
+                    selectedStatuses={selectedStatuses}
+                    onStatusChange={setSelectedStatuses}
                 />
 
                 <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
@@ -294,17 +308,19 @@ export default function RmoManagement({ orders, workspace, query, users, stats }
                         initialSorting={initialSorting}
                         meta={{ ...omit(orders, ['data']) }}
                         onFetch={(params) => {
+                            const fetchParams: Record<string, unknown> = {
+                                sort: params?.sort,
+                                'filter[search]': searchValue || undefined,
+                                'filter[shop_id]': query?.filter?.shop_id || undefined,
+                                page: params?.page ?? 1,
+                            };
+                            if (selectedStatuses.length) fetchParams['filter[status]'] = selectedStatuses.join(',');
+                            if (selectedPageIds.length) fetchParams['filter[page_id]'] = selectedPageIds.join(',');
+                            if (selectedParcelStatuses.length) fetchParams['filter[parcel_status]'] = selectedParcelStatuses.join(',');
+
                             router.get(
                                 publicPage.rmoManagement({ workspace }),
-                                {
-                                    sort: params?.sort,
-                                    'filter[search]': searchValue || undefined,
-                                    'filter[status]': selectedStatus || undefined,
-                                    'filter[page_id]': selectedPageId || undefined,
-                                    'filter[parcel_status]': selectedParcelStatus || undefined,
-                                    'filter[shop_id]': query?.filter?.shop_id || undefined,
-                                    page: params?.page ?? 1,
-                                },
+                                fetchParams,
                                 { preserveState: true, replace: true, preserveScroll: true },
                             );
                         }}

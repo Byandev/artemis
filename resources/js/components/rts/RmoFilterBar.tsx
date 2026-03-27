@@ -9,7 +9,7 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ORDER_STATUSES } from '@/types/models/Pancake/OrderForDelivery';
 import { ChevronDown, ChevronUp, Search, SlidersHorizontal, X } from 'lucide-react';
 import { orderStatusConfig, ParcelStatusEntry } from './rmo-config';
@@ -24,31 +24,39 @@ interface Props {
     onSearchChange: (value: string) => void;
 
     uniquePages: UniquePage[];
-    selectedPageId: string;
-    onPageChange: (id: string) => void;
+    selectedPageIds: string[];
+    onPageChange: (ids: string[]) => void;
 
     parcelStatusConfig: Record<string, ParcelStatusEntry>;
     parcelStatusOptions: string[];
-    selectedParcelStatus: string;
-    onParcelStatusChange: (status: string) => void;
+    selectedParcelStatuses: string[];
+    onParcelStatusChange: (statuses: string[]) => void;
 
-    selectedStatus: string;
-    onStatusChange: (status: string) => void;
+    selectedStatuses: string[];
+    onStatusChange: (statuses: string[]) => void;
 }
 
-function SingleSelectGroup({
+function MultiSelectGroup({
     name,
-    value,
+    selected,
     onChange,
     options,
 }: {
     name: string;
-    value: string;
-    onChange: (v: string) => void;
+    selected: string[];
+    onChange: (v: string[]) => void;
     options: { id: string; label: string; dot?: string }[];
 }) {
     const [open, setOpen] = useState(false);
-    const isActive = !!value;
+    const activeCount = selected.length;
+
+    const toggle = (id: string) => {
+        if (selected.includes(id)) {
+            onChange(selected.filter((s) => s !== id));
+        } else {
+            onChange([...selected, id]);
+        }
+    };
 
     return (
         <Collapsible open={open} onOpenChange={setOpen}>
@@ -62,9 +70,9 @@ function SingleSelectGroup({
                     <span className="text-[10px] font-mono font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600">
                         {name}
                     </span>
-                    {isActive && (
+                    {activeCount > 0 && (
                         <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-emerald-500/[0.10] text-emerald-600 dark:text-emerald-400 text-[10px] font-semibold tabular-nums">
-                            1
+                            {activeCount}
                         </span>
                     )}
                 </span>
@@ -75,32 +83,12 @@ function SingleSelectGroup({
 
             <CollapsibleContent className="mt-0.5">
                 <div>
-                    <div
-                        onClick={() => onChange('')}
-                        className={[
-                            'flex items-center gap-2.5 px-2 py-2 rounded-[8px] cursor-pointer transition-colors',
-                            !value
-                                ? 'bg-emerald-500/[0.06] dark:bg-emerald-500/[0.08]'
-                                : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.03]',
-                        ].join(' ')}
-                    >
-                        <span
-                            className={[
-                                'text-[13px] truncate select-none',
-                                !value
-                                    ? 'text-emerald-700 dark:text-emerald-400 font-medium'
-                                    : 'text-gray-600 dark:text-gray-400',
-                            ].join(' ')}
-                        >
-                            All
-                        </span>
-                    </div>
                     {options.map((opt) => {
-                        const checked = value === opt.id;
+                        const checked = selected.includes(opt.id);
                         return (
-                            <div
+                            <label
                                 key={opt.id}
-                                onClick={() => onChange(opt.id)}
+                                htmlFor={`rmo-filter-${name}-${opt.id}`}
                                 className={[
                                     'flex items-center gap-2.5 px-2 py-2 rounded-[8px] cursor-pointer transition-colors',
                                     checked
@@ -108,6 +96,12 @@ function SingleSelectGroup({
                                         : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.03]',
                                 ].join(' ')}
                             >
+                                <Checkbox
+                                    id={`rmo-filter-${name}-${opt.id}`}
+                                    checked={checked}
+                                    onCheckedChange={() => toggle(opt.id)}
+                                    className="border-black/20 dark:border-white/20 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 dark:data-[state=checked]:bg-emerald-500 dark:data-[state=checked]:border-emerald-500"
+                                />
                                 {opt.dot && (
                                     <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${opt.dot}`} />
                                 )}
@@ -121,7 +115,7 @@ function SingleSelectGroup({
                                 >
                                     {opt.label}
                                 </span>
-                            </div>
+                            </label>
                         );
                     })}
                 </div>
@@ -134,25 +128,25 @@ export function RmoFilterBar({
     searchValue,
     onSearchChange,
     uniquePages,
-    selectedPageId,
+    selectedPageIds,
     onPageChange,
     parcelStatusConfig,
     parcelStatusOptions,
-    selectedParcelStatus,
+    selectedParcelStatuses,
     onParcelStatusChange,
-    selectedStatus,
+    selectedStatuses,
     onStatusChange,
 }: Props) {
     const [isOpen, setIsOpen] = useState(false);
 
-    const activeFilterCount = [selectedStatus, selectedPageId, selectedParcelStatus].filter(Boolean).length;
-    const hasActiveFilters = !!(selectedStatus || selectedPageId || selectedParcelStatus || searchValue);
+    const activeFilterCount = selectedStatuses.length + selectedPageIds.length + selectedParcelStatuses.length;
+    const hasActiveFilters = activeFilterCount > 0 || !!searchValue;
 
     const clearFilters = useCallback(() => {
         onSearchChange('');
-        onPageChange('');
-        onParcelStatusChange('');
-        onStatusChange('');
+        onPageChange([]);
+        onParcelStatusChange([]);
+        onStatusChange([]);
     }, [onSearchChange, onPageChange, onParcelStatusChange, onStatusChange]);
 
     const pageOptions = useMemo(
@@ -271,21 +265,21 @@ export function RmoFilterBar({
 
                     {/* Filter groups */}
                     <div className="max-h-72 space-y-1 overflow-y-auto p-2">
-                        <SingleSelectGroup
+                        <MultiSelectGroup
                             name="Page"
-                            value={selectedPageId}
+                            selected={selectedPageIds}
                             onChange={onPageChange}
                             options={pageOptions}
                         />
-                        <SingleSelectGroup
+                        <MultiSelectGroup
                             name="J&T Parcel Status"
-                            value={selectedParcelStatus}
+                            selected={selectedParcelStatuses}
                             onChange={onParcelStatusChange}
                             options={parcelOptions}
                         />
-                        <SingleSelectGroup
+                        <MultiSelectGroup
                             name="Order Status"
-                            value={selectedStatus}
+                            selected={selectedStatuses}
                             onChange={onStatusChange}
                             options={orderStatusOptions}
                         />
