@@ -7,6 +7,7 @@ use App\Models\Workspace;
 use App\Queries\RtsCxQuery;
 use App\Queries\RtsDeliveryAttemptsQuery;
 use App\Queries\RtsLocationQuery;
+use App\Queries\RtsOrderItemQuery;
 use App\Queries\RtsPriceQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -21,6 +22,15 @@ class AnalyticController extends Controller
                 'pages' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name'),
             ]),
         ]);
+    }
+
+    public function groupByOrderItem(Request $request, Workspace $workspace)
+    {
+        return response()->json(
+            (new RtsOrderItemQuery($workspace, $request))
+                ->sort($request->input('sort', '-total_orders'))
+                ->get($request->input('per_page', 15))
+        );
     }
 
     public function groupByPrice(Request $request, Workspace $workspace)

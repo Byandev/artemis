@@ -37,6 +37,14 @@ type CxRtsRow = {
     rts_rate_percentage: number;
 };
 
+type OrderItemRow = {
+    item_name: string | null;
+    total_orders: number;
+    delivered_count: number;
+    returned_count: number;
+    rts_rate_percentage: number;
+};
+
 type PriceRow = {
     price_bucket: string | null;
     total_orders: number;
@@ -148,12 +156,16 @@ export default function Analytics({ workspace }: Props) {
     const [cxRtsLoading, setCxRtsLoading] = useState(true);
     const [cxRtsType, setCxRtsType] = useState<'latest' | 'initial'>('latest');
 
+    const [orderItems, setOrderItems] = useState<PaginatedData<OrderItemRow> | null>(null);
+    const [orderItemsLoading, setOrderItemsLoading] = useState(true);
+    const [orderItemsSort, setOrderItemsSort] = useState('-total_orders');
+
     const [price, setPrice] = useState<PriceRow[]>([]);
     const [priceLoading, setPriceLoading] = useState(true);
 
-    const [priceView, setPriceView] = useState<ViewMode>('table');
-    const [attemptsView, setAttemptsView] = useState<ViewMode>('table');
-    const [cxRtsView, setCxRtsView] = useState<ViewMode>('table');
+    const [priceView, setPriceView] = useState<ViewMode>('chart');
+    const [attemptsView, setAttemptsView] = useState<ViewMode>('chart');
+    const [cxRtsView, setCxRtsView] = useState<ViewMode>('chart');
 
     const buildParams = useCallback(() => {
         const p = new URLSearchParams();
@@ -206,6 +218,20 @@ export default function Analytics({ workspace }: Props) {
         }
     }, [workspace.slug, buildParams, cxRtsType]);
 
+    const fetchOrderItems = useCallback(async (page = 1, sort = orderItemsSort) => {
+        setOrderItemsLoading(true);
+        try {
+            const p = buildParams();
+            p.append('page', String(page));
+            p.append('per_page', '15');
+            p.append('sort', sort);
+            const res = await fetch(`/workspaces/${workspace.slug}/rts/analytics/group-by/order-item?${p}`, { credentials: 'same-origin' });
+            if (res.ok) setOrderItems(await res.json());
+        } finally {
+            setOrderItemsLoading(false);
+        }
+    }, [workspace.slug, buildParams, orderItemsSort]);
+
     const fetchPrice = useCallback(async () => {
         setPriceLoading(true);
         try {
@@ -248,6 +274,7 @@ export default function Analytics({ workspace }: Props) {
         fetchDeliveryAttempts();
         fetchCxRts();
         fetchPrice();
+        fetchOrderItems(1, orderItemsSort);
     }, [dateRange, filter]);
 
     useEffect(() => {
@@ -506,6 +533,81 @@ export default function Analytics({ workspace }: Props) {
                                     ))}
                                 </tbody>
                             </table>
+                        )}
+                    </div>
+                </div>
+
+                {/* Product breakdown */}
+                <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                    <div className="flex items-center justify-between border-b border-black/6 dark:border-white/6 px-5 py-4">
+                        <div>
+                            <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">By Product</h2>
+                            <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">RTS rate broken down by product/item name</p>
+                        </div>
+                    </div>
+                    <div className="p-4">
+                        {orderItemsLoading ? (
+                            <div className="flex h-24 items-center justify-center text-[13px] text-gray-400">Loading…</div>
+                        ) : (
+                            <>
+                                <table className="w-full text-[12px]">
+                                    <thead>
+                                        <tr className="border-b border-black/6 dark:border-white/6">
+                                            {(['item_name', 'total_orders', 'delivered_count', 'returned_count', 'rts_rate_percentage'] as const).map((col) => {
+                                                const labels: Record<string, string> = { item_name: 'Item Name', total_orders: 'Total Orders', delivered_count: 'Delivered', returned_count: 'Returned', rts_rate_percentage: 'RTS Rate' };
+                                                const isActive = orderItemsSort.replace('-', '') === col;
+                                                const isDesc = orderItemsSort.startsWith('-') && isActive;
+                                                const nextSort = isActive && isDesc ? col : `-${col}`;
+                                                return (
+                                                    <th
+                                                        key={col}
+                                                        onClick={() => { setOrderItemsSort(nextSort); fetchOrderItems(1, nextSort); }}
+                                                        className={`px-3 py-2 font-mono text-[10px] uppercase tracking-wider cursor-pointer select-none transition-colors hover:text-gray-500 dark:hover:text-gray-400 ${col === 'item_name' ? 'text-left' : 'text-right'} ${isActive ? 'text-gray-500 dark:text-gray-400' : 'text-gray-300 dark:text-gray-600'}`}
+                                                    >
+                                                        {labels[col]}{isActive ? (isDesc ? ' ↓' : ' ↑') : ''}
+                                                    </th>
+                                                );
+                                            })}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(orderItems?.data ?? []).map((row, i) => (
+                                            <tr key={`${row.item_name}-${i}`} className="border-b border-black/4 dark:border-white/4 last:border-0">
+                                                <td className="px-3 py-2.5 font-medium text-gray-700 dark:text-gray-300">
+                                                    {row.item_name ?? <span className="text-gray-400">Unknown</span>}
+                                                </td>
+                                                <td className="px-3 py-2.5 text-right text-gray-600 dark:text-gray-400">{row.total_orders}</td>
+                                                <td className="px-3 py-2.5 text-right text-green-600 dark:text-green-400">{row.delivered_count}</td>
+                                                <td className="px-3 py-2.5 text-right text-red-500">{row.returned_count}</td>
+                                                <td className="px-3 py-2.5 text-right"><RtsCell value={row.rts_rate_percentage} /></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                {orderItems && orderItems.last_page > 1 && (
+                                    <div className="mt-4 flex items-center justify-between border-t border-black/4 dark:border-white/4 pt-4">
+                                        <p className="font-mono text-[11px] text-gray-400">
+                                            Showing {orderItems.from}–{orderItems.to} of {orderItems.total}
+                                        </p>
+                                        <div className="flex gap-1">
+                                            <button
+                                                disabled={orderItems.current_page === 1}
+                                                onClick={() => fetchOrderItems(orderItems.current_page - 1)}
+                                                className="rounded px-2.5 py-1 font-mono text-[11px] text-gray-500 transition-colors hover:bg-gray-100 disabled:opacity-30 dark:hover:bg-white/6"
+                                            >
+                                                Previous
+                                            </button>
+                                            <button
+                                                disabled={orderItems.current_page === orderItems.last_page}
+                                                onClick={() => fetchOrderItems(orderItems.current_page + 1)}
+                                                className="rounded px-2.5 py-1 font-mono text-[11px] text-gray-500 transition-colors hover:bg-gray-100 disabled:opacity-30 dark:hover:bg-white/6"
+                                            >
+                                                Next
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>

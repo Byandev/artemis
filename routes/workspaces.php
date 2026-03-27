@@ -109,6 +109,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/rts/analytics', [AnalyticController::class, 'index'])->name('workspaces.rts.analytics');
     Route::get('/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'index'])->name('workspaces.rts.rmo-management');
     Route::post('/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'updateStatus'])->name('workspaces.rts.rmo-updateStatus');
+    Route::get('/workspaces/{workspace}/rts/analytics/group-by/order-item', [AnalyticController::class, 'groupByOrderItem'])->name('workspaces.rts.analytics.group-by-order-item');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/price', [AnalyticController::class, 'groupByPrice'])->name('workspaces.rts.analytics.group-by-price');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/cx-rts', [AnalyticController::class, 'groupByCxRts'])->name('workspaces.rts.analytics.group-by-cx-rts');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/delivery-attempts', [AnalyticController::class, 'groupByDeliveryAttempts'])->name('workspaces.rts.analytics.group-by-delivery-attempts');
