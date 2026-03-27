@@ -23,6 +23,8 @@ import {
     Settings,
     User,
     ShieldIcon,
+    RotateCcw,
+    BarChart2,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -66,9 +68,20 @@ export function AppSidebar() {
             icon: User,
         },
         {
-            title: 'RMO Management',
-            icon: PhoneCall,
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/rmo-management`,
+            title: 'RTS',
+            icon: RotateCcw,
+            items: [
+                {
+                    title: 'Analytics',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
+                    icon: BarChart2,
+                },
+                {
+                    title: 'RMO Management',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/rmo-management`,
+                    icon: PhoneCall,
+                },
+            ],
         },
         {
             title: 'Roles',
