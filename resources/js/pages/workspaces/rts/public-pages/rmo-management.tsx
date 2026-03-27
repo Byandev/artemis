@@ -1,3 +1,4 @@
+import Filters, { FilterValue } from '@/components/filters/Filters';
 import { RmoFilterBar } from '@/components/rts/RmoFilterBar';
 import { createRmoColumns } from '@/components/rts/rmo-columns';
 import { publicParcelStatusConfig } from '@/components/rts/rmo-config';
@@ -21,19 +22,10 @@ import {
     TruckIcon,
     User as UserIcon,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import FormModal from './formModal';
-import { Page } from '@/types/models/Page';
-import { Shop } from '@/types/models/Shop';
 
 const parcelStatusOptions = Object.keys(publicParcelStatusConfig);
-
-interface RmoStats {
-    total_for_delivery_today: number;
-    called_rate: number;
-    successful_rate: number;
-    unsuccessful_rate: number;
-}
 
 interface Props {
     orders: PaginatedData<OrderForDelivery>;
@@ -44,17 +36,17 @@ interface Props {
             search?: string;
             status?: string | string[];
             page_id?: string | string[];
-            shop_id?: string;
+            shop_id?: string | string[];
             parcel_status?: string | string[];
         };
         page?: number;
         perPage?: number;
-
     };
     users: User[];
-    stats: RmoStats;
-    pages: Page[];
-    shops: Shop[]
+    total_for_delivery_today: number;
+    called_rate: number;
+    successful_rate: number;
+    unsuccessful_rate: number;
 }
 
 function StatCard({
@@ -89,9 +81,10 @@ export default function RmoManagement({
     workspace,
     query,
     users,
-    stats,
-    pages,
-    shops
+    total_for_delivery_today,
+    called_rate,
+    successful_rate,
+    unsuccessful_rate,
 }: Props) {
     const [isLoadingID, setIsLoadingID] = useState<number | null>(null);
     const [assigningOrderId, setAssigningOrderId] = useState<number | null>(
@@ -112,6 +105,11 @@ export default function RmoManagement({
         string[]
     >(() => {
         const v = query?.filter?.parcel_status;
+        if (!v) return [];
+        return Array.isArray(v) ? v : v.split(',').filter(Boolean);
+    });
+    const [selectedShopIds, setSelectedShopIds] = useState<string[]>(() => {
+        const v = query?.filter?.shop_id;
         if (!v) return [];
         return Array.isArray(v) ? v : v.split(',').filter(Boolean);
     });
@@ -143,6 +141,21 @@ export default function RmoManagement({
         }));
     }, [orders.data]);
 
+    const initialFilterValue = useMemo<FilterValue>(() => ({
+        teamIds: [],
+        productIds: [],
+        shopIds: selectedShopIds.map(Number),
+        pageIds: selectedPageIds.map(Number),
+        userIds: [],
+    }), []);
+
+    const handleFilterChange = useCallback((value: FilterValue) => {
+        const newPageIds = value.pageIds.map(String);
+        const newShopIds = value.shopIds.map(String);
+        setSelectedPageIds(newPageIds);
+        setSelectedShopIds(newShopIds);
+    }, []);
+
     useEffect(() => {
         const name = localStorage.getItem('user_name');
         if (name) setUserName(name);
@@ -153,12 +166,12 @@ export default function RmoManagement({
             const params: Record<string, unknown> = {
                 sort: query?.sort,
                 'filter[search]': searchValue || undefined,
-                'filter[shop_id]': query?.filter?.shop_id || undefined,
                 page:
                     searchValue ||
                     selectedStatuses.length ||
                     selectedPageIds.length ||
-                    selectedParcelStatuses.length
+                    selectedParcelStatuses.length ||
+                    selectedShopIds.length
                         ? 1
                         : (query?.page ?? 1),
             };
@@ -169,12 +182,13 @@ export default function RmoManagement({
             if (selectedParcelStatuses.length)
                 params['filter[parcel_status]'] =
                     selectedParcelStatuses.join(',');
+            if (selectedShopIds.length)
+                params['filter[shop_id]'] = selectedShopIds.join(',');
 
             router.get(publicPage.rmoManagement({ workspace }), params, {
                 preserveState: true,
                 replace: true,
                 preserveScroll: true,
-                only: ['orders'],
             });
         }, 500);
         return () => clearTimeout(timer);
@@ -183,8 +197,8 @@ export default function RmoManagement({
         selectedStatuses,
         selectedPageIds,
         selectedParcelStatuses,
+        selectedShopIds,
         query?.sort,
-        query?.filter?.shop_id,
     ]);
 
     const doAssign = (
@@ -336,7 +350,7 @@ export default function RmoManagement({
             </div>
 
             <div className="mx-auto w-full p-4 md:p-6">
-                {/* Page title + stats toggle */}
+                {/* Page title + filters + stats toggle */}
                 <div className="mb-6 flex items-start justify-between">
                     <div>
                         <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">
@@ -346,53 +360,60 @@ export default function RmoManagement({
                             Delivery tracking for today's assigned orders
                         </p>
                     </div>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                            setShowStats((prev) => {
-                                const next = !prev;
-                                localStorage.setItem(
-                                    'rmo_show_stats',
-                                    String(next),
-                                );
-                                return next;
-                            })
-                        }
-                        className="flex items-center gap-1.5 rounded-lg text-[12px]"
-                    >
-                        <BarChart3 className="h-3.5 w-3.5" />
-                        {showStats ? 'Hide' : 'Show'} Statistics
-                        {showStats ? (
-                            <ChevronUp className="h-3.5 w-3.5" />
-                        ) : (
-                            <ChevronDown className="h-3.5 w-3.5" />
-                        )}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Filters
+                            workspace={workspace}
+                            onChange={handleFilterChange}
+                            initialValue={initialFilterValue}
+                        />
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                                setShowStats((prev) => {
+                                    const next = !prev;
+                                    localStorage.setItem(
+                                        'rmo_show_stats',
+                                        String(next),
+                                    );
+                                    return next;
+                                })
+                            }
+                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                        >
+                            <BarChart3 className="h-3.5 w-3.5" />
+                            {showStats ? 'Hide' : 'Show'} Statistics
+                            {showStats ? (
+                                <ChevronUp className="h-3.5 w-3.5" />
+                            ) : (
+                                <ChevronDown className="h-3.5 w-3.5" />
+                            )}
+                        </Button>
+                    </div>
                 </div>
 
                 {showStats && (
                     <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                         <StatCard
                             title="Total For Delivery Today"
-                            value={stats?.total_for_delivery_today || 0}
+                            value={total_for_delivery_today || 0}
                             icon={TruckIcon}
                         />
                         <StatCard
                             title="Called Rate"
-                            value={stats?.called_rate || 0}
+                            value={called_rate || 0}
                             icon={PercentIcon}
                             suffix="%"
                         />
                         <StatCard
                             title="Successful Rate"
-                            value={stats?.successful_rate || 0}
+                            value={successful_rate || 0}
                             icon={CheckCircleIcon}
                             suffix="%"
                         />
                         <StatCard
                             title="Unsuccessful Rate"
-                            value={stats?.unsuccessful_rate || 0}
+                            value={unsuccessful_rate || 0}
                             icon={AlertTriangleIcon}
                             suffix="%"
                         />
@@ -424,8 +445,6 @@ export default function RmoManagement({
                             const fetchParams: Record<string, unknown> = {
                                 sort: params?.sort,
                                 'filter[search]': searchValue || undefined,
-                                'filter[shop_id]':
-                                    query?.filter?.shop_id || undefined,
                                 page: params?.page ?? 1,
                             };
                             if (selectedStatuses.length)
@@ -437,6 +456,9 @@ export default function RmoManagement({
                             if (selectedParcelStatuses.length)
                                 fetchParams['filter[parcel_status]'] =
                                     selectedParcelStatuses.join(',');
+                            if (selectedShopIds.length)
+                                fetchParams['filter[shop_id]'] =
+                                    selectedShopIds.join(',');
 
                             router.get(
                                 publicPage.rmoManagement({ workspace }),

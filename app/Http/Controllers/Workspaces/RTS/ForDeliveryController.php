@@ -157,7 +157,7 @@ class ForDeliveryController extends Controller
         $unsuccessfulRate = $totalParcel > 0 ? round(($totalUnsuccessful / $totalParcel) * 100, 1) : 0;
 
         $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id']);
-        
+
         return Inertia::render('workspaces/rts/rmo-management', [
             'orders' => $items,
             'workspace' => $workspace,
@@ -258,7 +258,10 @@ class ForDeliveryController extends Controller
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $query->whereIn('page_id', $values);
                 }),
-                AllowedFilter::exact('shop_id'),
+                AllowedFilter::callback('shop_id', function ($query, $value) {
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $query->whereIn('shop_id', $values);
+                }),
                 AllowedFilter::callback('status', function ($query, $value) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $query->whereIn('status', $values);
@@ -297,58 +300,75 @@ class ForDeliveryController extends Controller
             ])
             ->paginate(10);
 
-        $workspaceId = $workspace->id;
+        // Build a base query for stats that respects page/shop filters
+        $statsBase = OrderForDelivery::where('workspace_id', $workspace->id);
 
-// 1️⃣ Total for delivery today
-        $totalForDeliveryToday = OrderForDelivery::query()
-            ->from('pancake_order_for_delivery as ofd')
-            ->join('pancake_orders as o', 'o.id', '=', 'ofd.order_id')
-            ->where('ofd.workspace_id', $workspaceId)
-            ->where('o.parcel_status', 'out_for_delivery')
-            ->whereDate('o.created_at', now())  // or created_at if you prefer
+        $filterPageIds = $request->input('filter.page_id');
+        if ($filterPageIds) {
+            $pageIds = is_string($filterPageIds) ? explode(',', $filterPageIds) : (array) $filterPageIds;
+            $statsBase->whereIn('page_id', $pageIds);
+        }
+
+        $filterShopId = $request->input('filter.shop_id');
+        if ($filterShopId) {
+            $shopIds = is_string($filterShopId) ? explode(',', $filterShopId) : (array) $filterShopId;
+            $statsBase->whereIn('shop_id', $shopIds);
+        }
+
+        // 1️⃣ Total orders
+        $totalOrders = (clone $statsBase)->count();
+
+        // 2️⃣ Total for delivery today
+        $totalForDeliveryToday = (clone $statsBase)
+            ->whereHas('order', function ($query) {
+                $query->where('parcel_status', 'out_for_delivery')
+                    ->whereDate('created_at', now());
+            })
             ->count();
 
-// 2️⃣ All-time stats (no date filter)
-        $stats = OrderForDelivery::query()
-            ->from('pancake_order_for_delivery as ofd')
-            ->join('pancake_orders as o', 'o.id', '=', 'ofd.order_id')
-            ->where('ofd.workspace_id', $workspaceId)
-            ->selectRaw("
-        COUNT(*) as total,
-        SUM(CASE WHEN ofd.status != 'PENDING' THEN 1 ELSE 0 END) as total_not_pending,
-        SUM(CASE WHEN o.parcel_status IS NOT NULL THEN 1 ELSE 0 END) as total_parcel,
-        SUM(CASE WHEN o.parcel_status = 'delivered' THEN 1 ELSE 0 END) as total_delivered,
-        SUM(CASE WHEN o.parcel_status = 'returning' THEN 1 ELSE 0 END) as total_returning,
-        SUM(CASE WHEN o.parcel_status = 'undeliverable' THEN 1 ELSE 0 END) as total_undeliverable,
-        SUM(CASE WHEN o.parcel_status = 'problematic' THEN 1 ELSE 0 END) as total_problematic
-    ")
-            ->first();
+        // 3️⃣ Called rate (not pending)
+        $totalCalled = (clone $statsBase)
+            ->where('status', '!=', 'PENDING')
+            ->count();
 
-// 3️⃣ Calculate rates
-        $total = (int) ($stats->total ?: 1);
-        $totalParcel = (int) ($stats->total_parcel ?: 1);
+        $calledRate = $totalOrders > 0 ? round(($totalCalled / $totalOrders) * 100, 1) : 0;
 
-        $stats->called_rate = round(((int) $stats->total_not_pending / $total) * 100, 1);
-        $stats->successful_rate = round(((int) $stats->total_delivered / $totalParcel) * 100, 1);
-        $stats->unsuccessful_rate = round((
-                ((int) $stats->total_problematic + (int) $stats->total_returning + (int) $stats->total_undeliverable)
-                / $totalParcel
-            ) * 100, 1);
+        // 4️⃣ Successful rate (parcel delivered)
+        $totalParcel = (clone $statsBase)
+            ->whereHas('order', fn($q) => $q->whereNotNull('parcel_status'))
+            ->count();
 
-// 4️⃣ Add the for-delivery-today count
-        $stats->total_for_delivery_today = $totalForDeliveryToday;
+        $totalDelivered = (clone $statsBase)
+            ->whereHas('order', fn($q) => $q->where('parcel_status', 'delivered'))
+            ->count();
+
+        $successfulRate = $totalParcel > 0 ? round(($totalDelivered / $totalParcel) * 100, 1) : 0;
+
+        // 5️⃣ Unsuccessful rate (problematic + returning + undeliverable)
+        $totalUnsuccessful = (clone $statsBase)
+            ->whereHas('order', fn($q) => $q->whereIn('parcel_status', ['problematic', 'returning', 'undeliverable']))
+            ->count();
+
+        $unsuccessfulRate = $totalParcel > 0 ? round(($totalUnsuccessful / $totalParcel) * 100, 1) : 0;
 
         $users = User::get(['id', 'name']);
+
+        $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id']);
+
+        
 
         return Inertia::render('workspaces/rts/public-pages/rmo-management', [
             'orders' => $items,
             'workspace' => $workspace,
             'query' => [
-                ...$request->only(['sort', 'perPage', 'page',]),
+                ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
             'users' => $users,
-            'stats' => $stats,
+            'total_for_delivery_today' => $totalForDeliveryToday,
+            'called_rate' => $calledRate,
+            'successful_rate' => $successfulRate,
+            'unsuccessful_rate' => $unsuccessfulRate,
         ]);
     }
 
