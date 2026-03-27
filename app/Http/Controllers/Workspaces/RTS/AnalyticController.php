@@ -9,6 +9,7 @@ use App\Queries\RtsDeliveryAttemptsQuery;
 use App\Queries\RtsLocationQuery;
 use App\Queries\RtsOrderItemQuery;
 use App\Queries\RtsPriceQuery;
+use App\Queries\RtsRiderQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -53,6 +54,15 @@ class AnalyticController extends Controller
             (new RtsCxQuery($workspace, $request))
                 ->ofType($request->input('type', 'latest'))
                 ->get()
+        );
+    }
+
+    public function groupByRider(Request $request, Workspace $workspace)
+    {
+        return response()->json(
+            (new RtsRiderQuery($workspace, $request))
+                ->sort($request->input('sort', '-total_orders'))
+                ->get($request->input('per_page', 15))
         );
     }
 

@@ -19,6 +19,7 @@ export interface Page {
     parcel_journey_flow_id: number | null;
     parcel_journey_custom_field_id: number | null;
     parcel_journey_enabled: boolean | null;
+    is_sync_logic_updated: boolean | null;
 
     shop?: Shop;
     owner?: User;
