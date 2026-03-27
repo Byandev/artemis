@@ -11,6 +11,8 @@ use App\Http\Sorts\Order\ForDelivery\OrderDeliveryAttemptSort;
 use App\Http\Sorts\Order\ForDelivery\OrderNumberSort;
 use App\Http\Sorts\Order\ForDelivery\OrderParcelStatusSort;
 use App\Http\Sorts\Order\ForDelivery\OrderTrackingCodeSort;
+use App\Models\Page;
+use App\Models\Shop;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -29,7 +31,16 @@ class ForDeliveryController extends Controller
             ->with([
                 'order' => function ($query) {
                     $query
-                        ->select(['id', 'order_number', 'status_name', 'final_amount', 'parcel_status', 'tracking_code', 'delivery_attempts'])
+                        ->selectRaw("
+                            id, order_number, status_name, final_amount, parcel_status, tracking_code, delivery_attempts,
+                            (
+                                SELECT SUM(order_fail) / NULLIF(SUM(order_fail) + SUM(order_success), 0)
+                                FROM pancake_order_phone_number_reports
+                                WHERE order_id = pancake_orders.id
+                                and pancake_order_phone_number_reports.type = 'latest'
+                            ) AS cx_rts_rate
+                        ")
+
                         ->with([
                             'shippingAddress' => function ($subQuery) {
                                 $subQuery->with(['cityOrderSummary']);
@@ -93,52 +104,63 @@ class ForDeliveryController extends Controller
             ])
             ->paginate(10);
 
-        $totalForDeliveryToday = OrderForDelivery::query()
-            ->from('pancake_order_for_delivery as ofd')
-            ->join('pancake_orders as o', 'o.id', '=', 'ofd.order_id')
-            ->where('ofd.workspace_id', $workspace->id)
-            ->where('o.parcel_status', 'out_for_delivery')
-            ->whereDate('o.updated_at', now())  // or created_at if you prefer
+        // 1️⃣ Total orders in workspace
+        $totalOrders = OrderForDelivery::where('workspace_id', $workspace->id)->count();
+
+
+        // 2️⃣ Total for delivery today
+        $totalForDeliveryToday = OrderForDelivery::where('workspace_id', $workspace->id)
+            ->whereHas('order', function ($query) {
+                $query->where('parcel_status', 'out_for_delivery')
+                    ->whereDate('created_at', now());
+            })
             ->count();
 
-// 2️⃣ All-time stats (no date filter)
-        $stats = OrderForDelivery::query()
-            ->from('pancake_order_for_delivery as ofd')
-            ->join('pancake_orders as o', 'o.id', '=', 'ofd.order_id')
-            ->where('ofd.workspace_id', $workspace->id)
-            ->selectRaw("
-        COUNT(*) as total,
-        SUM(CASE WHEN ofd.status != 'PENDING' THEN 1 ELSE 0 END) as total_not_pending,
-        SUM(CASE WHEN o.parcel_status IS NOT NULL THEN 1 ELSE 0 END) as total_parcel,
-        SUM(CASE WHEN o.parcel_status = 'delivered' THEN 1 ELSE 0 END) as total_delivered,
-        SUM(CASE WHEN o.parcel_status = 'returning' THEN 1 ELSE 0 END) as total_returning,
-        SUM(CASE WHEN o.parcel_status = 'undeliverable' THEN 1 ELSE 0 END) as total_undeliverable,
-        SUM(CASE WHEN o.parcel_status = 'problematic' THEN 1 ELSE 0 END) as total_problematic
-    ")
-            ->first();
 
-// 3️⃣ Calculate rates
-        $total = (int) ($stats->total ?: 1);
-        $totalParcel = (int) ($stats->total_parcel ?: 1);
 
-        $stats->called_rate = round(((int) $stats->total_not_pending / $total) * 100, 1);
-        $stats->successful_rate = round(((int) $stats->total_delivered / $totalParcel) * 100, 1);
-        $stats->unsuccessful_rate = round((
-                ((int) $stats->total_problematic + (int) $stats->total_returning + (int) $stats->total_undeliverable)
-                / $totalParcel
-            ) * 100, 1);
+        // 3️⃣ Called rate (not pending)
+        $totalCalled = OrderForDelivery::where('workspace_id', $workspace->id)
+            ->where('status', '!=', 'PENDING')
+            ->count();
 
-// 4️⃣ Add the for-delivery-today count
-        $stats->total_for_delivery_today = $totalForDeliveryToday;
+        $calledRate = $totalOrders > 0 ? round(($totalCalled / $totalOrders) * 100, 1) : 0;
+
+        // 4️⃣ Successful rate (parcel delivered)
+        $totalParcel = OrderForDelivery::where('workspace_id', $workspace->id)
+            ->whereHas('order', fn($q) => $q->whereNotNull('parcel_status'))
+            ->count();
+
+        $totalDelivered = OrderForDelivery::where('workspace_id', $workspace->id)
+            ->whereHas('order', fn($q) => $q->where('parcel_status', 'delivered'))
+            ->count();
+
+        $successfulRate = $totalParcel > 0 ? round(($totalDelivered / $totalParcel) * 100, 1) : 0;
+
+        // 5️⃣ Unsuccessful rate (problematic + returning + undeliverable)
+        $totalUnsuccessful = OrderForDelivery::where('workspace_id', $workspace->id)
+            ->whereHas('order', fn($q) => $q->whereIn('parcel_status', ['problematic', 'returning', 'undeliverable']))
+            ->count();
+
+        $unsuccessfulRate = $totalParcel > 0 ? round(($totalUnsuccessful / $totalParcel) * 100, 1) : 0;
+
+
+        $pages = Page::get(['id', 'name']);
+
+        $shops = Shop::get(['id', 'name']);
 
         return Inertia::render('workspaces/rts/rmo-management', [
             'orders' => $items,
             'workspace' => $workspace,
             'query' => [
-                ...$request->only(['sort', 'perPage', 'page',]),
+                ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
-            'stats' => $stats,
+            'total_for_delivery_today' => $totalForDeliveryToday,
+            'called_rate' => $calledRate,
+            'successful_rate' => $successfulRate,
+            'unsuccessful_rate' => $unsuccessfulRate,
+            'pages' => Page::get(['id', 'name']),
+            'shops' => Shop::get(['id', 'name']),
         ]);
     }
 
@@ -195,7 +217,15 @@ class ForDeliveryController extends Controller
             ->with([
                 'order' => function ($query) {
                     $query
-                        ->select(['id', 'order_number', 'status_name', 'final_amount', 'parcel_status', 'tracking_code', 'delivery_attempts'])
+                        ->selectRaw("
+                            id, order_number, status_name, final_amount, parcel_status, tracking_code, delivery_attempts,
+                            (
+                                SELECT SUM(order_fail) / NULLIF(SUM(order_fail) + SUM(order_success), 0)
+                                FROM pancake_order_phone_number_reports
+                                WHERE order_id = pancake_orders.id
+                                and pancake_order_phone_number_reports.type = 'latest'
+                            ) AS cx_rts_rate
+                        ")
                         ->with([
                             'shippingAddress' => function ($subQuery) {
                                 $subQuery->with(['cityOrderSummary']);
@@ -267,7 +297,7 @@ class ForDeliveryController extends Controller
             ->join('pancake_orders as o', 'o.id', '=', 'ofd.order_id')
             ->where('ofd.workspace_id', $workspaceId)
             ->where('o.parcel_status', 'out_for_delivery')
-            ->whereDate('o.updated_at', now())  // or created_at if you prefer
+            ->whereDate('o.created_at', now())  // or created_at if you prefer
             ->count();
 
 // 2️⃣ All-time stats (no date filter)

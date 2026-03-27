@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import FormModal from './formModal';
+import { Page } from '@/types/models/Page';
+import { Shop } from '@/types/models/Shop';
 
 const parcelStatusOptions = Object.keys(publicParcelStatusConfig);
 
@@ -47,9 +49,12 @@ interface Props {
         };
         page?: number;
         perPage?: number;
+
     };
     users: User[];
     stats: RmoStats;
+    pages: Page[];
+    shops: Shop[]
 }
 
 function StatCard({
@@ -85,6 +90,8 @@ export default function RmoManagement({
     query,
     users,
     stats,
+    pages,
+    shops
 }: Props) {
     const [isLoadingID, setIsLoadingID] = useState<number | null>(null);
     const [assigningOrderId, setAssigningOrderId] = useState<number | null>(
