@@ -23,17 +23,6 @@ class RtsPriceQuery extends RtsBaseQuery
         END
     ";
 
-    private const METRICS_SQL = '
-        SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
-        SUM(CASE WHEN pancake_orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
-        SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
-        ROUND(
-            (SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
-            NULLIF(SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
-            2
-        ) AS rts_rate_percentage
-    ';
-
     public function get(): Collection
     {
         $bucketList = implode(', ', array_map(fn ($b) => "'{$b}'", self::BUCKETS));
@@ -41,7 +30,7 @@ class RtsPriceQuery extends RtsBaseQuery
         return $this->query
             ->selectRaw('(' . self::PRICE_EXPR . ') AS price_bucket, ' . self::METRICS_SQL)
             ->groupByRaw('(' . self::PRICE_EXPR . ')')
-            ->havingRaw('SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END) > 0')
+            ->havingRaw(self::HAVING_SQL)
             ->orderByRaw("FIELD(price_bucket, {$bucketList})")
             ->get();
     }
