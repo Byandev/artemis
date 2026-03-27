@@ -112,6 +112,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/pages', [AnalyticController::class, 'groupByPages'])->name('workspaces.rts.analytics.group-by-pages');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/shops', [AnalyticController::class, 'groupByShops'])->name('workspaces.rts.analytics.group-by-shops');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/users', [AnalyticController::class, 'groupByUsers'])->name('workspaces.rts.analytics.group-by-users');
+    Route::get('/workspaces/{workspace}/rts/analytics/group-by/delivery-attempts', [AnalyticController::class, 'groupByDeliveryAttempts'])->name('workspaces.rts.analytics.group-by-delivery-attempts');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/provinces', [AnalyticController::class, 'groupByProvinces'])->name('workspaces.rts.analytics.group-by-provinces');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/cities', [AnalyticController::class, 'groupByCities'])->name('workspaces.rts.analytics.group-by-cities');
     Route::get('/workspaces/{workspace}/rts/location-analytics', [AnalyticController::class, 'locationAnalytics'])->name('workspaces.rts.location-analytics');

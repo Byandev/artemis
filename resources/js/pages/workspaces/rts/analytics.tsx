@@ -17,6 +17,14 @@ import { toFrontendSort } from '@/lib/sort';
 
 type GroupBy = 'province' | 'city';
 
+type DeliveryAttemptRow = {
+    delivery_attempts: string | null;
+    total_orders: number;
+    delivered_count: number;
+    returned_count: number;
+    rts_rate_percentage: number;
+};
+
 interface Props {
     workspace: Workspace;
 }
@@ -38,10 +46,16 @@ type CityRow = {
     rts_rate_percentage: number;
 };
 
+function rtsColor(value: number) {
+    if (value <= 15) return 'text-green-600 dark:text-green-400';
+    if (value <= 20) return 'text-yellow-500 dark:text-yellow-400';
+    if (value <= 25) return 'text-orange-500 dark:text-orange-400';
+    return 'font-semibold text-red-500';
+}
+
+
 const RtsCell = ({ value }: { value: number }) => (
-    <span className={value >= 40 ? 'font-semibold text-red-500' : ''}>
-        {value}%
-    </span>
+    <span className={rtsColor(value)}>{value}%</span>
 );
 
 export default function Analytics({ workspace }: Props) {
@@ -63,6 +77,9 @@ export default function Analytics({ workspace }: Props) {
     const [citiesLoading, setCitiesLoading] = useState(true);
     const [citySearch, setCitySearch] = useState('');
     const [citySort, setCitySort] = useState('-total_orders');
+
+    const [deliveryAttempts, setDeliveryAttempts] = useState<DeliveryAttemptRow[]>([]);
+    const [deliveryAttemptsLoading, setDeliveryAttemptsLoading] = useState(true);
 
     const buildParams = useCallback(() => {
         const p = new URLSearchParams();
@@ -103,6 +120,17 @@ export default function Analytics({ workspace }: Props) {
         }
     }, [workspace.slug, buildParams, citySearch]);
 
+    const fetchDeliveryAttempts = useCallback(async () => {
+        setDeliveryAttemptsLoading(true);
+        try {
+            const p = buildParams();
+            const res = await fetch(`/workspaces/${workspace.slug}/rts/analytics/group-by/delivery-attempts?${p}`, { credentials: 'same-origin' });
+            if (res.ok) setDeliveryAttempts(await res.json());
+        } finally {
+            setDeliveryAttemptsLoading(false);
+        }
+    }, [workspace.slug, buildParams]);
+
     const provinceSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => {
         if (provinceSearchTimer.current) clearTimeout(provinceSearchTimer.current);
@@ -120,6 +148,7 @@ export default function Analytics({ workspace }: Props) {
     useEffect(() => {
         fetchProvinces(1);
         fetchCities(1, '');
+        fetchDeliveryAttempts();
     }, [dateRange, filter]);
 
     // Fetch the active tab's data when switching
@@ -211,6 +240,47 @@ export default function Analytics({ workspace }: Props) {
                     />
                 </PageHeader>
 
+                {/* Delivery Attempts breakdown */}
+                <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                    <div className="border-b border-black/6 dark:border-white/6 px-5 py-4">
+                        <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">By Delivery Attempts</h2>
+                        <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">RTS rate broken down by number of delivery attempts</p>
+                    </div>
+                    <div className="p-4">
+                        {deliveryAttemptsLoading ? (
+                            <div className="flex h-24 items-center justify-center text-[13px] text-gray-400">Loading…</div>
+                        ) : (
+                            <table className="w-full text-[12px]">
+                                <thead>
+                                    <tr className="border-b border-black/6 dark:border-white/6">
+                                        <th className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Attempts</th>
+                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Total Orders</th>
+                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Delivered</th>
+                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Returned</th>
+                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">RTS Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {deliveryAttempts.map((row) => (
+                                        <tr key={row.delivery_attempts ?? 'unknown'} className="border-b border-black/4 dark:border-white/4 last:border-0">
+                                            <td className="px-3 py-2.5 font-medium text-gray-700 dark:text-gray-300">
+                                                {row.delivery_attempts ?? <span className="text-gray-400">Unknown</span>}
+                                            </td>
+                                            <td className="px-3 py-2.5 text-right text-gray-600 dark:text-gray-400">{row.total_orders}</td>
+                                            <td className="px-3 py-2.5 text-right text-green-600 dark:text-green-400">{row.delivered_count}</td>
+                                            <td className="px-3 py-2.5 text-right text-red-500">{row.returned_count}</td>
+                                            <td className="px-3 py-2.5 text-right">
+                                                <RtsCell value={row.rts_rate_percentage} />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+
+                {/* Location breakdown */}
                 <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
                     <div className="flex items-center justify-between border-b border-black/6 dark:border-white/6 px-5 py-4">
                         <div>

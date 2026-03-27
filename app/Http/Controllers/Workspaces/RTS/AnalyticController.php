@@ -163,6 +163,39 @@ class AnalyticController extends Controller
         ]);
     }
 
+    public function groupByDeliveryAttempts(Request $request, Workspace $workspace)
+    {
+        $rows = Order::selectRaw('
+            CASE
+                WHEN pancake_orders.delivery_attempts >= 5 THEN \'5+\'
+                WHEN pancake_orders.delivery_attempts IS NULL THEN NULL
+                ELSE CAST(pancake_orders.delivery_attempts AS CHAR)
+            END AS delivery_attempts,
+            SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
+            SUM(CASE WHEN pancake_orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
+            SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
+            ROUND(
+                (SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
+                NULLIF(SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
+                2
+            ) AS rts_rate_percentage
+        ')
+            ->ofWorkspace($workspace)
+            ->applyRtsFilters($request)
+            ->havingRaw('SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END) > 0')
+            ->groupByRaw('
+                CASE
+                    WHEN pancake_orders.delivery_attempts >= 5 THEN \'5+\'
+                    WHEN pancake_orders.delivery_attempts IS NULL THEN NULL
+                    ELSE CAST(pancake_orders.delivery_attempts AS CHAR)
+                END
+            ')
+            ->orderByRaw('ISNULL(MIN(pancake_orders.delivery_attempts)), MIN(pancake_orders.delivery_attempts) ASC')
+            ->get();
+
+        return response()->json($rows);
+    }
+
     public function groupByProvinces(Request $request, Workspace $workspace)
     {
         return response()->json(
