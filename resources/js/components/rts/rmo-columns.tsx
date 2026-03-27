@@ -146,6 +146,17 @@ export function createRmoColumns({
             },
         },
         {
+            id: 'order_final_amount',
+            accessorKey: 'order.final_amount',
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="SRP" />,
+            cell: ({ row }) => (
+                <span className="font-mono text-[12px] tabular-nums text-gray-700 dark:text-gray-300">
+                    {currencyFormatter(row.original.order.final_amount)}
+                </span>
+            ),
+        },
+        {
             id: 'order_shipping_address_city_order_summary_rts_rate',
             accessorKey: 'order.shipping_address.city_order_summary.rts_rate',
             enableSorting: true,
@@ -176,17 +187,6 @@ export function createRmoColumns({
                     </span>
                 );
             },
-        },
-        {
-            id: 'order_final_amount',
-            accessorKey: 'order.final_amount',
-            enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="SRP" />,
-            cell: ({ row }) => (
-                <span className="font-mono text-[12px] tabular-nums text-gray-700 dark:text-gray-300">
-                    {currencyFormatter(row.original.order.final_amount)}
-                </span>
-            ),
         },
         {
             id: 'order_delivery_attempts',
