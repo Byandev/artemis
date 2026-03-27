@@ -46,7 +46,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
             <Form
                 {...AuthenticatedSessionController.store()}
                 resetOnSuccess={['password']}
-                className="flex flex-col gap-6"
+                className="flex flex-col gap-5"
             >
                 {({ processing, errors }) => (
                     <>
@@ -54,9 +54,11 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                             <input type="hidden" name="invitation" value={invitationToken} />
                         )}
 
-                        <div className="grid gap-6">
-                            <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
+                        <div className="grid gap-4">
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="email" className="text-[13px] font-medium text-gray-700 dark:text-gray-300">
+                                    Email address
+                                </Label>
                                 <Input
                                     id="email"
                                     type="email"
@@ -68,22 +70,25 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                     placeholder="email@example.com"
                                     defaultValue={invitation?.email || ''}
                                     readOnly={!!invitation}
+                                    className="h-10 text-[14px]"
                                 />
                                 {invitation && (
-                                    <p className="text-xs text-muted-foreground">
-                                        This email matches your invitation. If this is incorrect, please sign up with a different email address.
+                                    <p className="text-[12px] text-gray-400 dark:text-gray-500">
+                                        This email matches your invitation.
                                     </p>
                                 )}
                                 <InputError message={errors.email} />
                             </div>
 
-                            <div className="grid gap-2">
+                            <div className="grid gap-1.5">
                                 <div className="flex items-center">
-                                    <Label htmlFor="password">Password</Label>
+                                    <Label htmlFor="password" className="text-[13px] font-medium text-gray-700 dark:text-gray-300">
+                                        Password
+                                    </Label>
                                     {canResetPassword && (
                                         <TextLink
                                             href={request()}
-                                            className="ml-auto text-sm"
+                                            className="ml-auto text-[12px]"
                                             tabIndex={5}
                                         >
                                             Forgot password?
@@ -98,39 +103,36 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                     tabIndex={2}
                                     autoComplete="current-password"
                                     placeholder="Password"
+                                    className="h-10 text-[14px]"
                                 />
                                 <InputError message={errors.password} />
                             </div>
 
-                            <div className="flex items-center space-x-3">
-                                <Checkbox
-                                    id="remember"
-                                    name="remember"
-                                    tabIndex={3}
-                                />
-                                <Label htmlFor="remember">Remember me</Label>
+                            <div className="flex items-center space-x-2.5">
+                                <Checkbox id="remember" name="remember" tabIndex={3} />
+                                <Label htmlFor="remember" className="text-[13px] text-gray-600 dark:text-gray-400 font-normal">
+                                    Remember me
+                                </Label>
                             </div>
 
                             <Button
                                 type="submit"
-                                className="mt-4 w-full"
+                                className="mt-2 h-10 w-full text-[14px] font-medium"
                                 tabIndex={4}
                                 disabled={processing}
                                 data-test="login-button"
                             >
-                                {processing && (
-                                    <LoaderCircle className="h-4 w-4 animate-spin" />
-                                )}
+                                {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
                                 Log in
                             </Button>
                         </div>
 
-                        <div className="text-center text-sm text-muted-foreground">
+                        <p className="text-center text-[13px] text-gray-500 dark:text-gray-400">
                             Don't have an account?{' '}
                             <TextLink href={invitationToken ? register({ query: { invitation: invitationToken } }).url : register().url} tabIndex={5}>
                                 Sign up
                             </TextLink>
-                        </div>
+                        </p>
                     </>
                 )}
             </Form>
