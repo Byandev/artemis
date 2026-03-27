@@ -14,8 +14,7 @@ class InventoryController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
 
-        // $query = Inventory::where('workspace_id', $workspace->id);
-        $query = Inventory::query();
+        $query = Inventory::where('workspace_id', $workspace->id);
 
         if ($request->filled('search')) {
             $query->where('ref_no', 'like', '%' . $request->search . '%');
