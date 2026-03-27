@@ -1,119 +1,204 @@
-import { Workspace } from '@/types/models/Workspace';
-import PageHeader from '@/components/common/PageHeader';
 import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
-import { useState } from 'react';
-import moment from 'moment/moment';
-import Filters, { FilterValue } from '@/components/filters/Filters';
-import {
-    currencyFormatter,
-    numberFormatter,
-    percentageFormatter,
-} from '@/lib/utils';
-import { DollarSign, PackageCheck, Truck, Undo2 } from 'lucide-react';
-import { formatDate } from 'date-fns';
+import PageHeader from '@/components/common/PageHeader';
 import DatePicker from '@/components/ui/date-picker';
-import StatisticCard from '@/pages/workspaces/dashboard/partials/StatisticCard';
+import Filters, { FilterValue } from '@/components/filters/Filters';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import { Workspace } from '@/types/models/Workspace';
+import { Head } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
+import { formatDate } from 'date-fns';
 import flatpickr from 'flatpickr';
 import DateOption = flatpickr.Options.DateOption;
-import { metricConfigs } from '@/types/metrics';
+import moment from 'moment';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { omit } from 'lodash';
+import { PaginatedData } from '@/types';
+import { toFrontendSort } from '@/lib/sort';
+
+type GroupBy = 'province' | 'city';
 
 interface Props {
-    workspace: Workspace
+    workspace: Workspace;
 }
 
-const Analytics = ({ workspace }: Props) => {
+type ProvinceRow = {
+    province_name: string;
+    total_orders: number;
+    delivered_count: number;
+    returned_count: number;
+    rts_rate_percentage: number;
+};
+
+type CityRow = {
+    city_name: string;
+    province_name: string;
+    total_orders: number;
+    delivered_count: number;
+    returned_count: number;
+    rts_rate_percentage: number;
+};
+
+const RtsCell = ({ value }: { value: number }) => (
+    <span className={value >= 40 ? 'font-semibold text-red-500' : ''}>
+        {value}%
+    </span>
+);
+
+export default function Analytics({ workspace }: Props) {
     const [dateRange, setDateRange] = useState([
         moment().startOf('month').format('YYYY-MM-DD'),
         moment().endOf('month').format('YYYY-MM-DD'),
     ]);
-
     const [filter, setFilter] = useState<FilterValue>({
-        teamIds: [],
-        productIds: [],
-        shopIds: [],
-        pageIds: [],
-        userIds: [],
+        teamIds: [], productIds: [], shopIds: [], pageIds: [], userIds: [],
     });
+    const [groupBy, setGroupBy] = useState<GroupBy>('province');
 
-    const cards = [
+    const [provinces, setProvinces] = useState<PaginatedData<ProvinceRow> | null>(null);
+    const [provincesLoading, setProvincesLoading] = useState(true);
+    const [provinceSort, setProvinceSort] = useState('-total_orders');
+    const [provinceSearch, setProvinceSearch] = useState('');
+
+    const [cities, setCities] = useState<PaginatedData<CityRow> | null>(null);
+    const [citiesLoading, setCitiesLoading] = useState(true);
+    const [citySearch, setCitySearch] = useState('');
+    const [citySort, setCitySort] = useState('-total_orders');
+
+    const buildParams = useCallback(() => {
+        const p = new URLSearchParams();
+        p.append('start_date', dateRange[0]);
+        p.append('end_date', dateRange[1]);
+        filter.pageIds.forEach((id) => p.append('page_ids[]', String(id)));
+        filter.shopIds.forEach((id) => p.append('shop_ids[]', String(id)));
+        return p;
+    }, [dateRange, filter]);
+
+    const fetchProvinces = useCallback(async (page = 1, search = provinceSearch, sort = '-total_orders') => {
+        setProvincesLoading(true);
+        try {
+            const p = buildParams();
+            p.append('page', String(page));
+            p.append('per_page', '10');
+            if (search) p.append('search', search);
+            if (sort) p.append('sort', sort);
+            const res = await fetch(`/workspaces/${workspace.slug}/rts/analytics/group-by/provinces?${p}`, { credentials: 'same-origin' });
+            if (res.ok) setProvinces(await res.json());
+        } finally {
+            setProvincesLoading(false);
+        }
+    }, [workspace.slug, buildParams, provinceSearch]);
+
+    const fetchCities = useCallback(async (page = 1, search = citySearch, sort = '-total_orders') => {
+        setCitiesLoading(true);
+        try {
+            const p = buildParams();
+            p.append('page', String(page));
+            p.append('per_page', '10');
+            if (search) p.append('search', search);
+            if (sort) p.append('sort', sort);
+            const res = await fetch(`/workspaces/${workspace.slug}/rts/analytics/group-by/cities?${p}`, { credentials: 'same-origin' });
+            if (res.ok) setCities(await res.json());
+        } finally {
+            setCitiesLoading(false);
+        }
+    }, [workspace.slug, buildParams, citySearch]);
+
+    const provinceSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => {
+        if (provinceSearchTimer.current) clearTimeout(provinceSearchTimer.current);
+        provinceSearchTimer.current = setTimeout(() => fetchProvinces(1, provinceSearch), 400);
+        return () => { if (provinceSearchTimer.current) clearTimeout(provinceSearchTimer.current); };
+    }, [provinceSearch]);
+
+    const citySearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => {
+        if (citySearchTimer.current) clearTimeout(citySearchTimer.current);
+        citySearchTimer.current = setTimeout(() => fetchCities(1, citySearch), 400);
+        return () => { if (citySearchTimer.current) clearTimeout(citySearchTimer.current); };
+    }, [citySearch]);
+
+    useEffect(() => {
+        fetchProvinces(1);
+        fetchCities(1, '');
+    }, [dateRange, filter]);
+
+    // Fetch the active tab's data when switching
+    useEffect(() => {
+        if (groupBy === 'province') fetchProvinces(1);
+        else fetchCities(1, citySearch);
+    }, [groupBy]);
+
+    const provinceColumns: ColumnDef<ProvinceRow>[] = useMemo(() => [
         {
-            label: 'RTS Rate',
-            key: 'rtsRate',
-            formatter: percentageFormatter,
-            icon: Undo2,
-            tooltipLabel:
-                'Return-to-sender rate based on returned amount versus total amount.',
+            accessorKey: 'province_name',
+            header: ({ column }) => <SortableHeader column={column} title="Province" />,
+            cell: ({ row }) => row.original.province_name || <span className="text-gray-400">Unknown</span>,
         },
         {
-            label: 'Total Delivered',
-            key: 'deliveredAmount',
-            formatter: currencyFormatter,
-            icon: DollarSign,
-            tooltipLabel:
-                'Total delivered sales within the selected date range.',
+            accessorKey: 'total_orders',
+            header: ({ column }) => <SortableHeader column={column} title="Total Orders" />,
         },
         {
-            label: 'Total Returning',
-            key: 'returningAmount',
-            formatter: currencyFormatter,
-            icon: DollarSign,
-            tooltipLabel:
-                'Total returning sales within the selected date range.',
+            accessorKey: 'delivered_count',
+            header: ({ column }) => <SortableHeader column={column} title="Delivered" />,
+            cell: ({ row }) => <span className="text-green-600 dark:text-green-400">{row.original.delivered_count}</span>,
         },
         {
-            label: 'Total Returned',
-            key: 'returnedAmount',
-            formatter: currencyFormatter,
-            icon: DollarSign,
-            tooltipLabel:
-                'Total returned sales within the selected date range.',
+            accessorKey: 'returned_count',
+            header: ({ column }) => <SortableHeader column={column} title="Returned" />,
+            cell: ({ row }) => <span className="text-red-500">{row.original.returned_count}</span>,
         },
         {
-            label: 'Avg Delivery Days',
-            key: 'avgDeliveryDays',
-            formatter: (value: number) => `${value ?? 0} Days`,
-            icon: Truck,
-            tooltipLabel:
-                'Average number of days from shipped date to delivered date.',
+            accessorKey: 'rts_rate_percentage',
+            header: ({ column }) => <SortableHeader column={column} title="RTS Rate" />,
+            cell: ({ row }) => <RtsCell value={row.original.rts_rate_percentage} />,
+        },
+    ], []);
+
+    const cityColumns: ColumnDef<CityRow>[] = useMemo(() => [
+        {
+            accessorKey: 'city_name',
+            header: ({ column }) => <SortableHeader column={column} title="City" />,
+            cell: ({ row }) => row.original.city_name || <span className="text-gray-400">Unknown</span>,
         },
         {
-            label: 'Avg Shipped Out Days',
-            key: 'avgShippedOutDays',
-            formatter: (value: number) => `${value ?? 0} Days`,
-            icon: PackageCheck,
-            tooltipLabel:
-                'Average number of days from confirmed date to shipped out date.',
+            accessorKey: 'province_name',
+            header: ({ column }) => <SortableHeader column={column} title="Province" />,
+            cell: ({ row }) => <span className="text-gray-500 dark:text-gray-400">{row.original.province_name || '—'}</span>,
         },
         {
-            label: 'Tracked Orders by PJ',
-            key: 'trackedOrdersCount',
-            formatter: numberFormatter,
-            icon: DollarSign,
-            tooltipLabel: 'Total orders tracked by parcel journey',
+            accessorKey: 'total_orders',
+            header: ({ column }) => <SortableHeader column={column} title="Total Orders" />,
         },
-    ];
+        {
+            accessorKey: 'delivered_count',
+            header: ({ column }) => <SortableHeader column={column} title="Delivered" />,
+            cell: ({ row }) => <span className="text-green-600 dark:text-green-400">{row.original.delivered_count}</span>,
+        },
+        {
+            accessorKey: 'returned_count',
+            header: ({ column }) => <SortableHeader column={column} title="Returned" />,
+            cell: ({ row }) => <span className="text-red-500">{row.original.returned_count}</span>,
+        },
+        {
+            accessorKey: 'rts_rate_percentage',
+            header: ({ column }) => <SortableHeader column={column} title="RTS Rate" />,
+            cell: ({ row }) => <RtsCell value={row.original.rts_rate_percentage} />,
+        },
+    ], []);
 
     return (
         <AppLayout>
-
-            <Head title={`${workspace.name} - RTS Analytics`} />
-
-            <div className="p-4 md:p-6">
-
-            <PageHeader
-                title="RTS Analytics"
-                description={`Performance overview · ${formatDate(new Date(dateRange[0]), 'MMM d')} – ${formatDate(new Date(dateRange[1]), 'MMM d, yyyy')}`}
-            >
-                <div className="flex items-center gap-4">
-                    <Filters
-                        workspace={workspace}
-                        onChange={(value) => setFilter(value)}
-                    />
-
+            <Head title={`${workspace.name} — RTS Analytics`} />
+            <div className="p-4 md:p-6 space-y-6">
+                <PageHeader
+                    title="RTS Analytics"
+                    description={`${formatDate(new Date(dateRange[0]), 'MMM d')} – ${formatDate(new Date(dateRange[1]), 'MMM d, yyyy')}`}
+                >
+                    <Filters workspace={workspace} onChange={setFilter} />
                     <DatePicker
-                        id={'dashboard-date-range'}
-                        mode={'range'}
+                        id="rts-date-range"
+                        mode="range"
                         onChange={(dates) => {
                             if (dates.length === 2) {
                                 setDateRange([
@@ -124,28 +209,98 @@ const Analytics = ({ workspace }: Props) => {
                         }}
                         defaultDate={dateRange as never as DateOption}
                     />
+                </PageHeader>
+
+                <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                    <div className="flex items-center justify-between border-b border-black/6 dark:border-white/6 px-5 py-4">
+                        <div>
+                            <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">
+                                {groupBy === 'province' ? 'By Province' : 'By City'}
+                            </h2>
+                            <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
+                                {groupBy === 'province' ? 'RTS rate grouped by province' : 'RTS rate grouped by city'}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            {/* Search — changes placeholder based on active view */}
+                            <div className="relative">
+                                <svg className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+                                </svg>
+                                {groupBy === 'province' ? (
+                                    <input
+                                        type="text"
+                                        value={provinceSearch}
+                                        onChange={(e) => setProvinceSearch(e.target.value)}
+                                        placeholder="Search province…"
+                                        className="h-8 w-48 rounded-lg border border-black/8 dark:border-white/8 bg-stone-50 dark:bg-white/3 pl-8 pr-3 text-[12px]! text-gray-700 dark:text-gray-300 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-black/20 dark:focus:border-white/20 transition-colors"
+                                    />
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={citySearch}
+                                        onChange={(e) => setCitySearch(e.target.value)}
+                                        placeholder="Search city or province…"
+                                        className="h-8 w-52 rounded-lg border border-black/8 dark:border-white/8 bg-stone-50 dark:bg-white/3 pl-8 pr-3 text-[12px]! text-gray-700 dark:text-gray-300 placeholder-gray-300 dark:placeholder-gray-600 outline-none focus:border-black/20 dark:focus:border-white/20 transition-colors"
+                                    />
+                                )}
+                            </div>
+                            {/* Toggle */}
+                            <div className="flex rounded-lg border border-black/8 dark:border-white/8 overflow-hidden text-[12px] font-medium">
+                                <button
+                                    onClick={() => setGroupBy('province')}
+                                    className={`px-3 py-1.5 transition-colors ${groupBy === 'province' ? 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                                >
+                                    Province
+                                </button>
+                                <button
+                                    onClick={() => setGroupBy('city')}
+                                    className={`px-3 py-1.5 transition-colors border-l border-black/8 dark:border-white/8 ${groupBy === 'city' ? 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                                >
+                                    City
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="p-4">
+                        {groupBy === 'province' ? (
+                            provincesLoading ? (
+                                <div className="flex h-32 items-center justify-center text-[13px] text-gray-400">Loading…</div>
+                            ) : (
+                                <DataTable
+                                    columns={provinceColumns}
+                                    data={provinces?.data ?? []}
+                                    enableInternalPagination={false}
+                                    meta={provinces ? { ...omit(provinces, ['data']) } : undefined}
+                                    initialSorting={toFrontendSort(provinceSort)}
+                                    onFetch={(params) => {
+                                        const sort = params?.sort as string ?? '-total_orders';
+                                        setProvinceSort(sort);
+                                        fetchProvinces(Number(params?.page ?? 1), provinceSearch, sort);
+                                    }}
+                                />
+                            )
+                        ) : (
+                            citiesLoading ? (
+                                <div className="flex h-32 items-center justify-center text-[13px] text-gray-400">Loading…</div>
+                            ) : (
+                                <DataTable
+                                    columns={cityColumns}
+                                    data={cities?.data ?? []}
+                                    enableInternalPagination={false}
+                                    meta={cities ? { ...omit(cities, ['data']) } : undefined}
+                                    initialSorting={toFrontendSort(citySort)}
+                                    onFetch={(params) => {
+                                        const sort = params?.sort as string ?? '-total_orders';
+                                        setCitySort(sort);
+                                        fetchCities(Number(params?.page ?? 1), citySearch, sort);
+                                    }}
+                                />
+                            )
+                        )}
+                    </div>
                 </div>
-            </PageHeader>
-
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:gap-4 xl:grid-cols-4">
-                {metricConfigs.map((card) => (
-                    <StatisticCard
-                        key={card.key}
-                        label={card.name}
-                        metric={card.key}
-                        workspace={workspace}
-                        filter={filter}
-                        dateRange={dateRange}
-                        formatter={card.formatter}
-                        icon={card.icon}
-                        tooltipLabel={card.description}
-                    />
-                ))}
-            </div>
-
             </div>
         </AppLayout>
     );
 }
-
-export default Analytics

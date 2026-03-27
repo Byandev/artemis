@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Workspaces\RTS;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Workspace;
+use App\Queries\RtsLocationQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -152,37 +153,35 @@ class AnalyticController extends Controller
         ));
     }
 
+    public function locationAnalytics(Request $request, Workspace $workspace)
+    {
+        return Inertia::render('workspaces/rts/location-analytics', [
+            'workspace' => $workspace->loadMissing([
+                'shops' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name'),
+                'pages' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name'),
+            ]),
+        ]);
+    }
+
+    public function groupByProvinces(Request $request, Workspace $workspace)
+    {
+        return response()->json(
+            (new RtsLocationQuery($workspace, $request))
+                ->byProvince()
+                ->search($request->input('search', ''))
+                ->sort($request->input('sort', '-total_orders'))
+                ->paginate($request->input('per_page', 10))
+        );
+    }
+
     public function groupByCities(Request $request, Workspace $workspace)
     {
-        $query = Order::selectRaw('
-            shipping_addresses.district_name AS city_name,
-            shipping_addresses.province_name AS province_name,
-                SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
-            SUM(CASE WHEN pancake_orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
-            SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
-            ROUND(
-                (SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
-                NULLIF(SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
-                2
-            ) AS rts_rate_percentage
-        ')
-            ->leftJoin('shipping_addresses', 'shipping_addresses.order_id', '=', 'pancake_orders.id')
-            ->ofWorkspace($workspace)
-            ->applyRtsFilters($request)
-            ->groupBy('shipping_addresses.district_name', 'shipping_addresses.province_name')
-            ->havingRaw('SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END) > 0') // Only include cities with orders
-            ->orderBy('total_orders', 'DESC');
-
-        // If 'all' parameter is present, return all data without pagination (for heatmap)
-        if ($request->has('all')) {
-            $grouped = $query->get();
-
-            return response()->json(['data' => $grouped]);
-        }
-
-        // Otherwise, return paginated data (for table view)
-        $grouped = $query->paginate($request->input('per_page', 15));
-
-        return response()->json($grouped);
+        return response()->json(
+            (new RtsLocationQuery($workspace, $request))
+                ->byCity()
+                ->search($request->input('search', ''))
+                ->sort($request->input('sort', '-total_orders'))
+                ->paginate($request->input('per_page', 10))
+        );
     }
 }
