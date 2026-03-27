@@ -108,7 +108,7 @@ class Order extends Model
 
         // Date range filter
         if ($request->filled('start_date') && $request->filled('end_date')) {
-            $query->whereBetween('pancake_orders.confirmed_at', [
+            $query->whereRaw("DATE(pancake_orders.confirmed_at) >= ? AND DATE(pancake_orders.confirmed_at) <= ?", [
                 $request->start_date,
                 $request->end_date,
             ]);
