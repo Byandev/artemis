@@ -38,11 +38,11 @@ export const authParcelStatusConfig: Record<string, ParcelStatusEntry> = {
  * e.g. row.original.order.parcel_status?.toUpperCase()
  */
 export const publicParcelStatusConfig: Record<string, ParcelStatusEntry> = {
-    DELIVERED:          { label: 'Delivered',        dot: 'bg-emerald-500', pill: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' },
-    PENDING:            { label: 'Pending',           dot: 'bg-yellow-400',  pill: 'bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400' },
-    RETURNED:           { label: 'Returned',          dot: 'bg-red-500',     pill: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400' },
-    UNDELIVERABLE:      { label: 'Undeliverable',     dot: 'bg-rose-500',    pill: 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' },
-    CANCELLED:          { label: 'Cancelled',         dot: 'bg-gray-400',    pill: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
-    SHIPPED:            { label: 'Shipped',           dot: 'bg-blue-500',    pill: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400' },
-    'OUT FOR DELIVERY': { label: 'Out for Delivery',  dot: 'bg-violet-500',  pill: 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400' },
+    delivered:        { label: 'Delivered',        dot: 'bg-emerald-500', pill: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' },
+    pending:          { label: 'Pending',          dot: 'bg-yellow-400',  pill: 'bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400' },
+    returned:         { label: 'Returned',         dot: 'bg-red-500',     pill: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400' },
+    undeliverable:    { label: 'Undeliverable',    dot: 'bg-rose-500',    pill: 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' },
+    cancelled:        { label: 'Cancelled',        dot: 'bg-gray-400',    pill: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
+    shipped:          { label: 'Shipped',          dot: 'bg-blue-500',    pill: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400' },
+    out_for_delivery: { label: 'Out for Delivery', dot: 'bg-violet-500',  pill: 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400' },
 };

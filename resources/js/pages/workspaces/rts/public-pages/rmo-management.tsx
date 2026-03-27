@@ -13,30 +13,24 @@ import { useEffect, useMemo, useState } from 'react';
 import { toFrontendSort } from '@/lib/sort';
 import publicPage from '@/routes/public-page';
 import {
+    AlertTriangleIcon,
     BarChart3,
     CheckCircleIcon,
     ChevronDown,
     ChevronUp,
-    ClipboardListIcon,
-    ClockIcon,
-    PhoneIcon,
-    RotateCcw,
+    PercentIcon,
     TruckIcon,
     User as UserIcon,
-    XCircleIcon,
 } from 'lucide-react';
 import FormModal from './formModal';
 
 const parcelStatusOptions = Object.keys(publicParcelStatusConfig);
 
 interface RmoStats {
-    assigned_orders: number;
-    total_called: number;
-    total_pending: number;
-    total_delivered: number;
-    total_returning: number;
-    total_undeliverable: number;
-    total_out_for_delivery: number;
+    total_for_delivery_today: number;
+    called_rate: number;
+    successful_rate: number;
+    unsuccessful_rate: number;
 }
 
 interface Props {
@@ -49,6 +43,7 @@ interface Props {
             status?: string;
             page_id?: string;
             shop_id?: string;
+            parcel_status?: string;
         };
         page?: number;
         perPage?: number;
@@ -57,7 +52,7 @@ interface Props {
     stats: RmoStats;
 }
 
-function StatCard({ title, value, icon: Icon }: { title: string; value: number; icon: React.ComponentType<{ className?: string }> }) {
+function StatCard({ title, value, icon: Icon, suffix }: { title: string; value: number; icon: React.ComponentType<{ className?: string }>; suffix?: string }) {
     return (
         <div className="rounded-[14px] border border-black/6 bg-white p-[18px] dark:border-white/6 dark:bg-zinc-900">
             <div className="mb-2 flex items-center gap-2">
@@ -65,7 +60,7 @@ function StatCard({ title, value, icon: Icon }: { title: string; value: number; 
                 <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500">{title}</span>
             </div>
             <span className="font-mono text-[22px] font-semibold tracking-tight tabular-nums text-gray-900 dark:text-gray-100">
-                {value.toLocaleString()}
+                {value.toLocaleString()}{suffix}
             </span>
         </div>
     );
@@ -77,12 +72,10 @@ export default function RmoManagement({ orders, workspace, query, users, stats }
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [selectedStatus, setSelectedStatus] = useState<string>(query?.filter?.status ?? '');
     const [selectedPageId, setSelectedPageId] = useState<string>(query?.filter?.page_id ?? '');
-    const [selectedParcelStatus, setSelectedParcelStatus] = useState<string>('');
+    const [selectedParcelStatus, setSelectedParcelStatus] = useState<string>(query?.filter?.parcel_status ?? '');
     const [userName, setUserName] = useState<string | false>(false);
     const [isOpen, setIsOpen] = useState(false);
     const [showStats, setShowStats] = useState(() => localStorage.getItem('rmo_show_stats') === 'true');
-    const [myAssignedCount, setMyAssignedCount] = useState<number>(0);
-    const [myCalledCount, setMyCalledCount] = useState<number>(0);
     // When "Assign to me" is clicked on a row before a user is set, remember the pending order
     const [pendingAssign, setPendingAssign] = useState<{ orderId: number; currentStatus: string } | null>(null);
 
@@ -100,29 +93,6 @@ export default function RmoManagement({ orders, workspace, query, users, stats }
         const name = localStorage.getItem('user_name');
         if (name) setUserName(name);
     }, []);
-
-    const fetchMyStats = () => {
-        const userId = localStorage.getItem('user_id');
-        if (!userId) {
-            setMyAssignedCount(0);
-            setMyCalledCount(0);
-            return;
-        }
-        fetch(
-            `/public/workspaces/${workspace.slug}/rts/rmo-management/my-assigned-count?user_id=${userId}`,
-            { credentials: 'same-origin' },
-        )
-            .then((res) => res.json())
-            .then((result) => {
-                setMyAssignedCount(result.assigned ?? 0);
-                setMyCalledCount(result.called ?? 0);
-            })
-            .catch((err) => console.error(err));
-    };
-
-    useEffect(() => {
-        fetchMyStats();
-    }, [orders]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -200,7 +170,7 @@ export default function RmoManagement({ orders, workspace, query, users, stats }
         isLoadingID,
         onChangeStatus: handleChangeStatus,
         parcelStatusConfig: publicParcelStatusConfig,
-        normalizeParcelStatus: (s) => s?.toUpperCase(),
+        normalizeParcelStatus: (s) => s?.toLowerCase(),
         onAssignToMe: handleAssignToMe,
         onRemoveAssignee: handleRemoveAssignee,
         assigningOrderId,
@@ -294,14 +264,11 @@ export default function RmoManagement({ orders, workspace, query, users, stats }
                 </div>
 
                 {showStats && (
-                    <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                        <StatCard title="Assigned to Me" value={myAssignedCount} icon={ClipboardListIcon} />
-                        <StatCard title="My Total Called" value={myCalledCount} icon={PhoneIcon} />
-                        <StatCard title="Total Pending" value={stats?.total_pending || 0} icon={ClockIcon} />
-                        <StatCard title="Total Delivered" value={stats?.total_delivered || 0} icon={CheckCircleIcon} />
-                        <StatCard title="Total Returning" value={stats?.total_returning || 0} icon={RotateCcw} />
-                        <StatCard title="Undeliverable" value={stats?.total_undeliverable || 0} icon={XCircleIcon} />
-                        <StatCard title="Out for Delivery" value={stats?.total_out_for_delivery || 0} icon={TruckIcon} />
+                    <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <StatCard title="Total For Delivery Today" value={stats?.total_for_delivery_today || 0} icon={TruckIcon} />
+                        <StatCard title="Called Rate" value={stats?.called_rate || 0} icon={PercentIcon} suffix="%" />
+                        <StatCard title="Successful Rate" value={stats?.successful_rate || 0} icon={CheckCircleIcon} suffix="%" />
+                        <StatCard title="Unsuccessful Rate" value={stats?.unsuccessful_rate || 0} icon={AlertTriangleIcon} suffix="%" />
                     </div>
                 )}
 
