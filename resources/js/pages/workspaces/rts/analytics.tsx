@@ -3,6 +3,7 @@ import PageHeader from '@/components/common/PageHeader';
 import DatePicker from '@/components/ui/date-picker';
 import Filters, { FilterValue } from '@/components/filters/Filters';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import RtsBreakdownChart from '@/components/charts/RtsBreakdownChart';
 import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
@@ -14,6 +15,9 @@ import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { omit } from 'lodash';
 import { PaginatedData } from '@/types';
 import { toFrontendSort } from '@/lib/sort';
+import { BarChart2, Table } from 'lucide-react';
+
+type ViewMode = 'table' | 'chart';
 
 type GroupBy = 'province' | 'city';
 
@@ -100,6 +104,23 @@ const RtsCell = ({ value }: { value: number }) => (
     <span className={rtsColor(value)}>{value}%</span>
 );
 
+const ViewToggle = ({ value, onChange }: { value: ViewMode; onChange: (v: ViewMode) => void }) => (
+    <div className="flex rounded-lg border border-black/8 dark:border-white/8 overflow-hidden">
+        <button
+            onClick={() => onChange('table')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 transition-colors ${value === 'table' ? 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+        >
+            <Table className="h-3.5 w-3.5" />
+        </button>
+        <button
+            onClick={() => onChange('chart')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 border-l border-black/8 dark:border-white/8 transition-colors ${value === 'chart' ? 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+        >
+            <BarChart2 className="h-3.5 w-3.5" />
+        </button>
+    </div>
+);
+
 export default function Analytics({ workspace }: Props) {
     const [dateRange, setDateRange] = useState([
         moment().startOf('month').format('YYYY-MM-DD'),
@@ -129,6 +150,10 @@ export default function Analytics({ workspace }: Props) {
 
     const [price, setPrice] = useState<PriceRow[]>([]);
     const [priceLoading, setPriceLoading] = useState(true);
+
+    const [priceView, setPriceView] = useState<ViewMode>('table');
+    const [attemptsView, setAttemptsView] = useState<ViewMode>('table');
+    const [cxRtsView, setCxRtsView] = useState<ViewMode>('table');
 
     const buildParams = useCallback(() => {
         const p = new URLSearchParams();
@@ -318,83 +343,102 @@ export default function Analytics({ workspace }: Props) {
                     />
                 </PageHeader>
 
-                {/* Price breakdown */}
-                <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
-                    <div className="border-b border-black/6 dark:border-white/6 px-5 py-4">
-                        <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">By Price (Final Amount)</h2>
-                        <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">RTS rate broken down by order price range</p>
-                    </div>
-                    <div className="p-4">
-                        {priceLoading ? (
-                            <div className="flex h-24 items-center justify-center text-[13px] text-gray-400">Loading…</div>
-                        ) : (
-                            <table className="w-full text-[12px]">
-                                <thead>
-                                    <tr className="border-b border-black/6 dark:border-white/6">
-                                        <th className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Price Range</th>
-                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Total Orders</th>
-                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Delivered</th>
-                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Returned</th>
-                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">RTS Rate</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {price.map((row) => (
-                                        <tr key={row.price_bucket ?? 'unknown'} className="border-b border-black/4 dark:border-white/4 last:border-0">
-                                            <td className="px-3 py-2.5 font-medium text-gray-700 dark:text-gray-300">
-                                                {row.price_bucket ? (PRICE_LABELS[row.price_bucket] ?? row.price_bucket) : <span className="text-gray-400">Unknown</span>}
-                                            </td>
-                                            <td className="px-3 py-2.5 text-right text-gray-600 dark:text-gray-400">{row.total_orders}</td>
-                                            <td className="px-3 py-2.5 text-right text-green-600 dark:text-green-400">{row.delivered_count}</td>
-                                            <td className="px-3 py-2.5 text-right text-red-500">{row.returned_count}</td>
-                                            <td className="px-3 py-2.5 text-right">
-                                                <RtsCell value={row.rts_rate_percentage} />
-                                            </td>
+                {/* Price + Delivery Attempts side by side */}
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    {/* Price breakdown */}
+                    <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                        <div className="flex items-center justify-between border-b border-black/6 dark:border-white/6 px-5 py-4">
+                            <div>
+                                <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">By Price (Final Amount)</h2>
+                                <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">RTS rate by order price range</p>
+                            </div>
+                            <ViewToggle value={priceView} onChange={setPriceView} />
+                        </div>
+                        <div className="p-4">
+                            {priceLoading ? (
+                                <div className="flex h-24 items-center justify-center text-[13px] text-gray-400">Loading…</div>
+                            ) : priceView === 'chart' ? (
+                                <RtsBreakdownChart
+                                    rows={price.map((r) => ({
+                                        label: r.price_bucket ? (PRICE_LABELS[r.price_bucket] ?? r.price_bucket) : 'Unknown',
+                                        rts_rate_percentage: r.rts_rate_percentage,
+                                    }))}
+                                />
+                            ) : (
+                                <table className="w-full text-[12px]">
+                                    <thead>
+                                        <tr className="border-b border-black/6 dark:border-white/6">
+                                            <th className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Price Range</th>
+                                            <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Total</th>
+                                            <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Delivered</th>
+                                            <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Returned</th>
+                                            <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">RTS Rate</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
+                                    </thead>
+                                    <tbody>
+                                        {price.map((row) => (
+                                            <tr key={row.price_bucket ?? 'unknown'} className="border-b border-black/4 dark:border-white/4 last:border-0">
+                                                <td className="px-3 py-2.5 font-medium text-gray-700 dark:text-gray-300">
+                                                    {row.price_bucket ? (PRICE_LABELS[row.price_bucket] ?? row.price_bucket) : <span className="text-gray-400">Unknown</span>}
+                                                </td>
+                                                <td className="px-3 py-2.5 text-right text-gray-600 dark:text-gray-400">{row.total_orders}</td>
+                                                <td className="px-3 py-2.5 text-right text-green-600 dark:text-green-400">{row.delivered_count}</td>
+                                                <td className="px-3 py-2.5 text-right text-red-500">{row.returned_count}</td>
+                                                <td className="px-3 py-2.5 text-right"><RtsCell value={row.rts_rate_percentage} /></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
                     </div>
-                </div>
 
-                {/* Delivery Attempts breakdown */}
-                <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
-                    <div className="border-b border-black/6 dark:border-white/6 px-5 py-4">
-                        <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">By Delivery Attempts</h2>
-                        <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">RTS rate broken down by number of delivery attempts</p>
-                    </div>
-                    <div className="p-4">
-                        {deliveryAttemptsLoading ? (
-                            <div className="flex h-24 items-center justify-center text-[13px] text-gray-400">Loading…</div>
-                        ) : (
-                            <table className="w-full text-[12px]">
-                                <thead>
-                                    <tr className="border-b border-black/6 dark:border-white/6">
-                                        <th className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Attempts</th>
-                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Total Orders</th>
-                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Delivered</th>
-                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Returned</th>
-                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">RTS Rate</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {deliveryAttempts.map((row) => (
-                                        <tr key={row.delivery_attempts ?? 'unknown'} className="border-b border-black/4 dark:border-white/4 last:border-0">
-                                            <td className="px-3 py-2.5 font-medium text-gray-700 dark:text-gray-300">
-                                                {row.delivery_attempts ?? <span className="text-gray-400">Unknown</span>}
-                                            </td>
-                                            <td className="px-3 py-2.5 text-right text-gray-600 dark:text-gray-400">{row.total_orders}</td>
-                                            <td className="px-3 py-2.5 text-right text-green-600 dark:text-green-400">{row.delivered_count}</td>
-                                            <td className="px-3 py-2.5 text-right text-red-500">{row.returned_count}</td>
-                                            <td className="px-3 py-2.5 text-right">
-                                                <RtsCell value={row.rts_rate_percentage} />
-                                            </td>
+                    {/* Delivery Attempts breakdown */}
+                    <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                        <div className="flex items-center justify-between border-b border-black/6 dark:border-white/6 px-5 py-4">
+                            <div>
+                                <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">By Delivery Attempts</h2>
+                                <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">RTS rate by number of delivery attempts</p>
+                            </div>
+                            <ViewToggle value={attemptsView} onChange={setAttemptsView} />
+                        </div>
+                        <div className="p-4">
+                            {deliveryAttemptsLoading ? (
+                                <div className="flex h-24 items-center justify-center text-[13px] text-gray-400">Loading…</div>
+                            ) : attemptsView === 'chart' ? (
+                                <RtsBreakdownChart
+                                    rows={deliveryAttempts.map((r) => ({
+                                        label: r.delivery_attempts ?? 'Unknown',
+                                        rts_rate_percentage: r.rts_rate_percentage,
+                                    }))}
+                                />
+                            ) : (
+                                <table className="w-full text-[12px]">
+                                    <thead>
+                                        <tr className="border-b border-black/6 dark:border-white/6">
+                                            <th className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Attempts</th>
+                                            <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Total</th>
+                                            <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Delivered</th>
+                                            <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Returned</th>
+                                            <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">RTS Rate</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
+                                    </thead>
+                                    <tbody>
+                                        {deliveryAttempts.map((row) => (
+                                            <tr key={row.delivery_attempts ?? 'unknown'} className="border-b border-black/4 dark:border-white/4 last:border-0">
+                                                <td className="px-3 py-2.5 font-medium text-gray-700 dark:text-gray-300">
+                                                    {row.delivery_attempts ?? <span className="text-gray-400">Unknown</span>}
+                                                </td>
+                                                <td className="px-3 py-2.5 text-right text-gray-600 dark:text-gray-400">{row.total_orders}</td>
+                                                <td className="px-3 py-2.5 text-right text-green-600 dark:text-green-400">{row.delivered_count}</td>
+                                                <td className="px-3 py-2.5 text-right text-red-500">{row.returned_count}</td>
+                                                <td className="px-3 py-2.5 text-right"><RtsCell value={row.rts_rate_percentage} /></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -407,24 +451,34 @@ export default function Analytics({ workspace }: Props) {
                                 {cxRtsType === 'latest' ? 'Latest report — current cumulative RTS rate per phone number' : 'Initial report — RTS rate at the time the order was placed'}
                             </p>
                         </div>
-                        <div className="flex rounded-lg border border-black/8 dark:border-white/8 overflow-hidden text-[12px] font-medium">
-                            <button
-                                onClick={() => setCxRtsType('latest')}
-                                className={`px-3 py-1.5 transition-colors ${cxRtsType === 'latest' ? 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                            >
-                                Latest
-                            </button>
-                            <button
-                                onClick={() => setCxRtsType('initial')}
-                                className={`px-3 py-1.5 transition-colors border-l border-black/8 dark:border-white/8 ${cxRtsType === 'initial' ? 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                            >
-                                Initial
-                            </button>
+                        <div className="flex items-center gap-2">
+                            <div className="flex rounded-lg border border-black/8 dark:border-white/8 overflow-hidden text-[12px] font-medium">
+                                <button
+                                    onClick={() => setCxRtsType('latest')}
+                                    className={`px-3 py-1.5 transition-colors ${cxRtsType === 'latest' ? 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                                >
+                                    Latest
+                                </button>
+                                <button
+                                    onClick={() => setCxRtsType('initial')}
+                                    className={`px-3 py-1.5 transition-colors border-l border-black/8 dark:border-white/8 ${cxRtsType === 'initial' ? 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                                >
+                                    Initial
+                                </button>
+                            </div>
+                            <ViewToggle value={cxRtsView} onChange={setCxRtsView} />
                         </div>
                     </div>
                     <div className="p-4">
                         {cxRtsLoading ? (
                             <div className="flex h-24 items-center justify-center text-[13px] text-gray-400">Loading…</div>
+                        ) : cxRtsView === 'chart' ? (
+                            <RtsBreakdownChart
+                                rows={cxRts.map((r) => ({
+                                    label: CX_RTS_LABELS[r.cx_rts_bucket] ?? r.cx_rts_bucket,
+                                    rts_rate_percentage: r.rts_rate_percentage,
+                                }))}
+                            />
                         ) : (
                             <table className="w-full text-[12px]">
                                 <thead>
