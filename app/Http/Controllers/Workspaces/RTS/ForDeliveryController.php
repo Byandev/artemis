@@ -11,8 +11,6 @@ use App\Http\Sorts\Order\ForDelivery\OrderDeliveryAttemptSort;
 use App\Http\Sorts\Order\ForDelivery\OrderNumberSort;
 use App\Http\Sorts\Order\ForDelivery\OrderParcelStatusSort;
 use App\Http\Sorts\Order\ForDelivery\OrderTrackingCodeSort;
-use App\Models\Page;
-use App\Models\Shop;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -65,7 +63,10 @@ class ForDeliveryController extends Controller
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $query->whereIn('page_id', $values);
                 }),
-                AllowedFilter::exact('shop_id'),
+                AllowedFilter::callback('shop_id', function ($query, $value) {
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $query->whereIn('shop_id', $values);
+                }),
                 AllowedFilter::callback('status', function ($query, $value) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $query->whereIn('status', $values);
@@ -104,50 +105,59 @@ class ForDeliveryController extends Controller
             ])
             ->paginate(10);
 
-        // 1️⃣ Total orders in workspace
-        $totalOrders = OrderForDelivery::where('workspace_id', $workspace->id)->count();
+        // Build a base query for stats that respects page/shop filters
+        $statsBase = OrderForDelivery::where('workspace_id', $workspace->id);
 
+        $filterPageIds = $request->input('filter.page_id');
+        if ($filterPageIds) {
+            $pageIds = is_string($filterPageIds) ? explode(',', $filterPageIds) : (array) $filterPageIds;
+            $statsBase->whereIn('page_id', $pageIds);
+        }
+
+        $filterShopId = $request->input('filter.shop_id');
+        if ($filterShopId) {
+            $shopIds = is_string($filterShopId) ? explode(',', $filterShopId) : (array) $filterShopId;
+            $statsBase->whereIn('shop_id', $shopIds);
+        }
+
+        // 1️⃣ Total orders
+        $totalOrders = (clone $statsBase)->count();
 
         // 2️⃣ Total for delivery today
-        $totalForDeliveryToday = OrderForDelivery::where('workspace_id', $workspace->id)
+        $totalForDeliveryToday = (clone $statsBase)
             ->whereHas('order', function ($query) {
                 $query->where('parcel_status', 'out_for_delivery')
                     ->whereDate('created_at', now());
             })
             ->count();
 
-
-
         // 3️⃣ Called rate (not pending)
-        $totalCalled = OrderForDelivery::where('workspace_id', $workspace->id)
+        $totalCalled = (clone $statsBase)
             ->where('status', '!=', 'PENDING')
             ->count();
 
         $calledRate = $totalOrders > 0 ? round(($totalCalled / $totalOrders) * 100, 1) : 0;
 
         // 4️⃣ Successful rate (parcel delivered)
-        $totalParcel = OrderForDelivery::where('workspace_id', $workspace->id)
+        $totalParcel = (clone $statsBase)
             ->whereHas('order', fn($q) => $q->whereNotNull('parcel_status'))
             ->count();
 
-        $totalDelivered = OrderForDelivery::where('workspace_id', $workspace->id)
+        $totalDelivered = (clone $statsBase)
             ->whereHas('order', fn($q) => $q->where('parcel_status', 'delivered'))
             ->count();
 
         $successfulRate = $totalParcel > 0 ? round(($totalDelivered / $totalParcel) * 100, 1) : 0;
 
         // 5️⃣ Unsuccessful rate (problematic + returning + undeliverable)
-        $totalUnsuccessful = OrderForDelivery::where('workspace_id', $workspace->id)
+        $totalUnsuccessful = (clone $statsBase)
             ->whereHas('order', fn($q) => $q->whereIn('parcel_status', ['problematic', 'returning', 'undeliverable']))
             ->count();
 
         $unsuccessfulRate = $totalParcel > 0 ? round(($totalUnsuccessful / $totalParcel) * 100, 1) : 0;
 
-
-        $pages = Page::get(['id', 'name']);
-
-        $shops = Shop::get(['id', 'name']);
-
+        $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id']);
+        
         return Inertia::render('workspaces/rts/rmo-management', [
             'orders' => $items,
             'workspace' => $workspace,
@@ -159,8 +169,6 @@ class ForDeliveryController extends Controller
             'called_rate' => $calledRate,
             'successful_rate' => $successfulRate,
             'unsuccessful_rate' => $unsuccessfulRate,
-            'pages' => Page::get(['id', 'name']),
-            'shops' => Shop::get(['id', 'name']),
         ]);
     }
 

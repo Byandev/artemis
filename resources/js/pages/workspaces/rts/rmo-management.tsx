@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import Filters, { FilterValue } from '@/components/filters/Filters';
 import { createRmoColumns } from '@/components/rts/rmo-columns';
 import {
     authParcelStatusConfig,
@@ -16,9 +17,7 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
 import { PaginatedData } from '@/types';
-import { Page } from '@/types/models/Page';
 import { OrderForDelivery } from '@/types/models/Pancake/OrderForDelivery';
-import { Shop } from '@/types/models/Shop';
 import { Workspace } from '@/types/models/Workspace';
 import { router } from '@inertiajs/react';
 import { omit } from 'lodash';
@@ -31,7 +30,7 @@ import {
     TruckIcon,
     X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Props {
     orders: PaginatedData<OrderForDelivery>;
@@ -42,7 +41,7 @@ interface Props {
             search?: string;
             status?: string | string[];
             page_id?: string | string[];
-            shop_id?: string;
+            shop_id?: string | string[];
             parcel_status?: string | string[];
         };
         page?: number;
@@ -52,8 +51,6 @@ interface Props {
     called_rate: number;
     successful_rate: number;
     unsuccessful_rate: number;
-    pages: Page[];
-    shops: Shop[];
 }
 
 const statusOptions = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED'];
@@ -160,8 +157,6 @@ export default function RmoManagement({
     called_rate,
     successful_rate,
     unsuccessful_rate,
-    pages,
-    shops,
 }: Props) {
     const [isLoadingID, setIsLoadingID] = useState<number | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
@@ -181,8 +176,23 @@ export default function RmoManagement({
     });
     const [selectedShopIds, setSelectedShopIds] = useState<string[]>(() => {
         const v = query?.filter?.shop_id;
-        return v ? (Array.isArray(v) ? v : [v]) : [];
+        return v ? (Array.isArray(v) ? v : v.split(',').filter(Boolean)) : [];
     });
+
+    const initialFilterValue = useMemo<FilterValue>(() => ({
+        teamIds: [],
+        productIds: [],
+        shopIds: selectedShopIds.map(Number),
+        pageIds: selectedPageIds.map(Number),
+        userIds: [],
+    }), []);
+
+    const handleFilterChange = useCallback((value: FilterValue) => {
+        const newPageIds = value.pageIds.map(String);
+        const newShopIds = value.shopIds.map(String);
+        setSelectedPageIds(newPageIds);
+        setSelectedShopIds(newShopIds);
+    }, []);
 
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
@@ -208,15 +218,6 @@ export default function RmoManagement({
                 text: orderStatusConfig[status]?.text || '',
             })),
         [],
-    );
-
-    const pageOptions = useMemo(
-        () => pages.map((p) => ({ id: String(p.id), name: p.name })),
-        [pages],
-    );
-    const shopOptions = useMemo(
-        () => shops.map((s) => ({ id: String(s.id), name: s.name })),
-        [shops],
     );
 
     useEffect(() => {
@@ -245,7 +246,6 @@ export default function RmoManagement({
             router.get(workspaces.rts.rmoManagement({ workspace }), params, {
                 preserveState: true,
                 replace: true,
-                only: ['orders'],
             });
         }, 500);
         return () => clearTimeout(timer);
@@ -299,7 +299,13 @@ export default function RmoManagement({
                 <PageHeader
                     title="RMO Management"
                     description="Track and update delivery status for items out today"
-                />
+                >
+                    <Filters
+                        workspace={workspace}
+                        onChange={handleFilterChange}
+                        initialValue={initialFilterValue}
+                    />
+                </PageHeader>
 
                 <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <StatCard
