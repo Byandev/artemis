@@ -37,7 +37,7 @@ class Workspace extends Model
                 $originalSlug = $workspace->slug;
                 $count = 1;
                 while (static::where('slug', $workspace->slug)->exists()) {
-                    $workspace->slug = $originalSlug.'-'.$count;
+                    $workspace->slug = $originalSlug . '-' . $count;
                     $count++;
                 }
             }
@@ -129,7 +129,7 @@ class Workspace extends Model
      */
     public function addMember(User $user, string $role = 'member'): void
     {
-        if (! $this->hasMember($user)) {
+        if (!$this->hasMember($user)) {
             $this->users()->attach($user->id, ['role' => $role]);
         }
     }
@@ -188,5 +188,10 @@ class Workspace extends Model
             ->where('user_id', $user->id)
             ->wherePivot('role', 'admin')
             ->exists();
+    }
+
+    public function inventory()
+    {
+        return $this->hasMany(Inventory::class, 'workspace_id');
     }
 }

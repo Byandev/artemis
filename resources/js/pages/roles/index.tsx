@@ -23,7 +23,7 @@ import { useState } from 'react';
 import { toast, Toaster } from 'sonner';
 import { Workspace } from '@/types/models/Workspace';
 import { Role } from '@/types/models/Role';
-import RoleFormDialog from '@/components/roles/role-form-dialog'; // Added Toaster here
+import RoleFormDialog from '@/components/roles/role-form-dialog';
 import PageHeader from '@/components/common/PageHeader';
 
 
@@ -50,7 +50,7 @@ export default function Index({ roles, workspace }: Props) {
             onSuccess: () => {
                 toast.success(`${selectedRole.name} has been archived.`);
                 setIsArchiveModalOpen(false);
-                setSelectedRole(null);
+                setSelectedRole(undefined);
             },
         });
     };

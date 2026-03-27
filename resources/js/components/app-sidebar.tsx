@@ -23,6 +23,8 @@ import {
     Settings,
     User,
     ShieldIcon,
+    ClipboardList,
+
 } from 'lucide-react';
 import AppLogo from './app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -64,6 +66,11 @@ export function AppSidebar() {
             title: 'Employees',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/employees`,
             icon: User,
+        },
+        {
+            title: 'Inventory',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory_transaction`,
+            icon: ClipboardList,
         },
         {
             title: 'RMO Management',

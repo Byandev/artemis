@@ -8,7 +8,7 @@
     </ol>
 <li>Refinement Upload</li>
     <ol>
-        <li>API AJKSHDKJASHDJKASHDKJnow use public endpoints to access the data, making it accessible to guests.</li>
+        <li>API now use public endpoints to access the data, making it accessible to guests.</li>
     </ol>
 </ul>
 

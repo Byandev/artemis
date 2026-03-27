@@ -13,6 +13,7 @@ use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\Record\RTSController;
 use App\Http\Controllers\Workspaces\Record\SalesController;
 use App\Http\Controllers\Workspaces\RoleController;
+use App\Http\Controllers\Workspaces\InventoryController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
@@ -43,6 +44,17 @@ Route::middleware(['auth'])->group(function () {
     // Workspace setup (first-time after registration)
     Route::get('/workspaces/setup', [WorkspaceSetupController::class, 'create'])->name('workspaces.setup');
     Route::post('/workspaces/setup', [WorkspaceSetupController::class, 'store'])->name('workspaces.setup.store');
+
+
+    Route::prefix('workspaces/{workspace:slug}')->group(function () {
+
+        Route::get('/inventory_transaction', [InventoryController::class, 'index'])->name('inventory.index');
+        Route::post('/inventory_transaction', [InventoryController::class, 'store'])->name('inventory.store');
+        Route::patch('/inventory_transaction/{inventory}', [InventoryController::class, 'update'])->name('inventory.update');
+        Route::delete('/inventory_transaction/{inventory}', [InventoryController::class, 'destroy'])->name('inventory.destroy');
+    });
+
+
 
     // Workspace dashboard
     Route::get('/workspaces/{workspace}/dashboard', [WorkspaceController::class, 'dashboard'])->name('workspace.dashboard');
@@ -159,14 +171,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/inventory/purchased-orders/create', [PurchaseOrderController::class, 'create'])->name('workspaces.inventory.purchased-orders.create');
 });
 
+
 // Public invitation routes (guest or authenticated)
 Route::get('/workspaces/invitations/{token}', [WorkspaceInvitationController::class, 'show'])->name('workspaces.invitations.show');
 Route::get('/workspaces/invitations/{token}/accept', [WorkspaceInvitationController::class, 'accept'])->name('workspaces.invitations.accept');
 
 Route::prefix('/workspaces/{workspace:slug}')->group(function () {
 
-    // Archive & Restore Logic
-    // Ensure this is PATCH
     Route::patch('/roles/{role}/archive', [RoleController::class, 'archive'])->name('roles.archive');
     Route::post('/roles/{role}/restore', [RoleController::class, 'restore'])
         ->withTrashed()
@@ -176,4 +187,8 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
     Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
     Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
 
+
+
 });
+
+
