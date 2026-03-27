@@ -25,6 +25,48 @@ type DeliveryAttemptRow = {
     rts_rate_percentage: number;
 };
 
+type CxRtsRow = {
+    cx_rts_bucket: string;
+    total_orders: number;
+    delivered_count: number;
+    returned_count: number;
+    rts_rate_percentage: number;
+};
+
+type PriceRow = {
+    price_bucket: string | null;
+    total_orders: number;
+    delivered_count: number;
+    returned_count: number;
+    rts_rate_percentage: number;
+};
+
+const PRICE_LABELS: Record<string, string> = {
+    '0-250':     '₱0 – ₱250',
+    '251-500':   '₱251 – ₱500',
+    '501-750':   '₱501 – ₱750',
+    '751-1000':  '₱751 – ₱1,000',
+    '1001-1500': '₱1,001 – ₱1,500',
+    '1501-2000': '₱1,501 – ₱2,000',
+    '2001-3000': '₱2,001 – ₱3,000',
+    '3001-5000': '₱3,001 – ₱5,000',
+    '5000+':     '₱5,000+',
+};
+
+const CX_RTS_LABELS: Record<string, string> = {
+    no_report: 'No Report',
+    '0-10': '0 – 10%',
+    '11-20': '11 – 20%',
+    '21-30': '21 – 30%',
+    '31-40': '31 – 40%',
+    '41-50': '41 – 50%',
+    '51-60': '51 – 60%',
+    '61-70': '61 – 70%',
+    '71-80': '71 – 80%',
+    '81-90': '81 – 90%',
+    '91-100': '91 – 100%',
+};
+
 interface Props {
     workspace: Workspace;
 }
@@ -81,6 +123,13 @@ export default function Analytics({ workspace }: Props) {
     const [deliveryAttempts, setDeliveryAttempts] = useState<DeliveryAttemptRow[]>([]);
     const [deliveryAttemptsLoading, setDeliveryAttemptsLoading] = useState(true);
 
+    const [cxRts, setCxRts] = useState<CxRtsRow[]>([]);
+    const [cxRtsLoading, setCxRtsLoading] = useState(true);
+    const [cxRtsType, setCxRtsType] = useState<'latest' | 'initial'>('latest');
+
+    const [price, setPrice] = useState<PriceRow[]>([]);
+    const [priceLoading, setPriceLoading] = useState(true);
+
     const buildParams = useCallback(() => {
         const p = new URLSearchParams();
         p.append('start_date', dateRange[0]);
@@ -120,6 +169,29 @@ export default function Analytics({ workspace }: Props) {
         }
     }, [workspace.slug, buildParams, citySearch]);
 
+    const fetchCxRts = useCallback(async (type = cxRtsType) => {
+        setCxRtsLoading(true);
+        try {
+            const p = buildParams();
+            p.append('type', type);
+            const res = await fetch(`/workspaces/${workspace.slug}/rts/analytics/group-by/cx-rts?${p}`, { credentials: 'same-origin' });
+            if (res.ok) setCxRts(await res.json());
+        } finally {
+            setCxRtsLoading(false);
+        }
+    }, [workspace.slug, buildParams, cxRtsType]);
+
+    const fetchPrice = useCallback(async () => {
+        setPriceLoading(true);
+        try {
+            const p = buildParams();
+            const res = await fetch(`/workspaces/${workspace.slug}/rts/analytics/group-by/price?${p}`, { credentials: 'same-origin' });
+            if (res.ok) setPrice(await res.json());
+        } finally {
+            setPriceLoading(false);
+        }
+    }, [workspace.slug, buildParams]);
+
     const fetchDeliveryAttempts = useCallback(async () => {
         setDeliveryAttemptsLoading(true);
         try {
@@ -149,7 +221,13 @@ export default function Analytics({ workspace }: Props) {
         fetchProvinces(1);
         fetchCities(1, '');
         fetchDeliveryAttempts();
+        fetchCxRts();
+        fetchPrice();
     }, [dateRange, filter]);
+
+    useEffect(() => {
+        fetchCxRts(cxRtsType);
+    }, [cxRtsType]);
 
     // Fetch the active tab's data when switching
     useEffect(() => {
@@ -240,6 +318,46 @@ export default function Analytics({ workspace }: Props) {
                     />
                 </PageHeader>
 
+                {/* Price breakdown */}
+                <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                    <div className="border-b border-black/6 dark:border-white/6 px-5 py-4">
+                        <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">By Price (Final Amount)</h2>
+                        <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">RTS rate broken down by order price range</p>
+                    </div>
+                    <div className="p-4">
+                        {priceLoading ? (
+                            <div className="flex h-24 items-center justify-center text-[13px] text-gray-400">Loading…</div>
+                        ) : (
+                            <table className="w-full text-[12px]">
+                                <thead>
+                                    <tr className="border-b border-black/6 dark:border-white/6">
+                                        <th className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Price Range</th>
+                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Total Orders</th>
+                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Delivered</th>
+                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Returned</th>
+                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">RTS Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {price.map((row) => (
+                                        <tr key={row.price_bucket ?? 'unknown'} className="border-b border-black/4 dark:border-white/4 last:border-0">
+                                            <td className="px-3 py-2.5 font-medium text-gray-700 dark:text-gray-300">
+                                                {row.price_bucket ? (PRICE_LABELS[row.price_bucket] ?? row.price_bucket) : <span className="text-gray-400">Unknown</span>}
+                                            </td>
+                                            <td className="px-3 py-2.5 text-right text-gray-600 dark:text-gray-400">{row.total_orders}</td>
+                                            <td className="px-3 py-2.5 text-right text-green-600 dark:text-green-400">{row.delivered_count}</td>
+                                            <td className="px-3 py-2.5 text-right text-red-500">{row.returned_count}</td>
+                                            <td className="px-3 py-2.5 text-right">
+                                                <RtsCell value={row.rts_rate_percentage} />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+
                 {/* Delivery Attempts breakdown */}
                 <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
                     <div className="border-b border-black/6 dark:border-white/6 px-5 py-4">
@@ -265,6 +383,64 @@ export default function Analytics({ workspace }: Props) {
                                         <tr key={row.delivery_attempts ?? 'unknown'} className="border-b border-black/4 dark:border-white/4 last:border-0">
                                             <td className="px-3 py-2.5 font-medium text-gray-700 dark:text-gray-300">
                                                 {row.delivery_attempts ?? <span className="text-gray-400">Unknown</span>}
+                                            </td>
+                                            <td className="px-3 py-2.5 text-right text-gray-600 dark:text-gray-400">{row.total_orders}</td>
+                                            <td className="px-3 py-2.5 text-right text-green-600 dark:text-green-400">{row.delivered_count}</td>
+                                            <td className="px-3 py-2.5 text-right text-red-500">{row.returned_count}</td>
+                                            <td className="px-3 py-2.5 text-right">
+                                                <RtsCell value={row.rts_rate_percentage} />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+
+                {/* Cx RTS breakdown */}
+                <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                    <div className="flex items-center justify-between border-b border-black/6 dark:border-white/6 px-5 py-4">
+                        <div>
+                            <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">By Customer RTS (Phone Number Report)</h2>
+                            <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
+                                {cxRtsType === 'latest' ? 'Latest report — current cumulative RTS rate per phone number' : 'Initial report — RTS rate at the time the order was placed'}
+                            </p>
+                        </div>
+                        <div className="flex rounded-lg border border-black/8 dark:border-white/8 overflow-hidden text-[12px] font-medium">
+                            <button
+                                onClick={() => setCxRtsType('latest')}
+                                className={`px-3 py-1.5 transition-colors ${cxRtsType === 'latest' ? 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                            >
+                                Latest
+                            </button>
+                            <button
+                                onClick={() => setCxRtsType('initial')}
+                                className={`px-3 py-1.5 transition-colors border-l border-black/8 dark:border-white/8 ${cxRtsType === 'initial' ? 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                            >
+                                Initial
+                            </button>
+                        </div>
+                    </div>
+                    <div className="p-4">
+                        {cxRtsLoading ? (
+                            <div className="flex h-24 items-center justify-center text-[13px] text-gray-400">Loading…</div>
+                        ) : (
+                            <table className="w-full text-[12px]">
+                                <thead>
+                                    <tr className="border-b border-black/6 dark:border-white/6">
+                                        <th className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Cx. RTS Bucket</th>
+                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Total Orders</th>
+                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Delivered</th>
+                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Returned</th>
+                                        <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">RTS Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {cxRts.map((row) => (
+                                        <tr key={row.cx_rts_bucket} className="border-b border-black/4 dark:border-white/4 last:border-0">
+                                            <td className="px-3 py-2.5 font-medium text-gray-700 dark:text-gray-300">
+                                                {CX_RTS_LABELS[row.cx_rts_bucket] ?? row.cx_rts_bucket}
                                             </td>
                                             <td className="px-3 py-2.5 text-right text-gray-600 dark:text-gray-400">{row.total_orders}</td>
                                             <td className="px-3 py-2.5 text-right text-green-600 dark:text-green-400">{row.delivered_count}</td>
