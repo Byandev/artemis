@@ -84,7 +84,7 @@ export default function Welcome() {
                         {auth.user ? (
                             <Link
                                 href={dashboard()}
-                                className="inline-flex h-9 items-center rounded-lg bg-brand-500 px-5 text-[13px] font-medium text-white transition-colors hover:bg-brand-600"
+                                className="inline-flex h-9 items-center rounded-lg bg-brand-500! px-5 text-[13px] font-medium text-white transition-colors hover:bg-brand-600"
                             >
                                 Dashboard
                             </Link>
@@ -143,7 +143,7 @@ export default function Welcome() {
                         {auth.user ? (
                             <Link
                                 href={dashboard()}
-                                className="inline-flex h-11 items-center rounded-xl bg-brand-500 px-8 text-[14px] font-medium text-white shadow-lg shadow-brand-500/20 transition-all hover:bg-brand-600"
+                                className="inline-flex h-11 items-center rounded-xl bg-brand-500! px-8 text-[14px] font-medium text-white shadow-lg shadow-brand-500/20 transition-all hover:bg-brand-600"
                             >
                                 Go to Dashboard
                             </Link>
