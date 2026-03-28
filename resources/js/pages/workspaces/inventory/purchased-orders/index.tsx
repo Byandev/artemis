@@ -54,6 +54,24 @@ const formatMoney = (amount: number): string => {
     }).format(amount || 0);
 };
 
+const formatIssueDate = (value: string): string => {
+    if (!value) return '';
+
+    const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+        const [, year, month, day] = isoMatch;
+        return `${month}/${day}/${year}`;
+    }
+
+    const slashMatch = value.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (slashMatch) {
+        const [, month, day, year] = slashMatch;
+        return `${month}/${day}/${year}`;
+    }
+
+    return value;
+};
+
 const statusBadgeClass = (status: StatusId): string => {
     switch (status) {
         case 7:
@@ -162,8 +180,11 @@ const Index = ({ workspace }: Props) => {
             const params = new URLSearchParams();
             if (statusFilter !== 'all') params.set('status', statusFilter);
             if (query.trim()) params.set('q', query.trim());
-            if (startDate) params.set('start_date', startDate);
-            if (endDate) params.set('end_date', endDate);
+            const hasDateFilter = Boolean(startDate && endDate);
+            if (hasDateFilter) {
+                params.set('start_date', startDate);
+                params.set('end_date', endDate);
+            }
             params.set('page', String(page));
             params.set('per_page', '15');
 
@@ -389,7 +410,7 @@ const Index = ({ workspace }: Props) => {
                                 <>
                                     {visibleRows.map((row) => (
                                         <tr key={row.id} className="hover:bg-emerald-500/4 dark:hover:bg-emerald-500/8">
-                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{row.issue_date}</td>
+                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{formatIssueDate(row.issue_date)}</td>
                                             <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-700 dark:text-gray-200">{row.delivery_no || '-'}</td>
                                             <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-400">{row.cust_po_no || '-'}</td>
                                             <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-400">{row.control_no || '-'}</td>
