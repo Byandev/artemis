@@ -26,6 +26,7 @@ use App\Http\Controllers\Workspaces\WorkspaceSetupController;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Modules\Inventory\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\Workspaces\PpwController;
 
 /*
 |--------------------------------------------------------------------------
@@ -157,7 +158,17 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/botcake/sequences', [SequenceController::class, 'index'])->name('workspaces.botcake.sequences.index');
     Route::get('/workspaces/{workspace}/inventory/purchased-orders', [PurchaseOrderController::class, 'index'])->name('workspaces.inventory.purchased-orders.index');
     Route::get('/workspaces/{workspace}/inventory/purchased-orders/create', [PurchaseOrderController::class, 'create'])->name('workspaces.inventory.purchased-orders.create');
+
+    // PPW ROUTES
+    Route::prefix('/workspaces/{workspace}/inventory/ppw')->name('workspaces.inventory.ppw.')->group(function () {
+    Route::get('/', [PpwController::class, 'index'])->name('index');
+    Route::post('/', [PpwController::class, 'store'])->name('store');
+    Route::put('/{ppw}', [PpwController::class, 'update'])->name('update');
+    Route::delete('/{ppw}', [PpwController::class, 'destroy'])->name('destroy');
+    });
+
 });
+
 
 // Public invitation routes (guest or authenticated)
 Route::get('/workspaces/invitations/{token}', [WorkspaceInvitationController::class, 'show'])->name('workspaces.invitations.show');
@@ -177,3 +188,4 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
     Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
 
 });
+
