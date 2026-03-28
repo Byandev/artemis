@@ -1,8 +1,10 @@
 import { Head, Link } from '@inertiajs/react';
-import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Filter, Pencil, Plus, Search } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Pencil, Plus, Search, SquareX } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 type StatusId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
@@ -71,20 +73,40 @@ const statusBadgeClass = (status: StatusId): string => {
     }
 };
 
+const statusOptionTextClass = (status: StatusId): string => {
+    switch (status) {
+        case 7:
+            return 'text-emerald-600 dark:text-emerald-400';
+        case 6:
+            return 'text-sky-600 dark:text-sky-400';
+        case 5:
+            return 'text-violet-600 dark:text-violet-400';
+        case 3:
+            return 'text-amber-700 dark:text-amber-400';
+        case 8:
+            return 'text-red-600 dark:text-red-400';
+        case 4:
+            return 'text-emerald-600 dark:text-emerald-400';
+        default:
+            return 'text-gray-500 dark:text-gray-300';
+    }
+};
+
 const toInputDate = (date: Date): string => {
     const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
     return local.toISOString().slice(0, 10);
 };
 
-const getDefaultDateRange = (): { startDate: string; endDate: string } => {
-    const today = new Date();
-    const oneWeekBefore = new Date(today);
-    oneWeekBefore.setDate(today.getDate() - 7);
+const getDefaultDateRange = (): { startDate: string; endDate: string } => ({
+    startDate: '',
+    endDate: '',
+});
 
-    return {
-        startDate: toInputDate(oneWeekBefore),
-        endDate: toInputDate(today),
-    };
+const formatDisplayDate = (value: string): string => {
+    if (!value) return '';
+    const [year, month, day] = value.split('-');
+    if (!year || !month || !day) return value;
+    return `${month} - ${day} - ${year}`;
 };
 
 const Index = ({ workspace }: Props) => {
@@ -100,8 +122,9 @@ const Index = ({ workspace }: Props) => {
     const [query, setQuery] = useState('');
     const [startDate, setStartDate] = useState(defaultDateRangeRef.current.startDate);
     const [endDate, setEndDate] = useState(defaultDateRangeRef.current.endDate);
-    const endDateRef = useRef<HTMLInputElement | null>(null);
     const requestSerialRef = useRef(0);
+    const [datePickerOpen, setDatePickerOpen] = useState(false);
+    const [statusMenuRowId, setStatusMenuRowId] = useState<number | null>(null);
     const maxSelectableDate = toInputDate(new Date());
 
     const apiBase = useMemo(() => {
@@ -187,10 +210,6 @@ const Index = ({ workspace }: Props) => {
     };
 
     useEffect(() => {
-        if (!startDate || !endDate) {
-            return;
-        }
-
         void fetchRows(1);
     }, [statusFilter, query, startDate, endDate]);
 
@@ -267,25 +286,36 @@ const Index = ({ workspace }: Props) => {
                     </Link>
 
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative min-w-[150px]">
-                            <Calendar className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-                            <input
-                                ref={endDateRef}
-                                type="date"
-                                value={endDate}
-                                max={maxSelectableDate}
-                                onChange={(e) => {
-                                    const nextValue = e.target.value > maxSelectableDate ? maxSelectableDate : e.target.value;
-                                    setEndDate(nextValue);
-                                    if (startDate && startDate > nextValue) {
+                        <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                            <PopoverTrigger asChild>
+                                <button
+                                    type="button"
+                                    className="inline-flex h-9 min-w-[150px] items-center justify-center gap-1.5 rounded-[10px] border border-black/6 bg-white px-3 text-xs text-gray-400 outline-none transition-colors hover:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
+                                >
+                                    <CalendarIcon className="h-3.5 w-3.5" />
+                                    <span className="font-mono">{endDate ? formatDisplayDate(endDate) : 'Select Date'}</span>
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                                align="start"
+                                className="w-auto rounded-xl border border-black/6 bg-white p-2 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900"
+                            >
+                                <Calendar
+                                    mode="single"
+                                    selected={endDate ? new Date(endDate) : undefined}
+                                    onSelect={(date) => {
+                                        if (!date) return;
+
+                                        const nextValue = toInputDate(date) > maxSelectableDate ? maxSelectableDate : toInputDate(date);
+                                        setEndDate(nextValue);
                                         setStartDate(nextValue);
-                                    }
-                                }}
-                                onKeyDown={(e) => e.preventDefault()}
-                                onPaste={(e) => e.preventDefault()}
-                                className="h-9 w-full rounded-[10px] border border-black/6 bg-white pl-8 pr-3 text-xs text-gray-500 outline-none transition-colors focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
-                            />
-                        </div>
+                                        setDatePickerOpen(false);
+                                    }}
+                                    disabled={(date) => toInputDate(date) > maxSelectableDate}
+                                    className="rounded-[10px] bg-white p-0 text-xs dark:bg-zinc-900"
+                                />
+                            </PopoverContent>
+                        </Popover>
 
                         <div className="relative min-w-[220px]">
                             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
@@ -368,35 +398,67 @@ const Index = ({ workspace }: Props) => {
                                             <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{formatMoney(row.delivery_fee)}</td>
                                             <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-700 dark:text-gray-200">{formatMoney(row.total_amount)}</td>
                                             <td className="whitespace-nowrap px-4 py-2.5">
-                                                <div className="relative inline-flex h-6 w-[172px] items-center rounded-2xl bg-white pl-1.5 pr-6 dark:bg-zinc-900">
+                                                <div className="inline-flex h-6 w-[172px] items-center rounded-2xl pl-1.5">
                                                     <span className={`inline-flex w-full items-center gap-1 rounded-2xl px-2 py-1 text-[11px] font-medium ${statusBadgeClass(row.status)}`}>
                                                         <span className="h-1.5 w-1.5 rounded-full bg-current/60" />
                                                         <span>{statusLabel(row.status)}</span>
                                                     </span>
 
-                                                    <select
-                                                        value={row.status}
-                                                        onChange={(e) => void updateStatus(row.id, Number(e.target.value) as StatusId)}
-                                                        className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
-                                                        aria-label={`Change status for ${row.delivery_no || row.item}`}
+                                                    <Popover
+                                                        open={statusMenuRowId === row.id}
+                                                        onOpenChange={(open) => setStatusMenuRowId(open ? row.id : null)}
                                                     >
-                                                        {STATUS_OPTIONS.map((opt) => (
-                                                            <option key={opt.value} value={opt.value}>
-                                                                {opt.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-
-                                                    <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                                                        <PopoverTrigger asChild>
+                                                            <button
+                                                                type="button"
+                                                                className="ml-0.5 inline-flex h-6 w-5 items-center justify-center rounded-md text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-300"
+                                                                aria-label={`Open status dropdown for ${row.delivery_no || row.item}`}
+                                                            >
+                                                                <ChevronDown className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent
+                                                            align="end"
+                                                            sideOffset={6}
+                                                            className="w-[140px] rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900"
+                                                        >
+                                                            <ul className="space-y-0.5">
+                                                                {STATUS_OPTIONS.map((opt) => (
+                                                                    <li key={opt.value}>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setStatusMenuRowId(null);
+                                                                                void updateStatus(row.id, opt.value);
+                                                                            }}
+                                                                            className={[
+                                                                                'w-full rounded-md px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-black/3 dark:hover:bg-white/5',
+                                                                                statusOptionTextClass(opt.value),
+                                                                            ].join(' ')}
+                                                                        >
+                                                                            {opt.label}
+                                                                        </button>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </PopoverContent>
+                                                    </Popover>
                                                 </div>
                                             </td>
                                             <td className="whitespace-nowrap px-4 py-2.5">
-                                                <div className="flex items-center gap-2 text-gray-300">
-                                                    <button type="button" className="rounded p-1 hover:bg-black/3 hover:text-gray-500 dark:hover:bg-white/3">
+                                                <div className="inline-flex items-center text-[11px]">
+                                                    <button
+                                                        type="button"
+                                                        className="inline-flex items-center px-1 text-sky-600 transition-colors hover:text-sky-700 dark:text-sky-400"
+                                                    >
                                                         <Pencil className="h-3.5 w-3.5" />
                                                     </button>
-                                                    <button type="button" className="rounded p-1 hover:bg-black/3 hover:text-gray-500 dark:hover:bg-white/3">
-                                                        <Eye className="h-3.5 w-3.5" />
+                                                    <span className="mx-1 h-3.5 w-px bg-black/10 dark:bg-white/10" />
+                                                    <button
+                                                        type="button"
+                                                        className="inline-flex items-center px-1 text-red-500 transition-colors hover:text-red-600 dark:text-red-400"
+                                                    >
+                                                        <SquareX className="h-3.5 w-3.5" />
                                                     </button>
                                                 </div>
                                             </td>
