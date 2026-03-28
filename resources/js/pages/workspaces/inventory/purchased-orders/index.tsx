@@ -1,5 +1,5 @@
-import { Head } from '@inertiajs/react';
-import { Calendar } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
+import { Calendar, ChevronDown, Eye, Filter, Pencil, Plus, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
@@ -48,10 +48,27 @@ const statusLabel = (value: number): string => {
 
 const formatMoney = (amount: number): string => {
     return new Intl.NumberFormat('en-PH', {
-        style: 'currency',
-        currency: 'PHP',
-        minimumFractionDigits: 2,
+        maximumFractionDigits: 0,
     }).format(amount || 0);
+};
+
+const statusBadgeClass = (status: StatusId): string => {
+    switch (status) {
+        case 7:
+            return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
+        case 6:
+            return 'bg-sky-500/10 text-sky-600 dark:text-sky-400';
+        case 4:
+            return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
+        case 8:
+            return 'bg-red-500/10 text-red-600 dark:text-red-400';
+        case 3:
+            return 'bg-amber-500/10 text-amber-700 dark:text-amber-400';
+        case 5:
+            return 'bg-violet-500/10 text-violet-600 dark:text-violet-400';
+        default:
+            return 'bg-zinc-500/10 text-zinc-500 dark:text-zinc-400';
+    }
 };
 
 const toInputDate = (date: Date): string => {
@@ -191,6 +208,8 @@ const Index = ({ workspace }: Props) => {
     }, [statusFilter, query, startDate, endDate]);
 
     const hasMore = rows.length < totalRows && currentPage < lastPage;
+    const visibleRows = rows.slice(0, 15);
+    const emptyRows = Math.max(0, 15 - visibleRows.length);
 
     const openDatePicker = (ref: React.RefObject<HTMLInputElement | null>) => {
         const input = ref.current;
@@ -244,71 +263,22 @@ const Index = ({ workspace }: Props) => {
             <Head title={`${workspace.name} - Inventory Purchased Orders`} />
 
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <header className="mb-6">
-                    <h1 className="text-2xl font-semibold tracking-tight">Inventory Purchased Orders</h1>
-                    <p className="mt-1 text-sm text-zinc-500">Workspace-scoped list, filter, and status update demo.</p>
+                <header className="mb-5">
+                    <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">PO Management</h1>
                 </header>
 
-                <section className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4 md:grid-cols-2 xl:grid-cols-4">
-                    <div className="space-y-1">
-                        <label className="text-xs font-medium text-zinc-600">Search</label>
-                        <input
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Delivery No / PO / Control / Item"
-                            className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none ring-0 focus:border-zinc-500"
-                        />
-                    </div>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <Link
+                        href={`/workspaces/${workspace.slug}/inventory/purchased-orders/create`}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+                    >
+                        <Plus className="h-3.5 w-3.5" />
+                        Add Item
+                    </Link>
 
-                    <div className="space-y-1">
-                        <label className="text-xs font-medium text-zinc-600">Status</label>
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-zinc-500"
-                        >
-                            <option value="all">All Status</option>
-                            {STATUS_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="space-y-1">
-                        <label className="text-xs font-medium text-zinc-600">Start Date</label>
-                        <div className="relative">
-                            <input
-                                ref={startDateRef}
-                                type="date"
-                                value={startDate}
-                                max={maxSelectableDate}
-                                onChange={(e) => {
-                                    const nextValue = e.target.value > maxSelectableDate ? maxSelectableDate : e.target.value;
-                                    setStartDate(nextValue);
-                                    if (endDate && nextValue > endDate) {
-                                        setEndDate(nextValue);
-                                    }
-                                }}
-                                onKeyDown={(e) => e.preventDefault()}
-                                onPaste={(e) => e.preventDefault()}
-                                className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 pr-10 text-sm outline-none focus:border-zinc-500"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => openDatePicker(startDateRef)}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700"
-                                aria-label="Open start date picker"
-                            >
-                                <Calendar className="h-4 w-4" />
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="space-y-1">
-                        <label className="text-xs font-medium text-zinc-600">End Date</label>
-                        <div className="relative">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative min-w-[150px]">
+                            <Calendar className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                             <input
                                 ref={endDateRef}
                                 type="date"
@@ -323,112 +293,155 @@ const Index = ({ workspace }: Props) => {
                                 }}
                                 onKeyDown={(e) => e.preventDefault()}
                                 onPaste={(e) => e.preventDefault()}
-                                className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 pr-10 text-sm outline-none focus:border-zinc-500"
+                                className="h-9 w-full rounded-[10px] border border-black/6 bg-white pl-8 pr-3 text-xs text-gray-500 outline-none transition-colors focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
                             />
-                            <button
-                                type="button"
-                                onClick={() => openDatePicker(endDateRef)}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700"
-                                aria-label="Open end date picker"
-                            >
-                                <Calendar className="h-4 w-4" />
-                            </button>
                         </div>
-                    </div>
 
-                    <div className="space-y-1 md:col-span-2 xl:col-span-4">
+                        <div className="relative min-w-[220px]">
+                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                            <input
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                placeholder="Search Orders.."
+                                className="h-9 w-full rounded-[10px] border border-black/6 bg-white pl-8 pr-3 text-xs text-gray-500 outline-none transition-colors focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
+                            />
+                        </div>
+
+                        <div className="relative min-w-[120px]">
+                            <Filter className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="h-9 w-full appearance-none rounded-[10px] border border-black/6 bg-white pl-8 pr-7 text-xs text-gray-500 outline-none transition-colors focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
+                            >
+                                <option value="all">Status</option>
+                                {STATUS_OPTIONS.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                        </div>
+
                         <button
                             type="button"
                             onClick={resetFilters}
-                            className="h-10 rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
+                            className="h-9 rounded-[10px] border border-black/6 bg-white px-3 text-xs font-medium text-gray-500 transition-colors hover:bg-black/2 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
                         >
-                            Restore Default Filters
+                            Restore
                         </button>
                     </div>
-                </section>
+                </div>
 
                 {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
-                <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
-                    <table className="min-w-full divide-y divide-zinc-200 text-sm">
-                        <thead className="bg-zinc-50">
-                            <tr className="text-left text-xs font-medium uppercase tracking-wide text-zinc-500">
-                                <th className="px-3 py-3">Issue Date</th>
-                                <th className="px-3 py-3">Delivery No.</th>
-                                <th className="px-3 py-3">Cust. PO No.</th>
-                                <th className="px-3 py-3">Control No.</th>
-                                <th className="px-3 py-3">Item</th>
-                                <th className="px-3 py-3">COG Amount</th>
-                                <th className="px-3 py-3">Delivery Fee</th>
-                                <th className="px-3 py-3">Total Amount</th>
-                                <th className="px-3 py-3">Status</th>
+                <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                    <table className="min-w-full text-xs">
+                        <thead className="bg-[#F7F7F5] dark:bg-zinc-800/80">
+                            <tr className="text-left font-medium uppercase tracking-[0.06em] text-gray-400 dark:text-gray-500">
+                                <th className="px-4 py-3">Issue Date</th>
+                                <th className="px-4 py-3">Delivered No.</th>
+                                <th className="px-4 py-3">Cust PO No.</th>
+                                <th className="px-4 py-3">Control No.</th>
+                                <th className="px-4 py-3">Item</th>
+                                <th className="px-4 py-3">COG Amount</th>
+                                <th className="px-4 py-3">Delivery Fee</th>
+                                <th className="px-4 py-3">Total Amount</th>
+                                <th className="px-4 py-3">Status</th>
+                                <th className="px-4 py-3">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-zinc-100 bg-white">
+                        <tbody className="divide-y divide-black/6 bg-white text-gray-500 dark:divide-white/6 dark:bg-zinc-900 dark:text-gray-300">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={9} className="px-3 py-10 text-center text-zinc-500">
+                                    <td colSpan={10} className="px-3 py-10 text-center text-zinc-500">
                                         Loading...
                                     </td>
                                 </tr>
                             ) : rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="px-3 py-10 text-center text-zinc-500">
+                                    <td colSpan={10} className="px-3 py-10 text-center text-zinc-500">
                                         No records found.
                                     </td>
                                 </tr>
                             ) : (
-                                rows.map((row) => (
-                                    <tr key={row.id} className="hover:bg-zinc-50">
-                                        <td className="whitespace-nowrap px-3 py-2">{row.issue_date}</td>
-                                        <td className="whitespace-nowrap px-3 py-2">{row.delivery_no || '-'}</td>
-                                        <td className="whitespace-nowrap px-3 py-2">{row.cust_po_no || '-'}</td>
-                                        <td className="whitespace-nowrap px-3 py-2">{row.control_no || '-'}</td>
-                                        <td className="whitespace-nowrap px-3 py-2">{row.item}</td>
-                                        <td className="whitespace-nowrap px-3 py-2">{formatMoney(row.cog_amount)}</td>
-                                        <td className="whitespace-nowrap px-3 py-2">{formatMoney(row.delivery_fee)}</td>
-                                        <td className="whitespace-nowrap px-3 py-2 font-medium">{formatMoney(row.total_amount)}</td>
-                                        <td className="whitespace-nowrap px-3 py-2">
-                                            <select
-                                                value={row.status}
-                                                onChange={(e) => void updateStatus(row.id, Number(e.target.value) as StatusId)}
-                                                className="h-9 rounded-md border border-zinc-300 bg-white px-2 text-sm outline-none focus:border-zinc-500"
-                                            >
-                                                {STATUS_OPTIONS.map((opt) => (
-                                                    <option key={opt.value} value={opt.value}>
-                                                        {opt.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <span className="ml-2 text-xs text-zinc-500">{statusLabel(row.status)}</span>
-                                        </td>
-                                    </tr>
-                                ))
+                                <>
+                                    {visibleRows.map((row) => (
+                                        <tr key={row.id} className="hover:bg-emerald-500/4 dark:hover:bg-emerald-500/8">
+                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{row.issue_date}</td>
+                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-700 dark:text-gray-200">{row.delivery_no || '-'}</td>
+                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-400">{row.cust_po_no || '-'}</td>
+                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-400">{row.control_no || '-'}</td>
+                                            <td className="whitespace-nowrap px-4 py-2.5 font-medium uppercase text-gray-700 dark:text-gray-200">{row.item}</td>
+                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{formatMoney(row.cog_amount)}</td>
+                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{formatMoney(row.delivery_fee)}</td>
+                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-700 dark:text-gray-200">{formatMoney(row.total_amount)}</td>
+                                            <td className="whitespace-nowrap px-4 py-2.5">
+                                                <label className={`inline-flex items-center gap-1 rounded-2xl px-2.5 py-1 text-[11px] font-medium ${statusBadgeClass(row.status)}`}>
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-current/60" />
+                                                    {statusLabel(row.status)}
+                                                </label>
+                                                <select
+                                                    value={row.status}
+                                                    onChange={(e) => void updateStatus(row.id, Number(e.target.value) as StatusId)}
+                                                    className="ml-2 h-6 rounded-md border border-black/6 bg-white px-1.5 text-[11px] text-gray-500 outline-none dark:border-white/10 dark:bg-zinc-800"
+                                                >
+                                                    {STATUS_OPTIONS.map((opt) => (
+                                                        <option key={opt.value} value={opt.value}>
+                                                            {opt.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </td>
+                                            <td className="whitespace-nowrap px-4 py-2.5">
+                                                <div className="flex items-center gap-2 text-gray-300">
+                                                    <button type="button" className="rounded p-1 hover:bg-black/3 hover:text-gray-500 dark:hover:bg-white/3">
+                                                        <Pencil className="h-3.5 w-3.5" />
+                                                    </button>
+                                                    <button type="button" className="rounded p-1 hover:bg-black/3 hover:text-gray-500 dark:hover:bg-white/3">
+                                                        <Eye className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+
+                                    {Array.from({ length: emptyRows }).map((_, index) => (
+                                        <tr key={`empty-row-${index}`}>
+                                            <td colSpan={10} className="h-[29px] px-4" />
+                                        </tr>
+                                    ))}
+                                </>
                             )}
                         </tbody>
-                        {!loading && rows.length > 0 && (
-                            <tfoot className="border-t border-zinc-200 bg-zinc-50 text-sm text-zinc-600">
-                                <tr>
-                                    <td colSpan={9} className="px-3 py-3">
-                                        {hasMore ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => void fetchRows(currentPage + 1, true)}
-                                                disabled={loadingMore}
-                                                className="cursor-pointer font-medium text-zinc-800 underline underline-offset-2 disabled:cursor-not-allowed disabled:text-zinc-400"
-                                            >
-                                                {loadingMore
-                                                    ? 'Loading more...'
-                                                    : `Showed ${rows.length} of ${totalRows} Datas.. Click here to show more`}
-                                            </button>
-                                        ) : (
-                                            <span>{`Showed ${rows.length} of ${totalRows} Datas.`}</span>
-                                        )}
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        )}
                     </table>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-1">
+                    <p className="text-[11px] text-gray-400">Showing {visibleRows.length > 0 ? 1 : 0} - {visibleRows.length} of {totalRows} results</p>
+
+                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                        <button
+                            type="button"
+                            onClick={() => void fetchRows(Math.max(1, currentPage - 1), false)}
+                            disabled={loading || currentPage <= 1}
+                            className="rounded-md border border-black/6 bg-white px-2.5 py-1.5 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/6 dark:bg-zinc-900"
+                        >
+                            Back
+                        </button>
+                        <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-emerald-600 px-2 text-white dark:bg-emerald-500">
+                            {currentPage}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => void fetchRows(currentPage + 1, false)}
+                            disabled={loading || !hasMore}
+                            className="rounded-md border border-black/6 bg-white px-2.5 py-1.5 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/6 dark:bg-zinc-900"
+                        >
+                            Next
+                        </button>
+                    </div>
                 </div>
             </div>
         </AppLayout>

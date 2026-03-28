@@ -15,6 +15,7 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     LayoutDashboard,
     Package,
+    ClipboardList,
     Store,
     PhoneCall,
     Users,
@@ -153,6 +154,14 @@ export function AppSidebar() {
         },
     ];
 
+    const inventoryNavItems: NavItem[] = [
+        {
+            title: 'PO Management',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/po-management`,
+            icon: ClipboardList,
+        },
+    ];
+
 
 
 
@@ -176,6 +185,7 @@ export function AppSidebar() {
 
             <SidebarContent className="p-3">
                 <NavMain items={mainNavItems} group_label="Main" />
+                <NavMain items={inventoryNavItems} group_label="Inventory" />
                 {/*<NavMain items={accountNavItems} group_label="Account" />*/}
             </SidebarContent>
 
