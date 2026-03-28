@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { Calendar, ChevronDown, Eye, Filter, Pencil, Plus, Search } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Filter, Pencil, Plus, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
@@ -90,7 +90,6 @@ const getDefaultDateRange = (): { startDate: string; endDate: string } => {
 const Index = ({ workspace }: Props) => {
     const [rows, setRows] = useState<PurchasedOrder[]>([]);
     const [loading, setLoading] = useState(true);
-    const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [lastPage, setLastPage] = useState(1);
@@ -101,7 +100,6 @@ const Index = ({ workspace }: Props) => {
     const [query, setQuery] = useState('');
     const [startDate, setStartDate] = useState(defaultDateRangeRef.current.startDate);
     const [endDate, setEndDate] = useState(defaultDateRangeRef.current.endDate);
-    const startDateRef = useRef<HTMLInputElement | null>(null);
     const endDateRef = useRef<HTMLInputElement | null>(null);
     const requestSerialRef = useRef(0);
     const maxSelectableDate = toInputDate(new Date());
@@ -131,15 +129,11 @@ const Index = ({ workspace }: Props) => {
         return xsrfCookie ? decodeURIComponent(xsrfCookie) : '';
     }, []);
 
-    const fetchRows = async (page = 1, append = false) => {
+    const fetchRows = async (page = 1) => {
         const requestSerial = ++requestSerialRef.current;
 
-        if (append) {
-            setLoadingMore(true);
-        } else {
-            setLoading(true);
-            setError(null);
-        }
+        setLoading(true);
+        setError(null);
 
         try {
             const params = new URLSearchParams();
@@ -148,8 +142,7 @@ const Index = ({ workspace }: Props) => {
             if (startDate) params.set('start_date', startDate);
             if (endDate) params.set('end_date', endDate);
             params.set('page', String(page));
-            params.set('per_page', '50');
-            params.set('show_all', '1');
+            params.set('per_page', '15');
 
             const url = `${apiBase}/api/workspaces/${workspace.slug}/inventory/purchased-orders?${params.toString()}`;
             const res = await fetch(url, {
@@ -174,7 +167,7 @@ const Index = ({ workspace }: Props) => {
                 return;
             }
 
-            setRows((prev) => (append ? [...prev, ...nextRows] : nextRows));
+            setRows(nextRows);
             setCurrentPage(Number(payload.current_page || page));
             setLastPage(Number(payload.last_page || page));
             setTotalRows(Number(payload.total || nextRows.length));
@@ -183,19 +176,13 @@ const Index = ({ workspace }: Props) => {
                 return;
             }
 
-            if (!append) {
-                setRows([]);
-                setCurrentPage(1);
-                setLastPage(1);
-                setTotalRows(0);
-            }
+            setRows([]);
+            setCurrentPage(1);
+            setLastPage(1);
+            setTotalRows(0);
             setError(err instanceof Error ? err.message : 'Failed to fetch purchased orders.');
         } finally {
-            if (append) {
-                setLoadingMore(false);
-            } else {
-                setLoading(false);
-            }
+            setLoading(false);
         }
     };
 
@@ -204,24 +191,27 @@ const Index = ({ workspace }: Props) => {
             return;
         }
 
-        void fetchRows(1, false);
+        void fetchRows(1);
     }, [statusFilter, query, startDate, endDate]);
 
-    const hasMore = rows.length < totalRows && currentPage < lastPage;
-    const visibleRows = rows.slice(0, 15);
+    const visibleRows = rows;
     const emptyRows = Math.max(0, 15 - visibleRows.length);
+    const hasPrevious = currentPage > 1;
+    const hasNext = currentPage < lastPage;
+    const fromRow = totalRows === 0 ? 0 : (currentPage - 1) * 15 + 1;
+    const toRow = totalRows === 0 ? 0 : Math.min(currentPage * 15, totalRows);
 
-    const openDatePicker = (ref: React.RefObject<HTMLInputElement | null>) => {
-        const input = ref.current;
-        if (!input) return;
-
-        if (typeof input.showPicker === 'function') {
-            input.showPicker();
-            return;
+    const paginationPages = useMemo(() => {
+        if (lastPage <= 5) {
+            return Array.from({ length: lastPage }, (_, i) => i + 1);
         }
 
-        input.focus();
-    };
+        const start = Math.max(1, currentPage - 2);
+        const end = Math.min(lastPage, start + 4);
+        const adjustedStart = Math.max(1, end - 4);
+
+        return Array.from({ length: end - adjustedStart + 1 }, (_, i) => adjustedStart + i);
+    }, [currentPage, lastPage]);
 
     const resetFilters = () => {
         const defaults = getDefaultDateRange();
@@ -378,21 +368,27 @@ const Index = ({ workspace }: Props) => {
                                             <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{formatMoney(row.delivery_fee)}</td>
                                             <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-700 dark:text-gray-200">{formatMoney(row.total_amount)}</td>
                                             <td className="whitespace-nowrap px-4 py-2.5">
-                                                <label className={`inline-flex items-center gap-1 rounded-2xl px-2.5 py-1 text-[11px] font-medium ${statusBadgeClass(row.status)}`}>
-                                                    <span className="h-1.5 w-1.5 rounded-full bg-current/60" />
-                                                    {statusLabel(row.status)}
-                                                </label>
-                                                <select
-                                                    value={row.status}
-                                                    onChange={(e) => void updateStatus(row.id, Number(e.target.value) as StatusId)}
-                                                    className="ml-2 h-6 rounded-md border border-black/6 bg-white px-1.5 text-[11px] text-gray-500 outline-none dark:border-white/10 dark:bg-zinc-800"
-                                                >
-                                                    {STATUS_OPTIONS.map((opt) => (
-                                                        <option key={opt.value} value={opt.value}>
-                                                            {opt.label}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                <div className="relative inline-flex h-6 w-[172px] items-center rounded-2xl bg-white pl-1.5 pr-6 dark:bg-zinc-900">
+                                                    <span className={`inline-flex w-full items-center gap-1 rounded-2xl px-2 py-1 text-[11px] font-medium ${statusBadgeClass(row.status)}`}>
+                                                        <span className="h-1.5 w-1.5 rounded-full bg-current/60" />
+                                                        <span>{statusLabel(row.status)}</span>
+                                                    </span>
+
+                                                    <select
+                                                        value={row.status}
+                                                        onChange={(e) => void updateStatus(row.id, Number(e.target.value) as StatusId)}
+                                                        className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
+                                                        aria-label={`Change status for ${row.delivery_no || row.item}`}
+                                                    >
+                                                        {STATUS_OPTIONS.map((opt) => (
+                                                            <option key={opt.value} value={opt.value}>
+                                                                {opt.label}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+
+                                                    <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                                                </div>
                                             </td>
                                             <td className="whitespace-nowrap px-4 py-2.5">
                                                 <div className="flex items-center gap-2 text-gray-300">
@@ -418,30 +414,83 @@ const Index = ({ workspace }: Props) => {
                     </table>
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-1">
-                    <p className="text-[11px] text-gray-400">Showing {visibleRows.length > 0 ? 1 : 0} - {visibleRows.length} of {totalRows} results</p>
+                <div className="mt-3 grid grid-cols-3 items-center gap-3 px-1">
+                    <p className="text-[11px] text-gray-400">Showing {fromRow} - {toRow} of {totalRows} results</p>
 
-                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <div className="flex items-center justify-center gap-1 text-xs text-gray-500">
                         <button
                             type="button"
-                            onClick={() => void fetchRows(Math.max(1, currentPage - 1), false)}
-                            disabled={loading || currentPage <= 1}
+                            onClick={() => void fetchRows(1)}
+                            disabled={loading || !hasPrevious}
+                            className="rounded-md px-2 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label="First page"
+                        >
+                            <ChevronsLeft className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => void fetchRows(currentPage - 1)}
+                            disabled={loading || !hasPrevious}
+                            className="rounded-md px-2 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label="Previous page"
+                        >
+                            <ChevronLeft className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => void fetchRows(currentPage - 1)}
+                            disabled={loading || !hasPrevious}
                             className="rounded-md border border-black/6 bg-white px-2.5 py-1.5 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/6 dark:bg-zinc-900"
                         >
                             Back
                         </button>
-                        <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-emerald-600 px-2 text-white dark:bg-emerald-500">
-                            {currentPage}
-                        </span>
+
+                        {paginationPages.map((page) => (
+                            <button
+                                key={page}
+                                type="button"
+                                onClick={() => void fetchRows(page)}
+                                disabled={loading}
+                                className={[
+                                    'inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 transition-colors',
+                                    currentPage === page
+                                        ? 'bg-emerald-600 text-white dark:bg-emerald-500'
+                                        : 'text-gray-700 hover:bg-black/3 dark:text-gray-300 dark:hover:bg-white/5',
+                                ].join(' ')}
+                            >
+                                {page}
+                            </button>
+                        ))}
+
                         <button
                             type="button"
-                            onClick={() => void fetchRows(currentPage + 1, false)}
-                            disabled={loading || !hasMore}
+                            onClick={() => void fetchRows(currentPage + 1)}
+                            disabled={loading || !hasNext}
                             className="rounded-md border border-black/6 bg-white px-2.5 py-1.5 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/6 dark:bg-zinc-900"
                         >
                             Next
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => void fetchRows(currentPage + 1)}
+                            disabled={loading || !hasNext}
+                            className="rounded-md px-2 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label="Next page"
+                        >
+                            <ChevronRight className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => void fetchRows(lastPage)}
+                            disabled={loading || !hasNext}
+                            className="rounded-md px-2 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label="Last page"
+                        >
+                            <ChevronsRight className="h-3.5 w-3.5" />
+                        </button>
                     </div>
+
+                    <div />
                 </div>
             </div>
         </AppLayout>
