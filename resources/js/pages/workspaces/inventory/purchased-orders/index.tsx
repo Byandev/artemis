@@ -324,6 +324,7 @@ const Index = ({ workspace }: Props) => {
                                 <Calendar
                                     mode="single"
                                     selected={endDate ? new Date(endDate) : undefined}
+                                    toMonth={new Date()}
                                     onSelect={(date) => {
                                         if (!date) return;
 
