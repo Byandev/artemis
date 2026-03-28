@@ -498,15 +498,6 @@ const Index = ({ workspace }: Props) => {
                         >
                             <ChevronLeft className="h-3.5 w-3.5" />
                         </button>
-                        <button
-                            type="button"
-                            onClick={() => void fetchRows(currentPage - 1)}
-                            disabled={loading || !hasPrevious}
-                            className="rounded-md border border-black/6 bg-white px-2.5 py-1.5 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/6 dark:bg-zinc-900"
-                        >
-                            Back
-                        </button>
-
                         {paginationPages.map((page) => (
                             <button
                                 key={page}
@@ -524,14 +515,6 @@ const Index = ({ workspace }: Props) => {
                             </button>
                         ))}
 
-                        <button
-                            type="button"
-                            onClick={() => void fetchRows(currentPage + 1)}
-                            disabled={loading || !hasNext}
-                            className="rounded-md border border-black/6 bg-white px-2.5 py-1.5 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/6 dark:bg-zinc-900"
-                        >
-                            Next
-                        </button>
                         <button
                             type="button"
                             onClick={() => void fetchRows(currentPage + 1)}
