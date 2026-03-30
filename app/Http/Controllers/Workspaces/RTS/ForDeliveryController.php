@@ -103,10 +103,12 @@ class ForDeliveryController extends Controller
                 AllowedSort::custom('order_shipping_address_full_name', new CustomerNameSort),
                 AllowedSort::custom('order_shipping_address_city_order_summary_rts_rate', new LocationRtsRateSort),
             ])
+            ->whereDate('delivery_date', now())
             ->paginate(10);
 
         // Build a base query for stats that respects page/shop filters
-        $statsBase = OrderForDelivery::where('workspace_id', $workspace->id);
+        $statsBase = OrderForDelivery::where('workspace_id', $workspace->id)
+        ->where('delivery_date',  now());
 
         $filterPageIds = $request->input('filter.page_id');
         if ($filterPageIds) {
@@ -298,10 +300,12 @@ class ForDeliveryController extends Controller
                 AllowedSort::custom('order_shipping_address_full_name', new CustomerNameSort),
                 AllowedSort::custom('order_shipping_address_city_order_summary_rts_rate', new LocationRtsRateSort),
             ])
+            ->whereDate('delivery_date', now())
             ->paginate(10);
 
         // Build a base query for stats that respects page/shop filters
-        $statsBase = OrderForDelivery::where('workspace_id', $workspace->id);
+        $statsBase = OrderForDelivery::where('workspace_id', $workspace->id)
+            ->whereDate('delivery_date', now());
 
         $filterPageIds = $request->input('filter.page_id');
         if ($filterPageIds) {
@@ -355,7 +359,7 @@ class ForDeliveryController extends Controller
 
         $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id']);
 
-        
+
 
         return Inertia::render('workspaces/rts/public-pages/rmo-management', [
             'orders' => $items,

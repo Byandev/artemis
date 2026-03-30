@@ -9,7 +9,8 @@ import { OrderForDelivery, OrderStatus } from '@/types/models/Pancake/OrderForDe
 import { ColumnDef } from '@tanstack/react-table';
 import { Loader2, MapPin, Phone, UserPlus, X } from 'lucide-react';
 import { RmoStatusPicker } from './RmoStatusPicker';
-import { ParcelStatusEntry } from './rmo-config';
+import { orderStatusConfig, ParcelStatusEntry } from './rmo-config';
+import { usePage } from '@inertiajs/react';
 
 interface CreateRmoColumnsOptions {
     onChangeStatus: (status: string, orderId: number) => void;
@@ -33,6 +34,14 @@ export function createRmoColumns({
     onRemoveAssignee,
     disableStatusChange = false,
 }: CreateRmoColumnsOptions): ColumnDef<OrderForDelivery>[] {
+
+
+    const { props } = usePage();
+    const user = props.auth?.user;
+
+    const isAuthenticated = !!user;
+
+
     return [
         {
             id: 'order_number',
@@ -265,13 +274,30 @@ export function createRmoColumns({
             header: ({ column }) => <SortableHeader column={column} title="Status" />,
             cell: ({ row }) => {
                 const orderId = row.original.order_id;
+                const status = row.original.status as OrderStatus;
+                const config = orderStatusConfig[status];
+
+                if (!isAuthenticated) {
+                    return (
+                        <RmoStatusPicker
+                            currentStatus={row.original.status as OrderStatus}
+                            onChangeStatus={(status) => onChangeStatus(status, orderId)}
+                            disabled={disableStatusChange}
+                        />
+                    );
+                }
+
                 return (
-                    <RmoStatusPicker
-                        currentStatus={row.original.status as OrderStatus}
-                        onChangeStatus={(status) => onChangeStatus(status, orderId)}
-                        disabled={disableStatusChange}
-                    />
+                    <div
+                        className={`inline-flex w-fit items-center gap-2 rounded-full px-2 py-1 text-xs font-medium ${config?.pill ?? 'bg-gray-100 text-gray-600'}`}
+                    >
+                        <span
+                            className={`h-2 w-2 rounded-full ${config?.dot ?? 'bg-gray-400'}`}
+                        />
+                        {status}
+                    </div>
                 );
+
             },
         },
     ];
