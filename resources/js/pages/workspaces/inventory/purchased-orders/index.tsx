@@ -24,6 +24,7 @@ interface PurchasedOrder {
 
 interface PaginatedResponse {
     data: PurchasedOrder[];
+    available_years?: number[];
     current_page: number;
     last_page: number;
     per_page: number;
@@ -43,6 +44,21 @@ const STATUS_OPTIONS: Array<{ value: StatusId; label: string }> = [
     { value: 6, label: 'Waiting For Delivery' },
     { value: 7, label: 'Delivered' },
     { value: 8, label: 'Cancelled' },
+];
+
+const MONTH_OPTIONS = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
 ];
 
 const statusLabel = (value: number): string => {
@@ -161,6 +177,7 @@ const Index = ({ workspace }: Props) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [lastPage, setLastPage] = useState(1);
     const [totalRows, setTotalRows] = useState(0);
+    const [availableYears, setAvailableYears] = useState<number[]>([]);
 
     const defaultDateRangeRef = useRef(getDefaultDateRange());
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -170,6 +187,11 @@ const Index = ({ workspace }: Props) => {
     const requestSerialRef = useRef(0);
     const [datePickerOpen, setDatePickerOpen] = useState(false);
     const [statusMenuRowId, setStatusMenuRowId] = useState<number | null>(null);
+    const [monthListOpen, setMonthListOpen] = useState(false);
+    const [yearListOpen, setYearListOpen] = useState(false);
+    const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+    const monthDropdownRef = useRef<HTMLDivElement | null>(null);
+    const yearDropdownRef = useRef<HTMLDivElement | null>(null);
     const maxSelectableDate = toInputDate(new Date());
 
     const apiBase = useMemo(() => {
@@ -240,6 +262,7 @@ const Index = ({ workspace }: Props) => {
             }
 
             setRows(nextRows);
+            setAvailableYears(Array.isArray(payload.available_years) ? payload.available_years : []);
             setCurrentPage(Number(payload.current_page || page));
             setLastPage(Number(payload.last_page || page));
             setTotalRows(Number(payload.total || nextRows.length));
@@ -249,6 +272,7 @@ const Index = ({ workspace }: Props) => {
             }
 
             setRows([]);
+            setAvailableYears([]);
             setCurrentPage(1);
             setLastPage(1);
             setTotalRows(0);
@@ -262,7 +286,50 @@ const Index = ({ workspace }: Props) => {
         void fetchRows(1);
     }, [statusFilter, query, startDate, endDate]);
 
+    useEffect(() => {
+        if (!datePickerOpen) return;
+
+        const selected = fromInputDate(endDate) || fromInputDate(startDate);
+        if (!selected) return;
+
+        setCalendarMonth(new Date(selected.getUTCFullYear(), selected.getUTCMonth(), 1));
+    }, [datePickerOpen, startDate, endDate]);
+
+    useEffect(() => {
+        if (!datePickerOpen) {
+            setMonthListOpen(false);
+            setYearListOpen(false);
+            return;
+        }
+
+        const onDocumentMouseDown = (event: MouseEvent) => {
+            const target = event.target as Node;
+
+            if (monthDropdownRef.current && !monthDropdownRef.current.contains(target)) {
+                setMonthListOpen(false);
+            }
+
+            if (yearDropdownRef.current && !yearDropdownRef.current.contains(target)) {
+                setYearListOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', onDocumentMouseDown);
+
+        return () => {
+            document.removeEventListener('mousedown', onDocumentMouseDown);
+        };
+    }, [datePickerOpen]);
+
     const visibleRows = rows;
+    const calendarFromYear = availableYears.length > 0 ? Math.min(...availableYears) : 2000;
+    const calendarToYear = Math.min(availableYears.length > 0 ? Math.max(...availableYears) : new Date().getFullYear(), new Date().getFullYear());
+    const currentYear = new Date().getFullYear();
+    const currentMonthIndex = new Date().getMonth();
+    const selectableYears = (availableYears.length > 0
+        ? availableYears.filter((year) => year <= currentYear)
+        : Array.from({ length: currentYear - 1999 }, (_, i) => 2000 + i)
+    ).sort((a, b) => a - b);
     const hasPrevious = currentPage > 1;
     const hasNext = currentPage < lastPage;
     const fromRow = totalRows === 0 ? 0 : (currentPage - 1) * 15 + 1;
@@ -351,14 +418,102 @@ const Index = ({ workspace }: Props) => {
                                 <Calendar
                                     mode="range"
                                     timeZone="UTC"
+                                    month={calendarMonth}
+                                    onMonthChange={setCalendarMonth}
                                     selected={{
                                         from: fromInputDate(startDate),
                                         to: fromInputDate(endDate),
                                     }}
-                                    captionLayout="dropdown"
-                                    fromYear={2000}
-                                    toYear={new Date().getFullYear()}
-                                    toMonth={new Date()}
+                                    captionLayout="label"
+                                    fromYear={calendarFromYear}
+                                    toYear={calendarToYear}
+                                    components={{
+                                        CaptionLabel: (props) => (
+                                            <div className={props.className}>
+                                                <div className="flex w-full items-center gap-2">
+                                                    <div ref={monthDropdownRef} className="relative flex-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setMonthListOpen((prev) => !prev);
+                                                                setYearListOpen(false);
+                                                            }}
+                                                            className="inline-flex h-9 w-full items-center justify-between rounded-[10px] border border-black/6 bg-white px-3 text-xs text-gray-500 outline-none transition-colors hover:bg-black/2 focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5"
+                                                        >
+                                                            <span>{MONTH_OPTIONS[calendarMonth.getMonth()]}</span>
+                                                            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                                                        </button>
+
+                                                        {monthListOpen && (
+                                                            <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-40 rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900">
+                                                                <ul className="space-y-0.5">
+                                                                    {MONTH_OPTIONS.map((monthLabel, monthIndex) => {
+                                                                        const isDisabled = calendarMonth.getFullYear() === currentYear && monthIndex > currentMonthIndex;
+
+                                                                        return (
+                                                                            <li key={monthLabel}>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    disabled={isDisabled}
+                                                                                    onClick={() => {
+                                                                                        setMonthListOpen(false);
+                                                                                        setCalendarMonth(new Date(calendarMonth.getFullYear(), monthIndex, 1));
+                                                                                    }}
+                                                                                    className="w-full rounded-md px-2 py-1.5 text-left text-[11px] text-gray-500 transition-colors hover:bg-black/3 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300 dark:hover:bg-white/5"
+                                                                                >
+                                                                                    {monthLabel}
+                                                                                </button>
+                                                                            </li>
+                                                                        );
+                                                                    })}
+                                                                </ul>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <div ref={yearDropdownRef} className="relative min-w-24">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setYearListOpen((prev) => !prev);
+                                                                setMonthListOpen(false);
+                                                            }}
+                                                            className="inline-flex h-9 w-full items-center justify-between rounded-[10px] border border-black/6 bg-white px-3 text-xs text-gray-500 outline-none transition-colors hover:bg-black/2 focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5"
+                                                        >
+                                                            <span>{calendarMonth.getFullYear()}</span>
+                                                            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                                                        </button>
+
+                                                        {yearListOpen && (
+                                                            <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-28 rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900">
+                                                                <ul className="max-h-56 space-y-0.5 overflow-auto">
+                                                                    {selectableYears.map((year) => (
+                                                                        <li key={year}>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setYearListOpen(false);
+
+                                                                                    const nextMonth = year === currentYear
+                                                                                        ? Math.min(calendarMonth.getMonth(), currentMonthIndex)
+                                                                                        : calendarMonth.getMonth();
+
+                                                                                    setCalendarMonth(new Date(year, nextMonth, 1));
+                                                                                }}
+                                                                                className="w-full rounded-md px-2 py-1.5 text-left text-[11px] text-gray-500 transition-colors hover:bg-black/3 dark:text-gray-300 dark:hover:bg-white/5"
+                                                                            >
+                                                                                {year}
+                                                                            </button>
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ),
+                                    }}
                                     onSelect={(range: DateRange | undefined) => {
                                         if (!range?.from) {
                                             setStartDate('');
@@ -404,6 +559,8 @@ const Index = ({ workspace }: Props) => {
                                     }}
                                     disabled={(date) => toInputDate(date) > maxSelectableDate}
                                     classNames={{
+                                        month_caption: 'flex h-(--cell-size) w-full items-center px-(--cell-size)',
+                                        caption_label: 'w-full',
                                         range_start: 'rounded-md bg-emerald-600 text-white dark:bg-emerald-500 dark:text-zinc-950',
                                         range_end: 'rounded-md bg-emerald-600 text-white dark:bg-emerald-500 dark:text-zinc-950',
                                         range_middle: 'bg-emerald-500/14 text-emerald-800 dark:bg-emerald-400/18 dark:text-emerald-200',

@@ -25,6 +25,16 @@ class InventoryPurchasedOrderController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
+        $availableYears = InventoryPurchasedOrder::query()
+            ->where('user_id', $request->user()->id)
+            ->whereNotNull('issue_date')
+            ->selectRaw('YEAR(issue_date) as year')
+            ->distinct()
+            ->orderBy('year')
+            ->pluck('year')
+            ->map(fn ($year) => (int) $year)
+            ->values();
+
         $validated = $request->validate([
             'status' => ['nullable', 'integer', 'in:1,2,3,4,5,6,7,8'],
             'q' => ['nullable', 'string', 'max:120'],
@@ -90,6 +100,7 @@ class InventoryPurchasedOrderController extends Controller
 
             return response()->json([
                 'data' => $allRows,
+                'available_years' => $availableYears,
                 'current_page' => 1,
                 'last_page' => 1,
                 'per_page' => $allRows->count(),
@@ -108,7 +119,10 @@ class InventoryPurchasedOrderController extends Controller
             $paginated->getCollection()->map(fn (InventoryPurchasedOrder $row) => $this->normalizeIssueDate($row))
         );
 
-        return response()->json($paginated);
+        $response = $paginated->toArray();
+        $response['available_years'] = $availableYears;
+
+        return response()->json($response);
     }
 
     public function updateStatus(Request $request, Workspace $workspace, int $order)
