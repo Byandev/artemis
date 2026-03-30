@@ -11,6 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class InventoryPurchasedOrderController extends Controller
 {
+    private const STATUS_VALUES = '1,2,3,4,5,6,7,8';
+
     private function normalizeIssueDate(InventoryPurchasedOrder $row): array
     {
         $data = $row->toArray();
@@ -19,13 +21,16 @@ class InventoryPurchasedOrderController extends Controller
         return $data;
     }
 
-    public function index(Request $request, Workspace $workspace)
+    private function assertWorkspaceMembership(Request $request, Workspace $workspace): void
     {
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
+    }
 
-        $availableYears = InventoryPurchasedOrder::query()
+    private function getAvailableYears(Request $request)
+    {
+        return InventoryPurchasedOrder::query()
             ->where('user_id', $request->user()->id)
             ->whereNotNull('issue_date')
             ->selectRaw('YEAR(issue_date) as year')
@@ -34,27 +39,11 @@ class InventoryPurchasedOrderController extends Controller
             ->pluck('year')
             ->map(fn ($year) => (int) $year)
             ->values();
+    }
 
-        $validated = $request->validate([
-            'status' => ['nullable', 'integer', 'in:1,2,3,4,5,6,7,8'],
-            'q' => ['nullable', 'string', 'max:120'],
-            'start_date' => ['nullable', 'date'],
-            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
-            'per_page' => ['nullable', 'integer', 'min:1'],
-            'show_all' => ['nullable', 'boolean'],
-        ]);
-
-        if (! empty($validated['start_date']) && ! empty($validated['end_date'])) {
-            $start = Carbon::parse($validated['start_date']);
-            $end = Carbon::parse($validated['end_date']);
-            if ($start->diffInDays($end) > 93) {
-                throw ValidationException::withMessages([
-                    'end_date' => ['Date range cannot exceed 93 days.'],
-                ]);
-            }
-        }
-
-        $query = InventoryPurchasedOrder::query()
+    private function baseQuery(Request $request)
+    {
+        return InventoryPurchasedOrder::query()
             ->select([
                 'id',
                 'issue_date',
@@ -68,7 +57,10 @@ class InventoryPurchasedOrderController extends Controller
                 'status',
             ])
             ->where('user_id', $request->user()->id);
+    }
 
+    private function applyFilters($query, array $validated): void
+    {
         if (isset($validated['status'])) {
             $query->where('status', $validated['status']);
         }
@@ -90,6 +82,35 @@ class InventoryPurchasedOrderController extends Controller
         if (! empty($validated['end_date'])) {
             $query->whereDate('issue_date', '<=', $validated['end_date']);
         }
+    }
+
+    public function index(Request $request, Workspace $workspace)
+    {
+        $this->assertWorkspaceMembership($request, $workspace);
+
+        $availableYears = $this->getAvailableYears($request);
+
+        $validated = $request->validate([
+            'status' => ['nullable', 'integer', 'in:'.self::STATUS_VALUES],
+            'q' => ['nullable', 'string', 'max:120'],
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'per_page' => ['nullable', 'integer', 'min:1'],
+            'show_all' => ['nullable', 'boolean'],
+        ]);
+
+        if (! empty($validated['start_date']) && ! empty($validated['end_date'])) {
+            $start = Carbon::parse($validated['start_date']);
+            $end = Carbon::parse($validated['end_date']);
+            if ($start->diffInDays($end) > 93) {
+                throw ValidationException::withMessages([
+                    'end_date' => ['Date range cannot exceed 93 days.'],
+                ]);
+            }
+        }
+
+        $query = $this->baseQuery($request);
+        $this->applyFilters($query, $validated);
 
         if (! empty($validated['show_all'])) {
             $allRows = $query
@@ -127,12 +148,10 @@ class InventoryPurchasedOrderController extends Controller
 
     public function updateStatus(Request $request, Workspace $workspace, int $order)
     {
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
+        $this->assertWorkspaceMembership($request, $workspace);
 
         $validated = $request->validate([
-            'status' => ['required', 'integer', 'in:1,2,3,4,5,6,7,8'],
+            'status' => ['required', 'integer', 'in:'.self::STATUS_VALUES],
         ]);
 
         $ownedOrder = InventoryPurchasedOrder::query()

@@ -61,6 +61,10 @@ const MONTH_OPTIONS = [
     'December',
 ];
 
+const DROPDOWN_PANEL_CLASS = 'absolute left-0 top-[calc(100%+6px)] z-50 rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900';
+const DROPDOWN_OPTION_BASE_CLASS = 'w-full rounded-md px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-black/3 dark:hover:bg-white/5';
+const DATE_DROPDOWN_TRIGGER_CLASS = 'inline-flex h-9 w-full items-center justify-between rounded-[10px] border border-black/6 bg-white px-3 text-xs text-gray-500 outline-none transition-colors hover:bg-black/2 focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5';
+
 const statusLabel = (value: number): string => {
     return STATUS_OPTIONS.find((s) => s.value === value)?.label ?? `Unknown (${value})`;
 };
@@ -128,9 +132,9 @@ const statusOptionTextClass = (status: StatusId): string => {
 };
 
 const toInputDate = (date: Date): string => {
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 };
 
@@ -138,7 +142,7 @@ const fromInputDate = (value: string): Date | undefined => {
     if (!value) return undefined;
     const [year, month, day] = value.split('-').map(Number);
     if (!year || !month || !day) return undefined;
-    return new Date(Date.UTC(year, month - 1, day));
+    return new Date(year, month - 1, day);
 };
 
 const normalizeDateRange = (first: string, second: string): { start: string; end: string } => {
@@ -148,11 +152,6 @@ const normalizeDateRange = (first: string, second: string): { start: string; end
 
     return { start: second, end: first };
 };
-
-const getDefaultDateRange = (): { startDate: string; endDate: string } => ({
-    startDate: '',
-    endDate: '',
-});
 
 const formatDisplayDate = (start: string, end?: string): string => {
     if (!start) return '';
@@ -179,14 +178,14 @@ const Index = ({ workspace }: Props) => {
     const [totalRows, setTotalRows] = useState(0);
     const [availableYears, setAvailableYears] = useState<number[]>([]);
 
-    const defaultDateRangeRef = useRef(getDefaultDateRange());
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [query, setQuery] = useState('');
-    const [startDate, setStartDate] = useState(defaultDateRangeRef.current.startDate);
-    const [endDate, setEndDate] = useState(defaultDateRangeRef.current.endDate);
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
     const requestSerialRef = useRef(0);
     const [datePickerOpen, setDatePickerOpen] = useState(false);
     const [statusMenuRowId, setStatusMenuRowId] = useState<number | null>(null);
+    const [statusFilterMenuOpen, setStatusFilterMenuOpen] = useState(false);
     const [monthListOpen, setMonthListOpen] = useState(false);
     const [yearListOpen, setYearListOpen] = useState(false);
     const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
@@ -292,7 +291,7 @@ const Index = ({ workspace }: Props) => {
         const selected = fromInputDate(endDate) || fromInputDate(startDate);
         if (!selected) return;
 
-        setCalendarMonth(new Date(selected.getUTCFullYear(), selected.getUTCMonth(), 1));
+        setCalendarMonth(new Date(selected.getFullYear(), selected.getMonth(), 1));
     }, [datePickerOpen, startDate, endDate]);
 
     useEffect(() => {
@@ -321,11 +320,11 @@ const Index = ({ workspace }: Props) => {
         };
     }, [datePickerOpen]);
 
-    const visibleRows = rows;
     const calendarFromYear = availableYears.length > 0 ? Math.min(...availableYears) : 2000;
     const calendarToYear = Math.min(availableYears.length > 0 ? Math.max(...availableYears) : new Date().getFullYear(), new Date().getFullYear());
     const currentYear = new Date().getFullYear();
     const currentMonthIndex = new Date().getMonth();
+    const maxCalendarMonth = new Date(currentYear, currentMonthIndex, 1);
     const selectableYears = (availableYears.length > 0
         ? availableYears.filter((year) => year <= currentYear)
         : Array.from({ length: currentYear - 1999 }, (_, i) => 2000 + i)
@@ -347,12 +346,67 @@ const Index = ({ workspace }: Props) => {
         return Array.from({ length: end - adjustedStart + 1 }, (_, i) => adjustedStart + i);
     }, [currentPage, lastPage]);
 
+    const setCalendarMonthByYear = (year: number) => {
+        const nextMonth = year === currentYear
+            ? Math.min(calendarMonth.getMonth(), currentMonthIndex)
+            : calendarMonth.getMonth();
+
+        setCalendarMonth(new Date(year, nextMonth, 1));
+    };
+
+    const statusFilterLabel = statusFilter === 'all'
+        ? 'Status'
+        : statusLabel(Number(statusFilter));
+
+    const handleCalendarMonthChange = (next: Date) => {
+        const normalized = new Date(next.getFullYear(), next.getMonth(), 1);
+
+        if (normalized > maxCalendarMonth) {
+            return;
+        }
+
+        setCalendarMonth(normalized);
+    };
+
+    const applyPickedDate = (picked: string) => {
+        if (picked > maxSelectableDate) return;
+
+        if (!startDate && !endDate) {
+            setStartDate(picked);
+            setEndDate(picked);
+            return;
+        }
+
+        if (startDate && endDate) {
+            if (picked > endDate) {
+                setStartDate(endDate);
+                setEndDate(picked);
+                return;
+            }
+
+            if (picked < startDate) {
+                setStartDate(picked);
+                setEndDate(startDate);
+                return;
+            }
+
+            const normalized = normalizeDateRange(startDate, picked);
+            setStartDate(normalized.start);
+            setEndDate(normalized.end);
+            return;
+        }
+
+        const existing = startDate || endDate;
+        const normalized = normalizeDateRange(existing, picked);
+        setStartDate(normalized.start);
+        setEndDate(normalized.end);
+    };
+
     const resetFilters = () => {
-        const defaults = getDefaultDateRange();
         setQuery('');
         setStatusFilter('all');
-        setStartDate(defaults.startDate);
-        setEndDate(defaults.endDate);
+        setStartDate('');
+        setEndDate('');
     };
 
     const updateStatus = async (id: number, status: StatusId) => {
@@ -417,9 +471,8 @@ const Index = ({ workspace }: Props) => {
                             >
                                 <Calendar
                                     mode="range"
-                                    timeZone="UTC"
                                     month={calendarMonth}
-                                    onMonthChange={setCalendarMonth}
+                                    onMonthChange={handleCalendarMonthChange}
                                     selected={{
                                         from: fromInputDate(startDate),
                                         to: fromInputDate(endDate),
@@ -427,6 +480,7 @@ const Index = ({ workspace }: Props) => {
                                     captionLayout="label"
                                     fromYear={calendarFromYear}
                                     toYear={calendarToYear}
+                                    toMonth={maxCalendarMonth}
                                     components={{
                                         CaptionLabel: (props) => (
                                             <div className={props.className}>
@@ -438,14 +492,14 @@ const Index = ({ workspace }: Props) => {
                                                                 setMonthListOpen((prev) => !prev);
                                                                 setYearListOpen(false);
                                                             }}
-                                                            className="inline-flex h-9 w-full items-center justify-between rounded-[10px] border border-black/6 bg-white px-3 text-xs text-gray-500 outline-none transition-colors hover:bg-black/2 focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5"
+                                                            className={DATE_DROPDOWN_TRIGGER_CLASS}
                                                         >
                                                             <span>{MONTH_OPTIONS[calendarMonth.getMonth()]}</span>
                                                             <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
                                                         </button>
 
                                                         {monthListOpen && (
-                                                            <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-40 rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900">
+                                                            <div className={`${DROPDOWN_PANEL_CLASS} w-40`}>
                                                                 <ul className="space-y-0.5">
                                                                     {MONTH_OPTIONS.map((monthLabel, monthIndex) => {
                                                                         const isDisabled = calendarMonth.getFullYear() === currentYear && monthIndex > currentMonthIndex;
@@ -459,7 +513,7 @@ const Index = ({ workspace }: Props) => {
                                                                                         setMonthListOpen(false);
                                                                                         setCalendarMonth(new Date(calendarMonth.getFullYear(), monthIndex, 1));
                                                                                     }}
-                                                                                    className="w-full rounded-md px-2 py-1.5 text-left text-[11px] text-gray-500 transition-colors hover:bg-black/3 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300 dark:hover:bg-white/5"
+                                                                                    className={`${DROPDOWN_OPTION_BASE_CLASS} text-gray-500 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300`}
                                                                                 >
                                                                                     {monthLabel}
                                                                                 </button>
@@ -478,14 +532,14 @@ const Index = ({ workspace }: Props) => {
                                                                 setYearListOpen((prev) => !prev);
                                                                 setMonthListOpen(false);
                                                             }}
-                                                            className="inline-flex h-9 w-full items-center justify-between rounded-[10px] border border-black/6 bg-white px-3 text-xs text-gray-500 outline-none transition-colors hover:bg-black/2 focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5"
+                                                            className={DATE_DROPDOWN_TRIGGER_CLASS}
                                                         >
                                                             <span>{calendarMonth.getFullYear()}</span>
                                                             <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
                                                         </button>
 
                                                         {yearListOpen && (
-                                                            <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-28 rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900">
+                                                            <div className={`${DROPDOWN_PANEL_CLASS} w-28`}>
                                                                 <ul className="max-h-56 space-y-0.5 overflow-auto">
                                                                     {selectableYears.map((year) => (
                                                                         <li key={year}>
@@ -493,14 +547,9 @@ const Index = ({ workspace }: Props) => {
                                                                                 type="button"
                                                                                 onClick={() => {
                                                                                     setYearListOpen(false);
-
-                                                                                    const nextMonth = year === currentYear
-                                                                                        ? Math.min(calendarMonth.getMonth(), currentMonthIndex)
-                                                                                        : calendarMonth.getMonth();
-
-                                                                                    setCalendarMonth(new Date(year, nextMonth, 1));
+                                                                                    setCalendarMonthByYear(year);
                                                                                 }}
-                                                                                className="w-full rounded-md px-2 py-1.5 text-left text-[11px] text-gray-500 transition-colors hover:bg-black/3 dark:text-gray-300 dark:hover:bg-white/5"
+                                                                                className={`${DROPDOWN_OPTION_BASE_CLASS} text-gray-500 dark:text-gray-300`}
                                                                             >
                                                                                 {year}
                                                                             </button>
@@ -521,41 +570,7 @@ const Index = ({ workspace }: Props) => {
                                         }
                                     }}
                                     onDayClick={(day) => {
-                                        const picked = toInputDate(day);
-
-                                        if (picked > maxSelectableDate) {
-                                            return;
-                                        }
-
-                                        if (!startDate && !endDate) {
-                                            setStartDate(picked);
-                                            setEndDate(picked);
-                                            return;
-                                        }
-
-                                        if (startDate && endDate) {
-                                            if (picked > endDate) {
-                                                setStartDate(endDate);
-                                                setEndDate(picked);
-                                                return;
-                                            }
-
-                                            if (picked < startDate) {
-                                                setStartDate(picked);
-                                                setEndDate(startDate);
-                                                return;
-                                            }
-
-                                            const normalized = normalizeDateRange(startDate, picked);
-                                            setStartDate(normalized.start);
-                                            setEndDate(normalized.end);
-                                            return;
-                                        }
-
-                                        const existing = startDate || endDate;
-                                        const normalized = normalizeDateRange(existing, picked);
-                                        setStartDate(normalized.start);
-                                        setEndDate(normalized.end);
+                                        applyPickedDate(toInputDate(day));
                                     }}
                                     disabled={(date) => toInputDate(date) > maxSelectableDate}
                                     classNames={{
@@ -581,22 +596,54 @@ const Index = ({ workspace }: Props) => {
                             />
                         </div>
 
-                        <div className="relative min-w-[120px]">
-                            <Filter className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="h-9 w-full appearance-none rounded-[10px] border border-black/6 bg-white pl-8 pr-7 text-xs text-gray-500 outline-none transition-colors focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
+                        <Popover open={statusFilterMenuOpen} onOpenChange={setStatusFilterMenuOpen}>
+                            <PopoverTrigger asChild>
+                                <button
+                                    type="button"
+                                    className="inline-flex h-9 min-w-[120px] items-center justify-between gap-2 rounded-[10px] border border-black/6 bg-white px-2.5 text-xs text-gray-500 outline-none transition-colors hover:bg-black/2 focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5"
+                                >
+                                    <span className="inline-flex items-center gap-1.5">
+                                        <Filter className="h-3.5 w-3.5 text-gray-400" />
+                                        <span>{statusFilterLabel}</span>
+                                    </span>
+                                    <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                                align="start"
+                                sideOffset={6}
+                                className="w-[170px] rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900"
                             >
-                                <option value="all">Status</option>
-                                {STATUS_OPTIONS.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                    </option>
-                                ))}
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-                        </div>
+                                <ul className="space-y-0.5">
+                                    <li>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setStatusFilterMenuOpen(false);
+                                                setStatusFilter('all');
+                                            }}
+                                            className={[DROPDOWN_OPTION_BASE_CLASS, 'text-gray-500 dark:text-gray-300'].join(' ')}
+                                        >
+                                            Status
+                                        </button>
+                                    </li>
+                                    {STATUS_OPTIONS.map((opt) => (
+                                        <li key={opt.value}>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setStatusFilterMenuOpen(false);
+                                                    setStatusFilter(String(opt.value));
+                                                }}
+                                                className={[DROPDOWN_OPTION_BASE_CLASS, statusOptionTextClass(opt.value)].join(' ')}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </PopoverContent>
+                        </Popover>
 
                         <button
                             type="button"
@@ -640,7 +687,7 @@ const Index = ({ workspace }: Props) => {
                                     </td>
                                 </tr>
                             ) : (
-                                visibleRows.map((row) => (
+                                rows.map((row) => (
                                     <tr key={row.id} className="hover:bg-emerald-500/4 dark:hover:bg-emerald-500/8">
                                         <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{formatIssueDate(row.issue_date)}</td>
                                         <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-700 dark:text-gray-200">{row.delivery_no || '-'}</td>
@@ -685,7 +732,7 @@ const Index = ({ workspace }: Props) => {
                                                                             void updateStatus(row.id, opt.value);
                                                                         }}
                                                                         className={[
-                                                                            'w-full rounded-md px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-black/3 dark:hover:bg-white/5',
+                                                                            DROPDOWN_OPTION_BASE_CLASS,
                                                                             statusOptionTextClass(opt.value),
                                                                         ].join(' ')}
                                                                     >
