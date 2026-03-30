@@ -3,7 +3,6 @@
 namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,19 +16,6 @@ class PurchaseOrderController extends Controller
     {
         return Inertia::render('workspaces/inventory/purchased-orders/index', [
             'workspace' => $workspace,
-        ]);
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create(Workspace $workspace)
-    {
-        $products = Product::all();
-
-        return Inertia::render('workspaces/inventory/purchased-orders/create', [
-            'workspace' => $workspace,
-            'products' => $products,
         ]);
     }
 
