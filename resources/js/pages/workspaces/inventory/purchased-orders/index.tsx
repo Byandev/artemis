@@ -211,6 +211,7 @@ const Index = ({ workspace }: Props) => {
     const requestSerialRef = useRef(0);
     const [datePickerOpen, setDatePickerOpen] = useState(false);
     const [statusMenuRowId, setStatusMenuRowId] = useState<number | null>(null);
+    const [addItemStatusMenuOpen, setAddItemStatusMenuOpen] = useState(false);
     const [addItemOpen, setAddItemOpen] = useState(false);
     const [addItemSubmitting, setAddItemSubmitting] = useState(false);
     const [addItemForm, setAddItemForm] = useState<AddItemForm>(ADD_ITEM_FORM_INITIAL);
@@ -789,8 +790,11 @@ const Index = ({ workspace }: Props) => {
                                     </div>
                                 </div>
 
-                                <div className="mt-4 border-t border-black/6 pt-4 dark:border-white/6">
-                                    <p className="mb-2 text-sm font-medium text-gray-600 dark:text-gray-300">Purchase Order</p>
+                                <div className="mt-4 pt-4">
+                                    <div className="mb-2 flex items-center gap-2">
+                                        <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Purchase Order</p>
+                                        <span className="h-px flex-1 bg-black/8 dark:bg-white/8" />
+                                    </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="mb-1.5 block text-xs font-medium text-gray-500">Custom Po No.</label>
@@ -813,8 +817,11 @@ const Index = ({ workspace }: Props) => {
                                     </div>
                                 </div>
 
-                                <div className="mt-4 border-t border-black/6 pt-4 dark:border-white/6">
-                                    <p className="mb-2 text-sm font-medium text-gray-600 dark:text-gray-300">Item</p>
+                                <div className="mt-4 pt-4">
+                                    <div className="mb-2 flex items-center gap-2">
+                                        <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Item</p>
+                                        <span className="h-px flex-1 bg-black/8 dark:bg-white/8" />
+                                    </div>
                                     <div>
                                         <label className="mb-1.5 block text-xs font-medium text-gray-500">Item Name</label>
                                         <input
@@ -865,19 +872,50 @@ const Index = ({ workspace }: Props) => {
                                     </div>
                                 </div>
 
-                                <div className="mt-4 border-t border-black/6 pt-4 dark:border-white/6">
-                                    <label className="mb-1.5 block text-xs font-medium text-gray-500">Status</label>
-                                    <select
-                                        value={addItemForm.status}
-                                        onChange={(e) => setAddItemForm((prev) => ({ ...prev, status: e.target.value }))}
-                                        className="h-9 w-[180px] appearance-none rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
-                                    >
-                                        {STATUS_OPTIONS.map((opt) => (
-                                            <option key={opt.value} value={String(opt.value)}>
-                                                {opt.label}
-                                            </option>
-                                        ))}
-                                    </select>
+                                <div className="mt-4 pt-4">
+                                    <label className="mb-2 block text-center text-xs font-medium text-gray-500">Status</label>
+                                    <div className="flex justify-center">
+                                        <div className="inline-flex h-6 w-[172px] items-center rounded-2xl pl-1.5">
+                                            <span className={`inline-flex w-full items-center gap-1 rounded-2xl px-2 py-1 text-[11px] font-medium ${statusBadgeClass(Number(addItemForm.status) as StatusId)}`}>
+                                                <span className="h-1.5 w-1.5 rounded-full bg-current/60" />
+                                                <span>{statusLabel(Number(addItemForm.status))}</span>
+                                            </span>
+
+                                            <Popover open={addItemStatusMenuOpen} onOpenChange={setAddItemStatusMenuOpen}>
+                                                <PopoverTrigger asChild>
+                                                    <button
+                                                        type="button"
+                                                        className="ml-0.5 inline-flex h-6 w-5 items-center justify-center rounded-md text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-300"
+                                                        aria-label="Open add-item status dropdown"
+                                                    >
+                                                        <ChevronDown className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </PopoverTrigger>
+                                                <PopoverContent
+                                                    align="end"
+                                                    sideOffset={6}
+                                                    className="w-[170px] rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900"
+                                                >
+                                                    <ul className="space-y-0.5">
+                                                        {STATUS_OPTIONS.map((opt) => (
+                                                            <li key={opt.value}>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setAddItemStatusMenuOpen(false);
+                                                                        setAddItemForm((prev) => ({ ...prev, status: String(opt.value) }));
+                                                                    }}
+                                                                    className={[DROPDOWN_OPTION_BASE_CLASS, statusOptionTextClass(opt.value)].join(' ')}
+                                                                >
+                                                                    {opt.label}
+                                                                </button>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </PopoverContent>
+                                            </Popover>
+                                        </div>
+                                    </div>
                                     {addItemFieldErrors.status && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.status}</p>}
                                 </div>
 
