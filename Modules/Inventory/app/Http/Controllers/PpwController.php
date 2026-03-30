@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Http\Controllers\Workspaces;
+namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\Ppw;
 use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Modules\Inventory\Models\Ppw;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 

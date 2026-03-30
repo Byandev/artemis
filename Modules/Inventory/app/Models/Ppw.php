@@ -1,16 +1,15 @@
 <?php
 
-namespace App\Models;
+namespace Modules\Inventory\Models;
 
+use App\Models\Product;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Ppw extends Model
 {
-    use HasFactory;
-
     protected $table = 'inventory_ppws';
 
     protected $fillable = [
