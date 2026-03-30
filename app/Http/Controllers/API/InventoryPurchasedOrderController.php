@@ -11,6 +11,14 @@ use Illuminate\Validation\ValidationException;
 
 class InventoryPurchasedOrderController extends Controller
 {
+    private function normalizeIssueDate(InventoryPurchasedOrder $row): array
+    {
+        $data = $row->toArray();
+        $data['issue_date'] = $row->getRawOriginal('issue_date');
+
+        return $data;
+    }
+
     public function index(Request $request, Workspace $workspace)
     {
         if (! $request->user()->isMemberOf($workspace)) {
@@ -74,7 +82,11 @@ class InventoryPurchasedOrderController extends Controller
         }
 
         if (! empty($validated['show_all'])) {
-            $allRows = $query->orderByDesc('issue_date')->orderByDesc('id')->get();
+            $allRows = $query
+                ->orderByDesc('issue_date')
+                ->orderByDesc('id')
+                ->get()
+                ->map(fn (InventoryPurchasedOrder $row) => $this->normalizeIssueDate($row));
 
             return response()->json([
                 'data' => $allRows,
@@ -87,9 +99,16 @@ class InventoryPurchasedOrderController extends Controller
 
         $perPage = (int) ($validated['per_page'] ?? 50);
 
-        return response()->json(
-            $query->orderByDesc('issue_date')->orderByDesc('id')->paginate($perPage)
+        $paginated = $query
+            ->orderByDesc('issue_date')
+            ->orderByDesc('id')
+            ->paginate($perPage);
+
+        $paginated->setCollection(
+            $paginated->getCollection()->map(fn (InventoryPurchasedOrder $row) => $this->normalizeIssueDate($row))
         );
+
+        return response()->json($paginated);
     }
 
     public function updateStatus(Request $request, Workspace $workspace, int $order)

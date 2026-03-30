@@ -5,6 +5,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DateRange } from 'react-day-picker';
 
 type StatusId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
@@ -111,8 +112,25 @@ const statusOptionTextClass = (status: StatusId): string => {
 };
 
 const toInputDate = (date: Date): string => {
-    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-    return local.toISOString().slice(0, 10);
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const fromInputDate = (value: string): Date | undefined => {
+    if (!value) return undefined;
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return undefined;
+    return new Date(Date.UTC(year, month - 1, day));
+};
+
+const normalizeDateRange = (first: string, second: string): { start: string; end: string } => {
+    if (first <= second) {
+        return { start: first, end: second };
+    }
+
+    return { start: second, end: first };
 };
 
 const getDefaultDateRange = (): { startDate: string; endDate: string } => ({
@@ -120,11 +138,20 @@ const getDefaultDateRange = (): { startDate: string; endDate: string } => ({
     endDate: '',
 });
 
-const formatDisplayDate = (value: string): string => {
-    if (!value) return '';
-    const [year, month, day] = value.split('-');
-    if (!year || !month || !day) return value;
-    return `${month} - ${day} - ${year}`;
+const formatDisplayDate = (start: string, end?: string): string => {
+    if (!start) return '';
+
+    const formatOne = (value: string): string => {
+        const [year, month, day] = value.split('-');
+        if (!year || !month || !day) return value;
+        return `${month}/${day}/${year}`;
+    };
+
+    if (!end || start === end) {
+        return formatOne(start);
+    }
+
+    return `${formatOne(start)} - ${formatOne(end)}`;
 };
 
 const Index = ({ workspace }: Props) => {
@@ -180,9 +207,10 @@ const Index = ({ workspace }: Props) => {
             const params = new URLSearchParams();
             if (statusFilter !== 'all') params.set('status', statusFilter);
             if (query.trim()) params.set('q', query.trim());
-            const hasDateFilter = Boolean(startDate && endDate);
-            if (hasDateFilter) {
+            if (startDate) {
                 params.set('start_date', startDate);
+            }
+            if (endDate) {
                 params.set('end_date', endDate);
             }
             params.set('page', String(page));
@@ -235,7 +263,6 @@ const Index = ({ workspace }: Props) => {
     }, [statusFilter, query, startDate, endDate]);
 
     const visibleRows = rows;
-    const emptyRows = Math.max(0, 15 - visibleRows.length);
     const hasPrevious = currentPage > 1;
     const hasNext = currentPage < lastPage;
     const fromRow = totalRows === 0 ? 0 : (currentPage - 1) * 15 + 1;
@@ -314,7 +341,7 @@ const Index = ({ workspace }: Props) => {
                                     className="inline-flex h-9 min-w-[150px] items-center justify-center gap-1.5 rounded-[10px] border border-black/6 bg-white px-3 text-xs text-gray-400 outline-none transition-colors hover:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
                                 >
                                     <CalendarIcon className="h-3.5 w-3.5" />
-                                    <span className="font-mono">{endDate ? formatDisplayDate(endDate) : 'Select Date'}</span>
+                                    <span className="font-mono">{startDate ? formatDisplayDate(startDate, endDate) : 'Select Date'}</span>
                                 </button>
                             </PopoverTrigger>
                             <PopoverContent
@@ -322,16 +349,34 @@ const Index = ({ workspace }: Props) => {
                                 className="w-auto rounded-xl border border-black/6 bg-white p-2 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900"
                             >
                                 <Calendar
-                                    mode="single"
-                                    selected={endDate ? new Date(endDate) : undefined}
+                                    mode="range"
+                                    timeZone="UTC"
+                                    selected={{
+                                        from: fromInputDate(startDate),
+                                        to: fromInputDate(endDate),
+                                    }}
+                                    captionLayout="dropdown"
+                                    fromYear={2000}
+                                    toYear={new Date().getFullYear()}
                                     toMonth={new Date()}
-                                    onSelect={(date) => {
-                                        if (!date) return;
+                                    onSelect={(range: DateRange | undefined) => {
+                                        if (!range?.from) {
+                                            setStartDate('');
+                                            setEndDate('');
+                                            return;
+                                        }
 
-                                        const nextValue = toInputDate(date) > maxSelectableDate ? maxSelectableDate : toInputDate(date);
-                                        setEndDate(nextValue);
-                                        setStartDate(nextValue);
-                                        setDatePickerOpen(false);
+                                        const nextStart = toInputDate(range.from);
+                                        const nextEnd = toInputDate(range.to ?? range.from);
+
+                                        const normalized = normalizeDateRange(nextStart, nextEnd);
+
+                                        setStartDate(normalized.start);
+                                        setEndDate(normalized.end);
+
+                                        if (range.to) {
+                                            setDatePickerOpen(false);
+                                        }
                                     }}
                                     disabled={(date) => toInputDate(date) > maxSelectableDate}
                                     className="rounded-[10px] bg-white p-0 text-xs dark:bg-zinc-900"
@@ -408,91 +453,83 @@ const Index = ({ workspace }: Props) => {
                                     </td>
                                 </tr>
                             ) : (
-                                <>
-                                    {visibleRows.map((row) => (
-                                        <tr key={row.id} className="hover:bg-emerald-500/4 dark:hover:bg-emerald-500/8">
-                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{formatIssueDate(row.issue_date)}</td>
-                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-700 dark:text-gray-200">{row.delivery_no || '-'}</td>
-                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-400">{row.cust_po_no || '-'}</td>
-                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-400">{row.control_no || '-'}</td>
-                                            <td className="whitespace-nowrap px-4 py-2.5 font-medium uppercase text-gray-700 dark:text-gray-200">{row.item}</td>
-                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{formatMoney(row.cog_amount)}</td>
-                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{formatMoney(row.delivery_fee)}</td>
-                                            <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-700 dark:text-gray-200">{formatMoney(row.total_amount)}</td>
-                                            <td className="whitespace-nowrap px-4 py-2.5">
-                                                <div className="inline-flex h-6 w-[172px] items-center rounded-2xl pl-1.5">
-                                                    <span className={`inline-flex w-full items-center gap-1 rounded-2xl px-2 py-1 text-[11px] font-medium ${statusBadgeClass(row.status)}`}>
-                                                        <span className="h-1.5 w-1.5 rounded-full bg-current/60" />
-                                                        <span>{statusLabel(row.status)}</span>
-                                                    </span>
+                                visibleRows.map((row) => (
+                                    <tr key={row.id} className="hover:bg-emerald-500/4 dark:hover:bg-emerald-500/8">
+                                        <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{formatIssueDate(row.issue_date)}</td>
+                                        <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-700 dark:text-gray-200">{row.delivery_no || '-'}</td>
+                                        <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-400">{row.cust_po_no || '-'}</td>
+                                        <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-400">{row.control_no || '-'}</td>
+                                        <td className="whitespace-nowrap px-4 py-2.5 font-medium uppercase text-gray-700 dark:text-gray-200">{row.item}</td>
+                                        <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{formatMoney(row.cog_amount)}</td>
+                                        <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{formatMoney(row.delivery_fee)}</td>
+                                        <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-700 dark:text-gray-200">{formatMoney(row.total_amount)}</td>
+                                        <td className="whitespace-nowrap px-4 py-2.5">
+                                            <div className="inline-flex h-6 w-[172px] items-center rounded-2xl pl-1.5">
+                                                <span className={`inline-flex w-full items-center gap-1 rounded-2xl px-2 py-1 text-[11px] font-medium ${statusBadgeClass(row.status)}`}>
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-current/60" />
+                                                    <span>{statusLabel(row.status)}</span>
+                                                </span>
 
-                                                    <Popover
-                                                        open={statusMenuRowId === row.id}
-                                                        onOpenChange={(open) => setStatusMenuRowId(open ? row.id : null)}
-                                                    >
-                                                        <PopoverTrigger asChild>
-                                                            <button
-                                                                type="button"
-                                                                className="ml-0.5 inline-flex h-6 w-5 items-center justify-center rounded-md text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-300"
-                                                                aria-label={`Open status dropdown for ${row.delivery_no || row.item}`}
-                                                            >
-                                                                <ChevronDown className="h-3.5 w-3.5" />
-                                                            </button>
-                                                        </PopoverTrigger>
-                                                        <PopoverContent
-                                                            align="end"
-                                                            sideOffset={6}
-                                                            className="w-[140px] rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900"
+                                                <Popover
+                                                    open={statusMenuRowId === row.id}
+                                                    onOpenChange={(open) => setStatusMenuRowId(open ? row.id : null)}
+                                                >
+                                                    <PopoverTrigger asChild>
+                                                        <button
+                                                            type="button"
+                                                            className="ml-0.5 inline-flex h-6 w-5 items-center justify-center rounded-md text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-300"
+                                                            aria-label={`Open status dropdown for ${row.delivery_no || row.item}`}
                                                         >
-                                                            <ul className="space-y-0.5">
-                                                                {STATUS_OPTIONS.map((opt) => (
-                                                                    <li key={opt.value}>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                setStatusMenuRowId(null);
-                                                                                void updateStatus(row.id, opt.value);
-                                                                            }}
-                                                                            className={[
-                                                                                'w-full rounded-md px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-black/3 dark:hover:bg-white/5',
-                                                                                statusOptionTextClass(opt.value),
-                                                                            ].join(' ')}
-                                                                        >
-                                                                            {opt.label}
-                                                                        </button>
-                                                                    </li>
-                                                                ))}
-                                                            </ul>
-                                                        </PopoverContent>
-                                                    </Popover>
-                                                </div>
-                                            </td>
-                                            <td className="whitespace-nowrap px-4 py-2.5">
-                                                <div className="inline-flex items-center text-[11px]">
-                                                    <button
-                                                        type="button"
-                                                        className="inline-flex items-center px-1 text-sky-600 transition-colors hover:text-sky-700 dark:text-sky-400"
+                                                            <ChevronDown className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent
+                                                        align="end"
+                                                        sideOffset={6}
+                                                        className="w-[140px] rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900"
                                                     >
-                                                        <Pencil className="h-3.5 w-3.5" />
-                                                    </button>
-                                                    <span className="mx-1 h-3.5 w-px bg-black/10 dark:bg-white/10" />
-                                                    <button
-                                                        type="button"
-                                                        className="inline-flex items-center px-1 text-red-500 transition-colors hover:text-red-600 dark:text-red-400"
-                                                    >
-                                                        <SquareX className="h-3.5 w-3.5" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-
-                                    {Array.from({ length: emptyRows }).map((_, index) => (
-                                        <tr key={`empty-row-${index}`}>
-                                            <td colSpan={10} className="h-[29px] px-4" />
-                                        </tr>
-                                    ))}
-                                </>
+                                                        <ul className="space-y-0.5">
+                                                            {STATUS_OPTIONS.map((opt) => (
+                                                                <li key={opt.value}>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setStatusMenuRowId(null);
+                                                                            void updateStatus(row.id, opt.value);
+                                                                        }}
+                                                                        className={[
+                                                                            'w-full rounded-md px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-black/3 dark:hover:bg-white/5',
+                                                                            statusOptionTextClass(opt.value),
+                                                                        ].join(' ')}
+                                                                    >
+                                                                        {opt.label}
+                                                                    </button>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </PopoverContent>
+                                                </Popover>
+                                            </div>
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-2.5">
+                                            <div className="inline-flex items-center text-[11px]">
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex items-center px-1 text-sky-600 transition-colors hover:text-sky-700 dark:text-sky-400"
+                                                >
+                                                    <Pencil className="h-3.5 w-3.5" />
+                                                </button>
+                                                <span className="mx-1 h-3.5 w-px bg-black/10 dark:bg-white/10" />
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex items-center px-1 text-red-500 transition-colors hover:text-red-600 dark:text-red-400"
+                                                >
+                                                    <SquareX className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
                             )}
                         </tbody>
                     </table>
