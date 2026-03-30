@@ -160,7 +160,20 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             ),
             cell: ({ row }) => {
                 const date = row.original.orders_last_synced_at;
-                return date ? new Date(date).toLocaleString() : 'Never';
+                const isUpdated = Boolean(row.original.is_sync_logic_updated);
+                return (
+                    <div className="flex items-center gap-2">
+                        <span>{date ? new Date(date).toLocaleString() : 'Never'}</span>
+                        <span className={clsx(
+                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
+                            isUpdated
+                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
+                                : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400',
+                        )}>
+                            {isUpdated ? 'Updated' : 'Legacy'}
+                        </span>
+                    </div>
+                );
             },
         },
         {
@@ -258,6 +271,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                         initialSorting={initialSorting}
                         meta={{ ...omit(pages, ['data']) }}
                         onFetch={(params) => {
+                            console.log(params)
                             router.get(
                                 workspaces.pages.index({ workspace }),
                                 {

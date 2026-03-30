@@ -12,7 +12,6 @@ import { RmoStatusPicker } from './RmoStatusPicker';
 import { ParcelStatusEntry } from './rmo-config';
 
 interface CreateRmoColumnsOptions {
-    isLoadingID: number | null;
     onChangeStatus: (status: string, orderId: number) => void;
     /** Parcel status config — authenticated uses snake_case keys, public uses UPPERCASE. */
     parcelStatusConfig: Record<string, ParcelStatusEntry>;
@@ -22,21 +21,21 @@ interface CreateRmoColumnsOptions {
     onAssignToMe?: (orderId: number, currentStatus: string) => void;
     /** Public view only — called when the × is clicked to clear an assignee. */
     onRemoveAssignee?: (orderId: number, currentStatus: string) => void;
-    /** Order ID currently being assigned (shows spinner). */
-    assigningOrderId?: number | null;
+    /** Disable the status picker (e.g. public view with no identity set). */
+    disableStatusChange?: boolean;
 }
 
 export function createRmoColumns({
-    isLoadingID,
     onChangeStatus,
     parcelStatusConfig,
     normalizeParcelStatus = (s) => s?.toLowerCase(),
     onAssignToMe,
     onRemoveAssignee,
-    assigningOrderId = null,
+    disableStatusChange = false,
 }: CreateRmoColumnsOptions): ColumnDef<OrderForDelivery>[] {
     return [
         {
+            id: 'order_number',
             accessorKey: 'order_number',
             header: ({ column }) => <SortableHeader column={column} title="Order #" />,
             cell: ({ row }) => (
@@ -68,6 +67,7 @@ export function createRmoColumns({
             },
         },
         {
+            id: 'order_tracking_code',
             accessorKey: 'order.tracking_code',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Tracking #" />,
@@ -78,6 +78,7 @@ export function createRmoColumns({
             ),
         },
         {
+            id: 'order_parcel_status',
             accessorKey: 'order.parcel_status',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="J&T Status" />,
@@ -110,6 +111,7 @@ export function createRmoColumns({
             ),
         },
         {
+            id: 'order_shipping_address_full_name',
             accessorKey: 'order.shipping_address.full_name',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Customer" />,
@@ -129,7 +131,7 @@ export function createRmoColumns({
                         {addr?.full_address && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <p className="flex max-w-[160px] cursor-default items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
+                                    <p className="flex max-w-40 cursor-default items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
                                         <MapPin className="h-3 w-3 shrink-0" />
                                         <span className="truncate">{addr.full_address}</span>
                                     </p>
@@ -144,6 +146,18 @@ export function createRmoColumns({
             },
         },
         {
+            id: 'order_final_amount',
+            accessorKey: 'order.final_amount',
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="SRP" />,
+            cell: ({ row }) => (
+                <span className="font-mono text-[12px] tabular-nums text-gray-700 dark:text-gray-300">
+                    {currencyFormatter(row.original.order.final_amount)}
+                </span>
+            ),
+        },
+        {
+            id: 'order_shipping_address_city_order_summary_rts_rate',
             accessorKey: 'order.shipping_address.city_order_summary.rts_rate',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Loc. RTS" />,
@@ -158,16 +172,24 @@ export function createRmoColumns({
             },
         },
         {
-            accessorKey: 'order.final_amount',
+            id: 'cx_rts_rate',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="SRP" />,
-            cell: ({ row }) => (
-                <span className="font-mono text-[12px] tabular-nums text-gray-700 dark:text-gray-300">
-                    {currencyFormatter(row.original.order.final_amount)}
-                </span>
-            ),
+            header: ({ column }) => <SortableHeader column={column} title="Cx. RTS" />,
+            cell: ({ row }) => {
+                const rate = row.original.order?.cx_rts_rate ?? null;
+                if (rate === null) {
+                    return <span className="text-[12px] text-gray-300 dark:text-gray-600">—</span>;
+                }
+                const isHigh = rate >= 0.4;
+                return (
+                    <span className={`text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                        {percentageFormatter(rate)}
+                    </span>
+                );
+            },
         },
         {
+            id: 'order_delivery_attempts',
             accessorKey: 'order.delivery_attempts',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Attempts" />,
@@ -186,6 +208,7 @@ export function createRmoColumns({
             },
         },
         {
+            id: 'conferrer_name',
             accessorKey: 'conferrer.name',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Confirmed By" />,
@@ -203,16 +226,6 @@ export function createRmoColumns({
                 const assignee = row.original.assignee;
                 const orderId = row.original.order_id;
                 const currentStatus = row.original.status;
-                const isAssigning = assigningOrderId === orderId;
-
-                if (isAssigning) {
-                    return (
-                        <div className="flex items-center gap-1.5 text-[12px] text-gray-400 dark:text-gray-500">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            Assigning…
-                        </div>
-                    );
-                }
 
                 if (!assignee) {
                     if (onAssignToMe) {
@@ -255,8 +268,8 @@ export function createRmoColumns({
                 return (
                     <RmoStatusPicker
                         currentStatus={row.original.status as OrderStatus}
-                        isLoading={isLoadingID === orderId}
                         onChangeStatus={(status) => onChangeStatus(status, orderId)}
+                        disabled={disableStatusChange}
                     />
                 );
             },

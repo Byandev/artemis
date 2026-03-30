@@ -206,6 +206,7 @@ export default function ShopBreakdown({
                     categories={categories}
                     series={series}
                     formatValue={formatValue}
+                    abbreviateLabels
                 />
             )}
         </div>

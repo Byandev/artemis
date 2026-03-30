@@ -5,9 +5,13 @@ interface Props {
     series: ApexNonAxisChartSeries | undefined;
     categories: string[];
     formatValue: (value: number) => string;
+    abbreviateLabels?: boolean;
 }
 
-export default function BarChart({ categories, series, formatValue }: Props) {
+const toAcronym = (name: string) =>
+    name.split(/\s+/).map((w) => w[0]?.toUpperCase() ?? '').join('');
+
+export default function BarChart({ categories, series, formatValue, abbreviateLabels = false }: Props) {
     const columnWidth =
         categories.length > 20 ? '80%' : categories.length > 10 ? '60%' : '40%';
 
@@ -40,6 +44,7 @@ export default function BarChart({ categories, series, formatValue }: Props) {
             axisBorder: { show: false },
             axisTicks: { show: false },
             labels: {
+                ...(abbreviateLabels && { formatter: toAcronym }),
                 style: {
                     fontSize: '11px',
                     fontFamily: 'DM Mono, monospace',

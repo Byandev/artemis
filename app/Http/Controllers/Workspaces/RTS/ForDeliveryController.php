@@ -50,12 +50,20 @@ class ForDeliveryController extends Controller
                 },
             ])
             ->allowedFilters([
-                AllowedFilter::exact('page_id'),
+                AllowedFilter::callback('page_id', function ($query, $value) {
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $query->whereIn('page_id', $values);
+                }),
                 AllowedFilter::exact('shop_id'),
-                AllowedFilter::exact('status'),
+                AllowedFilter::callback('status', function ($query, $value) {
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $query->whereIn('status', $values);
+                }),
                 AllowedFilter::callback('parcel_status', function ($query, $value) {
-                    $query->whereHas('order', function ($orderQuery) use ($value) {
-                        $orderQuery->where('parcel_status', $value);
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $values = array_map('strtolower', $values);
+                    $query->whereHas('order', function ($orderQuery) use ($values) {
+                        $orderQuery->whereIn('parcel_status', $values);
                     });
                 }),
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -85,14 +93,52 @@ class ForDeliveryController extends Controller
             ])
             ->paginate(10);
 
+        $totalForDeliveryToday = OrderForDelivery::query()
+            ->from('pancake_order_for_delivery as ofd')
+            ->join('pancake_orders as o', 'o.id', '=', 'ofd.order_id')
+            ->where('ofd.workspace_id', $workspace->id)
+            ->where('o.parcel_status', 'out_for_delivery')
+            ->whereDate('o.updated_at', now())  // or created_at if you prefer
+            ->count();
+
+// 2️⃣ All-time stats (no date filter)
+        $stats = OrderForDelivery::query()
+            ->from('pancake_order_for_delivery as ofd')
+            ->join('pancake_orders as o', 'o.id', '=', 'ofd.order_id')
+            ->where('ofd.workspace_id', $workspace->id)
+            ->selectRaw("
+        COUNT(*) as total,
+        SUM(CASE WHEN ofd.status != 'PENDING' THEN 1 ELSE 0 END) as total_not_pending,
+        SUM(CASE WHEN o.parcel_status IS NOT NULL THEN 1 ELSE 0 END) as total_parcel,
+        SUM(CASE WHEN o.parcel_status = 'delivered' THEN 1 ELSE 0 END) as total_delivered,
+        SUM(CASE WHEN o.parcel_status = 'returning' THEN 1 ELSE 0 END) as total_returning,
+        SUM(CASE WHEN o.parcel_status = 'undeliverable' THEN 1 ELSE 0 END) as total_undeliverable,
+        SUM(CASE WHEN o.parcel_status = 'problematic' THEN 1 ELSE 0 END) as total_problematic
+    ")
+            ->first();
+
+// 3️⃣ Calculate rates
+        $total = (int) ($stats->total ?: 1);
+        $totalParcel = (int) ($stats->total_parcel ?: 1);
+
+        $stats->called_rate = round(((int) $stats->total_not_pending / $total) * 100, 1);
+        $stats->successful_rate = round(((int) $stats->total_delivered / $totalParcel) * 100, 1);
+        $stats->unsuccessful_rate = round((
+                ((int) $stats->total_problematic + (int) $stats->total_returning + (int) $stats->total_undeliverable)
+                / $totalParcel
+            ) * 100, 1);
+
+// 4️⃣ Add the for-delivery-today count
+        $stats->total_for_delivery_today = $totalForDeliveryToday;
+
         return Inertia::render('workspaces/rts/rmo-management', [
             'orders' => $items,
             'workspace' => $workspace,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page',]),
                 'filter' => $request->input('filter', []),
-            ]
-
+            ],
+            'stats' => $stats,
         ]);
     }
 
@@ -100,9 +146,19 @@ class ForDeliveryController extends Controller
     {
         $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
 
-        $orderForDelivery->update([
-            'status' => $request->status,
-        ]);
+        if (!$orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        $data = ['status' => $request->status];
+
+        if ($request->has('removeAssignee') && $request->removeAssignee) {
+            $data['assignee_id'] = null;
+        } else {
+            $data['assignee_id'] = auth()->id();
+        }
+
+        $orderForDelivery->update($data);
 
         return redirect()->back()->with('success', 'Status updated successfully');
     }
@@ -160,12 +216,20 @@ class ForDeliveryController extends Controller
                 },
             ])
             ->allowedFilters([
-                AllowedFilter::exact('page_id'),
+                AllowedFilter::callback('page_id', function ($query, $value) {
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $query->whereIn('page_id', $values);
+                }),
                 AllowedFilter::exact('shop_id'),
-                AllowedFilter::exact('status'),
+                AllowedFilter::callback('status', function ($query, $value) {
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $query->whereIn('status', $values);
+                }),
                 AllowedFilter::callback('parcel_status', function ($query, $value) {
-                    $query->whereHas('order', function ($orderQuery) use ($value) {
-                        $orderQuery->where('parcel_status', $value);
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $values = array_map('strtolower', $values);
+                    $query->whereHas('order', function ($orderQuery) use ($values) {
+                        $orderQuery->whereIn('parcel_status', $values);
                     });
                 }),
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -195,6 +259,47 @@ class ForDeliveryController extends Controller
             ])
             ->paginate(10);
 
+        $workspaceId = $workspace->id;
+
+// 1️⃣ Total for delivery today
+        $totalForDeliveryToday = OrderForDelivery::query()
+            ->from('pancake_order_for_delivery as ofd')
+            ->join('pancake_orders as o', 'o.id', '=', 'ofd.order_id')
+            ->where('ofd.workspace_id', $workspaceId)
+            ->where('o.parcel_status', 'out_for_delivery')
+            ->whereDate('o.updated_at', now())  // or created_at if you prefer
+            ->count();
+
+// 2️⃣ All-time stats (no date filter)
+        $stats = OrderForDelivery::query()
+            ->from('pancake_order_for_delivery as ofd')
+            ->join('pancake_orders as o', 'o.id', '=', 'ofd.order_id')
+            ->where('ofd.workspace_id', $workspaceId)
+            ->selectRaw("
+        COUNT(*) as total,
+        SUM(CASE WHEN ofd.status != 'PENDING' THEN 1 ELSE 0 END) as total_not_pending,
+        SUM(CASE WHEN o.parcel_status IS NOT NULL THEN 1 ELSE 0 END) as total_parcel,
+        SUM(CASE WHEN o.parcel_status = 'delivered' THEN 1 ELSE 0 END) as total_delivered,
+        SUM(CASE WHEN o.parcel_status = 'returning' THEN 1 ELSE 0 END) as total_returning,
+        SUM(CASE WHEN o.parcel_status = 'undeliverable' THEN 1 ELSE 0 END) as total_undeliverable,
+        SUM(CASE WHEN o.parcel_status = 'problematic' THEN 1 ELSE 0 END) as total_problematic
+    ")
+            ->first();
+
+// 3️⃣ Calculate rates
+        $total = (int) ($stats->total ?: 1);
+        $totalParcel = (int) ($stats->total_parcel ?: 1);
+
+        $stats->called_rate = round(((int) $stats->total_not_pending / $total) * 100, 1);
+        $stats->successful_rate = round(((int) $stats->total_delivered / $totalParcel) * 100, 1);
+        $stats->unsuccessful_rate = round((
+                ((int) $stats->total_problematic + (int) $stats->total_returning + (int) $stats->total_undeliverable)
+                / $totalParcel
+            ) * 100, 1);
+
+// 4️⃣ Add the for-delivery-today count
+        $stats->total_for_delivery_today = $totalForDeliveryToday;
+
         $users = User::get(['id', 'name']);
 
         return Inertia::render('workspaces/rts/public-pages/rmo-management', [
@@ -205,6 +310,27 @@ class ForDeliveryController extends Controller
                 'filter' => $request->input('filter', []),
             ],
             'users' => $users,
+            'stats' => $stats,
         ]);
+    }
+
+    public function myAssignedCount(Request $request, Workspace $workspace)
+    {
+        $userId = $request->query('user_id');
+
+        if (!$userId) {
+            return response()->json(['assigned' => 0, 'called' => 0]);
+        }
+
+        $assigned = OrderForDelivery::where('workspace_id', $workspace->id)
+            ->where('assignee_id', $userId)
+            ->count();
+
+        $called = OrderForDelivery::where('workspace_id', $workspace->id)
+            ->where('caller_id', $userId)
+            ->whereIn('status', ['CX RINGING', 'RIDER RINGING'])
+            ->count();
+
+        return response()->json(['assigned' => $assigned, 'called' => $called]);
     }
 }
