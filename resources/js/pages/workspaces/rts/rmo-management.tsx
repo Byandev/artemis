@@ -53,7 +53,7 @@ interface Props {
     unsuccessful_rate: number;
 }
 
-const statusOptions = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED'];
+const statusOptions = orderStatusConfig;
 
 function StatCard({ title, value, icon: Icon, suffix }: any) {
     return (
