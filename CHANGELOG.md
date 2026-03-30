@@ -1,5 +1,43 @@
 # Changelog
 
+## [v2.1.0] — 2026-03-27
+
+### SyncOrder — Full Refactor (SOLID)
+
+- Broke `SyncOrder` job into 5 focused action classes: `UpsertOrderAction`, `SyncOrderItemsAction`, `SyncShippingAddressAction`, `SyncParcelTrackingAction`, `SyncPhoneNumberReportsAction`
+- `SyncOrder` is now a thin orchestrator using Laravel method injection
+- Added `JourneyUpdateNormalizer` — fixes `update_at` typo, resolves canonical status names, extracts rider name/mobile from `【...】` bracket notation
+- Added `OrderTimestampResolver` and `MessageRenderer` support classes
+- Parcel journey notification logic extracted into `ParcelJourneyNotifier` + Strategy pattern handlers: `DepartureHandler`, `ArrivalHandler`, `OnDeliveryHandler`
+
+### Parcel Journey — Logic Improvements
+
+- Save only journeys where status is `On Delivery` or `created_at` is today
+- Stop saving journey entries that succeed a `Return Register` status
+- `isNotifiable` only triggers if `created_at` is today
+- Rider name and mobile are now parsed by the normalizer and saved directly on the `parcel_journeys` record
+- `OnDeliveryHandler` reads `rider_name`/`rider_mobile` from the saved journey instead of re-parsing the note
+
+### RTS Analytics — New Cards & Decoupled Architecture
+
+- Each analytics card is now a self-contained component with its own fetch/state
+- **New: By Product** — RTS breakdown by product/item name with sortable DataTable
+- **New: By Rider** — RTS breakdown by rider name, sourced from the latest `On Delivery` parcel journey per order
+- Price, Delivery Attempts, and Cx RTS cards default to chart view
+- Product and Rider breakdowns use DataTable (same pattern as Location card)
+
+### Pages List
+
+- `is_sync_logic_updated` flag now shown inline in the Last Sync column as an **Updated** / **Legacy** badge
+
+### RMO Management — Refactor & Design
+
+- `ForDeliveryController` refactored: query building extracted to `ForDeliveryQuery`, stats to `ForDeliveryStatsService`
+- Parcel status badge shows an animated pulsing dot when status is `out_for_delivery`
+- Order status picker dropdown now shows color-coded pill badges for each option
+
+---
+
 ## [v2.0.1] — 2026-03-26
 
 ### New Features
