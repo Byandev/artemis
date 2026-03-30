@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { Calendar as CalendarIcon, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Pencil, Plus, Search, SquareX } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
@@ -440,7 +440,7 @@ const Index = ({ workspace }: Props) => {
         <AppLayout>
             <Head title={`${workspace.name} - Inventory Purchased Orders`} />
 
-            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6" style={{ fontFamily: 'Inter, sans-serif' }}>
                 <header className="mb-5">
                     <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">PO Management</h1>
                 </header>
@@ -657,10 +657,11 @@ const Index = ({ workspace }: Props) => {
 
                 {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
-                <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                    <table className="min-w-full text-xs">
+                <div className="relative overflow-visible">
+                    <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                        <table className="min-w-full text-xs">
                         <thead className="bg-[#F7F7F5] dark:bg-zinc-800/80">
-                            <tr className="text-left font-medium uppercase tracking-[0.06em] text-gray-400 dark:text-gray-500">
+                            <tr className="text-center font-medium uppercase tracking-[0.06em] text-gray-400 dark:text-gray-500">
                                 <th className="px-4 py-3">Issue Date</th>
                                 <th className="px-4 py-3">Delivered No.</th>
                                 <th className="px-4 py-3">Cust PO No.</th>
@@ -749,16 +750,22 @@ const Index = ({ workspace }: Props) => {
                                             <div className="inline-flex items-center text-[11px]">
                                                 <button
                                                     type="button"
-                                                    className="inline-flex items-center px-1 text-sky-600 transition-colors hover:text-sky-700 dark:text-sky-400"
+                                                    className="group relative inline-flex items-center px-1 text-gray-400 transition-colors hover:text-sky-600 dark:text-gray-500 dark:hover:text-sky-400"
                                                 >
+                                                    <span className="pointer-events-none absolute right-full mr-1.5 rounded-md bg-sky-500 px-2 py-0.5 text-[10px] font-semibold tracking-[0.02em] text-white opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100 dark:bg-sky-500 dark:text-white">
+                                                        EDIT
+                                                    </span>
                                                     <Pencil className="h-3.5 w-3.5" />
                                                 </button>
                                                 <span className="mx-1 h-3.5 w-px bg-black/10 dark:bg-white/10" />
                                                 <button
                                                     type="button"
-                                                    className="inline-flex items-center px-1 text-red-500 transition-colors hover:text-red-600 dark:text-red-400"
+                                                    className="group relative inline-flex items-center px-1 text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
                                                 >
-                                                    <SquareX className="h-3.5 w-3.5" />
+                                                    <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-1.5 -translate-y-1/2 rounded-md bg-red-500 px-2 py-0.5 text-[10px] font-semibold tracking-[0.02em] text-white opacity-0 transition-all group-hover:opacity-100 dark:bg-red-500 dark:text-white">
+                                                        DELETE
+                                                    </span>
+                                                    <Trash2 className="h-3.5 w-3.5" />
                                                 </button>
                                             </div>
                                         </td>
@@ -766,7 +773,8 @@ const Index = ({ workspace }: Props) => {
                                 ))
                             )}
                         </tbody>
-                    </table>
+                        </table>
+                    </div>
                 </div>
 
                 <div className="mt-3 grid grid-cols-3 items-center gap-3 px-1">
