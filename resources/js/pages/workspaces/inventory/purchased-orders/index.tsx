@@ -363,22 +363,52 @@ const Index = ({ workspace }: Props) => {
                                         if (!range?.from) {
                                             setStartDate('');
                                             setEndDate('');
+                                        }
+                                    }}
+                                    onDayClick={(day) => {
+                                        const picked = toInputDate(day);
+
+                                        if (picked > maxSelectableDate) {
                                             return;
                                         }
 
-                                        const nextStart = toInputDate(range.from);
-                                        const nextEnd = toInputDate(range.to ?? range.from);
+                                        if (!startDate && !endDate) {
+                                            setStartDate(picked);
+                                            setEndDate(picked);
+                                            return;
+                                        }
 
-                                        const normalized = normalizeDateRange(nextStart, nextEnd);
+                                        if (startDate && endDate) {
+                                            if (picked > endDate) {
+                                                setStartDate(endDate);
+                                                setEndDate(picked);
+                                                return;
+                                            }
 
+                                            if (picked < startDate) {
+                                                setStartDate(picked);
+                                                setEndDate(startDate);
+                                                return;
+                                            }
+
+                                            const normalized = normalizeDateRange(startDate, picked);
+                                            setStartDate(normalized.start);
+                                            setEndDate(normalized.end);
+                                            return;
+                                        }
+
+                                        const existing = startDate || endDate;
+                                        const normalized = normalizeDateRange(existing, picked);
                                         setStartDate(normalized.start);
                                         setEndDate(normalized.end);
-
-                                        if (range.to) {
-                                            setDatePickerOpen(false);
-                                        }
                                     }}
                                     disabled={(date) => toInputDate(date) > maxSelectableDate}
+                                    classNames={{
+                                        range_start: 'rounded-md bg-emerald-600 text-white dark:bg-emerald-500 dark:text-zinc-950',
+                                        range_end: 'rounded-md bg-emerald-600 text-white dark:bg-emerald-500 dark:text-zinc-950',
+                                        range_middle: 'bg-emerald-500/14 text-emerald-800 dark:bg-emerald-400/18 dark:text-emerald-200',
+                                        today: 'rounded-md ring-1 ring-emerald-500/30 text-emerald-700 dark:ring-emerald-400/35 dark:text-emerald-300',
+                                    }}
                                     className="rounded-[10px] bg-white p-0 text-xs dark:bg-zinc-900"
                                 />
                             </PopoverContent>
