@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { Calendar as CalendarIcon, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
@@ -6,6 +6,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DateRange } from 'react-day-picker';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 type StatusId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
@@ -33,6 +34,18 @@ interface PaginatedResponse {
 
 interface Props {
     workspace: Workspace;
+}
+
+interface AddItemForm {
+    issue_date: string;
+    delivery_no: string;
+    cust_po_no: string;
+    control_no: string;
+    item: string;
+    cog_amount: string;
+    delivery_fee: string;
+    total_amount: string;
+    status: string;
 }
 
 const STATUS_OPTIONS: Array<{ value: StatusId; label: string }> = [
@@ -64,6 +77,19 @@ const MONTH_OPTIONS = [
 const DROPDOWN_PANEL_CLASS = 'absolute left-0 top-[calc(100%+6px)] z-50 rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900';
 const DROPDOWN_OPTION_BASE_CLASS = 'w-full rounded-md px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-black/3 dark:hover:bg-white/5';
 const DATE_DROPDOWN_TRIGGER_CLASS = 'inline-flex h-9 w-full items-center justify-between rounded-[10px] border border-black/6 bg-white px-3 text-xs text-gray-500 outline-none transition-colors hover:bg-black/2 focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5';
+const SANS_FONT = "'DM Sans', system-ui, sans-serif";
+const MONO_FONT = "'DM Mono', monospace";
+const ADD_ITEM_FORM_INITIAL: AddItemForm = {
+    issue_date: '',
+    delivery_no: '',
+    cust_po_no: '',
+    control_no: '',
+    item: '',
+    cog_amount: '',
+    delivery_fee: '',
+    total_amount: '',
+    status: '1',
+};
 
 const statusLabel = (value: number): string => {
     return STATUS_OPTIONS.find((s) => s.value === value)?.label ?? `Unknown (${value})`;
@@ -185,6 +211,10 @@ const Index = ({ workspace }: Props) => {
     const requestSerialRef = useRef(0);
     const [datePickerOpen, setDatePickerOpen] = useState(false);
     const [statusMenuRowId, setStatusMenuRowId] = useState<number | null>(null);
+    const [addItemOpen, setAddItemOpen] = useState(false);
+    const [addItemSubmitting, setAddItemSubmitting] = useState(false);
+    const [addItemForm, setAddItemForm] = useState<AddItemForm>(ADD_ITEM_FORM_INITIAL);
+    const [addItemFieldErrors, setAddItemFieldErrors] = useState<Record<string, string>>({});
     const [statusFilterMenuOpen, setStatusFilterMenuOpen] = useState(false);
     const [monthListOpen, setMonthListOpen] = useState(false);
     const [yearListOpen, setYearListOpen] = useState(false);
@@ -192,6 +222,17 @@ const Index = ({ workspace }: Props) => {
     const monthDropdownRef = useRef<HTMLDivElement | null>(null);
     const yearDropdownRef = useRef<HTMLDivElement | null>(null);
     const maxSelectableDate = toInputDate(new Date());
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+        if (document.querySelector('link[data-artemis-fonts="true"]')) return;
+
+        const fontLink = document.createElement('link');
+        fontLink.rel = 'stylesheet';
+        fontLink.href = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap';
+        fontLink.setAttribute('data-artemis-fonts', 'true');
+        document.head.appendChild(fontLink);
+    }, []);
 
     const apiBase = useMemo(() => {
         if (typeof window === 'undefined') return '';
@@ -436,23 +477,83 @@ const Index = ({ workspace }: Props) => {
         }
     };
 
+    const submitAddItem = async () => {
+        setAddItemSubmitting(true);
+        setAddItemFieldErrors({});
+        setError(null);
+
+        try {
+            const url = `${apiBase}/api/workspaces/${workspace.slug}/inventory/purchased-orders`;
+            const res = await fetch(url, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: JSON.stringify({
+                    issue_date: addItemForm.issue_date,
+                    delivery_no: addItemForm.delivery_no || null,
+                    cust_po_no: addItemForm.cust_po_no || null,
+                    control_no: addItemForm.control_no || null,
+                    item: addItemForm.item,
+                    cog_amount: addItemForm.cog_amount || 0,
+                    delivery_fee: addItemForm.delivery_fee || 0,
+                    total_amount: addItemForm.total_amount || 0,
+                    status: Number(addItemForm.status),
+                }),
+            });
+
+            const text = await res.text();
+            const json = text ? JSON.parse(text) : {};
+
+            if (!res.ok) {
+                if (res.status === 422 && json.errors) {
+                    const mapped: Record<string, string> = {};
+                    Object.entries(json.errors as Record<string, string[]>).forEach(([key, value]) => {
+                        mapped[key] = Array.isArray(value) ? value[0] : String(value);
+                    });
+                    setAddItemFieldErrors(mapped);
+                    return;
+                }
+
+                throw new Error(json.message || 'Failed to create purchased order.');
+            }
+
+            setAddItemOpen(false);
+            setAddItemForm(ADD_ITEM_FORM_INITIAL);
+            void fetchRows(1);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to create purchased order.');
+        } finally {
+            setAddItemSubmitting(false);
+        }
+    };
+
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Inventory Purchased Orders`} />
 
-            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6" style={{ fontFamily: SANS_FONT }}>
                 <header className="mb-5">
                     <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">PO Management</h1>
                 </header>
 
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                    <Link
-                        href={`/workspaces/${workspace.slug}/inventory/purchased-orders/create`}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setAddItemFieldErrors({});
+                            setAddItemForm(ADD_ITEM_FORM_INITIAL);
+                            setAddItemOpen(true);
+                        }}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
                     >
                         <Plus className="h-3.5 w-3.5" />
                         Add Item
-                    </Link>
+                    </button>
 
                     <div className="flex flex-wrap items-center gap-2">
                         <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
@@ -462,7 +563,7 @@ const Index = ({ workspace }: Props) => {
                                     className="inline-flex h-9 min-w-[150px] items-center justify-center gap-1.5 rounded-[10px] border border-black/6 bg-white px-3 text-xs text-gray-400 outline-none transition-colors hover:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
                                 >
                                     <CalendarIcon className="h-3.5 w-3.5" />
-                                    <span className="font-mono">{startDate ? formatDisplayDate(startDate, endDate) : 'Select Date'}</span>
+                                    <span style={{ fontFamily: MONO_FONT }}>{startDate ? formatDisplayDate(startDate, endDate) : 'Select Date'}</span>
                                 </button>
                             </PopoverTrigger>
                             <PopoverContent
@@ -657,6 +758,151 @@ const Index = ({ workspace }: Props) => {
 
                 {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
+                <Dialog open={addItemOpen} onOpenChange={setAddItemOpen}>
+                    <DialogContent className="max-w-[660px] rounded-2xl border border-black/6 p-0 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10" style={{ fontFamily: SANS_FONT }}>
+                        <div className="px-10 py-6">
+                            <h2 className="text-[28px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">ADD ITEM</h2>
+                            <p className="mt-1 text-xs text-gray-400">Fill in the details below to record a new item.</p>
+
+                                <div className="mt-4 border-t border-black/6 pt-4 dark:border-white/6">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="mb-1.5 block text-xs font-medium text-gray-500">Date</label>
+                                        <input
+                                            type="date"
+                                            value={addItemForm.issue_date}
+                                            onChange={(e) => setAddItemForm((prev) => ({ ...prev, issue_date: e.target.value }))}
+                                            className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
+                                        />
+                                        {addItemFieldErrors.issue_date && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.issue_date}</p>}
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-1.5 block text-xs font-medium text-gray-500">Delivered No.</label>
+                                        <input
+                                            value={addItemForm.delivery_no}
+                                            onChange={(e) => setAddItemForm((prev) => ({ ...prev, delivery_no: e.target.value }))}
+                                            placeholder="e.g. DN-1001"
+                                            className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
+                                        />
+                                        {addItemFieldErrors.delivery_no && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.delivery_no}</p>}
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 border-t border-black/6 pt-4 dark:border-white/6">
+                                    <p className="mb-2 text-sm font-medium text-gray-600 dark:text-gray-300">Purchase Order</p>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="mb-1.5 block text-xs font-medium text-gray-500">Custom Po No.</label>
+                                            <input
+                                                value={addItemForm.cust_po_no}
+                                                onChange={(e) => setAddItemForm((prev) => ({ ...prev, cust_po_no: e.target.value }))}
+                                                className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
+                                            />
+                                            {addItemFieldErrors.cust_po_no && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.cust_po_no}</p>}
+                                        </div>
+                                        <div>
+                                            <label className="mb-1.5 block text-xs font-medium text-gray-500">Control No.</label>
+                                            <input
+                                                value={addItemForm.control_no}
+                                                onChange={(e) => setAddItemForm((prev) => ({ ...prev, control_no: e.target.value }))}
+                                                className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
+                                            />
+                                            {addItemFieldErrors.control_no && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.control_no}</p>}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 border-t border-black/6 pt-4 dark:border-white/6">
+                                    <p className="mb-2 text-sm font-medium text-gray-600 dark:text-gray-300">Item</p>
+                                    <div>
+                                        <label className="mb-1.5 block text-xs font-medium text-gray-500">Item Name</label>
+                                        <input
+                                            value={addItemForm.item}
+                                            onChange={(e) => setAddItemForm((prev) => ({ ...prev, item: e.target.value }))}
+                                            className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
+                                        />
+                                        {addItemFieldErrors.item && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.item}</p>}
+                                    </div>
+
+                                    <div className="mt-3 grid grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="mb-1.5 block text-xs font-medium text-gray-500">COG Amount</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={addItemForm.cog_amount}
+                                                onChange={(e) => setAddItemForm((prev) => ({ ...prev, cog_amount: e.target.value }))}
+                                                className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
+                                            />
+                                            {addItemFieldErrors.cog_amount && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.cog_amount}</p>}
+                                        </div>
+                                        <div>
+                                            <label className="mb-1.5 block text-xs font-medium text-gray-500">Delivery Fee</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={addItemForm.delivery_fee}
+                                                onChange={(e) => setAddItemForm((prev) => ({ ...prev, delivery_fee: e.target.value }))}
+                                                className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
+                                            />
+                                            {addItemFieldErrors.delivery_fee && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.delivery_fee}</p>}
+                                        </div>
+                                        <div>
+                                            <label className="mb-1.5 block text-xs font-medium text-gray-500">Total Amount</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={addItemForm.total_amount}
+                                                onChange={(e) => setAddItemForm((prev) => ({ ...prev, total_amount: e.target.value }))}
+                                                className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
+                                            />
+                                            {addItemFieldErrors.total_amount && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.total_amount}</p>}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 border-t border-black/6 pt-4 dark:border-white/6">
+                                    <label className="mb-1.5 block text-xs font-medium text-gray-500">Status</label>
+                                    <select
+                                        value={addItemForm.status}
+                                        onChange={(e) => setAddItemForm((prev) => ({ ...prev, status: e.target.value }))}
+                                        className="h-9 w-[180px] appearance-none rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
+                                    >
+                                        {STATUS_OPTIONS.map((opt) => (
+                                            <option key={opt.value} value={String(opt.value)}>
+                                                {opt.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {addItemFieldErrors.status && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.status}</p>}
+                                </div>
+
+                                <div className="mt-5 flex items-center justify-end gap-3 border-t border-black/6 pt-5 dark:border-white/6">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAddItemOpen(false)}
+                                        className="h-9 rounded-lg border border-black/6 bg-white px-6 text-xs font-medium text-gray-600 transition-colors hover:bg-black/2 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5"
+                                    >
+                                        CANCEL
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={addItemSubmitting}
+                                        onClick={() => void submitAddItem()}
+                                        className="h-9 rounded-lg bg-emerald-600 px-6 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+                                    >
+                                        {addItemSubmitting ? 'ADDING...' : 'ADD ITEM'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
                 <div className="relative overflow-visible">
                     <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                         <table className="min-w-full text-xs">
@@ -690,14 +936,14 @@ const Index = ({ workspace }: Props) => {
                             ) : (
                                 rows.map((row) => (
                                     <tr key={row.id} className="hover:bg-emerald-500/4 dark:hover:bg-emerald-500/8">
-                                        <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{formatIssueDate(row.issue_date)}</td>
-                                        <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-700 dark:text-gray-200">{row.delivery_no || '-'}</td>
-                                        <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-400">{row.cust_po_no || '-'}</td>
-                                        <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-400">{row.control_no || '-'}</td>
+                                        <td className="whitespace-nowrap px-4 py-2.5 text-[11px]" style={{ fontFamily: MONO_FONT }}>{formatIssueDate(row.issue_date)}</td>
+                                        <td className="whitespace-nowrap px-4 py-2.5 text-[11px] text-gray-700 dark:text-gray-200" style={{ fontFamily: MONO_FONT }}>{row.delivery_no || '-'}</td>
+                                        <td className="whitespace-nowrap px-4 py-2.5 text-[11px] text-gray-400" style={{ fontFamily: MONO_FONT }}>{row.cust_po_no || '-'}</td>
+                                        <td className="whitespace-nowrap px-4 py-2.5 text-[11px] text-gray-400" style={{ fontFamily: MONO_FONT }}>{row.control_no || '-'}</td>
                                         <td className="whitespace-nowrap px-4 py-2.5 font-medium uppercase text-gray-700 dark:text-gray-200">{row.item}</td>
-                                        <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{formatMoney(row.cog_amount)}</td>
-                                        <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px]">{formatMoney(row.delivery_fee)}</td>
-                                        <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-gray-700 dark:text-gray-200">{formatMoney(row.total_amount)}</td>
+                                        <td className="whitespace-nowrap px-4 py-2.5 text-[11px]" style={{ fontFamily: MONO_FONT }}>{formatMoney(row.cog_amount)}</td>
+                                        <td className="whitespace-nowrap px-4 py-2.5 text-[11px]" style={{ fontFamily: MONO_FONT }}>{formatMoney(row.delivery_fee)}</td>
+                                        <td className="whitespace-nowrap px-4 py-2.5 text-[11px] text-gray-700 dark:text-gray-200" style={{ fontFamily: MONO_FONT }}>{formatMoney(row.total_amount)}</td>
                                         <td className="whitespace-nowrap px-4 py-2.5">
                                             <div className="inline-flex h-6 w-[172px] items-center rounded-2xl pl-1.5">
                                                 <span className={`inline-flex w-full items-center gap-1 rounded-2xl px-2 py-1 text-[11px] font-medium ${statusBadgeClass(row.status)}`}>
