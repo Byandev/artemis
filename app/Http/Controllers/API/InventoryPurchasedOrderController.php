@@ -175,4 +175,39 @@ class InventoryPurchasedOrderController extends Controller
             'data' => $ownedOrder->fresh(),
         ]);
     }
+
+    public function store(Request $request, Workspace $workspace)
+    {
+        $this->assertWorkspaceMembership($request, $workspace);
+
+        $validated = $request->validate([
+            'issue_date' => ['required', 'date'],
+            'delivery_no' => ['nullable', 'string', 'max:120'],
+            'cust_po_no' => ['nullable', 'string', 'max:120'],
+            'control_no' => ['nullable', 'string', 'max:120'],
+            'item' => ['required', 'string', 'max:160'],
+            'cog_amount' => ['nullable', 'numeric', 'min:0'],
+            'delivery_fee' => ['nullable', 'numeric', 'min:0'],
+            'total_amount' => ['nullable', 'numeric', 'min:0'],
+            'status' => ['required', 'integer', 'in:'.self::STATUS_VALUES],
+        ]);
+
+        $created = InventoryPurchasedOrder::query()->create([
+            'user_id' => $request->user()->id,
+            'issue_date' => $validated['issue_date'],
+            'delivery_no' => $validated['delivery_no'] ?? null,
+            'cust_po_no' => $validated['cust_po_no'] ?? null,
+            'control_no' => $validated['control_no'] ?? null,
+            'item' => trim($validated['item']),
+            'cog_amount' => (float) ($validated['cog_amount'] ?? 0),
+            'delivery_fee' => (float) ($validated['delivery_fee'] ?? 0),
+            'total_amount' => (float) ($validated['total_amount'] ?? 0),
+            'status' => (int) $validated['status'],
+        ]);
+
+        return response()->json([
+            'message' => 'Purchased order created.',
+            'data' => $this->normalizeIssueDate($created),
+        ], 201);
+    }
 }
