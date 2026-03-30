@@ -90,8 +90,14 @@ export function AppSidebar() {
         },
         {
             title: 'Inventory',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppw`,
             icon: Package,
+            items: [
+                {
+                    title: 'PPW',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppw`,
+                    icon: Package,
+                },
+            ],
         },
 
     ];
