@@ -88,6 +88,18 @@ export function AppSidebar() {
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/roles`,
             icon: ShieldIcon,
         },
+        {
+            title: 'Inventory',
+            icon: Package,
+            items: [
+                {
+                    title: 'PPW',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppw`,
+                    icon: Package,
+                },
+            ],
+        },
+
     ];
 
     // const mainNavItems: NavItem[] = [
