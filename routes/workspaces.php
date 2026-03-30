@@ -157,7 +157,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/botcake/sequences', [SequenceController::class, 'index'])->name('workspaces.botcake.sequences.index');
     Route::get('/workspaces/{workspace}/inventory/po-management', [PurchaseOrderController::class, 'index'])->name('workspaces.inventory.po-management.index');
     Route::get('/workspaces/{workspace}/inventory/purchased-orders', [PurchaseOrderController::class, 'index'])->name('workspaces.inventory.purchased-orders.index');
-    Route::get('/workspaces/{workspace}/inventory/purchased-orders/create', [PurchaseOrderController::class, 'create'])->name('workspaces.inventory.purchased-orders.create');
 });
 
 // Public invitation routes (guest or authenticated)
