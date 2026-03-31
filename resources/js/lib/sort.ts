@@ -1,5 +1,5 @@
 import type { SortingState } from "@tanstack/react-table"
-import { isFunction, isString } from 'lodash';
+import { isString } from 'lodash';
 
 // Frontend -> Backend
 export function toBackendSort(sorting: SortingState): string {
