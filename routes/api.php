@@ -24,7 +24,7 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             ->name('inventory.purchased-orders.store');
         Route::patch('/inventory/purchased-orders/{order}/status', [InventoryPurchasedOrderController::class, 'updateStatus'])
             ->middleware('throttle:30,1')
-            ->name('inventory.purchased-orders.update-status'); 
+            ->name('inventory.purchased-orders.update-status');
         Route::delete('/inventory/purchased-orders/{order}', [InventoryPurchasedOrderController::class, 'destroy'])
             ->middleware('throttle:30,1')
             ->name('inventory.purchased-orders.destroy');

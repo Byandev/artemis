@@ -6,12 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\InventoryPurchasedOrder;
 use App\Models\Workspace;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class InventoryPurchasedOrderController extends Controller
 {
     private const STATUS_VALUES = '1,2,3,4,5,6,7,8';
+    private const DEFAULT_PER_PAGE = 50;
+    private const MAX_DATE_RANGE_DAYS = 93;
 
     private function normalizeIssueDate(InventoryPurchasedOrder $row): array
     {
@@ -28,7 +33,7 @@ class InventoryPurchasedOrderController extends Controller
         }
     }
 
-    private function getAvailableYears(Request $request)
+    private function getAvailableYears(Request $request): Collection
     {
         return InventoryPurchasedOrder::query()
             ->where('user_id', $request->user()->id)
@@ -41,7 +46,7 @@ class InventoryPurchasedOrderController extends Controller
             ->values();
     }
 
-    private function baseQuery(Request $request)
+    private function baseQuery(Request $request): Builder
     {
         return InventoryPurchasedOrder::query()
             ->select([
@@ -59,7 +64,7 @@ class InventoryPurchasedOrderController extends Controller
             ->where('user_id', $request->user()->id);
     }
 
-    private function applyFilters($query, array $validated): void
+    private function applyFilters(Builder $query, array $validated): void
     {
         if (isset($validated['status'])) {
             $query->where('status', $validated['status']);
@@ -84,7 +89,15 @@ class InventoryPurchasedOrderController extends Controller
         }
     }
 
-    public function index(Request $request, Workspace $workspace)
+    private function findOwnedOrder(Request $request, int $order): InventoryPurchasedOrder
+    {
+        return InventoryPurchasedOrder::query()
+            ->where('id', $order)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
+    }
+
+    public function index(Request $request, Workspace $workspace): JsonResponse
     {
         $this->assertWorkspaceMembership($request, $workspace);
 
@@ -102,9 +115,9 @@ class InventoryPurchasedOrderController extends Controller
         if (! empty($validated['start_date']) && ! empty($validated['end_date'])) {
             $start = Carbon::parse($validated['start_date']);
             $end = Carbon::parse($validated['end_date']);
-            if ($start->diffInDays($end) > 93) {
+            if ($start->diffInDays($end) > self::MAX_DATE_RANGE_DAYS) {
                 throw ValidationException::withMessages([
-                    'end_date' => ['Date range cannot exceed 93 days.'],
+                    'end_date' => ['Date range cannot exceed '.self::MAX_DATE_RANGE_DAYS.' days.'],
                 ]);
             }
         }
@@ -119,17 +132,19 @@ class InventoryPurchasedOrderController extends Controller
                 ->get()
                 ->map(fn (InventoryPurchasedOrder $row) => $this->normalizeIssueDate($row));
 
+            $total = $allRows->count();
+
             return response()->json([
                 'data' => $allRows,
                 'available_years' => $availableYears,
                 'current_page' => 1,
                 'last_page' => 1,
-                'per_page' => $allRows->count(),
-                'total' => $allRows->count(),
+                'per_page' => $total,
+                'total' => $total,
             ]);
         }
 
-        $perPage = (int) ($validated['per_page'] ?? 50);
+        $perPage = (int) ($validated['per_page'] ?? self::DEFAULT_PER_PAGE);
 
         $paginated = $query
             ->orderByDesc('issue_date')
@@ -146,7 +161,7 @@ class InventoryPurchasedOrderController extends Controller
         return response()->json($response);
     }
 
-    public function updateStatus(Request $request, Workspace $workspace, int $order)
+    public function updateStatus(Request $request, Workspace $workspace, int $order): JsonResponse
     {
         $this->assertWorkspaceMembership($request, $workspace);
 
@@ -154,10 +169,7 @@ class InventoryPurchasedOrderController extends Controller
             'status' => ['required', 'integer', 'in:'.self::STATUS_VALUES],
         ]);
 
-        $ownedOrder = InventoryPurchasedOrder::query()
-            ->where('id', $order)
-            ->where('user_id', $request->user()->id)
-            ->firstOrFail();
+        $ownedOrder = $this->findOwnedOrder($request, $order);
 
         if ((int) $ownedOrder->status === (int) $validated['status']) {
             return response()->json([
@@ -176,7 +188,7 @@ class InventoryPurchasedOrderController extends Controller
         ]);
     }
 
-    public function store(Request $request, Workspace $workspace)
+    public function store(Request $request, Workspace $workspace): JsonResponse
     {
         $this->assertWorkspaceMembership($request, $workspace);
 
@@ -211,14 +223,11 @@ class InventoryPurchasedOrderController extends Controller
         ], 201);
     }
 
-    public function destroy(Request $request, Workspace $workspace, int $order)
+    public function destroy(Request $request, Workspace $workspace, int $order): JsonResponse
     {
         $this->assertWorkspaceMembership($request, $workspace);
 
-        $ownedOrder = InventoryPurchasedOrder::query()
-            ->where('id', $order)
-            ->where('user_id', $request->user()->id)
-            ->firstOrFail();
+        $ownedOrder = $this->findOwnedOrder($request, $order);
 
         $deliveryNo = $ownedOrder->delivery_no;
         $ownedOrder->delete();
