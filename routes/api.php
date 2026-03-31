@@ -25,6 +25,9 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::patch('/inventory/purchased-orders/{order}/status', [InventoryPurchasedOrderController::class, 'updateStatus'])
             ->middleware('throttle:30,1')
             ->name('inventory.purchased-orders.update-status'); 
+        Route::delete('/inventory/purchased-orders/{order}', [InventoryPurchasedOrderController::class, 'destroy'])
+            ->middleware('throttle:30,1')
+            ->name('inventory.purchased-orders.destroy');
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
