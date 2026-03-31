@@ -22,4 +22,8 @@ class User extends Model
     {
         return $this->hasMany(Order::class, 'assignee_id', 'fb_id');
     }
+
+    public function assignedOrderForDelivery(){
+        return $this->hasMany(OrderForDelivery::class, 'assignee_id', 'id');
+    }
 }
