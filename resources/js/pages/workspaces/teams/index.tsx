@@ -30,7 +30,6 @@ interface Props {
     workspace: Workspace;
     teams: PaginatedData<Team>;
     workspaceMembers: User[];
-    isAdmin: boolean;
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -39,7 +38,7 @@ interface Props {
     };
 }
 
-export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin, query }: Props) {
+export default function TeamsIndex({ workspace, teams, workspaceMembers, query }: Props) {
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
 
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -94,7 +93,6 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
         {
             id: 'actions',
             cell: ({ row }) => {
-                if (!isAdmin) return null;
                 const team = row.original;
                 return (
                     <div className="flex justify-end">
@@ -127,14 +125,12 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
             <Head title={`${workspace.name} - Teams`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader title="Teams" description="Organize members into teams for better collaboration">
-                    {isAdmin && (
                         <button
                             onClick={() => setCreateDialogOpen(true)}
                             className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
                         >
                             Create Team
                         </button>
-                    )}
                 </PageHeader>
 
                 <div className="mb-3 flex items-center gap-2">
