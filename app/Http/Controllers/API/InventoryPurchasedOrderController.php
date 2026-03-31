@@ -210,4 +210,25 @@ class InventoryPurchasedOrderController extends Controller
             'data' => $this->normalizeIssueDate($created),
         ], 201);
     }
+
+    public function destroy(Request $request, Workspace $workspace, int $order)
+    {
+        $this->assertWorkspaceMembership($request, $workspace);
+
+        $ownedOrder = InventoryPurchasedOrder::query()
+            ->where('id', $order)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
+
+        $deliveryNo = $ownedOrder->delivery_no;
+        $ownedOrder->delete();
+
+        return response()->json([
+            'message' => 'Purchased order deleted.',
+            'data' => [
+                'id' => $order,
+                'delivery_no' => $deliveryNo,
+            ],
+        ]);
+    }
 }
