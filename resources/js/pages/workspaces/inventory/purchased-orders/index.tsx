@@ -64,17 +64,6 @@ const Index = ({ workspace }: Props) => {
     const [addItemFieldErrors, setAddItemFieldErrors] = useState<Record<string, string>>({});
     const [products, setProducts] = useState<Product[]>([]);
 
-    useEffect(() => {
-        if (typeof document === 'undefined') return;
-        if (document.querySelector('link[data-artemis-fonts="true"]')) return;
-
-        const fontLink = document.createElement('link');
-        fontLink.rel = 'stylesheet';
-        fontLink.href = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap';
-        fontLink.setAttribute('data-artemis-fonts', 'true');
-        document.head.appendChild(fontLink);
-    }, []);
-
     const apiBase = useMemo(() => {
         if (typeof window === 'undefined') return '';
         const envBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
@@ -449,19 +438,21 @@ const Index = ({ workspace }: Props) => {
                         setRowToDelete(row);
                         setDeleteModalOpen(true);
                     }}
-                />
-
-                <PurchasedOrdersPagination
-                    loading={loading}
-                    hasPrevious={hasPrevious}
-                    hasNext={hasNext}
-                    fromRow={fromRow}
-                    toRow={toRow}
-                    totalRows={totalRows}
-                    currentPage={currentPage}
-                    lastPage={lastPage}
-                    paginationPages={paginationPages}
-                    onFetchPage={(page) => void fetchRows(page)}
+                    footerSlot={(
+                        <PurchasedOrdersPagination
+                            variant="inline"
+                            loading={loading}
+                            hasPrevious={hasPrevious}
+                            hasNext={hasNext}
+                            fromRow={fromRow}
+                            toRow={toRow}
+                            totalRows={totalRows}
+                            currentPage={currentPage}
+                            lastPage={lastPage}
+                            paginationPages={paginationPages}
+                            onFetchPage={(page) => void fetchRows(page)}
+                        />
+                    )}
                 />
             </div>
         </AppLayout>

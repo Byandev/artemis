@@ -11,6 +11,7 @@ interface PurchasedOrdersPaginationProps {
     lastPage: number;
     paginationPages: number[];
     onFetchPage: (page: number) => void;
+    variant?: 'card' | 'inline';
 }
 
 export function PurchasedOrdersPagination({
@@ -21,9 +22,22 @@ export function PurchasedOrdersPagination({
     currentPage,
     lastPage,
     onFetchPage,
+    variant = 'card',
 }: PurchasedOrdersPaginationProps) {
     if (loading || totalRows === 0) {
         return null;
+    }
+
+    if (variant === 'inline') {
+        return (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="font-mono text-[12px] text-gray-500 dark:text-gray-400">
+                    Showing {fromRow} to {toRow} of {totalRows} entries
+                </p>
+
+                <Pagination currentPage={currentPage} totalPages={lastPage} onPageChange={onFetchPage} />
+            </div>
+        );
     }
 
     return (

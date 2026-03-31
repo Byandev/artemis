@@ -1,4 +1,5 @@
 import { ChevronDown, Inbox, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ReactNode } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ interface PurchasedOrdersTableProps {
     onUpdateStatus: (id: number, status: StatusId) => void;
     onOpenEdit: (row: PurchasedOrder) => void;
     onOpenDelete: (row: PurchasedOrder) => void;
+    footerSlot?: ReactNode;
 }
 
 export function PurchasedOrdersTable({
@@ -42,6 +44,7 @@ export function PurchasedOrdersTable({
     onUpdateStatus,
     onOpenEdit,
     onOpenDelete,
+    footerSlot,
 }: PurchasedOrdersTableProps) {
     return (
         <div className="relative overflow-visible">
@@ -177,6 +180,11 @@ export function PurchasedOrdersTable({
                                 )}
                             </TableBody>
                         </Table>
+                        {footerSlot && (
+                            <div className="border-t border-black/6 bg-white px-4 py-3 text-[12px] text-gray-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300">
+                                {footerSlot}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
