@@ -1,4 +1,14 @@
-# Logout Fix Note
+# Profile Name Change Fix
 
-- Updated sidebar footer to submit logout as POST via Inertia. Changed files: [resources/js/components/nav-footer.tsx](resources/js/components/nav-footer.tsx), [resources/js/types/index.d.ts](resources/js/types/index.d.ts).
-- Test: click Logout in sidebar footer; expect POST /logout and redirect to home/login.
+- Fixed profile update redirect to include the workspace parameter, keeping users on the correct profile page after saving name/email. Changed file: [app/Http/Controllers/Settings/ProfileController.php](app/Http/Controllers/Settings/ProfileController.php).
+- Test: change name/email in workspace profile settings; expect successful save and redirect back to the same workspace profile page.
+
+## Changed File Locations
+
+```
+app/
+└── Http/
+	└── Controllers/
+		└── Settings/
+			└── ProfileController.php   # Redirect now includes workspace param after update
+```
