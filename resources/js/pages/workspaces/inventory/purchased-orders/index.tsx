@@ -417,6 +417,7 @@ const Index = ({ workspace }: Props) => {
         return params.get('debugEmpty') === '1';
     }, []);
     const hasActiveFilters = query.trim().length > 0 || statusFilter !== 'all' || Boolean(startDate) || Boolean(endDate);
+    const canClearDateRange = Boolean(startDate && endDate);
     const isEffectivelyEmpty = forceDebugEmptyState || rows.length === 0;
     const showEmptyState = !loading && isEffectivelyEmpty;
     const useFilteredEmptyCopy = hasActiveFilters;
@@ -803,12 +804,13 @@ const Index = ({ workspace }: Props) => {
                                 <div className="mt-2 flex items-center justify-end border-t border-black/6 pt-2 dark:border-white/10">
                                     <button
                                         type="button"
+                                        disabled={!canClearDateRange}
                                         onClick={() => {
                                             setStartDate('');
                                             setEndDate('');
                                             setDatePickerOpen(false);
                                         }}
-                                        className="rounded-md px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-black/3 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-gray-100"
+                                        className="rounded-md px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-black/3 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-gray-100 dark:disabled:hover:text-gray-300"
                                     >
                                         Clear Selection
                                     </button>
