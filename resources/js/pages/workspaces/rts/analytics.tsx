@@ -9,6 +9,7 @@ import PriceCard from '@/components/rts/PriceCard';
 import ProductCard from '@/components/rts/ProductCard';
 import AdCard from '@/components/rts/AdCard';
 import ConfirmedByCard from '@/components/rts/ConfirmedByCard';
+import OrderFrequencyCard from '@/components/rts/OrderFrequencyCard';
 import RiderCard from '@/components/rts/RiderCard';
 import { RtsQueryParams } from '@/components/rts/rts-shared';
 import { Workspace } from '@/types/models/Workspace';
@@ -73,6 +74,7 @@ export default function Analytics({ workspace }: Props) {
                 <RiderCard workspaceSlug={workspace.slug} queryParams={queryParams} />
                 <ConfirmedByCard workspaceSlug={workspace.slug} queryParams={queryParams} />
                 <AdCard workspaceSlug={workspace.slug} queryParams={queryParams} />
+                <OrderFrequencyCard workspaceSlug={workspace.slug} queryParams={queryParams} />
                 <LocationCard workspaceSlug={workspace.slug} queryParams={queryParams} />
             </div>
         </AppLayout>

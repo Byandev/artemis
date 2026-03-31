@@ -11,6 +11,7 @@ use App\Queries\RtsOrderItemQuery;
 use App\Queries\RtsPriceQuery;
 use App\Queries\RtsAdQuery;
 use App\Queries\RtsConfirmedByQuery;
+use App\Queries\RtsOrderFrequencyQuery;
 use App\Queries\RtsRiderQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -75,6 +76,13 @@ class AnalyticController extends Controller
             (new RtsConfirmedByQuery($workspace, $request))
                 ->sort($request->input('sort', '-total_orders'))
                 ->get($request->input('per_page', 15))
+        );
+    }
+
+    public function groupByOrderFrequency(Request $request, Workspace $workspace)
+    {
+        return response()->json(
+            (new RtsOrderFrequencyQuery($workspace, $request))->get()
         );
     }
 
