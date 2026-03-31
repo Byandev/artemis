@@ -5,18 +5,15 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryPurchasedOrder;
 use App\Models\Workspace;
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Validation\ValidationException;
 
 class InventoryPurchasedOrderController extends Controller
 {
     private const STATUS_VALUES = '1,2,3,4,5,6,7,8';
     private const DEFAULT_PER_PAGE = 50;
-    private const MAX_DATE_RANGE_DAYS = 93;
 
     private function normalizeIssueDate(InventoryPurchasedOrder $row): array
     {
@@ -111,16 +108,6 @@ class InventoryPurchasedOrderController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1'],
             'show_all' => ['nullable', 'boolean'],
         ]);
-
-        if (! empty($validated['start_date']) && ! empty($validated['end_date'])) {
-            $start = Carbon::parse($validated['start_date']);
-            $end = Carbon::parse($validated['end_date']);
-            if ($start->diffInDays($end) > self::MAX_DATE_RANGE_DAYS) {
-                throw ValidationException::withMessages([
-                    'end_date' => ['Date range cannot exceed '.self::MAX_DATE_RANGE_DAYS.' days.'],
-                ]);
-            }
-        }
 
         $query = $this->baseQuery($request);
         $this->applyFilters($query, $validated);
