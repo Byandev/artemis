@@ -419,7 +419,7 @@ const Index = ({ workspace }: Props) => {
     const hasActiveFilters = query.trim().length > 0 || statusFilter !== 'all' || Boolean(startDate) || Boolean(endDate);
     const isEffectivelyEmpty = forceDebugEmptyState || rows.length === 0;
     const showEmptyState = !loading && isEffectivelyEmpty;
-    const useFilteredEmptyCopy = hasActiveFilters || forceDebugEmptyState;
+    const useFilteredEmptyCopy = hasActiveFilters;
     const emptyStateTitle = useFilteredEmptyCopy ? 'No PO Records found' : 'No records yet';
     const emptyStateDescription = useFilteredEmptyCopy
         ? 'Try adjusting your search or selected period'
@@ -800,6 +800,19 @@ const Index = ({ workspace }: Props) => {
                                     }}
                                     className="rounded-[10px] bg-white p-0 text-xs dark:bg-zinc-900"
                                 />
+                                <div className="mt-2 flex items-center justify-end border-t border-black/6 pt-2 dark:border-white/10">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setStartDate('');
+                                            setEndDate('');
+                                            setDatePickerOpen(false);
+                                        }}
+                                        className="rounded-md px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-black/3 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-gray-100"
+                                    >
+                                        Clear Selection
+                                    </button>
+                                </div>
                             </PopoverContent>
                         </Popover>
 
@@ -1008,6 +1021,18 @@ const Index = ({ workspace }: Props) => {
                                                     }}
                                                     className="rounded-[10px] bg-white p-0 text-xs dark:bg-zinc-900"
                                                 />
+                                                <div className="mt-2 flex items-center justify-end border-t border-black/6 pt-2 dark:border-white/10">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setAddItemForm((prev) => ({ ...prev, issue_date: '' }));
+                                                            setAddItemDatePickerOpen(false);
+                                                        }}
+                                                        className="rounded-md px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-black/3 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-gray-100"
+                                                    >
+                                                        Clear Selection
+                                                    </button>
+                                                </div>
                                             </PopoverContent>
                                         </Popover>
                                         {addItemFieldErrors.issue_date && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.issue_date}</p>}
@@ -1210,7 +1235,7 @@ const Index = ({ workspace }: Props) => {
                                         setDeleteModalOpen(false);
                                         setRowToDelete(null);
                                     }}
-                                    className="h-9 min-w-[112px] rounded-lg border border-black/8 bg-white px-5 text-xs font-semibold text-gray-600 transition-colors hover:bg-black/2 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5"
+                                    className="h-9 min-w-28 rounded-lg border border-black/8 bg-white px-5 text-xs font-semibold text-gray-600 transition-colors hover:bg-black/2 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5"
                                 >
                                     CANCEL
                                 </button>
@@ -1218,7 +1243,7 @@ const Index = ({ workspace }: Props) => {
                                     type="button"
                                     disabled={deleteSubmitting}
                                     onClick={() => void confirmDelete()}
-                                    className="h-9 min-w-[112px] rounded-lg bg-red-600 px-5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-red-500 dark:hover:bg-red-400"
+                                    className="h-9 min-w-28 rounded-lg bg-red-600 px-5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-red-500 dark:hover:bg-red-400"
                                 >
                                     {deleteSubmitting ? 'DELETING...' : 'DELETE'}
                                 </button>
@@ -1229,7 +1254,24 @@ const Index = ({ workspace }: Props) => {
 
                 <div className="relative overflow-visible">
                     <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                        {showEmptyState ? (
+                        {loading ? (
+                            <div className="flex min-h-[620px] flex-col items-center justify-center px-4">
+                                <div className="relative h-40 w-40">
+                                    <div className="absolute inset-0 rounded-full border-12 border-gray-300/90" />
+                                    <div className="absolute inset-0 animate-spin rounded-full border-12 border-transparent border-r-[#16d5b2] border-b-[#16d5b2]" />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <img
+                                            src="/img/logo/artemis.png"
+                                            alt="Artemis"
+                                            className="h-[70px] w-[70px] object-contain"
+                                        />
+                                    </div>
+                                </div>
+                                <p className="mt-4 text-[44px] font-medium tracking-[0.03em] text-gray-900" style={{ fontFamily: MONO_FONT }}>
+                                    LOADING...
+                                </p>
+                            </div>
+                        ) : showEmptyState ? (
                             <div className="flex min-h-[500px] flex-col items-center justify-center px-4 text-center">
                                 <h3 className="text-[40px] font-semibold tracking-[-0.02em] text-gray-900 dark:text-gray-100">{emptyStateTitle}</h3>
                                 <p className="mt-2 text-[18px] text-gray-400 dark:text-gray-500">{emptyStateDescription}</p>
@@ -1263,13 +1305,7 @@ const Index = ({ workspace }: Props) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-black/6 bg-white text-gray-500 dark:divide-white/6 dark:bg-zinc-900 dark:text-gray-300">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={10} className="px-3 py-10 text-center text-zinc-500">
-                                        Loading...
-                                    </td>
-                                </tr>
-                            ) : rows.length === 0 ? (
+                            {rows.length === 0 ? (
                                 <tr>
                                     <td colSpan={10} className="px-3 py-10 text-center text-zinc-500">
                                         No records yet.
@@ -1370,6 +1406,7 @@ const Index = ({ workspace }: Props) => {
                     </div>
                 </div>
 
+                {!loading && (
                 <div className="mt-3 grid grid-cols-3 items-center gap-3 px-1">
                     <p className="text-[11px] text-gray-400">Showing {fromRow} - {toRow} of {totalRows} results</p>
 
@@ -1431,6 +1468,7 @@ const Index = ({ workspace }: Props) => {
 
                     <div />
                 </div>
+                )}
             </div>
         </AppLayout>
     );
