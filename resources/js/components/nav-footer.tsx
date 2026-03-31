@@ -7,6 +7,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
+import { Link } from '@inertiajs/react';
 import { type ComponentPropsWithoutRef } from 'react';
 
 export function NavFooter({
@@ -29,14 +30,18 @@ export function NavFooter({
                                 asChild
                                 className="text-neutral-600 hover:text-neutral-800 dark:text-neutral-300 dark:hover:text-neutral-100"
                             >
-                                <a
+                                <Link
                                     href={
                                         typeof item.href === 'string'
                                             ? item.href
                                             : item.href.url
                                     }
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                    method={
+                                        typeof item.href === 'object' && 'method' in item.href
+                                            ? item.href.method
+                                            : undefined
+                                    }
+                                    as="button"
                                 >
                                     {item.icon && (
                                         <Icon
@@ -45,7 +50,7 @@ export function NavFooter({
                                         />
                                     )}
                                     <span>{item.title}</span>
-                                </a>
+                                </Link>
                             </SidebarMenuButton>
                         </SidebarMenuItem>
                     ))}

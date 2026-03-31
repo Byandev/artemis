@@ -18,7 +18,7 @@ export interface NavGroup {
 
 export interface NavItem {
     title: string;
-    href: NonNullable<InertiaLinkProps['href']>;
+    href: NonNullable<InertiaLinkProps['href']> | { url: string; method?: string };
     icon?: LucideIcon | null;
     isActive?: boolean;
     items?: NavItem[]
