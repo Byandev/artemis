@@ -31,5 +31,6 @@ export interface Order {
   created_at: string | null;
   updated_at: string | null;
   shipping_address?: ShippingAddress;
-  items?: OrderItem[]
+  items?: OrderItem[];
+  cx_rts_rate?: number | null;
 }
