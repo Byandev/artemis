@@ -1,41 +1,34 @@
-# Branch Changelog
+# Inventory PO Management Readme
 
 Branch: `feature/inventory-po-management`
 
-This document summarizes the work in this branch using recent commit messages.
+## Overview
 
-## Commits (Newest to Oldest)
+This branch delivers the Inventory Purchased Orders experience in the web app. It includes filtering, pagination, add/edit/delete flows, and UI polish for PO management.
 
-- `7e7806b9` removed the max date range for calendar
-- `42c9c7a5` cleaned backend codes and removed max date range for calendar
-- `bb2dc9ef` added validation for clearing selection in calendar
-- `c0a2d92c` replace refresh label to refresh icon in the filter
-- `f6e50548` changed "status" into "All Status" by default
-- `2c3cd076` added clear date range selection
-- `542a8ae5` added empty data filtering
-- `a6b2359d` added delete po management data controller
-- `a72f490d` added api for deleting product orders
-- `9c9e220d` added "add item" modal design refinement
-- `36d45b5a` added add item modal
-- `54ba5df5` remove excess tsx
-- `027cfcee` added logic for adding item in the po management
-- `b6bf6a70` added po management add item
-- `21359242` added po management "add item" feature
-- `646e909f` fix button labels for action
-- `2ace9b86` Final PO Management Main
-- `c2e83ba3` final working data filtering with design
-- `b014126c` fix start date and end date logic (work as set, start date and end date vice versa)
-- `3d869f7c` working date filtering (range)
-- `058cc50c` Added condition in the select date input to choose only on the current and past dates
-- `63ab618a` Added refinement on "Issue Date" column to show only the formatted date "MM/DD/YYYY"
-- `395a7490` Added divider in action button and removed redundant pagination button
-- `ca4a9fa1` Design adjustment on dropdown and refinement on filter for dates
-- `ab5eeec6` Revised main frontend design w/o modal
+## Recent Frontend Changes
 
-## Functional Summary
+- Extracted shared PO helpers in [resources/js/utils/purchased-orders.ts](resources/js/utils/purchased-orders.ts) for totals math, pagination windowing, empty-state copy, item options, and status labels.
+- Centralized HTTP handling in [resources/js/utils/http.ts](resources/js/utils/http.ts) so CSRF headers are always sent (fixes DELETE/GET CSRF mismatch).
+- Refactored the main page [resources/js/pages/workspaces/inventory/purchased-orders/index.tsx](resources/js/pages/workspaces/inventory/purchased-orders/index.tsx) to use the shared helpers and slimmer in-page logic.
 
-- Implemented PO Management UI and filtering workflow.
-- Added date range filtering refinements and clear-selection behavior.
-- Added Add Item modal flow and delete API/controller support.
-- Improved empty-state handling and filter controls.
-- Refined loading/filter action controls and backend cleanup.
+## Feature Summary
+
+- PO listing with status/date/text filters, pagination, and formatted money/date display.
+- Add/Edit modal with validation, auto-total computation, and status selection.
+- Delete flow with confirmation dialog.
+- Empty states that adapt copy when filters are applied.
+
+## Dev Notes
+
+- API base comes from `VITE_API_BASE_URL`; falls back to localhost during Vite dev.
+- CSRF token is read from `<meta name="csrf-token">` or `XSRF-TOKEN` cookie; requests include `X-CSRF-TOKEN` and `credentials: 'include'`.
+- Pagination window shows up to five pages, centered around the current page when possible.
+- Totals: `cog_amount + delivery_fee`, shown when either field has a value.
+
+## Quick Manual Test Plan
+
+- Load PO list; verify pagination and totals rows update with filters.
+- Apply status/text/date filters; confirm empty-state copy switches when filtered.
+- Add a PO (ensure total auto-updates); edit an existing PO; delete a PO (CSRF should succeed).
+- Toggle status inline; ensure badge updates and persists on refresh.
