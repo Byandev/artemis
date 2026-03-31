@@ -46,16 +46,16 @@ export function createRmoColumns({
 
 
     return [
-        {
-            id: 'order_number',
-            accessorKey: 'order_number',
-            header: ({ column }) => <SortableHeader column={column} title="Order #" />,
-            cell: ({ row }) => (
-                <span className="font-mono text-[12px] text-gray-500 dark:text-gray-400">
-                    {row.original.order.order_number}
-                </span>
-            ),
-        },
+        // {
+        //     id: 'order_number',
+        //     accessorKey: 'order_number',
+        //     header: ({ column }) => <SortableHeader column={column} title="Order #" />,
+        //     cell: ({ row }) => (
+        //         <span className="font-mono text-[12px] text-gray-500 dark:text-gray-400">
+        //             {row.original.order.order_number}
+        //         </span>
+        //     ),
+        // },
         {
             accessorFn: (row) => (row.order.items ?? []).map((item) => item.name).join(', '),
             id: 'items',
@@ -169,16 +169,20 @@ export function createRmoColumns({
             ),
         },
         {
-            id: 'order_shipping_address_city_order_summary_rts_rate',
-            accessorKey: 'order.shipping_address.city_order_summary.rts_rate',
+            id: 'order_delivery_attempts',
+            accessorKey: 'order.delivery_attempts',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Loc. RTS" />,
+            header: ({ column }) => <SortableHeader column={column} title="Attempts" />,
             cell: ({ row }) => {
-                const rate = row.original.order?.shipping_address?.city_order_summary?.rts_rate ?? 0;
-                const isHigh = rate >= 0.4;
+                const attempts = row.original.order.delivery_attempts ?? 0;
+                const isMultiple = attempts > 1;
                 return (
-                    <span className={`text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                        {percentageFormatter(rate)}
+                    <span className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums ${
+                        isMultiple
+                            ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+                            : 'text-gray-500 dark:text-gray-400'
+                    }`}>
+                        {attempts}
                     </span>
                 );
             },
@@ -201,20 +205,33 @@ export function createRmoColumns({
             },
         },
         {
-            id: 'order_delivery_attempts',
-            accessorKey: 'order.delivery_attempts',
+            id: 'order_shipping_address_city_order_summary_rts_rate',
+            accessorKey: 'order.shipping_address.city_order_summary.rts_rate',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Attempts" />,
+            header: ({ column }) => <SortableHeader column={column} title="Loc. RTS" />,
             cell: ({ row }) => {
-                const attempts = row.original.order.delivery_attempts ?? 0;
-                const isMultiple = attempts > 1;
+                const rate = row.original.order?.shipping_address?.city_order_summary?.rts_rate ?? 0;
+                const isHigh = rate >= 0.4;
                 return (
-                    <span className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums ${
-                        isMultiple
-                            ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
-                            : 'text-gray-500 dark:text-gray-400'
-                    }`}>
-                        {attempts}
+                    <span className={`text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                        {percentageFormatter(rate)}
+                    </span>
+                );
+            },
+        },
+        {
+            id: 'rider_rts_rate',
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Rider RTS" />,
+            cell: ({ row }) => {
+                const rate = row.original.rider_rts_rate ?? null;
+                if (rate === null) {
+                    return <span className="text-[12px] text-gray-300 dark:text-gray-600">—</span>;
+                }
+                const isHigh = rate >= 0.4;
+                return (
+                    <span className={`text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                        {percentageFormatter(rate)}
                     </span>
                 );
             },
