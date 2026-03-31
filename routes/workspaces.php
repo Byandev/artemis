@@ -7,6 +7,7 @@ use App\Http\Controllers\Workspaces\AdsManager\CampaignController;
 use App\Http\Controllers\Workspaces\AdsManager\OptimizationRuleController;
 use App\Http\Controllers\Workspaces\Botcake\FlowController;
 use App\Http\Controllers\Workspaces\Botcake\SequenceController;
+use App\Http\Controllers\Workspaces\EmployeeController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\ProductController;
@@ -17,7 +18,6 @@ use App\Http\Controllers\Workspaces\RTS\AnalyticController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
-use App\Http\Controllers\Workspaces\EmployeeController;
 use App\Http\Controllers\Workspaces\TeamController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
@@ -25,6 +25,7 @@ use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
+use Modules\Inventory\Http\Controllers\PpwController;
 use Modules\Inventory\Http\Controllers\PurchaseOrderController;
 
 /*
@@ -107,12 +108,13 @@ Route::middleware(['auth'])->group(function () {
         return redirect()->route('workspaces.rts.analytics', $workspace);
     })->name('workspaces.rts');
     Route::get('/workspaces/{workspace}/rts/analytics', [AnalyticController::class, 'index'])->name('workspaces.rts.analytics');
-    Route::get('/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'index'])->name('workspaces.rts.rmo-management');
-    Route::post('/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'updateStatus'])->name('workspaces.rts.rmo-updateStatus');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/order-item', [AnalyticController::class, 'groupByOrderItem'])->name('workspaces.rts.analytics.group-by-order-item');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/price', [AnalyticController::class, 'groupByPrice'])->name('workspaces.rts.analytics.group-by-price');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/cx-rts', [AnalyticController::class, 'groupByCxRts'])->name('workspaces.rts.analytics.group-by-cx-rts');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/delivery-attempts', [AnalyticController::class, 'groupByDeliveryAttempts'])->name('workspaces.rts.analytics.group-by-delivery-attempts');
+    Route::get('/workspaces/{workspace}/rts/analytics/group-by/ad', [AnalyticController::class, 'groupByAd'])->name('workspaces.rts.analytics.group-by-ad');
+    Route::get('/workspaces/{workspace}/rts/analytics/group-by/order-frequency', [AnalyticController::class, 'groupByOrderFrequency'])->name('workspaces.rts.analytics.group-by-order-frequency');
+    Route::get('/workspaces/{workspace}/rts/analytics/group-by/confirmed-by', [AnalyticController::class, 'groupByConfirmedBy'])->name('workspaces.rts.analytics.group-by-confirmed-by');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/rider', [AnalyticController::class, 'groupByRider'])->name('workspaces.rts.analytics.group-by-rider');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/provinces', [AnalyticController::class, 'groupByProvinces'])->name('workspaces.rts.analytics.group-by-provinces');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/cities', [AnalyticController::class, 'groupByCities'])->name('workspaces.rts.analytics.group-by-cities');
@@ -160,7 +162,17 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/botcake/sequences', [SequenceController::class, 'index'])->name('workspaces.botcake.sequences.index');
     Route::get('/workspaces/{workspace}/inventory/purchased-orders', [PurchaseOrderController::class, 'index'])->name('workspaces.inventory.purchased-orders.index');
     Route::get('/workspaces/{workspace}/inventory/purchased-orders/create', [PurchaseOrderController::class, 'create'])->name('workspaces.inventory.purchased-orders.create');
+
+    // PPW ROUTES
+    Route::prefix('/workspaces/{workspace}/inventory/ppw')->name('workspaces.inventory.ppw.')->group(function () {
+    Route::get('/', [PpwController::class, 'index'])->name('index');
+    Route::post('/', [PpwController::class, 'store'])->name('store');
+    Route::put('/{ppw}', [PpwController::class, 'update'])->name('update');
+    Route::delete('/{ppw}', [PpwController::class, 'destroy'])->name('destroy');
+    });
+
 });
+
 
 // Public invitation routes (guest or authenticated)
 Route::get('/workspaces/invitations/{token}', [WorkspaceInvitationController::class, 'show'])->name('workspaces.invitations.show');
@@ -180,3 +192,4 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
     Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
 
 });
+
