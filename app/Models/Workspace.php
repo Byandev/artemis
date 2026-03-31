@@ -189,4 +189,13 @@ class Workspace extends Model
             ->wherePivot('role', 'admin')
             ->exists();
     }
+
+    public function pageOwners()
+    {
+        return $this->belongsToMany(User::class, 'workspace_user')
+            ->has('pages')
+            ->withTimestamps()
+            ->withPivot('role', 'role_id')
+            ->using(WorkspaceUser::class);
+    }
 }

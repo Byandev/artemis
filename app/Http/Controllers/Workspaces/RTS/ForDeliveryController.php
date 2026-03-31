@@ -14,6 +14,7 @@ use App\Http\Sorts\Order\ForDelivery\OrderDeliveryAttemptSort;
 use App\Http\Sorts\Order\ForDelivery\OrderNumberSort;
 use App\Http\Sorts\Order\ForDelivery\OrderParcelStatusSort;
 use App\Http\Sorts\Order\ForDelivery\OrderTrackingCodeSort;
+use App\Models\Page;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -110,6 +111,13 @@ class ForDeliveryController extends Controller
                         $orderQuery->whereIn('parcel_status', $values);
                     });
                 }),
+                AllowedFilter::callback('user_id', function ($query, $value) use ($workspace) {
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $pageIds = Page::whereIn('owner_id', $values)
+                        ->where('workspace_id', $workspace->id)
+                        ->pluck('id');
+                    $query->whereIn('page_id', $pageIds);
+                }),
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where(function ($q) use ($value) {
                         $q->whereHas('order', function ($orderQuery) use ($value) {
@@ -195,7 +203,7 @@ class ForDeliveryController extends Controller
 
         $users = User::get(['id', 'name']);
 
-        $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id']);
+        $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id', 'pageOwners:id,name']);
 
         return Inertia::render('workspaces/rts/public-pages/rmo-management', [
             'orders' => $items,

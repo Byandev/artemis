@@ -40,6 +40,7 @@ interface Props {
             status?: string | string[];
             page_id?: string | string[];
             shop_id?: string | string[];
+            user_id?: string | string[];
             parcel_status?: string | string[];
         };
         page?: number;
@@ -81,6 +82,12 @@ export default function RmoManagement({
             : []
     );
 
+    const [selectedUserIds, setSelectedUserIds] = useState<string[]>(() =>
+        query?.filter?.user_id
+            ? (Array.isArray(query.filter.user_id) ? query.filter.user_id : query.filter.user_id.split(',').filter(Boolean))
+            : []
+    );
+
     // Use URL as source of truth for status (avoids stale closure issues with select)
     const currentStatus = useMemo(() => Array.isArray(query?.filter?.status)
         ? (query.filter.status[0] ?? '')
@@ -100,16 +107,36 @@ export default function RmoManagement({
             productIds: [],
             shopIds: selectedShopIds.map(Number),
             pageIds: selectedPageIds.map(Number),
-            userIds: [],
+            userIds: selectedUserIds.map(Number),
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [],
     );
 
     const handleFilterChange = useCallback((value: FilterValue) => {
-        setSelectedPageIds(value.pageIds.map(String));
-        setSelectedShopIds(value.shopIds.map(String));
-    }, [setSelectedPageIds, setSelectedShopIds]);
+        const newPageIds = value.pageIds.map(String);
+        const newShopIds = value.shopIds.map(String);
+        const newUserIds = value.userIds.map(String);
+
+        setSelectedPageIds(newPageIds);
+        setSelectedShopIds(newShopIds);
+        setSelectedUserIds(newUserIds);
+
+        router.get(
+            publicPage.rmoManagement({ workspace }),
+            {
+                sort: query?.sort || undefined,
+                'filter[search]': searchValue || undefined,
+                ...(currentStatus ? { 'filter[status]': currentStatus } : {}),
+                ...(currentParcelStatus ? { 'filter[parcel_status]': currentParcelStatus } : {}),
+                ...(newPageIds.length ? { 'filter[page_id]': newPageIds.join(',') } : {}),
+                ...(newShopIds.length ? { 'filter[shop_id]': newShopIds.join(',') } : {}),
+                ...(newUserIds.length ? { 'filter[user_id]': newUserIds.join(',') } : {}),
+                page: 1,
+            },
+            { preserveState: true, replace: true, preserveScroll: true },
+        );
+    }, [workspace, query?.sort, searchValue, currentStatus, currentParcelStatus]);
 
     const buildAllParams = useCallback(
         (sort?: string | null, page?: number, status?: string, parcelStatus?: string) => ({
@@ -123,9 +150,10 @@ export default function RmoManagement({
                 : (currentParcelStatus ? { 'filter[parcel_status]': currentParcelStatus } : {})),
             ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
             ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
+            ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
             page: page ?? 1,
         }),
-        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds],
+        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds],
     );
 
     const handleStatusChange = useCallback(
@@ -154,6 +182,18 @@ export default function RmoManagement({
         const name = localStorage.getItem('user_name');
         if (name) setUserName(name);
     }, []);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            router.get(
+                publicPage.rmoManagement({ workspace }),
+                buildAllParams(query?.sort, 1),
+                { preserveState: true, replace: true, preserveScroll: true },
+            );
+        }, 400);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchValue]);
 
 
     const doAssign = useCallback(
@@ -632,9 +672,10 @@ export default function RmoManagement({
                                     ...(currentParcelStatus ? { 'filter[parcel_status]': currentParcelStatus } : {}),
                                     ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
                                     ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
+                                    ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
                                     page: params?.page ?? 1,
                                 },
-                                { preserveState: false, replace: true, preserveScroll: true },
+                                { preserveState: true, replace: true, preserveScroll: true },
                             );
                         }}
                     />
