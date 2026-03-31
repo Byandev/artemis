@@ -11,9 +11,12 @@ export const request = async (method: string, url: string, options: RequestOptio
 
     if (options.body !== undefined) {
         headers['Content-Type'] = 'application/json';
-        if (options.csrfToken) {
-            headers['X-CSRF-TOKEN'] = options.csrfToken;
-        }
+    }
+
+    // Send CSRF token on all requests to satisfy Laravel/Sanctum protection,
+    // even when there's no JSON body (DELETE/GET with query params).
+    if (options.csrfToken) {
+        headers['X-CSRF-TOKEN'] = options.csrfToken;
     }
 
     const res = await fetch(url, {
