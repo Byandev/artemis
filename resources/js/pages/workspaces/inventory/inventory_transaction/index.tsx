@@ -18,7 +18,7 @@ import {
 import { useState, useEffect } from 'react';
 import { toast, Toaster } from 'sonner';
 import { Workspace } from '@/types/models/Workspace';
-import { Inventory } from '@/types/models/Inventory';
+import { InventoryTransaction } from '@/types/models/Inventory';
 import InventoryFormDialog from '@/components/inventory/inventory-form-dialog';
 import PageHeader from '@/components/common/PageHeader';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -28,7 +28,7 @@ import { omit } from 'lodash';
 
 interface Props {
     inventory: {
-        data: Inventory[];
+        data: InventoryTransaction[];
         total: number;
         from: number;
         to: number;
@@ -46,12 +46,10 @@ interface Props {
 }
 
 export default function Index({ inventory, workspace, query }: Props) {
-    // Aligned with your controller's 'search' parameter
     const [searchQuery, setSearchQuery] = useState(query?.search ?? '');
     const [openFormModal, setOpenFormModal] = useState(false);
-    const [selectedInventory, setSelectedInventory] = useState<Inventory | undefined>(undefined);
+    const [selectedInventory, setSelectedInventory] = useState<InventoryTransaction | undefined>(undefined);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-    const [inventoryToDelete, setInventoryToDelete] = useState<Inventory | null>(null);
     const [dateRange, setDateRange] = useState<string[]>([]);
 
     useEffect(() => {
@@ -76,29 +74,29 @@ export default function Index({ inventory, workspace, query }: Props) {
         return () => clearTimeout(timer);
     }, [searchQuery, dateRange]);
 
-    const handleEdit = (item: Inventory) => {
+    const handleEdit = (item: InventoryTransaction) => {
         setSelectedInventory(item);
         setOpenFormModal(true);
     };
 
-    const confirmDelete = (item: Inventory) => {
-        setInventoryToDelete(item);
+    const confirmDelete = (item: InventoryTransaction) => {
+        setSelectedInventory(item);
         setDeleteModalOpen(true);
     };
 
     const handleDeleteAction = () => {
-        if (!inventoryToDelete) return;
+        if (!selectedInventory) return;
 
-        router.delete(`/workspaces/${workspace.slug}/inventory_transaction/${inventoryToDelete.id}`, {
+        router.delete(`/workspaces/${workspace.slug}/inventory_transaction/${selectedInventory.id}`, {
             onSuccess: () => {
                 setDeleteModalOpen(false);
-                setInventoryToDelete(null);
+                setSelectedInventory(undefined);
                 toast.success('Record deleted successfully');
             }
         });
     };
 
-    const columns: ColumnDef<Inventory>[] = [
+    const columns: ColumnDef<InventoryTransaction>[] = [
         {
             accessorKey: 'date',
             header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Date</div>,
@@ -210,13 +208,17 @@ export default function Index({ inventory, workspace, query }: Props) {
             <Head title="Transaction Logs" />
             <Toaster position="top-right" richColors />
 
-            <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+            <Dialog open={deleteModalOpen}
+                onOpenChange={(open) => {
+                    setDeleteModalOpen(open);
+                    if (!open) setSelectedInventory(undefined);
+                }}>
                 <DialogContent className="max-w-[400px] p-0 overflow-hidden border-none bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl">
                     <div className="p-6">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">Delete Transaction</DialogTitle>
                             <DialogDescription className="text-[13px] text-gray-500 dark:text-gray-400 mt-2">
-                                Are you sure you want to delete <span className="font-medium text-gray-900 dark:text-white">{inventoryToDelete?.ref_no || 'this transaction'}</span>?
+                                Are you sure you want to delete <span className="font-medium text-gray-900 dark:text-white">{selectedInventory?.ref_no || 'this transaction'}</span>?
                                 This action cannot be undone.
                             </DialogDescription>
                         </DialogHeader>

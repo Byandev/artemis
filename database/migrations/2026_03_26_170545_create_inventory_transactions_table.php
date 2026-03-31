@@ -12,8 +12,8 @@ return new class extends Migration {
     {
         Schema::create('inventory_transactions', function (Blueprint $table) {
             $table->id();
-            $table->date('date')->nullable();
-            $table->string('ref_no')->nullable();
+            $table->date('date');
+            $table->string('ref_no');
             $table->integer('po_qty_in')->default(0);
             $table->integer('po_qty_out')->default(0);
             $table->integer('rts_goods_out')->default(0);
@@ -28,6 +28,6 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists('inventory_transactions_table');
+        Schema::dropIfExists('inventory_transactions');
     }
 };

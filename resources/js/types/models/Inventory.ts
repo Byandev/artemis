@@ -1,4 +1,4 @@
-export interface Inventory {
+export interface InventoryTransaction {
     id: number;
     date: string | null;
     ref_no: string | null;

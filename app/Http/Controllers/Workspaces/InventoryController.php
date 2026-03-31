@@ -15,6 +15,7 @@ class InventoryController extends Controller
     {
 
         $query = Inventory::where('workspace_id', $workspace->id);
+        // $query = Inventory::query();
 
         if ($request->filled('search')) {
             $query->where('ref_no', 'like', '%' . $request->search . '%');
@@ -25,12 +26,7 @@ class InventoryController extends Controller
 
         $inventory = $query->orderBy('date', 'asc')
             ->paginate(10)
-            ->withQueryString()
-            ->through(function ($item) {
-                $item->remaining_qty = ((int) $item->po_qty_in + (int) $item->rts_goods_in)
-                    - ((int) $item->po_qty_out + (int) $item->rts_goods_out + (int) $item->rts_bad);
-                return $item;
-            });
+            ->withQueryString();
 
         return Inertia::render('workspaces/inventory/inventory_transaction/index', [
             'workspace' => $workspace,
