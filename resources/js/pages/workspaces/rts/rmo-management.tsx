@@ -211,7 +211,7 @@ export default function RmoManagement({
 
     const orderStatusOptions = useMemo(
         () =>
-            statusOptions.map((status) => ({
+            Object.keys(orderStatusConfig).map((status) => ({
                 id: status,
                 name: status.replace(/_/g, ' '),
                 dot: orderStatusConfig[status]?.dot || 'bg-gray-400',
@@ -295,7 +295,7 @@ export default function RmoManagement({
 
     return (
         <AppLayout>
-            <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
+            <div className="mx-auto w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
                     title="RMO Management"
                     description="Track and update delivery status for items out today"
