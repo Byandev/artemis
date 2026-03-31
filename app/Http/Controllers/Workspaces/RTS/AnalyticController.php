@@ -9,6 +9,7 @@ use App\Queries\RtsDeliveryAttemptsQuery;
 use App\Queries\RtsLocationQuery;
 use App\Queries\RtsOrderItemQuery;
 use App\Queries\RtsPriceQuery;
+use App\Queries\RtsAdQuery;
 use App\Queries\RtsConfirmedByQuery;
 use App\Queries\RtsRiderQuery;
 use Illuminate\Http\Request;
@@ -56,6 +57,15 @@ class AnalyticController extends Controller
             (new RtsCxQuery($workspace, $request))
                 ->ofType($request->input('type', 'latest'))
                 ->get()
+        );
+    }
+
+    public function groupByAd(Request $request, Workspace $workspace)
+    {
+        return response()->json(
+            (new RtsAdQuery($workspace, $request))
+                ->sort($request->input('sort', '-total_orders'))
+                ->get($request->input('per_page', 15))
         );
     }
 

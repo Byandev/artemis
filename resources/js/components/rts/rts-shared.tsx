@@ -41,6 +41,15 @@ export type PriceRow = {
     rts_rate_percentage: number;
 };
 
+export type AdRow = {
+    ad_id: string | null;
+    ad_name: string | null;
+    total_orders: number;
+    delivered_count: number;
+    returned_count: number;
+    rts_rate_percentage: number;
+};
+
 export type ConfirmedByRow = {
     confirmed_by_name: string | null;
     total_orders: number;
