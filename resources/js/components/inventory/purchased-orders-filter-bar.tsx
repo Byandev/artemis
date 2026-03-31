@@ -1,9 +1,9 @@
 import { Dispatch, SetStateAction } from 'react';
-import { ChevronDown, Filter, RefreshCw, Search } from 'lucide-react';
+import { ChevronDown, Filter, RotateCcw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import DatePicker from '@/components/ui/date-picker';
-import { StatusId, StatusOption } from '@/components/inventory/purchased-orders-types';
+import { StatusId, StatusOption } from '@/types/models/PurchasedOrder';
 
 interface PurchasedOrdersFilterBarProps {
     startDate: string;
@@ -13,9 +13,9 @@ interface PurchasedOrdersFilterBarProps {
     setQuery: Dispatch<SetStateAction<string>>;
     statusFilterLabel: string;
     statusOptions: StatusOption[];
-    statusOptionTextClass: (status: StatusId) => string;
+    statusOptionTextClass: (status: StatusId | string) => string;
     setStatusFilter: Dispatch<SetStateAction<string>>;
-    onLoad: () => void;
+    onResetFilters: () => void;
     loading: boolean;
 }
 
@@ -29,7 +29,7 @@ export function PurchasedOrdersFilterBar({
     statusOptions,
     statusOptionTextClass,
     setStatusFilter,
-    onLoad,
+    onResetFilters,
     loading,
 }: PurchasedOrdersFilterBarProps) {
     return (
@@ -103,13 +103,13 @@ export function PurchasedOrdersFilterBar({
 
                 <Button
                     type="button"
-                    onClick={onLoad}
-                    aria-label="Load records"
+                    onClick={onResetFilters}
+                    aria-label="Reset filters"
                     variant="outline"
                     size="icon"
                     className="h-9 w-9 rounded-[10px] border-black/6 bg-white text-gray-500 hover:bg-black/2 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
                 >
-                    <RefreshCw className={['h-3.5 w-3.5', loading ? 'animate-spin' : ''].join(' ')} />
+                    <RotateCcw className={['h-3.5 w-3.5', loading ? 'animate-spin' : ''].join(' ')} />
                 </Button>
             </div>
         </div>

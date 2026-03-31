@@ -2,7 +2,7 @@ import { ChevronDown, Inbox, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { PurchasedOrder, StatusId, StatusOption } from '@/components/inventory/purchased-orders-types';
+import { PurchasedOrder, StatusId, StatusOption } from '@/types/models/PurchasedOrder';
 
 interface PurchasedOrdersTableProps {
     loading: boolean;
@@ -15,10 +15,10 @@ interface PurchasedOrdersTableProps {
     monoFont: string;
     formatIssueDate: (value: string) => string;
     formatMoney: (amount: number) => string;
-    statusBadgeClass: (status: StatusId) => string;
-    statusLabel: (value: number) => string;
+    statusBadgeClass: (status: StatusId | string) => string;
+    statusLabel: (value: StatusId | number | string) => string;
     statusOptions: StatusOption[];
-    statusOptionTextClass: (status: StatusId) => string;
+    statusOptionTextClass: (status: StatusId | string) => string;
     onUpdateStatus: (id: number, status: StatusId) => void;
     onOpenEdit: (row: PurchasedOrder) => void;
     onOpenDelete: (row: PurchasedOrder) => void;

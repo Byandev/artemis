@@ -1,10 +1,8 @@
 import { Calendar, ChevronDown } from 'lucide-react';
-import { Dispatch, RefObject, SetStateAction, useRef } from 'react';
-import { Button } from '@/components/ui/button';
+import { Dispatch, SetStateAction, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-
-export type StatusId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+import { StatusId } from '@/types/models/PurchasedOrder';
 
 export interface AddItemForm {
     issue_date: string;
@@ -15,7 +13,7 @@ export interface AddItemForm {
     cog_amount: string;
     delivery_fee: string;
     total_amount: string;
-    status: string;
+    status: StatusId;
 }
 
 interface AddItemDialogProps {
@@ -29,36 +27,10 @@ interface AddItemDialogProps {
     addItemFieldErrors: Record<string, string>;
     submitting: boolean;
     onSubmit: () => void;
-    addItemDatePickerOpen: boolean;
-    setAddItemDatePickerOpen: Dispatch<SetStateAction<boolean>>;
-    addItemCalendarMonth: Date;
-    setAddItemCalendarMonth: Dispatch<SetStateAction<Date>>;
-    handleAddItemCalendarMonthChange: (next: Date) => void;
-    calendarFromYear: number;
-    calendarToYear: number;
-    maxCalendarMonth: Date;
-    selectableYears: number[];
-    currentYear: number;
-    currentMonthIndex: number;
-    addItemMonthListOpen: boolean;
-    setAddItemMonthListOpen: Dispatch<SetStateAction<boolean>>;
-    addItemYearListOpen: boolean;
-    setAddItemYearListOpen: Dispatch<SetStateAction<boolean>>;
-    addItemMonthDropdownRef: RefObject<HTMLDivElement | null>;
-    addItemYearDropdownRef: RefObject<HTMLDivElement | null>;
-    setAddItemCalendarMonthByYear: (year: number) => void;
-    dateDropdownTriggerClass: string;
-    dropdownPanelClass: string;
-    dropdownOptionBaseClass: string;
-    monthOptions: string[];
-    toInputDate: (date: Date) => string;
-    fromInputDate: (value: string) => Date | undefined;
-    formatDisplayDate: (start: string, end?: string) => string;
-    maxSelectableDate: string;
     statusOptions: Array<{ value: StatusId; label: string }>;
-    statusBadgeClass: (status: StatusId) => string;
-    statusLabel: (value: number) => string;
-    statusOptionTextClass: (status: StatusId) => string;
+    statusBadgeClass: (status: StatusId | string) => string;
+    statusLabel: (value: StatusId | number | string) => string;
+    statusOptionTextClass: (status: StatusId | string) => string;
     monoFont: string;
     sansFont: string;
 }
@@ -74,32 +46,6 @@ export function AddItemDialog({
     addItemFieldErrors,
     submitting,
     onSubmit,
-    addItemDatePickerOpen,
-    setAddItemDatePickerOpen,
-    addItemCalendarMonth,
-    setAddItemCalendarMonth,
-    handleAddItemCalendarMonthChange,
-    calendarFromYear,
-    calendarToYear,
-    maxCalendarMonth,
-    selectableYears,
-    currentYear,
-    currentMonthIndex,
-    addItemMonthListOpen,
-    setAddItemMonthListOpen,
-    addItemYearListOpen,
-    setAddItemYearListOpen,
-    addItemMonthDropdownRef,
-    addItemYearDropdownRef,
-    setAddItemCalendarMonthByYear,
-    dateDropdownTriggerClass,
-    dropdownPanelClass,
-    dropdownOptionBaseClass,
-    monthOptions,
-    toInputDate,
-    fromInputDate,
-    formatDisplayDate,
-    maxSelectableDate,
     statusOptions,
     statusBadgeClass,
     statusLabel,
@@ -248,9 +194,9 @@ export function AddItemDialog({
                             <label className="mb-1 block text-[11px] font-medium text-gray-500">Status</label>
                             <div className="flex justify-start">
                                 <div className="inline-flex h-6 w-[172px] items-center rounded-2xl pl-1.5">
-                                    <span className={`inline-flex w-full items-center gap-1 rounded-2xl px-2 py-1 text-[11px] font-medium ${statusBadgeClass(Number(addItemForm.status) as StatusId)}`}>
+                                    <span className={`inline-flex w-full items-center gap-1 rounded-2xl px-2 py-1 text-[11px] font-medium ${statusBadgeClass(addItemForm.status)}`}>
                                         <span className="h-1.5 w-1.5 rounded-full bg-current/60" />
-                                        <span>{statusLabel(Number(addItemForm.status))}</span>
+                                        <span>{statusLabel(addItemForm.status)}</span>
                                     </span>
 
                                     <DropdownMenu>
@@ -268,7 +214,7 @@ export function AddItemDialog({
                                                 <DropdownMenuItem
                                                     key={opt.value}
                                                     className={statusOptionTextClass(opt.value)}
-                                                    onClick={() => setAddItemForm((prev) => ({ ...prev, status: String(opt.value) }))}
+                                                    onClick={() => setAddItemForm((prev) => ({ ...prev, status: opt.value }))}
                                                 >
                                                     {opt.label}
                                                 </DropdownMenuItem>
