@@ -27,6 +27,7 @@ use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Modules\Inventory\Http\Controllers\PpwController;
 use Modules\Inventory\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\Workspaces\PpwController;
 
 /*
 |--------------------------------------------------------------------------

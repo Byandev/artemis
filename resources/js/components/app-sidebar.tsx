@@ -93,61 +93,7 @@ export function AppSidebar() {
                 },
             ],
         },
-
     ];
-
-    // const mainNavItems: NavItem[] = [
-    //     {
-    //         title: 'Dashboard',
-    //         href: dashboardUrl,
-    //         icon: LayoutDashboard,
-    //     },
-    //     // {
-    //     //     title: 'Ads Manager',
-    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ads-manager`,
-    //     //     icon: Target,
-    //     // },
-    //     {
-    //         title: 'Shops',
-    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/shops`,
-    //         icon: Store,
-    //     },
-    //     {
-    //         title: 'Pages',
-    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
-    //         icon: BookOpenIcon,
-    //     },
-    //     {
-    //         title: 'Products',
-    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products`,
-    //         icon: Package,
-    //     },
-    //     // {
-    //     //     title: 'Facebook Accounts',
-    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/facebook-accounts`,
-    //     //     icon: FacebookIcon,
-    //     // },
-    //     // {
-    //     //     title: 'Ad Accounts',
-    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ad-accounts`,
-    //     //     icon: CreditCard,
-    //     // },
-    //     {
-    //         title: 'Teams',
-    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
-    //         icon: Users,
-    //     },
-    //     {
-    //         title: 'RTS Management',
-    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts`,
-    //         icon: TrendingUp,
-    //     },
-    //     // {
-    //     //     title: 'Botcake',
-    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/botcake`,
-    //     //     icon: MousePointerClickIcon,
-    //     // },
-    // ];
 
     const accountNavItems: NavItem[] = [
         {
@@ -155,7 +101,6 @@ export function AppSidebar() {
             href: '/profile',
             icon: User,
         },
-
         {
             title: 'Settings',
             href: `/settings`,
@@ -164,16 +109,12 @@ export function AppSidebar() {
     ];
 
     const footerNavItems: NavItem[] = [
-
         {
             title: 'Logout',
             href: logout(),
             icon: LogOut,
         },
     ];
-
-
-
 
     return (
         <Sidebar
