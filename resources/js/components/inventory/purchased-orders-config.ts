@@ -1,35 +1,47 @@
 import { AddItemForm } from '@/components/inventory/add-item-dialog';
-import { StatusId, StatusOption } from '@/components/inventory/purchased-orders-types';
+import { StatusId, StatusOption } from '@/types/models/PurchasedOrder';
 
 export const STATUS_OPTIONS: StatusOption[] = [
-    { value: 1, label: 'For Approval' },
-    { value: 2, label: 'Approved' },
-    { value: 3, label: 'To Pay' },
-    { value: 4, label: 'Paid' },
-    { value: 5, label: 'For Purchase' },
-    { value: 6, label: 'Waiting For Delivery' },
-    { value: 7, label: 'Delivered' },
-    { value: 8, label: 'Cancelled' },
+    { value: 'For Approval', label: 'For Approval' },
+    { value: 'Approved', label: 'Approved' },
+    { value: 'To Pay', label: 'To Pay' },
+    { value: 'Paid', label: 'Paid' },
+    { value: 'For Purchase', label: 'For Purchase' },
+    { value: 'Waiting For Delivery', label: 'Waiting For Delivery' },
+    { value: 'Delivered', label: 'Delivered' },
+    { value: 'Cancelled', label: 'Cancelled' },
 ];
 
-export const MONTH_OPTIONS = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-];
+const LEGACY_STATUS_MAP: Record<string, StatusId> = {
+    '1': 'For Approval',
+    '2': 'Approved',
+    '3': 'To Pay',
+    '4': 'Paid',
+    '5': 'For Purchase',
+    '6': 'Waiting For Delivery',
+    '7': 'Delivered',
+    '8': 'Cancelled',
+};
 
-export const DROPDOWN_PANEL_CLASS = 'absolute left-0 top-[calc(100%+6px)] z-50 rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900';
-export const DROPDOWN_OPTION_BASE_CLASS = 'w-full rounded-md px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-black/3 dark:hover:bg-white/5';
-export const DATE_DROPDOWN_TRIGGER_CLASS = 'inline-flex h-9 w-full items-center justify-between rounded-[10px] border border-black/6 bg-white px-3 text-xs text-gray-500 outline-none transition-colors hover:bg-black/2 focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5';
+const normalizeStatus = (value: StatusId | number | string): StatusId => {
+    const key = String(value);
+    if (LEGACY_STATUS_MAP[key]) return LEGACY_STATUS_MAP[key];
+    const direct = STATUS_OPTIONS.find((s) => s.value === key)?.value;
+    return (direct || 'For Approval') as StatusId;
+};
+
+export const statusToCode = (value: StatusId | number | string): number => {
+    const key = String(value);
+    if (LEGACY_STATUS_MAP[key]) return Number(key);
+
+    const match = STATUS_OPTIONS.find((s, idx) => s.value === key || String(idx + 1) === key);
+    if (match) return STATUS_OPTIONS.indexOf(match) + 1;
+
+    const parsed = Number.parseInt(key, 10);
+    return Number.isFinite(parsed) ? parsed : 1;
+};
+
+export const normalizeStatusLabel = normalizeStatus;
 
 export const SANS_FONT = "'DM Sans', system-ui, sans-serif";
 export const MONO_FONT = "'DM Mono', monospace";
@@ -43,16 +55,12 @@ export const ADD_ITEM_FORM_INITIAL: AddItemForm = {
     cog_amount: '',
     delivery_fee: '',
     total_amount: '',
-    status: '1',
+    status: 'For Approval',
 };
 
-export const statusLabel = (value: number | string): string => {
-    if (typeof value === 'string' && isNaN(Number(value))) {
-        return value;
-    }
-
-    const numeric = Number(value);
-    return STATUS_OPTIONS.find((s) => s.value === numeric)?.label ?? String(value);
+export const statusLabel = (value: StatusId | number | string): string => {
+    const normalized = normalizeStatus(value);
+    return STATUS_OPTIONS.find((s) => s.value === normalized)?.label ?? String(normalized);
 };
 
 export const formatMoney = (amount: number): string => {
@@ -80,19 +88,19 @@ export const formatIssueDate = (value: string): string => {
 };
 
 export const statusBadgeClass = (status: StatusId | string): string => {
-    const numeric = Number(status);
-    switch (numeric) {
-        case 7:
+    const normalized = normalizeStatus(status);
+    switch (normalized) {
+        case 'Delivered':
             return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
-        case 6:
+        case 'Waiting For Delivery':
             return 'bg-sky-500/10 text-sky-600 dark:text-sky-400';
-        case 4:
+        case 'Paid':
             return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
-        case 8:
+        case 'Cancelled':
             return 'bg-red-500/10 text-red-600 dark:text-red-400';
-        case 3:
+        case 'To Pay':
             return 'bg-amber-500/10 text-amber-700 dark:text-amber-400';
-        case 5:
+        case 'For Purchase':
             return 'bg-violet-500/10 text-violet-600 dark:text-violet-400';
         default:
             return 'bg-zinc-500/10 text-zinc-500 dark:text-zinc-400';
@@ -100,80 +108,22 @@ export const statusBadgeClass = (status: StatusId | string): string => {
 };
 
 export const statusOptionTextClass = (status: StatusId | string): string => {
-    const numeric = Number(status);
-    switch (numeric) {
-        case 7:
+    const normalized = normalizeStatus(status);
+    switch (normalized) {
+        case 'Delivered':
             return 'text-emerald-600 dark:text-emerald-400';
-        case 6:
+        case 'Waiting For Delivery':
             return 'text-sky-600 dark:text-sky-400';
-        case 5:
+        case 'For Purchase':
             return 'text-violet-600 dark:text-violet-400';
-        case 3:
+        case 'To Pay':
             return 'text-amber-700 dark:text-amber-400';
-        case 8:
+        case 'Cancelled':
             return 'text-red-600 dark:text-red-400';
-        case 4:
+        case 'Paid':
             return 'text-emerald-600 dark:text-emerald-400';
         default:
             return 'text-gray-500 dark:text-gray-300';
     }
 };
 
-export const toInputDate = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-};
-
-export const fromInputDate = (value: string): Date | undefined => {
-    if (!value) return undefined;
-    const [year, month, day] = value.split('-').map(Number);
-    if (!year || !month || !day) return undefined;
-    return new Date(year, month - 1, day);
-};
-
-export const normalizeDateRange = (first: string, second: string): { start: string; end: string } => {
-    if (first <= second) {
-        return { start: first, end: second };
-    }
-
-    return { start: second, end: first };
-};
-
-export const formatDisplayDate = (start: string, end?: string): string => {
-    if (!start) return '';
-
-    const toParts = (value: string): { y: number; m: number; d: number } | null => {
-        const [year, month, day] = value.split('-').map(Number);
-        if (!year || !month || !day) return null;
-        return { y: year, m: month, d: day };
-    };
-
-    const startParts = toParts(start);
-    const endParts = end ? toParts(end) : null;
-
-    if (!startParts) return start;
-
-    const formatOne = ({ y, m, d }: { y: number; m: number; d: number }): string => {
-        const monthLabel = MONTH_OPTIONS[m - 1] ?? String(m).padStart(2, '0');
-        return `${monthLabel} ${d}, ${y}`;
-    };
-
-    if (!endParts || start === end) {
-        return formatOne(startParts);
-    }
-
-    const sameYear = startParts.y === endParts.y;
-    const sameMonth = sameYear && startParts.m === endParts.m;
-
-    const left = sameMonth
-        ? `${MONTH_OPTIONS[startParts.m - 1]} ${startParts.d}`
-        : formatOne(startParts);
-
-    const right = sameYear
-        ? `${MONTH_OPTIONS[endParts.m - 1]} ${endParts.d}, ${endParts.y}`
-        : formatOne(endParts);
-
-    return `${left} – ${right}`;
-};

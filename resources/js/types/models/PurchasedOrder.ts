@@ -1,4 +1,12 @@
-export type StatusId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+export type StatusId =
+    | 'For Approval'
+    | 'Approved'
+    | 'To Pay'
+    | 'Paid'
+    | 'For Purchase'
+    | 'Waiting For Delivery'
+    | 'Delivered'
+    | 'Cancelled';
 
 export interface PurchasedOrder {
     id: number;
