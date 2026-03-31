@@ -6,7 +6,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DateRange } from 'react-day-picker';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 
 type StatusId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
@@ -213,7 +213,14 @@ const Index = ({ workspace }: Props) => {
     const [statusMenuRowId, setStatusMenuRowId] = useState<number | null>(null);
     const [addItemStatusMenuOpen, setAddItemStatusMenuOpen] = useState(false);
     const [addItemOpen, setAddItemOpen] = useState(false);
+    const [addItemDatePickerOpen, setAddItemDatePickerOpen] = useState(false);
+    const [addItemMonthListOpen, setAddItemMonthListOpen] = useState(false);
+    const [addItemYearListOpen, setAddItemYearListOpen] = useState(false);
+    const [addItemCalendarMonth, setAddItemCalendarMonth] = useState<Date>(new Date());
     const [addItemSubmitting, setAddItemSubmitting] = useState(false);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+    const [rowToDelete, setRowToDelete] = useState<PurchasedOrder | null>(null);
     const [addItemForm, setAddItemForm] = useState<AddItemForm>(ADD_ITEM_FORM_INITIAL);
     const [addItemFieldErrors, setAddItemFieldErrors] = useState<Record<string, string>>({});
     const [statusFilterMenuOpen, setStatusFilterMenuOpen] = useState(false);
@@ -222,6 +229,8 @@ const Index = ({ workspace }: Props) => {
     const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
     const monthDropdownRef = useRef<HTMLDivElement | null>(null);
     const yearDropdownRef = useRef<HTMLDivElement | null>(null);
+    const addItemMonthDropdownRef = useRef<HTMLDivElement | null>(null);
+    const addItemYearDropdownRef = useRef<HTMLDivElement | null>(null);
     const maxSelectableDate = toInputDate(new Date());
 
     useEffect(() => {
@@ -362,11 +371,37 @@ const Index = ({ workspace }: Props) => {
         };
     }, [datePickerOpen]);
 
+    useEffect(() => {
+        if (!addItemDatePickerOpen) {
+            setAddItemMonthListOpen(false);
+            setAddItemYearListOpen(false);
+            return;
+        }
+
+        const onDocumentMouseDown = (event: MouseEvent) => {
+            const target = event.target as Node;
+
+            if (addItemMonthDropdownRef.current && !addItemMonthDropdownRef.current.contains(target)) {
+                setAddItemMonthListOpen(false);
+            }
+
+            if (addItemYearDropdownRef.current && !addItemYearDropdownRef.current.contains(target)) {
+                setAddItemYearListOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', onDocumentMouseDown);
+
+        return () => {
+            document.removeEventListener('mousedown', onDocumentMouseDown);
+        };
+    }, [addItemDatePickerOpen]);
+
     const calendarFromYear = availableYears.length > 0 ? Math.min(...availableYears) : 2000;
     const calendarToYear = Math.min(availableYears.length > 0 ? Math.max(...availableYears) : new Date().getFullYear(), new Date().getFullYear());
     const currentYear = new Date().getFullYear();
     const currentMonthIndex = new Date().getMonth();
-    const maxCalendarMonth = new Date(currentYear, currentMonthIndex, 1);
+    const maxCalendarMonth = useMemo(() => new Date(currentYear, currentMonthIndex, 1), [currentYear, currentMonthIndex]);
     const selectableYears = (availableYears.length > 0
         ? availableYears.filter((year) => year <= currentYear)
         : Array.from({ length: currentYear - 1999 }, (_, i) => 2000 + i)
@@ -375,6 +410,21 @@ const Index = ({ workspace }: Props) => {
     const hasNext = currentPage < lastPage;
     const fromRow = totalRows === 0 ? 0 : (currentPage - 1) * 15 + 1;
     const toRow = totalRows === 0 ? 0 : Math.min(currentPage * 15, totalRows);
+    const forceDebugEmptyState = useMemo(() => {
+        if (typeof window === 'undefined') return false;
+        const params = new URLSearchParams(window.location.search);
+
+        return params.get('debugEmpty') === '1';
+    }, []);
+    const hasActiveFilters = query.trim().length > 0 || statusFilter !== 'all' || Boolean(startDate) || Boolean(endDate);
+    const isEffectivelyEmpty = forceDebugEmptyState || rows.length === 0;
+    const showEmptyState = !loading && isEffectivelyEmpty;
+    const useFilteredEmptyCopy = hasActiveFilters || forceDebugEmptyState;
+    const emptyStateTitle = useFilteredEmptyCopy ? 'No PO Records found' : 'No records yet';
+    const emptyStateDescription = useFilteredEmptyCopy
+        ? 'Try adjusting your search or selected period'
+        : 'There are no orders available yet. New records will appear here once created.';
+    const emptyStateButtonLabel = useFilteredEmptyCopy ? 'Add Item' : 'Create Item';
 
     const paginationPages = useMemo(() => {
         if (lastPage <= 5) {
@@ -396,6 +446,14 @@ const Index = ({ workspace }: Props) => {
         setCalendarMonth(new Date(year, nextMonth, 1));
     };
 
+    const setAddItemCalendarMonthByYear = (year: number) => {
+        const nextMonth = year === currentYear
+            ? Math.min(addItemCalendarMonth.getMonth(), currentMonthIndex)
+            : addItemCalendarMonth.getMonth();
+
+        setAddItemCalendarMonth(new Date(year, nextMonth, 1));
+    };
+
     const statusFilterLabel = statusFilter === 'all'
         ? 'Status'
         : statusLabel(Number(statusFilter));
@@ -408,6 +466,16 @@ const Index = ({ workspace }: Props) => {
         }
 
         setCalendarMonth(normalized);
+    };
+
+    const handleAddItemCalendarMonthChange = (next: Date) => {
+        const normalized = new Date(next.getFullYear(), next.getMonth(), 1);
+
+        if (normalized > maxCalendarMonth) {
+            return;
+        }
+
+        setAddItemCalendarMonth(normalized);
     };
 
     const applyPickedDate = (picked: string) => {
@@ -530,6 +598,53 @@ const Index = ({ workspace }: Props) => {
             setError(err instanceof Error ? err.message : 'Failed to create purchased order.');
         } finally {
             setAddItemSubmitting(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!addItemOpen) return;
+
+        const selected = fromInputDate(addItemForm.issue_date);
+        if (selected) {
+            setAddItemCalendarMonth(new Date(selected.getFullYear(), selected.getMonth(), 1));
+            return;
+        }
+
+        setAddItemCalendarMonth(maxCalendarMonth);
+    }, [addItemOpen, addItemForm.issue_date, maxCalendarMonth]);
+
+    const confirmDelete = async () => {
+        if (!rowToDelete) return;
+
+        setDeleteSubmitting(true);
+        setError(null);
+
+        try {
+            const url = `${apiBase}/api/workspaces/${workspace.slug}/inventory/purchased-orders/${rowToDelete.id}`;
+            const res = await fetch(url, {
+                method: 'DELETE',
+                credentials: 'include',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+            });
+
+            const text = await res.text();
+            const json = text ? JSON.parse(text) : {};
+
+            if (!res.ok) {
+                throw new Error(json.message || 'Failed to delete purchased order.');
+            }
+
+            setDeleteModalOpen(false);
+            setRowToDelete(null);
+            void fetchRows(currentPage);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to delete purchased order.');
+        } finally {
+            setDeleteSubmitting(false);
         }
     };
 
@@ -760,21 +875,141 @@ const Index = ({ workspace }: Props) => {
                 {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
                 <Dialog open={addItemOpen} onOpenChange={setAddItemOpen}>
-                    <DialogContent className="max-w-[660px] rounded-2xl border border-black/6 p-0 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10" style={{ fontFamily: SANS_FONT }}>
-                        <div className="px-10 py-6">
-                            <h2 className="text-[28px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">ADD ITEM</h2>
+                    <DialogContent className="max-w-[520px] rounded-2xl border border-black/6 p-0 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10" style={{ fontFamily: SANS_FONT }}>
+                        <DialogTitle className="sr-only">Add Item</DialogTitle>
+                        <DialogDescription className="sr-only">Fill in the details below to record a new item.</DialogDescription>
+                        <div className="px-6 py-4">
+                            <h2 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">ADD ITEM</h2>
                             <p className="mt-1 text-xs text-gray-400">Fill in the details below to record a new item.</p>
 
-                                <div className="mt-4 border-t border-black/6 pt-4 dark:border-white/6">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="mt-3 border-t border-black/6 pt-3 dark:border-white/6">
+                                <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="mb-1.5 block text-xs font-medium text-gray-500">Date</label>
-                                        <input
-                                            type="date"
-                                            value={addItemForm.issue_date}
-                                            onChange={(e) => setAddItemForm((prev) => ({ ...prev, issue_date: e.target.value }))}
-                                            className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
-                                        />
+                                        <Popover open={addItemDatePickerOpen} onOpenChange={setAddItemDatePickerOpen}>
+                                            <PopoverTrigger asChild>
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex h-9 w-full items-center justify-between gap-1.5 rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none transition-colors hover:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
+                                                >
+                                                    <span style={{ fontFamily: MONO_FONT }}>{addItemForm.issue_date ? formatDisplayDate(addItemForm.issue_date) : 'mm/dd/yy'}</span>
+                                                    <CalendarIcon className="h-3.5 w-3.5 text-gray-400" />
+                                                </button>
+                                            </PopoverTrigger>
+                                            <PopoverContent
+                                                align="start"
+                                                className="w-auto rounded-xl border border-black/6 bg-white p-2 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900"
+                                            >
+                                                <Calendar
+                                                    mode="single"
+                                                    month={addItemCalendarMonth}
+                                                    onMonthChange={handleAddItemCalendarMonthChange}
+                                                    selected={fromInputDate(addItemForm.issue_date)}
+                                                    captionLayout="label"
+                                                    fromYear={calendarFromYear}
+                                                    toYear={calendarToYear}
+                                                    toMonth={maxCalendarMonth}
+                                                    components={{
+                                                        CaptionLabel: (props) => (
+                                                            <div className={props.className}>
+                                                                <div className="flex w-full items-center gap-2">
+                                                                    <div ref={addItemMonthDropdownRef} className="relative flex-1">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setAddItemMonthListOpen((prev) => !prev);
+                                                                                setAddItemYearListOpen(false);
+                                                                            }}
+                                                                            className={DATE_DROPDOWN_TRIGGER_CLASS}
+                                                                        >
+                                                                            <span>{MONTH_OPTIONS[addItemCalendarMonth.getMonth()]}</span>
+                                                                            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                                                                        </button>
+
+                                                                        {addItemMonthListOpen && (
+                                                                            <div className={`${DROPDOWN_PANEL_CLASS} w-40`}>
+                                                                                <ul className="space-y-0.5">
+                                                                                    {MONTH_OPTIONS.map((monthLabel, monthIndex) => {
+                                                                                        const isDisabled = addItemCalendarMonth.getFullYear() === currentYear && monthIndex > currentMonthIndex;
+
+                                                                                        return (
+                                                                                            <li key={monthLabel}>
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    disabled={isDisabled}
+                                                                                                    onClick={() => {
+                                                                                                        setAddItemMonthListOpen(false);
+                                                                                                        setAddItemCalendarMonth(new Date(addItemCalendarMonth.getFullYear(), monthIndex, 1));
+                                                                                                    }}
+                                                                                                    className={`${DROPDOWN_OPTION_BASE_CLASS} text-gray-500 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300`}
+                                                                                                >
+                                                                                                    {monthLabel}
+                                                                                                </button>
+                                                                                            </li>
+                                                                                        );
+                                                                                    })}
+                                                                                </ul>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div ref={addItemYearDropdownRef} className="relative min-w-24">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setAddItemYearListOpen((prev) => !prev);
+                                                                                setAddItemMonthListOpen(false);
+                                                                            }}
+                                                                            className={DATE_DROPDOWN_TRIGGER_CLASS}
+                                                                        >
+                                                                            <span>{addItemCalendarMonth.getFullYear()}</span>
+                                                                            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                                                                        </button>
+
+                                                                        {addItemYearListOpen && (
+                                                                            <div className={`${DROPDOWN_PANEL_CLASS} w-28`}>
+                                                                                <ul className="max-h-56 space-y-0.5 overflow-auto">
+                                                                                    {selectableYears.map((year) => (
+                                                                                        <li key={year}>
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                onClick={() => {
+                                                                                                    setAddItemYearListOpen(false);
+                                                                                                    setAddItemCalendarMonthByYear(year);
+                                                                                                }}
+                                                                                                className={`${DROPDOWN_OPTION_BASE_CLASS} text-gray-500 dark:text-gray-300`}
+                                                                                            >
+                                                                                                {year}
+                                                                                            </button>
+                                                                                        </li>
+                                                                                    ))}
+                                                                                </ul>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ),
+                                                    }}
+                                                    onSelect={(date) => {
+                                                        if (!date) return;
+                                                        const picked = toInputDate(date);
+                                                        if (picked > maxSelectableDate) return;
+
+                                                        setAddItemForm((prev) => ({ ...prev, issue_date: picked }));
+                                                        setAddItemCalendarMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+                                                        setAddItemDatePickerOpen(false);
+                                                    }}
+                                                    disabled={(date) => toInputDate(date) > maxSelectableDate}
+                                                    classNames={{
+                                                        month_caption: 'flex h-(--cell-size) w-full items-center px-(--cell-size)',
+                                                        caption_label: 'w-full',
+                                                        today: 'rounded-md ring-1 ring-emerald-500/30 text-emerald-700 dark:ring-emerald-400/35 dark:text-emerald-300',
+                                                    }}
+                                                    className="rounded-[10px] bg-white p-0 text-xs dark:bg-zinc-900"
+                                                />
+                                            </PopoverContent>
+                                        </Popover>
                                         {addItemFieldErrors.issue_date && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.issue_date}</p>}
                                     </div>
 
@@ -941,8 +1176,77 @@ const Index = ({ workspace }: Props) => {
                     </DialogContent>
                 </Dialog>
 
+                <Dialog
+                    open={deleteModalOpen}
+                    onOpenChange={(open) => {
+                        setDeleteModalOpen(open);
+                        if (!open) setRowToDelete(null);
+                    }}
+                >
+                    <DialogContent className="max-w-[440px] rounded-2xl border border-black/6 p-0 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10" style={{ fontFamily: SANS_FONT }}>
+                        <DialogTitle className="sr-only">Delete Item</DialogTitle>
+                        <DialogDescription className="sr-only">Confirm deleting the selected purchase order record.</DialogDescription>
+                        <div className="px-6 py-5">
+                            <div className="flex items-center justify-between border-b border-black/8 pb-2 dark:border-white/10">
+                                <h3 className="text-[27px] font-semibold tracking-tight text-red-600 dark:text-red-400">DELETE ITEM</h3>
+                                <span className="text-[22px] font-semibold tracking-tight text-gray-900 underline decoration-red-500/70 underline-offset-6 dark:text-gray-100 dark:decoration-red-400/70">
+                                    {rowToDelete?.control_no || rowToDelete?.delivery_no || 'N/A'}
+                                </span>
+                            </div>
+
+                            <div className="mt-4 text-center">
+                                <p className="text-[15px] font-semibold text-red-500 dark:text-red-400">Are you sure you want to delete</p>
+                                <p className="mt-2 text-[18px] font-semibold text-gray-900 dark:text-gray-100">
+                                    PURCHASE ORDER: <span className="text-red-600 dark:text-red-400">{rowToDelete?.control_no || rowToDelete?.delivery_no || 'N/A'}</span>
+                                </p>
+                                <p className="mt-2 text-[14px] text-gray-400 dark:text-gray-500">This action will permanently remove</p>
+                                <p className="text-[14px] text-gray-400 dark:text-gray-500">the record from the system</p>
+                            </div>
+
+                            <div className="mt-5 flex items-center justify-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setDeleteModalOpen(false);
+                                        setRowToDelete(null);
+                                    }}
+                                    className="h-9 min-w-[112px] rounded-lg border border-black/8 bg-white px-5 text-xs font-semibold text-gray-600 transition-colors hover:bg-black/2 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5"
+                                >
+                                    CANCEL
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={deleteSubmitting}
+                                    onClick={() => void confirmDelete()}
+                                    className="h-9 min-w-[112px] rounded-lg bg-red-600 px-5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-red-500 dark:hover:bg-red-400"
+                                >
+                                    {deleteSubmitting ? 'DELETING...' : 'DELETE'}
+                                </button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
                 <div className="relative overflow-visible">
                     <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                        {showEmptyState ? (
+                            <div className="flex min-h-[500px] flex-col items-center justify-center px-4 text-center">
+                                <h3 className="text-[40px] font-semibold tracking-[-0.02em] text-gray-900 dark:text-gray-100">{emptyStateTitle}</h3>
+                                <p className="mt-2 text-[18px] text-gray-400 dark:text-gray-500">{emptyStateDescription}</p>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setAddItemFieldErrors({});
+                                        setAddItemForm(ADD_ITEM_FORM_INITIAL);
+                                        setAddItemOpen(true);
+                                    }}
+                                    className="mt-5 inline-flex h-11 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 text-[17px] font-medium text-white transition-colors hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+                                >
+                                    <Plus className="h-5 w-5" />
+                                    {emptyStateButtonLabel}
+                                </button>
+                            </div>
+                        ) : (
                         <table className="min-w-full text-xs">
                         <thead className="bg-[#F7F7F5] dark:bg-zinc-800/80">
                             <tr className="text-center font-medium uppercase tracking-[0.06em] text-gray-400 dark:text-gray-500">
@@ -968,7 +1272,7 @@ const Index = ({ workspace }: Props) => {
                             ) : rows.length === 0 ? (
                                 <tr>
                                     <td colSpan={10} className="px-3 py-10 text-center text-zinc-500">
-                                        No records found.
+                                        No records yet.
                                     </td>
                                 </tr>
                             ) : (
@@ -1045,6 +1349,10 @@ const Index = ({ workspace }: Props) => {
                                                 <button
                                                     type="button"
                                                     className="group relative inline-flex items-center px-1 text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
+                                                    onClick={() => {
+                                                        setRowToDelete(row);
+                                                        setDeleteModalOpen(true);
+                                                    }}
                                                 >
                                                     <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-1.5 -translate-y-1/2 rounded-md bg-red-500 px-2 py-0.5 text-[10px] font-semibold tracking-[0.02em] text-white opacity-0 transition-all group-hover:opacity-100 dark:bg-red-500 dark:text-white">
                                                         DELETE
@@ -1058,6 +1366,7 @@ const Index = ({ workspace }: Props) => {
                             )}
                         </tbody>
                         </table>
+                        )}
                     </div>
                 </div>
 
