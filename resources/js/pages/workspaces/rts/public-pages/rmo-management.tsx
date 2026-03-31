@@ -1,12 +1,10 @@
 import Filters, { FilterValue } from '@/components/filters/Filters';
-import { authParcelStatusConfig, ParcelStatusEntry } from '@/components/rts/rmo-config';
-import { RmoFilterControls } from '@/components/rts/RmoFilterControls';
+import { authParcelStatusConfig, orderStatusConfig, ParcelStatusEntry } from '@/components/rts/rmo-config';
 import { RmoStatCards } from '@/components/rts/RmoStatCards';
 import { RmoStatusPicker } from '@/components/rts/RmoStatusPicker';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useRmoFilterState } from '@/hooks/useRmoFilterState';
 import { currencyFormatter, percentageFormatter } from '@/lib/utils';
 import { toFrontendSort } from '@/lib/sort';
 import publicPage from '@/routes/public-page';
@@ -23,12 +21,14 @@ import {
     ChevronUp,
     MapPin,
     Phone,
+    Search,
     User as UserIcon,
     UserPlus,
     X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import FormModal from './formModal';
+import workspaces from '@/routes/workspaces';
 
 interface Props {
     orders: PaginatedData<OrderForDelivery>;
@@ -67,16 +67,30 @@ export default function RmoManagement({
     const [showStats, setShowStats] = useState(() => localStorage.getItem('rmo_show_stats') === 'true');
     const [pendingAssign, setPendingAssign] = useState<{ orderId: number; currentStatus: string } | null>(null);
 
-    const {
-        searchValue, setSearchValue,
-        selectedPageIds, setSelectedPageIds,
-        selectedShopIds, setSelectedShopIds,
-    } = useRmoFilterState(query);
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+
+    const [selectedPageIds, setSelectedPageIds] = useState<string[]>(() =>
+        query?.filter?.page_id
+            ? (Array.isArray(query.filter.page_id) ? query.filter.page_id : query.filter.page_id.split(',').filter(Boolean))
+            : []
+    );
+
+    const [selectedShopIds, setSelectedShopIds] = useState<string[]>(() =>
+        query?.filter?.shop_id
+            ? (Array.isArray(query.filter.shop_id) ? query.filter.shop_id : query.filter.shop_id.split(',').filter(Boolean))
+            : []
+    );
 
     // Use URL as source of truth for status (avoids stale closure issues with select)
-    const currentStatus = Array.isArray(query?.filter?.status)
+    const currentStatus = useMemo(() => Array.isArray(query?.filter?.status)
         ? (query.filter.status[0] ?? '')
-        : (query?.filter?.status ?? '');
+        : (query?.filter?.status ?? ''), [query?.filter?.status]);
+
+    const currentParcelStatus = useMemo(() =>
+        Array.isArray(query?.filter?.parcel_status)
+            ? (query.filter.parcel_status[0] ?? '')
+            : (query?.filter?.parcel_status ?? ''), [query?.filter?.parcel_status]
+    );
 
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
 
@@ -98,31 +112,22 @@ export default function RmoManagement({
     }, [setSelectedPageIds, setSelectedShopIds]);
 
     const buildAllParams = useCallback(
-        (sort?: string | null, page?: number, status?: string) => ({
+        (sort?: string | null, page?: number, status?: string, parcelStatus?: string) => ({
             sort: sort ?? undefined,
             'filter[search]': searchValue || undefined,
             ...(status !== undefined
                 ? (status ? { 'filter[status]': status } : {})
                 : (currentStatus ? { 'filter[status]': currentStatus } : {})),
+            ...(parcelStatus !== undefined
+                ? (parcelStatus ? { 'filter[parcel_status]': parcelStatus } : {})
+                : (currentParcelStatus ? { 'filter[parcel_status]': currentParcelStatus } : {})),
             ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
             ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
             page: page ?? 1,
         }),
-        [searchValue, currentStatus, selectedPageIds, selectedShopIds],
+        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds],
     );
 
-    const navigate = useCallback(
-        (sort?: string | null, page?: number) => {
-            router.get(
-                publicPage.rmoManagement({ workspace }),
-                buildAllParams(sort, page),
-                { preserveState: true, replace: true, preserveScroll: true },
-            );
-        },
-        [workspace, buildAllParams],
-    );
-
-    // Navigate immediately on status change (no debounce needed for select)
     const handleStatusChange = useCallback(
         (status: string) => {
             router.get(
@@ -134,22 +139,22 @@ export default function RmoManagement({
         [workspace, buildAllParams, query?.sort],
     );
 
+    const handleParcelStatusChange = useCallback(
+        (parcelStatus: string) => {
+            router.get(
+                publicPage.rmoManagement({ workspace }),
+                buildAllParams(query?.sort, 1, undefined, parcelStatus),
+                { preserveState: true, replace: true, preserveScroll: true },
+            );
+        },
+        [workspace, buildAllParams, query?.sort],
+    );
+
     useEffect(() => {
         const name = localStorage.getItem('user_name');
         if (name) setUserName(name);
     }, []);
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            navigate(
-                query?.sort,
-                searchValue || selectedPageIds.length || selectedShopIds.length
-                    ? 1
-                    : (query?.page ?? 1),
-            );
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [searchValue, selectedPageIds, selectedShopIds, query?.sort]);
 
     const doAssign = useCallback(
         (orderId: number, currentStatus: string, userId: string | null) => {
@@ -216,45 +221,38 @@ export default function RmoManagement({
                 header: ({ column }) => <SortableHeader enabled={false} column={column} title="Items" />,
                 cell: ({ row }) => {
                     const items = row.original.order.items ?? [];
-                    const pageName = row.original.page?.name;
-                    return (
-                        <div className="space-y-0.5">
-                            {items.map((item, i) => (
-                                <p key={i} className="text-[12px] font-medium leading-snug text-gray-800 dark:text-gray-200">
-                                    {item.name}
-                                </p>
-                            ))}
-                            {pageName && (
-                                <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">{pageName}</p>
-                            )}
-                        </div>
-                    );
-                },
-            },
-            {
-                id: 'order_tracking_code',
-                accessorKey: 'order.tracking_code',
-                enableSorting: true,
-                header: ({ column }) => <SortableHeader column={column} title="Tracking #" />,
-                cell: ({ row }) => (
-                    <span className="font-mono text-[12px] text-gray-500 dark:text-gray-400">
-                        {row.original.order.tracking_code ?? '—'}
-                    </span>
-                ),
-            },
-            {
-                id: 'order_parcel_status',
-                accessorKey: 'order.parcel_status',
-                enableSorting: true,
-                header: ({ column }) => <SortableHeader column={column} title="J&T Status" />,
-                cell: ({ row }) => {
+                    const trackingCode = row.original.order.tracking_code;
                     const key = (row.original.order.parcel_status ?? '').toLowerCase();
                     const cfg = authParcelStatusConfig[key] as ParcelStatusEntry | undefined;
                     return (
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${cfg?.pill ?? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
-                            <span className={`h-1.5 w-1.5 rounded-full ${cfg?.dot ?? 'bg-gray-400'}`} />
-                            {cfg?.label ?? key ?? '—'}
-                        </span>
+                        <div className="space-y-1.5">
+                            <div className="space-y-0.5">
+                                {items.map((item, i) => (
+                                    <p key={i} className="text-[12px] font-medium leading-snug text-gray-800 dark:text-gray-200">
+                                        {item.name}
+                                    </p>
+                                ))}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {trackingCode && (
+                                    <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                                        {trackingCode}
+                                    </span>
+                                )}
+                            </div>
+                            <div>
+                                {cfg ? (
+                                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${cfg.pill}`}>
+                                        <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+                                        {cfg.label}
+                                    </span>
+                                ) : key ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                                        {key}
+                                    </span>
+                                ) : null}
+                            </div>
+                        </div>
                     );
                 },
             },
@@ -262,7 +260,7 @@ export default function RmoManagement({
                 accessorKey: 'rider_name',
                 header: ({ column }) => <SortableHeader column={column} title="Rider" />,
                 cell: ({ row }) => (
-                    <div className="space-y-0.5">
+                    <div className="space-y-1.5">
                         <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
                             {row.original.rider_name || '—'}
                         </p>
@@ -283,7 +281,7 @@ export default function RmoManagement({
                 cell: ({ row }) => {
                     const addr = row.original.order.shipping_address;
                     return (
-                        <div className="space-y-0.5">
+                        <div className="space-y-1.5">
                             <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
                                 {addr?.full_name || '—'}
                             </p>
@@ -316,7 +314,7 @@ export default function RmoManagement({
                 enableSorting: true,
                 header: ({ column }) => <SortableHeader column={column} title="SRP" />,
                 cell: ({ row }) => (
-                    <span className="font-mono text-[12px] tabular-nums text-gray-700 dark:text-gray-300">
+                    <span className="font-mono text-[12px] text-center tabular-nums text-gray-700 dark:text-gray-300">
                         {currencyFormatter(row.original.order.final_amount)}
                     </span>
                 ),
@@ -330,11 +328,13 @@ export default function RmoManagement({
                     const attempts = row.original.order.delivery_attempts ?? 0;
                     const isMultiple = attempts > 1;
                     return (
-                        <span className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums ${
-                            isMultiple
-                                ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
-                                : 'text-gray-500 dark:text-gray-400'
-                        }`}>
+                        <span
+                            className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-center text-[11px] font-medium tabular-nums ${
+                                isMultiple
+                                    ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+                                    : 'text-gray-500 dark:text-gray-400'
+                            }`}
+                        >
                             {attempts}
                         </span>
                     );
@@ -347,11 +347,17 @@ export default function RmoManagement({
                 cell: ({ row }) => {
                     const rate = row.original.order?.cx_rts_rate ?? null;
                     if (rate === null) {
-                        return <span className="text-[12px] text-gray-300 dark:text-gray-600">—</span>;
+                        return (
+                            <span className="text-center text-[12px] text-gray-300 dark:text-gray-600">
+                                —
+                            </span>
+                        );
                     }
                     const isHigh = rate >= 0.4;
                     return (
-                        <span className={`text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                        <span
+                            className={`text-center text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}
+                        >
                             {percentageFormatter(rate)}
                         </span>
                     );
@@ -366,7 +372,9 @@ export default function RmoManagement({
                     const rate = row.original.order?.shipping_address?.city_order_summary?.rts_rate ?? 0;
                     const isHigh = rate >= 0.4;
                     return (
-                        <span className={`text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                        <span
+                            className={`text-center text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}
+                        >
                             {percentageFormatter(rate)}
                         </span>
                     );
@@ -379,11 +387,17 @@ export default function RmoManagement({
                 cell: ({ row }) => {
                     const rate = row.original.rider_rts_rate ?? null;
                     if (rate === null) {
-                        return <span className="text-[12px] text-gray-300 dark:text-gray-600">—</span>;
+                        return (
+                            <span className="text-center text-[12px] text-gray-300 dark:text-gray-600">
+                                —
+                            </span>
+                        );
                     }
                     const isHigh = rate >= 0.4;
                     return (
-                        <span className={`text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                        <span
+                            className={`text-center  text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}
+                        >
                             {percentageFormatter(rate)}
                         </span>
                     );
@@ -561,12 +575,44 @@ export default function RmoManagement({
                 )}
 
                 <div className="mb-4">
-                    <RmoFilterControls
-                        searchValue={searchValue}
-                        onSearchChange={setSearchValue}
-                        selectedStatus={currentStatus}
-                        onStatusChange={handleStatusChange}
-                    />
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="relative w-60">
+                            <Search className="absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text"
+                                className="h-8 w-full rounded-lg border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! outline-none focus:border-emerald-500 dark:bg-zinc-800 dark:text-gray-300"
+                                placeholder="Search orders…"
+                                value={searchValue}
+                                onChange={(e) => setSearchValue(e.target.value)}
+                            />
+                        </div>
+
+                        <select
+                            value={currentStatus}
+                            onChange={(e) => handleStatusChange(e.target.value)}
+                            className="h-8 rounded-lg border border-black/6 bg-stone-100 px-2 text-[12px]! text-gray-700 outline-none focus:border-emerald-500 dark:bg-zinc-800 dark:text-gray-300"
+                        >
+                            <option value="">All Statuses</option>
+                            {Object.keys(orderStatusConfig).map((status) => (
+                                <option key={status} value={status}>
+                                    {status}
+                                </option>
+                            ))}
+                        </select>
+
+                        <select
+                            value={currentParcelStatus}
+                            onChange={(e) => handleParcelStatusChange(e.target.value)}
+                            className="h-8 rounded-lg border border-black/6 bg-stone-100 px-2 text-[12px]! text-gray-700 outline-none focus:border-emerald-500 dark:bg-zinc-800 dark:text-gray-300"
+                        >
+                            <option value="">All J&amp;T Statuses</option>
+                            {Object.entries(authParcelStatusConfig).map(([key, config]) => (
+                                <option key={key} value={key}>
+                                    {config.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -577,7 +623,19 @@ export default function RmoManagement({
                         initialSorting={initialSorting}
                         meta={{ ...omit(orders, ['data']) }}
                         onFetch={(params) => {
-                            navigate(params?.sort as string | undefined, Number(params?.page ?? 1));
+                            router.get(
+                                publicPage.rmoManagement({ workspace }),
+                                {
+                                    sort: params?.sort || undefined,
+                                    'filter[search]': searchValue || undefined,
+                                    ...(currentStatus ? { 'filter[status]': currentStatus } : {}),
+                                    ...(currentParcelStatus ? { 'filter[parcel_status]': currentParcelStatus } : {}),
+                                    ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
+                                    ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
+                                    page: params?.page ?? 1,
+                                },
+                                { preserveState: false, replace: true, preserveScroll: true },
+                            );
                         }}
                     />
                 </div>

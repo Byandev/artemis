@@ -195,8 +195,6 @@ class ForDeliveryController extends Controller
 
         $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id']);
 
-
-
         return Inertia::render('workspaces/rts/public-pages/rmo-management', [
             'orders' => $items,
             'workspace' => $workspace,
