@@ -455,7 +455,7 @@ const Index = ({ workspace }: Props) => {
     };
 
     const statusFilterLabel = statusFilter === 'all'
-        ? 'Status'
+        ? 'All Status'
         : statusLabel(Number(statusFilter));
 
     const handleCalendarMonthChange = (next: Date) => {
@@ -854,7 +854,7 @@ const Index = ({ workspace }: Props) => {
                                             }}
                                             className={[DROPDOWN_OPTION_BASE_CLASS, 'text-gray-500 dark:text-gray-300'].join(' ')}
                                         >
-                                            Status
+                                            All Status
                                         </button>
                                     </li>
                                     {STATUS_OPTIONS.map((opt) => (
@@ -877,10 +877,10 @@ const Index = ({ workspace }: Props) => {
 
                         <button
                             type="button"
-                            onClick={resetFilters}
+                            onClick={() => void fetchRows(1)}
                             className="h-9 rounded-[10px] border border-black/6 bg-white px-3 text-xs font-medium text-gray-500 transition-colors hover:bg-black/2 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
                         >
-                            Restore
+                            Load
                         </button>
                     </div>
                 </div>
