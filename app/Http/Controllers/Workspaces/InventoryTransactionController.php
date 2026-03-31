@@ -7,30 +7,47 @@ use App\Models\Inventory;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Spatie\QueryBuilder\QueryBuilder;
+use Spatie\QueryBuilder\AllowedFilter;
+use App\Models\User;
 
-class InventoryController extends Controller
+class InventoryTransactionController extends Controller
 {
 
     public function index(Request $request, Workspace $workspace)
     {
-
-        $query = Inventory::where('workspace_id', $workspace->id);
-        // $query = Inventory::query();
-
-        if ($request->filled('search')) {
-            $query->where('ref_no', 'like', '%' . $request->search . '%');
-        }
-        if ($request->filled('start_date') && $request->filled('end_date')) {
-            $query->whereBetween('date', [$request->start_date, $request->end_date]);
+        if (!$request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
         }
 
-        $inventory = $query->orderBy('date', 'asc')
+        $inventory = QueryBuilder::for(Inventory::where('workspace_id', $workspace->id))
+            ->allowedFilters([
+
+                AllowedFilter::callback('search', function ($query, $value) {
+                    $query->where('ref_no', 'like', "%{$value}%");
+                }),
+                AllowedFilter::callback('start_date', function ($query, $value) {
+                    $query->whereDate('date', '>=', $value);
+                }),
+                AllowedFilter::callback('end_date', function ($query, $value) {
+                    $query->whereDate('date', '<=', $value);
+                }),
+            ])
+            ->allowedSorts(['date', 'ref_no', 'remaining_qty', 'created_at'])
+            ->defaultSort('-date')
             ->paginate(10)
             ->withQueryString();
+
+        $users = User::get(['id', 'name']);
 
         return Inertia::render('workspaces/inventory/inventory_transaction/index', [
             'workspace' => $workspace,
             'inventory' => $inventory,
+            'query' => [
+                ...$request->only(['sort', 'page']),
+                'filter' => $request->input('filter', []),
+            ],
+            'users' => $users,
         ]);
     }
 

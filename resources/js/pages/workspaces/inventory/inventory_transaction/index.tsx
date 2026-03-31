@@ -18,7 +18,7 @@ import {
 import { useState, useEffect } from 'react';
 import { toast, Toaster } from 'sonner';
 import { Workspace } from '@/types/models/Workspace';
-import { InventoryTransaction } from '@/types/models/Inventory';
+import { InventoryTransaction } from '@/types/models/InventoryTransaction';
 import InventoryFormDialog from '@/components/inventory/inventory-form-dialog';
 import PageHeader from '@/components/common/PageHeader';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -57,17 +57,19 @@ export default function Index({ inventory, workspace, query }: Props) {
             router.get(
                 `/workspaces/${workspace.slug}/inventory_transaction`,
                 {
-
-                    search: searchQuery || undefined,
-                    start_date: dateRange[0],
-                    end_date: dateRange[1],
+                    filter: {
+                        search: searchQuery || undefined,
+                        start_date: dateRange?.[0] || undefined,
+                        end_date: dateRange?.[1] || undefined,
+                    },
                     page: searchQuery ? 1 : query?.page ?? 1,
+                    sort: query?.sort
                 },
                 {
                     preserveState: true,
                     replace: true,
                     preserveScroll: true,
-                    only: ['inventory']
+                    only: ['inventory', 'query']
                 }
             );
         }, 500);

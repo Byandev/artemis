@@ -1,5 +1,5 @@
 import { Workspace } from '@/types/models/Workspace';
-import { Inventory } from '@/types/models/Inventory';
+import { Inventory } from '@/types/models/InventoryTransaction';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useForm } from '@inertiajs/react';
 import React, { useEffect, useMemo } from 'react';

@@ -13,7 +13,7 @@ use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\Record\RTSController;
 use App\Http\Controllers\Workspaces\Record\SalesController;
 use App\Http\Controllers\Workspaces\RoleController;
-use App\Http\Controllers\Workspaces\InventoryController;
+use App\Http\Controllers\Workspaces\InventoryTransactionController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
@@ -48,10 +48,10 @@ Route::middleware(['auth'])->group(function () {
 
     Route::prefix('workspaces/{workspace:slug}')->group(function () {
 
-        Route::get('/inventory_transaction', [InventoryController::class, 'index'])->name('inventory.index');
-        Route::post('/inventory_transaction', [InventoryController::class, 'store'])->name('inventory.store');
-        Route::patch('/inventory_transaction/{inventory}', [InventoryController::class, 'update'])->name('inventory.update');
-        Route::delete('/inventory_transaction/{inventory}', [InventoryController::class, 'destroy'])->name('inventory.destroy');
+        Route::get('/inventory_transaction', [InventoryTransactionController::class, 'index'])->name('inventory.index');
+        Route::post('/inventory_transaction', [InventoryTransactionController::class, 'store'])->name('inventory.store');
+        Route::patch('/inventory_transaction/{inventory}', [InventoryTransactionController::class, 'update'])->name('inventory.update');
+        Route::delete('/inventory_transaction/{inventory}', [InventoryTransactionController::class, 'destroy'])->name('inventory.destroy');
     });
 
 
