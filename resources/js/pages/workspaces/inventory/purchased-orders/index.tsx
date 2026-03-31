@@ -1,5 +1,5 @@
 import { Head } from '@inertiajs/react';
-import { Calendar as CalendarIcon, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
@@ -878,9 +878,10 @@ const Index = ({ workspace }: Props) => {
                         <button
                             type="button"
                             onClick={() => void fetchRows(1)}
-                            className="h-9 rounded-[10px] border border-black/6 bg-white px-3 text-xs font-medium text-gray-500 transition-colors hover:bg-black/2 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
+                            aria-label="Load records"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-black/6 bg-white text-gray-500 transition-colors hover:bg-black/2 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
                         >
-                            Load
+                            <RefreshCw className={['h-3.5 w-3.5', loading ? 'animate-spin' : ''].join(' ')} />
                         </button>
                     </div>
                 </div>
