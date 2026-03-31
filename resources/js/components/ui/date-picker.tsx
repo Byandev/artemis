@@ -21,6 +21,8 @@ const fmtYear = (d: Date) => d.getFullYear().toString();
 export default function DatePicker({ id, mode, onChange, label, defaultDate, placeholder }: PropsType) {
     const fpRef    = useRef<flatpickr.Instance | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const clearBtnRef = useRef<HTMLButtonElement | null>(null);
+    const keepOpenRef = useRef<boolean>(false);
 
     const [selectedDates, setSelectedDates] = useState<Date[]>(() => {
         if (!defaultDate) return [];
@@ -35,6 +37,10 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
             setSelectedDates([...dates]);
             if (typeof onChange === 'function') onChange(dates, dateStr, instance);
             else if (Array.isArray(onChange)) onChange.forEach((fn) => fn(dates, dateStr, instance));
+
+            // Keep dropdown open after selecting dates so users can adjust without reopening.
+            keepOpenRef.current = true;
+            if (instance && !instance.isOpen) instance.open();
         };
 
         const instance = flatpickr(inputRef.current, {
@@ -43,12 +49,46 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
             dateFormat: "Y-m-d",
             defaultDate,
             onChange: wrappedOnChange,
+            closeOnSelect: false,
+            onClose: (_dates, _dateStr, inst) => {
+                if (keepOpenRef.current) {
+                    keepOpenRef.current = false;
+                    inst.open();
+                }
+            },
         });
 
         fpRef.current = Array.isArray(instance) ? instance[0] : instance;
 
-        return () => { fpRef.current?.destroy(); fpRef.current = null; };
-    }, [mode, id, defaultDate]);
+        const calendar = fpRef.current?.calendarContainer;
+        if (calendar && !clearBtnRef.current) {
+            const footer = document.createElement('div');
+            footer.className = 'flatpickr-footer mt-2 px-2 pb-2 flex justify-end';
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = 'Clear Selection';
+            button.className = 'text-[12px] font-medium text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100';
+
+            button.onclick = (e) => {
+                e.preventDefault();
+                fpRef.current?.clear();
+                setSelectedDates([]);
+                wrappedOnChange([], '', fpRef.current as flatpickr.Instance);
+            };
+
+            footer.appendChild(button);
+            calendar.appendChild(footer);
+            clearBtnRef.current = button;
+        }
+
+        return () => {
+            fpRef.current?.destroy();
+            fpRef.current = null;
+            clearBtnRef.current = null;
+            keepOpenRef.current = false;
+        };
+    }, [mode, id, defaultDate, onChange]);
 
     const isRange  = mode === 'range';
     const hasStart = selectedDates.length >= 1;

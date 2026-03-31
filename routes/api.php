@@ -22,6 +22,9 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::post('/inventory/purchased-orders', [InventoryPurchasedOrderController::class, 'store'])
             ->middleware('throttle:30,1')
             ->name('inventory.purchased-orders.store');
+        Route::match(['put', 'patch'], '/inventory/purchased-orders/{order}', [InventoryPurchasedOrderController::class, 'update'])
+            ->middleware('throttle:30,1')
+            ->name('inventory.purchased-orders.update');
         Route::patch('/inventory/purchased-orders/{order}/status', [InventoryPurchasedOrderController::class, 'updateStatus'])
             ->middleware('throttle:30,1')
             ->name('inventory.purchased-orders.update-status');

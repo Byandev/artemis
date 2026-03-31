@@ -1,199 +1,40 @@
 import { Head } from '@inertiajs/react';
-import { Calendar as CalendarIcon, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Plus } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { DateRange } from 'react-day-picker';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
-
-type StatusId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
-
-interface PurchasedOrder {
-    id: number;
-    issue_date: string;
-    delivery_no: string | null;
-    cust_po_no: string | null;
-    control_no: string | null;
-    item: string;
-    cog_amount: number;
-    delivery_fee: number;
-    total_amount: number;
-    status: StatusId;
-}
-
-interface PaginatedResponse {
-    data: PurchasedOrder[];
-    available_years?: number[];
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-}
+import AlertError from '@/components/alert-error';
+import PageHeader from '@/components/common/PageHeader';
+import { AddItemDialog } from '@/components/inventory/add-item-dialog';
+import { AddItemForm } from '@/components/inventory/add-item-dialog';
+import {
+    ADD_ITEM_FORM_INITIAL,
+    DATE_DROPDOWN_TRIGGER_CLASS,
+    DROPDOWN_OPTION_BASE_CLASS,
+    DROPDOWN_PANEL_CLASS,
+    MONO_FONT,
+    MONTH_OPTIONS,
+    SANS_FONT,
+    STATUS_OPTIONS,
+    formatDisplayDate,
+    formatIssueDate,
+    formatMoney,
+    fromInputDate,
+    statusBadgeClass,
+    statusLabel,
+    statusOptionTextClass,
+    toInputDate,
+} from '@/components/inventory/purchased-orders-config';
+import { PurchasedOrdersPagination } from '@/components/inventory/purchased-orders-pagination';
+import { DeleteItemDialog } from '@/components/inventory/delete-item-dialog';
+import { PurchasedOrdersFilterBar } from '@/components/inventory/purchased-orders-filter-bar';
+import { PurchasedOrdersTable } from '@/components/inventory/purchased-orders-table';
+import { PaginatedResponse, PurchasedOrder, StatusId } from '@/components/inventory/purchased-orders-types';
+import { Product } from '@/types/models/Product';
 
 interface Props {
     workspace: Workspace;
 }
-
-interface AddItemForm {
-    issue_date: string;
-    delivery_no: string;
-    cust_po_no: string;
-    control_no: string;
-    item: string;
-    cog_amount: string;
-    delivery_fee: string;
-    total_amount: string;
-    status: string;
-}
-
-const STATUS_OPTIONS: Array<{ value: StatusId; label: string }> = [
-    { value: 1, label: 'For Approval' },
-    { value: 2, label: 'Approved' },
-    { value: 3, label: 'To Pay' },
-    { value: 4, label: 'Paid' },
-    { value: 5, label: 'For Purchase' },
-    { value: 6, label: 'Waiting For Delivery' },
-    { value: 7, label: 'Delivered' },
-    { value: 8, label: 'Cancelled' },
-];
-
-const MONTH_OPTIONS = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-];
-
-const DROPDOWN_PANEL_CLASS = 'absolute left-0 top-[calc(100%+6px)] z-50 rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900';
-const DROPDOWN_OPTION_BASE_CLASS = 'w-full rounded-md px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-black/3 dark:hover:bg-white/5';
-const DATE_DROPDOWN_TRIGGER_CLASS = 'inline-flex h-9 w-full items-center justify-between rounded-[10px] border border-black/6 bg-white px-3 text-xs text-gray-500 outline-none transition-colors hover:bg-black/2 focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5';
-const SANS_FONT = "'DM Sans', system-ui, sans-serif";
-const MONO_FONT = "'DM Mono', monospace";
-const ADD_ITEM_FORM_INITIAL: AddItemForm = {
-    issue_date: '',
-    delivery_no: '',
-    cust_po_no: '',
-    control_no: '',
-    item: '',
-    cog_amount: '',
-    delivery_fee: '',
-    total_amount: '',
-    status: '1',
-};
-
-const statusLabel = (value: number): string => {
-    return STATUS_OPTIONS.find((s) => s.value === value)?.label ?? `Unknown (${value})`;
-};
-
-const formatMoney = (amount: number): string => {
-    return new Intl.NumberFormat('en-PH', {
-        maximumFractionDigits: 0,
-    }).format(amount || 0);
-};
-
-const formatIssueDate = (value: string): string => {
-    if (!value) return '';
-
-    const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (isoMatch) {
-        const [, year, month, day] = isoMatch;
-        return `${month}/${day}/${year}`;
-    }
-
-    const slashMatch = value.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-    if (slashMatch) {
-        const [, month, day, year] = slashMatch;
-        return `${month}/${day}/${year}`;
-    }
-
-    return value;
-};
-
-const statusBadgeClass = (status: StatusId): string => {
-    switch (status) {
-        case 7:
-            return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
-        case 6:
-            return 'bg-sky-500/10 text-sky-600 dark:text-sky-400';
-        case 4:
-            return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
-        case 8:
-            return 'bg-red-500/10 text-red-600 dark:text-red-400';
-        case 3:
-            return 'bg-amber-500/10 text-amber-700 dark:text-amber-400';
-        case 5:
-            return 'bg-violet-500/10 text-violet-600 dark:text-violet-400';
-        default:
-            return 'bg-zinc-500/10 text-zinc-500 dark:text-zinc-400';
-    }
-};
-
-const statusOptionTextClass = (status: StatusId): string => {
-    switch (status) {
-        case 7:
-            return 'text-emerald-600 dark:text-emerald-400';
-        case 6:
-            return 'text-sky-600 dark:text-sky-400';
-        case 5:
-            return 'text-violet-600 dark:text-violet-400';
-        case 3:
-            return 'text-amber-700 dark:text-amber-400';
-        case 8:
-            return 'text-red-600 dark:text-red-400';
-        case 4:
-            return 'text-emerald-600 dark:text-emerald-400';
-        default:
-            return 'text-gray-500 dark:text-gray-300';
-    }
-};
-
-const toInputDate = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-};
-
-const fromInputDate = (value: string): Date | undefined => {
-    if (!value) return undefined;
-    const [year, month, day] = value.split('-').map(Number);
-    if (!year || !month || !day) return undefined;
-    return new Date(year, month - 1, day);
-};
-
-const normalizeDateRange = (first: string, second: string): { start: string; end: string } => {
-    if (first <= second) {
-        return { start: first, end: second };
-    }
-
-    return { start: second, end: first };
-};
-
-const formatDisplayDate = (start: string, end?: string): string => {
-    if (!start) return '';
-
-    const formatOne = (value: string): string => {
-        const [year, month, day] = value.split('-');
-        if (!year || !month || !day) return value;
-        return `${month}/${day}/${year}`;
-    };
-
-    if (!end || start === end) {
-        return formatOne(start);
-    }
-
-    return `${formatOne(start)} - ${formatOne(end)}`;
-};
 
 const Index = ({ workspace }: Props) => {
     const [rows, setRows] = useState<PurchasedOrder[]>([]);
@@ -202,6 +43,7 @@ const Index = ({ workspace }: Props) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [lastPage, setLastPage] = useState(1);
     const [totalRows, setTotalRows] = useState(0);
+    const [perPage, setPerPage] = useState(15);
     const [availableYears, setAvailableYears] = useState<number[]>([]);
 
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -209,10 +51,8 @@ const Index = ({ workspace }: Props) => {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const requestSerialRef = useRef(0);
-    const [datePickerOpen, setDatePickerOpen] = useState(false);
-    const [statusMenuRowId, setStatusMenuRowId] = useState<number | null>(null);
-    const [addItemStatusMenuOpen, setAddItemStatusMenuOpen] = useState(false);
     const [addItemOpen, setAddItemOpen] = useState(false);
+    const [editingRow, setEditingRow] = useState<PurchasedOrder | null>(null);
     const [addItemDatePickerOpen, setAddItemDatePickerOpen] = useState(false);
     const [addItemMonthListOpen, setAddItemMonthListOpen] = useState(false);
     const [addItemYearListOpen, setAddItemYearListOpen] = useState(false);
@@ -223,12 +63,7 @@ const Index = ({ workspace }: Props) => {
     const [rowToDelete, setRowToDelete] = useState<PurchasedOrder | null>(null);
     const [addItemForm, setAddItemForm] = useState<AddItemForm>(ADD_ITEM_FORM_INITIAL);
     const [addItemFieldErrors, setAddItemFieldErrors] = useState<Record<string, string>>({});
-    const [statusFilterMenuOpen, setStatusFilterMenuOpen] = useState(false);
-    const [monthListOpen, setMonthListOpen] = useState(false);
-    const [yearListOpen, setYearListOpen] = useState(false);
-    const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
-    const monthDropdownRef = useRef<HTMLDivElement | null>(null);
-    const yearDropdownRef = useRef<HTMLDivElement | null>(null);
+    const [products, setProducts] = useState<Product[]>([]);
     const addItemMonthDropdownRef = useRef<HTMLDivElement | null>(null);
     const addItemYearDropdownRef = useRef<HTMLDivElement | null>(null);
     const maxSelectableDate = toInputDate(new Date());
@@ -251,6 +86,32 @@ const Index = ({ workspace }: Props) => {
         if (window.location.port === '5173') return 'http://localhost';
         return '';
     }, []);
+
+    const fetchProducts = useCallback(async () => {
+        try {
+            const params = new URLSearchParams({ per_page: '200', sort: 'name' });
+            const url = `${apiBase}/api/workspaces/${workspace.slug}/products?${params.toString()}`;
+            const res = await fetch(url, {
+                credentials: 'include',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            const text = await res.text();
+            const json = text ? JSON.parse(text) : {};
+
+            if (!res.ok) {
+                throw new Error(json.message || 'Failed to load products.');
+            }
+
+            const payload = Array.isArray(json.data) ? json.data : [];
+            setProducts(payload as Product[]);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to load products.');
+        }
+    }, [apiBase, workspace.slug]);
 
     const csrfToken = useMemo(() => {
         if (typeof document === 'undefined') return '';
@@ -286,7 +147,7 @@ const Index = ({ workspace }: Props) => {
                 params.set('end_date', endDate);
             }
             params.set('page', String(page));
-            params.set('per_page', '15');
+            params.set('per_page', String(perPage));
 
             const url = `${apiBase}/api/workspaces/${workspace.slug}/inventory/purchased-orders?${params.toString()}`;
             const res = await fetch(url, {
@@ -313,9 +174,17 @@ const Index = ({ workspace }: Props) => {
 
             setRows(nextRows);
             setAvailableYears(Array.isArray(payload.available_years) ? payload.available_years : []);
-            setCurrentPage(Number(payload.current_page || page));
-            setLastPage(Number(payload.last_page || page));
-            setTotalRows(Number(payload.total || nextRows.length));
+            const payloadPerPage = Number((payload as { per_page?: number }).per_page || perPage || 15);
+            const payloadTotal = Number((payload as { total?: number }).total ?? nextRows.length);
+            const payloadLastPage = Number((payload as { last_page?: number }).last_page || 0);
+            const computedLastPage = Math.max(1, payloadLastPage || Math.ceil(payloadTotal / payloadPerPage) || 1);
+            const requestedPage = Number(payload.current_page || page || 1) || 1;
+            const clampedPage = Math.min(Math.max(requestedPage, 1), computedLastPage);
+
+            setPerPage(payloadPerPage);
+            setCurrentPage(clampedPage);
+            setLastPage(computedLastPage);
+            setTotalRows(payloadTotal);
         } catch (err) {
             if (requestSerial !== requestSerialRef.current) {
                 return;
@@ -337,39 +206,8 @@ const Index = ({ workspace }: Props) => {
     }, [statusFilter, query, startDate, endDate]);
 
     useEffect(() => {
-        if (!datePickerOpen) return;
-
-        const selected = fromInputDate(endDate) || fromInputDate(startDate);
-        if (!selected) return;
-
-        setCalendarMonth(new Date(selected.getFullYear(), selected.getMonth(), 1));
-    }, [datePickerOpen, startDate, endDate]);
-
-    useEffect(() => {
-        if (!datePickerOpen) {
-            setMonthListOpen(false);
-            setYearListOpen(false);
-            return;
-        }
-
-        const onDocumentMouseDown = (event: MouseEvent) => {
-            const target = event.target as Node;
-
-            if (monthDropdownRef.current && !monthDropdownRef.current.contains(target)) {
-                setMonthListOpen(false);
-            }
-
-            if (yearDropdownRef.current && !yearDropdownRef.current.contains(target)) {
-                setYearListOpen(false);
-            }
-        };
-
-        document.addEventListener('mousedown', onDocumentMouseDown);
-
-        return () => {
-            document.removeEventListener('mousedown', onDocumentMouseDown);
-        };
-    }, [datePickerOpen]);
+        void fetchProducts();
+    }, [fetchProducts]);
 
     useEffect(() => {
         if (!addItemDatePickerOpen) {
@@ -408,8 +246,8 @@ const Index = ({ workspace }: Props) => {
     ).sort((a, b) => a - b);
     const hasPrevious = currentPage > 1;
     const hasNext = currentPage < lastPage;
-    const fromRow = totalRows === 0 ? 0 : (currentPage - 1) * 15 + 1;
-    const toRow = totalRows === 0 ? 0 : Math.min(currentPage * 15, totalRows);
+    const fromRow = totalRows === 0 ? 0 : Math.min((currentPage - 1) * perPage + 1, totalRows);
+    const toRow = totalRows === 0 ? 0 : Math.min(currentPage * perPage, totalRows);
     const forceDebugEmptyState = useMemo(() => {
         if (typeof window === 'undefined') return false;
         const params = new URLSearchParams(window.location.search);
@@ -417,7 +255,6 @@ const Index = ({ workspace }: Props) => {
         return params.get('debugEmpty') === '1';
     }, []);
     const hasActiveFilters = query.trim().length > 0 || statusFilter !== 'all' || Boolean(startDate) || Boolean(endDate);
-    const canClearDateRange = Boolean(startDate && endDate);
     const isEffectivelyEmpty = forceDebugEmptyState || rows.length === 0;
     const showEmptyState = !loading && isEffectivelyEmpty;
     const useFilteredEmptyCopy = hasActiveFilters;
@@ -428,24 +265,19 @@ const Index = ({ workspace }: Props) => {
     const emptyStateButtonLabel = useFilteredEmptyCopy ? 'Add Item' : 'Create Item';
 
     const paginationPages = useMemo(() => {
-        if (lastPage <= 5) {
-            return Array.from({ length: lastPage }, (_, i) => i + 1);
+        const safeLast = Math.max(1, lastPage || 1);
+        const safeCurrent = Math.min(Math.max(currentPage, 1), safeLast);
+
+        if (safeLast <= 5) {
+            return Array.from({ length: safeLast }, (_, i) => i + 1);
         }
 
-        const start = Math.max(1, currentPage - 2);
-        const end = Math.min(lastPage, start + 4);
+        const start = Math.max(1, safeCurrent - 2);
+        const end = Math.min(safeLast, start + 4);
         const adjustedStart = Math.max(1, end - 4);
 
         return Array.from({ length: end - adjustedStart + 1 }, (_, i) => adjustedStart + i);
     }, [currentPage, lastPage]);
-
-    const setCalendarMonthByYear = (year: number) => {
-        const nextMonth = year === currentYear
-            ? Math.min(calendarMonth.getMonth(), currentMonthIndex)
-            : calendarMonth.getMonth();
-
-        setCalendarMonth(new Date(year, nextMonth, 1));
-    };
 
     const setAddItemCalendarMonthByYear = (year: number) => {
         const nextMonth = year === currentYear
@@ -455,19 +287,53 @@ const Index = ({ workspace }: Props) => {
         setAddItemCalendarMonth(new Date(year, nextMonth, 1));
     };
 
+    const itemOptions = useMemo(() => {
+        const names = new Set<string>();
+
+        products.forEach((product) => {
+            const label = (product.name || product.title || '').trim();
+            if (label) names.add(label);
+        });
+
+        const currentValue = addItemForm.item.trim();
+        if (currentValue && !names.has(currentValue)) names.add(currentValue);
+
+        return Array.from(names).sort((a, b) => a.localeCompare(b));
+    }, [products, addItemForm.item]);
+
+    const isAddItemFormComplete = useMemo(() => {
+        return Boolean(
+            addItemForm.issue_date &&
+                addItemForm.delivery_no.trim() &&
+                addItemForm.cust_po_no.trim() &&
+                addItemForm.control_no.trim() &&
+                addItemForm.item.trim() &&
+                addItemForm.cog_amount !== '' &&
+                addItemForm.delivery_fee !== '' &&
+                addItemForm.total_amount !== '' &&
+                addItemForm.status.trim(),
+        );
+    }, [addItemForm]);
+
+    const parseAmount = (value: string): number => {
+        const parsed = Number.parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    useEffect(() => {
+        const cog = parseAmount(addItemForm.cog_amount);
+        const fee = parseAmount(addItemForm.delivery_fee);
+        const shouldDisplay = addItemForm.cog_amount !== '' || addItemForm.delivery_fee !== '';
+        const nextTotal = shouldDisplay ? (cog + fee).toFixed(2) : '';
+
+        if (addItemForm.total_amount !== nextTotal) {
+            setAddItemForm((prev) => ({ ...prev, total_amount: nextTotal }));
+        }
+    }, [addItemForm.cog_amount, addItemForm.delivery_fee, addItemForm.total_amount, setAddItemForm]);
+
     const statusFilterLabel = statusFilter === 'all'
         ? 'All Status'
-        : statusLabel(Number(statusFilter));
-
-    const handleCalendarMonthChange = (next: Date) => {
-        const normalized = new Date(next.getFullYear(), next.getMonth(), 1);
-
-        if (normalized > maxCalendarMonth) {
-            return;
-        }
-
-        setCalendarMonth(normalized);
-    };
+        : statusLabel(statusFilter);
 
     const handleAddItemCalendarMonthChange = (next: Date) => {
         const normalized = new Date(next.getFullYear(), next.getMonth(), 1);
@@ -477,47 +343,6 @@ const Index = ({ workspace }: Props) => {
         }
 
         setAddItemCalendarMonth(normalized);
-    };
-
-    const applyPickedDate = (picked: string) => {
-        if (picked > maxSelectableDate) return;
-
-        if (!startDate && !endDate) {
-            setStartDate(picked);
-            setEndDate(picked);
-            return;
-        }
-
-        if (startDate && endDate) {
-            if (picked > endDate) {
-                setStartDate(endDate);
-                setEndDate(picked);
-                return;
-            }
-
-            if (picked < startDate) {
-                setStartDate(picked);
-                setEndDate(startDate);
-                return;
-            }
-
-            const normalized = normalizeDateRange(startDate, picked);
-            setStartDate(normalized.start);
-            setEndDate(normalized.end);
-            return;
-        }
-
-        const existing = startDate || endDate;
-        const normalized = normalizeDateRange(existing, picked);
-        setStartDate(normalized.start);
-        setEndDate(normalized.end);
-    };
-
-    const resetFilters = () => {
-        setQuery('');
-        setStatusFilter('all');
-        setStartDate('');
-        setEndDate('');
     };
 
     const updateStatus = async (id: number, status: StatusId) => {
@@ -553,9 +378,29 @@ const Index = ({ workspace }: Props) => {
         setError(null);
 
         try {
-            const url = `${apiBase}/api/workspaces/${workspace.slug}/inventory/purchased-orders`;
+            const simpleErrors: Record<string, string> = {};
+            if (!addItemForm.issue_date) simpleErrors.issue_date = 'Transaction date is required.';
+            if (!addItemForm.delivery_no.trim()) simpleErrors.delivery_no = 'Delivery number is required.';
+            if (!addItemForm.cust_po_no.trim()) simpleErrors.cust_po_no = 'Customer number is required.';
+            if (!addItemForm.control_no.trim()) simpleErrors.control_no = 'Control number is required.';
+            if (!addItemForm.item.trim()) simpleErrors.item = 'Item is required.';
+            if (addItemForm.cog_amount === '') simpleErrors.cog_amount = 'COG amount is required.';
+            if (addItemForm.delivery_fee === '') simpleErrors.delivery_fee = 'Delivery fee is required.';
+            if (Object.keys(simpleErrors).length) {
+                setAddItemFieldErrors(simpleErrors);
+                return;
+            }
+
+            const numericCog = parseAmount(addItemForm.cog_amount);
+            const numericDelivery = parseAmount(addItemForm.delivery_fee);
+            const numericTotal = numericCog + numericDelivery;
+
+            const isEdit = Boolean(editingRow);
+            const url = isEdit
+                ? `${apiBase}/api/workspaces/${workspace.slug}/inventory/purchased-orders/${editingRow?.id}`
+                : `${apiBase}/api/workspaces/${workspace.slug}/inventory/purchased-orders`;
             const res = await fetch(url, {
-                method: 'POST',
+                method: isEdit ? 'PUT' : 'POST',
                 credentials: 'include',
                 headers: {
                     Accept: 'application/json',
@@ -569,9 +414,9 @@ const Index = ({ workspace }: Props) => {
                     cust_po_no: addItemForm.cust_po_no || null,
                     control_no: addItemForm.control_no || null,
                     item: addItemForm.item,
-                    cog_amount: addItemForm.cog_amount || 0,
-                    delivery_fee: addItemForm.delivery_fee || 0,
-                    total_amount: addItemForm.total_amount || 0,
+                    cog_amount: numericCog,
+                    delivery_fee: numericDelivery,
+                    total_amount: numericTotal,
                     status: Number(addItemForm.status),
                 }),
             });
@@ -593,10 +438,11 @@ const Index = ({ workspace }: Props) => {
             }
 
             setAddItemOpen(false);
+            setEditingRow(null);
             setAddItemForm(ADD_ITEM_FORM_INITIAL);
-            void fetchRows(1);
+            void fetchRows(isEdit ? currentPage : 1);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to create purchased order.');
+            setError(err instanceof Error ? err.message : isEdit ? 'Failed to update purchased order.' : 'Failed to create purchased order.');
         } finally {
             setAddItemSubmitting(false);
         }
@@ -654,824 +500,161 @@ const Index = ({ workspace }: Props) => {
             <Head title={`${workspace.name} - Inventory Purchased Orders`} />
 
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6" style={{ fontFamily: SANS_FONT }}>
-                <header className="mb-5">
-                    <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">PO Management</h1>
-                </header>
-
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <PageHeader
+                    title="Purchased Orders"
+                    description="Track incoming purchase orders, costs, and statuses."
+                >
                     <button
-                        type="button"
                         onClick={() => {
                             setAddItemFieldErrors({});
                             setAddItemForm(ADD_ITEM_FORM_INITIAL);
                             setAddItemOpen(true);
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
                     >
-                        <Plus className="h-3.5 w-3.5" />
-                        Add Item
+                        <Plus className="mr-1.5 h-3.5 w-3.5" />
+                        Add Order
                     </button>
+                </PageHeader>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-                            <PopoverTrigger asChild>
-                                <button
-                                    type="button"
-                                    className="inline-flex h-9 min-w-[150px] items-center justify-center gap-1.5 rounded-[10px] border border-black/6 bg-white px-3 text-xs text-gray-400 outline-none transition-colors hover:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
-                                >
-                                    <CalendarIcon className="h-3.5 w-3.5" />
-                                    <span style={{ fontFamily: MONO_FONT }}>{startDate ? formatDisplayDate(startDate, endDate) : 'Select Date'}</span>
-                                </button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                                align="start"
-                                className="w-auto rounded-xl border border-black/6 bg-white p-2 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900"
-                            >
-                                <Calendar
-                                    mode="range"
-                                    month={calendarMonth}
-                                    onMonthChange={handleCalendarMonthChange}
-                                    selected={{
-                                        from: fromInputDate(startDate),
-                                        to: fromInputDate(endDate),
-                                    }}
-                                    captionLayout="label"
-                                    fromYear={calendarFromYear}
-                                    toYear={calendarToYear}
-                                    toMonth={maxCalendarMonth}
-                                    components={{
-                                        CaptionLabel: (props) => (
-                                            <div className={props.className}>
-                                                <div className="flex w-full items-center gap-2">
-                                                    <div ref={monthDropdownRef} className="relative flex-1">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setMonthListOpen((prev) => !prev);
-                                                                setYearListOpen(false);
-                                                            }}
-                                                            className={DATE_DROPDOWN_TRIGGER_CLASS}
-                                                        >
-                                                            <span>{MONTH_OPTIONS[calendarMonth.getMonth()]}</span>
-                                                            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-                                                        </button>
+                <PurchasedOrdersFilterBar
+                    startDate={startDate}
+                    endDate={endDate}
+                    onDateChange={(nextStart, nextEnd) => {
+                        setStartDate(nextStart);
+                        setEndDate(nextEnd);
+                    }}
+                    query={query}
+                    setQuery={setQuery}
+                    statusFilterLabel={statusFilterLabel}
+                    statusOptions={STATUS_OPTIONS}
+                    statusOptionTextClass={statusOptionTextClass}
+                    setStatusFilter={setStatusFilter}
+                    onLoad={() => void fetchRows(1)}
+                    loading={loading}
+                />
 
-                                                        {monthListOpen && (
-                                                            <div className={`${DROPDOWN_PANEL_CLASS} w-40`}>
-                                                                <ul className="space-y-0.5">
-                                                                    {MONTH_OPTIONS.map((monthLabel, monthIndex) => {
-                                                                        const isDisabled = calendarMonth.getFullYear() === currentYear && monthIndex > currentMonthIndex;
+                {error && <AlertError errors={[error]} title="PO Management Request Failed" />}
 
-                                                                        return (
-                                                                            <li key={monthLabel}>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    disabled={isDisabled}
-                                                                                    onClick={() => {
-                                                                                        setMonthListOpen(false);
-                                                                                        setCalendarMonth(new Date(calendarMonth.getFullYear(), monthIndex, 1));
-                                                                                    }}
-                                                                                    className={`${DROPDOWN_OPTION_BASE_CLASS} text-gray-500 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300`}
-                                                                                >
-                                                                                    {monthLabel}
-                                                                                </button>
-                                                                            </li>
-                                                                        );
-                                                                    })}
-                                                                </ul>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                <AddItemDialog
+                    open={addItemOpen}
+                    onOpenChange={(open) => {
+                        setAddItemOpen(open);
+                        if (!open) setEditingRow(null);
+                    }}
+                    mode={editingRow ? 'edit' : 'add'}
+                    addItemForm={addItemForm}
+                    setAddItemForm={setAddItemForm}
+                    itemOptions={itemOptions}
+                    isFormComplete={isAddItemFormComplete}
+                    addItemFieldErrors={addItemFieldErrors}
+                    submitting={addItemSubmitting}
+                    onSubmit={() => void submitAddItem()}
+                    addItemDatePickerOpen={addItemDatePickerOpen}
+                    setAddItemDatePickerOpen={setAddItemDatePickerOpen}
+                    addItemCalendarMonth={addItemCalendarMonth}
+                    setAddItemCalendarMonth={setAddItemCalendarMonth}
+                    handleAddItemCalendarMonthChange={handleAddItemCalendarMonthChange}
+                    calendarFromYear={calendarFromYear}
+                    calendarToYear={calendarToYear}
+                    maxCalendarMonth={maxCalendarMonth}
+                    selectableYears={selectableYears}
+                    currentYear={currentYear}
+                    currentMonthIndex={currentMonthIndex}
+                    addItemMonthListOpen={addItemMonthListOpen}
+                    setAddItemMonthListOpen={setAddItemMonthListOpen}
+                    addItemYearListOpen={addItemYearListOpen}
+                    setAddItemYearListOpen={setAddItemYearListOpen}
+                    addItemMonthDropdownRef={addItemMonthDropdownRef}
+                    addItemYearDropdownRef={addItemYearDropdownRef}
+                    setAddItemCalendarMonthByYear={setAddItemCalendarMonthByYear}
+                    dateDropdownTriggerClass={DATE_DROPDOWN_TRIGGER_CLASS}
+                    dropdownPanelClass={DROPDOWN_PANEL_CLASS}
+                    dropdownOptionBaseClass={DROPDOWN_OPTION_BASE_CLASS}
+                    monthOptions={MONTH_OPTIONS}
+                    toInputDate={toInputDate}
+                    fromInputDate={fromInputDate}
+                    formatDisplayDate={formatDisplayDate}
+                    maxSelectableDate={maxSelectableDate}
+                    statusOptions={STATUS_OPTIONS}
+                    statusBadgeClass={statusBadgeClass}
+                    statusLabel={statusLabel}
+                    statusOptionTextClass={statusOptionTextClass}
+                    monoFont={MONO_FONT}
+                    sansFont={SANS_FONT}
+                />
 
-                                                    <div ref={yearDropdownRef} className="relative min-w-24">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setYearListOpen((prev) => !prev);
-                                                                setMonthListOpen(false);
-                                                            }}
-                                                            className={DATE_DROPDOWN_TRIGGER_CLASS}
-                                                        >
-                                                            <span>{calendarMonth.getFullYear()}</span>
-                                                            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-                                                        </button>
-
-                                                        {yearListOpen && (
-                                                            <div className={`${DROPDOWN_PANEL_CLASS} w-28`}>
-                                                                <ul className="max-h-56 space-y-0.5 overflow-auto">
-                                                                    {selectableYears.map((year) => (
-                                                                        <li key={year}>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => {
-                                                                                    setYearListOpen(false);
-                                                                                    setCalendarMonthByYear(year);
-                                                                                }}
-                                                                                className={`${DROPDOWN_OPTION_BASE_CLASS} text-gray-500 dark:text-gray-300`}
-                                                                            >
-                                                                                {year}
-                                                                            </button>
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ),
-                                    }}
-                                    onSelect={(range: DateRange | undefined) => {
-                                        if (!range?.from) {
-                                            setStartDate('');
-                                            setEndDate('');
-                                        }
-                                    }}
-                                    onDayClick={(day) => {
-                                        applyPickedDate(toInputDate(day));
-                                    }}
-                                    disabled={(date) => toInputDate(date) > maxSelectableDate}
-                                    classNames={{
-                                        month_caption: 'flex h-(--cell-size) w-full items-center px-(--cell-size)',
-                                        caption_label: 'w-full',
-                                        range_start: 'rounded-md bg-emerald-600 text-white dark:bg-emerald-500 dark:text-zinc-950',
-                                        range_end: 'rounded-md bg-emerald-600 text-white dark:bg-emerald-500 dark:text-zinc-950',
-                                        range_middle: 'bg-emerald-500/14 text-emerald-800 dark:bg-emerald-400/18 dark:text-emerald-200',
-                                        today: 'rounded-md ring-1 ring-emerald-500/30 text-emerald-700 dark:ring-emerald-400/35 dark:text-emerald-300',
-                                    }}
-                                    className="rounded-[10px] bg-white p-0 text-xs dark:bg-zinc-900"
-                                />
-                                <div className="mt-2 flex items-center justify-end border-t border-black/6 pt-2 dark:border-white/10">
-                                    <button
-                                        type="button"
-                                        disabled={!canClearDateRange}
-                                        onClick={() => {
-                                            setStartDate('');
-                                            setEndDate('');
-                                            setDatePickerOpen(false);
-                                        }}
-                                        className="rounded-md px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-black/3 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-gray-100 dark:disabled:hover:text-gray-300"
-                                    >
-                                        Clear Selection
-                                    </button>
-                                </div>
-                            </PopoverContent>
-                        </Popover>
-
-                        <div className="relative min-w-[220px]">
-                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-                            <input
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                placeholder="Search Orders.."
-                                className="h-9 w-full rounded-[10px] border border-black/6 bg-white pl-8 pr-3 text-xs text-gray-500 outline-none transition-colors focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
-                            />
-                        </div>
-
-                        <Popover open={statusFilterMenuOpen} onOpenChange={setStatusFilterMenuOpen}>
-                            <PopoverTrigger asChild>
-                                <button
-                                    type="button"
-                                    className="inline-flex h-9 min-w-[120px] items-center justify-between gap-2 rounded-[10px] border border-black/6 bg-white px-2.5 text-xs text-gray-500 outline-none transition-colors hover:bg-black/2 focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5"
-                                >
-                                    <span className="inline-flex items-center gap-1.5">
-                                        <Filter className="h-3.5 w-3.5 text-gray-400" />
-                                        <span>{statusFilterLabel}</span>
-                                    </span>
-                                    <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-                                </button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                                align="start"
-                                sideOffset={6}
-                                className="w-[170px] rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900"
-                            >
-                                <ul className="space-y-0.5">
-                                    <li>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setStatusFilterMenuOpen(false);
-                                                setStatusFilter('all');
-                                            }}
-                                            className={[DROPDOWN_OPTION_BASE_CLASS, 'text-gray-500 dark:text-gray-300'].join(' ')}
-                                        >
-                                            All Status
-                                        </button>
-                                    </li>
-                                    {STATUS_OPTIONS.map((opt) => (
-                                        <li key={opt.value}>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setStatusFilterMenuOpen(false);
-                                                    setStatusFilter(String(opt.value));
-                                                }}
-                                                className={[DROPDOWN_OPTION_BASE_CLASS, statusOptionTextClass(opt.value)].join(' ')}
-                                            >
-                                                {opt.label}
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </PopoverContent>
-                        </Popover>
-
-                        <button
-                            type="button"
-                            onClick={() => void fetchRows(1)}
-                            aria-label="Load records"
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-black/6 bg-white text-gray-500 transition-colors hover:bg-black/2 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
-                        >
-                            <RefreshCw className={['h-3.5 w-3.5', loading ? 'animate-spin' : ''].join(' ')} />
-                        </button>
-                    </div>
-                </div>
-
-                {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
-
-                <Dialog open={addItemOpen} onOpenChange={setAddItemOpen}>
-                    <DialogContent className="max-w-[520px] rounded-2xl border border-black/6 p-0 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10" style={{ fontFamily: SANS_FONT }}>
-                        <DialogTitle className="sr-only">Add Item</DialogTitle>
-                        <DialogDescription className="sr-only">Fill in the details below to record a new item.</DialogDescription>
-                        <div className="px-6 py-4">
-                            <h2 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">ADD ITEM</h2>
-                            <p className="mt-1 text-xs text-gray-400">Fill in the details below to record a new item.</p>
-
-                                <div className="mt-3 border-t border-black/6 pt-3 dark:border-white/6">
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="mb-1.5 block text-xs font-medium text-gray-500">Date</label>
-                                        <Popover open={addItemDatePickerOpen} onOpenChange={setAddItemDatePickerOpen}>
-                                            <PopoverTrigger asChild>
-                                                <button
-                                                    type="button"
-                                                    className="inline-flex h-9 w-full items-center justify-between gap-1.5 rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none transition-colors hover:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
-                                                >
-                                                    <span style={{ fontFamily: MONO_FONT }}>{addItemForm.issue_date ? formatDisplayDate(addItemForm.issue_date) : 'mm/dd/yy'}</span>
-                                                    <CalendarIcon className="h-3.5 w-3.5 text-gray-400" />
-                                                </button>
-                                            </PopoverTrigger>
-                                            <PopoverContent
-                                                align="start"
-                                                className="w-auto rounded-xl border border-black/6 bg-white p-2 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900"
-                                            >
-                                                <Calendar
-                                                    mode="single"
-                                                    month={addItemCalendarMonth}
-                                                    onMonthChange={handleAddItemCalendarMonthChange}
-                                                    selected={fromInputDate(addItemForm.issue_date)}
-                                                    captionLayout="label"
-                                                    fromYear={calendarFromYear}
-                                                    toYear={calendarToYear}
-                                                    toMonth={maxCalendarMonth}
-                                                    components={{
-                                                        CaptionLabel: (props) => (
-                                                            <div className={props.className}>
-                                                                <div className="flex w-full items-center gap-2">
-                                                                    <div ref={addItemMonthDropdownRef} className="relative flex-1">
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                setAddItemMonthListOpen((prev) => !prev);
-                                                                                setAddItemYearListOpen(false);
-                                                                            }}
-                                                                            className={DATE_DROPDOWN_TRIGGER_CLASS}
-                                                                        >
-                                                                            <span>{MONTH_OPTIONS[addItemCalendarMonth.getMonth()]}</span>
-                                                                            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-                                                                        </button>
-
-                                                                        {addItemMonthListOpen && (
-                                                                            <div className={`${DROPDOWN_PANEL_CLASS} w-40`}>
-                                                                                <ul className="space-y-0.5">
-                                                                                    {MONTH_OPTIONS.map((monthLabel, monthIndex) => {
-                                                                                        const isDisabled = addItemCalendarMonth.getFullYear() === currentYear && monthIndex > currentMonthIndex;
-
-                                                                                        return (
-                                                                                            <li key={monthLabel}>
-                                                                                                <button
-                                                                                                    type="button"
-                                                                                                    disabled={isDisabled}
-                                                                                                    onClick={() => {
-                                                                                                        setAddItemMonthListOpen(false);
-                                                                                                        setAddItemCalendarMonth(new Date(addItemCalendarMonth.getFullYear(), monthIndex, 1));
-                                                                                                    }}
-                                                                                                    className={`${DROPDOWN_OPTION_BASE_CLASS} text-gray-500 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300`}
-                                                                                                >
-                                                                                                    {monthLabel}
-                                                                                                </button>
-                                                                                            </li>
-                                                                                        );
-                                                                                    })}
-                                                                                </ul>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-
-                                                                    <div ref={addItemYearDropdownRef} className="relative min-w-24">
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                setAddItemYearListOpen((prev) => !prev);
-                                                                                setAddItemMonthListOpen(false);
-                                                                            }}
-                                                                            className={DATE_DROPDOWN_TRIGGER_CLASS}
-                                                                        >
-                                                                            <span>{addItemCalendarMonth.getFullYear()}</span>
-                                                                            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-                                                                        </button>
-
-                                                                        {addItemYearListOpen && (
-                                                                            <div className={`${DROPDOWN_PANEL_CLASS} w-28`}>
-                                                                                <ul className="max-h-56 space-y-0.5 overflow-auto">
-                                                                                    {selectableYears.map((year) => (
-                                                                                        <li key={year}>
-                                                                                            <button
-                                                                                                type="button"
-                                                                                                onClick={() => {
-                                                                                                    setAddItemYearListOpen(false);
-                                                                                                    setAddItemCalendarMonthByYear(year);
-                                                                                                }}
-                                                                                                className={`${DROPDOWN_OPTION_BASE_CLASS} text-gray-500 dark:text-gray-300`}
-                                                                                            >
-                                                                                                {year}
-                                                                                            </button>
-                                                                                        </li>
-                                                                                    ))}
-                                                                                </ul>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ),
-                                                    }}
-                                                    onSelect={(date) => {
-                                                        if (!date) return;
-                                                        const picked = toInputDate(date);
-                                                        if (picked > maxSelectableDate) return;
-
-                                                        setAddItemForm((prev) => ({ ...prev, issue_date: picked }));
-                                                        setAddItemCalendarMonth(new Date(date.getFullYear(), date.getMonth(), 1));
-                                                        setAddItemDatePickerOpen(false);
-                                                    }}
-                                                    disabled={(date) => toInputDate(date) > maxSelectableDate}
-                                                    classNames={{
-                                                        month_caption: 'flex h-(--cell-size) w-full items-center px-(--cell-size)',
-                                                        caption_label: 'w-full',
-                                                        today: 'rounded-md ring-1 ring-emerald-500/30 text-emerald-700 dark:ring-emerald-400/35 dark:text-emerald-300',
-                                                    }}
-                                                    className="rounded-[10px] bg-white p-0 text-xs dark:bg-zinc-900"
-                                                />
-                                                <div className="mt-2 flex items-center justify-end border-t border-black/6 pt-2 dark:border-white/10">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setAddItemForm((prev) => ({ ...prev, issue_date: '' }));
-                                                            setAddItemDatePickerOpen(false);
-                                                        }}
-                                                        className="rounded-md px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-black/3 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-gray-100"
-                                                    >
-                                                        Clear Selection
-                                                    </button>
-                                                </div>
-                                            </PopoverContent>
-                                        </Popover>
-                                        {addItemFieldErrors.issue_date && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.issue_date}</p>}
-                                    </div>
-
-                                    <div>
-                                        <label className="mb-1.5 block text-xs font-medium text-gray-500">Delivered No.</label>
-                                        <input
-                                            value={addItemForm.delivery_no}
-                                            onChange={(e) => setAddItemForm((prev) => ({ ...prev, delivery_no: e.target.value }))}
-                                            placeholder="e.g. DN-1001"
-                                            className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
-                                        />
-                                        {addItemFieldErrors.delivery_no && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.delivery_no}</p>}
-                                    </div>
-                                </div>
-
-                                <div className="mt-4 pt-4">
-                                    <div className="mb-2 flex items-center gap-2">
-                                        <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Purchase Order</p>
-                                        <span className="h-px flex-1 bg-black/8 dark:bg-white/8" />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="mb-1.5 block text-xs font-medium text-gray-500">Custom Po No.</label>
-                                            <input
-                                                value={addItemForm.cust_po_no}
-                                                onChange={(e) => setAddItemForm((prev) => ({ ...prev, cust_po_no: e.target.value }))}
-                                                className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
-                                            />
-                                            {addItemFieldErrors.cust_po_no && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.cust_po_no}</p>}
-                                        </div>
-                                        <div>
-                                            <label className="mb-1.5 block text-xs font-medium text-gray-500">Control No.</label>
-                                            <input
-                                                value={addItemForm.control_no}
-                                                onChange={(e) => setAddItemForm((prev) => ({ ...prev, control_no: e.target.value }))}
-                                                className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
-                                            />
-                                            {addItemFieldErrors.control_no && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.control_no}</p>}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="mt-4 pt-4">
-                                    <div className="mb-2 flex items-center gap-2">
-                                        <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Item</p>
-                                        <span className="h-px flex-1 bg-black/8 dark:bg-white/8" />
-                                    </div>
-                                    <div>
-                                        <label className="mb-1.5 block text-xs font-medium text-gray-500">Item Name</label>
-                                        <input
-                                            value={addItemForm.item}
-                                            onChange={(e) => setAddItemForm((prev) => ({ ...prev, item: e.target.value }))}
-                                            className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
-                                        />
-                                        {addItemFieldErrors.item && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.item}</p>}
-                                    </div>
-
-                                    <div className="mt-3 grid grid-cols-3 gap-4">
-                                        <div>
-                                            <label className="mb-1.5 block text-xs font-medium text-gray-500">COG Amount</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                value={addItemForm.cog_amount}
-                                                onChange={(e) => setAddItemForm((prev) => ({ ...prev, cog_amount: e.target.value }))}
-                                                className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
-                                            />
-                                            {addItemFieldErrors.cog_amount && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.cog_amount}</p>}
-                                        </div>
-                                        <div>
-                                            <label className="mb-1.5 block text-xs font-medium text-gray-500">Delivery Fee</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                value={addItemForm.delivery_fee}
-                                                onChange={(e) => setAddItemForm((prev) => ({ ...prev, delivery_fee: e.target.value }))}
-                                                className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
-                                            />
-                                            {addItemFieldErrors.delivery_fee && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.delivery_fee}</p>}
-                                        </div>
-                                        <div>
-                                            <label className="mb-1.5 block text-xs font-medium text-gray-500">Total Amount</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                value={addItemForm.total_amount}
-                                                onChange={(e) => setAddItemForm((prev) => ({ ...prev, total_amount: e.target.value }))}
-                                                className="h-9 w-full rounded-lg border border-black/6 bg-white px-2.5 text-xs text-gray-700 outline-none focus:border-emerald-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-200"
-                                            />
-                                            {addItemFieldErrors.total_amount && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.total_amount}</p>}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="mt-4 pt-4">
-                                    <label className="mb-2 block text-center text-xs font-medium text-gray-500">Status</label>
-                                    <div className="flex justify-center">
-                                        <div className="inline-flex h-6 w-[172px] items-center rounded-2xl pl-1.5">
-                                            <span className={`inline-flex w-full items-center gap-1 rounded-2xl px-2 py-1 text-[11px] font-medium ${statusBadgeClass(Number(addItemForm.status) as StatusId)}`}>
-                                                <span className="h-1.5 w-1.5 rounded-full bg-current/60" />
-                                                <span>{statusLabel(Number(addItemForm.status))}</span>
-                                            </span>
-
-                                            <Popover open={addItemStatusMenuOpen} onOpenChange={setAddItemStatusMenuOpen}>
-                                                <PopoverTrigger asChild>
-                                                    <button
-                                                        type="button"
-                                                        className="ml-0.5 inline-flex h-6 w-5 items-center justify-center rounded-md text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-300"
-                                                        aria-label="Open add-item status dropdown"
-                                                    >
-                                                        <ChevronDown className="h-3.5 w-3.5" />
-                                                    </button>
-                                                </PopoverTrigger>
-                                                <PopoverContent
-                                                    align="end"
-                                                    sideOffset={6}
-                                                    className="w-[170px] rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900"
-                                                >
-                                                    <ul className="space-y-0.5">
-                                                        {STATUS_OPTIONS.map((opt) => (
-                                                            <li key={opt.value}>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        setAddItemStatusMenuOpen(false);
-                                                                        setAddItemForm((prev) => ({ ...prev, status: String(opt.value) }));
-                                                                    }}
-                                                                    className={[DROPDOWN_OPTION_BASE_CLASS, statusOptionTextClass(opt.value)].join(' ')}
-                                                                >
-                                                                    {opt.label}
-                                                                </button>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </PopoverContent>
-                                            </Popover>
-                                        </div>
-                                    </div>
-                                    {addItemFieldErrors.status && <p className="mt-1 text-[10px] text-red-500">{addItemFieldErrors.status}</p>}
-                                </div>
-
-                                <div className="mt-5 flex items-center justify-end gap-3 border-t border-black/6 pt-5 dark:border-white/6">
-                                    <button
-                                        type="button"
-                                        onClick={() => setAddItemOpen(false)}
-                                        className="h-9 rounded-lg border border-black/6 bg-white px-6 text-xs font-medium text-gray-600 transition-colors hover:bg-black/2 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5"
-                                    >
-                                        CANCEL
-                                    </button>
-                                    <button
-                                        type="button"
-                                        disabled={addItemSubmitting}
-                                        onClick={() => void submitAddItem()}
-                                        className="h-9 rounded-lg bg-emerald-600 px-6 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-500 dark:hover:bg-emerald-400"
-                                    >
-                                        {addItemSubmitting ? 'ADDING...' : 'ADD ITEM'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-
-                <Dialog
+                <DeleteItemDialog
                     open={deleteModalOpen}
                     onOpenChange={(open) => {
                         setDeleteModalOpen(open);
                         if (!open) setRowToDelete(null);
                     }}
-                >
-                    <DialogContent className="max-w-[440px] rounded-2xl border border-black/6 p-0 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10" style={{ fontFamily: SANS_FONT }}>
-                        <DialogTitle className="sr-only">Delete Item</DialogTitle>
-                        <DialogDescription className="sr-only">Confirm deleting the selected purchase order record.</DialogDescription>
-                        <div className="px-6 py-5">
-                            <div className="flex items-center justify-between border-b border-black/8 pb-2 dark:border-white/10">
-                                <h3 className="text-[27px] font-semibold tracking-tight text-red-600 dark:text-red-400">DELETE ITEM</h3>
-                                <span className="text-[22px] font-semibold tracking-tight text-gray-900 underline decoration-red-500/70 underline-offset-6 dark:text-gray-100 dark:decoration-red-400/70">
-                                    {rowToDelete?.control_no || rowToDelete?.delivery_no || 'N/A'}
-                                </span>
-                            </div>
+                    rowToDelete={rowToDelete}
+                    deleteSubmitting={deleteSubmitting}
+                    onConfirmDelete={() => void confirmDelete()}
+                    onCancel={() => {
+                        setDeleteModalOpen(false);
+                        setRowToDelete(null);
+                    }}
+                    sansFont={SANS_FONT}
+                />
 
-                            <div className="mt-4 text-center">
-                                <p className="text-[15px] font-semibold text-red-500 dark:text-red-400">Are you sure you want to delete</p>
-                                <p className="mt-2 text-[18px] font-semibold text-gray-900 dark:text-gray-100">
-                                    PURCHASE ORDER: <span className="text-red-600 dark:text-red-400">{rowToDelete?.control_no || rowToDelete?.delivery_no || 'N/A'}</span>
-                                </p>
-                                <p className="mt-2 text-[14px] text-gray-400 dark:text-gray-500">This action will permanently remove</p>
-                                <p className="text-[14px] text-gray-400 dark:text-gray-500">the record from the system</p>
-                            </div>
+                <PurchasedOrdersTable
+                    loading={loading}
+                    showEmptyState={showEmptyState}
+                    emptyStateTitle={emptyStateTitle}
+                    emptyStateDescription={emptyStateDescription}
+                    emptyStateButtonLabel={emptyStateButtonLabel}
+                    onOpenAddItem={() => {
+                        setAddItemFieldErrors({});
+                        setAddItemForm(ADD_ITEM_FORM_INITIAL);
+                        setEditingRow(null);
+                        setAddItemOpen(true);
+                    }}
+                    rows={rows}
+                    monoFont={MONO_FONT}
+                    formatIssueDate={formatIssueDate}
+                    formatMoney={formatMoney}
+                    statusBadgeClass={statusBadgeClass}
+                    statusLabel={statusLabel}
+                    statusOptions={STATUS_OPTIONS}
+                    statusOptionTextClass={statusOptionTextClass}
+                    onUpdateStatus={(id, status) => void updateStatus(id, status)}
+                    onOpenEdit={(row) => {
+                        setAddItemFieldErrors({});
+                        setEditingRow(row);
+                        setAddItemForm({
+                            issue_date: row.issue_date || '',
+                            delivery_no: row.delivery_no || '',
+                            cust_po_no: row.cust_po_no || '',
+                            control_no: row.control_no || '',
+                            item: row.item || '',
+                            cog_amount: row.cog_amount != null ? String(row.cog_amount) : '',
+                            delivery_fee: row.delivery_fee != null ? String(row.delivery_fee) : '',
+                            total_amount: row.total_amount != null ? String(row.total_amount) : '',
+                            status: String(row.status ?? 1),
+                        });
+                        setAddItemOpen(true);
+                    }}
+                    onOpenDelete={(row) => {
+                        setRowToDelete(row);
+                        setDeleteModalOpen(true);
+                    }}
+                />
 
-                            <div className="mt-5 flex items-center justify-center gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setDeleteModalOpen(false);
-                                        setRowToDelete(null);
-                                    }}
-                                    className="h-9 min-w-28 rounded-lg border border-black/8 bg-white px-5 text-xs font-semibold text-gray-600 transition-colors hover:bg-black/2 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5"
-                                >
-                                    CANCEL
-                                </button>
-                                <button
-                                    type="button"
-                                    disabled={deleteSubmitting}
-                                    onClick={() => void confirmDelete()}
-                                    className="h-9 min-w-28 rounded-lg bg-red-600 px-5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-red-500 dark:hover:bg-red-400"
-                                >
-                                    {deleteSubmitting ? 'DELETING...' : 'DELETE'}
-                                </button>
-                            </div>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-
-                <div className="relative overflow-visible">
-                    <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                        {loading ? (
-                            <div className="flex min-h-[620px] flex-col items-center justify-center px-4">
-                                <div className="relative h-40 w-40">
-                                    <div className="absolute inset-0 rounded-full border-12 border-gray-300/90" />
-                                    <div className="absolute inset-0 animate-spin rounded-full border-12 border-transparent border-r-[#16d5b2] border-b-[#16d5b2]" />
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <img
-                                            src="/img/logo/artemis.png"
-                                            alt="Artemis"
-                                            className="h-[70px] w-[70px] object-contain"
-                                        />
-                                    </div>
-                                </div>
-                                <p className="mt-4 text-[44px] font-medium tracking-[0.03em] text-gray-900" style={{ fontFamily: MONO_FONT }}>
-                                    LOADING...
-                                </p>
-                            </div>
-                        ) : showEmptyState ? (
-                            <div className="flex min-h-[500px] flex-col items-center justify-center px-4 text-center">
-                                <h3 className="text-[40px] font-semibold tracking-[-0.02em] text-gray-900 dark:text-gray-100">{emptyStateTitle}</h3>
-                                <p className="mt-2 text-[18px] text-gray-400 dark:text-gray-500">{emptyStateDescription}</p>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setAddItemFieldErrors({});
-                                        setAddItemForm(ADD_ITEM_FORM_INITIAL);
-                                        setAddItemOpen(true);
-                                    }}
-                                    className="mt-5 inline-flex h-11 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 text-[17px] font-medium text-white transition-colors hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
-                                >
-                                    <Plus className="h-5 w-5" />
-                                    {emptyStateButtonLabel}
-                                </button>
-                            </div>
-                        ) : (
-                        <table className="min-w-full text-xs">
-                        <thead className="bg-[#F7F7F5] dark:bg-zinc-800/80">
-                            <tr className="text-center font-medium uppercase tracking-[0.06em] text-gray-400 dark:text-gray-500">
-                                <th className="px-4 py-3">Issue Date</th>
-                                <th className="px-4 py-3">Delivered No.</th>
-                                <th className="px-4 py-3">Cust PO No.</th>
-                                <th className="px-4 py-3">Control No.</th>
-                                <th className="px-4 py-3">Item</th>
-                                <th className="px-4 py-3">COG Amount</th>
-                                <th className="px-4 py-3">Delivery Fee</th>
-                                <th className="px-4 py-3">Total Amount</th>
-                                <th className="px-4 py-3">Status</th>
-                                <th className="px-4 py-3">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-black/6 bg-white text-gray-500 dark:divide-white/6 dark:bg-zinc-900 dark:text-gray-300">
-                            {rows.length === 0 ? (
-                                <tr>
-                                    <td colSpan={10} className="px-3 py-10 text-center text-zinc-500">
-                                        No records yet.
-                                    </td>
-                                </tr>
-                            ) : (
-                                rows.map((row) => (
-                                    <tr key={row.id} className="hover:bg-emerald-500/4 dark:hover:bg-emerald-500/8">
-                                        <td className="whitespace-nowrap px-4 py-2.5 text-[11px]" style={{ fontFamily: MONO_FONT }}>{formatIssueDate(row.issue_date)}</td>
-                                        <td className="whitespace-nowrap px-4 py-2.5 text-[11px] text-gray-700 dark:text-gray-200" style={{ fontFamily: MONO_FONT }}>{row.delivery_no || '-'}</td>
-                                        <td className="whitespace-nowrap px-4 py-2.5 text-[11px] text-gray-400" style={{ fontFamily: MONO_FONT }}>{row.cust_po_no || '-'}</td>
-                                        <td className="whitespace-nowrap px-4 py-2.5 text-[11px] text-gray-400" style={{ fontFamily: MONO_FONT }}>{row.control_no || '-'}</td>
-                                        <td className="whitespace-nowrap px-4 py-2.5 font-medium uppercase text-gray-700 dark:text-gray-200">{row.item}</td>
-                                        <td className="whitespace-nowrap px-4 py-2.5 text-[11px]" style={{ fontFamily: MONO_FONT }}>{formatMoney(row.cog_amount)}</td>
-                                        <td className="whitespace-nowrap px-4 py-2.5 text-[11px]" style={{ fontFamily: MONO_FONT }}>{formatMoney(row.delivery_fee)}</td>
-                                        <td className="whitespace-nowrap px-4 py-2.5 text-[11px] text-gray-700 dark:text-gray-200" style={{ fontFamily: MONO_FONT }}>{formatMoney(row.total_amount)}</td>
-                                        <td className="whitespace-nowrap px-4 py-2.5">
-                                            <div className="inline-flex h-6 w-[172px] items-center rounded-2xl pl-1.5">
-                                                <span className={`inline-flex w-full items-center gap-1 rounded-2xl px-2 py-1 text-[11px] font-medium ${statusBadgeClass(row.status)}`}>
-                                                    <span className="h-1.5 w-1.5 rounded-full bg-current/60" />
-                                                    <span>{statusLabel(row.status)}</span>
-                                                </span>
-
-                                                <Popover
-                                                    open={statusMenuRowId === row.id}
-                                                    onOpenChange={(open) => setStatusMenuRowId(open ? row.id : null)}
-                                                >
-                                                    <PopoverTrigger asChild>
-                                                        <button
-                                                            type="button"
-                                                            className="ml-0.5 inline-flex h-6 w-5 items-center justify-center rounded-md text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-300"
-                                                            aria-label={`Open status dropdown for ${row.delivery_no || row.item}`}
-                                                        >
-                                                            <ChevronDown className="h-3.5 w-3.5" />
-                                                        </button>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent
-                                                        align="end"
-                                                        sideOffset={6}
-                                                        className="w-[140px] rounded-xl border border-black/6 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-zinc-900"
-                                                    >
-                                                        <ul className="space-y-0.5">
-                                                            {STATUS_OPTIONS.map((opt) => (
-                                                                <li key={opt.value}>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setStatusMenuRowId(null);
-                                                                            void updateStatus(row.id, opt.value);
-                                                                        }}
-                                                                        className={[
-                                                                            DROPDOWN_OPTION_BASE_CLASS,
-                                                                            statusOptionTextClass(opt.value),
-                                                                        ].join(' ')}
-                                                                    >
-                                                                        {opt.label}
-                                                                    </button>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    </PopoverContent>
-                                                </Popover>
-                                            </div>
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-2.5">
-                                            <div className="inline-flex items-center text-[11px]">
-                                                <button
-                                                    type="button"
-                                                    className="group relative inline-flex items-center px-1 text-gray-400 transition-colors hover:text-sky-600 dark:text-gray-500 dark:hover:text-sky-400"
-                                                >
-                                                    <span className="pointer-events-none absolute right-full mr-1.5 rounded-md bg-sky-500 px-2 py-0.5 text-[10px] font-semibold tracking-[0.02em] text-white opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100 dark:bg-sky-500 dark:text-white">
-                                                        EDIT
-                                                    </span>
-                                                    <Pencil className="h-3.5 w-3.5" />
-                                                </button>
-                                                <span className="mx-1 h-3.5 w-px bg-black/10 dark:bg-white/10" />
-                                                <button
-                                                    type="button"
-                                                    className="group relative inline-flex items-center px-1 text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
-                                                    onClick={() => {
-                                                        setRowToDelete(row);
-                                                        setDeleteModalOpen(true);
-                                                    }}
-                                                >
-                                                    <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-1.5 -translate-y-1/2 rounded-md bg-red-500 px-2 py-0.5 text-[10px] font-semibold tracking-[0.02em] text-white opacity-0 transition-all group-hover:opacity-100 dark:bg-red-500 dark:text-white">
-                                                        DELETE
-                                                    </span>
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                        </table>
-                        )}
-                    </div>
-                </div>
-
-                {!loading && (
-                <div className="mt-3 grid grid-cols-3 items-center gap-3 px-1">
-                    <p className="text-[11px] text-gray-400">Showing {fromRow} - {toRow} of {totalRows} results</p>
-
-                    <div className="flex items-center justify-center gap-1 text-xs text-gray-500">
-                        <button
-                            type="button"
-                            onClick={() => void fetchRows(1)}
-                            disabled={loading || !hasPrevious}
-                            className="rounded-md px-2 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
-                            aria-label="First page"
-                        >
-                            <ChevronsLeft className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => void fetchRows(currentPage - 1)}
-                            disabled={loading || !hasPrevious}
-                            className="rounded-md px-2 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
-                            aria-label="Previous page"
-                        >
-                            <ChevronLeft className="h-3.5 w-3.5" />
-                        </button>
-                        {paginationPages.map((page) => (
-                            <button
-                                key={page}
-                                type="button"
-                                onClick={() => void fetchRows(page)}
-                                disabled={loading}
-                                className={[
-                                    'inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 transition-colors',
-                                    currentPage === page
-                                        ? 'bg-emerald-600 text-white dark:bg-emerald-500'
-                                        : 'text-gray-700 hover:bg-black/3 dark:text-gray-300 dark:hover:bg-white/5',
-                                ].join(' ')}
-                            >
-                                {page}
-                            </button>
-                        ))}
-
-                        <button
-                            type="button"
-                            onClick={() => void fetchRows(currentPage + 1)}
-                            disabled={loading || !hasNext}
-                            className="rounded-md px-2 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
-                            aria-label="Next page"
-                        >
-                            <ChevronRight className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => void fetchRows(lastPage)}
-                            disabled={loading || !hasNext}
-                            className="rounded-md px-2 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
-                            aria-label="Last page"
-                        >
-                            <ChevronsRight className="h-3.5 w-3.5" />
-                        </button>
-                    </div>
-
-                    <div />
-                </div>
-                )}
+                <PurchasedOrdersPagination
+                    loading={loading}
+                    hasPrevious={hasPrevious}
+                    hasNext={hasNext}
+                    fromRow={fromRow}
+                    toRow={toRow}
+                    totalRows={totalRows}
+                    currentPage={currentPage}
+                    lastPage={lastPage}
+                    paginationPages={paginationPages}
+                    onFetchPage={(page) => void fetchRows(page)}
+                />
             </div>
         </AppLayout>
     );
