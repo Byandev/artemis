@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Workspaces\RTS;
 
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\Order\ForDelivery\ConferrerNameSort;
+use App\Http\Sorts\Order\ForDelivery\CxRtsRateSort;
 use App\Http\Sorts\Order\ForDelivery\CustomerNameSort;
 use App\Http\Sorts\Order\ForDelivery\LocationRtsRateSort;
 use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
@@ -135,6 +136,7 @@ class ForDeliveryController extends Controller
                 AllowedSort::custom('order_shipping_address_city_order_summary_rts_rate', new LocationRtsRateSort),
                 AllowedSort::custom('rider_rts_rate', new RiderRtsSort),
                 AllowedSort::custom('risk_score', new RiskScoreSort),
+                AllowedSort::custom('cx_rts_rate', new CxRtsRateSort),
             ])
             ->whereDate('delivery_date', now())
             ->paginate(10);
