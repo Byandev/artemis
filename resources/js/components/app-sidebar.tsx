@@ -94,13 +94,17 @@ export function AppSidebar() {
             icon: Package,
             items: [
                 {
+                    title: 'Purchased Orders',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/purchased-orders`,
+                    icon: ClipboardList,
+                },
+                {
                     title: 'PPW',
                     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppw`,
                     icon: Package,
                 },
             ],
         },
-
     ];
 
     // const mainNavItems: NavItem[] = [
@@ -179,17 +183,6 @@ export function AppSidebar() {
         },
     ];
 
-    const inventoryNavItems: NavItem[] = [
-        {
-            title: 'PO Management',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/po-management`,
-            icon: ClipboardList,
-        },
-    ];
-
-
-
-
     return (
         <Sidebar
             className="bg-white dark:bg-zinc-900"
@@ -210,7 +203,6 @@ export function AppSidebar() {
 
             <SidebarContent className="p-3">
                 <NavMain items={mainNavItems} group_label="Main" />
-                <NavMain items={inventoryNavItems} group_label="Inventory" />
                 {/*<NavMain items={accountNavItems} group_label="Account" />*/}
             </SidebarContent>
 
