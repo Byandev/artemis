@@ -199,8 +199,8 @@ class Workspace extends Model
             ->using(WorkspaceUser::class);
     }
 
-    public function inventory()
+    public function inventoryTransactions()
     {
-        return $this->hasMany(Inventory::class, 'workspace_id');
+        return $this->hasMany(InventoryTransaction::class, 'workspace_id');
     }
 }
