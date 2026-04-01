@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class TeamController extends Controller
@@ -71,8 +72,16 @@ class TeamController extends Controller
             abort(403, 'You do not have permission to create teams.');
         }
 
+
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:teams,name'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('teams', 'name')->where(function ($query) use ($workspace) {
+                    return $query->where('workspace_id', $workspace->id);
+                }),
+            ],
             'members' => ['array'],
             'members.*' => ['exists:users,id'],
         ]);
