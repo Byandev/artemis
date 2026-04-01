@@ -48,15 +48,17 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
     useEffect(() => {
+        if (searchValue === (query?.filter?.search ?? '')) return;
+
         const timer = setTimeout(() => {
             router.get(
                 `/workspaces/${workspace.slug}/teams`,
                 {
                     sort: query?.sort,
-                    'filter[search]': searchValue || undefined,
-                    page: searchValue ? 1 : query?.page ?? 1,
+                    'filter[search]': searchValue.trim() !== '' ? searchValue : undefined,
+                    page: searchValue.trim() !== '' ? 1 : (query?.page ?? 1),
                 },
-                { preserveState: true, replace: true, preserveScroll: true, only: ['teams'] },
+                { preserveState: true, replace: true, preserveScroll: true, only: ['teams', 'query'] },
             );
         }, 500);
         return () => clearTimeout(timer);
@@ -160,7 +162,7 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, isAdmin
                             router.get(
                                 `/workspaces/${workspace.slug}/teams`,
                                 {
-                                    sort: params?.sort,
+                                    sort: params?.sort ?? query?.sort,
                                     'filter[search]': searchValue || undefined,
                                     page: params?.page ?? 1,
                                 },

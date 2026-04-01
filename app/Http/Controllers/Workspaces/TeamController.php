@@ -16,7 +16,7 @@ class TeamController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -24,18 +24,28 @@ class TeamController extends Controller
             ->withCount('members')
             ->with(['members:id,name,email']);
 
-        // Search by name
-        if ($request->filled('search')) {
-            $query->where('name', 'like', '%'.$request->get('search').'%');
+        $searchTeam = $request->input('filter.search');
+        if (!empty($searchTeam)) {
+            $query->where('teams.name', 'like', '%' . $searchTeam . '%');
         }
 
-        // Sorting
-        $sortField = $request->get('sort', 'created_at');
-        $sortDirection = $request->get('direction', 'desc');
+        $sort = $request->input('sort', 'created_at');
+        $direction = 'asc';
+
+        if (str_starts_with($sort, '-')) {
+            $direction = 'desc';
+            $sort = ltrim($sort, '-');
+        }
+
 
         $allowedSortFields = ['name', 'created_at', 'members_count'];
-        if (in_array($sortField, $allowedSortFields)) {
-            $query->orderBy($sortField, $sortDirection === 'desc' ? 'desc' : 'asc');
+        
+        if (in_array($sort, $allowedSortFields)) {
+            if ($sort === 'members_count') {
+                $query->orderBy('members_count', $direction);
+            } else {
+                $query->orderBy("teams.{$sort}", $direction);
+            }
         }
 
         // Pagination
@@ -53,10 +63,12 @@ class TeamController extends Controller
             'teams' => $teams,
             'workspaceMembers' => $workspaceMembers,
             'isAdmin' => $isAdmin,
-            'filters' => [
-                'search' => $request->get('search', ''),
-                'sort' => $sortField,
-                'direction' => $sortDirection,
+            'query' => [
+                'filter' => [
+                    'search' => $searchTeam ?? '',
+                ],
+                'sort' => $request->input('sort'),
+                'page' => $request->input('page'),
             ],
         ]);
     }
@@ -67,7 +79,7 @@ class TeamController extends Controller
     public function store(Request $request, Workspace $workspace)
     {
         // Check if user has admin access
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (!$request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to create teams.');
         }
 
@@ -82,7 +94,7 @@ class TeamController extends Controller
             'name' => $validated['name'],
         ]);
 
-        if (! empty($validated['members'])) {
+        if (!empty($validated['members'])) {
             // Validate that all selected members are part of the workspace
             $validMemberIds = $workspace->users()
                 ->whereIn('users.id', $validated['members'])
@@ -100,7 +112,7 @@ class TeamController extends Controller
     public function update(Request $request, Workspace $workspace, Team $team)
     {
         // Check if user has admin access
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (!$request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to update teams.');
         }
 
@@ -135,7 +147,7 @@ class TeamController extends Controller
     public function destroy(Request $request, Workspace $workspace, Team $team)
     {
         // Check if user has admin access
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (!$request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to delete teams.');
         }
 

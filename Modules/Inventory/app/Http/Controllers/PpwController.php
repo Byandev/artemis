@@ -9,14 +9,17 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Inventory\Models\Ppw;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class PpwController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
-        $ppws = QueryBuilder::for(Ppw::where('workspace_id', $workspace->id))
+        $ppws = QueryBuilder::for(Ppw::where('inventory_ppws.workspace_id', $workspace->id))
             ->with(['product'])
+            ->join('products', 'inventory_ppws.product_id', '=', 'products.id')
+            ->select('inventory_ppws.*')
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->whereHas('product', function ($q) use ($value) {
@@ -32,7 +35,7 @@ class PpwController extends Controller
                     $query->whereDate('transaction_date', '<=', $value);
                 }),
             ])
-            ->allowedSorts(['transaction_date', 'count', 'created_at'])
+            ->allowedSorts(['transaction_date', 'count', 'inventory_ppws.created_at', AllowedSort::field('product_name', 'products.name')])
             ->defaultSort('-transaction_date')
             ->paginate(10)
             ->withQueryString();
@@ -63,31 +66,50 @@ class PpwController extends Controller
             'count' => $request->count,
         ]);
 
-        return redirect()->route('workspaces.inventory.ppw.index', $workspace->slug)
+        // return redirect()->route('workspaces.inventory.ppw.index', $workspace->slug)
+        //     ->with('success', 'PPW record created successfully.');
+
+        return redirect()->back()
             ->with('success', 'PPW record created successfully.');
     }
 
+    // public function update(Request $request, Workspace $workspace, Ppw $ppw)
+    // {
+    //     $request->validate([
+    //         'product_id' => 'required|exists:products,id',
+    //         'transaction_date' => 'required|date',
+    //         'count' => 'required|integer|min:0',
+    //     ]);
+
+    //     $ppw->update([
+    //         'product_id' => $request->product_id,
+    //         'transaction_date' => $request->transaction_date,
+    //         'count' => $request->count,
+    //     ]);
+
+    //     return redirect()->route('workspaces.inventory.ppw.index', $workspace->slug)
+    //         ->with('success', 'PPW record updated.');
+    // }
+
     public function update(Request $request, Workspace $workspace, Ppw $ppw)
     {
-        $request->validate([
+        $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
             'transaction_date' => 'required|date',
             'count' => 'required|integer|min:0',
         ]);
 
-        $ppw->update([
-            'product_id' => $request->product_id,
-            'transaction_date' => $request->transaction_date,
-            'count' => $request->count,
-        ]);
+        $ppw->update($validated);
 
-        return redirect()->route('workspaces.inventory.ppw.index', $workspace->slug)
-            ->with('success', 'PPW record updated.');
+        return redirect()->back()
+            ->with('success', 'PPW record updated successfully.');
     }
 
     public function destroy(Workspace $workspace, Ppw $ppw)
     {
         $ppw->delete();
-        return redirect()->route('workspaces.inventory.ppw.index', $workspace->slug);
+        // return redirect()->route('workspaces.inventory.ppw.index', $workspace->slug);
+        return redirect()->back()
+            ->with('success', 'PPW record deleted successfully.');
     }
 }

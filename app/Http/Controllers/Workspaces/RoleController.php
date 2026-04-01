@@ -16,7 +16,16 @@ class RoleController extends Controller
         $roles = Role::withTrashed()
             ->where('workspace_id', $workspace->id)
             ->orderBy('deleted_at', 'asc')
-            ->get();
+            ->get()
+            ->map(function ($role) {
+                return [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                    'description' => $role->description,
+                    'deleted_at' => $role->deleted_at,
+                    'status' => $role->trashed() ? 'Archived' : 'Active',
+                ];
+            });
 
         return Inertia::render('roles/index', [
             'workspace' => $workspace,
@@ -41,16 +50,35 @@ class RoleController extends Controller
         return back()->with('success', 'Role created successfully!');
     }
 
+    // public function update(Request $request, Workspace $workspace, Role $role)
+    // {
+    //     $validated = $request->validate([
+    //         'name' => 'required|string|max:255',
+    //         'description' => 'nullable|string',
+    //     ]);
+
+    //     $role->update($validated);
+
+    //     return redirect()->route('roles.index', $workspace->slug);
+    // }
+
     public function update(Request $request, Workspace $workspace, Role $role)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('roles', 'name')->where('workspace_id', $workspace->id)->ignore($role->id),
+            ],
             'description' => 'nullable|string',
         ]);
 
         $role->update($validated);
 
-        return redirect()->route('roles.index', $workspace->slug);
+        return redirect()->route('roles.index', [
+            'workspace' => $workspace->slug
+        ])->with('success', 'Role updated successfully!');
     }
 
     public function archive(Workspace $workspace, Role $role)

@@ -111,6 +111,24 @@ export default function Index({ roles, workspace }: Props) {
         //     }
         // },
         {
+            accessorKey: 'status',
+            header: () => <div className="font-mono font-medium text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600 text-left">Status</div>,
+            cell: ({ row }) => {
+                const isArchived = !!row.original.deleted_at;
+                return (
+                    <div className="flex items-center">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${isArchived
+                                ? 'bg-red-50 text-red-600 border-red-200/50 dark:bg-red-900/20 dark:text-red-500'
+                                : 'bg-emerald-50 text-emerald-600 border-emerald-200/50 dark:bg-emerald-900/20 dark:text-emerald-400'
+                            }`}>
+                            <span className={`mr-1.5 h-1 w-1 rounded-full ${isArchived ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                            {isArchived ? 'Archived' : 'Active'}
+                        </span>
+                    </div>
+                );
+            },
+        },
+        {
             id: 'actions',
             cell: ({ row }) => (
                 <div className="flex justify-end">
