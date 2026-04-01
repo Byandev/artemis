@@ -373,8 +373,8 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                                             <Label htmlFor="role">Role</Label>
 
                                             <Select
-                                            value={inviteForm.data.role_id}
-                                            onValueChange={(value) => inviteForm.setData('role_id', value)}
+                                                value={inviteForm.data.role_id}
+                                                onValueChange={(value) => inviteForm.setData('role_id', value)}
                                             >
                                                 <SelectTrigger>
                                                     <SelectValue />

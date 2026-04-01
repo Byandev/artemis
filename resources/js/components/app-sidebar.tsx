@@ -25,6 +25,8 @@ import {
     RotateCcw,
     BarChart2,
     MapPin,
+    ClipboardList,
+
 } from 'lucide-react';
 import AppLogo from './app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -68,6 +70,22 @@ export function AppSidebar() {
             icon: User,
         },
         {
+            title: 'Inventory',
+            icon: Package,
+            items: [
+                {
+                    title: 'Transaction Logs',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory_transaction`,
+                    icon: ClipboardList,
+                },
+                {
+                    title: 'PPW',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppw`,
+                    icon: BarChart2,
+                },
+            ],
+        },
+        {
             title: 'RTS',
             icon: RotateCcw,
             items: [
@@ -88,18 +106,6 @@ export function AppSidebar() {
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/roles`,
             icon: ShieldIcon,
         },
-        {
-            title: 'Inventory',
-            icon: Package,
-            items: [
-                {
-                    title: 'PPW',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppw`,
-                    icon: Package,
-                },
-            ],
-        },
-
     ];
 
     // const mainNavItems: NavItem[] = [
