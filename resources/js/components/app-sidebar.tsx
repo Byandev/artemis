@@ -17,7 +17,6 @@ import {
     Package,
     ClipboardList,
     Store,
-    PhoneCall,
     Users,
     BookOpenIcon,
     LogOut,
@@ -26,6 +25,9 @@ import {
     ShieldIcon,
     RotateCcw,
     BarChart2,
+    MapPin,
+    ClipboardList,
+
 } from 'lucide-react';
 import AppLogo from './app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -69,6 +71,22 @@ export function AppSidebar() {
             icon: User,
         },
         {
+            title: 'Inventory',
+            icon: Package,
+            items: [
+                {
+                    title: 'Transaction Logs',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory_transaction`,
+                    icon: ClipboardList,
+                },
+                {
+                    title: 'PPW',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppw`,
+                    icon: BarChart2,
+                },
+            ],
+        },
+        {
             title: 'RTS',
             icon: RotateCcw,
             items: [
@@ -78,9 +96,9 @@ export function AppSidebar() {
                     icon: BarChart2,
                 },
                 {
-                    title: 'RMO Management',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/rmo-management`,
-                    icon: PhoneCall,
+                    title: 'Parcel Journey',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/parcel-journeys`,
+                    icon: MapPin,
                 },
             ],
         },

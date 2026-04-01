@@ -8,6 +8,7 @@ import {
 import { Workspace } from '@/types/models/Workspace';
 import ShopFilter from '@/components/filters/ShopFilter';
 import PageFilter from '@/components/filters/PageFilter';
+import UserFilter from '@/components/filters/UserFilter';
 
 export interface FilterValue {
     teamIds: (string | number)[];
@@ -181,6 +182,11 @@ const Filters = ({
                         workspace={workspace}
                         selected={localValue.shopIds}
                         onSelect={(id) => handleFilterChange('shopIds', id)}
+                    />
+                    <UserFilter
+                        workspace={workspace}
+                        selected={localValue.userIds}
+                        onSelect={(id) => handleFilterChange('userIds', id)}
                     />
                 </div>
 

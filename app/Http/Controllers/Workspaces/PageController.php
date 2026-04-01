@@ -27,7 +27,7 @@ class PageController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -63,7 +63,7 @@ class PageController extends Controller
 
     public function create(Request $request, Workspace $workspace)
     {
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -77,7 +77,7 @@ class PageController extends Controller
 
     public function edit(Request $request, Workspace $workspace, Page $page)
     {
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -94,13 +94,13 @@ class PageController extends Controller
     {
 
         // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
         $validated = $request->validated();
 
-        $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
+        $response = Http::get('https://pos.pages.fm/api/v1/shops/' . $validated['shop_id'], [
             'api_key' => $validated['pos_token'],
         ]);
 
@@ -116,7 +116,7 @@ class PageController extends Controller
 
         $page = $pages->firstWhere('id', $validated['id']);
 
-        if (! $page) {
+        if (!$page) {
             throw ValidationException::withMessages([
                 'id' => 'Page not found',
             ]);
@@ -144,6 +144,7 @@ class PageController extends Controller
             'parcel_journey_enabled' => $validated['parcel_journey_enabled'] ?? null,
             'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
             'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
+            'status' => $validated['status'] ?? 'active',
         ]);
 
         dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear(1)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
@@ -171,6 +172,7 @@ class PageController extends Controller
             'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
             'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
             'owner_id' => $validated['owner_id'],
+            'status' => $validated['status'],
         ]);
 
         return redirect()->route('workspaces.pages.index', $workspace)
@@ -180,7 +182,7 @@ class PageController extends Controller
     public function refresh(Request $request, Workspace $workspace, Page $page)
     {
         // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -201,7 +203,6 @@ class PageController extends Controller
 
     public function archive(Request $request, Workspace $workspace, Page $page)
     {
-        // Check if user has access to this workspace
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
@@ -210,15 +211,13 @@ class PageController extends Controller
             abort(403);
         }
 
-        $page->archive();
+        $page->deactivate();
 
-        return redirect()->route('workspaces.pages.index', $workspace)
-            ->with('success', 'Page archived successfully.');
+        return redirect()->route('workspaces.pages.index', $workspace);
     }
 
     public function restore(Request $request, Workspace $workspace, Page $page)
     {
-        // Check if user has access to this workspace
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
@@ -227,9 +226,8 @@ class PageController extends Controller
             abort(403);
         }
 
-        $page->restore();
+        $page->activate();
 
-        return redirect()->route('workspaces.pages.index', $workspace)
-            ->with('success', 'Page restored successfully.');
+        return redirect()->route('workspaces.pages.index', $workspace);
     }
 }

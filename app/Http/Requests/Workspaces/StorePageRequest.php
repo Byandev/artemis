@@ -33,6 +33,7 @@ class StorePageRequest extends FormRequest
             'parcel_journey_flow_id' => 'nullable|integer',
             'parcel_journey_custom_field_id' => 'nullable|integer',
             'parcel_journey_enabled' => 'boolean',
+            'status' => 'nullable|in:active,inactive',
         ];
     }
 

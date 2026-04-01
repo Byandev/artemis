@@ -9,6 +9,9 @@ use App\Queries\RtsDeliveryAttemptsQuery;
 use App\Queries\RtsLocationQuery;
 use App\Queries\RtsOrderItemQuery;
 use App\Queries\RtsPriceQuery;
+use App\Queries\RtsAdQuery;
+use App\Queries\RtsConfirmedByQuery;
+use App\Queries\RtsOrderFrequencyQuery;
 use App\Queries\RtsRiderQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -21,6 +24,7 @@ class AnalyticController extends Controller
             'workspace' => $workspace->loadMissing([
                 'shops' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name'),
                 'pages' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name'),
+                'pageOwners:id,name'
             ]),
         ]);
     }
@@ -54,6 +58,31 @@ class AnalyticController extends Controller
             (new RtsCxQuery($workspace, $request))
                 ->ofType($request->input('type', 'latest'))
                 ->get()
+        );
+    }
+
+    public function groupByAd(Request $request, Workspace $workspace)
+    {
+        return response()->json(
+            (new RtsAdQuery($workspace, $request))
+                ->sort($request->input('sort', '-total_orders'))
+                ->get($request->input('per_page', 15))
+        );
+    }
+
+    public function groupByConfirmedBy(Request $request, Workspace $workspace)
+    {
+        return response()->json(
+            (new RtsConfirmedByQuery($workspace, $request))
+                ->sort($request->input('sort', '-total_orders'))
+                ->get($request->input('per_page', 15))
+        );
+    }
+
+    public function groupByOrderFrequency(Request $request, Workspace $workspace)
+    {
+        return response()->json(
+            (new RtsOrderFrequencyQuery($workspace, $request))->get()
         );
     }
 

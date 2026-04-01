@@ -54,9 +54,7 @@ export function DataTable<TData, TValue>({
         columns,
         getCoreRowModel: getCoreRowModel(),
         onSortingChange: (updater) => {
-            console.log(updater, sorting)
             const next = typeof updater === "function" ? updater(sorting) : updater
-            // co
             setSorting(next)
 
             if (onFetch) onFetch({ sort: toBackendSort(next), page: 1 })

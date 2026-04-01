@@ -146,4 +146,9 @@ class User extends Authenticatable implements MustVerifyEmail
 
         return $this->role === $requiredRole;
     }
+
+    public function pages()
+    {
+        return $this->hasMany(Page::class, 'owner_id');
+    }
 }

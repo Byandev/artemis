@@ -104,6 +104,8 @@ export interface OrderForDelivery {
     status: OrderStatus;
     rider_name: string;
     rider_phone: string;
+    rider_rts_rate: number | null;
+    risk_score: number | null;
     caller_id: string | null;
     conferrer_id: string | null;
     delivery_date: string; // ISO date
