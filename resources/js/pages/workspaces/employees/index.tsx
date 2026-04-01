@@ -51,17 +51,20 @@ export default function EmployeesIndex({ workspace, employees, query }: Props) {
     const columns: ColumnDef<Employee>[] = [
         {
             accessorKey: 'name',
+            size: 260,
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Name" />,
         },
         {
             accessorKey: 'email',
+            size: 260,
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Email" />,
             cell: ({ row }) => row.original.email || '-',
         },
         {
             accessorKey: 'phone_number',
+            size: 180,
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Phone" />,
             cell: ({ row }) => row.original.phone_number || '-',

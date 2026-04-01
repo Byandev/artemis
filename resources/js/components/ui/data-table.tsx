@@ -77,7 +77,11 @@ export function DataTable<TData, TValue>({
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
                                     return (
-                                        <TableHead key={header.id} className="px-4 py-2.5 text-[10px] font-mono font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600 border-b border-black/6 dark:border-white/6 whitespace-nowrap">
+                                        <TableHead
+                                            key={header.id}
+                                            className="px-4 py-2.5 text-[10px] font-mono font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600 border-b border-black/6 dark:border-white/6 whitespace-nowrap"
+                                            style={{ width: header.getSize() ? `${header.getSize()}px` : undefined }}
+                                        >
                                             {header.isPlaceholder
                                                 ? null
                                                 : flexRender(
@@ -99,7 +103,11 @@ export function DataTable<TData, TValue>({
                                     className="hover:bg-emerald-500/[0.03] transition-colors"
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id} className='px-4 py-3 text-[12px] text-black dark:text-gray-400 border-b border-black/6 dark:border-white/6 align-top whitespace-nowrap'>
+                                        <TableCell
+                                            key={cell.id}
+                                            className='px-4 py-3 text-[12px] text-black dark:text-gray-400 border-b border-black/6 dark:border-white/6 align-top whitespace-nowrap'
+                                            style={{ width: cell.column.getSize() ? `${cell.column.getSize()}px` : undefined }}
+                                        >
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}
