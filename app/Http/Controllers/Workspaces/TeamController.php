@@ -67,7 +67,7 @@ class TeamController extends Controller
     public function store(Request $request, Workspace $workspace)
     {
         // Check if user has admin access
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have permission to create teams.');
         }
 
@@ -100,7 +100,7 @@ class TeamController extends Controller
     public function update(Request $request, Workspace $workspace, Team $team)
     {
         // Check if user has admin access
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have permission to update teams.');
         }
 
@@ -135,7 +135,7 @@ class TeamController extends Controller
     public function destroy(Request $request, Workspace $workspace, Team $team)
     {
         // Check if user has admin access
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have permission to delete teams.');
         }
 

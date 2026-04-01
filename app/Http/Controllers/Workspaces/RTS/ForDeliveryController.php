@@ -4,13 +4,17 @@ namespace App\Http\Controllers\Workspaces\RTS;
 
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\Order\ForDelivery\ConferrerNameSort;
+use App\Http\Sorts\Order\ForDelivery\CxRtsRateSort;
 use App\Http\Sorts\Order\ForDelivery\CustomerNameSort;
 use App\Http\Sorts\Order\ForDelivery\LocationRtsRateSort;
+use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
+use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Http\Sorts\Order\ForDelivery\OrderAmountSort;
 use App\Http\Sorts\Order\ForDelivery\OrderDeliveryAttemptSort;
 use App\Http\Sorts\Order\ForDelivery\OrderNumberSort;
 use App\Http\Sorts\Order\ForDelivery\OrderParcelStatusSort;
 use App\Http\Sorts\Order\ForDelivery\OrderTrackingCodeSort;
+use App\Models\Page;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -22,147 +26,6 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class ForDeliveryController extends Controller
 {
-    public function index(Request $request, Workspace $workspace)
-    {
-        $items = QueryBuilder::for(OrderForDelivery::class)
-            ->where('workspace_id', $workspace->id)
-            ->with([
-                'order' => function ($query) {
-                    $query
-                        ->select(['id', 'order_number', 'status_name', 'final_amount', 'parcel_status', 'tracking_code', 'delivery_attempts'])
-                        ->with([
-                            'shippingAddress' => function ($subQuery) {
-                                $subQuery->with(['cityOrderSummary']);
-                            },
-                            'items' => function ($subQuery) {
-                                $subQuery->select(['order_id', 'quantity', 'name']);
-                            },
-                        ]);
-                },
-                'conferrer' => function ($query) {
-                    $query->select(['id', 'name']);
-                },
-                'assignee' => function ($query) {
-                    $query->select(['id', 'name']);
-                },
-                'page' => function ($query) {
-                    $query->select(['id', 'name']);
-                },
-            ])
-            ->allowedFilters([
-                AllowedFilter::callback('page_id', function ($query, $value) {
-                    $values = is_string($value) ? explode(',', $value) : (array) $value;
-                    $query->whereIn('page_id', $values);
-                }),
-                AllowedFilter::exact('shop_id'),
-                AllowedFilter::callback('status', function ($query, $value) {
-                    $values = is_string($value) ? explode(',', $value) : (array) $value;
-                    $query->whereIn('status', $values);
-                }),
-                AllowedFilter::callback('parcel_status', function ($query, $value) {
-                    $values = is_string($value) ? explode(',', $value) : (array) $value;
-                    $values = array_map('strtolower', $values);
-                    $query->whereHas('order', function ($orderQuery) use ($values) {
-                        $orderQuery->whereIn('parcel_status', $values);
-                    });
-                }),
-                AllowedFilter::callback('search', function ($query, $value) {
-                    $query->where(function ($q) use ($value) {
-                        $q->whereHas('order', function ($orderQuery) use ($value) {
-                            $orderQuery->where('order_number', 'LIKE', "%{$value}%")
-                                ->orWhere('tracking_code', 'LIKE', "%{$value}%");
-                        })
-                            ->orWhere('rider_name', 'LIKE', "%{$value}%")
-                            ->orWhereHas('conferrer', function ($conferrerQuery) use ($value) {
-                                $conferrerQuery->where('name', 'LIKE', "%{$value}%");
-                            });
-                    });
-                }),
-            ])
-            ->allowedSorts([
-                'status',
-                'rider_name',
-                AllowedSort::custom('conferrer_name', new ConferrerNameSort),
-                AllowedSort::custom('order_number', new OrderNumberSort),
-                AllowedSort::custom('order_parcel_status', new OrderParcelStatusSort),
-                AllowedSort::custom('order_delivery_attempts', new OrderDeliveryAttemptSort),
-                AllowedSort::custom('order_tracking_code', new OrderTrackingCodeSort),
-                AllowedSort::custom('order_final_amount', new OrderAmountSort),
-                AllowedSort::custom('order_shipping_address_full_name', new CustomerNameSort),
-                AllowedSort::custom('order_shipping_address_city_order_summary_rts_rate', new LocationRtsRateSort),
-            ])
-            ->paginate(10);
-
-        $totalForDeliveryToday = OrderForDelivery::query()
-            ->from('pancake_order_for_delivery as ofd')
-            ->join('pancake_orders as o', 'o.id', '=', 'ofd.order_id')
-            ->where('ofd.workspace_id', $workspace->id)
-            ->where('o.parcel_status', 'out_for_delivery')
-            ->whereDate('o.updated_at', now())  // or created_at if you prefer
-            ->count();
-
-// 2️⃣ All-time stats (no date filter)
-        $stats = OrderForDelivery::query()
-            ->from('pancake_order_for_delivery as ofd')
-            ->join('pancake_orders as o', 'o.id', '=', 'ofd.order_id')
-            ->where('ofd.workspace_id', $workspace->id)
-            ->selectRaw("
-        COUNT(*) as total,
-        SUM(CASE WHEN ofd.status != 'PENDING' THEN 1 ELSE 0 END) as total_not_pending,
-        SUM(CASE WHEN o.parcel_status IS NOT NULL THEN 1 ELSE 0 END) as total_parcel,
-        SUM(CASE WHEN o.parcel_status = 'delivered' THEN 1 ELSE 0 END) as total_delivered,
-        SUM(CASE WHEN o.parcel_status = 'returning' THEN 1 ELSE 0 END) as total_returning,
-        SUM(CASE WHEN o.parcel_status = 'undeliverable' THEN 1 ELSE 0 END) as total_undeliverable,
-        SUM(CASE WHEN o.parcel_status = 'problematic' THEN 1 ELSE 0 END) as total_problematic
-    ")
-            ->first();
-
-// 3️⃣ Calculate rates
-        $total = (int) ($stats->total ?: 1);
-        $totalParcel = (int) ($stats->total_parcel ?: 1);
-
-        $stats->called_rate = round(((int) $stats->total_not_pending / $total) * 100, 1);
-        $stats->successful_rate = round(((int) $stats->total_delivered / $totalParcel) * 100, 1);
-        $stats->unsuccessful_rate = round((
-                ((int) $stats->total_problematic + (int) $stats->total_returning + (int) $stats->total_undeliverable)
-                / $totalParcel
-            ) * 100, 1);
-
-// 4️⃣ Add the for-delivery-today count
-        $stats->total_for_delivery_today = $totalForDeliveryToday;
-
-        return Inertia::render('workspaces/rts/rmo-management', [
-            'orders' => $items,
-            'workspace' => $workspace,
-            'query' => [
-                ...$request->only(['sort', 'perPage', 'page',]),
-                'filter' => $request->input('filter', []),
-            ],
-            'stats' => $stats,
-        ]);
-    }
-
-    public function updateStatus(Workspace $workspace, $id, Request $request)
-    {
-        $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
-
-        if (!$orderForDelivery) {
-            return redirect()->back()->with('error', 'Order not found.');
-        }
-
-        $data = ['status' => $request->status];
-
-        if ($request->has('removeAssignee') && $request->removeAssignee) {
-            $data['assignee_id'] = null;
-        } else {
-            $data['assignee_id'] = auth()->id();
-        }
-
-        $orderForDelivery->update($data);
-
-        return redirect()->back()->with('success', 'Status updated successfully');
-    }
-
     public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
     {
         $isRemoving = $request->has('removeAssignee') && $request->removeAssignee;
@@ -192,10 +55,23 @@ class ForDeliveryController extends Controller
     {
         $items = QueryBuilder::for(OrderForDelivery::class)
             ->where('workspace_id', $workspace->id)
+            ->addSelect([
+                'pancake_order_for_delivery.*',
+                \DB::raw('(SELECT rts_rate FROM rider_delivery_summary WHERE rider_name = pancake_order_for_delivery.rider_name AND rider_phone = pancake_order_for_delivery.rider_phone LIMIT 1) as rider_rts_rate'),
+                \DB::raw('(' . RiskScoreSort::sql() . ') as risk_score'),
+            ])
             ->with([
                 'order' => function ($query) {
                     $query
-                        ->select(['id', 'order_number', 'status_name', 'final_amount', 'parcel_status', 'tracking_code', 'delivery_attempts'])
+                        ->selectRaw("
+                            id, order_number, status_name, final_amount, parcel_status, tracking_code, delivery_attempts,
+                            (
+                                SELECT SUM(order_fail) / NULLIF(SUM(order_fail) + SUM(order_success), 0)
+                                FROM pancake_order_phone_number_reports
+                                WHERE order_id = pancake_orders.id
+                                and pancake_order_phone_number_reports.type = 'latest'
+                            ) AS cx_rts_rate
+                        ")
                         ->with([
                             'shippingAddress' => function ($subQuery) {
                                 $subQuery->with(['cityOrderSummary']);
@@ -220,7 +96,10 @@ class ForDeliveryController extends Controller
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $query->whereIn('page_id', $values);
                 }),
-                AllowedFilter::exact('shop_id'),
+                AllowedFilter::callback('shop_id', function ($query, $value) {
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $query->whereIn('shop_id', $values);
+                }),
                 AllowedFilter::callback('status', function ($query, $value) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $query->whereIn('status', $values);
@@ -231,6 +110,13 @@ class ForDeliveryController extends Controller
                     $query->whereHas('order', function ($orderQuery) use ($values) {
                         $orderQuery->whereIn('parcel_status', $values);
                     });
+                }),
+                AllowedFilter::callback('user_id', function ($query, $value) use ($workspace) {
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $pageIds = Page::whereIn('owner_id', $values)
+                        ->where('workspace_id', $workspace->id)
+                        ->pluck('id');
+                    $query->whereIn('page_id', $pageIds);
                 }),
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where(function ($q) use ($value) {
@@ -256,61 +142,81 @@ class ForDeliveryController extends Controller
                 AllowedSort::custom('order_final_amount', new OrderAmountSort),
                 AllowedSort::custom('order_shipping_address_full_name', new CustomerNameSort),
                 AllowedSort::custom('order_shipping_address_city_order_summary_rts_rate', new LocationRtsRateSort),
+                AllowedSort::custom('rider_rts_rate', new RiderRtsSort),
+                AllowedSort::custom('risk_score', new RiskScoreSort),
+                AllowedSort::custom('cx_rts_rate', new CxRtsRateSort),
             ])
+            ->whereDate('delivery_date', now())
             ->paginate(10);
 
-        $workspaceId = $workspace->id;
+        // Build a base query for stats that respects page/shop filters
+        $statsBase = OrderForDelivery::where('workspace_id', $workspace->id)
+            ->where('delivery_date', now());
 
-// 1️⃣ Total for delivery today
-        $totalForDeliveryToday = OrderForDelivery::query()
-            ->from('pancake_order_for_delivery as ofd')
-            ->join('pancake_orders as o', 'o.id', '=', 'ofd.order_id')
-            ->where('ofd.workspace_id', $workspaceId)
-            ->where('o.parcel_status', 'out_for_delivery')
-            ->whereDate('o.updated_at', now())  // or created_at if you prefer
+        $filterPageIds = $request->input('filter.page_id');
+        if ($filterPageIds) {
+            $pageIds = is_string($filterPageIds) ? explode(',', $filterPageIds) : (array) $filterPageIds;
+            $statsBase->whereIn('page_id', $pageIds);
+        }
+
+        $filterShopId = $request->input('filter.shop_id');
+        if ($filterShopId) {
+            $shopIds = is_string($filterShopId) ? explode(',', $filterShopId) : (array) $filterShopId;
+            $statsBase->whereIn('shop_id', $shopIds);
+        }
+
+        // 1️⃣ Total orders
+        $totalOrders = (clone $statsBase)->count();
+
+        // 2️⃣ Total for delivery today
+        $totalForDeliveryToday = (clone $statsBase)
+            ->whereHas('order', function ($query) {
+                $query->where('parcel_status', 'out_for_delivery')
+                    ->whereDate('created_at', now());
+            })
             ->count();
 
-// 2️⃣ All-time stats (no date filter)
-        $stats = OrderForDelivery::query()
-            ->from('pancake_order_for_delivery as ofd')
-            ->join('pancake_orders as o', 'o.id', '=', 'ofd.order_id')
-            ->where('ofd.workspace_id', $workspaceId)
-            ->selectRaw("
-        COUNT(*) as total,
-        SUM(CASE WHEN ofd.status != 'PENDING' THEN 1 ELSE 0 END) as total_not_pending,
-        SUM(CASE WHEN o.parcel_status IS NOT NULL THEN 1 ELSE 0 END) as total_parcel,
-        SUM(CASE WHEN o.parcel_status = 'delivered' THEN 1 ELSE 0 END) as total_delivered,
-        SUM(CASE WHEN o.parcel_status = 'returning' THEN 1 ELSE 0 END) as total_returning,
-        SUM(CASE WHEN o.parcel_status = 'undeliverable' THEN 1 ELSE 0 END) as total_undeliverable,
-        SUM(CASE WHEN o.parcel_status = 'problematic' THEN 1 ELSE 0 END) as total_problematic
-    ")
-            ->first();
+        // 3️⃣ Called rate (not pending)
+        $totalCalled = (clone $statsBase)
+            ->where('status', '!=', 'PENDING')
+            ->count();
 
-// 3️⃣ Calculate rates
-        $total = (int) ($stats->total ?: 1);
-        $totalParcel = (int) ($stats->total_parcel ?: 1);
+        $calledRate = $totalOrders > 0 ? round(($totalCalled / $totalOrders) * 100, 1) : 0;
 
-        $stats->called_rate = round(((int) $stats->total_not_pending / $total) * 100, 1);
-        $stats->successful_rate = round(((int) $stats->total_delivered / $totalParcel) * 100, 1);
-        $stats->unsuccessful_rate = round((
-                ((int) $stats->total_problematic + (int) $stats->total_returning + (int) $stats->total_undeliverable)
-                / $totalParcel
-            ) * 100, 1);
+        // 4️⃣ Successful rate (parcel delivered)
+        $totalParcel = (clone $statsBase)
+            ->whereHas('order', fn($q) => $q->whereNotNull('parcel_status'))
+            ->count();
 
-// 4️⃣ Add the for-delivery-today count
-        $stats->total_for_delivery_today = $totalForDeliveryToday;
+        $totalDelivered = (clone $statsBase)
+            ->whereHas('order', fn($q) => $q->where('parcel_status', 'delivered'))
+            ->count();
+
+        $successfulRate = $totalParcel > 0 ? round(($totalDelivered / $totalParcel) * 100, 1) : 0;
+
+        // 5️⃣ Unsuccessful rate (problematic + returning + undeliverable)
+        $totalUnsuccessful = (clone $statsBase)
+            ->whereHas('order', fn($q) => $q->whereIn('parcel_status', ['problematic', 'returning', 'undeliverable']))
+            ->count();
+
+        $unsuccessfulRate = $totalParcel > 0 ? round(($totalUnsuccessful / $totalParcel) * 100, 1) : 0;
 
         $users = User::get(['id', 'name']);
+
+        $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id', 'pageOwners:id,name']);
 
         return Inertia::render('workspaces/rts/public-pages/rmo-management', [
             'orders' => $items,
             'workspace' => $workspace,
             'query' => [
-                ...$request->only(['sort', 'perPage', 'page',]),
+                ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
             'users' => $users,
-            'stats' => $stats,
+            'total_for_delivery_today' => $totalForDeliveryToday,
+            'called_rate' => $calledRate,
+            'successful_rate' => $successfulRate,
+            'unsuccessful_rate' => $unsuccessfulRate,
         ]);
     }
 

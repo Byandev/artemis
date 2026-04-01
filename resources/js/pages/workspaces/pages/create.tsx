@@ -30,6 +30,7 @@ export default function Create({ workspace, users }: Props) {
         parcel_journey_custom_field_id: '',
         parcel_journey_enabled: false as boolean,
         owner_id: '',
+        status: 'active' as 'active' | 'inactive',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -90,6 +91,24 @@ export default function Create({ workspace, users }: Props) {
                                         ))}
                                     </select>
                                     {errors.owner_id && <p className={errorClass}>{errors.owner_id}</p>}
+                                </div>
+                                <div className={`${fieldClass} sm:col-span-2`}>
+                                    <div className="flex items-center justify-between rounded-[10px] border border-black/8 bg-stone-50 px-4 py-3 dark:border-white/8 dark:bg-zinc-800">
+                                        <div>
+                                            <p className={labelClass}>Status</p>
+                                            <p className="mt-0.5 font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                                                {data.status === 'active' ? 'Page is active and visible' : 'Page is inactive and hidden'}
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setData('status', data.status === 'active' ? 'inactive' : 'active')}
+                                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${data.status === 'active' ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-zinc-600'}`}
+                                        >
+                                            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ${data.status === 'active' ? 'translate-x-5' : 'translate-x-0'}`} />
+                                        </button>
+                                    </div>
+                                    {errors.status && <p className={errorClass}>{errors.status}</p>}
                                 </div>
                             </div>
                         </div>
