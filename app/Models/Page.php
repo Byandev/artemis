@@ -66,6 +66,21 @@ class Page extends Model
         $this->delete();
     }
 
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
+    }
+
+    public function activate(): void
+    {
+        $this->update(['status' => 'active']);
+    }
+
+    public function deactivate(): void
+    {
+        $this->update(['status' => 'inactive']);
+    }
+
     public function customerServiceRepresentatives(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(CustomerServiceRepresentative::class, 'page_customer_service_representative');
