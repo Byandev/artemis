@@ -1,7 +1,5 @@
 <?php
-
 namespace App\Http\Controllers\Workspaces;
-
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\Workspace;

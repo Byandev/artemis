@@ -3,6 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Workspace } from '@/types/models/Workspace';
 import { Trash2 } from 'lucide-react';
 import workspaces from '@/routes/workspaces';
+import { toast } from 'sonner';
 
 interface Team {
     id: number;
@@ -20,7 +21,10 @@ export function DeleteTeamDialog({ workspace, team, onClose }: DeleteTeamDialogP
         if (!team) return;
         router.delete(workspaces.teams.destroy.url({ workspace, team: team.id }), {
             preserveScroll: true,
-            onSuccess: () => onClose(),
+            onSuccess: () => {
+                toast.success('Team has been deleted successfully');
+                onClose();
+            },
         });
     };
 

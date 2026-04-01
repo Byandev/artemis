@@ -1,3 +1,5 @@
+
+import { toast } from 'sonner';
 import { useForm } from '@inertiajs/react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { MemberSelector } from '@/components/teams/member-selector';
@@ -42,19 +44,29 @@ export function TeamFormDialog({ workspace, workspaceMembers, open, onOpenChange
     }, [team, open]);
 
     const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (isEditing) {
-            put(workspaces.teams.update.url({ workspace, team: team.id }), {
-                preserveScroll: true,
-                onSuccess: () => { reset(); onOpenChange(false); },
-            });
-        } else {
-            post(workspaces.teams.store.url({ workspace }), {
-                preserveScroll: true,
-                onSuccess: () => { reset(); onOpenChange(false); },
-            });
-        }
-    };
+    e.preventDefault();
+
+    if (isEditing) {
+        put(workspaces.teams.update.url({ workspace, team: team.id }), {
+            preserveScroll: true,
+            onSuccess: () => { 
+                toast.success('Team updated successfully!');
+                reset(); 
+                onOpenChange(false); 
+            },
+        });
+    } else {
+        post(workspaces.teams.store.url({ workspace }), {
+            preserveScroll: true,
+            onSuccess: () => { 
+                // 3. Add the success notification for Creating
+                toast.success('Team created successfully!');
+                reset(); 
+                onOpenChange(false); 
+            },
+        });
+    }
+};
 
     const handleOpenChange = (open: boolean) => {
         onOpenChange(open);
