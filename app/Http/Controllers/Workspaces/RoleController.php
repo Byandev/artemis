@@ -16,16 +16,7 @@ class RoleController extends Controller
         $roles = Role::withTrashed()
             ->where('workspace_id', $workspace->id)
             ->orderBy('deleted_at', 'asc')
-            ->get()
-            ->map(function ($role) {
-                return [
-                    'id' => $role->id,
-                    'name' => $role->name,
-                    'description' => $role->description,
-                    'deleted_at' => $role->deleted_at,
-                    'status' => $role->trashed() ? 'Archived' : 'Active',
-                ];
-            });
+            ->get();
 
         return Inertia::render('roles/index', [
             'workspace' => $workspace,

@@ -23,9 +23,8 @@ import { useState } from 'react';
 import { toast, Toaster } from 'sonner';
 import { Workspace } from '@/types/models/Workspace';
 import { Role } from '@/types/models/Role';
-import RoleFormDialog from '@/components/roles/role-form-dialog'; // Added Toaster here
+import RoleFormDialog from '@/components/roles/role-form-dialog'; 
 import PageHeader from '@/components/common/PageHeader';
-
 
 interface Props {
     roles: Role[];
@@ -34,14 +33,11 @@ interface Props {
 
 export default function Index({ roles, workspace }: Props) {
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedRole, setSelectedRole] = useState<Role | undefined>(
-        undefined,
-    );
+    const [selectedRole, setSelectedRole] = useState<Role | undefined>(undefined);
 
     const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
     const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
     const [openFormModal, setOpenFormModal] = useState(false);
-
 
     const handleConfirmArchive = () => {
         if (!selectedRole) return;
@@ -67,15 +63,6 @@ export default function Index({ roles, workspace }: Props) {
         });
     };
 
-    // const userCounts = useMemo(() => {
-    //     const counts: Record<string, number> = {};
-    //     users.forEach(u => {
-    //         const r = u.role.toLowerCase();
-    //         counts[r] = (counts[r] || 0) + 1;
-    //     });
-    //     return counts;
-    // }, [users]);
-
     const columns: ColumnDef<Role>[] = [
         {
             accessorKey: 'name',
@@ -95,25 +82,11 @@ export default function Index({ roles, workspace }: Props) {
                 </div>
             ),
         },
-        // {
-        //     id: 'members',
-        //     header: () => <div className="font-extrabold text-sm text-gray-900 text-center py-2">Members</div>,
-        //     cell: ({ row }) => {
-        //         const count = userCounts[row.original.role.toLowerCase()] || 0;
-        //         return (
-        //             <div className="flex justify-center">
-        //                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200">
-        //                     <Users className="w-3 h-3" />
-        //                     {count}
-        //                 </span>
-        //             </div>
-        //         );
-        //     }
-        // },
         {
             accessorKey: 'status',
             header: () => <div className="font-mono font-medium text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600 text-left">Status</div>,
             cell: ({ row }) => {
+                // Logic fix: Determine status from deleted_at instead of a backend string
                 const isArchived = !!row.original.deleted_at;
                 return (
                     <div className="flex items-center">
@@ -142,18 +115,18 @@ export default function Index({ roles, workspace }: Props) {
                             {!row.original.deleted_at ? (
                                 <>
                                     <DropdownMenuItem onClick={() => { setSelectedRole(row.original); setOpenFormModal(true); }}>
-                                        <Pencil />
+                                        <Pencil className="mr-2 h-4 w-4" />
                                         Edit
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem variant="destructive" onClick={() => { setSelectedRole(row.original); setIsArchiveModalOpen(true); }}>
-                                        <Archive />
+                                        <Archive className="mr-2 h-4 w-4" />
                                         Archive
                                     </DropdownMenuItem>
                                 </>
                             ) : (
                                 <DropdownMenuItem onClick={() => { setSelectedRole(row.original); setIsRestoreModalOpen(true); }}>
-                                    <RefreshCcw />
+                                    <RefreshCcw className="mr-2 h-4 w-4" />
                                     Restore
                                 </DropdownMenuItem>
                             )}
@@ -167,13 +140,15 @@ export default function Index({ roles, workspace }: Props) {
     return (
         <AppLayout>
             <Head title="Roles Management" />
-            {/* Added Toaster component here */}
             <Toaster position="top-right" richColors />
 
             <RoleFormDialog
                 workspace={workspace}
                 open={openFormModal}
-                onOpenChange={setOpenFormModal}
+                onOpenChange={(open) => {
+                    setOpenFormModal(open);
+                    if(!open) setSelectedRole(undefined);
+                }}
                 role={selectedRole}
             />
 
@@ -183,8 +158,8 @@ export default function Index({ roles, workspace }: Props) {
                     description="Define and manage access levels for your workspace"
                 >
                     <button
-                        onClick={() => setOpenFormModal(true)}
-                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
+                        onClick={() => { setSelectedRole(undefined); setOpenFormModal(true); }}
+                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono text-[12px] font-medium text-white transition-all hover:bg-emerald-700"
                     >
                         Add New Role
                     </button>
@@ -198,7 +173,7 @@ export default function Index({ roles, workspace }: Props) {
                             placeholder="Search roles..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono text-[12px] text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                         />
                     </div>
                 </div>
@@ -206,7 +181,9 @@ export default function Index({ roles, workspace }: Props) {
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         columns={columns}
-                        data={roles}
+                        data={roles.filter(role => 
+                            role.name.toLowerCase().includes(searchQuery.toLowerCase())
+                        )}
                         enableInternalPagination={true}
                     />
                 </div>
@@ -214,7 +191,7 @@ export default function Index({ roles, workspace }: Props) {
 
             {/* Archive Modal */}
             {isArchiveModalOpen && (
-                <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div
                         className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px]"
                         onClick={() => setIsArchiveModalOpen(false)}
@@ -237,8 +214,7 @@ export default function Index({ roles, workspace }: Props) {
                             <div className="mb-6 w-full rounded-xl border border-orange-100 bg-orange-50/60 p-3">
                                 <p className="flex items-center justify-center gap-2 text-xs font-medium text-orange-800">
                                     <ShieldCheck className="h-4 w-4" />
-                                    This role will be hidden but can be restored
-                                    later.
+                                    This role will be hidden but can be restored later.
                                 </p>
                             </div>
                             <div className="flex w-full items-center gap-3">
@@ -263,7 +239,7 @@ export default function Index({ roles, workspace }: Props) {
 
             {/* Restore Modal */}
             {isRestoreModalOpen && (
-                <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div
                         className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px]"
                         onClick={() => setIsRestoreModalOpen(false)}
@@ -286,8 +262,7 @@ export default function Index({ roles, workspace }: Props) {
                             <div className="mb-6 w-full rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
                                 <p className="flex items-center justify-center gap-2 text-xs font-medium text-emerald-800">
                                     <ShieldCheck className="h-4 w-4" />
-                                    This role will be visible and usable in the
-                                    workspace again.
+                                    This role will be visible and usable in the workspace again.
                                 </p>
                             </div>
                             <div className="flex w-full items-center gap-3">
