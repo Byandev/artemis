@@ -14,6 +14,7 @@ export interface Page {
     infotxt_token?: string;
     infotxt_user_id?: string;
     orders_last_synced_at: string;
+    status: 'active' | 'inactive';
     deleted_at: string | null; // SoftDeletes column
     pancake_token: string | null;
     parcel_journey_flow_id: number | null;
