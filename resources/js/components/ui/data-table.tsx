@@ -54,9 +54,7 @@ export function DataTable<TData, TValue>({
         columns,
         getCoreRowModel: getCoreRowModel(),
         onSortingChange: (updater) => {
-            console.log(updater, sorting)
             const next = typeof updater === "function" ? updater(sorting) : updater
-            // co
             setSorting(next)
 
             if (onFetch) onFetch({ sort: toBackendSort(next), page: 1 })
@@ -73,13 +71,13 @@ export function DataTable<TData, TValue>({
     return (
         <>
             <div className="max-w-full overflow-x-auto custom-scrollbar">
-                <Table>
+                <Table className="table-fixed">
                     <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
                                     return (
-                                        <TableHead key={header.id} className="px-4 py-2.5 text-[10px] font-mono font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600 border-b border-black/6 dark:border-white/6">
+                                        <TableHead key={header.id} className="px-4 py-2.5 text-[10px] font-mono font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600 border-b border-black/6 dark:border-white/6 whitespace-nowrap">
                                             {header.isPlaceholder
                                                 ? null
                                                 : flexRender(
@@ -101,7 +99,7 @@ export function DataTable<TData, TValue>({
                                     className="hover:bg-emerald-500/[0.03] transition-colors"
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id} className='px-4 py-3  text-[12px] text-black dark:text-gray-400 border-b border-black/6 dark:border-white/6 align-top'>
+                                        <TableCell key={cell.id} className='px-4 py-3 text-[12px] text-black dark:text-gray-400 border-b border-black/6 dark:border-white/6 align-top whitespace-nowrap'>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}
