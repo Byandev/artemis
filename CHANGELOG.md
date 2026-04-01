@@ -1,5 +1,27 @@
 # Changelog
 
+## [v2.2.0] — 2026-04-01
+
+### Parcel Journey — New Page & Analytics
+
+- Added **Parcel Journey** entry under the RTS sidebar
+- New page at `/rts/parcel-journeys` displaying parcel journey notification templates
+- Analytics cards at the top of the page: **Tracked Orders**, **SMS Sent**, **Chat Sent**, **Total Sent**
+- Analytics are computed by combining `parcel_journey_notification_logs` (batch) + `parcel_journey_notifications` (real-time) for accurate totals
+- **Date range filter** on the analytics section; defaults to current month
+- Template list uses paginated DataTable with the standard premium table design
+- **Template form redesigned** — premium dialog matching the teams form style; variable chips styled as code tokens with violet accent and hover effect
+
+### Pages — Status Management
+
+- Replaced Archive/Restore with **Active / Inactive** status
+- Added `status` column (`enum: active, inactive, default: active`) to `pages` table — run `php artisan migrate`
+- Status toggle added to both **Create** and **Edit** page forms (Basic Info section)
+- Status badge on the pages list shows **Active** (emerald) / **Inactive** (red)
+- `PageController::archive` and `restore` now set `status` instead of soft-deleting
+
+---
+
 ## [v2.1.0] — 2026-03-27
 
 ### SyncOrder — Full Refactor (SOLID)
