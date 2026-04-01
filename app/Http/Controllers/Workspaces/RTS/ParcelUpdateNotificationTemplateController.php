@@ -81,15 +81,22 @@ class ParcelUpdateNotificationTemplateController extends Controller
             $q->where('workspace_id', $workspace->id);
         })->whereBetween('date', [$startDate, $endDate]);
 
-        $trackedOrders = (clone $logs)->sum('tracked_orders');
-        $smsSent       = (clone $logs)->sum('sms_sent');
-        $chatSent      = (clone $logs)->sum('chat_sent');
+        $logsTrackedOrders = (clone $logs)->sum('tracked_orders');
+        $logsSmsSent       = (clone $logs)->sum('sms_sent');
+        $logsChatSent      = (clone $logs)->sum('chat_sent');
 
-        $totalSent = ParcelJourneyNotification::whereHas('order', function ($q) use ($workspace) {
+        $notifBase = ParcelJourneyNotification::whereHas('order', function ($q) use ($workspace) {
             $q->where('workspace_id', $workspace->id);
-        })->whereBetween('created_at', [$startDate, $endDate . ' 23:59:59'])
-            ->whereIn('status', ['sent', 'delivered'])
-            ->count();
+        })->whereBetween('created_at', [$startDate, $endDate . ' 23:59:59']);
+
+        $notifTrackedOrders = (clone $notifBase)->distinct('order_id')->count('order_id');
+        $notifSmsSent       = (clone $notifBase)->where('type', 'sms')->whereIn('status', ['sent', 'delivered'])->count();
+        $notifChatSent      = (clone $notifBase)->where('type', 'chat')->whereIn('status', ['sent', 'delivered'])->count();
+
+        $trackedOrders = $logsTrackedOrders + $notifTrackedOrders;
+        $smsSent       = $logsSmsSent + $notifSmsSent;
+        $chatSent      = $logsChatSent + $notifChatSent;
+        $totalSent     = $smsSent + $chatSent;
 
         return Inertia::render('workspaces/rts/parcel-update-notification-templates', [
             'workspace'  => $workspace,
