@@ -21,7 +21,7 @@ class WorkspaceMemberController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -77,6 +77,7 @@ class WorkspaceMemberController extends Controller
                 'expires_at',
                 AllowedSort::custom('inviter_name', new InviterNameSort, 'inviter.name'),
             ])
+            ->ignoreInvalidSorts()
             ->defaultSort('-created_at')
             ->paginate($request->input('perPage', 10))
             ->withQueryString();
@@ -102,7 +103,7 @@ class WorkspaceMemberController extends Controller
     public function updateMember(Request $request, Workspace $workspace, User $user)
     {
 
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (!$request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to update member roles.');
         }
 
@@ -129,7 +130,7 @@ class WorkspaceMemberController extends Controller
     public function destroy(Request $request, Workspace $workspace, User $user)
     {
         // Only admins and owners can remove members
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (!$request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to remove members.');
         }
 
