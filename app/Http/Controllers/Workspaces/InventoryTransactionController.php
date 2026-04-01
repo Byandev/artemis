@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
-use App\Models\Inventory;
+use App\Models\InventoryTransaction;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,7 +20,7 @@ class InventoryTransactionController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
-        $inventory = QueryBuilder::for(Inventory::where('workspace_id', $workspace->id))
+        $inventory = QueryBuilder::for(InventoryTransaction::where('workspace_id', $workspace->id))
             ->allowedFilters([
 
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -68,7 +68,7 @@ class InventoryTransactionController extends Controller
         return redirect()->back()->with('success', 'Entry created successfully.');
     }
 
-    public function update(Request $request, Workspace $workspace, Inventory $inventory)
+    public function update(Request $request, Workspace $workspace, InventoryTransaction $inventory)
     {
         $validated = $request->validate([
             'date' => 'nullable|date',
@@ -85,7 +85,7 @@ class InventoryTransactionController extends Controller
         return redirect()->back()->with('success', 'Entry updated successfully.');
     }
 
-    public function destroy(Workspace $workspace, Inventory $inventory)
+    public function destroy(Workspace $workspace, InventoryTransaction $inventory)
     {
         // Standard delete() on a model WITHOUT SoftDeletes trait performs a hard delete
         $inventory->delete();
