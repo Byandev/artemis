@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -29,9 +30,10 @@ class ProfileController extends Controller
     /**
      * Update the user's profile settings.
      */
-    public function update(ProfileUpdateRequest $request): RedirectResponse
+    public function update(ProfileUpdateRequest $request, Workspace $workspace): RedirectResponse
     {
         $request->user()->fill($request->validated());
+        // $workspace = $request->input('workspace');
 
         if ($request->user()->isDirty('email')) {
             $request->user()->email_verified_at = null;
@@ -39,7 +41,9 @@ class ProfileController extends Controller
 
         $request->user()->save();
 
-        return to_route('profile.edit');
+        return Redirect::route('profile.edit', [
+            'workspace' => $workspace->slug
+        ]);
     }
 
     /**
