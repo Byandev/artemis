@@ -24,6 +24,7 @@ import {
     ShieldIcon,
     RotateCcw,
     BarChart2,
+    MapPin,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -74,6 +75,11 @@ export function AppSidebar() {
                     title: 'Analytics',
                     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
                     icon: BarChart2,
+                },
+                {
+                    title: 'Parcel Journey',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/parcel-journeys`,
+                    icon: MapPin,
                 },
             ],
         },

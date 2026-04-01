@@ -68,7 +68,9 @@ class ParcelUpdateNotificationTemplateController extends Controller
             ], ['message']);
         }
 
-        $templates = ParcelJourneyNotificationTemplate::where('workspace_id', $workspace->id)->get();
+        $templates = ParcelJourneyNotificationTemplate::where('workspace_id', $workspace->id)
+            ->paginate(15)
+            ->withQueryString();
 
         return Inertia::render('workspaces/rts/parcel-update-notification-templates', [
             'workspace' => $workspace,

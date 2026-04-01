@@ -1,19 +1,19 @@
 import AppLayout from '@/layouts/app-layout';
-import RtsNavigation from '@/pages/workspaces/rts/partials/RtsNavigation';
+import PageHeader from '@/components/common/PageHeader';
+import { DataTable } from '@/components/ui/data-table';
 import { Workspace } from '@/types/models/Workspace';
-import { ChangeEvent, useRef, useState } from 'react';
+import { useState } from 'react';
 import { ParcelJourneyNotificationTemplate } from '@/types/models/ParcelJourneyNotificationTemplate';
 import { ColumnDef } from '@tanstack/react-table';
-import { DataTable } from '@/components/ui/data-table';
-import { startCase } from 'lodash'
+import { omit, startCase } from 'lodash';
 import { Button } from '@/components/ui/button';
 import TemplateForm from '@/components/rts/template-form';
-import RTSManagementLayout from '@/pages/workspaces/rts/partials/Layout';
-import ComponentCard from '@/components/common/ComponentCard';
+import { Head, router } from '@inertiajs/react';
+import { PaginatedData } from '@/types';
 
 type Props = {
     workspace: Workspace;
-    templates: ParcelJourneyNotificationTemplate[]
+    templates: PaginatedData<ParcelJourneyNotificationTemplate>;
 }
 
 const ParcelUpdateNotificationTemplates = ({ workspace, templates }: Props) => {
@@ -24,62 +24,96 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates }: Props) => {
         {
             accessorKey: 'type',
             header: 'Type',
-            cell: ({ row }) => startCase(row.original.type)
+            cell: ({ row }) => (
+                <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
+                    {startCase(row.original.type)}
+                </span>
+            ),
         },
         {
             accessorKey: 'activity',
             header: 'Activity',
-            cell: ({ row }) => startCase(row.original.activity)
+            cell: ({ row }) => (
+                <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-400">
+                    {startCase(row.original.activity)}
+                </span>
+            ),
         },
         {
             accessorKey: 'receiver',
             header: 'Receiver',
-            cell: ({ row }) => startCase(row.original.receiver)
+            cell: ({ row }) => (
+                <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-400">
+                    {startCase(row.original.receiver)}
+                </span>
+            ),
         },
         {
             accessorKey: 'message',
             header: 'Message',
-            cell: ({ row }) => {
-                return <div className="truncate max-w-4xl">
+            cell: ({ row }) => (
+                <div className="truncate max-w-3xl font-mono text-[11px] text-gray-500 dark:text-gray-400">
                     {row.original.message}
                 </div>
-            }
+            ),
         },
         {
-            accessorKey: 'id',
-            header: 'Action',
-            cell: ({ row }) => {
-                return <Button size={'sm'} onClick={() => {
-                    setSelected(row.original)
-                    setOpenForm(true)
-                }} className="cursor-pointer">Edit</Button>
-            }
-        }
+            id: 'actions',
+            cell: ({ row }) => (
+                <div className="flex justify-end">
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                            setSelected(row.original);
+                            setOpenForm(true);
+                        }}
+                        className="h-7 cursor-pointer font-mono! text-[11px]!"
+                    >
+                        Edit
+                    </Button>
+                </div>
+            ),
+        },
     ];
 
     return (
         <AppLayout>
-            <div className="p-4">
+            <Head title={`${workspace.name} — Parcel Journey Templates`} />
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+                <PageHeader
+                    title="Parcel Journey Templates"
+                    description="Modify the template of the messages for your parcel journey"
+                />
+
+                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                    <DataTable
+                        columns={columns}
+                        data={templates.data || []}
+                        enableInternalPagination={false}
+                        meta={{ ...omit(templates, ['data']) }}
+                        onFetch={(params) => {
+                            router.get(
+                                `/workspaces/${workspace.slug}/rts/parcel-journeys`,
+                                { page: params?.page ?? 1 },
+                                { preserveState: true, replace: true, preserveScroll: true, only: ['templates'] },
+                            );
+                        }}
+                    />
+                </div>
+
                 <TemplateForm
                     open={openForm}
-                    onOpenChange={setOpenForm}
+                    onOpenChange={(open) => {
+                        setOpenForm(open);
+                        if (!open) setSelected(undefined);
+                    }}
                     workspace={workspace}
                     initialValue={selected}
                 />
-
-                <ComponentCard
-                    title={'Parcel Journey Notification Templates'}
-                    desc={
-                        'Modify the template of the messages for your parcel journey'
-                    }
-                    className='min-h-screen'
-                >
-                    <DataTable columns={columns} data={templates} />
-                </ComponentCard>
             </div>
         </AppLayout>
     );
 };
 
-
-export default ParcelUpdateNotificationTemplates
+export default ParcelUpdateNotificationTemplates;
