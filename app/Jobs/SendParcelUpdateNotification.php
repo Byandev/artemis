@@ -28,6 +28,8 @@ class SendParcelUpdateNotification implements ShouldQueue
             return;
         }
 
+        sleep(0.5);
+
         $this->parcelJourneyNotification->load('order.page');
 
         if ($this->parcelJourneyNotification->type === 'sms') {
