@@ -48,11 +48,10 @@ Route::middleware(['auth'])->group(function () {
 
 
     Route::prefix('workspaces/{workspace:slug}')->group(function () {
-
-        Route::get('/inventory_transaction', [InventoryTransactionController::class, 'index'])->name('inventory.index');
-        Route::post('/inventory_transaction', [InventoryTransactionController::class, 'store'])->name('inventory.store');
-        Route::patch('/inventory_transaction/{inventory}', [InventoryTransactionController::class, 'update'])->name('inventory.update');
-        Route::delete('/inventory_transaction/{inventory}', [InventoryTransactionController::class, 'destroy'])->name('inventory.destroy');
+        Route::get('/inventory_transaction', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
+        Route::post('/inventory_transaction', [InventoryTransactionController::class, 'store'])->name('inventory.transactions.store');
+        Route::patch('/inventory_transaction/{inventory}', [InventoryTransactionController::class, 'update'])->name('inventory.transactions.update');
+        Route::delete('/inventory_transaction/{inventory}', [InventoryTransactionController::class, 'destroy'])->name('inventory.transactions.destroy');
     });
 
 
