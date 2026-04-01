@@ -71,8 +71,19 @@ export function AppSidebar() {
         },
         {
             title: 'Inventory',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory_transaction`,
-            icon: ClipboardList,
+            icon: Package,
+            items: [
+                {
+                    title: 'Transaction Logs',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory_transaction`,
+                    icon: ClipboardList,
+                },
+                {
+                    title: 'PPW',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppw`,
+                    icon: BarChart2,
+                },
+            ],
         },
         {
             title: 'RTS',
