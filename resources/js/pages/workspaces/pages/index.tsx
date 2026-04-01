@@ -1,12 +1,10 @@
 import PageHeader from '@/components/common/PageHeader';
-import { ArchivePageDialog } from '@/components/pages/archive-page-dialog';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
@@ -15,16 +13,14 @@ import workspaces from '@/routes/workspaces';
 import { PaginatedData } from '@/types';
 import { Page } from '@/types/models/Page';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { omit } from 'lodash';
 import {
-    Archive,
     Edit,
     MoreHorizontal,
     RefreshCw,
-    RotateCcw,
     Search,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -42,18 +38,19 @@ interface PagesProps {
     }
 }
 
-const StatusBadge = ({ isArchived }: { isArchived: boolean }) => {
+const StatusBadge = ({ status }: { status: 'active' | 'inactive' }) => {
+    const isActive = status === 'active';
     return (
         <span
             className={clsx(
-                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
-                isArchived
-                    ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                    : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] font-medium uppercase tracking-wide',
+                isActive
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+                    : 'bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400',
             )}
         >
-            <span className={clsx('h-1.5 w-1.5 rounded-full', isArchived ? 'bg-slate-400' : 'bg-emerald-500')} />
-            {isArchived ? 'Archived' : 'Active'}
+            <span className={clsx('h-1.5 w-1.5 rounded-full', isActive ? 'bg-emerald-500' : 'bg-red-400')} />
+            {isActive ? 'Active' : 'Inactive'}
         </span>
     );
 };
@@ -81,9 +78,8 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
 
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
-    const [pageToArchive, setPageToArchive] = useState<Page | null>(null);
 
-    const { post, processing } = useForm({});
+    const [processing, setProcessing] = useState(false);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -115,14 +111,13 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
     };
 
     const refresh = (page: Page) => {
-        post(workspaces.pages.refresh.url({ workspace, page }), {
+        setProcessing(true);
+        router.post(workspaces.pages.refresh.url({ workspace, page }), {}, {
             onSuccess: () => alert('Refresh Started'),
+            onFinish: () => setProcessing(false),
         });
     };
 
-    const handleRestore = (page: Page) => {
-        router.post(workspaces.pages.restore.url({ workspace, page }));
-    };
 
     const columns: ColumnDef<Page>[] = [
         {
@@ -160,7 +155,20 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             ),
             cell: ({ row }) => {
                 const date = row.original.orders_last_synced_at;
-                return date ? new Date(date).toLocaleString() : 'Never';
+                const isUpdated = Boolean(row.original.is_sync_logic_updated);
+                return (
+                    <div className="flex items-center gap-2">
+                        <span>{date ? new Date(date).toLocaleString() : 'Never'}</span>
+                        <span className={clsx(
+                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
+                            isUpdated
+                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
+                                : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400',
+                        )}>
+                            {isUpdated ? 'Updated' : 'Legacy'}
+                        </span>
+                    </div>
+                );
             },
         },
         {
@@ -168,10 +176,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Status'} />
             ),
-            cell: ({ row }) => {
-                const isArchived = row.original.deleted_at !== null;
-                return <StatusBadge isArchived={isArchived} />;
-            },
+            cell: ({ row }) => <StatusBadge status={row.original.status} />,
         },
         {
             accessorKey: 'parcel_journey_enabled',
@@ -188,7 +193,6 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             id: 'actions',
             cell: ({ row }) => {
                 const page = row.original;
-                const isArchived = page.deleted_at !== null;
 
                 return (
                     <DropdownMenu>
@@ -197,30 +201,15 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                                 <MoreHorizontal className="h-3.5 w-3.5" />
                             </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
-                            {!isArchived && (
-                                <>
-                                    <DropdownMenuItem onClick={() => handleEdit(page)}>
-                                        <Edit />
-                                        Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => refresh(page)} disabled={processing}>
-                                        <RefreshCw className={processing ? 'animate-spin' : ''} />
-                                        {processing ? 'Refreshing…' : 'Refresh Orders'}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem variant="destructive" onClick={() => setPageToArchive(page)}>
-                                        <Archive />
-                                        Archive
-                                    </DropdownMenuItem>
-                                </>
-                            )}
-                            {isArchived && (
-                                <DropdownMenuItem onClick={() => handleRestore(page)}>
-                                    <RotateCcw />
-                                    Restore
+                        <DropdownMenuContent align="end" className="w-44">
+                                <DropdownMenuItem onClick={() => handleEdit(page)}>
+                                    <Edit />
+                                    Edit
                                 </DropdownMenuItem>
-                            )}
+                                <DropdownMenuItem onClick={() => refresh(page)} disabled={processing}>
+                                    <RefreshCw className={processing ? 'animate-spin' : ''} />
+                                    {processing ? 'Refreshing…' : 'Refresh Orders'}
+                                </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 );
@@ -258,6 +247,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                         initialSorting={initialSorting}
                         meta={{ ...omit(pages, ['data']) }}
                         onFetch={(params) => {
+                            console.log(params)
                             router.get(
                                 workspaces.pages.index({ workspace }),
                                 {
@@ -275,12 +265,6 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                     />
                 </div>
 
-                {/* Archive Confirmation Dialog */}
-                <ArchivePageDialog
-                    page={pageToArchive}
-                    workspace={workspace}
-                    onClose={() => setPageToArchive(null)}
-                />
             </div>
         </AppLayout>
     );

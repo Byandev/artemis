@@ -16,13 +16,15 @@ import {
     LayoutDashboard,
     Package,
     Store,
-    PhoneCall,
     Users,
     BookOpenIcon,
     LogOut,
     Settings,
     User,
     ShieldIcon,
+    RotateCcw,
+    BarChart2,
+    MapPin,
     ClipboardList,
 
 } from 'lucide-react';
@@ -73,16 +75,26 @@ export function AppSidebar() {
             icon: ClipboardList,
         },
         {
-            title: 'RMO Management',
-            icon: PhoneCall,
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/rmo-management`,
+            title: 'RTS',
+            icon: RotateCcw,
+            items: [
+                {
+                    title: 'Analytics',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
+                    icon: BarChart2,
+                },
+                {
+                    title: 'Parcel Journey',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/parcel-journeys`,
+                    icon: MapPin,
+                },
+            ],
         },
         {
             title: 'Roles',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/roles`,
             icon: ShieldIcon,
-        }
-
+        },
     ];
 
     // const mainNavItems: NavItem[] = [

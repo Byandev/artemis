@@ -17,6 +17,7 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Modules\Pancake\Jobs\FetchPageOrders;
 use Modules\Pancake\Jobs\FetchShopCustomers;
+use Modules\Pancake\Jobs\FetchShopUsers;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -143,10 +144,12 @@ class PageController extends Controller
             'parcel_journey_enabled' => $validated['parcel_journey_enabled'] ?? null,
             'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
             'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
+            'status' => $validated['status'] ?? 'active',
         ]);
 
         dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear(1)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
         dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subYear(1)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
 
         return redirect()->route('workspaces.pages.index', $workspace)
             ->with('success', 'Page created successfully.');
@@ -169,6 +172,7 @@ class PageController extends Controller
             'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
             'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
             'owner_id' => $validated['owner_id'],
+            'status' => $validated['status'],
         ]);
 
         return redirect()->route('workspaces.pages.index', $workspace)
@@ -187,7 +191,10 @@ class PageController extends Controller
             abort(403);
         }
 
-        $page->update(['orders_last_synced_at' => null]);
+        $page->update([
+            'orders_last_synced_at' => null,
+            'is_sync_logic_updated' => true
+        ]);
 
         dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
 
@@ -196,8 +203,7 @@ class PageController extends Controller
 
     public function archive(Request $request, Workspace $workspace, Page $page)
     {
-        // Check if user has access to this workspace
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -205,16 +211,14 @@ class PageController extends Controller
             abort(403);
         }
 
-        $page->archive();
+        $page->deactivate();
 
-        return redirect()->route('workspaces.pages.index', $workspace)
-            ->with('success', 'Page archived successfully.');
+        return redirect()->route('workspaces.pages.index', $workspace);
     }
 
     public function restore(Request $request, Workspace $workspace, Page $page)
     {
-        // Check if user has access to this workspace
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -222,9 +226,8 @@ class PageController extends Controller
             abort(403);
         }
 
-        $page->restore();
+        $page->activate();
 
-        return redirect()->route('workspaces.pages.index', $workspace)
-            ->with('success', 'Page restored successfully.');
+        return redirect()->route('workspaces.pages.index', $workspace);
     }
 }

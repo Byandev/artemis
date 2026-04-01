@@ -1,7 +1,5 @@
-import { EntityFilter } from '@/components/filters/EntityFilter';
+import { FilterGroup } from '@/components/filters/FilterGroup';
 import { Workspace } from '@/types/models/Workspace';
-import { User } from '@/types'
-
 
 interface Props {
     workspace: Workspace;
@@ -11,13 +9,13 @@ interface Props {
 
 const UserFilter = ({ workspace, selected, onSelect }: Props) => {
     return (
-        <EntityFilter<User>
-            workspace={workspace}
-            endpoint={'/users'}
-            getId={(p) => p.id}
-            getLabel={(p) => p.name}
+        <FilterGroup<{ id: number; name: string }>
+            name="User"
+            getId={(item) => item.id}
+            getLabel={(item) => item.name}
             selected={selected}
             onSelect={onSelect}
+            options={workspace.page_owners ?? []}
         />
     );
 };

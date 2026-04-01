@@ -190,6 +190,15 @@ class Workspace extends Model
             ->exists();
     }
 
+    public function pageOwners()
+    {
+        return $this->belongsToMany(User::class, 'workspace_user')
+            ->has('pages')
+            ->withTimestamps()
+            ->withPivot('role', 'role_id')
+            ->using(WorkspaceUser::class);
+    }
+
     public function inventory()
     {
         return $this->hasMany(Inventory::class, 'workspace_id');

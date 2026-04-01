@@ -79,14 +79,14 @@ export default function Index({ roles, workspace }: Props) {
     const columns: ColumnDef<Role>[] = [
         {
             accessorKey: 'name',
-            header: () => <div className="font-mono font-medium text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Role Name</div>,
+            header: () => <div className="font-mono font-medium text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600 text-left">Name</div>,
             cell: ({ row }) => (
                 <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">{row.original.name}</span>
             ),
         },
         {
             accessorKey: 'description',
-            header: () => <div className="font-mono font-medium text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Description</div>,
+            header: () => <div className="font-mono font-medium text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600 text-left">Description</div>,
             cell: ({ row }) => (
                 <div className="max-w-[400px]">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">

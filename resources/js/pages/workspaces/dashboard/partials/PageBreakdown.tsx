@@ -205,6 +205,7 @@ export default function PageBreakdown({ workspace, dateRange, filter, metrics }:
                         categories={categories}
                         series={series}
                         formatValue={formatValue}
+                        abbreviateLabels
                     />
                 )}
             </div>
