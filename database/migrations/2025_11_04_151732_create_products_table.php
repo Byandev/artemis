@@ -16,7 +16,7 @@ return new class extends Migration
             $table->unsignedBigInteger('workspace_id');
             $table->unsignedBigInteger('owner_id');
             $table->string('title');
-            $table->text('description');
+            $table->text('description')->nullable();
             $table->timestamps();
 
             $table->foreign('workspace_id')

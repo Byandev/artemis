@@ -19,12 +19,13 @@ import {
     ShieldCheck,
     MoreHorizontal,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { toast, Toaster } from 'sonner';
 import { Workspace } from '@/types/models/Workspace';
 import { Role } from '@/types/models/Role';
 import RoleFormDialog from '@/components/roles/role-form-dialog'; // Added Toaster here
 import PageHeader from '@/components/common/PageHeader';
+
 
 
 interface Props {
@@ -66,6 +67,13 @@ export default function Index({ roles, workspace }: Props) {
             },
         });
     };
+
+    const filteredRoles = useMemo(() => {
+    return roles.filter((role) =>
+        role.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (role.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
+    );
+}, [roles, searchQuery]);
 
     // const userCounts = useMemo(() => {
     //     const counts: Record<string, number> = {};
@@ -188,7 +196,7 @@ export default function Index({ roles, workspace }: Props) {
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         columns={columns}
-                        data={roles}
+                        data={filteredRoles}
                         enableInternalPagination={true}
                     />
                 </div>

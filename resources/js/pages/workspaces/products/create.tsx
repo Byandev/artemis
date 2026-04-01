@@ -6,6 +6,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { ArrowLeft } from 'lucide-react';
 import workspaces from '@/routes/workspaces';
+import { toast } from 'sonner';
 
 interface PageProps {
     workspace: Workspace;
@@ -30,9 +31,15 @@ const Create = ({ workspace, pages }: PageProps) => {
         page_ids: [] as number[],
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(workspaces.products.store.url({ workspace }));
+        
+        post(workspaces.products.store.url({ workspace }), {
+            onSuccess: () => {
+                toast.success('Product created successfully!');
+            },
+            preserveScroll: true,
+        });
     };
 
     return (

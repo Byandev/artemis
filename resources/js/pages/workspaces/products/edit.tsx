@@ -7,6 +7,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { ArrowLeft } from 'lucide-react';
 import workspaces from '@/routes/workspaces';
+import { toast } from 'sonner';
 
 interface PageProps {
     workspace: Workspace;
@@ -32,10 +33,16 @@ const Edit = ({ workspace, product, pages }: PageProps) => {
         page_ids: product.pages?.map((p) => p.id) || [] as number[],
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        put(workspaces.products.update.url({ workspace, product }));
-    };
+     const handleSubmit = (e: React.FormEvent) => {
+           e.preventDefault();
+           
+           put(workspaces.products.update.url({ workspace, product }), {
+               onSuccess: () => {
+                   toast.success('Product updated successfully!');
+               },
+               preserveScroll: true,
+           });
+       };
 
     return (
         <AppLayout>
