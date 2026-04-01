@@ -1,14 +1,18 @@
-# Profile Name Change Fix
+# Employees Table Column Width Fix
 
-- Fixed profile update redirect to include the workspace parameter, keeping users on the correct profile page after saving name/email. Changed file: [app/Http/Controllers/Settings/ProfileController.php](app/Http/Controllers/Settings/ProfileController.php).
-- Test: change name/email in workspace profile settings; expect successful save and redirect back to the same workspace profile page.
+- Locked Name/Email/Phone column sizes and set table to table-fixed to stop width shifting. Changed files: [resources/js/components/ui/data-table.tsx](resources/js/components/ui/data-table.tsx), [resources/js/pages/workspaces/employees/index.tsx](resources/js/pages/workspaces/employees/index.tsx).
+- Test: open Employees page, sort and paginate; column widths should stay consistent while data loads.
 
 ## Changed File Locations
 
 ```
-app/
-└── Http/
-	└── Controllers/
-		└── Settings/
-			└── ProfileController.php   # Redirect now includes workspace param after update
+resources/
+└── js/
+	├── components/
+	│   └── ui/
+	│       └── data-table.tsx      # Applies table-fixed and column size styles
+	└── pages/
+		└── workspaces/
+			└── employees/
+				└── index.tsx       # Sets explicit sizes for Name/Email/Phone columns
 ```
