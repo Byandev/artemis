@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import { DataTable } from '@/components/ui/data-table';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import {
@@ -15,17 +15,16 @@ import {
     Edit,
     Trash2,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { toFrontendSort } from '@/lib/sort';
 import { toast, Toaster } from 'sonner';
 import { Workspace } from '@/types/models/Workspace';
 import { InventoryTransaction } from '@/types/models/InventoryTransaction';
 import InventoryFormDialog from '@/components/inventory/inventory-form-dialog';
 import PageHeader from '@/components/common/PageHeader';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import DatePicker from '@/components/ui/date-picker';
 import moment from 'moment';
 import { omit } from 'lodash';
-import { Button } from '@/components/ui/button';
 
 interface Props {
     inventory: {
@@ -47,11 +46,11 @@ interface Props {
 }
 
 export default function Index({ inventory, workspace, query }: Props) {
+    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
     const [searchQuery, setSearchQuery] = useState(query?.search ?? '');
     const [openFormModal, setOpenFormModal] = useState(false);
     const [selectedInventory, setSelectedInventory] = useState<InventoryTransaction | undefined>(undefined);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-    const [dateRange, setDateRange] = useState<string[]>([]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -60,8 +59,6 @@ export default function Index({ inventory, workspace, query }: Props) {
                 {
                     filter: {
                         search: searchQuery || undefined,
-                        start_date: dateRange?.[0] || undefined,
-                        end_date: dateRange?.[1] || undefined,
                     },
                     page: searchQuery ? 1 : query?.page ?? 1,
                     sort: query?.sort
@@ -75,7 +72,7 @@ export default function Index({ inventory, workspace, query }: Props) {
             );
         }, 500);
         return () => clearTimeout(timer);
-    }, [searchQuery, dateRange]);
+    }, [searchQuery]);
 
     const handleEdit = (item: InventoryTransaction) => {
         setSelectedInventory(item);
@@ -102,7 +99,8 @@ export default function Index({ inventory, workspace, query }: Props) {
     const columns: ColumnDef<InventoryTransaction>[] = [
         {
             accessorKey: 'date',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Date</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Date" />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
@@ -113,7 +111,8 @@ export default function Index({ inventory, workspace, query }: Props) {
         },
         {
             accessorKey: 'ref_no',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Reference No.</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Reference No." />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">
@@ -124,7 +123,8 @@ export default function Index({ inventory, workspace, query }: Props) {
         },
         {
             accessorKey: 'po_qty_in',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">PO Quantity In</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="PO Quantity In" />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.po_qty_in || 0}</p>
@@ -133,7 +133,8 @@ export default function Index({ inventory, workspace, query }: Props) {
         },
         {
             accessorKey: 'po_qty_out',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">PO Quantity Out</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="PO Quantity Out" />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.po_qty_out || 0}</p>
@@ -142,7 +143,8 @@ export default function Index({ inventory, workspace, query }: Props) {
         },
         {
             accessorKey: 'rts_goods_in',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">RTS Goods In</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="RTS Goods In" />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.rts_goods_in || 0}</p>
@@ -151,7 +153,8 @@ export default function Index({ inventory, workspace, query }: Props) {
         },
         {
             accessorKey: 'rts_goods_out',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">RTS Goods Out</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="RTS Goods Out" />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.rts_goods_out || 0}</p>
@@ -160,7 +163,8 @@ export default function Index({ inventory, workspace, query }: Props) {
         },
         {
             accessorKey: 'rts_bad',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">RTS Bad</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="RTS Bad" />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.rts_bad || 0}</p>
@@ -169,7 +173,8 @@ export default function Index({ inventory, workspace, query }: Props) {
         },
         {
             accessorKey: 'remaining_qty',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Remaining Quantity</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Remaining Quantity" />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className={`text-[12px] font-bold ${row.original.remaining_qty < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
@@ -267,26 +272,6 @@ export default function Index({ inventory, workspace, query }: Props) {
                     title="Transaction Logs"
                     description="Manage your inventory transactions"
                 >
-                    <DatePicker
-                        id={'inventory-date-range'}
-                        mode={'range'}
-                        placeholder="Filter by date range..."
-                        onChange={(dates) => {
-                            if (dates.length === 2) {
-                                setDateRange([
-                                    moment(dates[0]).format('YYYY-MM-DD'),
-                                    moment(dates[1]).format('YYYY-MM-DD'),
-                                ]);
-                            } else if (dates.length === 0) {
-                                setDateRange([]);
-                            }
-                        }}
-                        defaultDate={
-                            dateRange.length > 0
-                                ? (dateRange as any)
-                                : undefined
-                        }
-                    />
                     <button
                         onClick={() => {
                             setSelectedInventory(undefined);
@@ -316,6 +301,7 @@ export default function Index({ inventory, workspace, query }: Props) {
                         columns={columns}
                         data={inventory.data || []}
                         enableInternalPagination={false}
+                        initialSorting={initialSorting}
                         meta={{ ...omit(inventory, ['data']) }}
                         onFetch={(params) => {
                             router.get(
@@ -323,8 +309,6 @@ export default function Index({ inventory, workspace, query }: Props) {
                                 {
                                     sort: params?.sort,
                                     search: searchQuery || undefined,
-                                    start_date: dateRange[0],
-                                    end_date: dateRange[1],
                                     page: params?.page ?? 1,
                                 },
                                 {

@@ -31,7 +31,7 @@ class InventoryTransactionController extends Controller
                     $query->whereDate('date', '<=', $value);
                 }),
             ])
-            ->allowedSorts(['date', 'ref_no', 'remaining_qty', 'created_at'])
+            ->allowedSorts(['date', 'ref_no', 'po_qty_in', 'po_qty_out', 'rts_goods_in', 'rts_goods_out', 'rts_bad', 'remaining_qty', 'created_at'])
             ->defaultSort('-date')
             ->paginate(10)
             ->withQueryString();
@@ -61,12 +61,12 @@ class InventoryTransactionController extends Controller
             'rts_bad' => 'nullable|integer|min:0',
         ]);
 
-        $workspace->inventory()->create($validated);
+        $workspace->inventoryTransactions()->create($validated);
 
         return redirect()->back()->with('success', 'Entry created successfully.');
     }
 
-    public function update(Request $request, Workspace $workspace, InventoryTransaction $inventory)
+    public function update(Request $request, Workspace $workspace, InventoryTransaction $transaction)
     {
         $validated = $request->validate([
             'date' => 'nullable|date',
@@ -78,14 +78,14 @@ class InventoryTransactionController extends Controller
             'rts_bad' => 'nullable|integer|min:0',
         ]);
 
-        $inventory->update($validated);
+        $transaction->update($validated);
 
         return redirect()->back()->with('success', 'Entry updated successfully.');
     }
 
-    public function destroy(Workspace $workspace, InventoryTransaction $inventory)
+    public function destroy(Workspace $workspace, InventoryTransaction $transaction)
     {
-        $inventory->delete();
+        $transaction->delete();
 
         return redirect()->back()->with('success', 'Entry permanently deleted.');
     }

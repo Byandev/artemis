@@ -19,11 +19,6 @@ import { ColumnDef } from '@tanstack/react-table';
 import { omit, debounce } from 'lodash';
 import { MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import DatePicker from '@/components/ui/date-picker';
-import moment from 'moment';
-import flatpickr from 'flatpickr';
-
-type DateOption = flatpickr.Options.DateOption;
 
 interface Ppw {
     id: number;
@@ -44,7 +39,7 @@ interface Props {
         sort?: string | null;
         perPage?: number | string;
         page?: number | string;
-        filter?: { search?: string; start_date?: string; end_date?: string };
+        filter?: { search?: string };
     };
 }
 
@@ -59,22 +54,14 @@ export default function PpwIndex({ workspace, ppws, products, query }: Props) {
 
     const baseUrl = `/workspaces/${workspace.slug}/inventory/ppws`;
 
-    const [dateRange, setDateRange] = useState<string[]>([
-        query?.filter?.start_date ?? moment().startOf('month').format('YYYY-MM-DD'),
-        query?.filter?.end_date ?? moment().endOf('month').format('YYYY-MM-DD'),
-    ]);
-
-
     const performQuery = useCallback(
-        debounce((search: string, dates: string[]) => {
+        debounce((search: string) => {
             router.get(
                 baseUrl,
                 {
                     sort: query?.sort,
                     'filter[search]': search || undefined,
-                    'filter[start_date]': dates[0],
-                    'filter[end_date]': dates[1],
-                    page: 1, // Always reset to page 1 on filter
+                    page: 1,
                 },
                 {
                     preserveState: true,
@@ -88,15 +75,15 @@ export default function PpwIndex({ workspace, ppws, products, query }: Props) {
     );
 
     useEffect(() => {
-        if (dateRange.length === 2) {
-            performQuery(searchValue, dateRange);
-        }
+        performQuery(searchValue);
         return () => performQuery.cancel();
-    }, [searchValue, dateRange, performQuery]);
+    }, [searchValue, performQuery]);
 
     const columns: ColumnDef<Ppw>[] = [
         {
-            accessorKey: 'product.name',
+            id: 'product_name',
+            accessorFn: (row) => row.product?.name,
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Product Name" />,
             cell: ({ row }) => (
                 <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
@@ -185,19 +172,6 @@ export default function PpwIndex({ workspace, ppws, products, query }: Props) {
                             onChange={(e) => setSearchValue(e.target.value)}
                         />
                     </div>
-                    <DatePicker
-                        id={'ppw-date-range'}
-                        mode={'range'}
-                        onChange={(dates) => {
-                            if (dates.length === 2) {
-                                setDateRange([
-                                    moment(dates[0]).format('YYYY-MM-DD'),
-                                    moment(dates[1]).format('YYYY-MM-DD'),
-                                ]);
-                            }
-                        }}
-                        defaultDate={dateRange as never as DateOption}
-                    />
                 </div>
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -213,8 +187,6 @@ export default function PpwIndex({ workspace, ppws, products, query }: Props) {
                                 {
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
-                                    'filter[start_date]': dateRange[0],
-                                    'filter[end_date]': dateRange[1],
                                     page: params?.page ?? 1,
                                 },
                                 { preserveState: true, replace: true, preserveScroll: true }
