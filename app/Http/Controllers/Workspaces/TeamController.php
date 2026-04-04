@@ -8,6 +8,8 @@ use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class TeamController extends Controller
 {
@@ -21,28 +23,15 @@ class TeamController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
-        $query = Team::ofWorkspace($workspace)
-            ->withCount('members')
-            ->with(['members:id,name,email']);
+        $teams = QueryBuilder::for(Team::ofWorkspace($workspace)->withCount('members')->with(['members:id,name,email']))
+            ->allowedFilters([
+                AllowedFilter::partial('search', 'name'),
+            ])
+            ->allowedSorts(['name', 'created_at', 'members_count'])
+            ->defaultSort('-created_at')
+            ->paginate(10)
+            ->withQueryString();
 
-        // Search by name
-        if ($request->filled('search')) {
-            $query->where('name', 'like', '%'.$request->get('search').'%');
-        }
-
-        // Sorting
-        $sortField = $request->get('sort', 'created_at');
-        $sortDirection = $request->get('direction', 'desc');
-
-        $allowedSortFields = ['name', 'created_at', 'members_count'];
-        if (in_array($sortField, $allowedSortFields)) {
-            $query->orderBy($sortField, $sortDirection === 'desc' ? 'desc' : 'asc');
-        }
-
-        // Pagination
-        $teams = $query->paginate(10)->withQueryString();
-
-        // Get workspace members for the dropdown
         $workspaceMembers = $workspace->users()
             ->select('users.id', 'users.name', 'users.email')
             ->get();
@@ -50,14 +39,13 @@ class TeamController extends Controller
         $isAdmin = $request->user()->isAdminOf($workspace);
 
         return Inertia::render('workspaces/teams/index', [
-            'workspace' => $workspace,
-            'teams' => $teams,
+            'workspace'        => $workspace,
+            'teams'            => $teams,
             'workspaceMembers' => $workspaceMembers,
-            'isAdmin' => $isAdmin,
-            'filters' => [
-                'search' => $request->get('search', ''),
-                'sort' => $sortField,
-                'direction' => $sortDirection,
+            'isAdmin'          => $isAdmin,
+            'query'            => [
+                ...$request->only(['sort', 'perPage', 'page']),
+                'filter' => $request->input('filter', []),
             ],
         ]);
     }
