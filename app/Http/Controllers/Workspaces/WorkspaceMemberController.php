@@ -77,7 +77,6 @@ class WorkspaceMemberController extends Controller
                 'expires_at',
                 AllowedSort::custom('inviter_name', new InviterNameSort, 'inviter.name'),
             ])
-            ->ignoreInvalidSorts()
             ->defaultSort('-created_at')
             ->paginate($request->input('perPage', 10))
             ->withQueryString();
