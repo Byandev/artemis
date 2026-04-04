@@ -13,6 +13,7 @@ use App\Metrics\Orders\AverageLifetimeValue;
 use App\Metrics\Orders\DeliveredAmount;
 use App\Metrics\Orders\DeliveredAvgCustomerRts;
 use App\Metrics\Orders\DeliveredAvgDeliveryAttempts;
+use App\Metrics\Orders\RepeatCustomerOrderCount;
 use App\Metrics\Orders\RepeatOrderRatio;
 use App\Metrics\Orders\ReturnedAmount;
 use App\Metrics\Orders\ReturnedAvgCustomerRts;
@@ -23,6 +24,7 @@ use App\Metrics\Orders\TimeToFirstOrder;
 use App\Metrics\Orders\TotalOrders;
 use App\Metrics\Orders\TotalSales;
 use App\Metrics\ParcelJourney\TrackedOrdersCount;
+use App\Metrics\ParcelJourney\TotalForDeliveryCount;
 use App\Models\Workspace;
 use InvalidArgumentException;
 
@@ -43,6 +45,7 @@ final class WorkspaceMetrics
         'totalSales' => TotalSales::class,
         'totalOrders' => TotalOrders::class,
         'repeatOrderRatio' => RepeatOrderRatio::class,
+        'repeatCustomerOrderCount' => RepeatCustomerOrderCount::class,
         'timeToFirstOrder' => TimeToFirstOrder::class,
         'avgLifetimeValue' => AverageLifetimeValue::class,
         'averageDaysFromShippedToDelivered' => AverageDaysFromShippedToDelivered::class,
@@ -55,6 +58,7 @@ final class WorkspaceMetrics
         'returnedAmount' => ReturnedAmount::class,
         'returningAmount' => ReturningAmount::class,
         'trackedOrdersCount' => TrackedOrdersCount::class,
+        'totalForDeliveryCount' => TotalForDeliveryCount::class,
         'deliveredAvgCustomerRts' => DeliveredAvgCustomerRts::class,
         'returnedAvgCustomerRts' => ReturnedAvgCustomerRts::class,
         'deliveredAvgDeliveryAttempts' => DeliveredAvgDeliveryAttempts::class,

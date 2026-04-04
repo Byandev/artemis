@@ -69,22 +69,22 @@ export function AppSidebar() {
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/employees`,
             icon: User,
         },
-        {
-            title: 'Inventory',
-            icon: Package,
-            items: [
-                {
-                    title: 'Transaction Logs',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory_transaction`,
-                    icon: ClipboardList,
-                },
-                {
-                    title: 'PPW',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppw`,
-                    icon: BarChart2,
-                },
-            ],
-        },
+        // {
+        //     title: 'Inventory',
+        //     icon: Package,
+        //     items: [
+        //         {
+        //             title: 'Transaction Logs',
+        //             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory_transaction`,
+        //             icon: ClipboardList,
+        //         },
+        //         {
+        //             title: 'PPW',
+        //             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppw`,
+        //             icon: BarChart2,
+        //         },
+        //     ],
+        // },
         {
             title: 'RTS',
             icon: RotateCcw,

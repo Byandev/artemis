@@ -25,7 +25,9 @@ export type MetricKey =
     | 'deliveredAvgCustomerRts'
     | 'returnedAvgCustomerRts'
     | 'deliveredAvgDeliveryAttempts'
-    | 'returnedAvgDeliveryAttempts';
+    | 'returnedAvgDeliveryAttempts'
+    | 'totalForDeliveryCount'
+    | 'repeatCustomerOrderCount';
 
 export type MetricGroupKey =
     | 'revenueVolume'
@@ -198,6 +200,20 @@ export const metricConfigs: MetricConfig[] = [
         description: 'Average delivery attempts for returned orders.',
         formatter: numberFormatter,
         reverse: true,
+    },
+    {
+        key: 'repeatCustomerOrderCount',
+        groupKey: 'customerQualityRetention',
+        name: 'Repeat Customer Orders',
+        description: 'Number of orders placed by customers who have made 2 or more purchases.',
+        formatter: numberFormatter,
+    },
+    {
+        key: 'totalForDeliveryCount',
+        groupKey: 'deliveryOutcomes',
+        name: 'For Delivery Count',
+        description: 'Total number of orders with an "On Delivery" parcel journey within the selected date range.',
+        formatter: numberFormatter,
     },
 ];
 
