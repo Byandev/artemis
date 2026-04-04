@@ -70,6 +70,8 @@ interface Props {
         sort?: string | null;
         perPage?: number | string;
         page?: number | string;
+        invitation_sort?: string | null;
+        invitation_page?: number | string;
         filter?: {
             search?: string;
         };
@@ -77,9 +79,8 @@ interface Props {
 }
 
 export default function WorkspaceMembers({ workspace, members, pendingInvitations, isAdmin, query, roles }: Props) {
-    const initialSorting = useMemo(() => {
-        return toFrontendSort(query?.sort ?? null);
-    }, [query?.sort]);
+    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
+    const initialInvitationSorting = useMemo(() => toFrontendSort(query?.invitation_sort ?? null), [query?.invitation_sort]);
 
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
@@ -183,7 +184,9 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
             ),
         },
         {
-            accessorKey: 'pivot.role',
+            id: 'role',
+            accessorFn: (row) => row.pivot?.role,
+            enableSorting: true,
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Role'} />
             ),
@@ -252,7 +255,9 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
             ),
         },
         {
-            accessorKey: 'role',
+            id: 'role_name',
+            accessorFn: (row) => row.role?.name,
+            enableSorting: true,
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Role'} />
             ),
@@ -435,12 +440,10 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                                     {
                                         sort: params?.sort,
                                         page: params?.page ?? 1,
+                                        invitation_sort: query?.invitation_sort,
+                                        invitation_page: query?.invitation_page,
                                     },
-                                    {
-                                        preserveState: false,
-                                        replace: true,
-                                        preserveScroll: true,
-                                    },
+                                    { preserveState: false, replace: true, preserveScroll: true },
                                 );
                             }}
                         />
@@ -454,22 +457,18 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                                     columns={invitationsColumns}
                                     enableInternalPagination={false}
                                     data={pendingInvitations.data || []}
-                                    initialSorting={initialSorting}
-                                    meta={{
-                                        ...omit(pendingInvitations, ['data']),
-                                    }}
+                                    initialSorting={initialInvitationSorting}
+                                    meta={{ ...omit(pendingInvitations, ['data']) }}
                                     onFetch={(params) => {
                                         router.get(
                                             `/workspaces/${workspace.slug}/members`,
                                             {
-                                                sort: params?.sort,
-                                                page: params?.page ?? 1,
+                                                sort: query?.sort,
+                                                page: query?.page,
+                                                invitation_sort: params?.sort,
+                                                invitation_page: params?.page ?? 1,
                                             },
-                                            {
-                                                preserveState: false,
-                                                replace: true,
-                                                preserveScroll: true,
-                                            },
+                                            { preserveState: false, replace: true, preserveScroll: true },
                                         );
                                     }}
                                 />
