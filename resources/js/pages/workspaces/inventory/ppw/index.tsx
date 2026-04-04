@@ -54,19 +54,17 @@ export default function PpwIndex({ workspace, ppws, products, query }: Props) {
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [editingPpw, setEditingPpw] = useState<Ppw | null>(null);
     const [ppwToDelete, setPpwToDelete] = useState<Ppw | null>(null);
-    
-    
+
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
-    const baseUrl = `/workspaces/${workspace.slug}/inventory/ppw`;
+    const baseUrl = `/workspaces/${workspace.slug}/inventory/ppws`;
 
-  
     const [dateRange, setDateRange] = useState<string[]>([
         query?.filter?.start_date ?? moment().startOf('month').format('YYYY-MM-DD'),
         query?.filter?.end_date ?? moment().endOf('month').format('YYYY-MM-DD'),
     ]);
 
-    
+
     const performQuery = useCallback(
         debounce((search: string, dates: string[]) => {
             router.get(

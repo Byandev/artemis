@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models;
+namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -24,9 +24,4 @@ class InventoryTransaction extends Model
         'rts_bad',
         'remaining_qty',
     ];
-
-    public function inventory()
-    {
-        return $this->hasMany(Inventory::class);
-    }
 }

@@ -14,7 +14,7 @@ use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\Record\RTSController;
 use App\Http\Controllers\Workspaces\Record\SalesController;
 use App\Http\Controllers\Workspaces\RoleController;
-use App\Http\Controllers\Workspaces\InventoryTransactionController;
+use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
@@ -48,10 +48,10 @@ Route::middleware(['auth'])->group(function () {
 
 
     Route::prefix('workspaces/{workspace:slug}')->group(function () {
-        Route::get('/inventory_transaction', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
-        Route::post('/inventory_transaction', [InventoryTransactionController::class, 'store'])->name('inventory.transactions.store');
-        Route::patch('/inventory_transaction/{inventory}', [InventoryTransactionController::class, 'update'])->name('inventory.transactions.update');
-        Route::delete('/inventory_transaction/{inventory}', [InventoryTransactionController::class, 'destroy'])->name('inventory.transactions.destroy');
+        Route::get('/inventory/transactions', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
+        Route::post('/inventory/transactions', [InventoryTransactionController::class, 'store'])->name('inventory.transactions.store');
+        Route::patch('/inventory/transactions/{inventory}', [InventoryTransactionController::class, 'update'])->name('inventory.transactions.update');
+        Route::delete('/inventory/transactions/{inventory}', [InventoryTransactionController::class, 'destroy'])->name('inventory.transactions.destroy');
     });
 
 
@@ -176,11 +176,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/inventory/purchased-orders/create', [PurchaseOrderController::class, 'create'])->name('workspaces.inventory.purchased-orders.create');
 
     // PPW ROUTES
-    Route::prefix('/workspaces/{workspace}/inventory/ppw')->name('workspaces.inventory.ppw.')->group(function () {
-    Route::get('/', [PpwController::class, 'index'])->name('index');
-    Route::post('/', [PpwController::class, 'store'])->name('store');
-    Route::put('/{ppw}', [PpwController::class, 'update'])->name('update');
-    Route::delete('/{ppw}', [PpwController::class, 'destroy'])->name('destroy');
+    Route::prefix('/workspaces/{workspace}/inventory/ppws')->name('workspaces.inventory.ppw.')->group(function () {
+        Route::get('/', [PpwController::class, 'index'])->name('index');
+        Route::post('/', [PpwController::class, 'store'])->name('store');
+        Route::put('/{ppw}', [PpwController::class, 'update'])->name('update');
+        Route::delete('/{ppw}', [PpwController::class, 'destroy'])->name('destroy');
     });
 
 });

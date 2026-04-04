@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import DatePicker from '@/components/ui/date-picker';
 import moment from 'moment';
 import { omit } from 'lodash';
+import { Button } from '@/components/ui/button';
 
 interface Props {
     inventory: {
@@ -55,7 +56,7 @@ export default function Index({ inventory, workspace, query }: Props) {
     useEffect(() => {
         const timer = setTimeout(() => {
             router.get(
-                `/workspaces/${workspace.slug}/inventory_transaction`,
+                `/workspaces/${workspace.slug}/inventory/transactions`,
                 {
                     filter: {
                         search: searchQuery || undefined,
@@ -89,7 +90,7 @@ export default function Index({ inventory, workspace, query }: Props) {
     const handleDeleteAction = () => {
         if (!selectedInventory) return;
 
-        router.delete(`/workspaces/${workspace.slug}/inventory_transaction/${selectedInventory.id}`, {
+        router.delete(`/workspaces/${workspace.slug}/inventory/transactions/${selectedInventory.id}`, {
             onSuccess: () => {
                 setDeleteModalOpen(false);
                 setSelectedInventory(undefined);
@@ -210,31 +211,39 @@ export default function Index({ inventory, workspace, query }: Props) {
             <Head title="Transaction Logs" />
             <Toaster position="top-right" richColors />
 
-            <Dialog open={deleteModalOpen}
+            <Dialog
+                open={deleteModalOpen}
                 onOpenChange={(open) => {
                     setDeleteModalOpen(open);
                     if (!open) setSelectedInventory(undefined);
-                }}>
-                <DialogContent className="max-w-[400px] p-0 overflow-hidden border-none bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl">
+                }}
+            >
+                <DialogContent className="max-w-[400px] overflow-hidden rounded-2xl border-none bg-white p-0 shadow-2xl dark:bg-zinc-900">
                     <div className="p-6">
                         <DialogHeader>
-                            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">Delete Transaction</DialogTitle>
-                            <DialogDescription className="text-[13px] text-gray-500 dark:text-gray-400 mt-2">
-                                Are you sure you want to delete <span className="font-medium text-gray-900 dark:text-white">{selectedInventory?.ref_no || 'this transaction'}</span>?
-                                This action cannot be undone.
+                            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
+                                Delete Transaction
+                            </DialogTitle>
+                            <DialogDescription className="mt-2 text-[13px] text-gray-500 dark:text-gray-400">
+                                Are you sure you want to delete{' '}
+                                <span className="font-medium text-gray-900 dark:text-white">
+                                    {selectedInventory?.ref_no ||
+                                        'this transaction'}
+                                </span>
+                                ? This action cannot be undone.
                             </DialogDescription>
                         </DialogHeader>
 
                         <div className="mt-6 flex justify-end gap-3">
                             <button
                                 onClick={() => setDeleteModalOpen(false)}
-                                className="h-9 px-4 rounded-lg border border-gray-200 bg-white text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors dark:border-white/10 dark:bg-transparent dark:text-gray-300"
+                                className="flex h-9 items-center rounded-lg border border-black/8 bg-stone-100 px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleDeleteAction}
-                                className="h-9 px-4 rounded-lg bg-red-500 text-[13px] font-medium text-white hover:bg-red-600 transition-colors"
+                                className="flex h-9 items-center rounded-lg bg-red-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-red-700"
                             >
                                 Delete
                             </button>
@@ -254,7 +263,10 @@ export default function Index({ inventory, workspace, query }: Props) {
             />
 
             <div className="w-full space-y-6 p-4 md:p-6">
-                <PageHeader title="Transaction Logs" description="Manage your inventory transactions">
+                <PageHeader
+                    title="Transaction Logs"
+                    description="Manage your inventory transactions"
+                >
                     <DatePicker
                         id={'inventory-date-range'}
                         mode={'range'}
@@ -269,16 +281,20 @@ export default function Index({ inventory, workspace, query }: Props) {
                                 setDateRange([]);
                             }
                         }}
-                        defaultDate={dateRange.length > 0 ? (dateRange as any) : undefined}
+                        defaultDate={
+                            dateRange.length > 0
+                                ? (dateRange as any)
+                                : undefined
+                        }
                     />
                     <button
                         onClick={() => {
                             setSelectedInventory(undefined);
                             setOpenFormModal(true);
                         }}
-                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono text-[11px] font-medium text-white transition-all hover:bg-emerald-700"
+                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
                     >
-                        Add New Inventory
+                        Record new Transaction
                     </button>
                 </PageHeader>
 
@@ -290,12 +306,12 @@ export default function Index({ inventory, workspace, query }: Props) {
                             placeholder="Search Inventory Reference No...."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pl-8 font-mono text-[12px] text-gray-800 outline-none focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pl-8 font-mono! text-[12px]! text-gray-800 outline-none focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                         />
                     </div>
                 </div>
 
-                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900 overflow-hidden">
+                <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         columns={columns}
                         data={inventory.data || []}
@@ -303,7 +319,7 @@ export default function Index({ inventory, workspace, query }: Props) {
                         meta={{ ...omit(inventory, ['data']) }}
                         onFetch={(params) => {
                             router.get(
-                                `/workspaces/${workspace.slug}/inventory_transaction`,
+                                `/workspaces/${workspace.slug}/inventory/transactions`,
                                 {
                                     sort: params?.sort,
                                     search: searchQuery || undefined,
@@ -315,8 +331,8 @@ export default function Index({ inventory, workspace, query }: Props) {
                                     preserveState: true,
                                     replace: true,
                                     preserveScroll: true,
-                                    only: ['inventory']
-                                }
+                                    only: ['inventory'],
+                                },
                             );
                         }}
                     />

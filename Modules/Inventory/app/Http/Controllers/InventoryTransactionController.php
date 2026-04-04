@@ -1,19 +1,18 @@
 <?php
 
-namespace App\Http\Controllers\Workspaces;
+namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\InventoryTransaction;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Spatie\QueryBuilder\QueryBuilder;
+use Modules\Inventory\Models\InventoryTransaction;
 use Spatie\QueryBuilder\AllowedFilter;
-use App\Models\User;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class InventoryTransactionController extends Controller
 {
-
     public function index(Request $request, Workspace $workspace)
     {
         if (!$request->user()->isMemberOf($workspace)) {
@@ -22,7 +21,6 @@ class InventoryTransactionController extends Controller
 
         $inventory = QueryBuilder::for(InventoryTransaction::where('workspace_id', $workspace->id))
             ->allowedFilters([
-
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where('ref_no', 'like', "%{$value}%");
                 }),
@@ -87,7 +85,6 @@ class InventoryTransactionController extends Controller
 
     public function destroy(Workspace $workspace, InventoryTransaction $inventory)
     {
-        // Standard delete() on a model WITHOUT SoftDeletes trait performs a hard delete
         $inventory->delete();
 
         return redirect()->back()->with('success', 'Entry permanently deleted.');
