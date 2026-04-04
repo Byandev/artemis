@@ -191,8 +191,7 @@ Route::get('/workspaces/invitations/{token}', [WorkspaceInvitationController::cl
 Route::get('/workspaces/invitations/{token}/accept', [WorkspaceInvitationController::class, 'accept'])->name('workspaces.invitations.accept');
 
 Route::prefix('/workspaces/{workspace:slug}')->group(function () {
-
-    Route::patch('/roles/{role}/archive', [RoleController::class, 'archive'])->name('roles.archive');
+    Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
     Route::post('/roles/{role}/restore', [RoleController::class, 'restore'])
         ->withTrashed()
         ->name('roles.restore');
