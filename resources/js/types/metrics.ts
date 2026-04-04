@@ -27,7 +27,10 @@ export type MetricKey =
     | 'deliveredAvgDeliveryAttempts'
     | 'returnedAvgDeliveryAttempts'
     | 'totalForDeliveryCount'
-    | 'repeatCustomerOrderCount';
+    | 'repeatCustomerOrderCount'
+    | 'retention30dRateCohort'
+    | 'retention60dRateCohort'
+    | 'retention90dRateCohort';
 
 export type MetricGroupKey =
     | 'revenueVolume'
@@ -207,6 +210,27 @@ export const metricConfigs: MetricConfig[] = [
         name: 'Repeat Customer Orders',
         description: 'Number of orders placed by customers who have made 2 or more purchases.',
         formatter: numberFormatter,
+    },
+    {
+        key: 'retention30dRateCohort',
+        groupKey: 'customerQualityRetention',
+        name: '30-Day Retention',
+        description: 'Of new customers in the selected period, the % who placed another order within 30 days of their first.',
+        formatter: percentageFormatter,
+    },
+    {
+        key: 'retention60dRateCohort',
+        groupKey: 'customerQualityRetention',
+        name: '60-Day Retention',
+        description: 'Of new customers in the selected period, the % who placed another order within 60 days of their first.',
+        formatter: percentageFormatter,
+    },
+    {
+        key: 'retention90dRateCohort',
+        groupKey: 'customerQualityRetention',
+        name: '90-Day Retention',
+        description: 'Of new customers in the selected period, the % who placed another order within 90 days of their first.',
+        formatter: percentageFormatter,
     },
     {
         key: 'totalForDeliveryCount',

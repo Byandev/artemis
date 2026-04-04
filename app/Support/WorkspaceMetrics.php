@@ -15,6 +15,9 @@ use App\Metrics\Orders\DeliveredAvgCustomerRts;
 use App\Metrics\Orders\DeliveredAvgDeliveryAttempts;
 use App\Metrics\Orders\RepeatCustomerOrderCount;
 use App\Metrics\Orders\RepeatOrderRatio;
+use App\Metrics\Orders\Retention30dRateCohort;
+use App\Metrics\Orders\Retention60dRateCohort;
+use App\Metrics\Orders\Retention90dRateCohort;
 use App\Metrics\Orders\ReturnedAmount;
 use App\Metrics\Orders\ReturnedAvgCustomerRts;
 use App\Metrics\Orders\ReturnedAvgDeliveryAttempts;
@@ -45,7 +48,10 @@ final class WorkspaceMetrics
         'totalSales' => TotalSales::class,
         'totalOrders' => TotalOrders::class,
         'repeatOrderRatio' => RepeatOrderRatio::class,
-        'repeatCustomerOrderCount' => RepeatCustomerOrderCount::class,
+        'repeatCustomerOrderCount'  => RepeatCustomerOrderCount::class,
+        'retention30dRateCohort'    => Retention30dRateCohort::class,
+        'retention60dRateCohort'    => Retention60dRateCohort::class,
+        'retention90dRateCohort'    => Retention90dRateCohort::class,
         'timeToFirstOrder' => TimeToFirstOrder::class,
         'avgLifetimeValue' => AverageLifetimeValue::class,
         'averageDaysFromShippedToDelivered' => AverageDaysFromShippedToDelivered::class,
