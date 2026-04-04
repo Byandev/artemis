@@ -210,9 +210,9 @@ export function AppSidebar() {
                 {/*<NavMain items={accountNavItems} group_label="Account" />*/}
             </SidebarContent>
 
-            <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
-            </SidebarFooter>
+            {/*<SidebarFooter>*/}
+            {/*    <NavFooter items={footerNavItems} className="mt-auto" />*/}
+            {/*</SidebarFooter>*/}
         </Sidebar>
     );
 }
