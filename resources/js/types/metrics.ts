@@ -29,6 +29,7 @@ export type MetricKey =
     | 'returnedAvgDeliveryAttempts'
     | 'totalForDeliveryCount'
     | 'repeatCustomerOrderCount'
+    | 'repeatCustomerRatio'
     | 'retention30dRateCohort'
     | 'retention60dRateCohort'
     | 'retention90dRateCohort';
@@ -159,6 +160,13 @@ export const metricConfigs: MetricConfig[] = [
     },
     {
         key: 'repeatOrderRatio',
+        groupKey: 'customerQualityRetention',
+        name: 'Repeat Order Ratio',
+        description: 'Out of all orders in the selected period, what percentage were placed by repeat customers.',
+        formatter: percentageFormatter,
+    },
+    {
+        key: 'repeatCustomerRatio',
         groupKey: 'customerQualityRetention',
         name: 'Repeat Customer Ratio',
         description: 'Out of all unique customers in the selected period, what percentage have ordered more than once.',

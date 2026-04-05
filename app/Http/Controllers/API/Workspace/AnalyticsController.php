@@ -124,7 +124,6 @@ class AnalyticsController extends Controller
      */
     private function ttl(array $dateRange): int
     {
-        return 1;
         $endDate = $dateRange['end_date'] ?? null;
 
         if ($endDate && Carbon::parse($endDate)->startOfDay()->lt(Carbon::today())) {
