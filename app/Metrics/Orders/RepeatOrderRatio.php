@@ -48,8 +48,9 @@ final class RepeatOrderRatio
 
         $repeatCustomers = $this->buildRepeatSubquery($workspaceId, $endExclusive);
 
-        $total = DB::table('pancake_orders as po')
+        return DB::table('pancake_orders as po')
             ->join('pages', 'pages.id', '=', 'po.page_id')
+            ->leftJoinSub($repeatCustomers, 'rc', fn ($j) => $j->on('rc.customer_id', '=', 'po.customer_id'))
             ->where('po.workspace_id', $workspaceId)
             ->where('po.confirmed_at', '>=', $startAt)
             ->where('po.confirmed_at', '<', $endExclusive)
@@ -58,25 +59,14 @@ final class RepeatOrderRatio
             ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
             ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
             ->groupBy('pages.id', 'pages.name')
-            ->selectRaw('pages.id as page_id, pages.name as page_name, COUNT(po.id) as total_orders');
-
-        $repeat = DB::table('pancake_orders as po')
-            ->join('pages', 'pages.id', '=', 'po.page_id')
-            ->joinSub($repeatCustomers, 'rc', fn ($j) => $j->on('rc.customer_id', '=', 'po.customer_id'))
-            ->where('po.workspace_id', $workspaceId)
-            ->where('po.confirmed_at', '>=', $startAt)
-            ->where('po.confirmed_at', '<', $endExclusive)
-            ->whereNotNull('po.customer_id')
-            ->whereNotIn('po.status', [6, 7])
-            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-            ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
-            ->groupBy('pages.id', 'pages.name')
-            ->selectRaw('pages.id as page_id, pages.name as page_name, COUNT(po.id) as repeat_orders');
-
-        return DB::query()
-            ->fromSub($total, 't')
-            ->leftJoinSub($repeat, 'r', fn ($j) => $j->on('r.page_id', '=', 't.page_id'))
-            ->selectRaw('t.page_id, t.page_name, ROUND(COALESCE(r.repeat_orders, 0) * 1.0 / NULLIF(t.total_orders, 0), 4) as value')
+            ->selectRaw('
+                pages.id   AS page_id,
+                pages.name AS page_name,
+                ROUND(
+                    COUNT(CASE WHEN rc.customer_id IS NOT NULL THEN 1 END) * 1.0
+                    / NULLIF(COUNT(po.id), 0),
+                4) AS value
+            ')
             ->orderByDesc('value')
             ->get();
     }
@@ -91,9 +81,10 @@ final class RepeatOrderRatio
 
         $repeatCustomers = $this->buildRepeatSubquery($workspaceId, $endExclusive);
 
-        $total = DB::table('pancake_orders as po')
+        return DB::table('pancake_orders as po')
             ->join('pages', 'pages.id', '=', 'po.page_id')
             ->join('shops', 'shops.id', '=', 'pages.shop_id')
+            ->leftJoinSub($repeatCustomers, 'rc', fn ($j) => $j->on('rc.customer_id', '=', 'po.customer_id'))
             ->where('po.workspace_id', $workspaceId)
             ->where('po.confirmed_at', '>=', $startAt)
             ->where('po.confirmed_at', '<', $endExclusive)
@@ -103,27 +94,14 @@ final class RepeatOrderRatio
             ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
             ->when(! empty($shopIds), fn ($q) => $q->whereIn('shops.id', $shopIds))
             ->groupBy('shops.id', 'shops.name')
-            ->selectRaw('shops.id as shop_id, shops.name as shop_name, COUNT(po.id) as total_orders');
-
-        $repeat = DB::table('pancake_orders as po')
-            ->join('pages', 'pages.id', '=', 'po.page_id')
-            ->join('shops', 'shops.id', '=', 'pages.shop_id')
-            ->joinSub($repeatCustomers, 'rc', fn ($j) => $j->on('rc.customer_id', '=', 'po.customer_id'))
-            ->where('po.workspace_id', $workspaceId)
-            ->where('po.confirmed_at', '>=', $startAt)
-            ->where('po.confirmed_at', '<', $endExclusive)
-            ->whereNotNull('po.customer_id')
-            ->whereNotIn('po.status', [6, 7])
-            ->whereNotNull('pages.shop_id')
-            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-            ->when(! empty($shopIds), fn ($q) => $q->whereIn('shops.id', $shopIds))
-            ->groupBy('shops.id', 'shops.name')
-            ->selectRaw('shops.id as shop_id, shops.name as shop_name, COUNT(po.id) as repeat_orders');
-
-        return DB::query()
-            ->fromSub($total, 't')
-            ->leftJoinSub($repeat, 'r', fn ($j) => $j->on('r.shop_id', '=', 't.shop_id'))
-            ->selectRaw('t.shop_id, t.shop_name, ROUND(COALESCE(r.repeat_orders, 0) * 1.0 / NULLIF(t.total_orders, 0), 4) as value')
+            ->selectRaw('
+                shops.id   AS shop_id,
+                shops.name AS shop_name,
+                ROUND(
+                    COUNT(CASE WHEN rc.customer_id IS NOT NULL THEN 1 END) * 1.0
+                    / NULLIF(COUNT(po.id), 0),
+                4) AS value
+            ')
             ->orderByDesc('value')
             ->get();
     }
@@ -138,9 +116,10 @@ final class RepeatOrderRatio
 
         $repeatCustomers = $this->buildRepeatSubquery($workspaceId, $endExclusive);
 
-        $total = DB::table('pancake_orders as po')
+        return DB::table('pancake_orders as po')
             ->join('pages', 'pages.id', '=', 'po.page_id')
             ->join('users', 'users.id', '=', 'pages.owner_id')
+            ->leftJoinSub($repeatCustomers, 'rc', fn ($j) => $j->on('rc.customer_id', '=', 'po.customer_id'))
             ->where('po.workspace_id', $workspaceId)
             ->where('po.confirmed_at', '>=', $startAt)
             ->where('po.confirmed_at', '<', $endExclusive)
@@ -150,27 +129,14 @@ final class RepeatOrderRatio
             ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
             ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
             ->groupBy('users.id', 'users.name')
-            ->selectRaw('users.id as user_id, users.name as user_name, COUNT(po.id) as total_orders');
-
-        $repeat = DB::table('pancake_orders as po')
-            ->join('pages', 'pages.id', '=', 'po.page_id')
-            ->join('users', 'users.id', '=', 'pages.owner_id')
-            ->joinSub($repeatCustomers, 'rc', fn ($j) => $j->on('rc.customer_id', '=', 'po.customer_id'))
-            ->where('po.workspace_id', $workspaceId)
-            ->where('po.confirmed_at', '>=', $startAt)
-            ->where('po.confirmed_at', '<', $endExclusive)
-            ->whereNotNull('po.customer_id')
-            ->whereNotNull('pages.owner_id')
-            ->whereNotIn('po.status', [6, 7])
-            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-            ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
-            ->groupBy('users.id', 'users.name')
-            ->selectRaw('users.id as user_id, users.name as user_name, COUNT(po.id) as repeat_orders');
-
-        return DB::query()
-            ->fromSub($total, 't')
-            ->leftJoinSub($repeat, 'r', fn ($j) => $j->on('r.user_id', '=', 't.user_id'))
-            ->selectRaw('t.user_id, t.user_name, ROUND(COALESCE(r.repeat_orders, 0) * 1.0 / NULLIF(t.total_orders, 0), 4) as value')
+            ->selectRaw('
+                users.id   AS user_id,
+                users.name AS user_name,
+                ROUND(
+                    COUNT(CASE WHEN rc.customer_id IS NOT NULL THEN 1 END) * 1.0
+                    / NULLIF(COUNT(po.id), 0),
+                4) AS value
+            ')
             ->orderByDesc('value')
             ->get();
     }
@@ -180,32 +146,31 @@ final class RepeatOrderRatio
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
         $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
 
-        $base = DB::table('pancake_orders as po')
+        $repeatCustomers = $this->buildRepeatSubquery($workspaceId, $endExclusive);
+
+        $row = DB::table('pancake_orders as po')
             ->when(! empty($pageIds) || ! empty($shopIds), fn ($q) =>
                 $q->join('pages', 'pages.id', '=', 'po.page_id')
                   ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
                   ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
             )
+            ->leftJoinSub($repeatCustomers, 'rc', fn ($j) => $j->on('rc.customer_id', '=', 'po.customer_id'))
             ->where('po.workspace_id', $workspaceId)
             ->where('po.confirmed_at', '>=', $startAt)
             ->where('po.confirmed_at', '<', $endExclusive)
             ->whereNotNull('po.customer_id')
-            ->whereNotIn('po.status', [6, 7]);
+            ->whereNotIn('po.status', [6, 7])
+            ->selectRaw('
+                COUNT(po.id)                                             AS total_orders,
+                COUNT(CASE WHEN rc.customer_id IS NOT NULL THEN 1 END)  AS repeat_orders
+            ')
+            ->first();
 
-        $totalOrders = (int) (clone $base)->selectRaw('COUNT(po.id) as total')->value('total');
-
-        if ($totalOrders === 0) {
+        if (! $row || $row->total_orders == 0) {
             return 0.0;
         }
 
-        $repeatCustomers = $this->buildRepeatSubquery($workspaceId, $endExclusive);
-
-        $repeatOrders = (int) (clone $base)
-            ->joinSub($repeatCustomers, 'rc', fn ($j) => $j->on('rc.customer_id', '=', 'po.customer_id'))
-            ->selectRaw('COUNT(po.id) as total')
-            ->value('total');
-
-        return round($repeatOrders / $totalOrders, 4);
+        return round($row->repeat_orders / $row->total_orders, 4);
     }
 
     /**
