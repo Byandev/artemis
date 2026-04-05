@@ -21,7 +21,7 @@ class WorkspaceMemberController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -65,8 +65,17 @@ class WorkspaceMemberController extends Controller
                 return $user;
             });
 
-        // Get pending invitations with pagination
-        $pendingInvitations = QueryBuilder::for($workspace->pendingInvitations()->getQuery())
+        // Get pending invitations with pagination — uses invitation_sort / invitation_page params
+        $invitationRequest = $request->duplicate(
+            query: array_merge(
+                $request->query(),
+                $request->has('invitation_sort') ? ['sort' => $request->input('invitation_sort')] : []
+            )
+        );
+
+        $pendingInvitations = QueryBuilder::for($workspace->pendingInvitations()->getQuery(), $invitationRequest)
+            ->leftJoin('roles', 'roles.id', '=', 'workspace_invitations.role_id')
+            ->select('workspace_invitations.*')
             ->with(['inviter', 'role'])
             ->allowedFilters([
                 AllowedFilter::partial('search', 'email'),
@@ -75,10 +84,11 @@ class WorkspaceMemberController extends Controller
                 'id',
                 'email',
                 'expires_at',
+                AllowedSort::field('role_name', 'roles.name'),
                 AllowedSort::custom('inviter_name', new InviterNameSort, 'inviter.name'),
             ])
             ->defaultSort('-created_at')
-            ->paginate($request->input('perPage', 10))
+            ->paginate($request->input('perPage', 10), ['*'], 'invitation_page')
             ->withQueryString();
 
         $isAdmin = $request->user()->isAdminOf($workspace);
@@ -91,7 +101,9 @@ class WorkspaceMemberController extends Controller
             'roles' => Role::where('workspace_id', $workspace->id)->get(),
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
-                'filter' => $request->input('filter', []),
+                'invitation_sort' => $request->input('invitation_sort'),
+                'invitation_page' => $request->input('invitation_page'),
+                'filter'          => $request->input('filter', []),
             ],
         ]);
     }
@@ -102,7 +114,7 @@ class WorkspaceMemberController extends Controller
     public function updateMember(Request $request, Workspace $workspace, User $user)
     {
 
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (!$request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to update member roles.');
         }
 
@@ -129,7 +141,7 @@ class WorkspaceMemberController extends Controller
     public function destroy(Request $request, Workspace $workspace, User $user)
     {
         // Only admins and owners can remove members
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (!$request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to remove members.');
         }
 

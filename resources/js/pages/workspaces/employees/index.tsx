@@ -52,18 +52,27 @@ export default function EmployeesIndex({ workspace, employees, query }: Props) {
         {
             accessorKey: 'name',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Name" />,
+            size: 260,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Name" />
+            ),
         },
         {
             accessorKey: 'email',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Email" />,
+            size: 260,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Email" />
+            ),
             cell: ({ row }) => row.original.email || '-',
         },
         {
             accessorKey: 'phone_number',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Phone" />,
+            size: 260,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Phone" />
+            ),
             cell: ({ row }) => row.original.phone_number || '-',
         },
     ];

@@ -51,7 +51,7 @@ export function DeleteProductDialog({
                     <AlertDialogAction
                         onClick={handleDelete}
                         disabled={processing}
-                        className="bg-destructive text-black hover:bg-destructive/90"
+                        className="bg-red-600 text-white hover:bg-red-700"
                     >
                         {processing ? 'Deleting...' : 'Delete'}
                     </AlertDialogAction>

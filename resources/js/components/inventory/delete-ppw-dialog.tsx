@@ -32,7 +32,7 @@ export function DeletePpwDialog({ ppw, workspace, onClose }: Props) {
     const handleDelete = () => {
         if (!ppw) return;
 
-        router.delete(`/workspaces/${workspace.slug}/inventory/ppw/${ppw.id}`, {
+        router.delete(`/workspaces/${workspace.slug}/inventory/ppws/${ppw.id}`, {
             preserveScroll: true,
             onStart: () => setProcessing(true),
             onSuccess: () => {
