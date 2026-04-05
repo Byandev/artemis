@@ -2,7 +2,6 @@ import { NavMain } from '@/components/nav-main';
 import {
     Sidebar,
     SidebarContent,
-    SidebarFooter,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
@@ -25,9 +24,10 @@ import {
     RotateCcw,
     BarChart2,
     MapPin,
+    ClipboardList,
+
 } from 'lucide-react';
 import AppLogo from './app-logo';
-import { NavFooter } from '@/components/nav-footer';
 
 export function AppSidebar() {
     const { currentWorkspace } = usePage().props;
@@ -68,6 +68,22 @@ export function AppSidebar() {
             icon: User,
         },
         {
+            title: 'Inventory',
+            icon: Package,
+            items: [
+                {
+                    title: 'PPW',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppws`,
+                    icon: BarChart2,
+                },
+                {
+                    title: 'Transaction Logs',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/transactions`,
+                    icon: ClipboardList,
+                },
+            ],
+        },
+        {
             title: 'RTS',
             icon: RotateCcw,
             items: [
@@ -88,97 +104,7 @@ export function AppSidebar() {
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/roles`,
             icon: ShieldIcon,
         },
-        {
-            title: 'Inventory',
-            icon: Package,
-            items: [
-                {
-                    title: 'PPW',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppw`,
-                    icon: Package,
-                },
-            ],
-        },
-
     ];
-
-    // const mainNavItems: NavItem[] = [
-    //     {
-    //         title: 'Dashboard',
-    //         href: dashboardUrl,
-    //         icon: LayoutDashboard,
-    //     },
-    //     // {
-    //     //     title: 'Ads Manager',
-    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ads-manager`,
-    //     //     icon: Target,
-    //     // },
-    //     {
-    //         title: 'Shops',
-    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/shops`,
-    //         icon: Store,
-    //     },
-    //     {
-    //         title: 'Pages',
-    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
-    //         icon: BookOpenIcon,
-    //     },
-    //     {
-    //         title: 'Products',
-    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products`,
-    //         icon: Package,
-    //     },
-    //     // {
-    //     //     title: 'Facebook Accounts',
-    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/facebook-accounts`,
-    //     //     icon: FacebookIcon,
-    //     // },
-    //     // {
-    //     //     title: 'Ad Accounts',
-    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ad-accounts`,
-    //     //     icon: CreditCard,
-    //     // },
-    //     {
-    //         title: 'Teams',
-    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
-    //         icon: Users,
-    //     },
-    //     {
-    //         title: 'RTS Management',
-    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts`,
-    //         icon: TrendingUp,
-    //     },
-    //     // {
-    //     //     title: 'Botcake',
-    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/botcake`,
-    //     //     icon: MousePointerClickIcon,
-    //     // },
-    // ];
-
-    const accountNavItems: NavItem[] = [
-        {
-            title: 'Profile',
-            href: '/profile',
-            icon: User,
-        },
-
-        {
-            title: 'Settings',
-            href: `/settings`,
-            icon: Settings,
-        },
-    ];
-
-    const footerNavItems: NavItem[] = [
-
-        {
-            title: 'Logout',
-            href: logout(),
-            icon: LogOut,
-        },
-    ];
-
-
 
 
     return (
@@ -204,9 +130,9 @@ export function AppSidebar() {
                 {/*<NavMain items={accountNavItems} group_label="Account" />*/}
             </SidebarContent>
 
-            <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
-            </SidebarFooter>
+            {/*<SidebarFooter>*/}
+            {/*    <NavFooter items={footerNavItems} className="mt-auto" />*/}
+            {/*</SidebarFooter>*/}
         </Sidebar>
     );
 }

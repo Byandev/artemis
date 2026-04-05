@@ -8,10 +8,13 @@ interface PaginationProps {
 }
 
 const Pagination = ({ currentPage, totalPages, onPageChange }: PaginationProps) => {
-    const pagesAroundCurrent = useMemo(() => Array.from(
-        { length: Math.min(3, totalPages) },
-        (_, i) => i + Math.max(currentPage - 1, 1)
-    ), [currentPage, totalPages]);
+    const pagesAroundCurrent = useMemo(() => {
+        const start = Math.min(
+            Math.max(currentPage - 1, 1),
+            Math.max(totalPages - 2, 1),
+        );
+        return Array.from({ length: Math.min(3, totalPages) }, (_, i) => start + i);
+    }, [currentPage, totalPages]);
 
     const navBtn = "inline-flex items-center justify-center h-8 gap-1.5 px-3 rounded-lg border text-[11px]! font-medium tracking-wide transition-all duration-150 disabled:pointer-events-none disabled:opacity-35 select-none";
     const navBtnActive = "border-black/10 bg-white text-gray-600 shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-gray-50 hover:border-black/15 dark:border-white/10 dark:bg-zinc-800 dark:text-gray-300 dark:shadow-none dark:hover:bg-zinc-700";

@@ -8,19 +8,29 @@ use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class RoleController extends Controller
 {
-    public function index(Workspace $workspace)
+    public function index(Request $request, Workspace $workspace)
     {
-        $roles = Role::withTrashed()
-            ->where('workspace_id', $workspace->id)
-            ->orderBy('deleted_at', 'asc')
-            ->get();
+        $roles = QueryBuilder::for(Role::withTrashed()->where('workspace_id', $workspace->id))
+            ->allowedFilters([
+                AllowedFilter::partial('search', 'name'),
+            ])
+            ->allowedSorts(['name', 'description', 'created_at', 'deleted_at'])
+            ->defaultSort('-created_at')
+            ->paginate(15)
+            ->withQueryString();
 
         return Inertia::render('roles/index', [
             'workspace' => $workspace,
-            'roles' => $roles,
+            'roles'     => $roles,
+            'query'     => [
+                ...$request->only(['sort', 'perPage', 'page']),
+                'filter' => $request->input('filter', []),
+            ],
         ]);
     }
 
@@ -53,7 +63,7 @@ class RoleController extends Controller
         return redirect()->route('roles.index', $workspace->slug);
     }
 
-    public function archive(Workspace $workspace, Role $role)
+    public function destroy(Workspace $workspace, Role $role)
     {
         $role->delete();
 

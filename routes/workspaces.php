@@ -14,6 +14,7 @@ use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\Record\RTSController;
 use App\Http\Controllers\Workspaces\Record\SalesController;
 use App\Http\Controllers\Workspaces\RoleController;
+use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
@@ -44,6 +45,16 @@ Route::middleware(['auth'])->group(function () {
     // Workspace setup (first-time after registration)
     Route::get('/workspaces/setup', [WorkspaceSetupController::class, 'create'])->name('workspaces.setup');
     Route::post('/workspaces/setup', [WorkspaceSetupController::class, 'store'])->name('workspaces.setup.store');
+
+
+    Route::prefix('workspaces/{workspace:slug}')->group(function () {
+        Route::get('/inventory/transactions', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
+        Route::post('/inventory/transactions', [InventoryTransactionController::class, 'store'])->name('inventory.transactions.store');
+        Route::patch('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'update'])->name('inventory.transactions.update');
+        Route::delete('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'destroy'])->name('inventory.transactions.destroy');
+    });
+
+
 
     // Workspace dashboard
     Route::get('/workspaces/{workspace}/dashboard', [WorkspaceController::class, 'dashboard'])->name('workspace.dashboard');
@@ -165,11 +176,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/inventory/purchased-orders/create', [PurchaseOrderController::class, 'create'])->name('workspaces.inventory.purchased-orders.create');
 
     // PPW ROUTES
-    Route::prefix('/workspaces/{workspace}/inventory/ppw')->name('workspaces.inventory.ppw.')->group(function () {
-    Route::get('/', [PpwController::class, 'index'])->name('index');
-    Route::post('/', [PpwController::class, 'store'])->name('store');
-    Route::put('/{ppw}', [PpwController::class, 'update'])->name('update');
-    Route::delete('/{ppw}', [PpwController::class, 'destroy'])->name('destroy');
+    Route::prefix('/workspaces/{workspace}/inventory/ppws')->name('workspaces.inventory.ppw.')->group(function () {
+        Route::get('/', [PpwController::class, 'index'])->name('index');
+        Route::post('/', [PpwController::class, 'store'])->name('store');
+        Route::put('/{ppw}', [PpwController::class, 'update'])->name('update');
+        Route::delete('/{ppw}', [PpwController::class, 'destroy'])->name('destroy');
     });
 
 });
@@ -180,10 +191,7 @@ Route::get('/workspaces/invitations/{token}', [WorkspaceInvitationController::cl
 Route::get('/workspaces/invitations/{token}/accept', [WorkspaceInvitationController::class, 'accept'])->name('workspaces.invitations.accept');
 
 Route::prefix('/workspaces/{workspace:slug}')->group(function () {
-
-    // Archive & Restore Logic
-    // Ensure this is PATCH
-    Route::patch('/roles/{role}/archive', [RoleController::class, 'archive'])->name('roles.archive');
+    Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
     Route::post('/roles/{role}/restore', [RoleController::class, 'restore'])
         ->withTrashed()
         ->name('roles.restore');
@@ -191,6 +199,8 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
     Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
     Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
     Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
+
+
 
 });
 

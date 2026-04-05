@@ -15,7 +15,9 @@ class PpwController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
-        $ppws = QueryBuilder::for(Ppw::where('workspace_id', $workspace->id))
+        $ppws = QueryBuilder::for(Ppw::where('inventory_ppws.workspace_id', $workspace->id))
+            ->leftJoin('products', 'products.id', '=', 'inventory_ppws.product_id')
+            ->select('inventory_ppws.*')
             ->with(['product'])
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -32,7 +34,7 @@ class PpwController extends Controller
                     $query->whereDate('transaction_date', '<=', $value);
                 }),
             ])
-            ->allowedSorts(['transaction_date', 'count', 'created_at'])
+            ->allowedSorts(['transaction_date', 'count', 'created_at', \Spatie\QueryBuilder\AllowedSort::field('product_name', 'products.name')])
             ->defaultSort('-transaction_date')
             ->paginate(10)
             ->withQueryString();
