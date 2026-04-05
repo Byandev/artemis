@@ -14,7 +14,7 @@ use App\Metrics\Orders\DeliveredAmount;
 use App\Metrics\Orders\DeliveredAvgCustomerRts;
 use App\Metrics\Orders\DeliveredAvgDeliveryAttempts;
 use App\Metrics\Orders\RepeatCustomerOrderCount;
-use App\Metrics\Orders\RepeatOrderRatio;
+use App\Metrics\Orders\RepeatCustomerRatio;
 use App\Metrics\Orders\Retention30dRateCohort;
 use App\Metrics\Orders\Retention60dRateCohort;
 use App\Metrics\Orders\Retention90dRateCohort;
@@ -26,6 +26,7 @@ use App\Metrics\Orders\RtsRate;
 use App\Metrics\Orders\TimeToFirstOrder;
 use App\Metrics\Orders\TotalOrders;
 use App\Metrics\Orders\TotalSales;
+use App\Metrics\Orders\UniqueCustomerCount;
 use App\Metrics\ParcelJourney\TrackedOrdersCount;
 use App\Metrics\ParcelJourney\TotalForDeliveryCount;
 use App\Models\Workspace;
@@ -47,7 +48,8 @@ final class WorkspaceMetrics
         'rtsRate' => RtsRate::class,
         'totalSales' => TotalSales::class,
         'totalOrders' => TotalOrders::class,
-        'repeatOrderRatio' => RepeatOrderRatio::class,
+        'uniqueCustomerCount' => UniqueCustomerCount::class,
+        'repeatOrderRatio' => RepeatCustomerRatio::class,
         'repeatCustomerOrderCount'  => RepeatCustomerOrderCount::class,
         'retention30dRateCohort'    => Retention30dRateCohort::class,
         'retention60dRateCohort'    => Retention60dRateCohort::class,

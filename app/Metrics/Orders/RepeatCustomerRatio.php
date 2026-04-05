@@ -7,7 +7,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
-final class RepeatOrderRatio
+final class RepeatCustomerRatio
 {
     /**
      * Overall repeat-customer rate.
@@ -16,10 +16,45 @@ final class RepeatOrderRatio
      */
     public function compute(int $workspaceId, array $dateRange, array $filter): float
     {
-        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
-        return $this->computeRatioForWindow($workspaceId, $filter, $startAt, $endExclusive);
+        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
+        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
+
+        $base = DB::table('pancake_orders')
+            ->when(! empty($pageIds) || ! empty($shopIds), function ($q) use ($pageIds, $shopIds) {
+                $q->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
+                    ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
+                    ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds));
+            })
+            ->where('pancake_orders.workspace_id', $workspaceId)
+            ->where('pancake_orders.confirmed_at', '>=', $startAt)
+            ->where('pancake_orders.confirmed_at', '<', $endExclusive)
+            ->whereNotNull('pancake_orders.customer_id')
+            ->whereNotIn('pancake_orders.status', [6, 7]);
+
+        $uniqueCustomers = (int) (clone $base)->selectRaw('COUNT(DISTINCT pancake_orders.customer_id) as total')->value('total');
+
+        if ($uniqueCustomers === 0) {
+            return 0.0;
+        }
+
+        $repeatCustomers = DB::table('pancake_orders')
+            ->where('workspace_id', $workspaceId)
+            ->where('confirmed_at', '<', $endExclusive)
+            ->whereNotNull('customer_id')
+            ->whereNotIn('status', [6, 7])
+            ->groupBy('customer_id')
+            ->havingRaw('COUNT(*) >= 2')
+            ->select('customer_id');
+
+        $repeatCount = (int) (clone $base)
+            ->joinSub($repeatCustomers, 'rc', fn ($j) => $j->on('rc.customer_id', '=', 'pancake_orders.customer_id'))
+            ->selectRaw('COUNT(DISTINCT pancake_orders.customer_id) as total')
+            ->value('total');
+
+        return round($repeatCount / $uniqueCustomers, 4);
     }
 
     public function breakdown(int $workspaceId, array $dateRange, array $filter, string $group = 'daily'): Collection
@@ -47,9 +82,9 @@ final class RepeatOrderRatio
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
         $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
 
-        // All orders up to end of window per customer (workspace-wide)
         $customerTotals = DB::table('pancake_orders')
             ->where('workspace_id', $workspaceId)
+            ->where('confirmed_at', '>=', $startAt)
             ->where('confirmed_at', '<', $endExclusive)
             ->whereNotNull('customer_id')
             ->whereNotIn('status', [6, 7])
@@ -89,6 +124,7 @@ final class RepeatOrderRatio
 
         $customerTotals = DB::table('pancake_orders')
             ->where('workspace_id', $workspaceId)
+            ->where('confirmed_at', '>=', $startAt)
             ->where('confirmed_at', '<', $endExclusive)
             ->whereNotNull('customer_id')
             ->whereNotIn('status', [6, 7])
@@ -140,6 +176,7 @@ final class RepeatOrderRatio
                 }
             )
             ->where('po.workspace_id', $workspaceId)
+            ->where('po.confirmed_at', '>=', $startAt)
             ->where('po.confirmed_at', '<', $endExclusive)
             ->whereNotNull('po.customer_id')
             ->whereNotIn('po.status', [6, 7])
@@ -187,6 +224,7 @@ final class RepeatOrderRatio
 
         $customerTotals = DB::table('pancake_orders')
             ->where('workspace_id', $workspaceId)
+            ->where('confirmed_at', '>=', $startAt)
             ->where('confirmed_at', '<', $endExclusive)
             ->whereNotNull('customer_id')
             ->whereNotIn('status', [6, 7])

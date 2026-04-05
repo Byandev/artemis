@@ -10,29 +10,68 @@ abstract class RetentionRateCohort
     abstract protected function days(): int;
 
     /**
-     * % of new-customer cohort that returned within N days.
+     * Ratio of customers who ordered in the window and placed 2+ orders
+     * within N days before their latest order, divided by unique customers in window.
      */
     public function compute(int $workspaceId, array $dateRange, array $filter): float
     {
         $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
-        return $this->computeForWindow($workspaceId, $filter, $startAt, $endExclusive);
+        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
+        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
+
+        $uniqueCustomers = (int) DB::table('pancake_orders as po')
+            ->when(! empty($pageIds) || ! empty($shopIds), fn ($q) =>
+                $q->join('pages', 'pages.id', '=', 'po.page_id')
+                  ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
+                  ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            )
+            ->where('po.workspace_id', $workspaceId)
+            ->where('po.confirmed_at', '>=', $startAt)
+            ->where('po.confirmed_at', '<', $endExclusive)
+            ->whereNotNull('po.customer_id')
+            ->whereNotIn('po.status', [6, 7])
+            ->selectRaw('COUNT(DISTINCT po.customer_id) as total')
+            ->value('total');
+
+        if ($uniqueCustomers === 0) {
+            return 0.0;
+        }
+
+        $qualified = $this->countForWindow($workspaceId, $filter, $startAt, $endExclusive);
+
+        return round($qualified / $uniqueCustomers, 4);
     }
 
     public function breakdown(int $workspaceId, array $dateRange, array $filter, string $group = 'daily')
     {
         $periods = $this->generatePeriods($dateRange, $group);
+        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
+        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
 
-        return collect($periods)->map(function (array $period) use ($workspaceId, $filter) {
+        return collect($periods)->map(function (array $period) use ($workspaceId, $filter, $pageIds, $shopIds) {
+            $uniqueCustomers = (int) DB::table('pancake_orders as po')
+                ->when(! empty($pageIds) || ! empty($shopIds), fn ($q) =>
+                    $q->join('pages', 'pages.id', '=', 'po.page_id')
+                      ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
+                      ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+                )
+                ->where('po.workspace_id', $workspaceId)
+                ->where('po.confirmed_at', '>=', $period['start'])
+                ->where('po.confirmed_at', '<', $period['end_exclusive'])
+                ->whereNotNull('po.customer_id')
+                ->whereNotIn('po.status', [6, 7])
+                ->selectRaw('COUNT(DISTINCT po.customer_id) as total')
+                ->value('total');
+
+            $qualified = $uniqueCustomers > 0
+                ? $this->countForWindow($workspaceId, $filter, $period['start'], $period['end_exclusive'])
+                : 0;
+
             return (object) [
                 'period' => $period['label'],
-                'value'  => $this->computeForWindow(
-                    $workspaceId,
-                    $filter,
-                    $period['start'],
-                    $period['end_exclusive']
-                ),
+                'value'  => $uniqueCustomers > 0 ? round($qualified / $uniqueCustomers, 4) : 0.0,
             ];
         });
     }
@@ -41,44 +80,45 @@ abstract class RetentionRateCohort
     {
         $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
+        $days         = $this->days();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
         $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
-        $days    = $this->days();
 
-        $newCustomers = $this->buildNewCustomersQuery($workspaceId, $startAt, $endExclusive, $pageIds, $shopIds);
+        // Latest order per customer in window, per page
+        $customerLatest = DB::table('pancake_orders as po')
+            ->join('pages', 'pages.id', '=', 'po.page_id')
+            ->where('po.workspace_id', $workspaceId)
+            ->where('po.confirmed_at', '>=', $startAt)
+            ->where('po.confirmed_at', '<', $endExclusive)
+            ->whereNotNull('po.customer_id')
+            ->whereNotIn('po.status', [6, 7])
+            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
+            ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->groupBy('po.customer_id', 'pages.id', 'pages.name')
+            ->selectRaw('po.customer_id, pages.id as page_id, pages.name as page_name, MAX(po.confirmed_at) as latest_order_at');
 
-        $subsequentOrders = DB::table('pancake_orders')
-            ->where('workspace_id', $workspaceId)
-            ->whereNotNull('customer_id')
-            ->whereNotIn('status', [6, 7])
-            ->select('customer_id', 'confirmed_at');
-
-        $perCustomer = DB::query()
-            ->fromSub($newCustomers, 'nc')
-            ->leftJoinSub($subsequentOrders, 'po', function ($join) {
-                $join->on('po.customer_id', '=', 'nc.customer_id')
-                    ->whereColumn('po.confirmed_at', '>', 'nc.first_order_at');
+        // Count orders per customer within N days before their latest order, on same page/shop
+        $qualified = DB::query()
+            ->fromSub($customerLatest, 'cl')
+            ->join('pancake_orders as po2', function ($join) {
+                $join->on('po2.customer_id', '=', 'cl.customer_id');
             })
-            ->join('pancake_orders as orig', 'orig.customer_id', '=', 'nc.customer_id')
-            ->join('pages', 'pages.id', '=', 'orig.page_id')
-            ->where('orig.workspace_id', $workspaceId)
-            ->whereColumn('orig.confirmed_at', '=', 'nc.first_order_at')
-            ->groupBy('pages.id', 'pages.name', 'nc.customer_id', 'nc.first_order_at')
-            ->selectRaw("
-                pages.id   as page_id,
-                pages.name as page_name,
-                MAX(CASE WHEN po.confirmed_at <= DATE_ADD(nc.first_order_at, INTERVAL {$days} DAY) AND po.confirmed_at IS NOT NULL THEN 1 ELSE 0 END) as returned
-            ");
+            ->join('pages as p2', 'p2.id', '=', 'po2.page_id')
+            ->whereColumn('po2.confirmed_at', '<=', 'cl.latest_order_at')
+            ->whereRaw("po2.confirmed_at >= DATE_SUB(cl.latest_order_at, INTERVAL {$days} DAY)")
+            ->where('po2.workspace_id', $workspaceId)
+            ->whereNotIn('po2.status', [6, 7])
+            ->when(! empty($pageIds), fn ($q) => $q->whereIn('p2.id', $pageIds))
+            ->when(! empty($shopIds), fn ($q) => $q->whereIn('p2.shop_id', $shopIds))
+            ->groupBy('cl.customer_id', 'cl.page_id', 'cl.page_name')
+            ->havingRaw('COUNT(po2.id) >= 2')
+            ->selectRaw('cl.customer_id, cl.page_id, cl.page_name');
 
         return DB::query()
-            ->fromSub($perCustomer, 'pc')
-            ->groupBy('pc.page_id', 'pc.page_name')
-            ->selectRaw('
-                pc.page_id,
-                pc.page_name,
-                ROUND(COALESCE(SUM(returned) * 1.0 / NULLIF(COUNT(*), 0), 0), 4) as value
-            ')
+            ->fromSub($qualified, 'q')
+            ->groupBy('q.page_id', 'q.page_name')
+            ->selectRaw('q.page_id, q.page_name, COUNT(DISTINCT q.customer_id) as value')
             ->orderByDesc('value')
             ->get();
     }
@@ -87,46 +127,44 @@ abstract class RetentionRateCohort
     {
         $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
+        $days         = $this->days();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
         $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
-        $days    = $this->days();
 
-        $newCustomers = $this->buildNewCustomersQuery($workspaceId, $startAt, $endExclusive, $pageIds, $shopIds);
-
-        $subsequentOrders = DB::table('pancake_orders')
-            ->where('workspace_id', $workspaceId)
-            ->whereNotNull('customer_id')
-            ->whereNotIn('status', [6, 7])
-            ->select('customer_id', 'confirmed_at');
-
-        $perCustomer = DB::query()
-            ->fromSub($newCustomers, 'nc')
-            ->leftJoinSub($subsequentOrders, 'po', function ($join) {
-                $join->on('po.customer_id', '=', 'nc.customer_id')
-                    ->whereColumn('po.confirmed_at', '>', 'nc.first_order_at');
-            })
-            ->join('pancake_orders as orig', 'orig.customer_id', '=', 'nc.customer_id')
-            ->join('pages', 'pages.id', '=', 'orig.page_id')
+        $customerLatest = DB::table('pancake_orders as po')
+            ->join('pages', 'pages.id', '=', 'po.page_id')
             ->join('shops', 'shops.id', '=', 'pages.shop_id')
-            ->where('orig.workspace_id', $workspaceId)
-            ->whereColumn('orig.confirmed_at', '=', 'nc.first_order_at')
+            ->where('po.workspace_id', $workspaceId)
+            ->where('po.confirmed_at', '>=', $startAt)
+            ->where('po.confirmed_at', '<', $endExclusive)
+            ->whereNotNull('po.customer_id')
+            ->whereNotIn('po.status', [6, 7])
             ->whereNotNull('pages.shop_id')
-            ->groupBy('shops.id', 'shops.name', 'nc.customer_id', 'nc.first_order_at')
-            ->selectRaw("
-                shops.id   as shop_id,
-                shops.name as shop_name,
-                MAX(CASE WHEN po.confirmed_at <= DATE_ADD(nc.first_order_at, INTERVAL {$days} DAY) AND po.confirmed_at IS NOT NULL THEN 1 ELSE 0 END) as returned
-            ");
+            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
+            ->when(! empty($shopIds), fn ($q) => $q->whereIn('shops.id', $shopIds))
+            ->groupBy('po.customer_id', 'shops.id', 'shops.name')
+            ->selectRaw('po.customer_id, shops.id as shop_id, shops.name as shop_name, MAX(po.confirmed_at) as latest_order_at');
+
+        $qualified = DB::query()
+            ->fromSub($customerLatest, 'cl')
+            ->join('pancake_orders as po2', fn ($j) => $j->on('po2.customer_id', '=', 'cl.customer_id'))
+            ->join('pages as p2', 'p2.id', '=', 'po2.page_id')
+            ->join('shops as s2', 's2.id', '=', 'p2.shop_id')
+            ->whereColumn('po2.confirmed_at', '<=', 'cl.latest_order_at')
+            ->whereRaw("po2.confirmed_at >= DATE_SUB(cl.latest_order_at, INTERVAL {$days} DAY)")
+            ->where('po2.workspace_id', $workspaceId)
+            ->whereNotIn('po2.status', [6, 7])
+            ->when(! empty($pageIds), fn ($q) => $q->whereIn('p2.id', $pageIds))
+            ->when(! empty($shopIds), fn ($q) => $q->whereIn('s2.id', $shopIds))
+            ->groupBy('cl.customer_id', 'cl.shop_id', 'cl.shop_name')
+            ->havingRaw('COUNT(po2.id) >= 2')
+            ->selectRaw('cl.customer_id, cl.shop_id, cl.shop_name');
 
         return DB::query()
-            ->fromSub($perCustomer, 'pc')
-            ->groupBy('pc.shop_id', 'pc.shop_name')
-            ->selectRaw('
-                pc.shop_id,
-                pc.shop_name,
-                ROUND(COALESCE(SUM(returned) * 1.0 / NULLIF(COUNT(*), 0), 0), 4) as value
-            ')
+            ->fromSub($qualified, 'q')
+            ->groupBy('q.shop_id', 'q.shop_name')
+            ->selectRaw('q.shop_id, q.shop_name, COUNT(DISTINCT q.customer_id) as value')
             ->orderByDesc('value')
             ->get();
     }
@@ -135,113 +173,95 @@ abstract class RetentionRateCohort
     {
         $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
+        $days         = $this->days();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
         $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
-        $days    = $this->days();
 
-        $newCustomers = $this->buildNewCustomersQuery($workspaceId, $startAt, $endExclusive, $pageIds, $shopIds);
-
-        $subsequentOrders = DB::table('pancake_orders')
-            ->where('workspace_id', $workspaceId)
-            ->whereNotNull('customer_id')
-            ->whereNotIn('status', [6, 7])
-            ->select('customer_id', 'confirmed_at');
-
-        $perCustomer = DB::query()
-            ->fromSub($newCustomers, 'nc')
-            ->leftJoinSub($subsequentOrders, 'po', function ($join) {
-                $join->on('po.customer_id', '=', 'nc.customer_id')
-                    ->whereColumn('po.confirmed_at', '>', 'nc.first_order_at');
-            })
-            ->join('pancake_orders as orig', 'orig.customer_id', '=', 'nc.customer_id')
-            ->join('pages', 'pages.id', '=', 'orig.page_id')
+        $customerLatest = DB::table('pancake_orders as po')
+            ->join('pages', 'pages.id', '=', 'po.page_id')
             ->join('users', 'users.id', '=', 'pages.owner_id')
-            ->where('orig.workspace_id', $workspaceId)
-            ->whereColumn('orig.confirmed_at', '=', 'nc.first_order_at')
-            ->groupBy('users.id', 'users.name', 'nc.customer_id', 'nc.first_order_at')
-            ->selectRaw("
-                users.id   as user_id,
-                users.name as user_name,
-                MAX(CASE WHEN po.confirmed_at <= DATE_ADD(nc.first_order_at, INTERVAL {$days} DAY) AND po.confirmed_at IS NOT NULL THEN 1 ELSE 0 END) as returned
-            ");
+            ->where('po.workspace_id', $workspaceId)
+            ->where('po.confirmed_at', '>=', $startAt)
+            ->where('po.confirmed_at', '<', $endExclusive)
+            ->whereNotNull('po.customer_id')
+            ->whereNotNull('pages.owner_id')
+            ->whereNotIn('po.status', [6, 7])
+            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
+            ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->groupBy('po.customer_id', 'users.id', 'users.name')
+            ->selectRaw('po.customer_id, users.id as user_id, users.name as user_name, MAX(po.confirmed_at) as latest_order_at');
+
+        $qualified = DB::query()
+            ->fromSub($customerLatest, 'cl')
+            ->join('pancake_orders as po2', fn ($j) => $j->on('po2.customer_id', '=', 'cl.customer_id'))
+            ->join('pages as p2', 'p2.id', '=', 'po2.page_id')
+            ->whereColumn('po2.confirmed_at', '<=', 'cl.latest_order_at')
+            ->whereRaw("po2.confirmed_at >= DATE_SUB(cl.latest_order_at, INTERVAL {$days} DAY)")
+            ->where('po2.workspace_id', $workspaceId)
+            ->whereNotIn('po2.status', [6, 7])
+            ->when(! empty($pageIds), fn ($q) => $q->whereIn('p2.id', $pageIds))
+            ->when(! empty($shopIds), fn ($q) => $q->whereIn('p2.shop_id', $shopIds))
+            ->groupBy('cl.customer_id', 'cl.user_id', 'cl.user_name')
+            ->havingRaw('COUNT(po2.id) >= 2')
+            ->selectRaw('cl.customer_id, cl.user_id, cl.user_name');
 
         return DB::query()
-            ->fromSub($perCustomer, 'pc')
-            ->groupBy('pc.user_id', 'pc.user_name')
-            ->selectRaw('
-                pc.user_id,
-                pc.user_name,
-                ROUND(COALESCE(SUM(returned) * 1.0 / NULLIF(COUNT(*), 0), 0), 4) as value
-            ')
+            ->fromSub($qualified, 'q')
+            ->groupBy('q.user_id', 'q.user_name')
+            ->selectRaw('q.user_id, q.user_name, COUNT(DISTINCT q.customer_id) as value')
             ->orderByDesc('value')
             ->get();
     }
 
-    private function computeForWindow(int $workspaceId, array $filter, string $startAt, string $endExclusive): float
+    private function countForWindow(int $workspaceId, array $filter, string $startAt, string $endExclusive): int
     {
+        $days    = $this->days();
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
         $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
-        $days    = $this->days();
 
-        $newCustomers = $this->buildNewCustomersQuery($workspaceId, $startAt, $endExclusive, $pageIds, $shopIds);
+        // Latest order per customer in the window (filtered by page/shop)
+        $customerLatest = DB::table('pancake_orders as po')
+            ->when(! empty($pageIds) || ! empty($shopIds), fn ($q) =>
+                $q->join('pages', 'pages.id', '=', 'po.page_id')
+                  ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
+                  ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            )
+            ->where('po.workspace_id', $workspaceId)
+            ->where('po.confirmed_at', '>=', $startAt)
+            ->where('po.confirmed_at', '<', $endExclusive)
+            ->whereNotNull('po.customer_id')
+            ->whereNotIn('po.status', [6, 7])
+            ->groupBy('po.customer_id')
+            ->selectRaw('po.customer_id, MAX(po.confirmed_at) as latest_order_at');
 
-        $subsequentOrders = DB::table('pancake_orders')
-            ->where('workspace_id', $workspaceId)
-            ->whereNotNull('customer_id')
-            ->whereNotIn('status', [6, 7])
-            ->select('customer_id', 'confirmed_at');
+        // Count orders within N days before latest order (same page/shop filter)
+        $qualified = DB::query()
+            ->fromSub($customerLatest, 'cl')
+            ->join('pancake_orders as po2', fn ($j) => $j->on('po2.customer_id', '=', 'cl.customer_id'))
+            ->when(! empty($pageIds) || ! empty($shopIds), fn ($q) =>
+                $q->join('pages as p2', 'p2.id', '=', 'po2.page_id')
+                  ->when(! empty($pageIds), fn ($q) => $q->whereIn('p2.id', $pageIds))
+                  ->when(! empty($shopIds), fn ($q) => $q->whereIn('p2.shop_id', $shopIds))
+            )
+            ->whereColumn('po2.confirmed_at', '<=', 'cl.latest_order_at')
+            ->whereRaw("po2.confirmed_at >= DATE_SUB(cl.latest_order_at, INTERVAL {$days} DAY)")
+            ->where('po2.workspace_id', $workspaceId)
+            ->whereNotIn('po2.status', [6, 7])
+            ->groupBy('cl.customer_id')
+            ->havingRaw('COUNT(po2.id) >= 2')
+            ->selectRaw('cl.customer_id');
 
-        $retentionData = DB::query()
-            ->fromSub($newCustomers, 'nc')
-            ->leftJoinSub($subsequentOrders, 'po', function ($join) {
-                $join->on('po.customer_id', '=', 'nc.customer_id')
-                    ->whereColumn('po.confirmed_at', '>', 'nc.first_order_at');
-            })
-            ->groupBy('nc.customer_id', 'nc.first_order_at')
-            ->selectRaw("
-                nc.customer_id,
-                MAX(CASE WHEN po.confirmed_at <= DATE_ADD(nc.first_order_at, INTERVAL {$days} DAY) AND po.confirmed_at IS NOT NULL THEN 1 ELSE 0 END) as returned
-            ");
-
-        $result = DB::query()
-            ->fromSub($retentionData, 'ret')
-            ->selectRaw('ROUND(COALESCE(SUM(returned) * 1.0 / NULLIF(COUNT(*), 0), 0), 4) as rate')
-            ->first();
-
-        return round((float) ($result->rate ?? 0), 4);
-    }
-
-    private function buildNewCustomersQuery(
-        int $workspaceId,
-        string $startAt,
-        string $endExclusive,
-        array $pageIds,
-        array $shopIds
-    ) {
-        $needsPages = ! empty($pageIds) || ! empty($shopIds);
-
-        $firstOrders = DB::table('pancake_orders')
-            ->when($needsPages, fn ($q) => $q->join('pages', 'pages.id', '=', 'pancake_orders.page_id'))
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotNull('pancake_orders.customer_id')
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-            ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
-            ->groupBy('pancake_orders.customer_id')
-            ->selectRaw('pancake_orders.customer_id, MIN(pancake_orders.confirmed_at) as first_order_at');
-
-        return DB::query()
-            ->fromSub($firstOrders, 'fo')
-            ->where('fo.first_order_at', '>=', $startAt)
-            ->where('fo.first_order_at', '<', $endExclusive)
-            ->select('fo.customer_id', 'fo.first_order_at');
+        return (int) DB::query()
+            ->fromSub($qualified, 'q')
+            ->selectRaw('COUNT(DISTINCT q.customer_id) as total')
+            ->value('total');
     }
 
     private function generatePeriods(array $dateRange, string $group): array
     {
-        $start  = Carbon::parse($dateRange['start_date'])->startOfDay();
-        $end    = Carbon::parse($dateRange['end_date'])->startOfDay();
+        $start   = Carbon::parse($dateRange['start_date'])->startOfDay();
+        $end     = Carbon::parse($dateRange['end_date'])->startOfDay();
         $periods = [];
 
         if ($group === 'monthly') {
@@ -287,10 +307,7 @@ abstract class RetentionRateCohort
 
     private function resolveIds(mixed $ids): array
     {
-        if (empty($ids)) {
-            return [];
-        }
-
+        if (empty($ids)) return [];
         return array_map('intval', is_array($ids) ? $ids : explode(',', $ids));
     }
 }
