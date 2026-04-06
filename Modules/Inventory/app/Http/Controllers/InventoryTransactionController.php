@@ -52,13 +52,13 @@ class InventoryTransactionController extends Controller
     public function store(Request $request, Workspace $workspace)
     {
         $validated = $request->validate([
-            'date' => 'nullable|date',
-            'ref_no' => 'nullable|string|max:255',
-            'po_qty_in' => 'nullable|integer|min:0',
-            'po_qty_out' => 'nullable|integer|min:0',
-            'rts_goods_in' => 'nullable|integer|min:0',
-            'rts_goods_out' => 'nullable|integer|min:0',
-            'rts_bad' => 'nullable|integer|min:0',
+            'date' => 'required|date',
+            'ref_no' => 'required|string|max:255|unique:inventory_transactions,ref_no,NULL,id,workspace_id,'.$workspace->id,
+            'po_qty_in' => 'required|integer|min:0',
+            'po_qty_out' => 'required|integer|min:0',
+            'rts_goods_in' => 'required|integer|min:0',
+            'rts_goods_out' => 'required|integer|min:0',
+            'rts_bad' => 'required|integer|min:0',
         ]);
 
         $workspace->inventoryTransactions()->create($validated);
@@ -69,13 +69,13 @@ class InventoryTransactionController extends Controller
     public function update(Request $request, Workspace $workspace, InventoryTransaction $transaction)
     {
         $validated = $request->validate([
-            'date' => 'nullable|date',
-            'ref_no' => 'nullable|string|max:255',
-            'po_qty_in' => 'nullable|integer|min:0',
-            'po_qty_out' => 'nullable|integer|min:0',
-            'rts_goods_in' => 'nullable|integer|min:0',
-            'rts_goods_out' => 'nullable|integer|min:0',
-            'rts_bad' => 'nullable|integer|min:0',
+            'date' => 'required|date',
+            'ref_no' => 'required|string|max:255|unique:inventory_transactions,ref_no,'.$transaction->id.',id,workspace_id,'.$workspace->id,
+            'po_qty_in' => 'required|integer|min:0',
+            'po_qty_out' => 'required|integer|min:0',
+            'rts_goods_in' => 'required|integer|min:0',
+            'rts_goods_out' => 'required|integer|min:0',
+            'rts_bad' => 'required|integer|min:0',
         ]);
 
         $transaction->update($validated);

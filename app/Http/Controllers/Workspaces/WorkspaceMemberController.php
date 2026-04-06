@@ -141,7 +141,7 @@ class WorkspaceMemberController extends Controller
     public function destroy(Request $request, Workspace $workspace, User $user)
     {
         // Only admins and owners can remove members
-        if (!$request->user()->isAdminOf($workspace)) {
+        if (!$workspace->isOwner($request->user())) {
             abort(403, 'You do not have permission to remove members.');
         }
 

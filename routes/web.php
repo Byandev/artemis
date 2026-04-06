@@ -11,6 +11,10 @@ Route::get('/leaderboards', function () {
     return Inertia::render('workspaces/public/leaderboard');
 });
 
+Route::get('/changelog', function () {
+    return Inertia::render('workspaces/changelog');
+})->name('changelog');
+
 Route::get('/design-guidelines', function () {
     return view('design-guidelines');
 });
@@ -22,16 +26,19 @@ Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', function () {
         $user = auth()->user();
 
-        // Get user's first workspace (prioritize owned workspaces)
-        $workspace = $user->ownedWorkspaces()->first()
+        // Use the last selected workspace from session, otherwise fall back to first owned workspace
+        $sessionWorkspaceId = session('current_workspace_id');
+
+        $workspace = ($sessionWorkspaceId
+            ? $user->workspaces()->where('workspaces.id', $sessionWorkspaceId)->first()
+            : null)
+            ?? $user->ownedWorkspaces()->first()
             ?? $user->workspaces()->first();
 
-        // If user has a workspace, redirect to it
         if ($workspace) {
             return redirect()->route('workspace.dashboard', $workspace->slug);
         }
 
-        // If no workspace, redirect to setup
         return redirect()->route('workspaces.setup');
     })->name('dashboard');
 });
