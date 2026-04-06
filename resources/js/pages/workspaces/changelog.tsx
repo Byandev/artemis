@@ -128,12 +128,116 @@ const changelog: ChangelogEntry[] = [
             },
         ],
     },
+    {
+        version: 'v1.2.0',
+        date: '2025-12-03',
+        sections: [
+            {
+                title: 'RTS Analytics',
+                items: [
+                    'RTS analytics dashboard with key metrics',
+                    'City heatmap — visual breakdown of RTS orders by city',
+                    'User analytics — RTS breakdown by assigned user',
+                    'Page breakdown — RTS breakdown per Facebook page',
+                    'City breakdown — tabular city-level RTS stats with pagination',
+                ],
+            },
+            {
+                title: 'Page Management',
+                items: [
+                    'Pages list with search, filter, and sort support',
+                    'Archive and restore pages',
+                    'Page detail view with order history',
+                ],
+            },
+            {
+                title: 'Teams',
+                items: [
+                    'Teams table, model, and controller',
+                    'Assign workspace members to teams',
+                ],
+            },
+            {
+                title: 'Employees',
+                items: [
+                    'Employees navigation added to sidebar',
+                    'Workspace user seeder for development',
+                ],
+            },
+            {
+                title: 'UI Improvements',
+                items: [
+                    'Data table empty state with icon, heading, and hint text',
+                    'Heatmap height adjustments for better readability',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v1.1.0',
+        date: '2025-11-28',
+        sections: [
+            {
+                title: 'Workspace Management',
+                items: [
+                    'Workspace creation flow',
+                    'Workspace context — scopes all data to the active workspace',
+                    'Workspace switching — switch between workspaces without logging out',
+                    'Workspace selection page listing all workspaces with member counts',
+                    'Workspace switcher dropdown in the sidebar',
+                    '"All workspaces" option for cross-workspace views',
+                    'Back button on workspace selection page',
+                ],
+            },
+            {
+                title: 'Invitation Flow',
+                items: [
+                    'Invite members to a workspace via email',
+                    'Accept/decline invitation flow',
+                ],
+            },
+            {
+                title: 'Facebook Integration',
+                items: [
+                    'Connect Facebook accounts to a workspace',
+                    'Fetch and display Facebook ad accounts',
+                    'Fetch campaigns linked to ad accounts',
+                ],
+            },
+            {
+                title: 'Fixes',
+                items: [
+                    'Fixed dialog overflow on smaller screens',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v1.0.0',
+        date: '2025-10-31',
+        sections: [
+            {
+                title: 'Initial Release',
+                items: [
+                    'Workspace setup — onboarding flow to create the first workspace',
+                    'Order sync — pull and sync orders from connected pages',
+                    'Page orders — view orders per Facebook page',
+                    'Trigger manual fetch for page orders',
+                    'Allow refreshing page orders on demand',
+                    'Message support on orders',
+                ],
+            },
+        ],
+    },
 ];
 
 const versionColors: Record<string, string> = {
     'v2.2.0': 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20',
     'v2.1.0': 'bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-blue-500/20',
     'v2.0.1': 'bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-violet-500/20',
+    'v1.2.0': 'bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20',
+    'v1.1.0': 'bg-orange-500/10 text-orange-600 dark:text-orange-400 ring-orange-500/20',
+    'v1.0.0': 'bg-rose-500/10 text-rose-600 dark:text-rose-400 ring-rose-500/20',
 };
 
 export default function Changelog() {
