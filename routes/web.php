@@ -11,6 +11,10 @@ Route::get('/leaderboards', function () {
     return Inertia::render('workspaces/public/leaderboard');
 });
 
+Route::get('/changelog', function () {
+    return Inertia::render('workspaces/changelog');
+})->name('changelog');
+
 Route::get('/design-guidelines', function () {
     return view('design-guidelines');
 });
