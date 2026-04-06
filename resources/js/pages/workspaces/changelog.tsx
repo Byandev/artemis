@@ -16,25 +16,21 @@ const changelog: ChangelogEntry[] = [
         date: '2026-04-01',
         sections: [
             {
-                title: 'Parcel Journey — New Page & Analytics',
+                title: 'Parcel Journey',
                 items: [
-                    'Added Parcel Journey entry under the RTS sidebar',
-                    'New page at /rts/parcel-journeys displaying parcel journey notification templates',
-                    'Analytics cards at the top: Tracked Orders, SMS Sent, Chat Sent, Total Sent',
-                    'Analytics are computed by combining parcel_journey_notification_logs (batch) + parcel_journey_notifications (real-time)',
-                    'Date range filter on the analytics section; defaults to current month',
-                    'Template list uses paginated DataTable with the standard premium table design',
-                    'Template form redesigned — premium dialog matching the teams form style; variable chips styled as code tokens with violet accent',
+                    'New Parcel Journey section added to the RTS menu',
+                    'See all your parcel notification templates in one place',
+                    'Dashboard cards showing how many orders were tracked, and how many SMS and chat messages were sent',
+                    'Filter the dashboard by date range — defaults to the current month',
+                    'Browse and manage notification templates with search and pagination',
                 ],
             },
             {
-                title: 'Pages — Status Management',
+                title: 'Page Status',
                 items: [
-                    'Replaced Archive/Restore with Active / Inactive status',
-                    'Added status column (enum: active, inactive, default: active) to pages table',
-                    'Status toggle added to both Create and Edit page forms',
-                    'Status badge on the pages list shows Active (emerald) / Inactive (red)',
-                    'PageController::archive and restore now set status instead of soft-deleting',
+                    'Pages can now be set to Active or Inactive instead of being archived',
+                    'Toggle a page on or off directly from the create or edit form',
+                    'Pages list shows a clear Active or Inactive badge for each page',
                 ],
             },
         ],
@@ -44,47 +40,32 @@ const changelog: ChangelogEntry[] = [
         date: '2026-03-27',
         sections: [
             {
-                title: 'SyncOrder — Full Refactor (SOLID)',
+                title: 'Parcel Journey Improvements',
                 items: [
-                    'Broke SyncOrder job into 5 focused action classes: UpsertOrderAction, SyncOrderItemsAction, SyncShippingAddressAction, SyncParcelTrackingAction, SyncPhoneNumberReportsAction',
-                    'SyncOrder is now a thin orchestrator using Laravel method injection',
-                    'Added JourneyUpdateNormalizer — fixes update_at typo, resolves canonical status names, extracts rider name/mobile from bracket notation',
-                    'Added OrderTimestampResolver and MessageRenderer support classes',
-                    'Parcel journey notification logic extracted into ParcelJourneyNotifier + Strategy pattern handlers',
+                    'Notifications are only sent for orders that are out for delivery today — no unnecessary messages',
+                    'Stops tracking a parcel once it has been registered as returned',
+                    'Rider name and contact number are now saved automatically when a delivery is recorded',
                 ],
             },
             {
-                title: 'Parcel Journey — Logic Improvements',
+                title: 'RTS Analytics',
                 items: [
-                    'Save only journeys where status is On Delivery or created_at is today',
-                    'Stop saving journey entries that succeed a Return Register status',
-                    'isNotifiable only triggers if created_at is today',
-                    'Rider name and mobile are now parsed by the normalizer and saved directly on the parcel_journeys record',
-                    'OnDeliveryHandler reads rider_name/rider_mobile from the saved journey instead of re-parsing the note',
+                    'New breakdown by Product — see which items have the most returns',
+                    'New breakdown by Rider — see which riders have the most returns',
+                    'Price, Delivery Attempts, and Customer RTS cards now default to chart view',
                 ],
             },
             {
-                title: 'RTS Analytics — New Cards & Decoupled Architecture',
+                title: 'Pages',
                 items: [
-                    'Each analytics card is now a self-contained component with its own fetch/state',
-                    'New: By Product — RTS breakdown by product/item name with sortable DataTable',
-                    'New: By Rider — RTS breakdown by rider name, sourced from the latest On Delivery parcel journey per order',
-                    'Price, Delivery Attempts, and Cx RTS cards default to chart view',
-                    'Product and Rider breakdowns use DataTable',
+                    'Pages list now shows whether a page is using the latest sync logic or an older version',
                 ],
             },
             {
-                title: 'Pages List',
+                title: 'RMO Management',
                 items: [
-                    'is_sync_logic_updated flag now shown inline in the Last Sync column as an Updated / Legacy badge',
-                ],
-            },
-            {
-                title: 'RMO Management — Refactor & Design',
-                items: [
-                    'ForDeliveryController refactored: query building extracted to ForDeliveryQuery, stats to ForDeliveryStatsService',
-                    'Parcel status badge shows an animated pulsing dot when status is out_for_delivery',
-                    'Order status picker dropdown now shows color-coded pill badges for each option',
+                    'Order status dropdown now shows color-coded labels for each status',
+                    'Orders that are out for delivery show a live pulsing indicator',
                 ],
             },
         ],
@@ -96,34 +77,121 @@ const changelog: ChangelogEntry[] = [
             {
                 title: 'New Features',
                 items: [
-                    'RMO Management Module — tabular view of return and delivery orders, status management via dropdown, search, pagination, and sortable columns',
-                    'Role Management Module — dedicated module for managing user roles with search, create, modify, and archive support',
-                    'Theme Toggle — Dark mode / Light mode support',
-                    'Employees page — New page listing Pancake users as Employees with search, sort, and pagination',
-                    'Employees sidebar link — "Employees" added to the main workspace navigation',
+                    'RMO Management — view and manage return and delivery orders in one place, with search, sorting, and status updates',
+                    'Role Management — create and manage user roles to control what each team member can access',
+                    'Dark Mode — switch between light and dark theme from the app header',
+                    'Employees — view all team members connected to your workspace in a searchable list',
                 ],
             },
             {
                 title: 'Improvements',
                 items: [
-                    'Sidebar Navigation — Added RMO Management and Roles module links',
-                    'App header — Removed notification bell; updated authenticated user display to a premium pill button showing initials and name',
-                    'Data table empty state — Replaced plain "No results." text with a centered icon box, heading, and hint text',
-                    'Analytics caching — All AnalyticsController methods now cache results for 5 minutes with workspace-scoped cache keys',
+                    'Navigation updated with links to RMO Management and Roles',
+                    'Your name and initials now appear as a pill in the header instead of a notification bell',
+                    'Empty tables now show a helpful message instead of blank space',
+                    'Analytics load faster thanks to short-term caching',
                 ],
             },
             {
                 title: 'Fixes',
                 items: [
-                    'Sidebar mobile dark mode — Fixed almost-transparent sidebar background on mobile dark mode',
-                    'Sidebar mobile border — Fixed overly bright border on the mobile sidebar sheet in dark mode',
-                    'Workspace setup route — Fixed MethodNotAllowedHttpException by correcting route method from PUT to POST',
+                    'Fixed sidebar background appearing transparent on mobile in dark mode',
+                    'Fixed sidebar border looking too bright on mobile in dark mode',
+                    'Fixed an error that occurred when setting up a new workspace',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v1.2.0',
+        date: '2025-12-03',
+        sections: [
+            {
+                title: 'RTS Analytics',
+                items: [
+                    'New RTS analytics dashboard with key return-to-sender metrics',
+                    'City heatmap — see which cities have the most returns at a glance',
+                    'Breakdown by user — see RTS numbers per team member',
+                    'Breakdown by page — see RTS numbers per Facebook page',
+                    'Breakdown by city — detailed table with return counts per city',
                 ],
             },
             {
-                title: 'Database',
+                title: 'Page Management',
                 items: [
-                    'pancake_customers — Removed unique index on fb_id column',
+                    'Search, filter, and sort your pages list',
+                    'Archive pages you no longer need and restore them anytime',
+                    'View order history directly from a page\'s detail view',
+                ],
+            },
+            {
+                title: 'Teams',
+                items: [
+                    'Create and manage teams within your workspace',
+                    'Assign team members to specific teams',
+                ],
+            },
+            {
+                title: 'Employees',
+                items: [
+                    'Employees section added to the sidebar navigation',
+                ],
+            },
+            {
+                title: 'Improvements',
+                items: [
+                    'Empty tables now show a friendly message with an icon instead of blank space',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v1.1.0',
+        date: '2025-11-28',
+        sections: [
+            {
+                title: 'Workspaces',
+                items: [
+                    'Create new workspaces from within the app',
+                    'Switch between workspaces without logging out',
+                    'Workspace selection screen showing all your workspaces and member counts',
+                    'Workspace switcher in the sidebar for quick access',
+                ],
+            },
+            {
+                title: 'Invitations',
+                items: [
+                    'Invite team members to your workspace by email',
+                    'Invited members can accept or decline the invitation',
+                ],
+            },
+            {
+                title: 'Facebook Integration',
+                items: [
+                    'Connect your Facebook accounts to a workspace',
+                    'View linked ad accounts and their campaigns',
+                ],
+            },
+            {
+                title: 'Fixes',
+                items: [
+                    'Fixed a dialog that was getting cut off on smaller screens',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v1.0.0',
+        date: '2025-10-31',
+        sections: [
+            {
+                title: 'Initial Release',
+                items: [
+                    'Set up your first workspace to get started',
+                    'Connect your pages and sync orders automatically',
+                    'View all orders per Facebook page',
+                    'Manually refresh orders whenever you need the latest data',
+                    'Send and view messages on orders',
                 ],
             },
         ],
@@ -134,6 +202,9 @@ const versionColors: Record<string, string> = {
     'v2.2.0': 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20',
     'v2.1.0': 'bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-blue-500/20',
     'v2.0.1': 'bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-violet-500/20',
+    'v1.2.0': 'bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20',
+    'v1.1.0': 'bg-orange-500/10 text-orange-600 dark:text-orange-400 ring-orange-500/20',
+    'v1.0.0': 'bg-rose-500/10 text-rose-600 dark:text-rose-400 ring-rose-500/20',
 };
 
 export default function Changelog() {
