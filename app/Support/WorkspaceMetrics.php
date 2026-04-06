@@ -15,6 +15,7 @@ use App\Metrics\Orders\DeliveredAvgCustomerRts;
 use App\Metrics\Orders\DeliveredAvgDeliveryAttempts;
 use App\Metrics\Orders\RepeatCustomerOrderCount;
 use App\Metrics\Orders\RepeatCustomerRatio;
+use App\Metrics\Orders\RepeatOrderRatio;
 use App\Metrics\Orders\Retention30dRateCohort;
 use App\Metrics\Orders\Retention60dRateCohort;
 use App\Metrics\Orders\Retention90dRateCohort;
@@ -49,7 +50,8 @@ final class WorkspaceMetrics
         'totalSales' => TotalSales::class,
         'totalOrders' => TotalOrders::class,
         'uniqueCustomerCount' => UniqueCustomerCount::class,
-        'repeatOrderRatio' => RepeatCustomerRatio::class,
+        'repeatOrderRatio' => RepeatOrderRatio::class,
+        'repeatCustomerRatio' => RepeatCustomerRatio::class,
         'repeatCustomerOrderCount'  => RepeatCustomerOrderCount::class,
         'retention30dRateCohort'    => Retention30dRateCohort::class,
         'retention60dRateCohort'    => Retention60dRateCohort::class,

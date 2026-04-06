@@ -29,6 +29,7 @@ export type MetricKey =
     | 'returnedAvgDeliveryAttempts'
     | 'totalForDeliveryCount'
     | 'repeatCustomerOrderCount'
+    | 'repeatCustomerRatio'
     | 'retention30dRateCohort'
     | 'retention60dRateCohort'
     | 'retention90dRateCohort';
@@ -160,6 +161,13 @@ export const metricConfigs: MetricConfig[] = [
     {
         key: 'repeatOrderRatio',
         groupKey: 'customerQualityRetention',
+        name: 'Repeat Order Ratio',
+        description: 'Out of all orders in the selected period, what percentage were placed by repeat customers.',
+        formatter: percentageFormatter,
+    },
+    {
+        key: 'repeatCustomerRatio',
+        groupKey: 'customerQualityRetention',
         name: 'Repeat Customer Ratio',
         description: 'Out of all unique customers in the selected period, what percentage have ordered more than once.',
         formatter: percentageFormatter,
@@ -223,21 +231,21 @@ export const metricConfigs: MetricConfig[] = [
         key: 'retention30dRateCohort',
         groupKey: 'customerQualityRetention',
         name: '30-Day Retention Rate',
-        description: 'Out of all customers who ordered in the selected period, what percentage had 2 or more orders in the 30 days leading up to their latest order.',
+        description: 'Of customers who placed their first order 30–60 days ago, what percentage came back and ordered again within 30 days. Always shows a complete, up-to-date result.',
         formatter: percentageFormatter,
     },
     {
         key: 'retention60dRateCohort',
         groupKey: 'customerQualityRetention',
         name: '60-Day Retention Rate',
-        description: 'Out of all customers who ordered in the selected period, what percentage had 2 or more orders in the 60 days leading up to their latest order.',
+        description: 'Of customers who placed their first order 60–120 days ago, what percentage came back and ordered again within 60 days. Always shows a complete, up-to-date result.',
         formatter: percentageFormatter,
     },
     {
         key: 'retention90dRateCohort',
         groupKey: 'customerQualityRetention',
         name: '90-Day Retention Rate',
-        description: 'Out of all customers who ordered in the selected period, what percentage had 2 or more orders in the 90 days leading up to their latest order.',
+        description: 'Of customers who placed their first order 90–180 days ago, what percentage came back and ordered again within 90 days. Always shows a complete, up-to-date result.',
         formatter: percentageFormatter,
     },
     {
