@@ -129,6 +129,7 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory }: Props
                                     placeholder="PO-001"
                                     className={inputClass}
                                 />
+                                {errors.ref_no && <p className="text-[11px] text-red-500">{errors.ref_no}</p>}
                             </div>
                         </div>
 
@@ -149,6 +150,7 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory }: Props
                                     }
                                     className={inputClass}
                                 />
+                                {errors.po_qty_in && <p className="text-[11px] text-red-500">{errors.po_qty_in}</p>}
                             </div>
                             <div className="space-y-1.5">
                                 <label className={labelClass}>
@@ -166,6 +168,7 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory }: Props
                                     }
                                     className={inputClass}
                                 />
+                                {errors.po_qty_out && <p className="text-[11px] text-red-500">{errors.po_qty_out}</p>}
                             </div>
                         </div>
 
@@ -186,6 +189,7 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory }: Props
                                     }
                                     className={inputClass}
                                 />
+                                {errors.rts_goods_in && <p className="text-[11px] text-red-500">{errors.rts_goods_in}</p>}
                             </div>
                             <div className="space-y-1.5">
                                 <label className={labelClass}>
@@ -203,6 +207,7 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory }: Props
                                     }
                                     className={inputClass}
                                 />
+                                {errors.rts_goods_out && <p className="text-[11px] text-red-500">{errors.rts_goods_out}</p>}
                             </div>
                         </div>
 
@@ -223,6 +228,7 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory }: Props
                                     }
                                     className={inputClass}
                                 />
+                                {errors.rts_bad && <p className="text-[11px] text-red-500">{errors.rts_bad}</p>}
                             </div>
                             <div className="space-y-1.5">
                                 <label className={labelClass}>
@@ -234,12 +240,13 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory }: Props
                                     value={data.remaining_qty}
                                     onChange={(e) =>
                                         setData(
-                                            'rts_bad',
+                                            'remaining_qty',
                                             parseInt(e.target.value) || 0,
                                         )
                                     }
                                     className={inputClass}
                                 />
+                                {errors.remaining_qty && <p className="text-[11px] text-red-500">{errors.remaining_qty}</p>}
                             </div>
                         </div>
                     </div>

@@ -7,7 +7,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard, logout } from '@/routes';
+import { dashboard } from '@/routes';
 import workspace from '@/routes/workspace';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
@@ -17,8 +17,6 @@ import {
     Store,
     Users,
     BookOpenIcon,
-    LogOut,
-    Settings,
     User,
     ShieldIcon,
     RotateCcw,
@@ -117,7 +115,7 @@ export function AppSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch>
+                            <Link href={dashboard().url}>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
