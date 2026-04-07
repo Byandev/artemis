@@ -2,14 +2,11 @@ import Pagination from '@/components/ui/pagination';
 
 interface PurchasedOrdersPaginationProps {
     loading: boolean;
-    hasPrevious: boolean;
-    hasNext: boolean;
     fromRow: number;
     toRow: number;
     totalRows: number;
     currentPage: number;
     lastPage: number;
-    paginationPages: number[];
     onFetchPage: (page: number) => void;
     variant?: 'card' | 'inline';
 }
