@@ -1,29 +1,36 @@
 <?php
 
 use App\Http\Controllers\API\Workspace\AnalyticsController;
+use App\Http\Controllers\API\InventoryPurchasedOrderController;
 use App\Http\Controllers\API\Workspace\CsrPerformanceController;
 use App\Http\Controllers\API\Workspace\PageController;
 use App\Http\Controllers\API\Workspace\ProductController;
 use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
+use Illuminate\Support\Facades\Route;
 
-Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {
-    Route::get('/workspaces/{workspace}/csrs/performance', [CsrPerformanceController::class, 'publicIndex'])
-        ->middleware('throttle:csr-public-performance')
-        ->name('workspaces.csrs.performance.index');
-
-    Route::get('/workspaces/{workspace}/csrs', [CsrPerformanceController::class, 'publicCsrIndex'])
-        ->middleware('throttle:csr-public-csrs')
-        ->name('workspaces.csrs.index');
-
-    Route::get('/leaderboards', [CsrPerformanceController::class, 'leaderboards']);
-
+Route::group(['prefix' => 'api/public', 'as' => 'api.public.', 'middleware' => ['throttle:60,1']], function () {
+    Route::get('/workspaces/{workspace}/csrs/performance', [CsrPerformanceController::class, 'publicIndex'])->name('workspaces.csrs.performance.index');
 });
 
 Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], function () {
     Route::group(['prefix' => 'workspaces/{workspace}', 'as' => 'workspaces.'], function () {
-        Route::get('/csrs/performance', [CsrPerformanceController::class, 'index'])->name('csrs.performance.index');
+        Route::get('/inventory/purchased-orders', [InventoryPurchasedOrderController::class, 'index'])
+            ->middleware('throttle:120,1')
+            ->name('inventory.purchased-orders.index');
+        Route::post('/inventory/purchased-orders', [InventoryPurchasedOrderController::class, 'store'])
+            ->middleware('throttle:30,1')
+            ->name('inventory.purchased-orders.store');
+        Route::match(['put', 'patch'], '/inventory/purchased-orders/{order}', [InventoryPurchasedOrderController::class, 'update'])
+            ->middleware('throttle:30,1')
+            ->name('inventory.purchased-orders.update');
+        Route::patch('/inventory/purchased-orders/{order}/status', [InventoryPurchasedOrderController::class, 'updateStatus'])
+            ->middleware('throttle:30,1')
+            ->name('inventory.purchased-orders.update-status');
+        Route::delete('/inventory/purchased-orders/{order}', [InventoryPurchasedOrderController::class, 'destroy'])
+            ->middleware('throttle:30,1')
+            ->name('inventory.purchased-orders.destroy');
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
@@ -40,3 +47,4 @@ Route::group(['prefix' => 'api/v1/workspace', 'as' => 'api.v1.workspace', 'middl
     Route::get('/analytics/per-shop', [AnalyticsController::class, 'perShop'])->name('analytics.perShop');
     Route::get('/analytics/per-user', [AnalyticsController::class, 'perUser'])->name('analytics.perUser');
 });
+ 

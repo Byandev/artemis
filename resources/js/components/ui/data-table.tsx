@@ -96,7 +96,7 @@ export function DataTable<TData, TValue>({
                                 <TableRow
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
-                                    className="hover:bg-emerald-500/[0.03] transition-colors"
+                                    className="hover:bg-emerald-500/3 transition-colors"
                                 >
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id} className='px-4 py-3  text-[12px] text-black dark:text-gray-400 border-b border-black/6 dark:border-white/6 align-top'>
@@ -125,7 +125,7 @@ export function DataTable<TData, TValue>({
             </div>
 
             {
-                meta?.links?.length &&
+                meta &&
                 <div className=" border-black/6 dark:border-white/6 py-3 pl-[18px] pr-4">
                     <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
                         <div className="">

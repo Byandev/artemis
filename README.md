@@ -1,28 +1,34 @@
-# CSR Leaderboards
+# Inventory PO Management Readme
 
-<h3>Backend Updates</h3>
-<ul>
-<li>Initial Uploading</li>
-    <ol>
-        <li>Tokens must be used in the API to get the data in the database.</li>
-    </ol>
-<li>Refinement Upload</li>
-    <ol>
-        <li>API now use public endpoints to access the data, making it accessible to guests.</li>
-    </ol>
-</ul>
+Branch: `feature/inventory-po-management`
 
-<h3>API Testing Snapshots</h3>
-<a href="https://drive.google.com/file/d/1OydeP9v4-3gu3P658eVyzr-87zGFOXOr/view?usp=drive_link">Daily CSR Leaderboards</a><br>
-<a href="https://drive.google.com/file/d/1zvMCUdkb6InqlyQszmGR462QkQsUl7l_/view?usp=drive_link">Weekly CSR Leaderboards</a><br>
-<a href="https://drive.google.com/file/d/1ke2Aj658R4vzbIiyALqxEHXheh3n1Aab/view?usp=drive_link">Monthly CSR Leaderboards</a>
+## Overview
 
-<h3>Finished CSR Leaderboards</h3>
-<b>http://localhost/csr-leaderboards/index.html</b><br>
+This branch delivers the Inventory Purchased Orders experience in the web app. It includes filtering, pagination, add/edit/delete flows, and UI polish for PO management.
 
-<h3>Updates / Patches </h3>
-<ul>
-    <li>Added public API endpoints for CSR performance and CSR list, with rate limiting to prevent abuse.</li>
-    <li>Added throttle middleware to limit the number of requests a client can make.</li>
-    <li>Added DoS protection to prevent abuse of the public API endpoints.</li>
-</ul>
+## Recent Frontend Changes
+
+- Extracted shared PO helpers in [resources/js/utils/purchased-orders.ts](resources/js/utils/purchased-orders.ts) for totals math, pagination windowing, empty-state copy, item options, and status labels.
+- Centralized HTTP handling in [resources/js/utils/http.ts](resources/js/utils/http.ts) so CSRF headers are always sent (fixes DELETE/GET CSRF mismatch).
+- Refactored the main page [resources/js/pages/workspaces/inventory/purchased-orders/index.tsx](resources/js/pages/workspaces/inventory/purchased-orders/index.tsx) to use the shared helpers and slimmer in-page logic.
+
+## Feature Summary
+
+- PO listing with status/date/text filters, pagination, and formatted money/date display.
+- Add/Edit modal with validation, auto-total computation, and status selection.
+- Delete flow with confirmation dialog.
+- Empty states that adapt copy when filters are applied.
+
+## Dev Notes
+
+- API base comes from `VITE_API_BASE_URL`; falls back to localhost during Vite dev.
+- CSRF token is read from `<meta name="csrf-token">` or `XSRF-TOKEN` cookie; requests include `X-CSRF-TOKEN` and `credentials: 'include'`.
+- Pagination window shows up to five pages, centered around the current page when possible.
+- Totals: `cog_amount + delivery_fee`, shown when either field has a value.
+
+## Quick Manual Test Plan
+
+- Load PO list; verify pagination and totals rows update with filters.
+- Apply status/text/date filters; confirm empty-state copy switches when filtered.
+- Add a PO (ensure total auto-updates); edit an existing PO; delete a PO (CSRF should succeed).
+- Toggle status inline; ensure badge updates and persists on refresh.

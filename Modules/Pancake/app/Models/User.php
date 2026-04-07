@@ -17,9 +17,4 @@ class User extends Model
     {
         return $this->hasMany(Order::class, 'confirmed_by', 'id');
     }
-
-    public function assignedOrders()
-    {
-        return $this->hasMany(Order::class, 'assignee_id', 'fb_id');
-    }
 }

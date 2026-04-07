@@ -21,12 +21,25 @@ const fmtYear = (d: Date) => d.getFullYear().toString();
 export default function DatePicker({ id, mode, onChange, label, defaultDate, placeholder }: PropsType) {
     const fpRef    = useRef<flatpickr.Instance | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const keepOpenRef = useRef<boolean>(false);
 
     const [selectedDates, setSelectedDates] = useState<Date[]>(() => {
         if (!defaultDate) return [];
         const arr = Array.isArray(defaultDate) ? defaultDate : [defaultDate];
         return arr.map((d) => new Date(d as string)).filter((d) => !isNaN(d.getTime()));
     });
+
+    // Keep picker in sync when parent-controlled defaultDate changes (e.g., filter reset)
+    useEffect(() => {
+        const arr = !defaultDate
+            ? []
+            : (Array.isArray(defaultDate) ? defaultDate : [defaultDate]).map((d) => new Date(d as string)).filter((d) => !isNaN(d.getTime()));
+
+        setSelectedDates(arr);
+        if (fpRef.current) {
+            fpRef.current.setDate(arr, false);
+        }
+    }, [defaultDate]);
 
     useEffect(() => {
         if (!inputRef.current) return;
@@ -35,6 +48,10 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
             setSelectedDates([...dates]);
             if (typeof onChange === 'function') onChange(dates, dateStr, instance);
             else if (Array.isArray(onChange)) onChange.forEach((fn) => fn(dates, dateStr, instance));
+
+            // Keep dropdown open after selecting dates so users can adjust without reopening.
+            keepOpenRef.current = true;
+            if (instance && !instance.isOpen) instance.open();
         };
 
         const instance = flatpickr(inputRef.current, {
@@ -43,12 +60,23 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
             dateFormat: "Y-m-d",
             defaultDate,
             onChange: wrappedOnChange,
+            closeOnSelect: false,
+            onClose: (_dates, _dateStr, inst) => {
+                if (keepOpenRef.current) {
+                    keepOpenRef.current = false;
+                    inst.open();
+                }
+            },
         });
 
         fpRef.current = Array.isArray(instance) ? instance[0] : instance;
 
-        return () => { fpRef.current?.destroy(); fpRef.current = null; };
-    }, [mode, id, defaultDate]);
+        return () => {
+            fpRef.current?.destroy();
+            fpRef.current = null;
+            keepOpenRef.current = false;
+        };
+    }, [mode, id, defaultDate, onChange]);
 
     const isRange  = mode === 'range';
     const hasStart = selectedDates.length >= 1;

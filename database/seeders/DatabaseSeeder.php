@@ -14,7 +14,12 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // For local development, seed all demo data from a single seeder file.
+        if (app()->environment('local')) {
+            $this->call(LocalFeatureDemoSeeder::class);
+
+            return;
+        }
 
         User::firstOrCreate(
             ['email' => 'test@example.com'],
@@ -24,9 +29,6 @@ class DatabaseSeeder extends Seeder
                 'email_verified_at' => now(),
             ]
         );
-
-        // Seed RTS analytics sample data
-        $this->call(RTSAnalyticsSeeder::class);
 
         // Seed Ads Manager sample data (commented out - use sync command instead)
         // $this->call(AdsManagerSeeder::class);

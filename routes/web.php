@@ -19,9 +19,9 @@ Route::get('/calculator', function () {
     return Inertia::render('calculator');
 })->name('calculator');
 
-Route::get('/design-guidelines', function () {
-    return view('design-guidelines');
-});
+Route::get('/csr-leaderboard', function () {
+    return redirect()->route('leaderboards.public');
+})->name('csr-leaderboard.public');
 
 Route::get('/auth/facebook/callback', [\App\Http\Controllers\Integrations\FacebookController::class, 'callback']);
 

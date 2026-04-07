@@ -7,13 +7,15 @@ interface PaginationProps {
     onPageChange: (newPage: number) => void
 }
 
-const Pagination = ({ currentPage, totalPages, onPageChange }: PaginationProps) => {
+const Pagination = ({ currentPage, totalPages , onPageChange}: PaginationProps) => {
     const pagesAroundCurrent = useMemo(() => {
+        const windowSize = Math.min(3, totalPages);
         const start = Math.min(
             Math.max(currentPage - 1, 1),
-            Math.max(totalPages - 2, 1),
+            Math.max(totalPages - windowSize + 1, 1)
         );
-        return Array.from({ length: Math.min(3, totalPages) }, (_, i) => start + i);
+
+        return Array.from({ length: windowSize }, (_, i) => start + i);
     }, [currentPage, totalPages]);
 
     const navBtn = "inline-flex items-center justify-center h-8 gap-1.5 px-3 rounded-lg border text-[11px]! font-medium tracking-wide transition-all duration-150 disabled:pointer-events-none disabled:opacity-35 select-none";
@@ -31,9 +33,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }: PaginationProps) 
             </button>
 
             <div className="flex items-center gap-1">
-                {currentPage > 3 && (
-                    <span className="flex h-8 w-8 items-center justify-center text-[11px]! text-gray-300 dark:text-gray-600">…</span>
-                )}
+                {pagesAroundCurrent[0] > 1 && <span className="px-2">...</span>}
                 {pagesAroundCurrent.map((page) => (
                     <button
                         key={page}
