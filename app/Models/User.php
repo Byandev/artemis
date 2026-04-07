@@ -147,8 +147,13 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->role === $requiredRole;
     }
 
-    public function pages()
+    public function pages(): User|\Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Page::class, 'owner_id');
+    }
+
+    public function pancakeAccounts(): User|\Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\Modules\Pancake\Models\User::class);
     }
 }
