@@ -45,9 +45,6 @@ export const buildItemOptions = (products: Product[], currentItem: string) => {
         if (label) names.add(label);
     });
 
-    const currentValue = currentItem.trim();
-    if (currentValue && !names.has(currentValue)) names.add(currentValue);
-
     return Array.from(names).sort((a, b) => a.localeCompare(b));
 };
 
