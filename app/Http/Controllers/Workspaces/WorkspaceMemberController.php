@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Password;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
@@ -161,6 +162,23 @@ class WorkspaceMemberController extends Controller
         $workspace->removeMember($user);
 
         return back()->with('success', 'Member removed successfully.');
+    }
+
+    /**
+     * Generate a password reset link for a workspace member and return it as JSON
+     * so the admin can copy and share it directly.
+     */
+    public function generatePasswordReset(Request $request, Workspace $workspace, User $user)
+    {
+        // Only admins and owners can remove members
+        if (!$workspace->isOwner($request->user())) {
+            abort(403, 'You do not have permission.');
+        }
+
+        $token = Password::createToken($user);
+        $url   = route('password.reset', ['token' => $token]) . '?' . http_build_query(['email' => $user->email]);
+
+        return response()->json(['url' => $url]);
     }
 
     public function store(Request $request, Workspace $workspace)

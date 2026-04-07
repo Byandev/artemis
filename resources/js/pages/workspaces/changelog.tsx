@@ -12,6 +12,35 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v2.3.0',
+        date: '2026-04-07',
+        sections: [
+            {
+                title: 'AI Chat — Dashboard & RTS Analytics',
+                items: [
+                    'Ask the AI questions about your data directly from the dashboard or the RTS analytics page',
+                    'Dashboard: analyze your sales metrics, page performance, shop performance, and team performance',
+                    'RTS Analytics: ask about returns by price, product, rider, customer risk, location, or order frequency',
+                    'Answers are based on the data currently on screen, not guesses',
+                ],
+            },
+            {
+                title: 'Members — Reset Password',
+                items: [
+                    'Admins can now generate a password reset link for any team member',
+                    'Click "Copy Reset Link" from the member\'s action menu — the link is copied to your clipboard and ready to share',
+                ],
+            },
+            {
+                title: 'RTS Analytics — Performance',
+                items: [
+                    'Analytics page loads noticeably faster — date filters now use index-friendly queries instead of per-row calculations',
+                    'New database indexes on key columns used by the RTS queries',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v2.2.0',
         date: '2026-04-01',
         sections: [
@@ -199,6 +228,7 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v2.3.0': 'bg-teal-500/10 text-teal-600 dark:text-teal-400 ring-teal-500/20',
     'v2.2.0': 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20',
     'v2.1.0': 'bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-blue-500/20',
     'v2.0.1': 'bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-violet-500/20',

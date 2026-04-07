@@ -24,8 +24,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'workspace' => CheckWorkspace::class,
-            'admin' => \App\Http\Middleware\CheckAdmin::class,
+            'workspace'   => CheckWorkspace::class,
+            'admin'       => \App\Http\Middleware\CheckAdmin::class,
+            'api.key'     => \App\Http\Middleware\AuthenticateApiKey::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
