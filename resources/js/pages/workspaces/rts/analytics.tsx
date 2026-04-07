@@ -18,7 +18,8 @@ import { formatDate } from 'date-fns';
 import flatpickr from 'flatpickr';
 import DateOption = flatpickr.Options.DateOption;
 import moment from 'moment';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import AskRtsWidget, { RtsData } from '@/components/ai/AskRtsWidget';
 
 interface Props {
     workspace: Workspace;
@@ -39,6 +40,17 @@ export default function Analytics({ workspace }: Props) {
         pageIds: filter.pageIds,
         shopIds: filter.shopIds,
     }), [dateRange, filter]);
+
+    const [rtsData, setRtsData] = useState<RtsData>({
+        price: [], products: [], riders: [], customerRisk: [], provinces: [], orderFrequency: [],
+    });
+
+    const onPriceLoaded        = useCallback((d: object[]) => setRtsData(prev => ({ ...prev, price: d })), []);
+    const onProductsLoaded     = useCallback((d: object[]) => setRtsData(prev => ({ ...prev, products: d })), []);
+    const onRidersLoaded       = useCallback((d: object[]) => setRtsData(prev => ({ ...prev, riders: d })), []);
+    const onCustomerRiskLoaded = useCallback((d: object[]) => setRtsData(prev => ({ ...prev, customerRisk: d })), []);
+    const onProvincesLoaded    = useCallback((d: object[]) => setRtsData(prev => ({ ...prev, provinces: d })), []);
+    const onOrderFreqLoaded    = useCallback((d: object[]) => setRtsData(prev => ({ ...prev, orderFrequency: d })), []);
 
     return (
         <AppLayout>
@@ -65,18 +77,20 @@ export default function Analytics({ workspace }: Props) {
                 </PageHeader>
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <PriceCard workspaceSlug={workspace.slug} queryParams={queryParams} />
+                    <PriceCard workspaceSlug={workspace.slug} queryParams={queryParams} onDataLoaded={onPriceLoaded} />
                     <DeliveryAttemptsCard workspaceSlug={workspace.slug} queryParams={queryParams} />
                 </div>
 
-                <CxRtsCard workspaceSlug={workspace.slug} queryParams={queryParams} />
-                <ProductCard workspaceSlug={workspace.slug} queryParams={queryParams} />
-                <RiderCard workspaceSlug={workspace.slug} queryParams={queryParams} />
+                <CxRtsCard workspaceSlug={workspace.slug} queryParams={queryParams} onDataLoaded={onCustomerRiskLoaded} />
+                <ProductCard workspaceSlug={workspace.slug} queryParams={queryParams} onDataLoaded={onProductsLoaded} />
+                <RiderCard workspaceSlug={workspace.slug} queryParams={queryParams} onDataLoaded={onRidersLoaded} />
                 <ConfirmedByCard workspaceSlug={workspace.slug} queryParams={queryParams} />
                 <AdCard workspaceSlug={workspace.slug} queryParams={queryParams} />
-                <OrderFrequencyCard workspaceSlug={workspace.slug} queryParams={queryParams} />
-                <LocationCard workspaceSlug={workspace.slug} queryParams={queryParams} />
+                <OrderFrequencyCard workspaceSlug={workspace.slug} queryParams={queryParams} onDataLoaded={onOrderFreqLoaded} />
+                <LocationCard workspaceSlug={workspace.slug} queryParams={queryParams} onDataLoaded={onProvincesLoaded} />
             </div>
+
+            <AskRtsWidget workspace={workspace} dateRange={dateRange} data={rtsData} />
         </AppLayout>
     );
 }
