@@ -67,27 +67,6 @@ export function AppSidebar() {
             icon: User,
         },
         {
-            title: 'Inventory',
-            icon: Package,
-            items: [
-                {
-                    title: 'Purchased Orders',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/purchased-orders`,
-                    icon: ClipboardList,
-                },
-                {
-                    title: 'PPW',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppw`,
-                    icon: BarChart2,
-                },
-                {
-                    title: 'Transaction Logs',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/transactions`,
-                    icon: ClipboardList,
-                },
-            ],
-        },
-        {
             title: 'RTS',
             icon: RotateCcw,
             items: [
@@ -107,6 +86,27 @@ export function AppSidebar() {
             title: 'Roles',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/roles`,
             icon: ShieldIcon,
+        },
+                {
+            title: 'Inventory',
+            icon: Package,
+            items: [
+                {
+                    title: 'Purchased Orders',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/purchased-orders`,
+                    icon: ClipboardList,
+                },
+                {
+                    title: 'PPW',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppws`,
+                    icon: BarChart2,
+                },
+                {
+                    title: 'Transaction Logs',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/transactions`,
+                    icon: ClipboardList,
+                },
+            ],
         },
     ];
 
