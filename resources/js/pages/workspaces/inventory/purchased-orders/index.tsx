@@ -5,8 +5,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import AlertError from '@/components/alert-error';
 import PageHeader from '@/components/common/PageHeader';
-import { AddItemDialog } from '@/components/inventory/add-item-dialog';
-import { AddItemForm } from '@/components/inventory/add-item-dialog';
+import { AddItemDialog, AddItemForm } from '@/components/inventory/add-item-dialog';
 import { PurchasedOrdersPagination } from '@/components/inventory/purchased-orders-pagination';
 import { DeleteItemDialog } from '@/components/inventory/delete-item-dialog';
 import { PurchasedOrdersFilterBar } from '@/components/inventory/purchased-orders-filter-bar';
@@ -17,7 +16,6 @@ import { request } from '@/utils/http';
 import {
     buildEmptyState,
     buildItemOptions,
-    buildPagination,
     computeStatusFilterLabel,
     computeTotals,
     parseAmount,
@@ -33,7 +31,6 @@ import {
     statusBadgeClass,
     statusLabel,
     statusOptionTextClass,
-    statusToCode,
 } from '@/components/inventory/purchased-orders-config';
 
 interface Props {
@@ -114,7 +111,7 @@ const Index = ({ workspace }: Props) => {
 
         try {
             const params = new URLSearchParams();
-            if (statusFilter !== 'all') params.set('status', String(statusToCode(statusFilter)));
+            if (statusFilter !== 'all') params.set('status', statusFilter);
             if (query.trim()) params.set('q', query.trim());
             if (startDate) {
                 params.set('start_date', startDate);
@@ -178,9 +175,14 @@ const Index = ({ workspace }: Props) => {
         return params.get('debugEmpty') === '1';
     }, []);
     const hasActiveFilters = query.trim().length > 0 || statusFilter !== 'all' || Boolean(startDate) || Boolean(endDate);
-    const { hasPrevious, hasNext, fromRow, toRow, pages: paginationPages } = useMemo(() => (
-        buildPagination(currentPage, lastPage, perPage, totalRows)
-    ), [currentPage, lastPage, perPage, totalRows]);
+    const fromRow = useMemo(
+        () => (totalRows === 0 ? 0 : Math.min((currentPage - 1) * perPage + 1, totalRows)),
+        [currentPage, perPage, totalRows],
+    );
+    const toRow = useMemo(
+        () => (totalRows === 0 ? 0 : Math.min(currentPage * perPage, totalRows)),
+        [currentPage, perPage, totalRows],
+    );
 
     const { showEmptyState, emptyStateTitle, emptyStateDescription, emptyStateButtonLabel } = useMemo(() => (
         buildEmptyState(rows.length, loading, hasActiveFilters, forceDebugEmptyState)
@@ -218,7 +220,7 @@ const Index = ({ workspace }: Props) => {
     const updateStatus = async (id: number, status: StatusId) => {
         try {
             const url = `${apiBase}/api/workspaces/${workspace.slug}/inventory/purchased-orders/${id}/status`;
-            const { res, json } = await doRequest('PATCH', url, { status: statusToCode(status) });
+            const { res, json } = await doRequest('PATCH', url, { status });
             if (!res.ok) throw new Error((json as { message?: string }).message || 'Failed to update status.');
 
             setRows((prev) => prev.map((row) => (row.id === id ? { ...row, status } : row)));
@@ -231,6 +233,7 @@ const Index = ({ workspace }: Props) => {
         setAddItemSubmitting(true);
         setAddItemFieldErrors({});
         setError(null);
+        const isEdit = Boolean(editingRow);
 
         try {
             const simpleErrors: Record<string, string> = {};
@@ -250,7 +253,6 @@ const Index = ({ workspace }: Props) => {
             const numericDelivery = parseAmount(addItemForm.delivery_fee);
             const numericTotal = numericCog + numericDelivery;
 
-            const isEdit = Boolean(editingRow);
             const url = isEdit
                 ? `${apiBase}/api/workspaces/${workspace.slug}/inventory/purchased-orders/${editingRow?.id}`
                 : `${apiBase}/api/workspaces/${workspace.slug}/inventory/purchased-orders`;
@@ -263,7 +265,7 @@ const Index = ({ workspace }: Props) => {
                 cog_amount: numericCog,
                 delivery_fee: numericDelivery,
                 total_amount: numericTotal,
-                status: statusToCode(addItemForm.status),
+                status: addItemForm.status,
             });
 
             if (!res.ok) {
@@ -442,14 +444,11 @@ const Index = ({ workspace }: Props) => {
                         <PurchasedOrdersPagination
                             variant="inline"
                             loading={loading}
-                            hasPrevious={hasPrevious}
-                            hasNext={hasNext}
                             fromRow={fromRow}
                             toRow={toRow}
                             totalRows={totalRows}
                             currentPage={currentPage}
                             lastPage={lastPage}
-                            paginationPages={paginationPages}
                             onFetchPage={(page) => void fetchRows(page)}
                         />
                     )}
