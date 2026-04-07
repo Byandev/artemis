@@ -79,6 +79,11 @@ export function AppSidebar() {
                     icon: ClipboardList,
                 },
                 {
+                    title: 'Purchased Orders',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/purchased-orders`,
+                    icon: ClipboardList,
+                },
+                {
                     title: 'PPW',
                     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppw`,
                     icon: BarChart2,
@@ -105,22 +110,6 @@ export function AppSidebar() {
             title: 'Roles',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/roles`,
             icon: ShieldIcon,
-        },
-        {
-            title: 'Inventory',
-            icon: Package,
-            items: [
-                {
-                    title: 'Purchased Orders',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/purchased-orders`,
-                    icon: ClipboardList,
-                },
-                {
-                    title: 'PPW',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppw`,
-                    icon: Package,
-                },
-            ],
         },
     ];
 
