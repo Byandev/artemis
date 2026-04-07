@@ -13,7 +13,6 @@ import { PaginatedResponse, PurchasedOrder, StatusId } from '@/types/models/Purc
 import { Product } from '@/types/models/Product';
 import { request } from '@/utils/http';
 import {
-    buildEmptyState,
     buildItemOptions,
     computeStatusFilterLabel,
     computeTotals,
@@ -166,18 +165,6 @@ const Index = ({ workspace }: Props) => {
 
     useEffect(() => { void fetchRows(1); }, [statusFilter, query, startDate, endDate, doRequest]);
     useEffect(() => { void fetchProducts(); }, [fetchProducts]);
-
-    const forceDebugEmptyState = useMemo(() => {
-        if (typeof window === 'undefined') return false;
-        const params = new URLSearchParams(window.location.search);
-
-        return params.get('debugEmpty') === '1';
-    }, []);
-    const hasActiveFilters = query.trim().length > 0 || statusFilter !== 'all' || Boolean(startDate) || Boolean(endDate);
-
-    const { showEmptyState, emptyStateTitle, emptyStateDescription, emptyStateButtonLabel } = useMemo(() => (
-        buildEmptyState(rows.length, loading, hasActiveFilters, forceDebugEmptyState)
-    ), [rows.length, loading, hasActiveFilters, forceDebugEmptyState]);
 
     const itemOptions = useMemo(() => buildItemOptions(products, addItemForm.item), [products, addItemForm.item]);
 
@@ -392,16 +379,6 @@ const Index = ({ workspace }: Props) => {
 
                 <PurchasedOrdersTable
                     loading={loading}
-                    showEmptyState={showEmptyState}
-                    emptyStateTitle={emptyStateTitle}
-                    emptyStateDescription={emptyStateDescription}
-                    emptyStateButtonLabel={emptyStateButtonLabel}
-                    onOpenAddItem={() => {
-                        setAddItemFieldErrors({});
-                        setAddItemForm(ADD_ITEM_FORM_INITIAL);
-                        setEditingRow(null);
-                        setAddItemOpen(true);
-                    }}
                     rows={rows}
                     monoFont={MONO_FONT}
                     formatIssueDate={formatIssueDate}
