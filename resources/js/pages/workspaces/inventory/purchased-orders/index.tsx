@@ -6,7 +6,6 @@ import { Workspace } from '@/types/models/Workspace';
 import AlertError from '@/components/alert-error';
 import PageHeader from '@/components/common/PageHeader';
 import { AddItemDialog, AddItemForm } from '@/components/inventory/add-item-dialog';
-import { PurchasedOrdersPagination } from '@/components/inventory/purchased-orders-pagination';
 import { DeleteItemDialog } from '@/components/inventory/delete-item-dialog';
 import { PurchasedOrdersFilterBar } from '@/components/inventory/purchased-orders-filter-bar';
 import { PurchasedOrdersTable } from '@/components/inventory/purchased-orders-table';
@@ -175,14 +174,6 @@ const Index = ({ workspace }: Props) => {
         return params.get('debugEmpty') === '1';
     }, []);
     const hasActiveFilters = query.trim().length > 0 || statusFilter !== 'all' || Boolean(startDate) || Boolean(endDate);
-    const fromRow = useMemo(
-        () => (totalRows === 0 ? 0 : Math.min((currentPage - 1) * perPage + 1, totalRows)),
-        [currentPage, perPage, totalRows],
-    );
-    const toRow = useMemo(
-        () => (totalRows === 0 ? 0 : Math.min(currentPage * perPage, totalRows)),
-        [currentPage, perPage, totalRows],
-    );
 
     const { showEmptyState, emptyStateTitle, emptyStateDescription, emptyStateButtonLabel } = useMemo(() => (
         buildEmptyState(rows.length, loading, hasActiveFilters, forceDebugEmptyState)
@@ -440,18 +431,11 @@ const Index = ({ workspace }: Props) => {
                         setRowToDelete(row);
                         setDeleteModalOpen(true);
                     }}
-                    footerSlot={(
-                        <PurchasedOrdersPagination
-                            variant="inline"
-                            loading={loading}
-                            fromRow={fromRow}
-                            toRow={toRow}
-                            totalRows={totalRows}
-                            currentPage={currentPage}
-                            lastPage={lastPage}
-                            onFetchPage={(page) => void fetchRows(page)}
-                        />
-                    )}
+                    currentPage={currentPage}
+                    lastPage={lastPage}
+                    perPage={perPage}
+                    totalRows={totalRows}
+                    onFetchPage={(page) => void fetchRows(page)}
                 />
             </div>
         </AppLayout>
