@@ -121,7 +121,7 @@ export function PurchasedOrdersTable({
                                             <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] text-gray-800 dark:text-gray-100" style={{ fontFamily: monoFont }}>{row.delivery_no || '-'}</TableCell>
                                             <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] text-gray-500 dark:text-gray-400" style={{ fontFamily: monoFont }}>{row.cust_po_no || '-'}</TableCell>
                                             <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] text-gray-500 dark:text-gray-400" style={{ fontFamily: monoFont }}>{row.control_no || '-'}</TableCell>
-                                            <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] font-semibold uppercase text-gray-800 dark:text-gray-100">{row.item}</TableCell>
+                                            <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] font-semibold text-gray-800 dark:text-gray-100">{row.item}</TableCell>
                                             <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] text-gray-700 dark:text-gray-200" style={{ fontFamily: monoFont }}>{formatMoney(row.cog_amount)}</TableCell>
                                             <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] text-gray-700 dark:text-gray-200" style={{ fontFamily: monoFont }}>{formatMoney(row.delivery_fee)}</TableCell>
                                             <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] text-gray-800 dark:text-gray-100" style={{ fontFamily: monoFont }}>{formatMoney(row.total_amount)}</TableCell>
