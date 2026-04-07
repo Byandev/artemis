@@ -378,7 +378,6 @@ const Index = ({ workspace }: Props) => {
                 />
 
                 <PurchasedOrdersTable
-                    loading={loading}
                     rows={rows}
                     monoFont={MONO_FONT}
                     formatIssueDate={formatIssueDate}
