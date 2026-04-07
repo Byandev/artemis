@@ -111,10 +111,8 @@ const Index = ({ workspace }: Props) => {
             const params = new URLSearchParams();
             if (statusFilter !== 'all') params.set('status', statusFilter);
             if (query.trim()) params.set('q', query.trim());
-            if (startDate) {
+            if (startDate && endDate) {
                 params.set('start_date', startDate);
-            }
-            if (endDate) {
                 params.set('end_date', endDate);
             }
             params.set('page', String(page));
@@ -295,6 +293,12 @@ const Index = ({ workspace }: Props) => {
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Inventory Purchased Orders`} />
+
+            {loading && (
+                <div className="pointer-events-none fixed inset-x-0 top-0 z-70 h-0.5 overflow-hidden">
+                    <div className="h-full w-full animate-pulse bg-linear-to-r from-transparent via-gray-600 to-transparent" />
+                </div>
+            )}
 
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6" style={{ fontFamily: SANS_FONT }}>
                 <PageHeader
