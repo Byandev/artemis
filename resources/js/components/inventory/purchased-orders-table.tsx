@@ -1,18 +1,12 @@
-import { ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, Pencil, Trash2 } from 'lucide-react';
 import { useMemo } from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { PurchasedOrder, StatusId, StatusOption } from '@/types/models/PurchasedOrder';
 import { ColumnDef } from '@tanstack/react-table';
 
 interface PurchasedOrdersTableProps {
     loading: boolean;
-    showEmptyState: boolean;
-    emptyStateTitle: string;
-    emptyStateDescription: string;
-    emptyStateButtonLabel: string;
-    onOpenAddItem: () => void;
     rows: PurchasedOrder[];
     monoFont: string;
     formatIssueDate: (value: string) => string;
@@ -33,11 +27,6 @@ interface PurchasedOrdersTableProps {
 
 export function PurchasedOrdersTable({
     loading,
-    showEmptyState,
-    emptyStateTitle,
-    emptyStateDescription,
-    emptyStateButtonLabel,
-    onOpenAddItem,
     rows,
     monoFont,
     formatIssueDate,
@@ -221,22 +210,6 @@ export function PurchasedOrdersTable({
                         <p className="mt-4 text-[18px] font-normal tracking-[0.01em] text-gray-800 dark:text-gray-200" style={{ fontFamily: monoFont }}>
                             Loading...
                         </p>
-                    </div>
-                ) : showEmptyState ? (
-                    <div className="flex min-h-[420px] flex-col items-center justify-center px-4 text-center">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10">
-                            <Plus className="h-7 w-7" />
-                        </div>
-                        <h3 className="mt-4 text-[22px] font-semibold tracking-[-0.01em] text-gray-900 dark:text-gray-100">{emptyStateTitle}</h3>
-                        <p className="mt-1 text-[14px] text-gray-500 dark:text-gray-500">{emptyStateDescription}</p>
-                        <Button
-                            type="button"
-                            onClick={onOpenAddItem}
-                            className="mt-4 inline-flex h-10 items-center gap-1.5 rounded-lg px-4 text-[14px] font-medium"
-                        >
-                            <Plus className="h-4 w-4" />
-                            {emptyStateButtonLabel}
-                        </Button>
                     </div>
                 ) : (
                     <div className="max-w-full overflow-x-auto custom-scrollbar">
