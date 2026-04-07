@@ -142,14 +142,38 @@ class InventoryPurchasedOrderController extends Controller
         ];
     }
 
-    private function purchasedOrderRules(): array
+    private function itemRule(Workspace $workspace): array
+    {
+        return [
+            'required',
+            'string',
+            'max:160',
+            function ($attribute, $value, $fail) use ($workspace) {
+                $item = trim((string) $value);
+
+                $exists = DB::table('products')
+                    ->where('workspace_id', $workspace->id)
+                    ->where(function ($query) use ($item) {
+                        $query->where('name', $item)
+                            ->orWhere('title', $item);
+                    })
+                    ->exists();
+
+                if (! $exists) {
+                    $fail('The selected '.$attribute.' is invalid for this workspace.');
+                }
+            },
+        ];
+    }
+
+    private function purchasedOrderRules(Workspace $workspace): array
     {
         return [
             'issue_date' => ['required', 'date'],
             'delivery_no' => ['nullable', 'string', 'max:120'],
             'cust_po_no' => ['nullable', 'string', 'max:120'],
             'control_no' => ['nullable', 'string', 'max:120'],
-            'item' => ['required', 'string', 'max:160'],
+            'item' => $this->itemRule($workspace),
             'cog_amount' => ['nullable', 'numeric', 'min:0'],
             'delivery_fee' => ['nullable', 'numeric', 'min:0'],
             'total_amount' => ['nullable', 'numeric', 'min:0'],
@@ -275,7 +299,7 @@ class InventoryPurchasedOrderController extends Controller
     {
         $this->assertWorkspaceMembership($request, $workspace);
 
-        $validated = $request->validate($this->purchasedOrderRules());
+        $validated = $request->validate($this->purchasedOrderRules($workspace));
 
         $createdId = DB::table(self::TABLE)->insertGetId([
             'user_id' => $request->user()->id,
@@ -306,7 +330,7 @@ class InventoryPurchasedOrderController extends Controller
 
         $this->findOwnedOrder($request, $order);
 
-        $validated = $request->validate($this->purchasedOrderRules());
+        $validated = $request->validate($this->purchasedOrderRules($workspace));
 
         DB::table(self::TABLE)
             ->where('id', $order)
