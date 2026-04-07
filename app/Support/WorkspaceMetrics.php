@@ -13,7 +13,12 @@ use App\Metrics\Orders\AverageLifetimeValue;
 use App\Metrics\Orders\DeliveredAmount;
 use App\Metrics\Orders\DeliveredAvgCustomerRts;
 use App\Metrics\Orders\DeliveredAvgDeliveryAttempts;
+use App\Metrics\Orders\RepeatCustomerOrderCount;
+use App\Metrics\Orders\RepeatCustomerRatio;
 use App\Metrics\Orders\RepeatOrderRatio;
+use App\Metrics\Orders\Retention30dRateCohort;
+use App\Metrics\Orders\Retention60dRateCohort;
+use App\Metrics\Orders\Retention90dRateCohort;
 use App\Metrics\Orders\ReturnedAmount;
 use App\Metrics\Orders\ReturnedAvgCustomerRts;
 use App\Metrics\Orders\ReturnedAvgDeliveryAttempts;
@@ -22,7 +27,9 @@ use App\Metrics\Orders\RtsRate;
 use App\Metrics\Orders\TimeToFirstOrder;
 use App\Metrics\Orders\TotalOrders;
 use App\Metrics\Orders\TotalSales;
+use App\Metrics\Orders\UniqueCustomerCount;
 use App\Metrics\ParcelJourney\TrackedOrdersCount;
+use App\Metrics\ParcelJourney\TotalForDeliveryCount;
 use App\Models\Workspace;
 use InvalidArgumentException;
 
@@ -42,7 +49,13 @@ final class WorkspaceMetrics
         'rtsRate' => RtsRate::class,
         'totalSales' => TotalSales::class,
         'totalOrders' => TotalOrders::class,
+        'uniqueCustomerCount' => UniqueCustomerCount::class,
         'repeatOrderRatio' => RepeatOrderRatio::class,
+        'repeatCustomerRatio' => RepeatCustomerRatio::class,
+        'repeatCustomerOrderCount'  => RepeatCustomerOrderCount::class,
+        'retention30dRateCohort'    => Retention30dRateCohort::class,
+        'retention60dRateCohort'    => Retention60dRateCohort::class,
+        'retention90dRateCohort'    => Retention90dRateCohort::class,
         'timeToFirstOrder' => TimeToFirstOrder::class,
         'avgLifetimeValue' => AverageLifetimeValue::class,
         'averageDaysFromShippedToDelivered' => AverageDaysFromShippedToDelivered::class,
@@ -55,6 +68,7 @@ final class WorkspaceMetrics
         'returnedAmount' => ReturnedAmount::class,
         'returningAmount' => ReturningAmount::class,
         'trackedOrdersCount' => TrackedOrdersCount::class,
+        'totalForDeliveryCount' => TotalForDeliveryCount::class,
         'deliveredAvgCustomerRts' => DeliveredAvgCustomerRts::class,
         'returnedAvgCustomerRts' => ReturnedAvgCustomerRts::class,
         'deliveredAvgDeliveryAttempts' => DeliveredAvgDeliveryAttempts::class,

@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import { DataTable } from '@/components/ui/data-table';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import {
@@ -15,14 +15,14 @@ import {
     Edit,
     Trash2,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { toFrontendSort } from '@/lib/sort';
 import { toast, Toaster } from 'sonner';
 import { Workspace } from '@/types/models/Workspace';
 import { InventoryTransaction } from '@/types/models/InventoryTransaction';
 import InventoryFormDialog from '@/components/inventory/inventory-form-dialog';
 import PageHeader from '@/components/common/PageHeader';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import DatePicker from '@/components/ui/date-picker';
 import moment from 'moment';
 import { omit } from 'lodash';
 
@@ -46,21 +46,19 @@ interface Props {
 }
 
 export default function Index({ inventory, workspace, query }: Props) {
+    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
     const [searchQuery, setSearchQuery] = useState(query?.search ?? '');
     const [openFormModal, setOpenFormModal] = useState(false);
     const [selectedInventory, setSelectedInventory] = useState<InventoryTransaction | undefined>(undefined);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-    const [dateRange, setDateRange] = useState<string[]>([]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
             router.get(
-                `/workspaces/${workspace.slug}/inventory_transaction`,
+                `/workspaces/${workspace.slug}/inventory/transactions`,
                 {
                     filter: {
                         search: searchQuery || undefined,
-                        start_date: dateRange?.[0] || undefined,
-                        end_date: dateRange?.[1] || undefined,
                     },
                     page: searchQuery ? 1 : query?.page ?? 1,
                     sort: query?.sort
@@ -74,7 +72,7 @@ export default function Index({ inventory, workspace, query }: Props) {
             );
         }, 500);
         return () => clearTimeout(timer);
-    }, [searchQuery, dateRange]);
+    }, [searchQuery]);
 
     const handleEdit = (item: InventoryTransaction) => {
         setSelectedInventory(item);
@@ -89,7 +87,7 @@ export default function Index({ inventory, workspace, query }: Props) {
     const handleDeleteAction = () => {
         if (!selectedInventory) return;
 
-        router.delete(`/workspaces/${workspace.slug}/inventory_transaction/${selectedInventory.id}`, {
+        router.delete(`/workspaces/${workspace.slug}/inventory/transactions/${selectedInventory.id}`, {
             onSuccess: () => {
                 setDeleteModalOpen(false);
                 setSelectedInventory(undefined);
@@ -101,7 +99,8 @@ export default function Index({ inventory, workspace, query }: Props) {
     const columns: ColumnDef<InventoryTransaction>[] = [
         {
             accessorKey: 'date',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Date</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Date" />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
@@ -112,7 +111,8 @@ export default function Index({ inventory, workspace, query }: Props) {
         },
         {
             accessorKey: 'ref_no',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Reference No.</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Reference No." />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">
@@ -123,7 +123,8 @@ export default function Index({ inventory, workspace, query }: Props) {
         },
         {
             accessorKey: 'po_qty_in',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">PO Quantity In</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="PO Quantity In" />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.po_qty_in || 0}</p>
@@ -132,7 +133,8 @@ export default function Index({ inventory, workspace, query }: Props) {
         },
         {
             accessorKey: 'po_qty_out',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">PO Quantity Out</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="PO Quantity Out" />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.po_qty_out || 0}</p>
@@ -141,7 +143,8 @@ export default function Index({ inventory, workspace, query }: Props) {
         },
         {
             accessorKey: 'rts_goods_in',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">RTS Goods In</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="RTS Goods In" />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.rts_goods_in || 0}</p>
@@ -150,7 +153,8 @@ export default function Index({ inventory, workspace, query }: Props) {
         },
         {
             accessorKey: 'rts_goods_out',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">RTS Goods Out</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="RTS Goods Out" />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.rts_goods_out || 0}</p>
@@ -159,7 +163,8 @@ export default function Index({ inventory, workspace, query }: Props) {
         },
         {
             accessorKey: 'rts_bad',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">RTS Bad</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="RTS Bad" />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.rts_bad || 0}</p>
@@ -168,7 +173,8 @@ export default function Index({ inventory, workspace, query }: Props) {
         },
         {
             accessorKey: 'remaining_qty',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Remaining Quantity</div>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Remaining Quantity" />,
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className={`text-[12px] font-bold ${row.original.remaining_qty < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
@@ -210,31 +216,39 @@ export default function Index({ inventory, workspace, query }: Props) {
             <Head title="Transaction Logs" />
             <Toaster position="top-right" richColors />
 
-            <Dialog open={deleteModalOpen}
+            <Dialog
+                open={deleteModalOpen}
                 onOpenChange={(open) => {
                     setDeleteModalOpen(open);
                     if (!open) setSelectedInventory(undefined);
-                }}>
-                <DialogContent className="max-w-[400px] p-0 overflow-hidden border-none bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl">
+                }}
+            >
+                <DialogContent className="max-w-[400px] overflow-hidden rounded-2xl border-none bg-white p-0 shadow-2xl dark:bg-zinc-900">
                     <div className="p-6">
                         <DialogHeader>
-                            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">Delete Transaction</DialogTitle>
-                            <DialogDescription className="text-[13px] text-gray-500 dark:text-gray-400 mt-2">
-                                Are you sure you want to delete <span className="font-medium text-gray-900 dark:text-white">{selectedInventory?.ref_no || 'this transaction'}</span>?
-                                This action cannot be undone.
+                            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
+                                Delete Transaction
+                            </DialogTitle>
+                            <DialogDescription className="mt-2 text-[13px] text-gray-500 dark:text-gray-400">
+                                Are you sure you want to delete{' '}
+                                <span className="font-medium text-gray-900 dark:text-white">
+                                    {selectedInventory?.ref_no ||
+                                        'this transaction'}
+                                </span>
+                                ? This action cannot be undone.
                             </DialogDescription>
                         </DialogHeader>
 
                         <div className="mt-6 flex justify-end gap-3">
                             <button
                                 onClick={() => setDeleteModalOpen(false)}
-                                className="h-9 px-4 rounded-lg border border-gray-200 bg-white text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors dark:border-white/10 dark:bg-transparent dark:text-gray-300"
+                                className="flex h-9 items-center rounded-lg border border-black/8 bg-stone-100 px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleDeleteAction}
-                                className="h-9 px-4 rounded-lg bg-red-500 text-[13px] font-medium text-white hover:bg-red-600 transition-colors"
+                                className="flex h-9 items-center rounded-lg bg-red-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-red-700"
                             >
                                 Delete
                             </button>
@@ -254,31 +268,18 @@ export default function Index({ inventory, workspace, query }: Props) {
             />
 
             <div className="w-full space-y-6 p-4 md:p-6">
-                <PageHeader title="Transaction Logs" description="Manage your inventory transactions">
-                    <DatePicker
-                        id={'inventory-date-range'}
-                        mode={'range'}
-                        placeholder="Filter by date range..."
-                        onChange={(dates) => {
-                            if (dates.length === 2) {
-                                setDateRange([
-                                    moment(dates[0]).format('YYYY-MM-DD'),
-                                    moment(dates[1]).format('YYYY-MM-DD'),
-                                ]);
-                            } else if (dates.length === 0) {
-                                setDateRange([]);
-                            }
-                        }}
-                        defaultDate={dateRange.length > 0 ? (dateRange as any) : undefined}
-                    />
+                <PageHeader
+                    title="Transaction Logs"
+                    description="Manage your inventory transactions"
+                >
                     <button
                         onClick={() => {
                             setSelectedInventory(undefined);
                             setOpenFormModal(true);
                         }}
-                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono text-[11px] font-medium text-white transition-all hover:bg-emerald-700"
+                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
                     >
-                        Add New Inventory
+                        Record new Transaction
                     </button>
                 </PageHeader>
 
@@ -290,33 +291,32 @@ export default function Index({ inventory, workspace, query }: Props) {
                             placeholder="Search Inventory Reference No...."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pl-8 font-mono text-[12px] text-gray-800 outline-none focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pl-8 font-mono! text-[12px]! text-gray-800 outline-none focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                         />
                     </div>
                 </div>
 
-                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900 overflow-hidden">
+                <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         columns={columns}
                         data={inventory.data || []}
                         enableInternalPagination={false}
+                        initialSorting={initialSorting}
                         meta={{ ...omit(inventory, ['data']) }}
                         onFetch={(params) => {
                             router.get(
-                                `/workspaces/${workspace.slug}/inventory_transaction`,
+                                `/workspaces/${workspace.slug}/inventory/transactions`,
                                 {
                                     sort: params?.sort,
                                     search: searchQuery || undefined,
-                                    start_date: dateRange[0],
-                                    end_date: dateRange[1],
                                     page: params?.page ?? 1,
                                 },
                                 {
                                     preserveState: true,
                                     replace: true,
                                     preserveScroll: true,
-                                    only: ['inventory']
-                                }
+                                    only: ['inventory'],
+                                },
                             );
                         }}
                     />

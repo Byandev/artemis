@@ -125,49 +125,34 @@ const StatisticCard = ({
         const fetchData = async () => {
             try {
                 setLoadingCurrent(true);
-                setLoadingComparison(false);
+                setLoadingComparison(true);
                 setCurrentValue(0);
                 setPreviousValue(0);
 
-                const currentRes = await axios.get<AnalyticsResponse>(
-                    '/api/v1/workspace/analytics',
-                    {
-                        signal: controller.signal,
-                        headers: { 'X-Workspace-Id': workspace.id },
-                        params: {
-                            ...commonParams,
-                            'date_range[start_date]':
-                                period.start.format('YYYY-MM-DD'),
-                            'date_range[end_date]':
-                                period.end.format('YYYY-MM-DD'),
-                        },
+                const axiosOpts = (startDate: string, endDate: string) => ({
+                    signal: controller.signal,
+                    headers: { 'X-Workspace-Id': workspace.id },
+                    params: {
+                        ...commonParams,
+                        'date_range[start_date]': startDate,
+                        'date_range[end_date]': endDate,
                     },
-                );
+                });
+
+                const [currentRes, previousRes] = await Promise.all([
+                    axios.get<AnalyticsResponse>('/api/v1/workspace/analytics', axiosOpts(
+                        period.start.format('YYYY-MM-DD'),
+                        period.end.format('YYYY-MM-DD'),
+                    )),
+                    axios.get<AnalyticsResponse>('/api/v1/workspace/analytics', axiosOpts(
+                        period.prevStart.format('YYYY-MM-DD'),
+                        period.prevEnd.format('YYYY-MM-DD'),
+                    )),
+                ]);
 
                 if (controller.signal.aborted) return;
 
-                const current = Number(currentRes.data?.[metric] ?? 0);
-                setCurrentValue(current);
-                setLoadingCurrent(false);
-                setLoadingComparison(true);
-
-                const previousRes = await axios.get<AnalyticsResponse>(
-                    '/api/v1/workspace/analytics',
-                    {
-                        signal: controller.signal,
-                        headers: { 'X-Workspace-Id': workspace.id },
-                        params: {
-                            ...commonParams,
-                            'date_range[start_date]':
-                                period.prevStart.format('YYYY-MM-DD'),
-                            'date_range[end_date]':
-                                period.prevEnd.format('YYYY-MM-DD'),
-                        },
-                    },
-                );
-
-                if (controller.signal.aborted) return;
-
+                setCurrentValue(Number(currentRes.data?.[metric] ?? 0));
                 setPreviousValue(Number(previousRes.data?.[metric] ?? 0));
             } catch (err: any) {
                 if (axios.isCancel?.(err) || err?.name === 'CanceledError') {

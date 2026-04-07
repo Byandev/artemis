@@ -11,10 +11,8 @@ use App\Http\Controllers\Workspaces\EmployeeController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\ProductController;
-use App\Http\Controllers\Workspaces\Record\RTSController;
-use App\Http\Controllers\Workspaces\Record\SalesController;
 use App\Http\Controllers\Workspaces\RoleController;
-use App\Http\Controllers\Workspaces\InventoryTransactionController;
+use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
@@ -48,10 +46,10 @@ Route::middleware(['auth'])->group(function () {
 
 
     Route::prefix('workspaces/{workspace:slug}')->group(function () {
-        Route::get('/inventory_transaction', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
-        Route::post('/inventory_transaction', [InventoryTransactionController::class, 'store'])->name('inventory.transactions.store');
-        Route::patch('/inventory_transaction/{inventory}', [InventoryTransactionController::class, 'update'])->name('inventory.transactions.update');
-        Route::delete('/inventory_transaction/{inventory}', [InventoryTransactionController::class, 'destroy'])->name('inventory.transactions.destroy');
+        Route::get('/inventory/transactions', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
+        Route::post('/inventory/transactions', [InventoryTransactionController::class, 'store'])->name('inventory.transactions.store');
+        Route::patch('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'update'])->name('inventory.transactions.update');
+        Route::delete('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'destroy'])->name('inventory.transactions.destroy');
     });
 
 
@@ -129,13 +127,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/rider', [AnalyticController::class, 'groupByRider'])->name('workspaces.rts.analytics.group-by-rider');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/provinces', [AnalyticController::class, 'groupByProvinces'])->name('workspaces.rts.analytics.group-by-provinces');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/cities', [AnalyticController::class, 'groupByCities'])->name('workspaces.rts.analytics.group-by-cities');
-    //    Route::get('/workspaces/{workspace}/rts/for-delivery-today', [ForDeliveryController::class, 'index'])->name('workspaces.rts.for-delivery-today');
     Route::get('/workspaces/{workspace}/rts/parcel-journeys', [ParcelUpdateNotificationTemplateController::class, 'index'])->name('workspaces.rts.parcel-journeys');
     Route::get('/workspaces/{workspace}/rts/parcel-update-notification', [ParcelUpdateNotificationController::class, 'index'])->name('workspaces.rts.parcel-update-notification');
     Route::get('/workspaces/{workspace}/rts/parcel-journey-notification-templates', [ParcelUpdateNotificationTemplateController::class, 'index'])->name('workspaces.rts.parcel-journey-notification-templates.index');
     Route::put('/workspaces/{workspace}/rts/parcel-journey-notification-templates/{template}', [ParcelUpdateNotificationTemplateController::class, 'update'])->name('workspaces.rts.parcel-journey-notification-templates.update');
-    Route::get('/workspaces/{workspace}/records/sales', [SalesController::class, 'index'])->name('workspaces.records.sales');
-    Route::get('/workspaces/{workspace}/records/rts', [RTSController::class, 'index'])->name('workspaces.records.rts');
 
     Route::get('/workspaces/{workspace}/facebook-accounts', [FacebookAccountController::class, 'index'])->name('workspaces.facebook-accounts.index');
     Route::get('/workspaces/{workspace}/ad-accounts', [AdAccountController::class, 'index'])->name('workspaces.ad-accounts.index');
@@ -177,11 +172,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/inventory/purchased-orders/create', [PurchaseOrderController::class, 'create'])->name('workspaces.inventory.purchased-orders.create');
 
     // PPW ROUTES
-    Route::prefix('/workspaces/{workspace}/inventory/ppw')->name('workspaces.inventory.ppw.')->group(function () {
-    Route::get('/', [PpwController::class, 'index'])->name('index');
-    Route::post('/', [PpwController::class, 'store'])->name('store');
-    Route::put('/{ppw}', [PpwController::class, 'update'])->name('update');
-    Route::delete('/{ppw}', [PpwController::class, 'destroy'])->name('destroy');
+    Route::prefix('/workspaces/{workspace}/inventory/ppws')->name('workspaces.inventory.ppw.')->group(function () {
+        Route::get('/', [PpwController::class, 'index'])->name('index');
+        Route::post('/', [PpwController::class, 'store'])->name('store');
+        Route::put('/{ppw}', [PpwController::class, 'update'])->name('update');
+        Route::delete('/{ppw}', [PpwController::class, 'destroy'])->name('destroy');
     });
 
 });
@@ -192,8 +187,7 @@ Route::get('/workspaces/invitations/{token}', [WorkspaceInvitationController::cl
 Route::get('/workspaces/invitations/{token}/accept', [WorkspaceInvitationController::class, 'accept'])->name('workspaces.invitations.accept');
 
 Route::prefix('/workspaces/{workspace:slug}')->group(function () {
-
-    Route::patch('/roles/{role}/archive', [RoleController::class, 'archive'])->name('roles.archive');
+    Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
     Route::post('/roles/{role}/restore', [RoleController::class, 'restore'])
         ->withTrashed()
         ->name('roles.restore');

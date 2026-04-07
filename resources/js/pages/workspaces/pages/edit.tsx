@@ -116,7 +116,7 @@ export default function Edit({ workspace, page, users }: Props) {
                             </p>
                             <div className="grid gap-5 sm:grid-cols-2">
                                 <div className={`${fieldClass} sm:col-span-2`}>
-                                    <label className={labelClass}>POS Token</label>
+                                    <label className={labelClass}>POS Token <span className="text-red-400">*</span></label>
                                     <input type="text" className={inputClass} placeholder="Enter POS token" value={data.pos_token} onChange={(e) => setData('pos_token', e.target.value)} />
                                     {errors.pos_token && <p className={errorClass}>{errors.pos_token}</p>}
                                 </div>

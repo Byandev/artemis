@@ -81,7 +81,7 @@ class ProductController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:10|unique:products,code',
+            'code' => 'required|string|max:10|unique:products,code,NULL,id,workspace_id,'.$workspace->id,
             'category' => 'required|string|max:255',
             'status' => 'required|in:Scaling,Testing,Failed,Inactive',
             'description' => 'nullable|string',
@@ -140,7 +140,7 @@ class ProductController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:10|unique:products,code,'.$product->id,
+            'code' => 'required|string|max:10|unique:products,code,'.$product->id.',id,workspace_id,'.$workspace->id,
             'category' => 'required|string|max:255',
             'status' => 'required|in:Scaling,Testing,Failed,Inactive',
             'description' => 'nullable|string',

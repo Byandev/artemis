@@ -38,20 +38,28 @@ interface Props {
 }
 
 const Dashboard = ({ workspace }: Props) => {
-    const [dateRange, setDateRange] = useState([
-        moment().startOf('month').format('YYYY-MM-DD'),
-        moment().endOf('month').format('YYYY-MM-DD'),
-    ]);
+    const STORAGE_KEY         = `dashboard_metrics_${workspace.id}`;
+    const DATE_RANGE_KEY      = `dashboard_date_range_${workspace.id}`;
+    const FILTER_KEY          = `dashboard_filter_${workspace.id}`;
 
-    const [filter, setFilter] = useState<FilterValue>({
-        teamIds: [],
-        productIds: [],
-        shopIds: [],
-        pageIds: [],
-        userIds: [],
+    const [dateRange, setDateRange] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem(DATE_RANGE_KEY);
+            if (saved) return JSON.parse(saved) as string[];
+        } catch {}
+        return [
+            moment().startOf('month').format('YYYY-MM-DD'),
+            moment().endOf('month').format('YYYY-MM-DD'),
+        ];
     });
 
-    const STORAGE_KEY = `dashboard_metrics_${workspace.id}`;
+    const [filter, setFilter] = useState<FilterValue>(() => {
+        try {
+            const saved = localStorage.getItem(FILTER_KEY);
+            if (saved) return JSON.parse(saved) as FilterValue;
+        } catch {}
+        return { teamIds: [], productIds: [], shopIds: [], pageIds: [], userIds: [] };
+    });
 
     const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>(() => {
         try {
@@ -78,17 +86,23 @@ const Dashboard = ({ workspace }: Props) => {
                     />
                     <Filters
                         workspace={workspace}
-                        onChange={(value) => setFilter(value)}
+                        initialValue={filter}
+                        onChange={(value) => {
+                            setFilter(value);
+                            try { localStorage.setItem(FILTER_KEY, JSON.stringify(value)); } catch {}
+                        }}
                     />
                     <DatePicker
                         id={'dashboard-date-range'}
                         mode={'range'}
                         onChange={(dates) => {
                             if (dates.length === 2) {
-                                setDateRange([
+                                const range = [
                                     moment(dates[0]).format('YYYY-MM-DD'),
                                     moment(dates[1]).format('YYYY-MM-DD'),
-                                ]);
+                                ];
+                                setDateRange(range);
+                                try { localStorage.setItem(DATE_RANGE_KEY, JSON.stringify(range)); } catch {}
                             }
                         }}
                         defaultDate={dateRange as never as DateOption}

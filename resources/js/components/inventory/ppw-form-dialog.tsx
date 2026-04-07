@@ -3,12 +3,6 @@ import { Workspace } from '@/types/models/Workspace';
 import { Product } from '@/types/models/Product';
 import { useForm } from '@inertiajs/react';
 import { useEffect } from 'react';
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns"; // Standard for formatting dates
-import { CalendarIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface Ppw {
     id: number;
@@ -54,8 +48,8 @@ export function PpwFormDialog({ workspace, products, open, onOpenChange, ppw }: 
         e.preventDefault();
 
         const url = isEditing
-            ? `/workspaces/${workspace.slug}/inventory/ppw/${ppw.id}`
-            : `/workspaces/${workspace.slug}/inventory/ppw`;
+            ? `/workspaces/${workspace.slug}/inventory/ppws/${ppw.id}`
+            : `/workspaces/${workspace.slug}/inventory/ppws`;
 
         const options = {
             preserveScroll: true,
@@ -113,36 +107,12 @@ export function PpwFormDialog({ workspace, products, open, onOpenChange, ppw }: 
                             <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
                                 Transaction Date <span className="text-red-400">*</span>
                             </label>
-
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant={"outline"}
-                                        className={cn(
-                                            "h-10 w-full justify-start rounded-[10px] border border-black/8 bg-stone-50 px-3 text-left font-mono! text-[13px]! font-normal transition-all hover:bg-stone-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100",
-                                            !data.transaction_date && "text-muted-foreground"
-                                        )}
-                                    >
-                                        <CalendarIcon className="mr-2 h-4 w-4 text-emerald-600" />
-                                        {data.transaction_date ? (
-                                            format(new Date(data.transaction_date), "PPP")
-                                        ) : (
-                                            <span>Pick a date</span>
-                                        )}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                        mode="single"
-                                        selected={data.transaction_date ? new Date(data.transaction_date) : undefined}
-                                        onSelect={(date) =>
-                                            setData('transaction_date', date ? format(date, "yyyy-MM-dd") : '')
-                                        }
-                                        initialFocus
-                                        className="rounded-md border dark:bg-zinc-900"
-                                    />
-                                </PopoverContent>
-                            </Popover>
+                            <input
+                                type="date"
+                                value={data.transaction_date}
+                                onChange={(e) => setData('transaction_date', e.target.value)}
+                                className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100"
+                            />
                             {errors.transaction_date && <p className="font-mono text-[11px] text-red-500 mt-1">{errors.transaction_date}</p>}
                         </div>
 

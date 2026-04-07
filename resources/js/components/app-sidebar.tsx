@@ -2,13 +2,12 @@ import { NavMain } from '@/components/nav-main';
 import {
     Sidebar,
     SidebarContent,
-    SidebarFooter,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard, logout } from '@/routes';
+import { dashboard } from '@/routes';
 import workspace from '@/routes/workspace';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
@@ -19,8 +18,6 @@ import {
     Store,
     Users,
     BookOpenIcon,
-    LogOut,
-    Settings,
     User,
     ShieldIcon,
     RotateCcw,
@@ -29,7 +26,6 @@ import {
 
 } from 'lucide-react';
 import AppLogo from './app-logo';
-import { NavFooter } from '@/components/nav-footer';
 
 export function AppSidebar() {
     const { currentWorkspace } = usePage().props;
@@ -74,8 +70,13 @@ export function AppSidebar() {
             icon: Package,
             items: [
                 {
+                    title: 'PPW',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppws`,
+                    icon: BarChart2,
+                },
+                {
                     title: 'Transaction Logs',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory_transaction`,
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/transactions`,
                     icon: ClipboardList,
                 },
                 {
@@ -199,7 +200,7 @@ export function AppSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch>
+                            <Link href={dashboard().url}>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
@@ -212,9 +213,9 @@ export function AppSidebar() {
                 {/*<NavMain items={accountNavItems} group_label="Account" />*/}
             </SidebarContent>
 
-            <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
-            </SidebarFooter>
+            {/*<SidebarFooter>*/}
+            {/*    <NavFooter items={footerNavItems} className="mt-auto" />*/}
+            {/*</SidebarFooter>*/}
         </Sidebar>
     );
 }

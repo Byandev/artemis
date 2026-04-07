@@ -1,19 +1,18 @@
 <?php
 
-namespace App\Http\Controllers\Workspaces;
+namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\InventoryTransaction;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Spatie\QueryBuilder\QueryBuilder;
+use Modules\Inventory\Models\InventoryTransaction;
 use Spatie\QueryBuilder\AllowedFilter;
-use App\Models\User;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class InventoryTransactionController extends Controller
 {
-
     public function index(Request $request, Workspace $workspace)
     {
         if (!$request->user()->isMemberOf($workspace)) {
@@ -22,7 +21,6 @@ class InventoryTransactionController extends Controller
 
         $inventory = QueryBuilder::for(InventoryTransaction::where('workspace_id', $workspace->id))
             ->allowedFilters([
-
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where('ref_no', 'like', "%{$value}%");
                 }),
@@ -33,7 +31,7 @@ class InventoryTransactionController extends Controller
                     $query->whereDate('date', '<=', $value);
                 }),
             ])
-            ->allowedSorts(['date', 'ref_no', 'remaining_qty', 'created_at'])
+            ->allowedSorts(['date', 'ref_no', 'po_qty_in', 'po_qty_out', 'rts_goods_in', 'rts_goods_out', 'rts_bad', 'remaining_qty', 'created_at'])
             ->defaultSort('-date')
             ->paginate(10)
             ->withQueryString();
@@ -54,41 +52,40 @@ class InventoryTransactionController extends Controller
     public function store(Request $request, Workspace $workspace)
     {
         $validated = $request->validate([
-            'date' => 'nullable|date',
-            'ref_no' => 'nullable|string|max:255',
-            'po_qty_in' => 'nullable|integer|min:0',
-            'po_qty_out' => 'nullable|integer|min:0',
-            'rts_goods_in' => 'nullable|integer|min:0',
-            'rts_goods_out' => 'nullable|integer|min:0',
-            'rts_bad' => 'nullable|integer|min:0',
+            'date' => 'required|date',
+            'ref_no' => 'required|string|max:255|unique:inventory_transactions,ref_no,NULL,id,workspace_id,'.$workspace->id,
+            'po_qty_in' => 'required|integer|min:0',
+            'po_qty_out' => 'required|integer|min:0',
+            'rts_goods_in' => 'required|integer|min:0',
+            'rts_goods_out' => 'required|integer|min:0',
+            'rts_bad' => 'required|integer|min:0',
         ]);
 
-        $workspace->inventory()->create($validated);
+        $workspace->inventoryTransactions()->create($validated);
 
         return redirect()->back()->with('success', 'Entry created successfully.');
     }
 
-    public function update(Request $request, Workspace $workspace, InventoryTransaction $inventory)
+    public function update(Request $request, Workspace $workspace, InventoryTransaction $transaction)
     {
         $validated = $request->validate([
-            'date' => 'nullable|date',
-            'ref_no' => 'nullable|string|max:255',
-            'po_qty_in' => 'nullable|integer|min:0',
-            'po_qty_out' => 'nullable|integer|min:0',
-            'rts_goods_in' => 'nullable|integer|min:0',
-            'rts_goods_out' => 'nullable|integer|min:0',
-            'rts_bad' => 'nullable|integer|min:0',
+            'date' => 'required|date',
+            'ref_no' => 'required|string|max:255|unique:inventory_transactions,ref_no,'.$transaction->id.',id,workspace_id,'.$workspace->id,
+            'po_qty_in' => 'required|integer|min:0',
+            'po_qty_out' => 'required|integer|min:0',
+            'rts_goods_in' => 'required|integer|min:0',
+            'rts_goods_out' => 'required|integer|min:0',
+            'rts_bad' => 'required|integer|min:0',
         ]);
 
-        $inventory->update($validated);
+        $transaction->update($validated);
 
         return redirect()->back()->with('success', 'Entry updated successfully.');
     }
 
-    public function destroy(Workspace $workspace, InventoryTransaction $inventory)
+    public function destroy(Workspace $workspace, InventoryTransaction $transaction)
     {
-        // Standard delete() on a model WITHOUT SoftDeletes trait performs a hard delete
-        $inventory->delete();
+        $transaction->delete();
 
         return redirect()->back()->with('success', 'Entry permanently deleted.');
     }
