@@ -1,44 +1,24 @@
 import { AddItemForm } from '@/components/inventory/add-item-dialog';
 import { StatusId, StatusOption } from '@/types/models/PurchasedOrder';
 
-export const STATUS_OPTIONS: StatusOption[] = [
-    { value: 'For Approval', label: 'For Approval' },
-    { value: 'Approved', label: 'Approved' },
-    { value: 'To Pay', label: 'To Pay' },
-    { value: 'Paid', label: 'Paid' },
-    { value: 'For Purchase', label: 'For Purchase' },
-    { value: 'Waiting For Delivery', label: 'Waiting For Delivery' },
-    { value: 'Delivered', label: 'Delivered' },
-    { value: 'Cancelled', label: 'Cancelled' },
+const STATUS_VALUES: StatusId[] = [
+    'For Approval',
+    'Approved',
+    'To Pay',
+    'Paid',
+    'For Purchase',
+    'Waiting For Delivery',
+    'Delivered',
+    'Cancelled',
 ];
 
-const LEGACY_STATUS_MAP: Record<string, StatusId> = {
-    '1': 'For Approval',
-    '2': 'Approved',
-    '3': 'To Pay',
-    '4': 'Paid',
-    '5': 'For Purchase',
-    '6': 'Waiting For Delivery',
-    '7': 'Delivered',
-    '8': 'Cancelled',
-};
+export const STATUS_OPTIONS: StatusOption[] = STATUS_VALUES.map((value) => ({ value, label: value }));
 
 const normalizeStatus = (value: StatusId | number | string): StatusId => {
     const key = String(value);
-    if (LEGACY_STATUS_MAP[key]) return LEGACY_STATUS_MAP[key];
-    const direct = STATUS_OPTIONS.find((s) => s.value === key)?.value;
-    return (direct || 'For Approval') as StatusId;
-};
-
-export const statusToCode = (value: StatusId | number | string): number => {
-    const key = String(value);
-    if (LEGACY_STATUS_MAP[key]) return Number(key);
-
-    const match = STATUS_OPTIONS.find((s, idx) => s.value === key || String(idx + 1) === key);
-    if (match) return STATUS_OPTIONS.indexOf(match) + 1;
-
-    const parsed = Number.parseInt(key, 10);
-    return Number.isFinite(parsed) ? parsed : 1;
+    const direct = STATUS_VALUES.find((status) => status === key);
+    if (direct) return direct;
+    return 'For Approval';
 };
 
 export const normalizeStatusLabel = normalizeStatus;
@@ -60,7 +40,7 @@ export const ADD_ITEM_FORM_INITIAL: AddItemForm = {
 
 export const statusLabel = (value: StatusId | number | string): string => {
     const normalized = normalizeStatus(value);
-    return STATUS_OPTIONS.find((s) => s.value === normalized)?.label ?? String(normalized);
+    return STATUS_OPTIONS.find((s) => s.value === normalized)?.label ?? normalized;
 };
 
 export const formatMoney = (amount: number): string => {
