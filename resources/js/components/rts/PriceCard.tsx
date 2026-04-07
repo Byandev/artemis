@@ -5,9 +5,10 @@ import { buildBaseParams, PRICE_LABELS, PriceRow, RtsCell, RtsQueryParams, ViewM
 interface Props {
     workspaceSlug: string;
     queryParams: RtsQueryParams;
+    onDataLoaded?: (data: PriceRow[]) => void;
 }
 
-export default function PriceCard({ workspaceSlug, queryParams }: Props) {
+export default function PriceCard({ workspaceSlug, queryParams, onDataLoaded }: Props) {
     const [price, setPrice] = useState<PriceRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState<ViewMode>('chart');
@@ -19,7 +20,7 @@ export default function PriceCard({ workspaceSlug, queryParams }: Props) {
         const p = buildBaseParams(queryParams);
         fetch(`/workspaces/${workspaceSlug}/rts/analytics/group-by/price?${p}`, { credentials: 'same-origin' })
             .then((res) => (res.ok ? res.json() : []))
-            .then((data) => { if (!cancelled) { setPrice(data); setLoading(false); } })
+            .then((data) => { if (!cancelled) { setPrice(data); setLoading(false); onDataLoaded?.(data); } })
             .catch(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, [workspaceSlug, JSON.stringify(queryParams)]);

@@ -17,6 +17,7 @@ interface Props {
     dateRange: string[];
     filter: FilterValue;
     metrics?: MetricKey[];
+    onDataLoaded?: (data: BreakdownItem[], metric: string) => void;
 }
 
 interface BreakdownItem {
@@ -25,7 +26,7 @@ interface BreakdownItem {
     value: number | string;
 }
 
-export default function PageBreakdown({ workspace, dateRange, filter, metrics }: Props) {
+export default function PageBreakdown({ workspace, dateRange, filter, metrics, onDataLoaded }: Props) {
     const [breakdown, setBreakdown] = useState<BreakdownItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -74,7 +75,9 @@ export default function PageBreakdown({ workspace, dateRange, filter, metrics }:
                 },
             })
             .then((response) => {
-                setBreakdown(response.data.data ?? []);
+                const data = response.data.data ?? [];
+                setBreakdown(data);
+                onDataLoaded?.(data, option);
             })
             .catch((error) => {
                 if (error.code !== 'ERR_CANCELED') {

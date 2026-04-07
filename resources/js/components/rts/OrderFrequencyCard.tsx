@@ -5,9 +5,10 @@ import { buildBaseParams, OrderFrequencyRow, RtsCell, RtsQueryParams, ViewMode, 
 interface Props {
     workspaceSlug: string;
     queryParams: RtsQueryParams;
+    onDataLoaded?: (data: OrderFrequencyRow[]) => void;
 }
 
-export default function OrderFrequencyCard({ workspaceSlug, queryParams }: Props) {
+export default function OrderFrequencyCard({ workspaceSlug, queryParams, onDataLoaded }: Props) {
     const [rows, setRows] = useState<OrderFrequencyRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState<ViewMode>('chart');
@@ -19,7 +20,7 @@ export default function OrderFrequencyCard({ workspaceSlug, queryParams }: Props
         const p = buildBaseParams(queryParams);
         fetch(`/workspaces/${workspaceSlug}/rts/analytics/group-by/order-frequency?${p}`, { credentials: 'same-origin' })
             .then((res) => (res.ok ? res.json() : []))
-            .then((data) => { if (!cancelled) { setRows(data); setLoading(false); } })
+            .then((data) => { if (!cancelled) { setRows(data); setLoading(false); onDataLoaded?.(data); } })
             .catch(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, [workspaceSlug, JSON.stringify(queryParams)]);

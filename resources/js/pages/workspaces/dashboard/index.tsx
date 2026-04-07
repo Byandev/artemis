@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Workspace } from '@/types/models/Workspace';
 import {
     currencyFormatter,
@@ -32,15 +32,16 @@ import { formatDate } from 'date-fns';
 import MetricPicker from '@/components/metrics/MetricPicker';
 import { metricConfigs, MetricKey } from '@/types/metrics';
 import PageHeader from '@/components/common/PageHeader';
+import AskDataWidget, { DashboardData } from '@/components/ai/AskDataWidget';
 
 interface Props {
     workspace: Workspace;
 }
 
 const Dashboard = ({ workspace }: Props) => {
-    const STORAGE_KEY         = `dashboard_metrics_${workspace.id}`;
-    const DATE_RANGE_KEY      = `dashboard_date_range_${workspace.id}`;
-    const FILTER_KEY          = `dashboard_filter_${workspace.id}`;
+    const STORAGE_KEY    = `dashboard_metrics_${workspace.id}`;
+    const DATE_RANGE_KEY = `dashboard_date_range_${workspace.id}`;
+    const FILTER_KEY     = `dashboard_filter_${workspace.id}`;
 
     const [dateRange, setDateRange] = useState<string[]>(() => {
         try {
@@ -69,6 +70,29 @@ const Dashboard = ({ workspace }: Props) => {
         return ['totalSales', 'totalOrders', 'aov', 'rtsRate'];
     });
 
+    // Collect loaded data from breakdown components for the AI widget
+    const [dashboardData, setDashboardData] = useState<DashboardData>({
+        metrics: {},
+        pages:   { data: [], metric: 'totalSales' },
+        shops:   { data: [], metric: 'totalSales' },
+        users:   { data: [], metric: 'totalSales' },
+    });
+
+    const onMetricLoaded = useCallback((metric: string, value: number) => {
+        setDashboardData(prev => ({ ...prev, metrics: { ...prev.metrics, [metric]: value } }));
+    }, []);
+
+    const onPagesLoaded = useCallback((data: object[], metric: string) => {
+        setDashboardData(prev => ({ ...prev, pages: { data, metric } }));
+    }, []);
+
+    const onShopsLoaded = useCallback((data: object[], metric: string) => {
+        setDashboardData(prev => ({ ...prev, shops: { data, metric } }));
+    }, []);
+
+    const onUsersLoaded = useCallback((data: object[], metric: string) => {
+        setDashboardData(prev => ({ ...prev, users: { data, metric } }));
+    }, []);
 
     return (
         <AppLayout>
@@ -109,7 +133,7 @@ const Dashboard = ({ workspace }: Props) => {
                     />
                 </PageHeader>
 
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:gap-4 xl:grid-cols-4">
+                <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2 md:gap-4 xl:grid-cols-4">
                     {metricConfigs
                         .filter(m => selectedMetrics.includes(m.key))
                         .map((card) => (
@@ -124,9 +148,11 @@ const Dashboard = ({ workspace }: Props) => {
                                 icon={card.icon}
                                 tooltipLabel={card.description}
                                 reverseTrend={card.reverse}
+                                onValueLoaded={onMetricLoaded}
                             />
                     ))}
                 </div>
+
                 <ComponentCard className="mt-12">
                     <StatisticBreakdown
                         metrics={selectedMetrics}
@@ -142,6 +168,7 @@ const Dashboard = ({ workspace }: Props) => {
                         workspace={workspace}
                         filter={filter}
                         metrics={selectedMetrics}
+                        onDataLoaded={onPagesLoaded}
                     />
                 </ComponentCard>
 
@@ -151,17 +178,27 @@ const Dashboard = ({ workspace }: Props) => {
                         dateRange={dateRange}
                         workspace={workspace}
                         metrics={selectedMetrics}
+                        onDataLoaded={onShopsLoaded}
                     />
                 </ComponentCard>
+
                 <ComponentCard className="mt-6">
                     <UserBreakdown
                         filter={filter}
                         dateRange={dateRange}
                         workspace={workspace}
                         metrics={selectedMetrics}
+                        onDataLoaded={onUsersLoaded}
                     />
                 </ComponentCard>
             </div>
+
+            {/* Floating AI chat — uses data already loaded on screen */}
+            <AskDataWidget
+                workspace={workspace}
+                dateRange={dateRange}
+                data={dashboardData}
+            />
         </AppLayout>
     );
 };
