@@ -18,6 +18,7 @@ import {
     Store,
     Users,
     BookOpenIcon,
+    Settings,
     User,
     ShieldIcon,
     RotateCcw,
@@ -70,16 +71,6 @@ export function AppSidebar() {
             icon: Package,
             items: [
                 {
-                    title: 'PPW',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppws`,
-                    icon: BarChart2,
-                },
-                {
-                    title: 'Transaction Logs',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/transactions`,
-                    icon: ClipboardList,
-                },
-                {
                     title: 'Purchased Orders',
                     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/purchased-orders`,
                     icon: ClipboardList,
@@ -88,6 +79,11 @@ export function AppSidebar() {
                     title: 'PPW',
                     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppw`,
                     icon: BarChart2,
+                },
+                {
+                    title: 'Transaction Logs',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/transactions`,
+                    icon: ClipboardList,
                 },
             ],
         },
@@ -178,15 +174,6 @@ export function AppSidebar() {
             title: 'Settings',
             href: `/settings`,
             icon: Settings,
-        },
-    ];
-
-    const footerNavItems: NavItem[] = [
-
-        {
-            title: 'Logout',
-            href: logout(),
-            icon: LogOut,
         },
     ];
 
