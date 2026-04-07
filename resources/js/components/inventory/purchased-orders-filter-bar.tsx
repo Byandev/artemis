@@ -59,10 +59,7 @@ export function PurchasedOrdersFilterBar({
                             const [from, to] = dates;
                             const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                             onDateChange(fmt(from), fmt(to));
-                        } else if (dates.length === 1) {
-                            const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                            onDateChange(fmt(dates[0]), '');
-                        } else {
+                        } else if (dates.length === 0) {
                             onDateChange('', '');
                         }
                     }}
