@@ -323,7 +323,7 @@ const Index = ({ workspace }: Props) => {
                         className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
                     >
                         <Plus className="mr-1.5 h-3.5 w-3.5" />
-                        Add Order
+                        Add Item
                     </button>
                 </PageHeader>
 
