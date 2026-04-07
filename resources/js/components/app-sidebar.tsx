@@ -26,7 +26,6 @@ import {
     RotateCcw,
     BarChart2,
     MapPin,
-    ClipboardList,
 
 } from 'lucide-react';
 import AppLogo from './app-logo';
