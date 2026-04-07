@@ -15,6 +15,10 @@ Route::get('/changelog', function () {
     return Inertia::render('workspaces/changelog');
 })->name('changelog');
 
+Route::get('/calculator', function () {
+    return Inertia::render('calculator');
+})->name('calculator');
+
 Route::get('/design-guidelines', function () {
     return view('design-guidelines');
 });

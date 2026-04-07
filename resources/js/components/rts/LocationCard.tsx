@@ -11,9 +11,10 @@ type GroupBy = 'province' | 'city';
 interface Props {
     workspaceSlug: string;
     queryParams: RtsQueryParams;
+    onDataLoaded?: (provinces: ProvinceRow[]) => void;
 }
 
-export default function LocationCard({ workspaceSlug, queryParams }: Props) {
+export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded }: Props) {
     const [groupBy, setGroupBy] = useState<GroupBy>('province');
 
     const [provinces, setProvinces] = useState<PaginatedData<ProvinceRow> | null>(null);
@@ -54,7 +55,15 @@ export default function LocationCard({ workspaceSlug, queryParams }: Props) {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
-        fetchProvinces(1, '', provinceSort);
+        setProvincesLoading(true);
+        const p = buildBaseParams(queryParams);
+        p.append('page', '1');
+        p.append('per_page', '10');
+        p.append('sort', provinceSort);
+        fetch(`/workspaces/${workspaceSlug}/rts/analytics/group-by/provinces?${p}`, { credentials: 'same-origin' })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => { setProvinces(data); setProvincesLoading(false); onDataLoaded?.(data?.data ?? []); })
+            .catch(() => setProvincesLoading(false));
         fetchCities(1, '', citySort);
     }, [workspaceSlug, JSON.stringify(queryParams)]);
 

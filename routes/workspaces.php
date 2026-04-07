@@ -11,8 +11,6 @@ use App\Http\Controllers\Workspaces\EmployeeController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\ProductController;
-use App\Http\Controllers\Workspaces\Record\RTSController;
-use App\Http\Controllers\Workspaces\Record\SalesController;
 use App\Http\Controllers\Workspaces\RoleController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
@@ -20,6 +18,7 @@ use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\TeamController;
+use App\Http\Controllers\Workspaces\AskDataController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
@@ -56,6 +55,9 @@ Route::middleware(['auth'])->group(function () {
 
 
 
+    // AI
+    Route::post('/workspaces/{workspace}/ask', AskDataController::class)->name('workspace.ask');
+
     // Workspace dashboard
     Route::get('/workspaces/{workspace}/dashboard', [WorkspaceController::class, 'dashboard'])->name('workspace.dashboard');
     Route::get('/workspaces/{workspace}/chart-data', [WorkspaceController::class, 'getChartData'])->name('workspace.chart-data');
@@ -77,6 +79,7 @@ Route::middleware(['auth'])->group(function () {
     //    Route::put('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'update'])->name('workspaces.members.update');
     Route::put('/workspaces/{workspace:slug}/members/{user}', [WorkspaceMemberController::class, 'updateMember'])->name('workspaces.members.update');
     Route::delete('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'destroy'])->name('workspaces.members.destroy');
+    Route::post('/workspaces/{workspace}/members/{user}/reset-password', [WorkspaceMemberController::class, 'generatePasswordReset'])->name('workspaces.members.reset-password');
 
     // Invitation routes (authenticated users)
     Route::post('/workspaces/{workspace}/invitations', [WorkspaceInvitationController::class, 'store'])->name('workspaces.invitations.store');
@@ -129,13 +132,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/rider', [AnalyticController::class, 'groupByRider'])->name('workspaces.rts.analytics.group-by-rider');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/provinces', [AnalyticController::class, 'groupByProvinces'])->name('workspaces.rts.analytics.group-by-provinces');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/cities', [AnalyticController::class, 'groupByCities'])->name('workspaces.rts.analytics.group-by-cities');
-    //    Route::get('/workspaces/{workspace}/rts/for-delivery-today', [ForDeliveryController::class, 'index'])->name('workspaces.rts.for-delivery-today');
     Route::get('/workspaces/{workspace}/rts/parcel-journeys', [ParcelUpdateNotificationTemplateController::class, 'index'])->name('workspaces.rts.parcel-journeys');
     Route::get('/workspaces/{workspace}/rts/parcel-update-notification', [ParcelUpdateNotificationController::class, 'index'])->name('workspaces.rts.parcel-update-notification');
     Route::get('/workspaces/{workspace}/rts/parcel-journey-notification-templates', [ParcelUpdateNotificationTemplateController::class, 'index'])->name('workspaces.rts.parcel-journey-notification-templates.index');
     Route::put('/workspaces/{workspace}/rts/parcel-journey-notification-templates/{template}', [ParcelUpdateNotificationTemplateController::class, 'update'])->name('workspaces.rts.parcel-journey-notification-templates.update');
-    Route::get('/workspaces/{workspace}/records/sales', [SalesController::class, 'index'])->name('workspaces.records.sales');
-    Route::get('/workspaces/{workspace}/records/rts', [RTSController::class, 'index'])->name('workspaces.records.rts');
 
     Route::get('/workspaces/{workspace}/facebook-accounts', [FacebookAccountController::class, 'index'])->name('workspaces.facebook-accounts.index');
     Route::get('/workspaces/{workspace}/ad-accounts', [AdAccountController::class, 'index'])->name('workspaces.ad-accounts.index');

@@ -17,6 +17,7 @@ interface Props {
     dateRange: string[];
     filter: FilterValue;
     metrics?: MetricKey[];
+    onDataLoaded?: (data: BreakdownItem[], metric: string) => void;
 }
 
 interface BreakdownItem {
@@ -30,6 +31,7 @@ export default function ShopBreakdown({
                                           dateRange,
                                           filter,
                                           metrics,
+                                          onDataLoaded,
                                       }: Props) {
     const [breakdown, setBreakdown] = useState<BreakdownItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -89,7 +91,9 @@ export default function ShopBreakdown({
                 },
             })
             .then((response) => {
-                setBreakdown(response.data.data ?? []);
+                const data = response.data.data ?? [];
+                setBreakdown(data);
+                onDataLoaded?.(data, option);
             })
             .catch((error) => {
                 if (error.code !== 'ERR_CANCELED') {

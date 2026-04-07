@@ -25,17 +25,7 @@ class RtsOrderItemQuery extends RtsBaseQuery
     public function get(int $perPage = 15): LengthAwarePaginator
     {
         return $this->query
-            ->selectRaw('
-                pancake_order_items.name AS item_name,
-                SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END) AS total_orders,
-                SUM(CASE WHEN pancake_orders.status = 3 THEN 1 ELSE 0 END) AS delivered_count,
-                SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) AS returned_count,
-                ROUND(
-                    (SUM(CASE WHEN pancake_orders.status IN (4,5) THEN 1 ELSE 0 END) * 100.0) /
-                    NULLIF(SUM(CASE WHEN pancake_orders.status IN (3,4,5) THEN 1 ELSE 0 END), 0),
-                    2
-                ) AS rts_rate_percentage
-            ')
+            ->selectRaw('pancake_order_items.name AS item_name, ' . self::METRICS_SQL)
             ->join('pancake_order_items', 'pancake_order_items.order_id', '=', 'pancake_orders.id')
             ->groupBy('pancake_order_items.name')
             ->havingRaw(self::HAVING_SQL)
