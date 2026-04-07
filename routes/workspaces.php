@@ -7,7 +7,7 @@ use App\Http\Controllers\Workspaces\AdsManager\CampaignController;
 use App\Http\Controllers\Workspaces\AdsManager\OptimizationRuleController;
 use App\Http\Controllers\Workspaces\Botcake\FlowController;
 use App\Http\Controllers\Workspaces\Botcake\SequenceController;
-use App\Http\Controllers\Workspaces\EmployeeController;
+use App\Http\Controllers\Workspaces\CSRController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\ProductController;
@@ -158,7 +158,8 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'destroy'])->name('workspaces.api.optimization-rules.destroy');
 
     // Employee routes
-    Route::get('/workspaces/{workspace}/employees', [EmployeeController::class, 'index'])->name('workspaces.employees.index');
+    Route::get('/workspaces/{workspace}/csr/management', [CSRController::class, 'index'])->name('workspaces.csr.index');
+    Route::get('/workspaces/{workspace}/csr/analytics', [CSRController::class, 'analytics'])->name('workspaces.csr.analytics');
 
     // Team routes
     Route::get('/workspaces/{workspace}/teams', [TeamController::class, 'index'])->name('workspaces.teams.index');
