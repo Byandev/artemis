@@ -35,6 +35,10 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
     });
 });
 
+Route::group(['prefix' => 'api/v1/public', 'as' => 'api.v1.public.', 'middleware' => ['api.key']], function () {
+    Route::get('/health', \App\Http\Controllers\PublicApi\HealthController::class)->name('health');
+});
+
 Route::group(['prefix' => 'api/v1/workspace', 'as' => 'api.v1.workspace', 'middleware' => ['auth', 'workspace']], function () {
     Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
     Route::get('/analytics/breakdown', [AnalyticsController::class, 'breakdown'])->name('analytics.breakdown');

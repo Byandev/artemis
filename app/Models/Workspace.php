@@ -204,4 +204,9 @@ class Workspace extends Model
     {
         return $this->hasMany(InventoryTransaction::class, 'workspace_id');
     }
+
+    public function apiKeys(): HasMany
+    {
+        return $this->hasMany(WorkspaceApiKey::class);
+    }
 }
