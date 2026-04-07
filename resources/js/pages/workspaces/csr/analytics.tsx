@@ -115,28 +115,38 @@ export default function Analytics({ workspace }: Props) {
         <AppLayout>
             <Head title={`${workspace.name} - CSR Analytics`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <PageHeader title="CSR Analytics" description="Aggregated CSR performance from daily records" />
-
-                <div className="mb-3 flex items-center justify-end gap-2">
+                <PageHeader
+                    title="CSR Analytics"
+                    description="Aggregated CSR performance from daily records"
+                >
                     <DatePicker
                         id="csr-analytics-date-range"
                         mode="range"
                         defaultDate={[range.from, range.to] as never}
                         onChange={(dates) => {
                             if (dates.length === 2) {
-                                setRange({ from: dates[0] as Date, to: dates[1] as Date });
+                                setRange({
+                                    from: dates[0] as Date,
+                                    to: dates[1] as Date,
+                                });
                             }
                         }}
                     />
-                </div>
+                </PageHeader>
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable columns={columns} data={pagedRecords} />
-                    <div className="flex flex-col gap-2 border-t border-black/6 px-4 py-3 dark:border-white/6 xl:flex-row xl:items-center xl:justify-between">
+                    <div className="flex flex-col gap-2 border-t border-black/6 px-4 py-3 xl:flex-row xl:items-center xl:justify-between dark:border-white/6">
                         <p className="text-center font-mono text-xs font-light text-gray-400 xl:text-left">
-                            Showing {(page - 1) * perPage + 1} to {Math.min(page * perPage, records.length)} of {records.length} entries
+                            Showing {(page - 1) * perPage + 1} to{' '}
+                            {Math.min(page * perPage, records.length)} of{' '}
+                            {records.length} entries
                         </p>
-                        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+                        <Pagination
+                            currentPage={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                        />
                     </div>
                 </div>
             </div>
