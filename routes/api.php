@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\API\Workspace\AnalyticsController;
+use App\Http\Controllers\API\Workspace\CSRController;
 use App\Http\Controllers\API\Workspace\CsrPerformanceController;
 use App\Http\Controllers\API\Workspace\PageController;
 use App\Http\Controllers\API\Workspace\ProductController;
@@ -24,6 +25,7 @@ Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {
 Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], function () {
     Route::group(['prefix' => 'workspaces/{workspace}', 'as' => 'workspaces.'], function () {
         Route::get('/csrs/performance', [CsrPerformanceController::class, 'index'])->name('csrs.performance.index');
+        Route::get('/csrs/daily-records', [CSRController::class, 'dailyRecords'])->name('csrs.daily-records.index');
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
@@ -35,6 +37,7 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
 
 Route::group(['prefix' => 'api/v1/public', 'as' => 'api.v1.public.', 'middleware' => ['api.key']], function () {
     Route::get('/health', \App\Http\Controllers\PublicApi\HealthController::class)->name('health');
+    Route::get('/users',  \App\Http\Controllers\PublicApi\UserController::class . '@index')->name('users.index');
 });
 
 Route::group(['prefix' => 'api/v1/workspace', 'as' => 'api.v1.workspace', 'middleware' => ['auth', 'workspace']], function () {

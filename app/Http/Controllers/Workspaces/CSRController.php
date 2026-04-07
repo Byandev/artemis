@@ -10,7 +10,7 @@ use Modules\Pancake\Models\User as PancakeUser;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
-class EmployeeController extends Controller
+class CSRController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
@@ -33,13 +33,24 @@ class EmployeeController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        return Inertia::render('workspaces/employees/index', [
+        return Inertia::render('workspaces/csr/index', [
             'workspace' => $workspace,
             'employees' => $employees,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
+        ]);
+    }
+
+    public function analytics(Request $request, Workspace $workspace)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        return Inertia::render('workspaces/csr/analytics', [
+            'workspace' => $workspace,
         ]);
     }
 }
