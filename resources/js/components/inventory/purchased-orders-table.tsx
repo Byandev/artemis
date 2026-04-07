@@ -1,9 +1,10 @@
-import { ChevronDown, Inbox, Pencil, Plus, Trash2 } from 'lucide-react';
-import { ReactNode } from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useMemo } from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { DataTable } from '@/components/ui/data-table';
 import { PurchasedOrder, StatusId, StatusOption } from '@/types/models/PurchasedOrder';
+import { ColumnDef } from '@tanstack/react-table';
 
 interface PurchasedOrdersTableProps {
     loading: boolean;
@@ -23,7 +24,11 @@ interface PurchasedOrdersTableProps {
     onUpdateStatus: (id: number, status: StatusId) => void;
     onOpenEdit: (row: PurchasedOrder) => void;
     onOpenDelete: (row: PurchasedOrder) => void;
-    footerSlot?: ReactNode;
+    currentPage: number;
+    lastPage: number;
+    perPage: number;
+    totalRows: number;
+    onFetchPage: (page: number) => void;
 }
 
 export function PurchasedOrdersTable({
@@ -44,8 +49,159 @@ export function PurchasedOrdersTable({
     onUpdateStatus,
     onOpenEdit,
     onOpenDelete,
-    footerSlot,
+    currentPage,
+    lastPage,
+    perPage,
+    totalRows,
+    onFetchPage,
 }: PurchasedOrdersTableProps) {
+    const fromRow = totalRows === 0 ? 0 : Math.min((currentPage - 1) * perPage + 1, totalRows);
+    const toRow = totalRows === 0 ? 0 : Math.min(currentPage * perPage, totalRows);
+
+    const columns = useMemo<ColumnDef<PurchasedOrder>[]>(() => [
+        {
+            accessorKey: 'issue_date',
+            header: 'Issue Date',
+            cell: ({ row }) => (
+                <span className="whitespace-nowrap text-[12px] text-gray-700 dark:text-gray-200" style={{ fontFamily: monoFont }}>
+                    {formatIssueDate(row.original.issue_date)}
+                </span>
+            ),
+        },
+        {
+            accessorKey: 'delivery_no',
+            header: 'Delivered No.',
+            cell: ({ row }) => (
+                <span className="whitespace-nowrap text-[12px] text-gray-800 dark:text-gray-100" style={{ fontFamily: monoFont }}>
+                    {row.original.delivery_no || '-'}
+                </span>
+            ),
+        },
+        {
+            accessorKey: 'cust_po_no',
+            header: 'Cust PO No.',
+            cell: ({ row }) => (
+                <span className="whitespace-nowrap text-[12px] text-gray-500 dark:text-gray-400" style={{ fontFamily: monoFont }}>
+                    {row.original.cust_po_no || '-'}
+                </span>
+            ),
+        },
+        {
+            accessorKey: 'control_no',
+            header: 'Control No.',
+            cell: ({ row }) => (
+                <span className="whitespace-nowrap text-[12px] text-gray-500 dark:text-gray-400" style={{ fontFamily: monoFont }}>
+                    {row.original.control_no || '-'}
+                </span>
+            ),
+        },
+        {
+            accessorKey: 'item',
+            header: 'Item',
+            cell: ({ row }) => (
+                <span className="whitespace-nowrap text-[12px] font-semibold text-gray-800 dark:text-gray-100">
+                    {row.original.item}
+                </span>
+            ),
+        },
+        {
+            accessorKey: 'cog_amount',
+            header: 'COG Amount',
+            cell: ({ row }) => (
+                <span className="whitespace-nowrap text-[12px] text-gray-700 dark:text-gray-200" style={{ fontFamily: monoFont }}>
+                    {formatMoney(row.original.cog_amount)}
+                </span>
+            ),
+        },
+        {
+            accessorKey: 'delivery_fee',
+            header: 'Delivery Fee',
+            cell: ({ row }) => (
+                <span className="whitespace-nowrap text-[12px] text-gray-700 dark:text-gray-200" style={{ fontFamily: monoFont }}>
+                    {formatMoney(row.original.delivery_fee)}
+                </span>
+            ),
+        },
+        {
+            accessorKey: 'total_amount',
+            header: 'Total Amount',
+            cell: ({ row }) => (
+                <span className="whitespace-nowrap text-[12px] text-gray-800 dark:text-gray-100" style={{ fontFamily: monoFont }}>
+                    {formatMoney(row.original.total_amount)}
+                </span>
+            ),
+        },
+        {
+            id: 'status',
+            header: 'Status',
+            cell: ({ row }) => (
+                <div className="inline-flex h-7 min-w-[170px] items-center rounded-2xl pl-1.5 pr-1">
+                    <span className={`inline-flex w-full items-center gap-1 rounded-2xl px-2 py-1 text-[11px] font-medium ${statusBadgeClass(row.original.status)}`}>
+                        <span className="h-1.5 w-1.5 rounded-full bg-current/60" />
+                        <span>{statusLabel(row.original.status)}</span>
+                    </span>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button
+                                type="button"
+                                className="ml-1 inline-flex h-6 w-5 items-center justify-center rounded-md text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                aria-label={`Open status dropdown for ${row.original.delivery_no || row.original.item}`}
+                            >
+                                <ChevronDown className="h-3.5 w-3.5" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-[150px] p-1.5">
+                            {statusOptions.map((opt) => (
+                                <DropdownMenuItem
+                                    key={opt.value}
+                                    className={statusOptionTextClass(opt.value)}
+                                    onClick={() => onUpdateStatus(row.original.id, opt.value)}
+                                >
+                                    {opt.label}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            ),
+        },
+        {
+            id: 'actions',
+            header: 'Actions',
+            cell: ({ row }) => (
+                <div className="inline-flex items-center text-[11px]">
+                    <button
+                        type="button"
+                        className="inline-flex items-center px-1 text-gray-400 transition-colors hover:text-sky-600 dark:text-gray-500 dark:hover:text-sky-400"
+                        onClick={() => onOpenEdit(row.original)}
+                    >
+                        <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="mx-1 h-3.5 w-px bg-black/10 dark:bg-white/10" />
+                    <button
+                        type="button"
+                        className="inline-flex items-center px-1 text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
+                        onClick={() => onOpenDelete(row.original)}
+                    >
+                        <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                </div>
+            ),
+        },
+    ], [
+        formatIssueDate,
+        formatMoney,
+        monoFont,
+        onOpenDelete,
+        onOpenEdit,
+        onUpdateStatus,
+        statusBadgeClass,
+        statusLabel,
+        statusOptionTextClass,
+        statusOptions,
+    ]);
+
     return (
         <div className="relative overflow-visible">
             <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white shadow-theme-xs dark:border-white/6 dark:bg-zinc-900">
@@ -84,107 +240,25 @@ export function PurchasedOrdersTable({
                     </div>
                 ) : (
                     <div className="max-w-full overflow-x-auto custom-scrollbar">
-                        <Table className="min-w-full">
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="px-4 py-2.5 text-left text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-400 dark:text-gray-500 border-b border-black/6 dark:border-white/6">Issue Date</TableHead>
-                                    <TableHead className="px-4 py-2.5 text-left text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-400 dark:text-gray-500 border-b border-black/6 dark:border-white/6">Delivered No.</TableHead>
-                                    <TableHead className="px-4 py-2.5 text-left text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-400 dark:text-gray-500 border-b border-black/6 dark:border-white/6">Cust PO No.</TableHead>
-                                    <TableHead className="px-4 py-2.5 text-left text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-400 dark:text-gray-500 border-b border-black/6 dark:border-white/6">Control No.</TableHead>
-                                    <TableHead className="px-4 py-2.5 text-left text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-400 dark:text-gray-500 border-b border-black/6 dark:border-white/6">Item</TableHead>
-                                    <TableHead className="px-4 py-2.5 text-left text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-400 dark:text-gray-500 border-b border-black/6 dark:border-white/6">COG Amount</TableHead>
-                                    <TableHead className="px-4 py-2.5 text-left text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-400 dark:text-gray-500 border-b border-black/6 dark:border-white/6">Delivery Fee</TableHead>
-                                    <TableHead className="px-4 py-2.5 text-left text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-400 dark:text-gray-500 border-b border-black/6 dark:border-white/6">Total Amount</TableHead>
-                                    <TableHead className="px-4 py-2.5 text-left text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-400 dark:text-gray-500 border-b border-black/6 dark:border-white/6">Status</TableHead>
-                                    <TableHead className="px-4 py-2.5 text-left text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-400 dark:text-gray-500 border-b border-black/6 dark:border-white/6">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody className="bg-white text-gray-600 dark:bg-zinc-900 dark:text-gray-300">
-                                {rows.length === 0 ? (
-                                    <TableRow className="hover:bg-transparent">
-                                        <TableCell colSpan={10} className="py-16 text-center">
-                                            <div className="flex flex-col items-center gap-3">
-                                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-stone-100 dark:bg-zinc-800">
-                                                    <Inbox className="h-5 w-5 text-gray-400 dark:text-gray-500" />
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <p className="font-mono text-[12px] font-medium text-gray-600 dark:text-gray-400">No results found</p>
-                                                    <p className="font-mono text-[11px] text-gray-400 dark:text-gray-600">Try adjusting your search or filters</p>
-                                                </div>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    rows.map((row) => (
-                                        <TableRow key={row.id} className="border-b border-black/6 transition-colors hover:bg-emerald-500/[0.03] dark:border-white/6 dark:hover:bg-emerald-500/8">
-                                            <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] text-gray-700 dark:text-gray-200" style={{ fontFamily: monoFont }}>{formatIssueDate(row.issue_date)}</TableCell>
-                                            <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] text-gray-800 dark:text-gray-100" style={{ fontFamily: monoFont }}>{row.delivery_no || '-'}</TableCell>
-                                            <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] text-gray-500 dark:text-gray-400" style={{ fontFamily: monoFont }}>{row.cust_po_no || '-'}</TableCell>
-                                            <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] text-gray-500 dark:text-gray-400" style={{ fontFamily: monoFont }}>{row.control_no || '-'}</TableCell>
-                                            <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] font-semibold text-gray-800 dark:text-gray-100">{row.item}</TableCell>
-                                            <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] text-gray-700 dark:text-gray-200" style={{ fontFamily: monoFont }}>{formatMoney(row.cog_amount)}</TableCell>
-                                            <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] text-gray-700 dark:text-gray-200" style={{ fontFamily: monoFont }}>{formatMoney(row.delivery_fee)}</TableCell>
-                                            <TableCell className="whitespace-nowrap px-4 py-3 text-[12px] text-gray-800 dark:text-gray-100" style={{ fontFamily: monoFont }}>{formatMoney(row.total_amount)}</TableCell>
-                                            <TableCell className="whitespace-nowrap px-4 py-3">
-                                                <div className="inline-flex h-7 min-w-[170px] items-center rounded-2xl pl-1.5 pr-1">
-                                                    <span className={`inline-flex w-full items-center gap-1 rounded-2xl px-2 py-1 text-[11px] font-medium ${statusBadgeClass(row.status)}`}>
-                                                        <span className="h-1.5 w-1.5 rounded-full bg-current/60" />
-                                                        <span>{statusLabel(row.status)}</span>
-                                                    </span>
-
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <button
-                                                                type="button"
-                                                                className="ml-1 inline-flex h-6 w-5 items-center justify-center rounded-md text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                                                                aria-label={`Open status dropdown for ${row.delivery_no || row.item}`}
-                                                            >
-                                                                <ChevronDown className="h-3.5 w-3.5" />
-                                                            </button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end" className="w-[150px] p-1.5">
-                                                            {statusOptions.map((opt) => (
-                                                                <DropdownMenuItem
-                                                                    key={opt.value}
-                                                                    className={statusOptionTextClass(opt.value)}
-                                                                    onClick={() => onUpdateStatus(row.id, opt.value)}
-                                                                >
-                                                                    {opt.label}
-                                                                </DropdownMenuItem>
-                                                            ))}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="whitespace-nowrap px-4 py-3">
-                                                <div className="inline-flex items-center text-[11px]">
-                                                    <button
-                                                        type="button"
-                                                        className="inline-flex items-center px-1 text-gray-400 transition-colors hover:text-sky-600 dark:text-gray-500 dark:hover:text-sky-400"
-                                                        onClick={() => onOpenEdit(row)}
-                                                    >
-                                                        <Pencil className="h-3.5 w-3.5" />
-                                                    </button>
-                                                    <span className="mx-1 h-3.5 w-px bg-black/10 dark:bg-white/10" />
-                                                    <button
-                                                        type="button"
-                                                        className="inline-flex items-center px-1 text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
-                                                        onClick={() => onOpenDelete(row)}
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                        {footerSlot && (
-                            <div className="border-t border-black/6 bg-white px-4 py-3 text-[12px] text-gray-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300">
-                                {footerSlot}
-                            </div>
-                        )}
+                        <DataTable
+                            columns={columns}
+                            data={rows}
+                            meta={{
+                                current_page: currentPage,
+                                last_page: lastPage,
+                                per_page: perPage,
+                                total: totalRows,
+                                from: fromRow,
+                                to: toRow,
+                                links: lastPage > 1
+                                    ? [{ url: '#', label: String(currentPage), active: true }]
+                                    : [],
+                            }}
+                            onFetch={(params) => {
+                                const nextPage = Number(params?.page ?? currentPage);
+                                onFetchPage(Number.isFinite(nextPage) ? nextPage : currentPage);
+                            }}
+                        />
                     </div>
                 )}
             </div>
