@@ -6,7 +6,6 @@ import { PurchasedOrder, StatusId, StatusOption } from '@/types/models/Purchased
 import { ColumnDef } from '@tanstack/react-table';
 
 interface PurchasedOrdersTableProps {
-    loading: boolean;
     rows: PurchasedOrder[];
     monoFont: string;
     formatIssueDate: (value: string) => string;
@@ -26,7 +25,6 @@ interface PurchasedOrdersTableProps {
 }
 
 export function PurchasedOrdersTable({
-    loading,
     rows,
     monoFont,
     formatIssueDate,
@@ -194,46 +192,27 @@ export function PurchasedOrdersTable({
     return (
         <div className="relative overflow-visible">
             <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white shadow-theme-xs dark:border-white/6 dark:bg-zinc-900">
-                {loading ? (
-                    <div className="flex min-h-[520px] flex-col items-center justify-center px-4">
-                        <div className="relative h-32 w-32">
-                            <div className="absolute inset-0 rounded-full border-10 border-gray-300/80 dark:border-white/10" />
-                            <div className="absolute inset-0 animate-spin rounded-full border-10 border-transparent border-r-[#16d5b2] border-b-[#16d5b2]" />
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <img
-                                    src="/img/logo/artemis.png"
-                                    alt="Artemis"
-                                    className="h-[58px] w-[58px] object-contain"
-                                />
-                            </div>
-                        </div>
-                        <p className="mt-4 text-[18px] font-normal tracking-[0.01em] text-gray-800 dark:text-gray-200" style={{ fontFamily: monoFont }}>
-                            Loading...
-                        </p>
-                    </div>
-                ) : (
-                    <div className="max-w-full overflow-x-auto custom-scrollbar">
-                        <DataTable
-                            columns={columns}
-                            data={rows}
-                            meta={{
-                                current_page: currentPage,
-                                last_page: lastPage,
-                                per_page: perPage,
-                                total: totalRows,
-                                from: fromRow,
-                                to: toRow,
-                                links: lastPage > 1
-                                    ? [{ url: '#', label: String(currentPage), active: true }]
-                                    : [],
-                            }}
-                            onFetch={(params) => {
-                                const nextPage = Number(params?.page ?? currentPage);
-                                onFetchPage(Number.isFinite(nextPage) ? nextPage : currentPage);
-                            }}
-                        />
-                    </div>
-                )}
+                <div className="max-w-full overflow-x-auto custom-scrollbar">
+                    <DataTable
+                        columns={columns}
+                        data={rows}
+                        meta={{
+                            current_page: currentPage,
+                            last_page: lastPage,
+                            per_page: perPage,
+                            total: totalRows,
+                            from: fromRow,
+                            to: toRow,
+                            links: lastPage > 1
+                                ? [{ url: '#', label: String(currentPage), active: true }]
+                                : [],
+                        }}
+                        onFetch={(params) => {
+                            const nextPage = Number(params?.page ?? currentPage);
+                            onFetchPage(Number.isFinite(nextPage) ? nextPage : currentPage);
+                        }}
+                    />
+                </div>
             </div>
         </div>
     );
