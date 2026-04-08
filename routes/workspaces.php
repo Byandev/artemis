@@ -159,6 +159,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Employee routes
     Route::get('/workspaces/{workspace}/employees', [EmployeeController::class, 'index'])->name('workspaces.employees.index');
+    Route::put('/workspaces/{workspace:slug}/employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
 
     // Team routes
     Route::get('/workspaces/{workspace}/teams', [TeamController::class, 'index'])->name('workspaces.teams.index');
