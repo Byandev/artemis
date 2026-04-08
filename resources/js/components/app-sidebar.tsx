@@ -62,10 +62,22 @@ export function AppSidebar() {
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
             icon: Users,
         },
+
         {
-            title: 'Employees',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/employees`,
+            title: 'CSR',
             icon: User,
+            items: [
+                {
+                    title: 'Management',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/csr/management`,
+                    icon: User,
+                },
+                {
+                    title: 'CSR Analytics',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/csr/analytics`,
+                    icon: BarChart2,
+                },
+            ],
         },
         {
             title: 'Inventory',

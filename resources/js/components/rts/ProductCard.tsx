@@ -9,14 +9,15 @@ import { buildBaseParams, OrderItemRow, RtsCell, RtsQueryParams } from './rts-sh
 interface Props {
     workspaceSlug: string;
     queryParams: RtsQueryParams;
+    onDataLoaded?: (data: OrderItemRow[]) => void;
 }
 
-export default function ProductCard({ workspaceSlug, queryParams }: Props) {
+export default function ProductCard({ workspaceSlug, queryParams, onDataLoaded }: Props) {
     const [data, setData] = useState<PaginatedData<OrderItemRow> | null>(null);
     const [loading, setLoading] = useState(true);
     const [sort, setSort] = useState('-total_orders');
 
-    const fetchPage = (page: number, currentSort: string) => {
+    const fetchPage = (page: number, currentSort: string, isInitial = false) => {
         setLoading(true);
         const p = buildBaseParams(queryParams);
         p.append('page', String(page));
@@ -24,12 +25,12 @@ export default function ProductCard({ workspaceSlug, queryParams }: Props) {
         p.append('sort', currentSort);
         fetch(`/workspaces/${workspaceSlug}/rts/analytics/group-by/order-item?${p}`, { credentials: 'same-origin' })
             .then((res) => (res.ok ? res.json() : null))
-            .then((json) => { setData(json); setLoading(false); })
+            .then((json) => { setData(json); setLoading(false); if (isInitial) onDataLoaded?.(json?.data ?? []); })
             .catch(() => setLoading(false));
     };
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => { fetchPage(1, sort); }, [workspaceSlug, JSON.stringify(queryParams)]);
+    useEffect(() => { fetchPage(1, sort, true); }, [workspaceSlug, JSON.stringify(queryParams)]);
 
     const columns: ColumnDef<OrderItemRow>[] = useMemo(() => [
         {

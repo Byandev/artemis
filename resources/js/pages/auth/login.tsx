@@ -1,19 +1,11 @@
 import AuthenticatedSessionController from '@/actions/App/Http/Controllers/Auth/AuthenticatedSessionController';
-import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import AuthLayout from '@/layouts/auth-layout';
 import { register } from '@/routes';
 import { request } from '@/routes/password';
 import { Form, Head, usePage } from '@inertiajs/react';
-import { Info, LoaderCircle } from 'lucide-react';
+import { Info, Loader2 } from 'lucide-react';
 import { WorkspaceInvitation } from '@/types/models/WorkspaceInvitation';
-
-
 
 interface LoginProps {
     status?: string;
@@ -28,19 +20,24 @@ export default function Login({ status, canResetPassword }: LoginProps) {
 
     return (
         <AuthLayout
-            title="Log in to your account"
-            description={invitation ? `Login to join ${invitation.workspace.name}` : "Enter your email and password below to log in"}
+            title="Welcome back"
+            description={invitation ? `Login to join ${invitation.workspace.name}` : 'Enter your credentials to access your workspace'}
         >
             <Head title="Log in" />
 
             {invitation && (
-                <Alert className="mb-4">
-                    <Info className="h-4 w-4" />
-                    <AlertDescription>
-                        You've been invited to join <strong>{invitation.workspace.name}</strong>
-                        Login to accept the invitation.
-                    </AlertDescription>
-                </Alert>
+                <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-brand-500/20 bg-brand-500/5 px-3.5 py-3">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-500" />
+                    <p className="font-mono text-[11px] leading-relaxed text-gray-600 dark:text-gray-400">
+                        You've been invited to join <span className="font-semibold text-gray-800 dark:text-gray-200">{invitation.workspace.name}</span>. Login to accept.
+                    </p>
+                </div>
+            )}
+
+            {status && (
+                <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                    <p className="font-mono text-[11px] text-emerald-700 dark:text-emerald-400">{status}</p>
+                </div>
             )}
 
             <Form
@@ -54,12 +51,13 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                             <input type="hidden" name="invitation" value={invitationToken} />
                         )}
 
-                        <div className="grid gap-4">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="email" className="text-[13px] font-medium text-gray-700 dark:text-gray-300">
+                        <div className="space-y-4">
+                            {/* Email */}
+                            <div className="space-y-1.5">
+                                <label htmlFor="email" className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
                                     Email address
-                                </Label>
-                                <Input
+                                </label>
+                                <input
                                     id="email"
                                     type="email"
                                     name="email"
@@ -70,78 +68,75 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                     placeholder="email@example.com"
                                     defaultValue={invitation?.email || ''}
                                     readOnly={!!invitation}
-                                    className="h-10 text-[14px]"
+                                    className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 read-only:opacity-60 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                                 />
                                 {invitation && (
-                                    <p className="text-[12px] text-gray-400 dark:text-gray-500">
-                                        This email matches your invitation.
-                                    </p>
+                                    <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">This email matches your invitation.</p>
                                 )}
-                                <InputError message={errors.email} />
+                                {errors.email && <p className="font-mono text-[11px] text-red-500">{errors.email}</p>}
                             </div>
 
-                            <div className="grid gap-1.5">
-                                <div className="flex items-center">
-                                    <Label htmlFor="password" className="text-[13px] font-medium text-gray-700 dark:text-gray-300">
+                            {/* Password */}
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                    <label htmlFor="password" className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
                                         Password
-                                    </Label>
+                                    </label>
                                     {canResetPassword && (
-                                        <TextLink
-                                            href={request()}
-                                            className="ml-auto text-[12px]"
-                                            tabIndex={5}
-                                        >
+                                        <TextLink href={request()} className="font-mono! text-[10px]!" tabIndex={5}>
                                             Forgot password?
                                         </TextLink>
                                     )}
                                 </div>
-                                <Input
+                                <input
                                     id="password"
                                     type="password"
                                     name="password"
                                     required
                                     tabIndex={2}
                                     autoComplete="current-password"
-                                    placeholder="Password"
-                                    className="h-10 text-[14px]"
+                                    placeholder="••••••••"
+                                    className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                                 />
-                                <InputError message={errors.password} />
+                                {errors.password && <p className="font-mono text-[11px] text-red-500">{errors.password}</p>}
                             </div>
 
-                            <div className="flex items-center space-x-2.5">
-                                <Checkbox id="remember" name="remember" tabIndex={3} />
-                                <Label htmlFor="remember" className="text-[13px] text-gray-600 dark:text-gray-400 font-normal">
-                                    Remember me
-                                </Label>
-                            </div>
+                            {/* Remember me */}
+                            <label className="flex cursor-pointer items-center gap-2.5">
+                                <input
+                                    type="checkbox"
+                                    name="remember"
+                                    tabIndex={3}
+                                    className="h-3.5 w-3.5 rounded border-black/20 accent-emerald-600 dark:border-white/20"
+                                />
+                                <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">Remember me</span>
+                            </label>
 
-                            <Button
+                            {/* Submit */}
+                            <button
                                 type="submit"
-                                className="mt-2 h-10 w-full text-[14px] font-medium"
                                 tabIndex={4}
                                 disabled={processing}
-                                data-test="login-button"
+                                className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-emerald-600 font-mono! text-[13px]! font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                             >
-                                {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                                {processing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                                 Log in
-                            </Button>
+                            </button>
                         </div>
 
-                        <p className="text-center text-[13px] text-gray-500 dark:text-gray-400">
+                        <p className="text-center font-mono text-[11px] text-gray-400 dark:text-gray-500">
                             Don't have an account?{' '}
-                            <TextLink href={invitationToken ? register({ query: { invitation: invitationToken } }).url : register().url} tabIndex={5}>
+                            <TextLink
+                                href={invitationToken ? register({ query: { invitation: invitationToken } }).url : register().url}
+                                className="font-mono! text-[11px]!"
+                                tabIndex={5}
+                            >
                                 Sign up
                             </TextLink>
                         </p>
                     </>
                 )}
             </Form>
-
-            {status && (
-                <div className="mb-4 text-center text-sm font-medium text-green-600">
-                    {status}
-                </div>
-            )}
         </AuthLayout>
     );
 }
