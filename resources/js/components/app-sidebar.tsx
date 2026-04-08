@@ -23,6 +23,8 @@ import {
     BarChart2,
     MapPin,
     ClipboardList,
+    Box,
+    Layers,
 
 } from 'lucide-react';
 import AppLogo from './app-logo';
@@ -67,7 +69,7 @@ export function AppSidebar() {
         },
         {
             title: 'Inventory',
-            icon: Package,
+            icon: Box,
             items: [
                 {
                     title: 'PPW',
@@ -78,6 +80,11 @@ export function AppSidebar() {
                     title: 'Transaction Logs',
                     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/transactions`,
                     icon: ClipboardList,
+                },
+                {
+                    title: 'Inventory Items',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/items`,
+                    icon: Layers,
                 },
             ],
         },

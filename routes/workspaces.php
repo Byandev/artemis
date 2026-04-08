@@ -28,6 +28,7 @@ use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Modules\Inventory\Http\Controllers\PpwController;
 use Modules\Inventory\Http\Controllers\PurchaseOrderController;
+use Modules\Inventory\Http\Controllers\InventoryItemController;
 
 /*
 |--------------------------------------------------------------------------
@@ -53,7 +54,6 @@ Route::middleware(['auth'])->group(function () {
         Route::patch('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'update'])->name('inventory.transactions.update');
         Route::delete('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'destroy'])->name('inventory.transactions.destroy');
     });
-
 
 
     // Workspace dashboard
@@ -181,6 +181,13 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/', [PpwController::class, 'store'])->name('store');
         Route::put('/{ppw}', [PpwController::class, 'update'])->name('update');
         Route::delete('/{ppw}', [PpwController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
+    Route::get('/', [InventoryItemController::class, 'index'])->name('index');
+    Route::post('/', [InventoryItemController::class, 'store'])->name('store');
+    Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
+    Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
     });
 
 });
