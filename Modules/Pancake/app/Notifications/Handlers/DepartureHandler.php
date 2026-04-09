@@ -9,7 +9,9 @@ class DepartureHandler extends BaseNotificationHandler
 {
     public function handle(Order $order, ParcelJourney $parcelJourney, string $psid, array $data): void
     {
-        if (! $this->page->parcel_journey_enabled) return;
+        if (! $this->page->parcel_journey_enabled) {
+            return;
+        }
 
         preg_match_all('/【(.*?)】/', $parcelJourney->note, $matches);
 

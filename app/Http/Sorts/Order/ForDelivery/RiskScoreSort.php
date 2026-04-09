@@ -10,13 +10,13 @@ class RiskScoreSort implements Sort
     public function __invoke(Builder $query, bool $descending, string $property): void
     {
         $query->orderByRaw(
-            self::sql() . ' ' . ($descending ? 'DESC' : 'ASC')
+            self::sql().' '.($descending ? 'DESC' : 'ASC')
         );
     }
 
     public static function sql(): string
     {
-        return "
+        return '
             LEAST(COALESCE((
                 SELECT (delivery_attempts - 1) / 4.0
                 FROM pancake_orders
@@ -42,6 +42,6 @@ class RiskScoreSort implements Sort
                 AND rider_phone = pancake_order_for_delivery.rider_phone
                 LIMIT 1
             ), 0) * 0.0625
-        ";
+        ';
     }
 }

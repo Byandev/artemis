@@ -27,7 +27,7 @@ class PageController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -63,7 +63,7 @@ class PageController extends Controller
 
     public function create(Request $request, Workspace $workspace)
     {
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -77,7 +77,7 @@ class PageController extends Controller
 
     public function edit(Request $request, Workspace $workspace, Page $page)
     {
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -94,13 +94,13 @@ class PageController extends Controller
     {
 
         // Check if user has access to this workspace
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
         $validated = $request->validated();
 
-        $response = Http::get('https://pos.pages.fm/api/v1/shops/' . $validated['shop_id'], [
+        $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
             'api_key' => $validated['pos_token'],
         ]);
 
@@ -116,7 +116,7 @@ class PageController extends Controller
 
         $page = $pages->firstWhere('id', $validated['id']);
 
-        if (!$page) {
+        if (! $page) {
             throw ValidationException::withMessages([
                 'id' => 'Page not found',
             ]);
@@ -147,8 +147,8 @@ class PageController extends Controller
             'status' => $validated['status'] ?? 'active',
         ]);
 
-        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear(1)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
-        dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subYear(1)->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonth()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subMonth()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
         dispatch(new FetchShopUsers($shop))->onQueue('pancake');
 
         return redirect()->route('workspaces.pages.index', $workspace)
@@ -182,7 +182,7 @@ class PageController extends Controller
     public function refresh(Request $request, Workspace $workspace, Page $page)
     {
         // Check if user has access to this workspace
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -193,10 +193,12 @@ class PageController extends Controller
 
         $page->update([
             'orders_last_synced_at' => null,
-            'is_sync_logic_updated' => true
+            'is_sync_logic_updated' => true,
         ]);
 
-        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonth()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
+
+        //        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
 
         return redirect()->route('workspaces.pages.index', $workspace);
     }

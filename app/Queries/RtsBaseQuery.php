@@ -56,12 +56,12 @@ abstract class RtsBaseQuery
     private function applyDateFilter(): void
     {
         $start = $this->request->input('start_date');
-        $end   = $this->request->input('end_date');
+        $end = $this->request->input('end_date');
 
         if ($start && $end) {
             $this->query->where(function ($q) use ($start, $end) {
-                $q->whereBetween('pancake_orders.delivered_at', [$start, $end . ' 23:59:59'])
-                  ->orWhereBetween('pancake_orders.returning_at', [$start, $end . ' 23:59:59']);
+                $q->whereBetween('pancake_orders.delivered_at', [$start, $end.' 23:59:59'])
+                    ->orWhereBetween('pancake_orders.returning_at', [$start, $end.' 23:59:59']);
             });
         }
     }

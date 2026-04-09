@@ -4,16 +4,16 @@ namespace App\Http\Controllers\Workspaces\RTS;
 
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\Order\ForDelivery\ConferrerNameSort;
-use App\Http\Sorts\Order\ForDelivery\CxRtsRateSort;
 use App\Http\Sorts\Order\ForDelivery\CustomerNameSort;
+use App\Http\Sorts\Order\ForDelivery\CxRtsRateSort;
 use App\Http\Sorts\Order\ForDelivery\LocationRtsRateSort;
-use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
-use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Http\Sorts\Order\ForDelivery\OrderAmountSort;
 use App\Http\Sorts\Order\ForDelivery\OrderDeliveryAttemptSort;
 use App\Http\Sorts\Order\ForDelivery\OrderNumberSort;
 use App\Http\Sorts\Order\ForDelivery\OrderParcelStatusSort;
 use App\Http\Sorts\Order\ForDelivery\OrderTrackingCodeSort;
+use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
+use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Models\Page;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
@@ -31,14 +31,14 @@ class ForDeliveryController extends Controller
         $isRemoving = $request->has('removeAssignee') && $request->removeAssignee;
 
         // Require userId unless explicitly removing the assignee
-        if (!$isRemoving && (!$request->has('userId') || !$request->userId)) {
+        if (! $isRemoving && (! $request->has('userId') || ! $request->userId)) {
             return redirect()->back()->with('error', 'Please select a user before updating.');
         }
 
         // Find the order
         $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
 
-        if (!$orderForDelivery) {
+        if (! $orderForDelivery) {
             return redirect()->back()->with('error', 'Order not found.');
         }
 
@@ -58,7 +58,7 @@ class ForDeliveryController extends Controller
             ->addSelect([
                 'pancake_order_for_delivery.*',
                 \DB::raw('(SELECT rts_rate FROM rider_delivery_summary WHERE rider_name = pancake_order_for_delivery.rider_name AND rider_phone = pancake_order_for_delivery.rider_phone LIMIT 1) as rider_rts_rate'),
-                \DB::raw('(' . RiskScoreSort::sql() . ') as risk_score'),
+                \DB::raw('('.RiskScoreSort::sql().') as risk_score'),
             ])
             ->with([
                 'order' => function ($query) {
@@ -185,18 +185,18 @@ class ForDeliveryController extends Controller
 
         // 4️⃣ Successful rate (parcel delivered)
         $totalParcel = (clone $statsBase)
-            ->whereHas('order', fn($q) => $q->whereNotNull('parcel_status'))
+            ->whereHas('order', fn ($q) => $q->whereNotNull('parcel_status'))
             ->count();
 
         $totalDelivered = (clone $statsBase)
-            ->whereHas('order', fn($q) => $q->where('parcel_status', 'delivered'))
+            ->whereHas('order', fn ($q) => $q->where('parcel_status', 'delivered'))
             ->count();
 
         $successfulRate = $totalParcel > 0 ? round(($totalDelivered / $totalParcel) * 100, 1) : 0;
 
         // 5️⃣ Unsuccessful rate (problematic + returning + undeliverable)
         $totalUnsuccessful = (clone $statsBase)
-            ->whereHas('order', fn($q) => $q->whereIn('parcel_status', ['problematic', 'returning', 'undeliverable']))
+            ->whereHas('order', fn ($q) => $q->whereIn('parcel_status', ['problematic', 'returning', 'undeliverable']))
             ->count();
 
         $unsuccessfulRate = $totalParcel > 0 ? round(($totalUnsuccessful / $totalParcel) * 100, 1) : 0;
@@ -224,7 +224,7 @@ class ForDeliveryController extends Controller
     {
         $userId = $request->query('user_id');
 
-        if (!$userId) {
+        if (! $userId) {
             return response()->json(['assigned' => 0, 'called' => 0]);
         }
 

@@ -2,8 +2,6 @@
 
 namespace App\Queries;
 
-use App\Models\Workspace;
-use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
 class RtsCxQuery extends RtsBaseQuery
@@ -44,7 +42,7 @@ class RtsCxQuery extends RtsBaseQuery
         $bucketList = implode(', ', array_map(fn ($b) => "'{$b}'", self::BUCKETS));
 
         return $this->query
-            ->selectRaw("({$bucketExpr}) AS cx_rts_bucket, " . self::METRICS_SQL)
+            ->selectRaw("({$bucketExpr}) AS cx_rts_bucket, ".self::METRICS_SQL)
             ->leftJoin('pancake_order_phone_number_reports AS pnr', function ($join) {
                 $join->on('pnr.order_id', '=', 'pancake_orders.id')
                     ->where('pnr.type', '=', $this->reportType);

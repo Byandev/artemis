@@ -16,10 +16,10 @@ final class UniqueCustomerCount
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
         $periodSql = match ($group) {
-            'daily'   => 'DATE(pancake_orders.confirmed_at)',
-            'weekly'  => "DATE_FORMAT(pancake_orders.confirmed_at, '%x-W%v')",
+            'daily' => 'DATE(pancake_orders.confirmed_at)',
+            'weekly' => "DATE_FORMAT(pancake_orders.confirmed_at, '%x-W%v')",
             'monthly' => "DATE_FORMAT(pancake_orders.confirmed_at, '%Y-%m')",
-            default   => 'DATE(pancake_orders.confirmed_at)',
+            default => 'DATE(pancake_orders.confirmed_at)',
         };
 
         return $this->baseQuery($workspaceId, $date_range, $filter)

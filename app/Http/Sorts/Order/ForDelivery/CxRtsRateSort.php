@@ -20,7 +20,7 @@ class CxRtsRateSort implements Sort
                 FROM pancake_order_phone_number_reports
                 WHERE order_id = pancake_order_for_delivery.order_id
                 AND pancake_order_phone_number_reports.type = \'latest\'
-            ) ' . ($descending ? 'DESC' : 'ASC')
+            ) '.($descending ? 'DESC' : 'ASC')
         );
     }
 }

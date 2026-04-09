@@ -5,7 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { ChevronsUpDown, Check, Plus, Users, LayoutGrid } from "lucide-react";
+import { ChevronsUpDown, Check, Plus, Users, LayoutGrid, KeyRound } from "lucide-react";
 import { Workspace } from '@/types/models/Workspace';
 import { Link, usePage } from '@inertiajs/react';
 
@@ -112,6 +112,15 @@ const WorkspaceSwitcher = () => {
                         >
                             <Users className="h-3.5 w-3.5 shrink-0" />
                             Manage members
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="p-0 focus:bg-transparent">
+                        <Link
+                            href={`/workspaces/${currentWorkspace.slug}/api-keys`}
+                            className="flex items-center gap-2.5 w-full px-2 py-2 rounded-[8px] text-[13px] text-gray-500 dark:text-gray-400 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] hover:text-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer"
+                        >
+                            <KeyRound className="h-3.5 w-3.5 shrink-0" />
+                            API Keys
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild className="p-0 focus:bg-transparent">

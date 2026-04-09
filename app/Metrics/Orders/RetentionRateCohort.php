@@ -21,9 +21,9 @@ abstract class RetentionRateCohort
      */
     public function compute(int $workspaceId, array $dateRange, array $filter): float
     {
-        $days        = $this->days();
+        $days = $this->days();
         $cohortStart = Carbon::now()->subDays($days * 2)->startOfDay()->toDateTimeString();
-        $cohortEnd   = Carbon::now()->subDays($days)->startOfDay()->toDateTimeString();
+        $cohortEnd = Carbon::now()->subDays($days)->startOfDay()->toDateTimeString();
 
         return $this->computeForWindow($workspaceId, $filter, $cohortStart, $cohortEnd);
     }
@@ -34,15 +34,15 @@ abstract class RetentionRateCohort
      */
     public function breakdown(int $workspaceId, array $dateRange, array $filter, string $group = 'daily')
     {
-        $days    = $this->days();
+        $days = $this->days();
         $periods = $this->generatePeriods($dateRange, $group);
-        $now     = Carbon::now();
+        $now = Carbon::now();
 
         return collect($periods)
             ->filter(fn ($p) => Carbon::parse($p['end_exclusive'])->addDays($days)->lte($now))
             ->map(fn ($p) => (object) [
                 'period' => $p['label'],
-                'value'  => $this->computeForWindow($workspaceId, $filter, $p['start'], $p['end_exclusive']),
+                'value' => $this->computeForWindow($workspaceId, $filter, $p['start'], $p['end_exclusive']),
             ])
             ->values();
     }
@@ -52,9 +52,9 @@ abstract class RetentionRateCohort
      */
     public function perPage(int $workspaceId, array $dateRange, array $filter)
     {
-        $days        = $this->days();
+        $days = $this->days();
         $cohortStart = Carbon::now()->subDays($days * 2)->startOfDay()->toDateTimeString();
-        $cohortEnd   = Carbon::now()->subDays($days)->startOfDay()->toDateTimeString();
+        $cohortEnd = Carbon::now()->subDays($days)->startOfDay()->toDateTimeString();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
         $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
@@ -96,9 +96,9 @@ abstract class RetentionRateCohort
      */
     public function perShop(int $workspaceId, array $dateRange, array $filter)
     {
-        $days        = $this->days();
+        $days = $this->days();
         $cohortStart = Carbon::now()->subDays($days * 2)->startOfDay()->toDateTimeString();
-        $cohortEnd   = Carbon::now()->subDays($days)->startOfDay()->toDateTimeString();
+        $cohortEnd = Carbon::now()->subDays($days)->startOfDay()->toDateTimeString();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
         $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
@@ -143,9 +143,9 @@ abstract class RetentionRateCohort
      */
     public function perUser(int $workspaceId, array $dateRange, array $filter)
     {
-        $days        = $this->days();
+        $days = $this->days();
         $cohortStart = Carbon::now()->subDays($days * 2)->startOfDay()->toDateTimeString();
-        $cohortEnd   = Carbon::now()->subDays($days)->startOfDay()->toDateTimeString();
+        $cohortEnd = Carbon::now()->subDays($days)->startOfDay()->toDateTimeString();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
         $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
@@ -186,15 +186,14 @@ abstract class RetentionRateCohort
 
     private function computeForWindow(int $workspaceId, array $filter, string $startAt, string $endExclusive): float
     {
-        $days    = $this->days();
+        $days = $this->days();
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
         $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
 
         $newCustomers = DB::table('pancake_orders as po')
-            ->when(! empty($pageIds) || ! empty($shopIds), fn ($q) =>
-                $q->join('pages', 'pages.id', '=', 'po.page_id')
-                  ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-                  ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->when(! empty($pageIds) || ! empty($shopIds), fn ($q) => $q->join('pages', 'pages.id', '=', 'po.page_id')
+                ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
+                ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
             )
             ->where('po.workspace_id', $workspaceId)
             ->whereNotNull('po.customer_id')
@@ -215,10 +214,9 @@ abstract class RetentionRateCohort
         $retained = DB::query()
             ->fromSub($newCustomers, 'nc')
             ->join('pancake_orders as po2', 'po2.customer_id', '=', 'nc.customer_id')
-            ->when(! empty($pageIds) || ! empty($shopIds), fn ($q) =>
-                $q->join('pages as p2', 'p2.id', '=', 'po2.page_id')
-                  ->when(! empty($pageIds), fn ($q) => $q->whereIn('p2.id', $pageIds))
-                  ->when(! empty($shopIds), fn ($q) => $q->whereIn('p2.shop_id', $shopIds))
+            ->when(! empty($pageIds) || ! empty($shopIds), fn ($q) => $q->join('pages as p2', 'p2.id', '=', 'po2.page_id')
+                ->when(! empty($pageIds), fn ($q) => $q->whereIn('p2.id', $pageIds))
+                ->when(! empty($shopIds), fn ($q) => $q->whereIn('p2.shop_id', $shopIds))
             )
             ->where('po2.workspace_id', $workspaceId)
             ->whereNotIn('po2.status', [6, 7])
@@ -237,43 +235,45 @@ abstract class RetentionRateCohort
 
     private function generatePeriods(array $dateRange, string $group): array
     {
-        $start   = Carbon::parse($dateRange['start_date'])->startOfDay();
-        $end     = Carbon::parse($dateRange['end_date'])->startOfDay();
+        $start = Carbon::parse($dateRange['start_date'])->startOfDay();
+        $end = Carbon::parse($dateRange['end_date'])->startOfDay();
         $periods = [];
 
         if ($group === 'monthly') {
             $cursor = $start->copy()->startOfMonth();
-            $last   = $end->copy()->startOfMonth();
+            $last = $end->copy()->startOfMonth();
             while ($cursor <= $last) {
                 $periods[] = [
-                    'label'         => $cursor->format('Y-m'),
-                    'start'         => $cursor->copy()->startOfMonth()->toDateTimeString(),
+                    'label' => $cursor->format('Y-m'),
+                    'start' => $cursor->copy()->startOfMonth()->toDateTimeString(),
                     'end_exclusive' => $cursor->copy()->addMonth()->startOfMonth()->toDateTimeString(),
                 ];
                 $cursor->addMonth();
             }
+
             return $periods;
         }
 
         if ($group === 'weekly') {
             $cursor = $start->copy()->startOfWeek(Carbon::MONDAY);
-            $last   = $end->copy()->startOfWeek(Carbon::MONDAY);
+            $last = $end->copy()->startOfWeek(Carbon::MONDAY);
             while ($cursor <= $last) {
                 $periods[] = [
-                    'label'         => $cursor->format('o-\WW'),
-                    'start'         => $cursor->copy()->toDateTimeString(),
+                    'label' => $cursor->format('o-\WW'),
+                    'start' => $cursor->copy()->toDateTimeString(),
                     'end_exclusive' => $cursor->copy()->addWeek()->toDateTimeString(),
                 ];
                 $cursor->addWeek();
             }
+
             return $periods;
         }
 
         $cursor = $start->copy();
         while ($cursor <= $end) {
             $periods[] = [
-                'label'         => $cursor->format('Y-m-d'),
-                'start'         => $cursor->copy()->startOfDay()->toDateTimeString(),
+                'label' => $cursor->format('Y-m-d'),
+                'start' => $cursor->copy()->startOfDay()->toDateTimeString(),
                 'end_exclusive' => $cursor->copy()->addDay()->startOfDay()->toDateTimeString(),
             ];
             $cursor->addDay();
@@ -284,7 +284,10 @@ abstract class RetentionRateCohort
 
     private function resolveIds(mixed $ids): array
     {
-        if (empty($ids)) return [];
+        if (empty($ids)) {
+            return [];
+        }
+
         return array_map('intval', is_array($ids) ? $ids : explode(',', $ids));
     }
 }

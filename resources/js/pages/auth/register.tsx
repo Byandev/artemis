@@ -1,16 +1,10 @@
 import RegisteredUserController from '@/actions/App/Http/Controllers/Auth/RegisteredUserController';
-import { login } from '@/routes';
-import { Form, Head, usePage } from '@inertiajs/react';
-import { Info, LoaderCircle } from 'lucide-react';
-
-import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import AuthLayout from '@/layouts/auth-layout';
+import { login } from '@/routes';
 import { Role } from '@/types/models/Role';
+import { Form, Head, usePage } from '@inertiajs/react';
+import { Info, Loader2 } from 'lucide-react';
 
 interface WorkspaceInvitation {
     id: number;
@@ -35,28 +29,20 @@ export default function Register() {
     return (
         <AuthLayout
             title="Create an account"
-            description={
-                invitation
-                    ? `Join ${invitation.workspace.name}`
-                    : 'Enter your details below to create your account'
-            }
+            description={invitation ? `Join ${invitation.workspace.name}` : 'Enter your details to get started'}
         >
             <Head title="Register" />
 
             {invitation && (
-                <Alert className="mb-4">
-                    <Info className="h-4 w-4" />
-                    <AlertDescription>
-                        <div>
-                            You've been invited to join{' '}
-                            <span>
-                                <strong>{invitation.workspace.name}</strong>
-                            </span>{' '}
-                            as a {invitation.role?.name} Create your account to
-                            accept the invitation.
-                        </div>
-                    </AlertDescription>
-                </Alert>
+                <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-brand-500/20 bg-brand-500/5 px-3.5 py-3">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-500" />
+                    <p className="font-mono text-[11px] leading-relaxed text-gray-600 dark:text-gray-400">
+                        You've been invited to join{' '}
+                        <span className="font-semibold text-gray-800 dark:text-gray-200">{invitation.workspace.name}</span>{' '}
+                        as a <span className="font-semibold text-gray-800 dark:text-gray-200">{invitation.role?.name}</span>.
+                        Create your account to accept.
+                    </p>
+                </div>
             )}
 
             <Form
@@ -71,93 +57,99 @@ export default function Register() {
                             <input type="hidden" name="invitation" value={invitationToken} />
                         )}
 
-                        <div className="grid gap-4">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="name" className="text-[13px] font-medium text-gray-700 dark:text-gray-300">
-                                    Full name
-                                </Label>
-                                <Input
+                        <div className="space-y-4">
+                            {/* Full name */}
+                            <div className="space-y-1.5">
+                                <label htmlFor="name" className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                    Full name <span className="text-red-400">*</span>
+                                </label>
+                                <input
                                     id="name"
                                     type="text"
+                                    name="name"
                                     required
                                     autoFocus
                                     tabIndex={1}
                                     autoComplete="name"
-                                    name="name"
                                     placeholder="Juan dela Cruz"
-                                    className="h-10 text-[14px]"
+                                    className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                                 />
-                                <InputError message={errors.name} />
+                                {errors.name && <p className="font-mono text-[11px] text-red-500">{errors.name}</p>}
                             </div>
 
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="email" className="text-[13px] font-medium text-gray-700 dark:text-gray-300">
-                                    Email address
-                                </Label>
-                                <Input
+                            {/* Email */}
+                            <div className="space-y-1.5">
+                                <label htmlFor="email" className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                    Email address <span className="text-red-400">*</span>
+                                </label>
+                                <input
                                     id="email"
                                     type="email"
+                                    name="email"
                                     required
                                     tabIndex={2}
                                     autoComplete="email"
-                                    name="email"
                                     placeholder="email@example.com"
                                     defaultValue={invitation?.email || ''}
                                     readOnly={!!invitation}
-                                    className="h-10 text-[14px]"
+                                    className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 read-only:opacity-60 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                                 />
-                                <InputError message={errors.email} />
+                                {errors.email && <p className="font-mono text-[11px] text-red-500">{errors.email}</p>}
                             </div>
 
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="password" className="text-[13px] font-medium text-gray-700 dark:text-gray-300">
-                                    Password
-                                </Label>
-                                <Input
+                            {/* Password */}
+                            <div className="space-y-1.5">
+                                <label htmlFor="password" className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                    Password <span className="text-red-400">*</span>
+                                </label>
+                                <input
                                     id="password"
                                     type="password"
+                                    name="password"
                                     required
                                     tabIndex={3}
                                     autoComplete="new-password"
-                                    name="password"
                                     placeholder="At least 8 characters"
-                                    className="h-10 text-[14px]"
+                                    className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                                 />
-                                <InputError message={errors.password} />
+                                {errors.password && <p className="font-mono text-[11px] text-red-500">{errors.password}</p>}
                             </div>
 
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="password_confirmation" className="text-[13px] font-medium text-gray-700 dark:text-gray-300">
-                                    Confirm password
-                                </Label>
-                                <Input
+                            {/* Confirm password */}
+                            <div className="space-y-1.5">
+                                <label htmlFor="password_confirmation" className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                    Confirm password <span className="text-red-400">*</span>
+                                </label>
+                                <input
                                     id="password_confirmation"
                                     type="password"
+                                    name="password_confirmation"
                                     required
                                     tabIndex={4}
                                     autoComplete="new-password"
-                                    name="password_confirmation"
                                     placeholder="Re-enter your password"
-                                    className="h-10 text-[14px]"
+                                    className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                                 />
-                                <InputError message={errors.password_confirmation} />
+                                {errors.password_confirmation && <p className="font-mono text-[11px] text-red-500">{errors.password_confirmation}</p>}
                             </div>
 
-                            <Button
+                            {/* Submit */}
+                            <button
                                 type="submit"
-                                className="mt-2 h-10 w-full text-[14px] font-medium"
                                 tabIndex={5}
-                                data-test="register-user-button"
+                                disabled={processing}
+                                className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-emerald-600 font-mono! text-[13px]! font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                             >
-                                {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                                {processing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                                 Create account
-                            </Button>
+                            </button>
                         </div>
 
-                        <p className="text-center text-[13px] text-gray-500 dark:text-gray-400">
+                        <p className="text-center font-mono text-[11px] text-gray-400 dark:text-gray-500">
                             Already have an account?{' '}
                             <TextLink
                                 href={invitationToken ? login({ query: { invitation: invitationToken } }).url : login().url}
+                                className="font-mono! text-[11px]!"
                                 tabIndex={6}
                             >
                                 Log in
