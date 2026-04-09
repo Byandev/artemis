@@ -2,20 +2,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
 import { useEffect } from 'react';
-
-interface Employee {
-    id: string;
-    name: string;
-    status: string;
-    user_id: string | null;
-}
+import { User } from '@/types/models/Pancake/User';
 
 interface EmployeeFormDialogProps {
     workspace: Workspace;
     systemUsers: { id: string; name: string }[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    employee?: Employee | null;
+    employee?: User | null;
 }
 
 export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenChange, employee }: EmployeeFormDialogProps) {
@@ -28,7 +22,7 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
         if (open && employee) {
             setData({
                 status: employee.status || 'ACTIVE',
-                user_id: employee.user_id || '',
+                user_id: employee.user?.id || '',
             });
         } else if (!open) {
             clearErrors();
@@ -38,7 +32,7 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         put(`/workspaces/${workspace.slug}/employees/${employee?.id}`, {
             preserveScroll: true,
             onSuccess: () => {

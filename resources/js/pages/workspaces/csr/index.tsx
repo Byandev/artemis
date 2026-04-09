@@ -15,23 +15,12 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-
-import { EmployeeFormDialog } from "./components/employee-form-dialog";
-
-interface Employee {
-    id: string;
-    name: string;
-    fb_id: string | null;
-    email: string | null;
-    phone_number: string | null;
-    status: string;
-    user_id: string | null;
-    user_name: string | null;
-}
+import { EmployeeFormDialog } from '@/pages/workspaces/employees/components/employee-form-dialog';
+import { User } from '@/types/models/Pancake/User';
 
 interface Props {
     workspace: Workspace;
-    employees: PaginatedData<Employee>;
+    employees: PaginatedData<User>;
     systemUsers: { id: string; name: string }[];
     query?: {
         sort?: string | null;
@@ -44,7 +33,7 @@ interface Props {
 export default function EmployeesIndex({ workspace, employees, systemUsers, query }: Props) {
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
-    const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+    const [editingEmployee, setEditingEmployee] = useState<User | null>(null);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -61,84 +50,116 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
         return () => clearTimeout(timer);
     }, [searchValue]);
 
-    const columns = useMemo<ColumnDef<Employee>[]>(() => [
-        {
-            accessorKey: 'name',
-            enableSorting: true,
-            size: 240,
-            header: ({ column }) => <SortableHeader column={column} title="Name" />,
-        },
-        {
-            accessorKey: 'email',
-            enableSorting: true,
-            size: 240,
-            header: ({ column }) => <SortableHeader column={column} title="Email" />,
-            cell: ({ row }) => row.original.email || '-',
-        },
-        {
-            accessorKey: 'phone_number',
-            enableSorting: true,
-            size: 160,
-            header: ({ column }) => <SortableHeader column={column} title="Phone" />,
-            cell: ({ row }) => row.original.phone_number || '-',
-        },
-        {
-            accessorKey: 'user_name',
-            enableSorting: true,
-            size: 200,
-            header: ({ column }) => <SortableHeader column={column} title="Assigned User" />,
-            cell: ({ row }) => {
-                const name = row.original.user_name;
-                if (!name) return <span className="text-gray-400 italic">Unassigned</span>;
+    const columns = useMemo<ColumnDef<User>[]>(
+        () => [
+            {
+                accessorKey: 'name',
+                enableSorting: true,
+                size: 240,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Name" />
+                ),
+            },
+            {
+                accessorKey: 'email',
+                enableSorting: true,
+                size: 240,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Email" />
+                ),
+                cell: ({ row }) => row.original.email || '-',
+            },
+            {
+                accessorKey: 'phone_number',
+                enableSorting: true,
+                size: 160,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Phone" />
+                ),
+                cell: ({ row }) => row.original.phone_number || '-',
+            },
+            {
+                accessorKey: 'user_name',
+                enableSorting: true,
+                size: 200,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Assigned User" />
+                ),
+                cell: ({ row }) => {
+                    const name = row.original.user?.name;
+                    if (!name)
+                        return (
+                            <span className="text-gray-400 italic">
+                                Unassigned
+                            </span>
+                        );
 
-                return (
-                    <div className="flex items-center gap-2">
-                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-stone-100 dark:bg-zinc-800">
-                            <UserIcon className="h-3 w-3 text-gray-500" />
+                    return (
+                        <div className="flex items-center gap-2">
+                            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-stone-100 dark:bg-zinc-800">
+                                <UserIcon className="h-3 w-3 text-gray-500" />
+                            </div>
+                            <span className="font-medium text-gray-700 dark:text-gray-300">
+                                {name}
+                            </span>
                         </div>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">{name}</span>
+                    );
+                },
+            },
+            {
+                accessorKey: 'status',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Status" />
+                ),
+                size: 120,
+                cell: ({ row }) => {
+                    const status = (
+                        row.original.status || 'ACTIVE'
+                    ).toUpperCase();
+                    const isActive = status === 'ACTIVE';
+                    return (
+                        <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                                isActive
+                                    ? 'bg-[#E6F9F1] text-[#10B981]'
+                                    : 'bg-[#FFF1F2] text-[#F43F5E]'
+                            }`}
+                        >
+                            <span
+                                className={`mr-1.5 h-1.5 w-1.5 rounded-full ${isActive ? 'bg-[#10B981]' : 'bg-[#F43F5E]'}`}
+                            ></span>
+                            {status}
+                        </span>
+                    );
+                },
+            },
+            {
+                id: 'actions',
+                cell: ({ row }) => (
+                    <div className="flex justify-end">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800">
+                                    <MoreHorizontal className="h-3.5 w-3.5" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuItem
+                                    onClick={() =>
+                                        setEditingEmployee(row.original)
+                                    }
+                                >
+                                    <Pencil className="mr-2 h-3.5 w-3.5" />
+                                    Edit Settings
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
-                );
+                ),
             },
-        },
-        {
-            accessorKey: 'status',
-            header: ({ column }) => <SortableHeader column={column} title="Status" />,
-            size: 120,
-            cell: ({ row }) => {
-                const status = (row.original.status || 'ACTIVE').toUpperCase();
-                const isActive = status === 'ACTIVE';
-                return (
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                        isActive ? 'bg-[#E6F9F1] text-[#10B981]' : 'bg-[#FFF1F2] text-[#F43F5E]'
-                    }`}>
-                        <span className={`mr-1.5 h-1.5 w-1.5 rounded-full ${isActive ? 'bg-[#10B981]' : 'bg-[#F43F5E]'}`}></span>
-                        {status}
-                    </span>
-                );
-            },
-        },
-        {
-            id: 'actions',
-            cell: ({ row }) => (
-                <div className="flex justify-end">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800">
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
-                            <DropdownMenuItem onClick={() => setEditingEmployee(row.original)}>
-                                <Pencil className="mr-2 h-3.5 w-3.5" />
-                                Edit Settings
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            ),
-        },
-    ], []);
+        ],
+        [],
+    );
 
     return (
         <AppLayout>
@@ -176,8 +197,8 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
 
                 <EmployeeFormDialog
                     open={editingEmployee !== null}
-                    onOpenChange={(open) => { 
-                        if (!open) setEditingEmployee(null); 
+                    onOpenChange={(open) => {
+                        if (!open) setEditingEmployee(null);
                     }}
                     employee={editingEmployee}
                     workspace={workspace}
