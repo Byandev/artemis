@@ -12,8 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('pancake_users', function (Blueprint $table) {
-            //
-//            $table->string('status')->default('active')->after('phone_number');
+            $table->string('status')->default('active')->after('phone_number');
         });
     }
 
