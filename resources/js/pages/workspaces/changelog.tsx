@@ -12,6 +12,20 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v2.4.4',
+        date: '2026-04-09',
+        sections: [
+            {
+                title: 'CSR Analytics',
+                items: [
+                    'Delivered and Returning columns now display as Philippine Peso currency',
+                    'All columns are now sortable — click any column header to sort ascending or descending',
+                    'Analytics data is now server-side paginated and sorted via QueryBuilder',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v2.4.3',
         date: '2026-04-09',
         sections: [
