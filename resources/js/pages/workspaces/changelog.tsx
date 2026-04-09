@@ -12,6 +12,18 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v2.4.1',
+        date: '2026-04-09',
+        sections: [
+            {
+                title: 'Fixes',
+                items: [
+                    'CSR Management — sorting and pagination now work correctly after the first load',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v2.4.0',
         date: '2026-04-09',
         sections: [
@@ -287,6 +299,7 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v2.4.1': 'bg-slate-500/10 text-slate-600 dark:text-slate-400 ring-slate-500/20',
     'v2.4.0': 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 ring-cyan-500/20',
     'v2.3.0': 'bg-teal-500/10 text-teal-600 dark:text-teal-400 ring-teal-500/20',
     'v2.2.0': 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20',
