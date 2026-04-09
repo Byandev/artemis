@@ -19,6 +19,8 @@ Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {
         ->name('workspaces.csrs.index');
 
     Route::get('/leaderboards', [CsrPerformanceController::class, 'leaderboards']);
+    Route::get('/leaderboards/group-by-called', [CsrPerformanceController::class, 'leaderboardsGroupByCalled']);
+    Route::get('/leaderboards/group-by-delivered', [CsrPerformanceController::class, 'leaderboardsGroupByDelivered']);
 
 });
 

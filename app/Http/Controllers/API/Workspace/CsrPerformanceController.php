@@ -250,4 +250,37 @@ class CsrPerformanceController extends Controller
             ->orderByDesc('sales')
             ->get();
     }
+
+    public function leaderboardsGroupByCalled()
+    {
+        $startDate = Carbon::now()->startOfDay()->format('Y-m-d H:i:s');
+        $endDate = Carbon::now()->endOfDay()->format('Y-m-d H:i:s');
+
+        return PancakeUser::query()
+            ->withCount([
+                'assignedOrderForDelivery' => function ($query) use ($startDate, $endDate) {
+                    $query->whereBetween('delivery_date', [$startDate, $endDate]);
+                },
+            ])
+            ->having('assigned_order_for_delivery_count', '>', 0) // Only get users with at least 1 assigned order
+            ->orderByDesc('assigned_order_for_delivery_count')
+            ->get();
+    }
+
+    public function leaderboardsGroupByDelivered()
+    {
+        $startDate = Carbon::now()->startOfDay()->format('Y-m-d H:i:s');
+        $endDate = Carbon::now()->endOfDay()->format('Y-m-d H:i:s');
+
+        return PancakeUser::query()
+            ->withCount([
+                'assignedOrderForDelivery' => function ($query) use ($startDate, $endDate) {
+                    $query->whereBetween('delivery_date', [$startDate, $endDate])
+                        ->where('status', 'Delivered');
+                },
+            ])
+            ->having('assigned_order_for_delivery_count', '>', 0) // Only get users with at least 1 delivered order
+            ->orderByDesc('assigned_order_for_delivery_count')
+            ->get();
+    }
 }
