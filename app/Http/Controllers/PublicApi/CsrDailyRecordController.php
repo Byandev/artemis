@@ -16,7 +16,7 @@ class CsrDailyRecordController extends Controller
         $validated = $request->validate([
             'csr_id'       => ['required', 'integer', 'exists:users,id'],
             'date'         => ['required', 'date_format:Y-m-d'],
-            'type'         => ['nullable', 'string', 'max:100'],
+            'type'         => ['required', 'string', 'max:100', 'in:erp,pos'],
             'total_orders' => ['required', 'integer', 'min:0'],
             'total_sales'  => ['required', 'numeric', 'min:0'],
             'returning'    => ['required', 'integer', 'min:0'],
