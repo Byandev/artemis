@@ -9,7 +9,7 @@ use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
 
-Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {
+Route::group(['prefix' => 'public', 'as' => 'api.public.'], function () {
     Route::get('/workspaces/{workspace}/csrs/performance', [CsrPerformanceController::class, 'publicIndex'])
         ->middleware('throttle:csr-public-performance')
         ->name('workspaces.csrs.performance.index');
@@ -24,7 +24,7 @@ Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {
 
 });
 
-Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], function () {
+Route::group(['prefix' => '', 'as' => 'api.', 'middleware' => ['auth']], function () {
     Route::group(['prefix' => 'workspaces/{workspace}', 'as' => 'workspaces.'], function () {
         Route::get('/csrs/performance', [CsrPerformanceController::class, 'index'])->name('csrs.performance.index');
         Route::get('/csrs/daily-records', [CSRController::class, 'dailyRecords'])->name('csrs.daily-records.index');
@@ -37,13 +37,13 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
     });
 });
 
-Route::group(['prefix' => 'api/v1/public', 'as' => 'api.v1.public.', 'middleware' => ['api.key']], function () {
+Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' => ['api.key']], function () {
     Route::get('/health',             \App\Http\Controllers\PublicApi\HealthController::class)->name('health');
     Route::get('/users',              [\App\Http\Controllers\PublicApi\UserController::class, 'index'])->name('users.index');
     Route::post('/csr-daily-records', [\App\Http\Controllers\PublicApi\CsrDailyRecordController::class, 'store'])->name('csr-daily-records.store');
 });
 
-Route::group(['prefix' => 'api/v1/workspace', 'as' => 'api.v1.workspace', 'middleware' => ['auth', 'workspace']], function () {
+Route::group(['prefix' => 'v1/workspace', 'as' => 'api.v1.workspace', 'middleware' => ['auth', 'workspace']], function () {
     Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
     Route::get('/analytics/breakdown', [AnalyticsController::class, 'breakdown'])->name('analytics.breakdown');
     Route::get('/analytics/per-page', [AnalyticsController::class, 'perPage'])->name('analytics.perPage');
