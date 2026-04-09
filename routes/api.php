@@ -1,52 +1,7 @@
 <?php
 
-use App\Http\Controllers\API\Workspace\AnalyticsController;
-use App\Http\Controllers\API\Workspace\CSRController;
-use App\Http\Controllers\API\Workspace\CsrPerformanceController;
-use App\Http\Controllers\API\Workspace\PageController;
-use App\Http\Controllers\API\Workspace\ProductController;
-use App\Http\Controllers\API\Workspace\ShopController;
-use App\Http\Controllers\API\Workspace\TeamController;
-use App\Http\Controllers\API\Workspace\UserController;
-
-Route::group(['prefix' => 'public', 'as' => 'api.public.'], function () {
-    Route::get('/workspaces/{workspace}/csrs/performance', [CsrPerformanceController::class, 'publicIndex'])
-        ->middleware('throttle:csr-public-performance')
-        ->name('workspaces.csrs.performance.index');
-
-    Route::get('/workspaces/{workspace}/csrs', [CsrPerformanceController::class, 'publicCsrIndex'])
-        ->middleware('throttle:csr-public-csrs')
-        ->name('workspaces.csrs.index');
-
-    Route::get('/leaderboards', [CsrPerformanceController::class, 'leaderboards']);
-    Route::get('/leaderboards/group-by-called', [CsrPerformanceController::class, 'leaderboardsGroupByCalled']);
-    Route::get('/leaderboards/group-by-delivered', [CsrPerformanceController::class, 'leaderboardsGroupByDelivered']);
-
-});
-
-Route::group(['prefix' => '', 'as' => 'api.', 'middleware' => ['auth']], function () {
-    Route::group(['prefix' => 'workspaces/{workspace}', 'as' => 'workspaces.'], function () {
-        Route::get('/csrs/performance', [CsrPerformanceController::class, 'index'])->name('csrs.performance.index');
-        Route::get('/csrs/daily-records', [CSRController::class, 'dailyRecords'])->name('csrs.daily-records.index');
-        Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
-        Route::get('/products', [ProductController::class, 'index'])->name('products.index');
-        Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
-        Route::get('/pages', [PageController::class, 'index'])->name('pages.index');
-        Route::get('/users', [UserController::class, 'index'])->name('users.index');
-        Route::get('/leaderboards', [CsrPerformanceController::class, 'leaderboards'])->name('leaderboards.index');
-    });
-});
-
 Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' => ['api.key']], function () {
     Route::get('/health',             \App\Http\Controllers\PublicApi\HealthController::class)->name('health');
     Route::get('/users',              [\App\Http\Controllers\PublicApi\UserController::class, 'index'])->name('users.index');
     Route::post('/csr-daily-records', [\App\Http\Controllers\PublicApi\CsrDailyRecordController::class, 'store'])->name('csr-daily-records.store');
-});
-
-Route::group(['prefix' => 'v1/workspace', 'as' => 'api.v1.workspace', 'middleware' => ['auth', 'workspace']], function () {
-    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
-    Route::get('/analytics/breakdown', [AnalyticsController::class, 'breakdown'])->name('analytics.breakdown');
-    Route::get('/analytics/per-page', [AnalyticsController::class, 'perPage'])->name('analytics.perPage');
-    Route::get('/analytics/per-shop', [AnalyticsController::class, 'perShop'])->name('analytics.perShop');
-    Route::get('/analytics/per-user', [AnalyticsController::class, 'perUser'])->name('analytics.perUser');
 });

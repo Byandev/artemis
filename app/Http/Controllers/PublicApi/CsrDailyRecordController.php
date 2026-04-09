@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\PublicApi;
 
 use App\Http\Controllers\Controller;
-use App\Models\CsrDailyRecord;
+use App\Models\PancakeUserDailyReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,7 +14,7 @@ class CsrDailyRecordController extends Controller
         $workspace = $request->attributes->get('workspace');
 
         $validated = $request->validate([
-            'csr_id'       => ['required', 'integer', 'exists:users,id'],
+            'pancake_user_id'       => ['required', 'integer', 'exists:users,id'],
             'date'         => ['required', 'date_format:Y-m-d'],
             'type'         => ['required', 'string', 'max:100', 'in:erp,pos'],
             'total_orders' => ['required', 'integer', 'min:0'],
@@ -25,17 +25,17 @@ class CsrDailyRecordController extends Controller
             'rmo_called'   => ['nullable', 'integer', 'min:0'],
         ]);
 
-        // Ensure the csr_id belongs to this workspace
-        $isMember = $workspace->users()->where('users.id', $validated['csr_id'])->exists();
+        // Ensure the pancake_user_id belongs to this workspace
+        $isMember = $workspace->users()->where('users.id', $validated['pancake_user_id'])->exists();
 
         if (! $isMember) {
             return response()->json(['error' => 'The specified CSR does not belong to this workspace.'], 422);
         }
 
-        $record = CsrDailyRecord::updateOrCreate(
+        $record = PancakeUserDailyReport::updateOrCreate(
             [
                 'workspace_id' => $workspace->id,
-                'csr_id'       => $validated['csr_id'],
+                'pancake_user_id'       => $validated['pancake_user_id'],
                 'date'         => $validated['date'],
                 'type'         => $validated['type'] ?? null,
             ],
