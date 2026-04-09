@@ -67,6 +67,7 @@ class HandleInertiaRequests extends Middleware
                 'success' => $request->session()->get('success'),
                 'newApiKey' => $request->session()->get('newApiKey'),
             ],
+            'appEnv' => config('app.env'),
         ];
     }
 }
