@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API\Workspace;
 
 use App\Http\Controllers\Controller;
+use App\Models\CsrDailyRecord;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -10,6 +11,39 @@ use Illuminate\Support\Facades\DB;
 
 class CSRController extends Controller
 {
+    public function storeDailyRecord(Request $request, Workspace $workspace)
+    {
+        $validated = $request->validate([
+            'csr_id'       => ['required', 'integer'],
+            'date'         => ['required', 'date'],
+            'total_orders' => ['nullable', 'integer', 'min:0'],
+            'total_sales'  => ['nullable', 'numeric', 'min:0'],
+            'returning'    => ['nullable', 'integer', 'min:0'],
+            'delivered'    => ['nullable', 'integer', 'min:0'],
+            'rts_rate'     => ['nullable', 'numeric', 'min:0'],
+            'rmo_called'   => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $record = CsrDailyRecord::updateOrCreate(
+            [
+                'workspace_id' => $workspace->id,
+                'csr_id'       => $validated['csr_id'],
+                'date'         => $validated['date'],
+                'type'         => 'ERP',
+            ],
+            [
+                'total_orders' => $validated['total_orders'] ?? 0,
+                'total_sales'  => $validated['total_sales']  ?? 0,
+                'returning'    => $validated['returning']    ?? 0,
+                'delivered'    => $validated['delivered']    ?? 0,
+                'rts_rate'     => $validated['rts_rate']     ?? 0,
+                'rmo_called'   => $validated['rmo_called']   ?? 0,
+            ]
+        );
+
+        return response()->json(['data' => $record], 201);
+    }
+
     public function dailyRecords(Request $request, Workspace $workspace)
     {
         if (! $request->user()->isMemberOf($workspace)) {

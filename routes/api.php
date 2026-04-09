@@ -20,6 +20,9 @@ Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {
 
     Route::get('/leaderboards', [CsrPerformanceController::class, 'leaderboards']);
 
+    Route::post('/workspaces/{workspace}/csrs/daily-records', [CSRController::class, 'storeDailyRecord'])
+        ->name('workspaces.csrs.daily-records.store');
+
 });
 
 Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], function () {
