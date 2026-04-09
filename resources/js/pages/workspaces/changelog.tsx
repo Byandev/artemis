@@ -12,6 +12,18 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v2.4.2',
+        date: '2026-04-09',
+        sections: [
+            {
+                title: 'Fixes',
+                items: [
+                    'New CSR users now default to ACTIVE status',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v2.4.1',
         date: '2026-04-09',
         sections: [
@@ -221,7 +233,7 @@ const changelog: ChangelogEntry[] = [
                 items: [
                     'Search, filter, and sort your pages list',
                     'Archive pages you no longer need and restore them anytime',
-                    'View order history directly from a page\'s detail view',
+                    "View order history directly from a page's detail view",
                 ],
             },
             {
@@ -233,9 +245,7 @@ const changelog: ChangelogEntry[] = [
             },
             {
                 title: 'Employees',
-                items: [
-                    'Employees section added to the sidebar navigation',
-                ],
+                items: ['Employees section added to the sidebar navigation'],
             },
             {
                 title: 'Improvements',
@@ -299,15 +309,26 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
-    'v2.4.1': 'bg-slate-500/10 text-slate-600 dark:text-slate-400 ring-slate-500/20',
-    'v2.4.0': 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 ring-cyan-500/20',
-    'v2.3.0': 'bg-teal-500/10 text-teal-600 dark:text-teal-400 ring-teal-500/20',
-    'v2.2.0': 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20',
-    'v2.1.0': 'bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-blue-500/20',
-    'v2.0.1': 'bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-violet-500/20',
-    'v1.2.0': 'bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20',
-    'v1.1.0': 'bg-orange-500/10 text-orange-600 dark:text-orange-400 ring-orange-500/20',
-    'v1.0.0': 'bg-rose-500/10 text-rose-600 dark:text-rose-400 ring-rose-500/20',
+    'v2.4.2':
+        'bg-slate-500/10 text-slate-600 dark:text-slate-400 ring-slate-500/20',
+    'v2.4.1':
+        'bg-slate-500/10 text-slate-600 dark:text-slate-400 ring-slate-500/20',
+    'v2.4.0':
+        'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 ring-cyan-500/20',
+    'v2.3.0':
+        'bg-teal-500/10 text-teal-600 dark:text-teal-400 ring-teal-500/20',
+    'v2.2.0':
+        'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20',
+    'v2.1.0':
+        'bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-blue-500/20',
+    'v2.0.1':
+        'bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-violet-500/20',
+    'v1.2.0':
+        'bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20',
+    'v1.1.0':
+        'bg-orange-500/10 text-orange-600 dark:text-orange-400 ring-orange-500/20',
+    'v1.0.0':
+        'bg-rose-500/10 text-rose-600 dark:text-rose-400 ring-rose-500/20',
 };
 
 export default function Changelog() {
