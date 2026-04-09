@@ -19,6 +19,7 @@ class User extends Model
     {
         return $this->belongsTo(SystemUser::class, 'user_id');
     }
+
     public function orders()
     {
         return $this->hasMany(Order::class, 'confirmed_by', 'id');

@@ -64,7 +64,7 @@ class HandleInertiaRequests extends Middleware
                 'location' => $request->url(),
             ],
             'flash' => [
-                'success'   => $request->session()->get('success'),
+                'success' => $request->session()->get('success'),
                 'newApiKey' => $request->session()->get('newApiKey'),
             ],
         ];

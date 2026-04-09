@@ -23,7 +23,7 @@ class UserController extends Controller
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where(function ($q) use ($value) {
                         $q->where('users.name', 'like', "%{$value}%")
-                          ->orWhere('users.email', 'like', "%{$value}%");
+                            ->orWhere('users.email', 'like', "%{$value}%");
                     });
                 }),
                 AllowedFilter::callback('has_pancake_account', function ($query, $value) {
@@ -40,4 +40,3 @@ class UserController extends Controller
         return response()->json($paginated);
     }
 }
-

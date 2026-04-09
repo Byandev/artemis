@@ -16,10 +16,10 @@ return new class extends Migration
             $table->string('status')->default('active')->after('phone_number');
 
             $table->foreignId('user_id')
-              ->nullable() 
-              ->after('id')
-              ->constrained('users')
-              ->onDelete('set null');
+                ->nullable()
+                ->after('id')
+                ->constrained('users')
+                ->onDelete('set null');
         });
     }
 

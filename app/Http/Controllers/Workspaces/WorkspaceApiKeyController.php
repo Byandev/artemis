@@ -22,7 +22,7 @@ class WorkspaceApiKeyController extends Controller
 
         return Inertia::render('workspaces/api-keys', [
             'workspace' => $workspace,
-            'apiKeys'   => $keys,
+            'apiKeys' => $keys,
         ]);
     }
 
@@ -39,10 +39,10 @@ class WorkspaceApiKeyController extends Controller
         $generated = WorkspaceApiKey::generate();
 
         $workspace->apiKeys()->create([
-            'name'          => $request->name,
-            'key'           => $generated['key'],
+            'name' => $request->name,
+            'key' => $generated['key'],
             'key_encrypted' => $generated['key_encrypted'],
-            'key_prefix'    => $generated['prefix'],
+            'key_prefix' => $generated['prefix'],
         ]);
 
         return back()->with('newApiKey', $generated['raw']);

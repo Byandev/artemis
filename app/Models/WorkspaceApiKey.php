@@ -26,15 +26,15 @@ class WorkspaceApiKey extends Model
      */
     public static function generate(): array
     {
-        $raw    = 'art_' . Str::random(40);
+        $raw = 'art_'.Str::random(40);
         $hashed = hash('sha256', $raw);
         $prefix = substr($raw, 0, 8);
 
         return [
-            'raw'           => $raw,
-            'key'           => $hashed,
+            'raw' => $raw,
+            'key' => $hashed,
             'key_encrypted' => Crypt::encryptString($raw),
-            'prefix'        => $prefix,
+            'prefix' => $prefix,
         ];
     }
 

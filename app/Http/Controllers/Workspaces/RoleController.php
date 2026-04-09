@@ -26,8 +26,8 @@ class RoleController extends Controller
 
         return Inertia::render('roles/index', [
             'workspace' => $workspace,
-            'roles'     => $roles,
-            'query'     => [
+            'roles' => $roles,
+            'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],

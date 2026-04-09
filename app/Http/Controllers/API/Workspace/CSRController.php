@@ -47,7 +47,7 @@ class CSRController extends Controller
             ->get();
 
         return response()->json([
-            'data'    => $records,
+            'data' => $records,
             'filters' => ['from' => $from, 'to' => $to],
         ]);
     }

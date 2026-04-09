@@ -3,20 +3,20 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
-use App\Models\Workspace;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Modules\Pancake\Models\User as PancakeUser;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
-use Illuminate\Support\Facades\DB;
 
 class CSRController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 

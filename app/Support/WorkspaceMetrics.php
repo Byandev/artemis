@@ -28,8 +28,8 @@ use App\Metrics\Orders\TimeToFirstOrder;
 use App\Metrics\Orders\TotalOrders;
 use App\Metrics\Orders\TotalSales;
 use App\Metrics\Orders\UniqueCustomerCount;
-use App\Metrics\ParcelJourney\TrackedOrdersCount;
 use App\Metrics\ParcelJourney\TotalForDeliveryCount;
+use App\Metrics\ParcelJourney\TrackedOrdersCount;
 use App\Models\Workspace;
 use InvalidArgumentException;
 
@@ -52,10 +52,10 @@ final class WorkspaceMetrics
         'uniqueCustomerCount' => UniqueCustomerCount::class,
         'repeatOrderRatio' => RepeatOrderRatio::class,
         'repeatCustomerRatio' => RepeatCustomerRatio::class,
-        'repeatCustomerOrderCount'  => RepeatCustomerOrderCount::class,
-        'retention30dRateCohort'    => Retention30dRateCohort::class,
-        'retention60dRateCohort'    => Retention60dRateCohort::class,
-        'retention90dRateCohort'    => Retention90dRateCohort::class,
+        'repeatCustomerOrderCount' => RepeatCustomerOrderCount::class,
+        'retention30dRateCohort' => Retention30dRateCohort::class,
+        'retention60dRateCohort' => Retention60dRateCohort::class,
+        'retention90dRateCohort' => Retention90dRateCohort::class,
         'timeToFirstOrder' => TimeToFirstOrder::class,
         'avgLifetimeValue' => AverageLifetimeValue::class,
         'averageDaysFromShippedToDelivered' => AverageDaysFromShippedToDelivered::class,

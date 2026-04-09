@@ -23,8 +23,8 @@ class SyncCsrDailyRecords extends Command
 
         $type = (string) $this->option('type');
 
-        $start = $date . ' 00:00:00';
-        $end   = $date . ' 23:59:59';
+        $start = $date.' 00:00:00';
+        $end = $date.' 23:59:59';
 
         $this->info("Syncing CSR daily records for {$date}...");
 
@@ -102,17 +102,17 @@ class SyncCsrDailyRecords extends Command
             CsrDailyRecord::updateOrCreate(
                 [
                     'workspace_id' => $row->workspace_id,
-                    'csr_id'       => $row->csr_id,
-                    'date'         => $date,
-                    'type'         => $type,
+                    'csr_id' => $row->csr_id,
+                    'date' => $date,
+                    'type' => $type,
                 ],
                 [
                     'total_orders' => (int) $row->total_orders,
-                    'total_sales'  => (float) $row->total_sales,
-                    'returning'    => (float) $row->returning,
-                    'delivered'    => (float) $row->delivered,
-                    'rts_rate'     => $rtsRate,
-                    'rmo_called'   => (int) ($rmoCalled[$row->workspace_id][$row->csr_id] ?? 0),
+                    'total_sales' => (float) $row->total_sales,
+                    'returning' => (float) $row->returning,
+                    'delivered' => (float) $row->delivered,
+                    'rts_rate' => $rtsRate,
+                    'rmo_called' => (int) ($rmoCalled[$row->workspace_id][$row->csr_id] ?? 0),
                 ]
             );
 

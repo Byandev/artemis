@@ -13,7 +13,7 @@ class HealthController extends Controller
         $workspace = $request->attributes->get('workspace');
 
         return response()->json([
-            'status'    => 'ok',
+            'status' => 'ok',
             'workspace' => $workspace->name,
         ]);
     }

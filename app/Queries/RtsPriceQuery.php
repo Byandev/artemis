@@ -28,8 +28,8 @@ class RtsPriceQuery extends RtsBaseQuery
         $bucketList = implode(', ', array_map(fn ($b) => "'{$b}'", self::BUCKETS));
 
         return $this->query
-            ->selectRaw('(' . self::PRICE_EXPR . ') AS price_bucket, ' . self::METRICS_SQL)
-            ->groupByRaw('(' . self::PRICE_EXPR . ')')
+            ->selectRaw('('.self::PRICE_EXPR.') AS price_bucket, '.self::METRICS_SQL)
+            ->groupByRaw('('.self::PRICE_EXPR.')')
             ->havingRaw(self::HAVING_SQL)
             ->orderByRaw("FIELD(price_bucket, {$bucketList})")
             ->get();

@@ -38,7 +38,7 @@ class InventoryItemController extends Controller
                 'sku',
                 'sales_keywords',
                 'transaction_keywords',
-                \Spatie\QueryBuilder\AllowedSort::field('product_name', 'products.name')
+                \Spatie\QueryBuilder\AllowedSort::field('product_name', 'products.name'),
             ])
             ->defaultSort('-created_at')
             ->paginate(10)
@@ -91,6 +91,7 @@ class InventoryItemController extends Controller
             'sales_keywords' => $request->sales_keywords,
             'transaction_keywords' => $request->transaction_keywords,
         ]);
+
         return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
             ->with('success', 'Inventory Items record updated.');
     }
@@ -98,6 +99,7 @@ class InventoryItemController extends Controller
     public function destroy(Workspace $workspace, InventoryItem $item)
     {
         $item->delete();
+
         return redirect()->route('workspaces.inventory.item.index', $workspace->slug);
     }
 }

@@ -5,6 +5,7 @@ namespace App\Queries;
 class RtsLocationQuery extends RtsBaseQuery
 {
     private array $allowedSortColumns = [];
+
     private string $mode = 'province';
 
     public function byProvince(): static
@@ -14,7 +15,7 @@ class RtsLocationQuery extends RtsBaseQuery
 
         $this->query
             ->leftJoin('shipping_addresses', 'shipping_addresses.order_id', '=', 'pancake_orders.id')
-            ->selectRaw('shipping_addresses.province_name AS province_name, ' . self::METRICS_SQL)
+            ->selectRaw('shipping_addresses.province_name AS province_name, '.self::METRICS_SQL)
             ->groupBy('shipping_addresses.province_name')
             ->havingRaw(self::HAVING_SQL);
 
@@ -28,7 +29,7 @@ class RtsLocationQuery extends RtsBaseQuery
 
         $this->query
             ->leftJoin('shipping_addresses', 'shipping_addresses.order_id', '=', 'pancake_orders.id')
-            ->selectRaw('shipping_addresses.district_name AS city_name, shipping_addresses.province_name AS province_name, ' . self::METRICS_SQL)
+            ->selectRaw('shipping_addresses.district_name AS city_name, shipping_addresses.province_name AS province_name, '.self::METRICS_SQL)
             ->groupBy('shipping_addresses.district_name', 'shipping_addresses.province_name')
             ->havingRaw(self::HAVING_SQL);
 
@@ -37,7 +38,9 @@ class RtsLocationQuery extends RtsBaseQuery
 
     public function search(string $term): static
     {
-        if (! $term) return $this;
+        if (! $term) {
+            return $this;
+        }
 
         if ($this->mode === 'province') {
             $this->query->where('shipping_addresses.province_name', 'LIKE', "%{$term}%");
@@ -53,7 +56,7 @@ class RtsLocationQuery extends RtsBaseQuery
 
     public function sort(string $param): static
     {
-        $desc   = str_starts_with($param, '-');
+        $desc = str_starts_with($param, '-');
         $column = ltrim($param, '-');
 
         $this->query->orderBy(

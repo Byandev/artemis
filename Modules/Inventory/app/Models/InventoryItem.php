@@ -2,15 +2,15 @@
 
 namespace Modules\Inventory\Models;
 
+use App\Models\Product;
+use App\Models\Workspace; // Assuming your Product model is in the main app
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Product; // Assuming your Product model is in the main app
-use App\Models\Workspace;
 
 class InventoryItem extends Model
 {
-    
-protected $table = 'inventory_items';
-protected $fillable = [
+    protected $table = 'inventory_items';
+
+    protected $fillable = [
         'workspace_id',
         'product_id',
         'sku',
@@ -26,7 +26,7 @@ protected $fillable = [
         return $this->belongsTo(Workspace::class);
     }
 
-        public function product()
+    public function product()
     {
         return $this->belongsTo(Product::class);
     }
