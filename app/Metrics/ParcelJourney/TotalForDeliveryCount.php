@@ -14,10 +14,10 @@ final class TotalForDeliveryCount
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
         $periodSql = match ($group) {
-            'daily'   => 'DATE(parcel_journeys.created_at)',
-            'weekly'  => "DATE_FORMAT(parcel_journeys.created_at, '%x-W%v')",
+            'daily' => 'DATE(parcel_journeys.created_at)',
+            'weekly' => "DATE_FORMAT(parcel_journeys.created_at, '%x-W%v')",
             'monthly' => "DATE_FORMAT(parcel_journeys.created_at, '%Y-%m')",
-            default   => 'DATE(parcel_journeys.created_at)',
+            default => 'DATE(parcel_journeys.created_at)',
         };
 
         return $this->baseQuery($workspaceId, $date_range)

@@ -16,28 +16,28 @@ class AskDataController extends Controller
         }
 
         $request->validate([
-            'section'  => ['required', 'string'],
+            'section' => ['required', 'string'],
             'question' => ['required', 'string', 'max:500'],
-            'data'     => ['required', 'array'],
+            'data' => ['required', 'array'],
         ]);
 
-        $section  = $request->input('section');
+        $section = $request->input('section');
         $question = $request->input('question');
-        $data     = json_encode($request->input('data'), JSON_PRETTY_PRINT);
+        $data = json_encode($request->input('data'), JSON_PRETTY_PRINT);
 
         $response = OpenAI::chat()->create([
-            'model'    => 'gpt-4o-mini',
+            'model' => 'gpt-4o-mini',
             'messages' => [
                 [
-                    'role'    => 'system',
-                    'content' => "You are a straight-talking business analyst for a Filipino eCommerce seller. You are given real data currently displayed on their dashboard. Answer questions and give insights based strictly on the provided data. Be concise — 3 to 5 sentences unless a detailed breakdown is specifically asked. Use ₱ for peso amounts. Do not make up numbers not in the data.",
+                    'role' => 'system',
+                    'content' => 'You are a straight-talking business analyst for a Filipino eCommerce seller. You are given real data currently displayed on their dashboard. Answer questions and give insights based strictly on the provided data. Be concise — 3 to 5 sentences unless a detailed breakdown is specifically asked. Use ₱ for peso amounts. Do not make up numbers not in the data.',
                 ],
                 [
-                    'role'    => 'user',
+                    'role' => 'user',
                     'content' => "Section: {$section}\n\nData:\n{$data}\n\nQuestion: {$question}",
                 ],
             ],
-            'max_tokens'  => 500,
+            'max_tokens' => 500,
             'temperature' => 0.5,
         ]);
 

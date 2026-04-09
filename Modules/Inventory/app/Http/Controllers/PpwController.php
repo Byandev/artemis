@@ -90,6 +90,7 @@ class PpwController extends Controller
     public function destroy(Workspace $workspace, Ppw $ppw)
     {
         $ppw->delete();
+
         return redirect()->route('workspaces.inventory.ppw.index', $workspace->slug);
     }
 }

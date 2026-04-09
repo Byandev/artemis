@@ -25,7 +25,7 @@ class ParcelJourneyNotifier
     {
         [, $psid] = explode('_', $order->fb_id);
 
-        $data    = $this->buildData($order, $parcelJourney);
+        $data = $this->buildData($order, $parcelJourney);
         $handler = $this->resolveHandler($parcelJourney->status);
 
         $handler?->handle($order, $parcelJourney, $psid, $data);
@@ -34,7 +34,7 @@ class ParcelJourneyNotifier
     private function buildData(Order $order, ParcelJourney $parcelJourney): array
     {
         $data = [
-            'date'          => Carbon::parse($parcelJourney->created_at)->format('F d'),
+            'date' => Carbon::parse($parcelJourney->created_at)->format('F d'),
             'tracking_code' => $order->tracking_code,
         ];
 
@@ -42,8 +42,8 @@ class ParcelJourneyNotifier
             $order->loadMissing(['shippingAddress', 'page']);
 
             $data = array_merge($data, [
-                'page_name'        => $order->page->name,
-                'customer_name'    => $order->shippingAddress?->full_name,
+                'page_name' => $order->page->name,
+                'customer_name' => $order->shippingAddress?->full_name,
                 'shipping_address' => $order->shippingAddress?->full_address,
             ]);
         }
@@ -54,10 +54,10 @@ class ParcelJourneyNotifier
     private function resolveHandler(string $status): ?NotifiesParcelJourney
     {
         return match ($status) {
-            'Departure'   => new DepartureHandler($this->page, $this->workspace, $this->renderer),
-            'Arrival'     => new ArrivalHandler($this->page, $this->workspace, $this->renderer),
+            'Departure' => new DepartureHandler($this->page, $this->workspace, $this->renderer),
+            'Arrival' => new ArrivalHandler($this->page, $this->workspace, $this->renderer),
             'On Delivery' => new OnDeliveryHandler($this->page, $this->workspace, $this->renderer),
-            default       => null,
+            default => null,
         };
     }
 }

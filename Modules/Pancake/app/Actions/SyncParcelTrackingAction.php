@@ -2,9 +2,9 @@
 
 namespace Modules\Pancake\Actions;
 
-use Carbon\Carbon;
 use App\Models\Page;
 use App\Models\Workspace;
+use Carbon\Carbon;
 use Modules\Pancake\Models\Order;
 use Modules\Pancake\Models\ParcelJourney;
 use Modules\Pancake\Notifications\ParcelJourneyNotifier;
@@ -20,14 +20,18 @@ readonly class SyncParcelTrackingAction
 
     public function execute(Order $savedOrder, array $order, Page $page, Workspace $workspace): void
     {
-        if (empty($order['partner']['extend_code'])) return;
+        if (empty($order['partner']['extend_code'])) {
+            return;
+        }
 
         $savedOrder->update([
             'tracking_code' => $order['partner']['extend_code'],
             'parcel_status' => $order['partner']['partner_status'],
         ]);
 
-        if (empty($order['partner']['extend_update'])) return;
+        if (empty($order['partner']['extend_update'])) {
+            return;
+        }
 
         $notifier = new ParcelJourneyNotifier($page, $workspace, $this->renderer);
 
@@ -40,9 +44,9 @@ readonly class SyncParcelTrackingAction
                 || Carbon::parse($item['updated_at'])->isToday())
             ->values();
 
-        $deliveryAttempts     = 0;
+        $deliveryAttempts = 0;
         $firstDeliveryAttempt = null;
-        $latestNotifiable     = null;
+        $latestNotifiable = null;
 
         foreach ($updates as $update) {
             if ($update['status'] === 'On Delivery') {
@@ -53,12 +57,12 @@ readonly class SyncParcelTrackingAction
             $journey = ParcelJourney::updateOrCreate(
                 [
                     'order_id' => $savedOrder->id,
-                    'status'   => $update['status'],
-                    'note'     => $update['note'],
-                    'created_at'   => $update['updated_at'],
+                    'status' => $update['status'],
+                    'note' => $update['note'],
+                    'created_at' => $update['updated_at'],
                 ],
                 [
-                    'rider_name'   => $update['rider_name'],
+                    'rider_name' => $update['rider_name'],
                     'rider_mobile' => $update['rider_mobile'],
                 ]
             );
@@ -73,7 +77,7 @@ readonly class SyncParcelTrackingAction
         }
 
         $savedOrder->update([
-            'delivery_attempts'      => $deliveryAttempts ?: null,
+            'delivery_attempts' => $deliveryAttempts ?: null,
             'first_delivery_attempt' => $firstDeliveryAttempt,
         ]);
     }

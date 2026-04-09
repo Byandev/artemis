@@ -39,11 +39,11 @@ class TeamController extends Controller
         $isAdmin = $request->user()->isAdminOf($workspace);
 
         return Inertia::render('workspaces/teams/index', [
-            'workspace'        => $workspace,
-            'teams'            => $teams,
+            'workspace' => $workspace,
+            'teams' => $teams,
             'workspaceMembers' => $workspaceMembers,
-            'isAdmin'          => $isAdmin,
-            'query'            => [
+            'isAdmin' => $isAdmin,
+            'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
@@ -59,7 +59,6 @@ class TeamController extends Controller
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have permission to create teams.');
         }
-
 
         $validated = $request->validate([
             'name' => [

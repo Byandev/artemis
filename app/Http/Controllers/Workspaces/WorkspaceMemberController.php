@@ -22,7 +22,7 @@ class WorkspaceMemberController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -104,7 +104,7 @@ class WorkspaceMemberController extends Controller
                 ...$request->only(['sort', 'perPage', 'page']),
                 'invitation_sort' => $request->input('invitation_sort'),
                 'invitation_page' => $request->input('invitation_page'),
-                'filter'          => $request->input('filter', []),
+                'filter' => $request->input('filter', []),
             ],
         ]);
     }
@@ -115,7 +115,7 @@ class WorkspaceMemberController extends Controller
     public function updateMember(Request $request, Workspace $workspace, User $user)
     {
 
-        if (!$request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to update member roles.');
         }
 
@@ -142,7 +142,7 @@ class WorkspaceMemberController extends Controller
     public function destroy(Request $request, Workspace $workspace, User $user)
     {
         // Only admins and owners can remove members
-        if (!$workspace->isOwner($request->user())) {
+        if (! $workspace->isOwner($request->user())) {
             abort(403, 'You do not have permission to remove members.');
         }
 
@@ -171,12 +171,12 @@ class WorkspaceMemberController extends Controller
     public function generatePasswordReset(Request $request, Workspace $workspace, User $user)
     {
         // Only admins and owners can remove members
-        if (!$workspace->isOwner($request->user())) {
+        if (! $workspace->isOwner($request->user())) {
             abort(403, 'You do not have permission.');
         }
 
         $token = Password::createToken($user);
-        $url   = route('password.reset', ['token' => $token]) . '?' . http_build_query(['email' => $user->email]);
+        $url = route('password.reset', ['token' => $token]).'?'.http_build_query(['email' => $user->email]);
 
         return response()->json(['url' => $url]);
     }

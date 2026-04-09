@@ -14,7 +14,7 @@ class AnalyticsController extends Controller
     {
         $workspace = Workspace::find($request->workspace->id);
 
-        $cacheKey = 'analytics:' . $workspace->id . ':' . $this->makeCacheKey($request->only(['date_range', 'filter', 'metric']));
+        $cacheKey = 'analytics:'.$workspace->id.':'.$this->makeCacheKey($request->only(['date_range', 'filter', 'metric']));
 
         $data = Cache::remember($cacheKey, $this->ttl($request->array('date_range', [])), function () use ($request, $workspace) {
             return $workspace->metrics($request->array('date_range', []), $request->array('filter', []))
@@ -28,7 +28,7 @@ class AnalyticsController extends Controller
     {
         $workspace = Workspace::find($request->workspace->id);
 
-        $cacheKey = 'analytics:' . $workspace->id . ':breakdown:' . $this->makeCacheKey($request->only(['date_range', 'filter', 'metric', 'group']));
+        $cacheKey = 'analytics:'.$workspace->id.':breakdown:'.$this->makeCacheKey($request->only(['date_range', 'filter', 'metric', 'group']));
 
         $data = Cache::remember($cacheKey, $this->ttl($request->array('date_range', [])), function () use ($request, $workspace) {
             return $workspace->metrics(
@@ -47,7 +47,7 @@ class AnalyticsController extends Controller
     {
         $workspace = Workspace::findOrFail($request->workspace->id);
 
-        $cacheKey = 'analytics:' . $workspace->id . ':per-page:' . $this->makeCacheKey($request->only(['date_range', 'filter', 'metric']));
+        $cacheKey = 'analytics:'.$workspace->id.':per-page:'.$this->makeCacheKey($request->only(['date_range', 'filter', 'metric']));
 
         $data = Cache::remember($cacheKey, $this->ttl($request->array('date_range', [])), function () use ($request, $workspace) {
             return $workspace->metrics(
@@ -65,7 +65,7 @@ class AnalyticsController extends Controller
     {
         $workspace = Workspace::findOrFail($request->workspace->id);
 
-        $cacheKey = 'analytics:' . $workspace->id . ':per-shop:' . $this->makeCacheKey($request->only(['date_range', 'filter', 'metric']));
+        $cacheKey = 'analytics:'.$workspace->id.':per-shop:'.$this->makeCacheKey($request->only(['date_range', 'filter', 'metric']));
 
         $data = Cache::remember($cacheKey, $this->ttl($request->array('date_range', [])), function () use ($request, $workspace) {
             return $workspace->metrics(
@@ -83,7 +83,7 @@ class AnalyticsController extends Controller
     {
         $workspace = Workspace::findOrFail($request->workspace->id);
 
-        $cacheKey = 'analytics:' . $workspace->id . ':per-user:' . $this->makeCacheKey($request->only(['date_range', 'filter', 'metric']));
+        $cacheKey = 'analytics:'.$workspace->id.':per-user:'.$this->makeCacheKey($request->only(['date_range', 'filter', 'metric']));
 
         $data = Cache::remember($cacheKey, $this->ttl($request->array('date_range', [])), function () use ($request, $workspace) {
             return $workspace->metrics(

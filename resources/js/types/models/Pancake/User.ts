@@ -7,4 +7,7 @@ export interface User {
     created_at: string;
     orders_count: number;
     sales: number;
+    status: string;
+    user?: User;
+    system_user?: User;
 }
