@@ -7,7 +7,7 @@ use App\Http\Controllers\Workspaces\AdsManager\CampaignController;
 use App\Http\Controllers\Workspaces\AdsManager\OptimizationRuleController;
 use App\Http\Controllers\Workspaces\Botcake\FlowController;
 use App\Http\Controllers\Workspaces\Botcake\SequenceController;
-use App\Http\Controllers\Workspaces\EmployeeController;
+use App\Http\Controllers\Workspaces\CSRController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\ProductController;
@@ -21,12 +21,14 @@ use App\Http\Controllers\Workspaces\TeamController;
 use App\Http\Controllers\Workspaces\AskDataController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
+use App\Http\Controllers\Workspaces\WorkspaceApiKeyController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Modules\Inventory\Http\Controllers\PpwController;
 use Modules\Inventory\Http\Controllers\PurchaseOrderController;
+use Modules\Inventory\Http\Controllers\InventoryItemController;
 
 /*
 |--------------------------------------------------------------------------
@@ -79,6 +81,13 @@ Route::middleware(['auth'])->group(function () {
     //    Route::put('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'update'])->name('workspaces.members.update');
     Route::put('/workspaces/{workspace:slug}/members/{user}', [WorkspaceMemberController::class, 'updateMember'])->name('workspaces.members.update');
     Route::delete('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'destroy'])->name('workspaces.members.destroy');
+    Route::post('/workspaces/{workspace}/members/{user}/reset-password', [WorkspaceMemberController::class, 'generatePasswordReset'])->name('workspaces.members.reset-password');
+
+    // API Keys
+    Route::get('/workspaces/{workspace}/api-keys', [WorkspaceApiKeyController::class, 'index'])->name('workspaces.api-keys.index');
+    Route::post('/workspaces/{workspace}/api-keys', [WorkspaceApiKeyController::class, 'store'])->name('workspaces.api-keys.store');
+    Route::get('/workspaces/{workspace}/api-keys/{apiKey}/reveal', [WorkspaceApiKeyController::class, 'reveal'])->name('workspaces.api-keys.reveal');
+    Route::delete('/workspaces/{workspace}/api-keys/{apiKey}', [WorkspaceApiKeyController::class, 'destroy'])->name('workspaces.api-keys.destroy');
 
     // Invitation routes (authenticated users)
     Route::post('/workspaces/{workspace}/invitations', [WorkspaceInvitationController::class, 'store'])->name('workspaces.invitations.store');
@@ -160,6 +169,8 @@ Route::middleware(['auth'])->group(function () {
     // Employee routes
     Route::get('/workspaces/{workspace}/employees', [EmployeeController::class, 'index'])->name('workspaces.employees.index');
     Route::put('/workspaces/{workspace:slug}/employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
+    Route::get('/workspaces/{workspace}/csr/management', [CSRController::class, 'index'])->name('workspaces.csr.index');
+    Route::get('/workspaces/{workspace}/csr/analytics', [CSRController::class, 'analytics'])->name('workspaces.csr.analytics');
 
     // Team routes
     Route::get('/workspaces/{workspace}/teams', [TeamController::class, 'index'])->name('workspaces.teams.index');
@@ -181,6 +192,13 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/', [PpwController::class, 'store'])->name('store');
         Route::put('/{ppw}', [PpwController::class, 'update'])->name('update');
         Route::delete('/{ppw}', [PpwController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
+    Route::get('/', [InventoryItemController::class, 'index'])->name('index');
+    Route::post('/', [InventoryItemController::class, 'store'])->name('store');
+    Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
+    Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
     });
 
 });

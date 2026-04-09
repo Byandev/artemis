@@ -49,7 +49,7 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
     useEffect(() => {
         const timer = setTimeout(() => {
             router.get(
-                `/workspaces/${workspace.slug}/employees`,
+                `/workspaces/${workspace.slug}/csr/management`,
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,

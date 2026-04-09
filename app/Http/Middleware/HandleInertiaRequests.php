@@ -63,6 +63,10 @@ class HandleInertiaRequests extends Middleware
             'ziggy' => [
                 'location' => $request->url(),
             ],
+            'flash' => [
+                'success'   => $request->session()->get('success'),
+                'newApiKey' => $request->session()->get('newApiKey'),
+            ],
         ];
     }
 }

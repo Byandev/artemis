@@ -43,9 +43,10 @@ import workspaces from '@/routes/workspaces';
 import { PaginatedData, User } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
+import axios from 'axios';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { MoreHorizontal, Send, Trash2, UserMinus, CopyleftIcon, UserCog } from 'lucide-react';
+import { MoreHorizontal, Send, Trash2, UserMinus, CopyleftIcon, UserCog, KeyRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Role } from '@/types/models/Role';
 
@@ -86,6 +87,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
     const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
     const [memberToUpdateRole, setMemberToUpdateRole] = useState<User | null>(null);
     const [invitationToRevoke, setInvitationToRevoke] = useState<Invitation | null>(null);
+    const [copiedMemberId, setCopiedMemberId] = useState<number | null>(null);
 
     const inviteForm = useForm({
         email: '',
@@ -162,6 +164,19 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
         });
     };
 
+    const copyResetPasswordUrl = async (member: User) => {
+        try {
+            const res = await axios.post(
+                workspaces.members.resetPassword.url({ workspace: workspace.slug, user: member.id })
+            );
+            await navigator.clipboard.writeText(res.data.url);
+            setCopiedMemberId(member.id);
+            setTimeout(() => setCopiedMemberId(null), 2000);
+        } catch (error) {
+            console.error('Failed to generate reset link:', error);
+        }
+    };
+
     const membersColumns: ColumnDef<User>[] = [
         {
             accessorKey: 'id',
@@ -224,6 +239,10 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                             >
                                 <UserCog className="mr-2 h-4 w-4" />
                                 Change Role
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => copyResetPasswordUrl(member)}>
+                                <KeyRound className="mr-2 h-4 w-4" />
+                                {copiedMemberId === member.id ? 'Copied!' : 'Copy Reset Link'}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem

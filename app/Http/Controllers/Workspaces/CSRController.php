@@ -12,7 +12,7 @@ use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 use Illuminate\Support\Facades\DB;
 
-class EmployeeController extends Controller
+class CSRController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
@@ -42,7 +42,7 @@ class EmployeeController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        return Inertia::render('workspaces/employees/index', [
+        return Inertia::render('workspaces/csr/index', [
             'workspace' => $workspace,
             'employees' => $employees,
             'query' => [
@@ -50,6 +50,17 @@ class EmployeeController extends Controller
                 'filter' => $request->input('filter', []),
             ],
             'systemUsers' => User::all(['id', 'name']),
+        ]);
+    }
+
+    public function analytics(Request $request, Workspace $workspace)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        return Inertia::render('workspaces/csr/analytics', [
+            'workspace' => $workspace,
         ]);
     }
 
