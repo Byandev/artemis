@@ -8,5 +8,6 @@ export interface User {
     orders_count: number;
     sales: number;
     status: string;
-    user?: User
+    user?: User;
+    system_user?: User;
 }

@@ -79,14 +79,14 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
                 cell: ({ row }) => row.original.phone_number || '-',
             },
             {
-                accessorKey: 'user_name',
+                accessorKey: 'system_user',
                 enableSorting: true,
                 size: 200,
                 header: ({ column }) => (
                     <SortableHeader column={column} title="Assigned User" />
                 ),
                 cell: ({ row }) => {
-                    const name = row.original.user?.name;
+                    const name = row.original.system_user?.name;
                     if (!name)
                         return (
                             <span className="text-gray-400 italic">

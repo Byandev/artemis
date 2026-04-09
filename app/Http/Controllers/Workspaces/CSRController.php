@@ -21,11 +21,7 @@ class CSRController extends Controller
         }
 
         $employees = QueryBuilder::for(PancakeUser::class)
-            ->leftJoin('users', 'pancake_users.user_id', '=', 'users.id')
-            ->select([
-                'pancake_users.*',
-                'users.name as user_name',
-            ])
+            ->with('systemUser')
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where(function ($q) use ($value) {
@@ -49,7 +45,7 @@ class CSRController extends Controller
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
-            'systemUsers' => User::all(['id', 'name']),
+            'systemUsers' => User::whereHas('workspaces', fn ($query) => $query->where('workspace_id', $workspace->id))->get()
         ]);
     }
 
@@ -64,20 +60,14 @@ class CSRController extends Controller
         ]);
     }
 
-    public function update(Request $request, Workspace $workspace, $employee)
+    public function update(Request $request, Workspace $workspace, PancakeUser $employee)
     {
         $validated = $request->validate([
             'status' => 'required|string|in:ACTIVE,INACTIVE',
             'user_id' => 'nullable|exists:users,id',
         ]);
 
-        DB::table('pancake_users')
-            ->where('id', $employee)
-            ->update([
-                'status' => strtoupper($validated['status']),
-                'user_id' => $validated['user_id'] ?: null,
-                'updated_at' => now(),
-            ]);
+        $employee->update($validated);
 
         return redirect()->back()->with('success', 'Employee updated successfully');
     }
