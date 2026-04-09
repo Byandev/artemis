@@ -27,8 +27,9 @@ class CSRController extends Controller
                         $q->where('pancake_users.name', 'like', "%{$value}%")
                             ->orWhere('pancake_users.email', 'like', "%{$value}%")
                             ->orWhere('pancake_users.phone_number', 'like', "%{$value}%")
-                            ->orWhere('pancake_users.status', 'like', "%{$value}%")
-                            ->orWhere('users.name', 'like', "%{$value}%");
+                            ->orWhere('pancake_users.status', 'like', "%{$value}%");
+                    })->orWhereHas('systemUser', function ($q) use ($value) {
+                        $q->where('name', 'like', "%{$value}%");
                     });
                 }),
             ])

@@ -186,11 +186,19 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
                         initialSorting={initialSorting}
                         meta={{ ...omit(employees, ['data']) }}
                         onFetch={(params) => {
-                            router.get(`/workspaces/${workspace.slug}/employees`, {
-                                sort: params?.sort,
-                                'filter[search]': searchValue || undefined,
-                                page: params?.page ?? 1,
-                            }, { preserveState: true, replace: true, preserveScroll: true });
+                            router.get(
+                                `/workspaces/${workspace.slug}/csr/management`,
+                                {
+                                    sort: params?.sort,
+                                    'filter[search]': searchValue || undefined,
+                                    page: params?.page ?? 1,
+                                },
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true,
+                                },
+                            );
                         }}
                     />
                 </div>
