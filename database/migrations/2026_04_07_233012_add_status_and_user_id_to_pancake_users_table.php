@@ -13,13 +13,7 @@ return new class extends Migration
     {
         Schema::table('pancake_users', function (Blueprint $table) {
             //
-            $table->string('status')->default('active')->after('phone_number');
-
-            $table->foreignId('user_id')
-                ->nullable()
-                ->after('id')
-                ->constrained('users')
-                ->onDelete('set null');
+//            $table->string('status')->default('active')->after('phone_number');
         });
     }
 
