@@ -12,6 +12,19 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v2.4.3',
+        date: '2026-04-09',
+        sections: [
+            {
+                title: 'Internal',
+                items: [
+                    'CSR daily records are now stored in a dedicated table keyed by Pancake user ID',
+                    'Fixed 401 errors on internal API endpoints caused by session auth not being available on the API middleware stack',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v2.4.2',
         date: '2026-04-09',
         sections: [
@@ -309,6 +322,8 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v2.4.3':
+        'bg-slate-500/10 text-slate-600 dark:text-slate-400 ring-slate-500/20',
     'v2.4.2':
         'bg-slate-500/10 text-slate-600 dark:text-slate-400 ring-slate-500/20',
     'v2.4.1':
