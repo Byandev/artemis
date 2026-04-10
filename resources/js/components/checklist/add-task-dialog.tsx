@@ -22,6 +22,7 @@ import { AddTaskForm } from './types';
 type AddTaskDialogProps = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    mode: 'add' | 'edit';
     form: AddTaskForm;
     setForm: React.Dispatch<React.SetStateAction<AddTaskForm>>;
     onSubmit: () => void;
@@ -31,22 +32,26 @@ type AddTaskDialogProps = {
 export function AddTaskDialog({
     open,
     onOpenChange,
+    mode,
     form,
     setForm,
     onSubmit,
     onCancel,
 }: AddTaskDialogProps) {
     const isFormValid = form.title.trim().length > 0 && form.target !== '';
+    const isEdit = mode === 'edit';
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md gap-0 rounded-xl border border-black/8 p-0 dark:border-white/8">
                 <DialogHeader className="border-b border-black/6 px-5 py-4 text-left dark:border-white/8">
                     <DialogTitle className="font-mono text-[16px] uppercase tracking-wide text-gray-800 dark:text-gray-100">
-                        Create Checklist
+                        {isEdit ? 'Edit Checklist' : 'Create Checklist'}
                     </DialogTitle>
                     <DialogDescription className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                        Fill in the details below to create checklist
+                        {isEdit
+                            ? 'Update the details below to edit checklist'
+                            : 'Fill in the details below to create checklist'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -113,7 +118,7 @@ export function AddTaskDialog({
                         onClick={onSubmit}
                         disabled={!isFormValid}
                     >
-                        Save
+                        {isEdit ? 'Update' : 'Save'}
                     </Button>
                 </DialogFooter>
             </DialogContent>
