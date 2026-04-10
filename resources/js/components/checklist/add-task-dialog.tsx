@@ -45,10 +45,10 @@ export function AddTaskDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md gap-0 rounded-xl border border-black/8 p-0 dark:border-white/8">
                 <DialogHeader className="space-y-0 border-b border-black/6 px-5 py-3 text-left dark:border-white/8">
-                    <DialogTitle className="font-mono text-[16px] leading-tight uppercase tracking-wide text-gray-800 dark:text-gray-100">
+                    <DialogTitle className="font-mono text-[16px] leading-none uppercase tracking-wide text-gray-800 dark:text-gray-100">
                         {isEdit ? 'Edit Checklist' : 'Create Checklist'}
                     </DialogTitle>
-                    <DialogDescription className="text-[11px] leading-tight text-gray-500 dark:text-gray-300">
+                    <DialogDescription className="-mt-0.5 text-[11px] leading-none text-gray-500 dark:text-gray-300">
                         {isEdit
                             ? 'Update the details below to edit checklist'
                             : 'Fill in the details below to create checklist'}
