@@ -1,6 +1,7 @@
 import PageHeader from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
 import { AddTaskDialog } from '@/components/checklist/add-task-dialog';
+import { DeleteChecklistDialog } from '@/components/checklist/delete-checklist-dialog';
 import { getChecklistColumns } from '@/components/checklist/checklist-columns';
 import { ADD_TASK_FORM_INITIAL, AddTaskForm, ChecklistItem } from '@/components/checklist/types';
 import { DataTable } from '@/components/ui/data-table';
@@ -15,23 +16,27 @@ interface Props {
 }
 
 const initialItems: ChecklistItem[] = [
-    { id: 1, title: 'Proof of Delivery Image', target: 'RTS Management', required: true },
-    { id: 2, title: 'Receiver Full Name', target: 'PO Management', required: true },
-    { id: 3, title: 'Customer Contact Number', target: 'PO Management', required: false },
-    { id: 4, title: 'Delivery Attempt Reason', target: 'RTS Management', required: true },
-    { id: 5, title: 'Parcel Condition Notes', target: 'Transaction Logs', required: false },
-    { id: 6, title: 'Supplier Reference ID', target: 'Purchased Orders', required: true },
-    { id: 7, title: 'Warehouse Received By', target: 'Purchased Orders', required: true },
-    { id: 8, title: 'Incident Attachment', target: 'RTS Management', required: false },
-    { id: 9, title: 'Cancellation Justification', target: 'PO Management', required: true },
-    { id: 10, title: 'Delivery Confirmation Time', target: 'Transaction Logs', required: false },
-    { id: 11, title: 'Verifier Signature', target: 'Purchased Orders', required: true },
-    { id: 12, title: 'Alternate Contact', target: 'RTS Management', required: false },
+    { id: 1, title: 'Proof of Delivery Image', target: 'Page', required: true },
+    { id: 2, title: 'Receiver Full Name', target: 'Shop', required: true },
+    { id: 3, title: 'Customer Contact Number', target: 'Shop', required: false },
+    { id: 4, title: 'Delivery Attempt Reason', target: 'Page', required: true },
+    { id: 5, title: 'Parcel Condition Notes', target: 'Shop', required: false },
+    { id: 6, title: 'Supplier Reference ID', target: 'Page', required: true },
+    { id: 7, title: 'Warehouse Received By', target: 'Shop', required: true },
+    { id: 8, title: 'Incident Attachment', target: 'Page', required: false },
+    { id: 9, title: 'Cancellation Justification', target: 'Shop', required: true },
+    { id: 10, title: 'Delivery Confirmation Time', target: 'Page', required: false },
+    { id: 11, title: 'Verifier Signature', target: 'Shop', required: true },
+    { id: 12, title: 'Alternate Contact', target: 'Page', required: false },
 ];
 
 export default function ChecklistPage({ workspace }: Props) {
     const [pageLoading, setPageLoading] = useState(true);
     const [addTaskOpen, setAddTaskOpen] = useState(false);
+    const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
+    const [editingItemId, setEditingItemId] = useState<number | null>(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<ChecklistItem | null>(null);
     const [addTaskForm, setAddTaskForm] = useState<AddTaskForm>(ADD_TASK_FORM_INITIAL);
     const [items, setItems] = useState<ChecklistItem[]>(initialItems);
     const [page, setPage] = useState(1);
@@ -85,25 +90,72 @@ export default function ChecklistPage({ workspace }: Props) {
             return;
         }
 
-        const nextId = (items.at(-1)?.id ?? 0) + 1;
-        const nextTask: ChecklistItem = {
-            id: nextId,
-            title: addTaskForm.title.trim(),
-            target: addTaskForm.target,
-            required: addTaskForm.required,
-        };
+        if (dialogMode === 'edit' && editingItemId !== null) {
+            setItems((prev) => prev.map((item) => (
+                item.id === editingItemId
+                    ? {
+                        ...item,
+                        title: addTaskForm.title.trim(),
+                        target: addTaskForm.target as 'Shop' | 'Page',
+                        required: addTaskForm.required,
+                    }
+                    : item
+            )));
+        } else {
+            const nextId = (items.at(-1)?.id ?? 0) + 1;
+            const nextTask: ChecklistItem = {
+                id: nextId,
+                title: addTaskForm.title.trim(),
+                target: addTaskForm.target as 'Shop' | 'Page',
+                required: addTaskForm.required,
+            };
 
-        setItems((prev) => [...prev, nextTask]);
+            setItems((prev) => [...prev, nextTask]);
+        }
+
         setPage(1);
         setAddTaskOpen(false);
+        setDialogMode('add');
+        setEditingItemId(null);
         resetAddTaskForm();
     };
 
-    const removeItem = useCallback((id: number) => {
-        setItems((prev) => prev.filter((item) => item.id !== id));
+    const openEdit = useCallback((item: ChecklistItem) => {
+        setDialogMode('edit');
+        setEditingItemId(item.id);
+        setAddTaskForm({
+            title: item.title,
+            target: item.target,
+            required: item.required,
+        });
+        setAddTaskOpen(true);
     }, []);
 
-    const columns = useMemo(() => getChecklistColumns(removeItem), [removeItem]);
+    const openDelete = useCallback((item: ChecklistItem) => {
+        setItemToDelete(item);
+        setDeleteDialogOpen(true);
+    }, []);
+
+    const confirmDelete = useCallback(() => {
+        if (!itemToDelete) {
+            setDeleteDialogOpen(false);
+            return;
+        }
+
+        setItems((prev) => {
+            const exists = prev.some((item) => item.id === itemToDelete.id);
+            if (!exists) {
+                return prev;
+            }
+
+            return prev.filter((item) => item.id !== itemToDelete.id);
+        });
+
+        setDeleteDialogOpen(false);
+        setItemToDelete(null);
+    }, [itemToDelete]);
+
+    const columns = useMemo(() => getChecklistColumns({ onEdit: openEdit, onDelete: openDelete }), [openDelete, openEdit]);
 
     return (
         <AppLayout>
@@ -123,6 +175,8 @@ export default function ChecklistPage({ workspace }: Props) {
                     <Button
                         type="button"
                         onClick={() => {
+                            setDialogMode('add');
+                            setEditingItemId(null);
                             resetAddTaskForm();
                             setAddTaskOpen(true);
                         }}
@@ -138,16 +192,33 @@ export default function ChecklistPage({ workspace }: Props) {
                     onOpenChange={(open) => {
                         setAddTaskOpen(open);
                         if (!open) {
+                            setDialogMode('add');
+                            setEditingItemId(null);
                             resetAddTaskForm();
                         }
                     }}
+                    mode={dialogMode}
                     form={addTaskForm}
                     setForm={setAddTaskForm}
                     onSubmit={submitAddTask}
                     onCancel={() => {
                         setAddTaskOpen(false);
+                        setDialogMode('add');
+                        setEditingItemId(null);
                         resetAddTaskForm();
                     }}
+                />
+
+                <DeleteChecklistDialog
+                    open={deleteDialogOpen}
+                    onOpenChange={(open) => {
+                        setDeleteDialogOpen(open);
+                        if (!open) {
+                            setItemToDelete(null);
+                        }
+                    }}
+                    item={itemToDelete}
+                    onConfirm={confirmDelete}
                 />
 
                 <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white shadow-theme-xs dark:border-white/6 dark:bg-zinc-900">
