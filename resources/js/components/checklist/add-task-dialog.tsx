@@ -44,20 +44,20 @@ export function AddTaskDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md gap-0 rounded-xl border border-black/8 p-0 dark:border-white/8">
-                <DialogHeader className="border-b border-black/6 px-5 py-4 text-left dark:border-white/8">
+                <DialogHeader className="space-y-0.5 border-b border-black/6 px-5 py-3 text-left dark:border-white/8">
                     <DialogTitle className="font-mono text-[16px] uppercase tracking-wide text-gray-800 dark:text-gray-100">
                         {isEdit ? 'Edit Checklist' : 'Create Checklist'}
                     </DialogTitle>
-                    <DialogDescription className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                    <DialogDescription className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-300">
                         {isEdit
                             ? 'Update the details below to edit checklist'
                             : 'Fill in the details below to create checklist'}
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-4 px-5 py-4">
+                <div className="space-y-3.5 px-5 py-3.5">
                     <div className="space-y-1.5">
-                        <Label className="font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                        <Label className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-300">
                             Title
                         </Label>
                         <Input
@@ -66,12 +66,12 @@ export function AddTaskDialog({
                                 setForm((prev) => ({ ...prev, title: e.target.value }));
                             }}
                             placeholder="Example Title"
-                            className="h-9 rounded-lg border-black/6 bg-stone-100 text-[12px] placeholder:text-gray-300 dark:border-white/8 dark:bg-zinc-800"
+                            className="h-9 rounded-lg border-black/6 bg-stone-100 text-[12px] placeholder:text-gray-400 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/20 dark:border-white/8 dark:bg-zinc-800 dark:placeholder:text-gray-500 dark:focus-visible:border-emerald-400 dark:focus-visible:ring-emerald-400/20"
                         />
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label className="font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                        <Label className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-300">
                             Target
                         </Label>
                         <Select
@@ -80,7 +80,7 @@ export function AddTaskDialog({
                                 setForm((prev) => ({ ...prev, target: value }));
                             }}
                         >
-                            <SelectTrigger className="h-9 rounded-lg border-black/6 bg-stone-100 text-[12px] dark:border-white/8 dark:bg-zinc-800">
+                            <SelectTrigger className="h-9 rounded-lg border-black/6 bg-stone-100 text-[12px] data-placeholder:text-gray-400 focus:ring-2 focus:ring-emerald-500/20 dark:border-white/8 dark:bg-zinc-800 dark:data-placeholder:text-gray-500 dark:focus:ring-emerald-400/20">
                                 <SelectValue placeholder="Select" />
                             </SelectTrigger>
                             <SelectContent>
@@ -92,12 +92,13 @@ export function AddTaskDialog({
 
                     <div className="flex items-center gap-2 pt-1">
                         <Switch
+                            className="data-[state=checked]:bg-emerald-600 dark:data-[state=checked]:bg-emerald-500"
                             checked={form.required}
                             onCheckedChange={(checked) => {
                                 setForm((prev) => ({ ...prev, required: Boolean(checked) }));
                             }}
                         />
-                        <Label className="font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                        <Label className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-300">
                             Required
                         </Label>
                     </div>
