@@ -1,25 +1,14 @@
 import PageHeader from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
-import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { AddTaskDialog } from '@/components/checklist/add-task-dialog';
+import { getChecklistColumns } from '@/components/checklist/checklist-columns';
+import { ADD_TASK_FORM_INITIAL, AddTaskForm, ChecklistItem } from '@/components/checklist/types';
+import { DataTable } from '@/components/ui/data-table';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
-import { ColumnDef } from '@tanstack/react-table';
-import { Eye, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-
-type ChecklistItem = {
-    id: number;
-    title: string;
-    target: string;
-    required: boolean;
-};
+import { Plus } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Props {
     workspace: Workspace;
@@ -42,6 +31,8 @@ const initialItems: ChecklistItem[] = [
 
 export default function ChecklistPage({ workspace }: Props) {
     const [pageLoading, setPageLoading] = useState(true);
+    const [addTaskOpen, setAddTaskOpen] = useState(false);
+    const [addTaskForm, setAddTaskForm] = useState<AddTaskForm>(ADD_TASK_FORM_INITIAL);
     const [items, setItems] = useState<ChecklistItem[]>(initialItems);
     const [page, setPage] = useState(1);
     const [sort, setSort] = useState('title');
@@ -85,90 +76,34 @@ export default function ChecklistPage({ workspace }: Props) {
     const from = sortedItems.length === 0 ? 0 : (currentPage - 1) * perPage + 1;
     const to = sortedItems.length === 0 ? 0 : Math.min(currentPage * perPage, sortedItems.length);
 
-    const columns = useMemo<ColumnDef<ChecklistItem>[]>(() => [
-        {
-            accessorKey: 'title',
-            header: ({ column }) => (
-                <div className="w-[340px]">
-                    <SortableHeader column={column} title="Title" />
-                </div>
-            ),
-            cell: ({ row }) => (
-                <span className="block w-[340px] truncate text-[12px] text-gray-800 dark:text-gray-100" title={row.original.title}>
-                    {row.original.title}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'target',
-            header: ({ column }) => (
-                <div className="w-[220px]">
-                    <SortableHeader column={column} title="Target" />
-                </div>
-            ),
-            cell: ({ row }) => (
-                <span className="block w-[220px] truncate whitespace-nowrap text-[12px] text-gray-700 dark:text-gray-200" title={row.original.target}>
-                    {row.original.target}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'required',
-            header: () => <div className="w-[140px] text-center">Required</div>,
-            cell: ({ row }) => (
-                <div className="flex w-[140px] justify-center">
-                    <span
-                        className={[
-                            'inline-flex min-w-14 justify-center rounded-2xl px-2 py-0.5 text-[11px] font-medium',
-                            row.original.required
-                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
-                                : 'bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400',
-                        ].join(' ')}
-                    >
-                        {row.original.required ? 'Yes' : 'No'}
-                    </span>
-                </div>
-            ),
-        },
-        {
-            id: 'actions',
-            header: () => <div className="w-[120px] text-center">Actions</div>,
-            cell: ({ row }) => (
-                <div className="flex w-[120px] justify-center">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button
-                                type="button"
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-black/4 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/6 dark:hover:text-gray-300"
-                                aria-label={`Open actions for ${row.original.title}`}
-                            >
-                                <MoreHorizontal className="h-4 w-4" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-[165px] p-1.5">
-                            <DropdownMenuItem>
-                                <Eye className="mr-1.5 h-3.5 w-3.5" />
-                                View
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                                Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                className="text-red-500 focus:text-red-500"
-                                onClick={() => {
-                                    setItems((prev) => prev.filter((item) => item.id !== row.original.id));
-                                }}
-                            >
-                                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                                Delete
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            ),
-        },
-    ], []);
+    const isAddTaskValid = addTaskForm.title.trim().length > 0 && addTaskForm.target !== '';
+
+    const resetAddTaskForm = () => setAddTaskForm(ADD_TASK_FORM_INITIAL);
+
+    const submitAddTask = () => {
+        if (!isAddTaskValid) {
+            return;
+        }
+
+        const nextId = (items.at(-1)?.id ?? 0) + 1;
+        const nextTask: ChecklistItem = {
+            id: nextId,
+            title: addTaskForm.title.trim(),
+            target: addTaskForm.target,
+            required: addTaskForm.required,
+        };
+
+        setItems((prev) => [...prev, nextTask]);
+        setPage(1);
+        setAddTaskOpen(false);
+        resetAddTaskForm();
+    };
+
+    const removeItem = useCallback((id: number) => {
+        setItems((prev) => prev.filter((item) => item.id !== id));
+    }, []);
+
+    const columns = useMemo(() => getChecklistColumns(removeItem), [removeItem]);
 
     return (
         <AppLayout>
@@ -188,16 +123,8 @@ export default function ChecklistPage({ workspace }: Props) {
                     <Button
                         type="button"
                         onClick={() => {
-                            const nextId = (items.at(-1)?.id ?? 0) + 1;
-                            const nextTask: ChecklistItem = {
-                                id: nextId,
-                                title: `Checklist Item ${String(nextId).padStart(3, '0')}`,
-                                target: nextId % 2 === 0 ? 'PO Management' : 'RTS Management',
-                                required: false,
-                            };
-
-                            setItems((prev) => [...prev, nextTask]);
-                            setPage(1);
+                            resetAddTaskForm();
+                            setAddTaskOpen(true);
                         }}
                         className="h-8 rounded-lg bg-emerald-600 px-3.5 text-[12px] font-medium text-white hover:bg-emerald-700"
                     >
@@ -205,6 +132,23 @@ export default function ChecklistPage({ workspace }: Props) {
                         Add Task
                     </Button>
                 </PageHeader>
+
+                <AddTaskDialog
+                    open={addTaskOpen}
+                    onOpenChange={(open) => {
+                        setAddTaskOpen(open);
+                        if (!open) {
+                            resetAddTaskForm();
+                        }
+                    }}
+                    form={addTaskForm}
+                    setForm={setAddTaskForm}
+                    onSubmit={submitAddTask}
+                    onCancel={() => {
+                        setAddTaskOpen(false);
+                        resetAddTaskForm();
+                    }}
+                />
 
                 <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white shadow-theme-xs dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
