@@ -40,15 +40,16 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
-import { PaginatedData, User } from '@/types';
+import { PaginatedData, SharedData, User } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import { MoreHorizontal, Send, Trash2, UserMinus, CopyleftIcon, UserCog, KeyRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Role } from '@/types/models/Role';
+import { toast } from 'sonner';
 
 interface Invitation {
     id: number;
@@ -80,6 +81,8 @@ interface Props {
 }
 
 export default function WorkspaceMembers({ workspace, members, pendingInvitations, isAdmin, query, roles }: Props) {
+    const { auth } = usePage<SharedData>().props;
+    const canRemoveMembers = auth?.user?.id === workspace.owner_id;
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
     const initialInvitationSorting = useMemo(() => toFrontendSort(query?.invitation_sort ?? null), [query?.invitation_sort]);
 
@@ -140,11 +143,21 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
     const handleRemoveMember = () => {
         if (!memberToRemove) return;
 
+        if (!canRemoveMembers) {
+            toast.error('You do not have permission to remove members.');
+            setMemberToRemove(null);
+            return;
+        }
+
         router.delete(
             workspaces.members.destroy.url({ workspace: workspace.slug, user: memberToRemove.id }),
             {
                 preserveScroll: true,
                 onSuccess: () => setMemberToRemove(null),
+                onError: () => {
+                    toast.error('You do not have permission to remove members.');
+                    setMemberToRemove(null);
+                },
             }
         );
     };
@@ -246,7 +259,14 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                                onClick={() => setMemberToRemove(member)}
+                                onClick={() => {
+                                    if (!canRemoveMembers) {
+                                        toast.error('You do not have permission to remove members.');
+                                        return;
+                                    }
+
+                                    setMemberToRemove(member);
+                                }}
                                 className="text-destructive focus:text-destructive"
                             >
                                 <UserMinus className="mr-2 h-4 w-4" />
