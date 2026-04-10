@@ -18,35 +18,27 @@ export function getChecklistColumns({ onEdit, onDelete }: ChecklistColumnActions
     return [
         {
             accessorKey: 'title',
-            header: ({ column }) => (
-                <div className="w-[260px] min-w-[260px] max-w-[260px]">
-                    <SortableHeader column={column} title="Title" />
-                </div>
-            ),
+            header: ({ column }) => <SortableHeader column={column} title="Title" />,
             cell: ({ row }) => (
-                <span className="block w-[260px] min-w-[260px] max-w-[260px] truncate text-[12px] text-gray-800 dark:text-gray-100" title={row.original.title}>
+                <span className="block truncate text-[12px] text-gray-800 dark:text-gray-100" title={row.original.title}>
                     {row.original.title}
                 </span>
             ),
         },
         {
             accessorKey: 'target',
-            header: ({ column }) => (
-                <div className="w-[180px] min-w-[180px] max-w-[180px] text-left">
-                    <SortableHeader column={column} title="Target" />
-                </div>
-            ),
+            header: ({ column }) => <SortableHeader column={column} title="Target" />,
             cell: ({ row }) => (
-                <span className="block w-[180px] min-w-[180px] max-w-[180px] truncate whitespace-nowrap text-left text-[12px] text-gray-700 dark:text-gray-200" title={row.original.target}>
+                <span className="block truncate whitespace-nowrap text-[12px] text-gray-700 dark:text-gray-200" title={row.original.target}>
                     {row.original.target}
                 </span>
             ),
         },
         {
             accessorKey: 'required',
-            header: () => <div className="w-[140px] min-w-[140px] max-w-[140px] text-center">Required</div>,
+            header: () => <div className="text-center">Required</div>,
             cell: ({ row }) => (
-                <div className="flex w-[140px] min-w-[140px] max-w-[140px] justify-center">
+                <div className="flex justify-center">
                     <span
                         className={[
                             'inline-flex min-w-14 justify-center rounded-2xl px-2 py-0.5 text-[11px] font-medium',
@@ -62,9 +54,9 @@ export function getChecklistColumns({ onEdit, onDelete }: ChecklistColumnActions
         },
         {
             id: 'actions',
-            header: () => <div className="w-[170px] min-w-[170px] max-w-[170px] text-center">Actions</div>,
+            header: () => <div className="text-center">Actions</div>,
             cell: ({ row }) => (
-                <div className="flex w-[170px] min-w-[170px] max-w-[170px] justify-center">
+                <div className="flex justify-center">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button
