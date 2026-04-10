@@ -32,14 +32,32 @@ export function getChecklistColumns({ onEdit, onDelete }: ChecklistColumnActions
         {
             accessorKey: 'target',
             header: ({ column }) => (
-                <div className="w-[220px]">
+                <div className="w-[220px] text-left">
                     <SortableHeader column={column} title="Target" />
                 </div>
             ),
             cell: ({ row }) => (
-                <span className="block w-[220px] truncate whitespace-nowrap text-[12px] text-gray-700 dark:text-gray-200" title={row.original.target}>
+                <span className="block w-[220px] truncate whitespace-nowrap text-left text-[12px] text-gray-700 dark:text-gray-200" title={row.original.target}>
                     {row.original.target}
                 </span>
+            ),
+        },
+        {
+            accessorKey: 'required',
+            header: () => <div className="w-[140px] text-center">Required</div>,
+            cell: ({ row }) => (
+                <div className="flex w-[140px] justify-center">
+                    <span
+                        className={[
+                            'inline-flex min-w-14 justify-center rounded-2xl px-2 py-0.5 text-[11px] font-medium',
+                            row.original.required
+                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                                : 'bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400',
+                        ].join(' ')}
+                    >
+                        {row.original.required ? 'Yes' : 'No'}
+                    </span>
+                </div>
             ),
         },
         {
