@@ -24,10 +24,13 @@ class CSRController extends Controller
             ? CarbonImmutable::parse($request->input('to'))->toDateString()
             : CarbonImmutable::now()->toDateString();
 
+        $type = $request->input('type');
+
         $records = DB::table('pancake_user_daily_reports as cdr')
             ->join('pancake_users as pu', 'pu.id', '=', 'cdr.pancake_user_id')
             ->where('cdr.workspace_id', $workspace->id)
             ->whereBetween('cdr.date', [$from, $to])
+            ->when($type, fn ($q) => $q->where('cdr.type', $type))
             ->groupBy('cdr.pancake_user_id', 'pu.name')
             ->selectRaw('
                 cdr.pancake_user_id,

@@ -23,14 +23,6 @@ interface CsrRecord {
 
 interface Props {
     workspace: Workspace;
-    records: PaginatedData<CsrRecord>;
-    query?: {
-        sort?: string | null;
-        from?: string | null;
-        to?: string | null;
-        page?: number | string;
-        type?: string | null;
-    };
 }
 
 const peso = (n: number) =>
@@ -45,28 +37,12 @@ export default function Analytics({ workspace }: Props) {
     const [records, setRecords] = useState<CsrRecord[]>([]);
     const [loading, setLoading] = useState(false);
     const [page, setPage] = useState(1);
+    const [currentType, setCurrentType] = useState('pos');
     const perPage = 15;
 
     useEffect(() => {
         setPage(1);
-    }, [range?.from, range?.to]);
-
-    const currentType = query?.type ?? 'pos';
-
-    const navigate = (params: Record<string, string | number | null | undefined>) => {
-        router.get(
-            analyticsUrl(workspace),
-            {
-                sort: query?.sort,
-                from: format(from, 'yyyy-MM-dd'),
-                to: format(to, 'yyyy-MM-dd'),
-                page: query?.page ?? 1,
-                type: currentType || undefined,
-                ...params,
-            },
-            { preserveState: false, replace: true, preserveScroll: true },
-        );
-    };
+    }, [range?.from, range?.to, currentType]);
 
     useEffect(() => {
         if (!range?.from || !range?.to) return;
@@ -77,6 +53,7 @@ export default function Analytics({ workspace }: Props) {
                 params: {
                     from: format(range.from, 'yyyy-MM-dd'),
                     to: format(range.to, 'yyyy-MM-dd'),
+                    type: currentType,
                 },
                 signal: controller.signal,
             })
@@ -86,7 +63,13 @@ export default function Analytics({ workspace }: Props) {
             })
             .finally(() => setLoading(false));
         return () => controller.abort();
-    }, [workspace.slug, range?.from, range?.to]);
+    }, [workspace.slug, range?.from, range?.to, currentType]);
+
+    const totalPages = Math.ceil(records.length / perPage);
+    const pagedRecords = useMemo(
+        () => records.slice((page - 1) * perPage, page * perPage),
+        [records, page, perPage],
+    );
 
     const columns = useMemo<ColumnDef<CsrRecord>[]>(
         () => [
@@ -140,12 +123,12 @@ export default function Analytics({ workspace }: Props) {
                 >
                     <div className="flex items-center p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
                         {['erp', 'pos'].map((value) => {
-                            const label =  value === 'erp' ? 'ERP' : 'POS';
+                            const label = value === 'erp' ? 'ERP' : 'POS';
                             const isActive = currentType === value;
                             return (
                                 <button
                                     key={value}
-                                    onClick={() => navigate({ type: value || undefined, page: 1 })}
+                                    onClick={() => setCurrentType(value)}
                                     className={`rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors ${
                                         isActive
                                             ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-600 dark:text-white'
