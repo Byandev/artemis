@@ -106,8 +106,8 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
             duration: 3000,
             closeButton: false,
             classNames: {
-                toast: 'rounded-xl border border-black/8 bg-white shadow-theme-xs data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-1 dark:border-white/10 dark:bg-zinc-900',
-                title: 'font-mono text-[12px] font-semibold text-gray-800 dark:text-gray-100',
+                toast: '!w-auto !min-w-0 !max-w-max max-w-[calc(100vw-1rem)] rounded-lg border border-black/8 bg-white px-2.5 py-1.5 shadow-theme-xs data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-1 dark:border-white/10 dark:bg-zinc-900',
+                title: 'font-mono text-[12px] leading-tight font-semibold text-gray-800 dark:text-gray-100',
             },
         });
     };
