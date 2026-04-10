@@ -1,7 +1,7 @@
 export type ChecklistItem = {
     id: number;
     title: string;
-    target: string;
+    target: 'Shop' | 'Page';
     required: boolean;
 };
 
