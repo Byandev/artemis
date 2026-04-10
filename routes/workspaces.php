@@ -19,6 +19,7 @@ use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\TeamController;
 use App\Http\Controllers\Workspaces\AskDataController;
+use App\Http\Controllers\Workspaces\ChecklistController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceApiKeyController;
@@ -26,7 +27,6 @@ use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 use Modules\Inventory\Http\Controllers\PpwController;
 use Modules\Inventory\Http\Controllers\PurchaseOrderController;
 
@@ -168,12 +168,13 @@ Route::middleware(['auth'])->group(function () {
 
     // Employee routes
     Route::get('/workspaces/{workspace}/employees', [EmployeeController::class, 'index'])->name('workspaces.employees.index');
-    // Stash marker: checklist route touched for local stash grouping.
-    Route::get('/workspaces/{workspace}/checklist', function (Workspace $workspace) {
-        return Inertia::render('workspaces/checklist/index', [
-            'workspace' => $workspace,
-        ]);
-    })->name('workspaces.checklist.index');
+
+    // Checklist routes
+    Route::get('/workspaces/{workspace}/checklist', [ChecklistController::class, 'index'])->name('workspaces.checklist.index');
+    Route::get('/workspaces/{workspace}/checklist/view', [ChecklistController::class, 'view'])->name('workspaces.checklist.view');
+    Route::post('/workspaces/{workspace}/checklist', [ChecklistController::class, 'store'])->name('workspaces.checklist.store');
+    Route::put('/workspaces/{workspace}/checklist/{checklist}', [ChecklistController::class, 'update'])->name('workspaces.checklist.update');
+    Route::delete('/workspaces/{workspace}/checklist/{checklist}', [ChecklistController::class, 'destroy'])->name('workspaces.checklist.destroy');
 
     // Team routes
     Route::get('/workspaces/{workspace}/teams', [TeamController::class, 'index'])->name('workspaces.teams.index');
