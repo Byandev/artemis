@@ -159,6 +159,7 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, query }
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
                                     page: params?.page ?? 1,
+                                    per_page: params?.per_page,
                                 },
                                 { preserveState: true, replace: true, preserveScroll: true },
                             );

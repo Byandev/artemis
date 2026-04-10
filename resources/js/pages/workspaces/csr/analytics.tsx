@@ -135,6 +135,7 @@ export default function Analytics({ workspace, records, query }: Props) {
                             navigate({
                                 sort: params?.sort,
                                 page: params?.page ?? 1,
+                                per_page: params?.per_page,
                             })
                         }
                     />

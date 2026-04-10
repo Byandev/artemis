@@ -32,7 +32,7 @@ class AdAccountController extends Controller
                 'status',
                 AllowedSort::custom('facebook_accounts', new FacebookAccountsSort),
             ])
-            ->paginate(10)
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         return Inertia::render('workspaces/ad-accounts/index', [

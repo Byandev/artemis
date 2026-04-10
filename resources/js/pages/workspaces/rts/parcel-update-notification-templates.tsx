@@ -280,7 +280,7 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates, pageStats, an
                         onFetch={(params) => {
                             router.get(
                                 url,
-                                { page: params?.page ?? 1, start_date: dateRange[0], end_date: dateRange[1] },
+                                { page: params?.page ?? 1, per_page: params?.per_page, start_date: dateRange[0], end_date: dateRange[1] },
                                 { preserveState: true, replace: true, preserveScroll: true, only: ['templates'] },
                             );
                         }}

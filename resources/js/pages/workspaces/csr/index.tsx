@@ -193,6 +193,7 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
                                     page: params?.page ?? 1,
+                                    per_page: params?.per_page,
                                 },
                                 {
                                     preserveState: true,

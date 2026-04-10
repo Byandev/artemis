@@ -19,7 +19,7 @@ class FacebookAccountController extends Controller
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),
             ])
-            ->paginate(10)
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         return Inertia::render('workspaces/facebook-accounts/index', [

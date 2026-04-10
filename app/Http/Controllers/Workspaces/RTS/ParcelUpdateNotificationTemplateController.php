@@ -75,7 +75,7 @@ class ParcelUpdateNotificationTemplateController extends Controller
         }
 
         $templates = ParcelJourneyNotificationTemplate::where('workspace_id', $workspace->id)
-            ->paginate(15)
+            ->paginate($request->integer('per_page', 15))
             ->withQueryString();
 
         $startDate = $request->input('start_date', now()->startOfMonth()->toDateString());
@@ -119,7 +119,14 @@ class ParcelUpdateNotificationTemplateController extends Controller
             ->where('po.workspace_id', $workspace->id)
             ->whereBetween('pj.created_at', [$startDate.' 00:00:00', $endDate.' 23:59:59'])
             ->whereIn('po.status', [3, 4, 5])
-            ->selectRaw('po.page_id, ROUND(SUM(po.status IN (4,5)) / NULLIF(SUM(po.status IN (3,4,5)), 0) * 100, 2) as rts_rate')
+            ->selectRaw('
+                po.page_id,
+                ROUND(
+                    SUM(CASE WHEN po.status IN (4,5) THEN po.final_amount ELSE 0 END)
+                    / NULLIF(SUM(CASE WHEN po.status IN (3,4,5) THEN po.final_amount ELSE 0 END), 0)
+                    * 100,
+                2) as rts_rate
+            ')
             ->groupBy('po.page_id');
 
         $pageQuery = Page::where('pages.workspace_id', $workspace->id)
