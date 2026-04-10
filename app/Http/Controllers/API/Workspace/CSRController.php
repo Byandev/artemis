@@ -54,4 +54,69 @@ class CSRController extends Controller
             'filters' => ['from' => $from, 'to' => $to],
         ]);
     }
+
+    private function statQuery(Request $request, Workspace $workspace)
+    {
+        $from = $request->input('from')
+            ? CarbonImmutable::parse($request->input('from'))->toDateString()
+            : CarbonImmutable::now()->subDays(6)->toDateString();
+
+        $to = $request->input('to')
+            ? CarbonImmutable::parse($request->input('to'))->toDateString()
+            : CarbonImmutable::now()->toDateString();
+
+        $type = $request->input('type');
+
+        return DB::table('pancake_user_daily_reports')
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('date', [$from, $to])
+            ->when($type, fn ($q) => $q->where('type', $type));
+    }
+
+    public function statTotalSales(Request $request, Workspace $workspace)
+    {
+        $value = $this->statQuery($request, $workspace)->sum('total_sales');
+
+        return response()->json(['value' => $value]);
+    }
+
+    public function statTotalOrders(Request $request, Workspace $workspace)
+    {
+        $value = $this->statQuery($request, $workspace)->sum('total_orders');
+
+        return response()->json(['value' => $value]);
+    }
+
+    public function statTotalDelivered(Request $request, Workspace $workspace)
+    {
+        $value = $this->statQuery($request, $workspace)->sum('delivered');
+
+        return response()->json(['value' => $value]);
+    }
+
+    public function statTotalReturning(Request $request, Workspace $workspace)
+    {
+        $value = $this->statQuery($request, $workspace)->sum('returning');
+
+        return response()->json(['value' => $value]);
+    }
+
+    public function statTotalRts(Request $request, Workspace $workspace)
+    {
+        $row = $this->statQuery($request, $workspace)
+            ->selectRaw('SUM(delivered) as d, SUM(`returning`) as r')
+            ->first();
+
+        $total = ($row->d ?? 0) + ($row->r ?? 0);
+        $value = $total > 0 ? round(($row->r / $total) * 100, 2) : 0;
+
+        return response()->json(['value' => $value]);
+    }
+
+    public function statTotalRmoCalled(Request $request, Workspace $workspace)
+    {
+        $value = $this->statQuery($request, $workspace)->sum('rmo_called');
+
+        return response()->json(['value' => $value]);
+    }
 }
