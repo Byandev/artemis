@@ -14,8 +14,6 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Eye, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-// Stash marker: checklist page touched for local stash grouping.
-
 type ChecklistItem = {
     id: number;
     title: string;
@@ -86,10 +84,6 @@ export default function ChecklistPage({ workspace }: Props) {
 
     const from = sortedItems.length === 0 ? 0 : (currentPage - 1) * perPage + 1;
     const to = sortedItems.length === 0 ? 0 : Math.min(currentPage * perPage, sortedItems.length);
-
-    const removeItem = (id: number) => {
-        setItems((prev) => prev.filter((item) => item.id !== id));
-    };
 
     const columns = useMemo<ColumnDef<ChecklistItem>[]>(() => [
         {
@@ -162,7 +156,9 @@ export default function ChecklistPage({ workspace }: Props) {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                                 className="text-red-500 focus:text-red-500"
-                                onClick={() => removeItem(row.original.id)}
+                                onClick={() => {
+                                    setItems((prev) => prev.filter((item) => item.id !== row.original.id));
+                                }}
                             >
                                 <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                                 Delete
@@ -172,7 +168,7 @@ export default function ChecklistPage({ workspace }: Props) {
                 </div>
             ),
         },
-    ], [removeItem]);
+    ], []);
 
     return (
         <AppLayout>
