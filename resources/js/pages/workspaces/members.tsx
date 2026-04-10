@@ -102,14 +102,12 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
     });
 
     const showNoPermissionToast = () => {
-        toast.error('You do not have permission to remove members.', {
-            description: 'Only the workspace owner can remove members.',
+        toast.error("You don't have this permission.", {
             duration: 3000,
             closeButton: false,
             classNames: {
-                toast: 'rounded-xl border border-black/8 bg-white shadow-theme-xs dark:border-white/10 dark:bg-zinc-900',
+                toast: 'rounded-xl border border-black/8 bg-white shadow-theme-xs data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-1 dark:border-white/10 dark:bg-zinc-900',
                 title: 'font-mono text-[12px] font-semibold text-gray-800 dark:text-gray-100',
-                description: 'font-mono text-[11px] text-gray-500 dark:text-gray-400',
             },
         });
     };
