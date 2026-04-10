@@ -1,28 +1,55 @@
-# CSR Leaderboards
+# Workspace Checklist Readme
 
-<h3>Backend Updates</h3>
-<ul>
-<li>Initial Uploading</li>
-    <ol>
-        <li>Tokens must be used in the API to get the data in the database.</li>
-    </ol>
-<li>Refinement Upload</li>
-    <ol>
-        <li>API now use public endpoints to access the data, making it accessible to guests.</li>
-    </ol>
-</ul>
+Branch: feature/workspace-checklist
 
-<h3>API Testing Snapshots</h3>
-<a href="https://drive.google.com/file/d/1OydeP9v4-3gu3P658eVyzr-87zGFOXOr/view?usp=drive_link">Daily CSR Leaderboards</a><br>
-<a href="https://drive.google.com/file/d/1zvMCUdkb6InqlyQszmGR462QkQsUl7l_/view?usp=drive_link">Weekly CSR Leaderboards</a><br>
-<a href="https://drive.google.com/file/d/1ke2Aj658R4vzbIiyALqxEHXheh3n1Aab/view?usp=drive_link">Monthly CSR Leaderboards</a>
+<!-- Stash marker: checklist docs touched for local stash grouping. -->
 
-<h3>Finished CSR Leaderboards</h3>
-<b>http://localhost/csr-leaderboards/index.html</b><br>
+## Overview
 
-<h3>Updates / Patches </h3>
-<ul>
-    <li>Added public API endpoints for CSR performance and CSR list, with rate limiting to prevent abuse.</li>
-    <li>Added throttle middleware to limit the number of requests a client can make.</li>
-    <li>Added DoS protection to prevent abuse of the public API endpoints.</li>
-</ul>
+This branch adds a new Checklist page under the workspace menu and follows the existing app design system for layout, table styling, and pagination.
+
+## What Was Added
+
+- Sidebar menu item for Checklist in [resources/js/components/app-sidebar.tsx](resources/js/components/app-sidebar.tsx).
+- Workspace route for Checklist page in [routes/workspaces.php](routes/workspaces.php).
+- New Checklist page implementation in [resources/js/pages/workspaces/checklist/index.tsx](resources/js/pages/workspaces/checklist/index.tsx).
+
+## Checklist Page Behavior
+
+- Page title and header follow existing workspace page style.
+- Table uses shared DataTable component with built-in footer and pagination.
+- Columns:
+	- Title
+	- Target
+	- Required
+	- Actions
+- Required badge styling:
+	- Yes: highlighted green
+	- No: neutral gray
+- Actions dropdown contains:
+	- View (icon)
+	- Edit (icon)
+	- Delete (icon)
+- Column widths are fixed to avoid layout shift when content is long.
+- Title and Target cells truncate long values.
+- Required and Actions columns are centered.
+- Sorting is enabled for Title and Target using shared sortable header pattern.
+
+## Route
+
+- URL: /workspaces/{workspace}/checklist
+- Route name: workspaces.checklist.index
+
+## Notes
+
+- Top loading line is scoped to the Checklist page only.
+- No global spinner/progress CSS changes are required.
+
+## Quick Manual Test Plan
+
+- Open Checklist from the sidebar and confirm route loads correctly.
+- Verify table footer and pagination render consistently.
+- Confirm sorting works on Title and Target.
+- Confirm Required and Actions columns remain centered.
+- Open the actions menu and verify View/Edit/Delete items and icons.
+- Add tasks and confirm fixed-width columns do not shift with long text.
