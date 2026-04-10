@@ -23,6 +23,14 @@ interface CsrRecord {
 
 interface Props {
     workspace: Workspace;
+    records: PaginatedData<CsrRecord>;
+    query?: {
+        sort?: string | null;
+        from?: string | null;
+        to?: string | null;
+        page?: number | string;
+        type?: string | null;
+    };
 }
 
 const peso = (n: number) =>
@@ -43,11 +51,22 @@ export default function Analytics({ workspace }: Props) {
         setPage(1);
     }, [range?.from, range?.to]);
 
-    const totalPages = Math.max(1, Math.ceil(records.length / perPage));
-    const pagedRecords = useMemo(
-        () => records.slice((page - 1) * perPage, page * perPage),
-        [records, page],
-    );
+    const currentType = query?.type ?? 'pos';
+
+    const navigate = (params: Record<string, string | number | null | undefined>) => {
+        router.get(
+            analyticsUrl(workspace),
+            {
+                sort: query?.sort,
+                from: format(from, 'yyyy-MM-dd'),
+                to: format(to, 'yyyy-MM-dd'),
+                page: query?.page ?? 1,
+                type: currentType || undefined,
+                ...params,
+            },
+            { preserveState: false, replace: true, preserveScroll: true },
+        );
+    };
 
     useEffect(() => {
         if (!range?.from || !range?.to) return;
@@ -119,6 +138,25 @@ export default function Analytics({ workspace }: Props) {
                     title="CSR Analytics"
                     description="Aggregated CSR performance from daily records"
                 >
+                    <div className="flex items-center p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+                        {['erp', 'pos'].map((value) => {
+                            const label =  value === 'erp' ? 'ERP' : 'POS';
+                            const isActive = currentType === value;
+                            return (
+                                <button
+                                    key={value}
+                                    onClick={() => navigate({ type: value || undefined, page: 1 })}
+                                    className={`rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                                        isActive
+                                            ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-600 dark:text-white'
+                                            : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            );
+                        })}
+                    </div>
                     <DatePicker
                         id="csr-analytics-date-range"
                         mode="range"
