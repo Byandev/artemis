@@ -5,6 +5,10 @@ export type ChecklistItem = {
     required: boolean;
 };
 
+export type ChecklistProgressItem = ChecklistItem & {
+    is_completed: boolean;
+};
+
 export type AddTaskForm = {
     title: string;
     target: 'Shop' | 'Page' | '';
