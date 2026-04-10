@@ -1,14 +1,16 @@
 import PageHeader from '@/components/common/PageHeader';
 import DatePicker from '@/components/ui/date-picker';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import Pagination from '@/components/ui/pagination';
 import AppLayout from '@/layouts/app-layout';
+import { toFrontendSort } from '@/lib/sort';
+import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { format, subDays } from 'date-fns';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { omit } from 'lodash';
+import { useEffect, useMemo, useState } from 'react';
 
 interface CsrRecord {
     csr_id: number;
@@ -81,11 +83,10 @@ export default function Analytics({ workspace }: Props) {
         from: subDays(today, 6),
         to: today,
     });
-    const [records, setRecords] = useState<CsrRecord[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [page, setPage] = useState(1);
+    const [paginatedRecords, setPaginatedRecords] = useState<PaginatedData<CsrRecord> | null>(null);
     const [currentType, setCurrentType] = useState('pos');
-    const perPage = 15;
+    const [sort, setSort] = useState('-total_sales');
+    const [page, setPage] = useState(1);
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
     const toStr = format(range.to, 'yyyy-MM-dd');
@@ -102,27 +103,20 @@ export default function Analytics({ workspace }: Props) {
     }, [range?.from, range?.to, currentType]);
 
     useEffect(() => {
-        if (!range?.from || !range?.to) return;
         const controller = new AbortController();
-        setLoading(true);
         axios
             .get(`/api/workspaces/${workspace.slug}/csrs/daily-records`, {
-                params: { from: fromStr, to: toStr, type: currentType },
+                params: { from: fromStr, to: toStr, type: currentType, sort, page },
                 signal: controller.signal,
             })
-            .then((res) => setRecords(res.data?.data ?? []))
+            .then((res) => setPaginatedRecords(res.data))
             .catch((err) => {
                 if (!axios.isCancel(err)) console.error(err);
-            })
-            .finally(() => setLoading(false));
+            });
         return () => controller.abort();
-    }, [workspace.slug, fromStr, toStr, currentType]);
+    }, [workspace.slug, fromStr, toStr, currentType, sort, page]);
 
-    const totalPages = Math.ceil(records.length / perPage);
-    const pagedRecords = useMemo(
-        () => records.slice((page - 1) * perPage, page * perPage),
-        [records, page, perPage],
-    );
+    const initialSorting = useMemo(() => toFrontendSort(sort), [sort]);
 
     const columns = useMemo<ColumnDef<CsrRecord>[]>(
         () => [
@@ -218,19 +212,22 @@ export default function Analytics({ workspace }: Props) {
                 </div>
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                    <DataTable columns={columns} data={pagedRecords} />
-                    <div className="flex flex-col gap-2 border-t border-black/6 px-4 py-3 xl:flex-row xl:items-center xl:justify-between dark:border-white/6">
-                        <p className="text-center font-mono text-xs font-light text-gray-400 xl:text-left">
-                            Showing {(page - 1) * perPage + 1} to{' '}
-                            {Math.min(page * perPage, records.length)} of{' '}
-                            {records.length} entries
-                        </p>
-                        <Pagination
-                            currentPage={page}
-                            totalPages={totalPages}
-                            onPageChange={setPage}
-                        />
-                    </div>
+                    <DataTable
+                        key={sort}
+                        columns={columns}
+                        data={paginatedRecords?.data ?? []}
+                        initialSorting={initialSorting}
+                        meta={paginatedRecords ? omit(paginatedRecords, ['data']) : undefined}
+                        onFetch={(params) => {
+                            if (params?.sort !== undefined) {
+                                setSort(params.sort as string);
+                                setPage(1);
+                            }
+                            if (params?.page !== undefined) {
+                                setPage(params.page as number);
+                            }
+                        }}
+                    />
                 </div>
             </div>
         </AppLayout>
