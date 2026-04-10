@@ -9,7 +9,12 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Eye, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { ChecklistItem } from './types';
 
-export function getChecklistColumns(onDelete: (id: number) => void): ColumnDef<ChecklistItem>[] {
+type ChecklistColumnActions = {
+    onEdit: (item: ChecklistItem) => void;
+    onDelete: (item: ChecklistItem) => void;
+};
+
+export function getChecklistColumns({ onEdit, onDelete }: ChecklistColumnActions): ColumnDef<ChecklistItem>[] {
     return [
         {
             accessorKey: 'title',
@@ -38,28 +43,10 @@ export function getChecklistColumns(onDelete: (id: number) => void): ColumnDef<C
             ),
         },
         {
-            accessorKey: 'required',
-            header: () => <div className="w-[140px] text-center">Required</div>,
-            cell: ({ row }) => (
-                <div className="flex w-[140px] justify-center">
-                    <span
-                        className={[
-                            'inline-flex min-w-14 justify-center rounded-2xl px-2 py-0.5 text-[11px] font-medium',
-                            row.original.required
-                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
-                                : 'bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400',
-                        ].join(' ')}
-                    >
-                        {row.original.required ? 'Yes' : 'No'}
-                    </span>
-                </div>
-            ),
-        },
-        {
             id: 'actions',
-            header: () => <div className="w-[120px] text-center">Actions</div>,
+            header: () => <div className="w-[170px] text-center">Actions</div>,
             cell: ({ row }) => (
-                <div className="flex w-[120px] justify-center">
+                <div className="flex w-[170px] justify-center">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button
@@ -71,17 +58,17 @@ export function getChecklistColumns(onDelete: (id: number) => void): ColumnDef<C
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-[165px] p-1.5">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem disabled>
                                 <Eye className="mr-1.5 h-3.5 w-3.5" />
                                 View
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onEdit(row.original)}>
                                 <Pencil className="mr-1.5 h-3.5 w-3.5" />
                                 Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
                                 className="text-red-500 focus:text-red-500"
-                                onClick={() => onDelete(row.original.id)}
+                                onClick={() => onDelete(row.original)}
                             >
                                 <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                                 Delete
