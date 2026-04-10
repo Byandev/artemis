@@ -14,26 +14,26 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     LayoutDashboard,
     Package,
+    ClipboardList,
+    ListChecks,
     Store,
     Users,
     BookOpenIcon,
+    Settings,
     User,
     ShieldIcon,
     RotateCcw,
     BarChart2,
     MapPin,
-    ClipboardList,
-    Box,
-    Layers,
 
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
 export function AppSidebar() {
-    const { currentWorkspace, appEnv } = usePage().props as unknown as { currentWorkspace: { slug: string }; appEnv: string };
+    const { currentWorkspace } = usePage().props;
 
     const dashboardUrl = currentWorkspace
-        ? workspace.dashboard.url(currentWorkspace.slug)
+        ? workspace.dashboard.url((currentWorkspace as { slug: string }).slug)
         : dashboard().url;
 
     const mainNavItems: NavItem[] = [
@@ -44,85 +44,145 @@ export function AppSidebar() {
         },
         {
             title: 'Shops',
-            href: `/workspaces/${currentWorkspace.slug}/shops`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/shops`,
             icon: Store,
         },
         {
             title: 'Pages',
-            href: `/workspaces/${currentWorkspace.slug}/pages`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
             icon: BookOpenIcon,
         },
         {
             title: 'Products',
-            href: `/workspaces/${currentWorkspace.slug}/products/list`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products/list`,
             icon: Package,
         },
         {
             title: 'Teams',
-            href: `/workspaces/${currentWorkspace.slug}/teams`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
             icon: Users,
         },
-
         {
-            title: 'CSR',
-            icon: User,
-            items: [
-                {
-                    title: 'Management',
-                    href: `/workspaces/${currentWorkspace.slug}/csr/management`,
-                    icon: User,
-                },
-                {
-                    title: 'CSR Analytics',
-                    href: `/workspaces/${currentWorkspace.slug}/csr/analytics`,
-                    icon: BarChart2,
-                },
-            ],
+            // Stash marker: checklist nav item touched for local stash grouping.
+            title: 'Checklist',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/checklist`,
+            icon: ListChecks,
         },
-        ...(appEnv !== 'production' ? [{
-            title: 'Inventory',
-            icon: Box,
-            items: [
-                {
-                    title: 'PPW',
-                    href: `/workspaces/${currentWorkspace.slug}/inventory/ppws`,
-                    icon: BarChart2,
-                },
-                {
-                    title: 'Transaction Logs',
-                    href: `/workspaces/${currentWorkspace.slug}/inventory/transactions`,
-                    icon: ClipboardList,
-                },
-                {
-                    title: 'Inventory Items',
-                    href: `/workspaces/${currentWorkspace.slug}/inventory/items`,
-                    icon: Layers,
-                },
-            ],
-        }] : []),
+        {
+            title: 'Employees',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/employees`,
+            icon: User,
+        },
         {
             title: 'RTS',
             icon: RotateCcw,
             items: [
                 {
                     title: 'Analytics',
-                    href: `/workspaces/${currentWorkspace.slug}/rts/analytics`,
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
                     icon: BarChart2,
                 },
                 {
                     title: 'Parcel Journey',
-                    href: `/workspaces/${currentWorkspace.slug}/rts/parcel-journeys`,
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/parcel-journeys`,
                     icon: MapPin,
                 },
             ],
         },
         {
             title: 'Roles',
-            href: `/workspaces/${currentWorkspace.slug}/roles`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/roles`,
             icon: ShieldIcon,
+        },
+                {
+            title: 'Inventory',
+            icon: Package,
+            items: [
+                {
+                    title: 'Purchased Orders',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/purchased-orders`,
+                    icon: ClipboardList,
+                },
+                {
+                    title: 'PPW',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/ppws`,
+                    icon: BarChart2,
+                },
+                {
+                    title: 'Transaction Logs',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/transactions`,
+                    icon: ClipboardList,
+                },
+            ],
         },
     ];
 
+    // const mainNavItems: NavItem[] = [
+    //     {
+    //         title: 'Dashboard',
+    //         href: dashboardUrl,
+    //         icon: LayoutDashboard,
+    //     },
+    //     // {
+    //     //     title: 'Ads Manager',
+    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ads-manager`,
+    //     //     icon: Target,
+    //     // },
+    //     {
+    //         title: 'Shops',
+    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/shops`,
+    //         icon: Store,
+    //     },
+    //     {
+    //         title: 'Pages',
+    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
+    //         icon: BookOpenIcon,
+    //     },
+    //     {
+    //         title: 'Products',
+    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products`,
+    //         icon: Package,
+    //     },
+    //     // {
+    //     //     title: 'Facebook Accounts',
+    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/facebook-accounts`,
+    //     //     icon: FacebookIcon,
+    //     // },
+    //     // {
+    //     //     title: 'Ad Accounts',
+    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/ad-accounts`,
+    //     //     icon: CreditCard,
+    //     // },
+    //     {
+    //         title: 'Teams',
+    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
+    //         icon: Users,
+    //     },
+    //     {
+    //         title: 'RTS Management',
+    //         href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts`,
+    //         icon: TrendingUp,
+    //     },
+    //     // {
+    //     //     title: 'Botcake',
+    //     //     href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/botcake`,
+    //     //     icon: MousePointerClickIcon,
+    //     // },
+    // ];
+
+    const accountNavItems: NavItem[] = [
+        {
+            title: 'Profile',
+            href: '/profile',
+            icon: User,
+        },
+
+        {
+            title: 'Settings',
+            href: `/settings`,
+            icon: Settings,
+        },
+    ];
 
     return (
         <Sidebar
