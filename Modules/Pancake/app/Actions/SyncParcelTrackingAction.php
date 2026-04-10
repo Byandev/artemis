@@ -6,6 +6,7 @@ use App\Models\Page;
 use App\Models\Workspace;
 use Carbon\Carbon;
 use Modules\Pancake\Models\Order;
+use Modules\Pancake\Models\OrderForDelivery;
 use Modules\Pancake\Models\ParcelJourney;
 use Modules\Pancake\Notifications\ParcelJourneyNotifier;
 use Modules\Pancake\Support\JourneyUpdateNormalizer;
@@ -66,6 +67,25 @@ readonly class SyncParcelTrackingAction
                     'rider_mobile' => $update['rider_mobile'],
                 ]
             );
+
+            if ($update['status'] === 'On Delivery' && $update['rider_name'] && $update['rider_mobile'] && Carbon::parse($update['updated_at'])->isToday()) {
+                OrderForDelivery::firstOrCreate(
+                    [
+                        'order_id'      => $savedOrder->id,
+                        'page_id'       => $savedOrder->page_id,
+                        'shop_id'       => $savedOrder->shop_id,
+                        'workspace_id'  => $savedOrder->workspace_id,
+                        'rider_name'    => $update['rider_name'],
+                        'rider_phone'   => $update['rider_mobile'],
+                        'delivery_date' => Carbon::parse($update['updated_at'])->format('Y-m-d'),
+                    ],
+                    [
+                        'conferrer_id' => $savedOrder->confirmed_by,
+                        'status'       => 'PENDING',
+                        'created_at'   => $update['updated_at'],
+                    ]
+                );
+            }
 
             if ($this->isNotifiable($savedOrder, $journey)) {
                 $latestNotifiable = $journey;

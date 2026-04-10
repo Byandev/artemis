@@ -19,8 +19,6 @@ class OnDeliveryHandler extends BaseNotificationHandler
             return;
         }
 
-        $this->createOrderForDelivery($order, $parcelJourney, $riderName, $riderMobile);
-
         if (! $this->page->parcel_journey_enabled) {
             return;
         }
@@ -37,29 +35,5 @@ class OnDeliveryHandler extends BaseNotificationHandler
         ]);
 
         $this->notifyCustomer($order, $parcelJourney, $psid, 'for-delivery', $data);
-    }
-
-    private function createOrderForDelivery(
-        Order $order,
-        ParcelJourney $parcelJourney,
-        string $riderName,
-        string $riderMobile,
-    ): void {
-        OrderForDelivery::firstOrCreate(
-            [
-                'order_id' => $order->id,
-                'page_id' => $order->page_id,
-                'shop_id' => $order->shop_id,
-                'rider_phone' => $riderMobile,
-                'rider_name' => $riderName,
-                'workspace_id' => $order->workspace_id,
-                'conferrer_id' => $order->confirmed_by,
-                'delivery_date' => Carbon::parse($parcelJourney->created_at)->format('Y-m-d'),
-            ],
-            [
-                'status' => 'PENDING',
-                'created_at' => $parcelJourney->created_at,
-            ]
-        );
     }
 }
