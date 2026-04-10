@@ -19,12 +19,12 @@ export function getChecklistColumns({ onEdit, onDelete }: ChecklistColumnActions
         {
             accessorKey: 'title',
             header: ({ column }) => (
-                <div className="w-[340px]">
+                <div className="w-[260px]">
                     <SortableHeader column={column} title="Title" />
                 </div>
             ),
             cell: ({ row }) => (
-                <span className="block w-[340px] truncate text-[12px] text-gray-800 dark:text-gray-100" title={row.original.title}>
+                <span className="block w-[260px] truncate text-[12px] text-gray-800 dark:text-gray-100" title={row.original.title}>
                     {row.original.title}
                 </span>
             ),
@@ -32,12 +32,12 @@ export function getChecklistColumns({ onEdit, onDelete }: ChecklistColumnActions
         {
             accessorKey: 'target',
             header: ({ column }) => (
-                <div className="w-[220px] text-left">
+                <div className="w-[180px] text-left">
                     <SortableHeader column={column} title="Target" />
                 </div>
             ),
             cell: ({ row }) => (
-                <span className="block w-[220px] truncate whitespace-nowrap text-left text-[12px] text-gray-700 dark:text-gray-200" title={row.original.target}>
+                <span className="block w-[180px] truncate whitespace-nowrap text-left text-[12px] text-gray-700 dark:text-gray-200" title={row.original.target}>
                     {row.original.target}
                 </span>
             ),
