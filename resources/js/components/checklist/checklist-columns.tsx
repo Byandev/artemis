@@ -10,11 +10,12 @@ import { Eye, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { ChecklistItem } from './types';
 
 type ChecklistColumnActions = {
+    onView: (item: ChecklistItem) => void;
     onEdit: (item: ChecklistItem) => void;
     onDelete: (item: ChecklistItem) => void;
 };
 
-export function getChecklistColumns({ onEdit, onDelete }: ChecklistColumnActions): ColumnDef<ChecklistItem>[] {
+export function getChecklistColumns({ onView, onEdit, onDelete }: ChecklistColumnActions): ColumnDef<ChecklistItem>[] {
     return [
         {
             accessorKey: 'title',
@@ -68,7 +69,7 @@ export function getChecklistColumns({ onEdit, onDelete }: ChecklistColumnActions
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-[165px] p-1.5">
-                            <DropdownMenuItem disabled>
+                            <DropdownMenuItem onClick={() => onView(row.original)}>
                                 <Eye className="mr-1.5 h-3.5 w-3.5" />
                                 View
                             </DropdownMenuItem>
