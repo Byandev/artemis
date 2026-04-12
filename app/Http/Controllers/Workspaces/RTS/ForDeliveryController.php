@@ -28,27 +28,45 @@ class ForDeliveryController extends Controller
 {
     public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
     {
-        $isRemoving = $request->has('removeAssignee') && $request->removeAssignee;
-        $isAssigning = ! $isRemoving && $request->has('userId') && $request->userId;
-
-        // Find the order
         $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
 
         if (! $orderForDelivery) {
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        $data = ['status' => $request->status];
-
-        if ($isAssigning) {
-            $data['assignee_id'] = $request->userId;
-        } elseif ($isRemoving) {
-            $data['assignee_id'] = null;
-        }
-
-        $orderForDelivery->update($data);
+        $orderForDelivery->update(['status' => $request->status]);
 
         return redirect()->back()->with('success', 'Status updated successfully');
+    }
+
+    public function publicAssignUser(Workspace $workspace, $id, Request $request)
+    {
+        $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
+
+        if (! $orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        if (! $request->userId) {
+            return redirect()->back()->with('error', 'Please select a user before assigning.');
+        }
+
+        $orderForDelivery->update(['assignee_id' => $request->userId]);
+
+        return redirect()->back()->with('success', 'Assignee updated successfully');
+    }
+
+    public function publicRemoveAssignee(Workspace $workspace, $id)
+    {
+        $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
+
+        if (! $orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        $orderForDelivery->update(['assignee_id' => null]);
+
+        return redirect()->back()->with('success', 'Assignee removed successfully');
     }
 
     public function public(Request $request, Workspace $workspace)
