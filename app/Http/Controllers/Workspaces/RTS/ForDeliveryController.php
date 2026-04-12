@@ -29,11 +29,7 @@ class ForDeliveryController extends Controller
     public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
     {
         $isRemoving = $request->has('removeAssignee') && $request->removeAssignee;
-
-        // Require userId unless explicitly removing the assignee
-        if (! $isRemoving && (! $request->has('userId') || ! $request->userId)) {
-            return redirect()->back()->with('error', 'Please select a user before updating.');
-        }
+        $isAssigning = ! $isRemoving && $request->has('userId') && $request->userId;
 
         // Find the order
         $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
@@ -42,11 +38,15 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        // Update status and assignee
-        $orderForDelivery->update([
-            'status' => $request->status,
-            'assignee_id' => $isRemoving ? null : $request->userId,
-        ]);
+        $data = ['status' => $request->status];
+
+        if ($isAssigning) {
+            $data['assignee_id'] = $request->userId;
+        } elseif ($isRemoving) {
+            $data['assignee_id'] = null;
+        }
+
+        $orderForDelivery->update($data);
 
         return redirect()->back()->with('success', 'Status updated successfully');
     }

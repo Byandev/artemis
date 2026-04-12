@@ -213,10 +213,9 @@ export default function RmoManagement({
 
     const handleChangeStatus = useCallback(
         (status: string, orderId: number) => {
-            const userId = localStorage.getItem('user_id');
             router.post(
                 `/public/workspaces/${workspace.slug}/rts/rmo-management/${orderId}`,
-                { status, userId },
+                { status },
                 { preserveScroll: true },
             );
         },
