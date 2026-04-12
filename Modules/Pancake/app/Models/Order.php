@@ -13,6 +13,10 @@ class Order extends Model
 
     protected $table = 'pancake_orders';
 
+    protected $casts = [
+        'status' => 'integer',
+    ];
+
     public function shippingAddress(): \Illuminate\Database\Eloquent\Relations\HasOne|\App\Models\Order
     {
         return $this->hasOne(ShippingAddress::class);

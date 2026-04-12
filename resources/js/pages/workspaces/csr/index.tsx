@@ -44,7 +44,7 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
                     'filter[search]': searchValue || undefined,
                     page: searchValue ? 1 : query?.page ?? 1,
                 },
-                { preserveState: true, replace: true, preserveScroll: true, only: ['employees'] },
+                { preserveState: true, replace: true, preserveScroll: true },
             );
         }, 500);
         return () => clearTimeout(timer);
@@ -57,7 +57,7 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
                 enableSorting: true,
                 size: 240,
                 header: ({ column }) => (
-                    <SortableHeader column={column} title="Name" />
+                    <SortableHeader column={column} title="Name" enabled/>
                 ),
             },
             {
@@ -186,12 +186,14 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
                         initialSorting={initialSorting}
                         meta={{ ...omit(employees, ['data']) }}
                         onFetch={(params) => {
+                            console.log(params)
                             router.get(
                                 `/workspaces/${workspace.slug}/csr/management`,
                                 {
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
                                     page: params?.page ?? 1,
+                                    per_page: params?.per_page,
                                 },
                                 {
                                     preserveState: true,

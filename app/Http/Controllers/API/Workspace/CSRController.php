@@ -10,6 +10,11 @@ use Illuminate\Support\Facades\DB;
 
 class CSRController extends Controller
 {
+    private const ALLOWED_SORTS = [
+        'csr_name', 'total_orders', 'total_sales',
+        'delivered', 'returning_count', 'rmo_called', 'rts_rate',
+    ];
+
     public function dailyRecords(Request $request, Workspace $workspace)
     {
         if (! $request->user()->isMemberOf($workspace)) {
@@ -23,6 +28,15 @@ class CSRController extends Controller
         $to = $request->input('to')
             ? CarbonImmutable::parse($request->input('to'))->toDateString()
             : CarbonImmutable::now()->toDateString();
+
+        $sortParam  = $request->input('sort', '-total_sales');
+        $desc       = str_starts_with($sortParam, '-');
+        $sortColumn = ltrim($sortParam, '-');
+
+        if (! in_array($sortColumn, self::ALLOWED_SORTS)) {
+            $sortColumn = 'total_sales';
+            $desc       = true;
+        }
 
         $records = DB::table('pancake_user_daily_reports as cdr')
             ->join('pancake_users as pu', 'pu.id', '=', 'cdr.pancake_user_id')
@@ -43,12 +57,12 @@ class CSRController extends Controller
                     ELSE 0
                 END as rts_rate
             ')
-            ->orderByDesc('total_sales')
-            ->get();
+            ->orderBy($sortColumn, $desc ? 'desc' : 'asc')
+            ->paginate(
+                perPage: $request->integer('per_page', 15),
+                page: $request->integer('page', 1),
+            );
 
-        return response()->json([
-            'data' => $records,
-            'filters' => ['from' => $from, 'to' => $to],
-        ]);
+        return response()->json($records);
     }
 }

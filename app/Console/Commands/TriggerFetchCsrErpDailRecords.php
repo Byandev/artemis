@@ -44,6 +44,9 @@ class TriggerFetchCsrErpDailRecords extends Command
                         'pancake_accounts' => $user->pancakeAccounts->map(fn ($account) => $account->name)->toArray(),
                     ];
 
+
+
+
                     dd($data);
                 });
             });

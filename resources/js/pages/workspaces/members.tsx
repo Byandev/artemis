@@ -459,6 +459,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                                     {
                                         sort: params?.sort,
                                         page: params?.page ?? 1,
+                                        per_page: params?.per_page,
                                         invitation_sort: query?.invitation_sort,
                                         invitation_page: query?.invitation_page,
                                     },
