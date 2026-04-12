@@ -53,7 +53,7 @@ class WorkspaceMemberController extends Controller
                 'pivot_created_at',
             ])
             ->defaultSort('-pivot_created_at')
-            ->paginate($request->input('perPage', 10))
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString()
             ->through(function ($user) {
                 $user->pivot = (object) [

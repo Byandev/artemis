@@ -28,27 +28,45 @@ class ForDeliveryController extends Controller
 {
     public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
     {
-        $isRemoving = $request->has('removeAssignee') && $request->removeAssignee;
-
-        // Require userId unless explicitly removing the assignee
-        if (! $isRemoving && (! $request->has('userId') || ! $request->userId)) {
-            return redirect()->back()->with('error', 'Please select a user before updating.');
-        }
-
-        // Find the order
         $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
 
         if (! $orderForDelivery) {
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        // Update status and assignee
-        $orderForDelivery->update([
-            'status' => $request->status,
-            'assignee_id' => $isRemoving ? null : $request->userId,
-        ]);
+        $orderForDelivery->update(['status' => $request->status]);
 
         return redirect()->back()->with('success', 'Status updated successfully');
+    }
+
+    public function publicAssignUser(Workspace $workspace, $id, Request $request)
+    {
+        $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
+
+        if (! $orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        if (! $request->userId) {
+            return redirect()->back()->with('error', 'Please select a user before assigning.');
+        }
+
+        $orderForDelivery->update(['assignee_id' => $request->userId]);
+
+        return redirect()->back()->with('success', 'Assignee updated successfully' . $request->userId);
+    }
+
+    public function publicRemoveAssignee(Workspace $workspace, $id)
+    {
+        $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
+
+        if (! $orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        $orderForDelivery->update(['assignee_id' => null]);
+
+        return redirect()->back()->with('success', 'Assignee removed successfully');
     }
 
     public function public(Request $request, Workspace $workspace)

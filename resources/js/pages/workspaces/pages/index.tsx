@@ -253,7 +253,8 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                                 {
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
-                                    page: params?.page ?? 1
+                                    page: params?.page ?? 1,
+                                    per_page: params?.per_page,
                                 },
                                 {
                                     preserveState: true,

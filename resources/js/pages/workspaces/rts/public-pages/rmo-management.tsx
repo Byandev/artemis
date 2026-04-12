@@ -196,15 +196,22 @@ export default function RmoManagement({
     }, [searchValue]);
 
 
-    const doAssign = useCallback(
-        (orderId: number, currentStatus: string, userId: string | null) => {
-            const payload =
-                userId === null
-                    ? { status: currentStatus, removeAssignee: true }
-                    : { status: currentStatus, userId };
+    const handleAssignUser = useCallback(
+        (orderId: number, userId: string) => {
             router.post(
-                `/public/workspaces/${workspace.slug}/rts/rmo-management/${orderId}`,
-                payload,
+                `/public/workspaces/${workspace.slug}/rts/rmo-management/${orderId}/assign`,
+                { userId },
+                { preserveScroll: true },
+            );
+        },
+        [workspace.slug],
+    );
+
+    const handleRemoveAssignee = useCallback(
+        (orderId: number) => {
+            router.post(
+                `/public/workspaces/${workspace.slug}/rts/rmo-management/${orderId}/remove-assignee`,
+                {},
                 { preserveScroll: true },
             );
         },
@@ -213,10 +220,9 @@ export default function RmoManagement({
 
     const handleChangeStatus = useCallback(
         (status: string, orderId: number) => {
-            const userId = localStorage.getItem('user_id');
             router.post(
                 `/public/workspaces/${workspace.slug}/rts/rmo-management/${orderId}`,
-                { status, userId },
+                { status },
                 { preserveScroll: true },
             );
         },
@@ -224,32 +230,27 @@ export default function RmoManagement({
     );
 
     const handleAssignToMe = useCallback(
-        (orderId: number, currentStatus: string) => {
+        (orderId: number) => {
             const userId = localStorage.getItem('user_id');
             if (userId) {
-                doAssign(orderId, currentStatus, userId);
+                handleAssignUser(orderId, userId);
             } else {
-                setPendingAssign({ orderId, currentStatus });
+                setPendingAssign({ orderId, currentStatus: '' });
                 setIsOpen(true);
             }
         },
-        [doAssign],
+        [handleAssignUser],
     );
 
     const handleUserSelected = useCallback(
         (userId: string) => {
             setUserName(localStorage.getItem('user_name') ?? '');
             if (pendingAssign) {
-                doAssign(pendingAssign.orderId, pendingAssign.currentStatus, userId);
+                handleAssignUser(pendingAssign.orderId, userId);
                 setPendingAssign(null);
             }
         },
-        [pendingAssign, doAssign],
-    );
-
-    const handleRemoveAssignee = useCallback(
-        (orderId: number, currentStatus: string) => doAssign(orderId, currentStatus, null),
-        [doAssign],
+        [pendingAssign, handleAssignUser],
     );
 
     const columns = useMemo<ColumnDef<OrderForDelivery>[]>(
@@ -461,12 +462,11 @@ export default function RmoManagement({
                 cell: ({ row }) => {
                     const assignee = row.original.assignee;
                     const orderId = row.original.order_id;
-                    const currentStatus = row.original.status;
 
                     if (!assignee) {
                         return (
                             <button
-                                onClick={() => handleAssignToMe(orderId, currentStatus)}
+                                onClick={() => handleAssignToMe(orderId)}
                                 className="flex items-center gap-1.5 rounded-lg border border-dashed border-black/10 dark:border-white/10 px-2.5 py-1 text-[11px] font-medium text-gray-400 dark:text-gray-500 transition-all hover:border-emerald-300 dark:hover:border-emerald-500/40 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400"
                             >
                                 <UserPlus className="h-3 w-3" />
@@ -481,7 +481,7 @@ export default function RmoManagement({
                                 {assignee.name}
                             </span>
                             <button
-                                onClick={() => handleRemoveAssignee(orderId, currentStatus)}
+                                onClick={() => handleRemoveAssignee(orderId)}
                                 className="invisible flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-300 transition-colors hover:bg-red-50 hover:text-red-400 dark:text-gray-600 dark:hover:bg-red-500/10 dark:hover:text-red-400 group-hover:visible"
                             >
                                 <X className="h-3 w-3" />

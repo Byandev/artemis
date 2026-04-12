@@ -207,7 +207,8 @@ const AdAccounts = ({ ad_accounts, workspace, query }: AdAccountsProps) => {
                                         {
                                             sort: params?.sort,
                                             'filter[search]': searchValue || undefined,
-                                            page: params?.page ?? 1
+                                            page: params?.page ?? 1,
+                                            per_page: params?.per_page,
                                         },
                                         {
                                             preserveState: false,
