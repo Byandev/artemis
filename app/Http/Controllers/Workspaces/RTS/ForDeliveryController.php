@@ -53,7 +53,7 @@ class ForDeliveryController extends Controller
 
         $orderForDelivery->update(['assignee_id' => $request->userId]);
 
-        return redirect()->back()->with('success', 'Assignee updated successfully');
+        return redirect()->back()->with('success', 'Assignee updated successfully' . $request->userId);
     }
 
     public function publicRemoveAssignee(Workspace $workspace, $id)
