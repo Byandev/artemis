@@ -169,7 +169,7 @@ class ForDeliveryController extends Controller
 
         // Build a base query for stats that respects page/shop filters
         $statsBase = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->where('delivery_date', now());
+            ->whereDate('delivery_date', now());
 
         $filterPageIds = $request->input('filter.page_id');
         if ($filterPageIds) {
