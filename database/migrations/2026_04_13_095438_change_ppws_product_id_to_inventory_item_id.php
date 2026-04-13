@@ -13,9 +13,9 @@ return new class extends Migration
         DB::table('inventory_ppws')->truncate();
 
         Schema::table('inventory_ppws', function (Blueprint $table) {
-            $table->dropForeign(['product_id']);
-            $table->dropColumn('product_id');
-            $table->foreignId('inventory_item_id')->after('id')->constrained('inventory_items')->onDelete('cascade');
+//            $table->dropForeign(['product_id']);
+//            $table->dropColumn('product_id');
+//            $table->foreignId('inventory_item_id')->after('id')->constrained('inventory_items')->onDelete('cascade');
         });
     }
 
