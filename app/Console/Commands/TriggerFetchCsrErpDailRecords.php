@@ -28,27 +28,69 @@ class TriggerFetchCsrErpDailRecords extends Command
      */
     public function handle()
     {
+        $webhookUrl = config('services.n8n.webhook_url');
+
+        if (empty($webhookUrl)) {
+            $this->error('n8n webhook URL is not configured (services.n8n.webhook_url).');
+            return 1;
+        }
+
         $date = Carbon::yesterday()->format('Y-m-d');
 
-        PancakeUser::query()
+        $users = PancakeUser::query()
             ->whereHas('systemUser.workspaces.apiKeys')
             ->with('systemUser.workspaces.apiKeys')
-            ->get()
-            ->each(function ($pancakeUser) use ($date) {
-               $pancakeUser->systemUser->workspaces->each(function ($workspace) use ($pancakeUser, $date) {
-                    $data = [
-                        'workspace_id' => $workspace->id,
-                        'workspace_api_key' => $workspace->apiKeys->first()->reveal(),
-                        'csr_id' => $pancakeUser->id,
-                        'csr_name' => $pancakeUser->name,
-                        'date' => $date,
-                        'webhook_url' => config('app.url') . '/api/v1/public/csr-daily-records',
-                    ];
+            ->get();
 
-                    Http::post(config('services.n8n.webhook_url'), $data);
+        if ($users->isEmpty()) {
+            $this->warn('No Pancake users found with linked workspaces and API keys.');
+            return 0;
+        }
 
-                    $this->info("Triggered for CSR {$pancakeUser->name} (ID: {$pancakeUser->id}) in workspace {$workspace->id}");
-                });
+        $this->info("Processing {$users->count()} CSR(s) for date: {$date}");
+
+        $succeeded = 0;
+        $failed = 0;
+
+        $users->each(function ($pancakeUser) use ($date, $webhookUrl, &$succeeded, &$failed) {
+            $pancakeUser->systemUser->workspaces->each(function ($workspace) use ($pancakeUser, $date, $webhookUrl, &$succeeded, &$failed) {
+                $apiKey = $workspace->apiKeys->first();
+
+                if (! $apiKey) {
+                    $this->warn("Skipping workspace {$workspace->id} — no API key found.");
+                    $failed++;
+                    return;
+                }
+
+                $data = [
+                    'workspace_id' => $workspace->id,
+                    'workspace_api_key' => $apiKey->reveal(),
+                    'csr_id' => $pancakeUser->id,
+                    'csr_name' => $pancakeUser->name,
+                    'date' => $date,
+                    'webhook_url' => config('app.url') . '/api/v1/public/csr-daily-records',
+                ];
+
+                try {
+                    $response = Http::timeout(30)->post($webhookUrl, $data);
+
+                    if ($response->successful()) {
+                        $this->info("Triggered for CSR {$pancakeUser->name} (ID: {$pancakeUser->id}) in workspace {$workspace->id}");
+                        $succeeded++;
+                    } else {
+                        $this->error("Failed for CSR {$pancakeUser->name} (ID: {$pancakeUser->id}) in workspace {$workspace->id} — HTTP {$response->status()}");
+                        $failed++;
+                    }
+                } catch (\Exception $e) {
+                    $this->error("Error for CSR {$pancakeUser->name} (ID: {$pancakeUser->id}) in workspace {$workspace->id} — {$e->getMessage()}");
+                    $failed++;
+                }
             });
+        });
+
+        $this->newLine();
+        $this->info("Done. Succeeded: {$succeeded}, Failed: {$failed}");
+
+        return $failed > 0 ? 1 : 0;
     }
 }

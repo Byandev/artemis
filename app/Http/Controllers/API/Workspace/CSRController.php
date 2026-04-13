@@ -53,9 +53,7 @@ class CSRController extends Controller
                     THEN ROUND((SUM(pancake_user_daily_reports.`returning`) / (SUM(pancake_user_daily_reports.delivered) + SUM(pancake_user_daily_reports.`returning`))) * 100, 2)
                     ELSE 0
                 END as rts_rate
-            ')
-            ->orderByDesc('total_sales')
-            ->get();
+            ');
 
         $records = QueryBuilder::for($query)
             ->allowedSorts([

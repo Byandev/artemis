@@ -197,13 +197,12 @@ export default function Analytics({ workspace }: Props) {
                     <DatePicker
                         id="csr-analytics-date-range"
                         mode="range"
-                        defaultDate={[from, to] as never}
+                        defaultDate={[range.from, range.to] as never}
                         onChange={(dates) => {
                             if (dates.length === 2) {
-                                navigate({
-                                    from: format(dates[0] as Date, 'yyyy-MM-dd'),
-                                    to: format(dates[1] as Date, 'yyyy-MM-dd'),
-                                    page: 1,
+                                setRange({
+                                    from: dates[0] as Date,
+                                    to: dates[1] as Date,
                                 });
                             }
                         }}
