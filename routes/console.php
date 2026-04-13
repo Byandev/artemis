@@ -8,6 +8,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('trigger-fetch-page-orders')->everyFifteenMinutes();
+Schedule::command('inventory:sync-averages')->hourly();
 // Schedule::command('trigger-fetch-ads-data')->hourlyAt(30);
 Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-customers')->hourlyAt(30);

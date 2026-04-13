@@ -16,5 +16,6 @@ export interface InventoryTransaction {
     rts_goods_out: number;
     rts_goods_in: number;
     rts_bad: number;
+    lost: number;
     remaining_qty: number;
 }

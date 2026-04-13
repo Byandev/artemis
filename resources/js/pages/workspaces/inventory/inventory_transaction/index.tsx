@@ -205,6 +205,16 @@ export default function Index({ inventory, workspace, items = [], query }: Props
             ),
         },
         {
+            accessorKey: 'lost',
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Lost" />,
+            cell: ({ row }) => (
+                <div className="flex h-10 items-center justify-center">
+                    <p className="text-[12px] text-orange-500 dark:text-orange-400">{row.original.lost || 0}</p>
+                </div>
+            ),
+        },
+        {
             accessorKey: 'remaining_qty',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Remaining Quantity" />,

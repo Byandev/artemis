@@ -12,6 +12,9 @@ interface InventoryItem {
     product_id: number;
     sales_keywords: string;
     transaction_keywords: string;
+    lead_time: number;
+    unfulfilled_count: number;
+    three_days_average: number;
     product?: {
         id: number;
         name: string;
@@ -35,6 +38,9 @@ export function ItemFormDialog({ workspace, products, open, onOpenChange, item }
         id: '',
         product_id: '',
         sku: '',
+        lead_time: '',
+        unfulfilled_count: '',
+        three_days_average: '',
         sales_keywords: '',
         transaction_keywords: '',
     });
@@ -47,6 +53,9 @@ export function ItemFormDialog({ workspace, products, open, onOpenChange, item }
                     id: item.id.toString(),
                     product_id: item.product_id.toString(),
                     sku: item.sku,
+                    lead_time: item.lead_time?.toString() ?? '0',
+                    unfulfilled_count: item.unfulfilled_count?.toString() ?? '0',
+                    three_days_average: item.three_days_average?.toString() ?? '0',
                     sales_keywords: item.sales_keywords ?? '',
                     transaction_keywords: item.transaction_keywords ?? '',
                 });
@@ -109,6 +118,53 @@ export function ItemFormDialog({ workspace, products, open, onOpenChange, item }
                             />
                             {errors.sku && <p className="font-mono text-[11px] text-red-500 mt-1">{errors.sku}</p>}
                         </div>
+                        {/* Lead Time */}
+                        <div className="space-y-1.5">
+                            <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                Lead Time <span className="text-gray-300 dark:text-gray-600 font-normal normal-case">(days)</span>
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={data.lead_time}
+                                onChange={(e) => setData('lead_time', e.target.value)}
+                                className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100"
+                            />
+                                {errors.lead_time && <p className="font-mono text-[11px] text-red-500 mt-1">{errors.lead_time}</p>}
+                        </div>
+                        {/* Unfulfilled Count */}
+                        <div className="space-y-1.5">
+                            <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                Unfulfilled Count
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={data.unfulfilled_count}
+                                onChange={(e) => setData('unfulfilled_count', e.target.value)}
+                                className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100"
+                            />
+                            {errors.unfulfilled_count && <p className="font-mono text-[11px] text-red-500 mt-1">{errors.unfulfilled_count}</p>}
+                        </div>
+                        {/* 3-Day Average */}
+                        <div className="space-y-1.5">
+                            <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                3-Day Avg
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.0001"
+                                placeholder="0"
+                                value={data.three_days_average}
+                                onChange={(e) => setData('three_days_average', e.target.value)}
+                                className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100"
+                            />
+                            {errors.three_days_average && <p className="font-mono text-[11px] text-red-500 mt-1">{errors.three_days_average}</p>}
+                        </div>
+
                         {/* Product Selector */}
                         <div className="space-y-1.5">
                             <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
