@@ -14,9 +14,8 @@ class CsrDailyRecordController extends Controller
         $workspace = $request->attributes->get('workspace');
 
         $validated = $request->validate([
-            'pancake_user_id'       => ['required', 'integer', 'exists:users,id'],
-            'date'         => ['required', 'date_format:Y-m-d'],
-            'type'         => ['required', 'string', 'max:100', 'in:erp,pos'],
+            'csr_id'       => ['required', ],
+            'date'         => ['required',],
             'total_orders' => ['required', 'integer', 'min:0'],
             'total_sales'  => ['required', 'numeric', 'min:0'],
             'returning'    => ['required', 'integer', 'min:0'],
@@ -25,19 +24,13 @@ class CsrDailyRecordController extends Controller
             'rmo_called'   => ['nullable', 'integer', 'min:0'],
         ]);
 
-        // Ensure the pancake_user_id belongs to this workspace
-        $isMember = $workspace->users()->where('users.id', $validated['pancake_user_id'])->exists();
-
-        if (! $isMember) {
-            return response()->json(['error' => 'The specified CSR does not belong to this workspace.'], 422);
-        }
 
         $record = PancakeUserDailyReport::updateOrCreate(
             [
                 'workspace_id' => $workspace->id,
-                'pancake_user_id'       => $validated['pancake_user_id'],
+                'pancake_user_id'  => $validated['csr_id'],
                 'date'         => $validated['date'],
-                'type'         => $validated['type'] ?? null,
+                'type'         => 'ERP',
             ],
             [
                 'total_orders' => $validated['total_orders'],

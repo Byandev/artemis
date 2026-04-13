@@ -35,6 +35,10 @@ return [
         ],
     ],
 
+    'n8n' => [
+        'webhook_url' => env('N8N_WEBHOOK_URL'),
+    ],
+
     'facebook' => [
         'config_id' => env('FACEBOOK_CONFIG_ID'),
         'client_id' => env('FACEBOOK_CLIENT_ID'),

@@ -616,12 +616,12 @@ export default function RmoManagement({
 
                 <div className="mb-4">
                     <div className="flex flex-wrap items-center gap-3">
-                        <div className="relative w-60">
+                        <div className="relative w-lg">
                             <Search className="absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                             <input
                                 type="text"
                                 className="h-8 w-full rounded-lg border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! outline-none focus:border-emerald-500 dark:bg-zinc-800 dark:text-gray-300"
-                                placeholder="Search orders…"
+                                placeholder="Search by order #, tracking code, rider, customer, or confirmed by…"
                                 value={searchValue}
                                 onChange={(e) => setSearchValue(e.target.value)}
                             />

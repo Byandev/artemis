@@ -26,6 +26,15 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import moment from 'moment';
 import { omit } from 'lodash';
 
+interface InventoryItem {
+    id: number;
+    sku: string;
+    product?: {
+        id: number;
+        name: string;
+    };
+}
+
 interface Props {
     inventory: {
         data: InventoryTransaction[];
@@ -38,6 +47,7 @@ interface Props {
         per_page: number;
     }
     workspace: Workspace;
+    items?: InventoryItem[];
     query?: {
         sort?: string | null;
         page?: number | string;
@@ -45,7 +55,7 @@ interface Props {
     };
 }
 
-export default function Index({ inventory, workspace, query }: Props) {
+export default function Index({ inventory, workspace, items = [], query }: Props) {
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
     const [searchQuery, setSearchQuery] = useState(query?.search ?? '');
     const [openFormModal, setOpenFormModal] = useState(false);
@@ -97,6 +107,29 @@ export default function Index({ inventory, workspace, query }: Props) {
     };
 
     const columns: ColumnDef<InventoryTransaction>[] = [
+        {
+            id: 'inventory_item',
+            accessorFn: (row) => row.inventory_item?.sku,
+            enableSorting: false,
+            header: ({ column }) => <SortableHeader column={column} title="Inventory Item" />,
+            cell: ({ row }) => {
+                const item = row.original.inventory_item;
+                return (
+                    <div className="flex h-10 items-center">
+                        {item ? (
+                            <div className="flex flex-col gap-0.5">
+                                <span className="font-mono text-[11px] font-medium text-gray-600 dark:text-gray-400">{item.sku}</span>
+                                {item.product && (
+                                    <span className="text-[10px] text-gray-400 dark:text-gray-500">{item.product.name}</span>
+                                )}
+                            </div>
+                        ) : (
+                            <span className="text-[12px] text-gray-400">—</span>
+                        )}
+                    </div>
+                );
+            },
+        },
         {
             accessorKey: 'date',
             enableSorting: true,
@@ -168,6 +201,16 @@ export default function Index({ inventory, workspace, query }: Props) {
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.rts_bad || 0}</p>
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'lost',
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Lost" />,
+            cell: ({ row }) => (
+                <div className="flex h-10 items-center justify-center">
+                    <p className="text-[12px] text-orange-500 dark:text-orange-400">{row.original.lost || 0}</p>
                 </div>
             ),
         },
@@ -265,6 +308,7 @@ export default function Index({ inventory, workspace, query }: Props) {
                     if (!open) setSelectedInventory(undefined);
                 }}
                 inventory={selectedInventory}
+                items={items}
             />
 
             <div className="w-full space-y-6 p-4 md:p-6">

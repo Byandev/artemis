@@ -140,7 +140,10 @@ class ForDeliveryController extends Controller
                     $query->where(function ($q) use ($value) {
                         $q->whereHas('order', function ($orderQuery) use ($value) {
                             $orderQuery->where('order_number', 'LIKE', "%{$value}%")
-                                ->orWhere('tracking_code', 'LIKE', "%{$value}%");
+                                ->orWhere('tracking_code', 'LIKE', "%{$value}%")
+                                ->orWhereHas('shippingAddress', function ($addrQuery) use ($value) {
+                                    $addrQuery->where('full_name', 'LIKE', "%{$value}%");
+                                });
                         })
                             ->orWhere('rider_name', 'LIKE', "%{$value}%")
                             ->orWhereHas('conferrer', function ($conferrerQuery) use ($value) {
