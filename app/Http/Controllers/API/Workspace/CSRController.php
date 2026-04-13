@@ -13,6 +13,11 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class CSRController extends Controller
 {
+    private const ALLOWED_SORTS = [
+        'csr_name', 'total_orders', 'total_sales',
+        'delivered', 'returning_count', 'rmo_called', 'rts_rate',
+    ];
+
     public function dailyRecords(Request $request, Workspace $workspace)
     {
         if (! $request->user()->isMemberOf($workspace)) {
@@ -48,7 +53,9 @@ class CSRController extends Controller
                     THEN ROUND((SUM(pancake_user_daily_reports.`returning`) / (SUM(pancake_user_daily_reports.delivered) + SUM(pancake_user_daily_reports.`returning`))) * 100, 2)
                     ELSE 0
                 END as rts_rate
-            ');
+            ')
+            ->orderByDesc('total_sales')
+            ->get();
 
         $records = QueryBuilder::for($query)
             ->allowedSorts([

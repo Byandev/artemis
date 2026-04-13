@@ -5,7 +5,7 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { format, subDays } from 'date-fns';
@@ -25,6 +25,13 @@ interface CsrRecord {
 
 interface Props {
     workspace: Workspace;
+    records: PaginatedData<CsrRecord>;
+    query?: {
+        sort?: string | null;
+        from?: string | null;
+        to?: string | null;
+        page?: number | string;
+    };
 }
 
 const peso = (n: number) =>
@@ -139,12 +146,12 @@ export default function Analytics({ workspace }: Props) {
             {
                 accessorKey: 'delivered',
                 header: ({ column }) => <SortableHeader column={column} title="Delivered" />,
-                cell: ({ row }) => Number(row.original.delivered).toLocaleString(),
+                cell: ({ row }) => peso(row.original.delivered),
             },
             {
                 accessorKey: 'returning_count',
                 header: ({ column }) => <SortableHeader column={column} title="Returning" />,
-                cell: ({ row }) => Number(row.original.returning_count).toLocaleString(),
+                cell: ({ row }) => peso(row.original.returning_count),
             },
             {
                 accessorKey: 'rts_rate',
@@ -190,12 +197,13 @@ export default function Analytics({ workspace }: Props) {
                     <DatePicker
                         id="csr-analytics-date-range"
                         mode="range"
-                        defaultDate={[range.from, range.to] as never}
+                        defaultDate={[from, to] as never}
                         onChange={(dates) => {
                             if (dates.length === 2) {
-                                setRange({
-                                    from: dates[0] as Date,
-                                    to: dates[1] as Date,
+                                navigate({
+                                    from: format(dates[0] as Date, 'yyyy-MM-dd'),
+                                    to: format(dates[1] as Date, 'yyyy-MM-dd'),
+                                    page: 1,
                                 });
                             }
                         }}

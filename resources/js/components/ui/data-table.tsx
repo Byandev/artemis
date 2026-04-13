@@ -13,6 +13,13 @@ import {
 
 import Pagination from '@/components/ui/pagination';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     Table,
     TableBody,
     TableCell,
@@ -126,18 +133,40 @@ export function DataTable<TData, TValue>({
 
             {
                 meta?.links?.length &&
-                <div className=" border-black/6 dark:border-white/6 py-3 pl-[18px] pr-4">
-                    <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
-                        <div className="">
-                            <p className="font-mono text-xs font-light   text-center text-gray-400 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
-                                Showing {meta?.from} to {meta?.to} of {meta?.total} entries
+                <div className="border-t border-black/6 dark:border-white/6 px-4 py-3">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                                <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                    Rows
+                                </span>
+                                <Select
+                                    value={String(meta?.per_page ?? 15)}
+                                    onValueChange={(val) => {
+                                        if (onFetch) onFetch({ per_page: Number(val), page: 1, sort: toBackendSort(sorting) })
+                                    }}
+                                >
+                                    <SelectTrigger className="h-7 w-[72px] rounded-[8px] border border-black/6 bg-stone-50 px-2.5 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="min-w-[72px]">
+                                        {[10, 25, 50, 100].map((n) => (
+                                            <SelectItem key={n} value={String(n)} className="font-mono! text-[11px]!">
+                                                {n}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="h-4 w-px bg-black/6 dark:bg-white/6" />
+                            <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                                Showing {meta?.from} to {meta?.to} of {meta?.total?.toLocaleString()} entries
                             </p>
                         </div>
 
                         <Pagination currentPage={meta.current_page} totalPages={meta.last_page} onPageChange={(page) => {
                             if (onFetch) onFetch({ page, sort: toBackendSort(sorting) })
                         }} />
-
                     </div>
                 </div>
             }

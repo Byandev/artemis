@@ -33,7 +33,7 @@ class ShopController extends Controller
                 'customers_last_synced_at',
                 'deleted_at',
             ])
-            ->paginate(10)
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         return Inertia::render('workspaces/shops/index', [
