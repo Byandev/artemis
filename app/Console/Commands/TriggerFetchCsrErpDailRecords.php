@@ -35,7 +35,7 @@ class TriggerFetchCsrErpDailRecords extends Command
             return 1;
         }
 
-        $date = Carbon::yesterday()->format('Y-m-d');
+        $date = Carbon::yesterday()->format('m/d/Y');
 
         $users = PancakeUser::query()
             ->whereHas('systemUser.workspaces.apiKeys')
