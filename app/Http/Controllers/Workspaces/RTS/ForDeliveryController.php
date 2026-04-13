@@ -187,40 +187,27 @@ class ForDeliveryController extends Controller
         }
 
         // 1️⃣ Total orders
-        $totalOrders = (clone $statsBase)->count();
-
-        // 2️⃣ Total for delivery today
-        $totalForDeliveryToday = (clone $statsBase)
-            ->whereHas('order', function ($query) {
-                $query->where('parcel_status', 'out_for_delivery')
-                    ->whereDate('created_at', now());
-            })
-            ->count();
+        $totalOrdersForDeliveryToday = (clone $statsBase)->count();
 
         // 3️⃣ Called rate (not pending)
         $totalCalled = (clone $statsBase)
             ->where('status', '!=', 'PENDING')
             ->count();
 
-        $calledRate = $totalOrders > 0 ? round(($totalCalled / $totalOrders) * 100, 1) : 0;
-
-        // 4️⃣ Successful rate (parcel delivered)
-        $totalParcel = (clone $statsBase)
-            ->whereHas('order', fn ($q) => $q->whereNotNull('parcel_status'))
-            ->count();
+        $calledRate = $totalOrdersForDeliveryToday > 0 ? round(($totalCalled / $totalOrdersForDeliveryToday) * 100, 1) : 0;
 
         $totalDelivered = (clone $statsBase)
             ->whereHas('order', fn ($q) => $q->where('parcel_status', 'delivered'))
             ->count();
 
-        $successfulRate = $totalParcel > 0 ? round(($totalDelivered / $totalParcel) * 100, 1) : 0;
+        $successfulRate = $totalOrdersForDeliveryToday > 0 ? round(($totalDelivered / $totalOrdersForDeliveryToday) * 100, 1) : 0;
 
         // 5️⃣ Unsuccessful rate (problematic + returning + undeliverable)
         $totalUnsuccessful = (clone $statsBase)
             ->whereHas('order', fn ($q) => $q->whereIn('parcel_status', ['problematic', 'returning', 'undeliverable']))
             ->count();
 
-        $unsuccessfulRate = $totalParcel > 0 ? round(($totalUnsuccessful / $totalParcel) * 100, 1) : 0;
+        $unsuccessfulRate = $totalOrdersForDeliveryToday > 0 ? round(($totalUnsuccessful / $totalOrdersForDeliveryToday) * 100, 1) : 0;
 
         $users = User::get(['id', 'name']);
 
@@ -234,7 +221,7 @@ class ForDeliveryController extends Controller
                 'filter' => $request->input('filter', []),
             ],
             'users' => $users,
-            'total_for_delivery_today' => $totalForDeliveryToday,
+            'total_for_delivery_today' => $totalOrdersForDeliveryToday,
             'called_rate' => $calledRate,
             'successful_rate' => $successfulRate,
             'unsuccessful_rate' => $unsuccessfulRate,
