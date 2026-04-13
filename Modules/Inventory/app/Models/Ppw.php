@@ -2,11 +2,11 @@
 
 namespace Modules\Inventory\Models;
 
-use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Inventory\Models\InventoryItem;
 
 class Ppw extends Model
 {
@@ -14,7 +14,7 @@ class Ppw extends Model
 
     protected $fillable = [
         'workspace_id',
-        'product_id',
+        'inventory_item_id',
         'transaction_date',
         'count',
     ];
@@ -24,9 +24,9 @@ class Ppw extends Model
         return $this->belongsTo(Workspace::class);
     }
 
-    public function product(): BelongsTo
+    public function inventoryItem(): BelongsTo
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(InventoryItem::class);
     }
 
     public function scopeOfWorkspace(Builder $builder, Workspace $workspace): Builder

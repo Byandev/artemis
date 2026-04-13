@@ -15,8 +15,9 @@ import { useState } from 'react';
 interface Ppw {
     id: number;
     transaction_date: string;
-    product?: {
-        name: string;
+    inventory_item?: {
+        sku: string;
+        product?: { name: string };
     };
 }
 
@@ -52,7 +53,7 @@ export function DeletePpwDialog({ ppw, workspace, onClose }: Props) {
                     <AlertDialogDescription className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
                         Are you sure you want to delete the record for{' '}
                         <span className="font-medium text-gray-900 dark:text-gray-200">
-                            {ppw?.product?.name || 'this product'}
+                            {ppw?.inventory_item?.sku ?? 'this item'}
                         </span>{' '}
                         on <span className="font-mono text-emerald-600 dark:text-emerald-400">{ppw?.transaction_date}</span>? 
                         This action cannot be undone.

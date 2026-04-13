@@ -131,11 +131,11 @@ export function ItemFormDialog({ workspace, products, open, onOpenChange, item }
 
 
                         {/* 3. Additional Settings Accordion */}
-                        <div className="space-y-3">
+                        <div className="space-y-3 mt-2">
                             <button
                                 type="button"
                                 onClick={() => setShowAdditional(!showAdditional)}
-                                className="flex w-full items-center justify-between rounded-[10px] border border-black/8 bg-stone-50/50 px-4 py-2.5 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-500 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800/50 dark:text-gray-400"
+                                className="flex w-full items-center justify-between rounded-[10px] font-mono! border border-black/8 bg-stone-50/50 px-4 py-2.5 text-[13px]! font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800/50 dark:text-gray-300"
                             >
                                 <span>Additional Settings</span>
                                 <span className={`transition-transform duration-200 ${showAdditional ? 'rotate-180' : ''}`}>
@@ -144,7 +144,7 @@ export function ItemFormDialog({ workspace, products, open, onOpenChange, item }
                             </button>
 
                             {showAdditional && (
-                                <div className="space-y-4 rounded-[12px] border border-dashed border-black/10 p-4 dark:border-white/10 bg-black/[0.01] dark:bg-white/[0.01] animate-in fade-in slide-in-from-top-1">
+                                <div className="space-y-4 mt-2 rounded-xl border border-dashed border-black/10 p-4 dark:border-white/10 bg-black/[0.01] dark:bg-white/[0.01] animate-in fade-in slide-in-from-top-1">
                                     {/* Sales Keywords */}
                                     <div className="space-y-1.5">
                                         <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">

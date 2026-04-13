@@ -104,33 +104,10 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
         {
             accessorKey: 'product_id',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Product ID" />,
+            header: ({ column }) => <SortableHeader column={column} title="Product" />,
             cell: ({ row }) => (
-                <div className="space-y-0.5">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-400">
-                        {/* Logic remains: displays the ID, ensuring it's treated as a string/number safely */}
-                             {row.original.product_id}
-                    </span>
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'sales_keywords',
-            enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Sales Keywords" />,
-            cell: ({ row }) => (
-                <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                    {row.original.sales_keywords}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'transaction_keywords',
-            enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Transaction Keywords" />,
-            cell: ({ row }) => (
-                <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                    {row.original.transaction_keywords}
+                <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
+                    {row.original.product?.name ?? row.original.product_id}
                 </span>
             ),
         },
