@@ -24,6 +24,7 @@ class InventoryTransaction extends Model
         'rts_goods_out',
         'rts_goods_in',
         'rts_bad',
+        'lost',
         'remaining_qty',
     ];
 

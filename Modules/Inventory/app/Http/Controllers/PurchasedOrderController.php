@@ -42,6 +42,7 @@ class PurchasedOrderController extends Controller
             'control_no'    => 'nullable|string|max:255',
             'delivery_fee'  => 'required|numeric|min:0',
             'total_amount'  => 'required|numeric|min:0',
+            'status'        => 'required|integer|in:1,2,3,4,5,6,7,8',
             'items'         => 'required|array|min:1',
             'items.*.inventory_item_id' => 'required|exists:inventory_items,id',
             'items.*.count'             => 'required|integer|min:1',
@@ -57,6 +58,7 @@ class PurchasedOrderController extends Controller
             'control_no'   => $request->control_no,
             'delivery_fee' => $request->delivery_fee,
             'total_amount' => $request->total_amount,
+            'status'       => $request->status,
         ]);
 
         foreach ($request->items as $item) {
@@ -85,6 +87,7 @@ class PurchasedOrderController extends Controller
             'control_no'    => 'nullable|string|max:255',
             'delivery_fee'  => 'required|numeric|min:0',
             'total_amount'  => 'required|numeric|min:0',
+            'status'        => 'required|integer|in:1,2,3,4,5,6,7,8',
             'items'         => 'required|array|min:1',
             'items.*.inventory_item_id' => 'required|exists:inventory_items,id',
             'items.*.count'             => 'required|integer|min:1',
@@ -99,6 +102,7 @@ class PurchasedOrderController extends Controller
             'control_no'   => $request->control_no,
             'delivery_fee' => $request->delivery_fee,
             'total_amount' => $request->total_amount,
+            'status'       => $request->status,
         ]);
 
         $purchasedOrder->items()->delete();

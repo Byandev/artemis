@@ -32,6 +32,7 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
         rts_goods_in: 0,
         rts_goods_out: 0,
         rts_bad: 0,
+        lost: 0,
         remaining_qty: 0,
     });
 
@@ -48,6 +49,7 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
                 rts_goods_in: inventory.rts_goods_in || 0,
                 rts_goods_out: inventory.rts_goods_out || 0,
                 rts_bad: inventory.rts_bad || 0,
+                lost: inventory.lost || 0,
                 remaining_qty: inventory.remaining_qty || 0,
             });
         } else {
@@ -261,6 +263,27 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
                                 />
                                 {errors.rts_bad && <p className="text-[11px] text-red-500">{errors.rts_bad}</p>}
                             </div>
+                            <div className="space-y-1.5">
+                                <label className={labelClass}>
+                                    Lost{' '}
+                                    <span className="text-red-400">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    value={data.lost}
+                                    onChange={(e) =>
+                                        setData(
+                                            'lost',
+                                            parseInt(e.target.value) || 0,
+                                        )
+                                    }
+                                    className={inputClass}
+                                />
+                                {errors.lost && <p className="text-[11px] text-red-500">{errors.lost}</p>}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <label className={labelClass}>
                                     Remaining Quantity{' '}

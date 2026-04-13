@@ -19,13 +19,31 @@ class PurchasedOrder extends Model
         'control_no',
         'delivery_fee',
         'total_amount',
+        'status',
     ];
 
     protected $casts = [
-        'issue_date' => 'date',
+        'issue_date'   => 'date:Y-m-d',
         'delivery_fee' => 'decimal:2',
         'total_amount' => 'decimal:2',
+        'status'       => 'integer',
     ];
+
+    public const STATUSES = [
+        1 => 'For Approval',
+        2 => 'Approved',
+        3 => 'To Pay',
+        4 => 'Paid',
+        5 => 'For Purchase',
+        6 => 'Waiting For Delivery',
+        7 => 'Delivered',
+        8 => 'Cancelled',
+    ];
+
+    public function getStatusLabelAttribute(): string
+    {
+        return self::STATUSES[$this->status] ?? 'Unknown';
+    }
 
     public function workspace(): BelongsTo
     {

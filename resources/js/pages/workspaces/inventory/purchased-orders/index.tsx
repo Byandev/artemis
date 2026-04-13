@@ -26,6 +26,17 @@ interface PurchasedOrderItem {
     };
 }
 
+const STATUSES: Record<number, { label: string; color: string }> = {
+    1: { label: 'For Approval',        color: 'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400' },
+    2: { label: 'Approved',            color: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400' },
+    3: { label: 'To Pay',              color: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400' },
+    4: { label: 'Paid',                color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' },
+    5: { label: 'For Purchase',        color: 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400' },
+    6: { label: 'Waiting For Delivery',color: 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-400' },
+    7: { label: 'Delivered',           color: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400' },
+    8: { label: 'Cancelled',           color: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400' },
+};
+
 interface PurchasedOrder {
     id: number;
     issue_date: string;
@@ -34,6 +45,7 @@ interface PurchasedOrder {
     control_no: string | null;
     delivery_fee: string;
     total_amount: string;
+    status: number;
     items: PurchasedOrderItem[];
 }
 
@@ -68,7 +80,7 @@ export default function PurchasedOrderIndex({ workspace, orders }: Props) {
             header: ({ column }) => <SortableHeader column={column} title="Issue Date" />,
             cell: ({ row }) => (
                 <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                    {row.original.issue_date}
+                    {row.original.issue_date ? row.original.issue_date.slice(0, 10) : '—'}
                 </span>
             ),
         },
@@ -121,6 +133,19 @@ export default function PurchasedOrderIndex({ workspace, orders }: Props) {
                     ₱{Number(row.original.total_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </span>
             ),
+        },
+        {
+            accessorKey: 'status',
+            enableSorting: false,
+            header: ({ column }) => <SortableHeader column={column} title="Status" />,
+            cell: ({ row }) => {
+                const s = STATUSES[row.original.status] ?? STATUSES[1];
+                return (
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 font-mono text-[11px] font-medium ${s.color}`}>
+                        {s.label}
+                    </span>
+                );
+            },
         },
         {
             accessorKey: 'items',

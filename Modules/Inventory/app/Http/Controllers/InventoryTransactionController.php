@@ -33,7 +33,7 @@ class InventoryTransactionController extends Controller
                     $query->whereDate('date', '<=', $value);
                 }),
             ])
-            ->allowedSorts(['date', 'ref_no', 'po_qty_in', 'po_qty_out', 'rts_goods_in', 'rts_goods_out', 'rts_bad', 'remaining_qty', 'created_at'])
+            ->allowedSorts(['date', 'ref_no', 'po_qty_in', 'po_qty_out', 'rts_goods_in', 'rts_goods_out', 'rts_bad', 'lost', 'remaining_qty', 'created_at'])
             ->defaultSort('-date')
             ->paginate(10)
             ->withQueryString();
@@ -63,6 +63,8 @@ class InventoryTransactionController extends Controller
             'rts_goods_in' => 'required|integer|min:0',
             'rts_goods_out' => 'required|integer|min:0',
             'rts_bad' => 'required|integer|min:0',
+            'lost' => 'required|integer|min:0',
+            'remaining_qty' => 'required|numeric',
         ]);
 
         $workspace->inventoryTransactions()->create($validated);
@@ -81,6 +83,8 @@ class InventoryTransactionController extends Controller
             'rts_goods_in' => 'required|integer|min:0',
             'rts_goods_out' => 'required|integer|min:0',
             'rts_bad' => 'required|integer|min:0',
+            'lost' => 'required|integer|min:0',
+            'remaining_qty' => 'required|numeric',
         ]);
 
         $transaction->update($validated);

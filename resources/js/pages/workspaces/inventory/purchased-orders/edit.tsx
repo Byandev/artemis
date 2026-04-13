@@ -10,11 +10,6 @@ interface InventoryItem {
     product?: { id: number; name: string };
 }
 
-interface Props {
-    workspace: Workspace;
-    items: InventoryItem[];
-}
-
 interface OrderItem {
     inventory_item_id: string;
     count: string;
@@ -22,12 +17,29 @@ interface OrderItem {
     total_amount: string;
 }
 
-const emptyItem = (): OrderItem => ({
-    inventory_item_id: '',
-    count: '',
-    amount: '',
-    total_amount: '',
-});
+interface PurchasedOrder {
+    id: number;
+    issue_date: string;
+    delivery_no: string | null;
+    cust_po_no: string | null;
+    control_no: string | null;
+    delivery_fee: string;
+    total_amount: string;
+    status: number;
+    items: Array<{
+        id: number;
+        inventory_item_id: number;
+        count: number;
+        amount: string;
+        total_amount: string;
+    }>;
+}
+
+interface Props {
+    workspace: Workspace;
+    order: PurchasedOrder;
+    items: InventoryItem[];
+}
 
 const STATUSES = [
     { value: 1, label: 'For Approval' },
@@ -40,16 +52,21 @@ const STATUSES = [
     { value: 8, label: 'Cancelled' },
 ];
 
-export default function Create({ workspace, items }: Props) {
-    const { data, setData, post, processing, errors } = useForm({
-        issue_date: '',
-        delivery_no: '',
-        cust_po_no: '',
-        control_no: '',
-        delivery_fee: '',
-        total_amount: '',
-        status: '1',
-        items: [emptyItem()],
+export default function Edit({ workspace, order, items }: Props) {
+    const { data, setData, put, processing, errors } = useForm({
+        issue_date: order.issue_date ?? '',
+        delivery_no: order.delivery_no ?? '',
+        cust_po_no: order.cust_po_no ?? '',
+        control_no: order.control_no ?? '',
+        delivery_fee: order.delivery_fee ?? '',
+        total_amount: order.total_amount ?? '',
+        status: String(order.status ?? 1),
+        items: order.items.map((item) => ({
+            inventory_item_id: String(item.inventory_item_id),
+            count: String(item.count),
+            amount: String(item.amount),
+            total_amount: String(item.total_amount),
+        })),
     });
 
     const inputClass = "h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600";
@@ -69,23 +86,23 @@ export default function Create({ workspace, items }: Props) {
         setData('items', updated);
     };
 
-    const addItem = () => setData('items', [...data.items, emptyItem()]);
+    const addItem = () => setData('items', [...data.items, { inventory_item_id: '', count: '', amount: '', total_amount: '' }]);
 
     const removeItem = (index: number) =>
         setData('items', data.items.filter((_, i) => i !== index));
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(`/workspaces/${workspace.slug}/inventory/purchased-orders`);
+        put(`/workspaces/${workspace.slug}/inventory/purchased-orders/${order.id}`);
     };
 
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - Create Purchased Order`} />
+            <Head title={`${workspace.name} - Edit Purchased Order`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
-                    title="Create Purchased Order"
-                    description="Add a new purchased order record."
+                    title="Edit Purchased Order"
+                    description="Update the purchased order details."
                 >
                     <button
                         type="button"
@@ -158,7 +175,6 @@ export default function Create({ workspace, items }: Props) {
                         </div>
 
                         <div className="space-y-3">
-                            {/* Header */}
                             <div className="grid grid-cols-[1fr_100px_120px_120px_36px] gap-3">
                                 <span className={labelClass}>Inventory Item</span>
                                 <span className={labelClass}>Count</span>
@@ -236,7 +252,7 @@ export default function Create({ workspace, items }: Props) {
                             disabled={processing}
                             className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                         >
-                            {processing ? 'Creating…' : 'Create Order'}
+                            {processing ? 'Saving…' : 'Save Changes'}
                         </button>
                     </div>
                 </form>

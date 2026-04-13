@@ -27,7 +27,6 @@ use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
-use Modules\Inventory\Http\Controllers\PpwController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
 
 /*
@@ -188,14 +187,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{purchasedOrder}/edit', [PurchasedOrderController::class, 'edit'])->name('edit');
         Route::put('/{purchasedOrder}', [PurchasedOrderController::class, 'update'])->name('update');
         Route::delete('/{purchasedOrder}', [PurchasedOrderController::class, 'destroy'])->name('destroy');
-    });
-
-    // PPW ROUTES
-    Route::prefix('/workspaces/{workspace}/inventory/ppws')->name('workspaces.inventory.ppw.')->group(function () {
-        Route::get('/', [PpwController::class, 'index'])->name('index');
-        Route::post('/', [PpwController::class, 'store'])->name('store');
-        Route::put('/{ppw}', [PpwController::class, 'update'])->name('update');
-        Route::delete('/{ppw}', [PpwController::class, 'destroy'])->name('destroy');
     });
 
     Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
