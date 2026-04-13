@@ -14,7 +14,7 @@ class TriggerFetchCsrErpDailRecords extends Command
      *
      * @var string
      */
-    protected $signature = 'trigger-fetch-csr-erp-dail-records';
+    protected $signature = 'trigger-fetch-csr-erp-dail-records {--batch-size=5} {--delay=300}';
 
     /**
      * The console command description.
@@ -35,57 +35,73 @@ class TriggerFetchCsrErpDailRecords extends Command
             return 1;
         }
 
+        $batchSize = (int) $this->option('batch-size');
+        $delay = (int) $this->option('delay');
         $date = Carbon::yesterday()->format('m/d/Y');
 
-        $users = PancakeUser::query()
+        $query = PancakeUser::query()
             ->whereHas('systemUser.workspaces.apiKeys')
             ->with('systemUser.workspaces.apiKeys')
-            ->get();
+            ->orderBy('id');
 
-        if ($users->isEmpty()) {
+        $total = $query->count();
+
+        if ($total === 0) {
             $this->warn('No Pancake users found with linked workspaces and API keys.');
             return 0;
         }
 
-        $this->info("Processing {$users->count()} CSR(s) for date: {$date}");
+        $this->info("Processing {$total} CSR(s) in batches of {$batchSize} with {$delay}s delay for date: {$date}");
 
         $succeeded = 0;
         $failed = 0;
+        $batchNumber = 0;
 
-        $users->each(function ($pancakeUser) use ($date, $webhookUrl, &$succeeded, &$failed) {
-            $pancakeUser->systemUser->workspaces->each(function ($workspace) use ($pancakeUser, $date, $webhookUrl, &$succeeded, &$failed) {
-                $apiKey = $workspace->apiKeys->first();
+        $query->chunk($batchSize, function ($pancakeUsers) use ($date, $webhookUrl, $delay, &$succeeded, &$failed, &$batchNumber) {
+            $batchNumber++;
 
-                if (! $apiKey) {
-                    $this->warn("Skipping workspace {$workspace->id} — no API key found.");
-                    $failed++;
-                    return;
-                }
+            if ($batchNumber > 1) {
+                $this->info("Waiting {$delay}s before batch {$batchNumber}...");
+                sleep($delay);
+            }
 
-                $data = [
-                    'workspace_id' => $workspace->id,
-                    'workspace_api_key' => $apiKey->reveal(),
-                    'csr_id' => $pancakeUser->id,
-                    'csr_name' => $pancakeUser->name,
-                    'date' => $date,
-                    'webhook_url' => config('app.url') . '/api/v1/public/csr-daily-records',
-                ];
+            $this->info("Processing batch {$batchNumber}...");
 
-                try {
-                    $response = Http::timeout(30)->post($webhookUrl, $data);
+            foreach ($pancakeUsers as $pancakeUser) {
+                foreach ($pancakeUser->systemUser->workspaces as $workspace) {
+                    $apiKey = $workspace->apiKeys->first();
 
-                    if ($response->successful()) {
-                        $this->info("Triggered for CSR {$pancakeUser->name} (ID: {$pancakeUser->id}) in workspace {$workspace->id}");
-                        $succeeded++;
-                    } else {
-                        $this->error("Failed for CSR {$pancakeUser->name} (ID: {$pancakeUser->id}) in workspace {$workspace->id} — HTTP {$response->status()}");
+                    if (! $apiKey) {
+                        $this->warn("Skipping workspace {$workspace->id} — no API key found.");
+                        $failed++;
+                        continue;
+                    }
+
+                    $data = [
+                        'workspace_id' => $workspace->id,
+                        'workspace_api_key' => $apiKey->reveal(),
+                        'csr_id' => $pancakeUser->id,
+                        'csr_name' => $pancakeUser->name,
+                        'date' => $date,
+                        'webhook_url' => config('app.url') . '/api/v1/public/csr-daily-records',
+                    ];
+
+                    try {
+                        $response = Http::timeout(30)->post($webhookUrl, $data);
+
+                        if ($response->successful()) {
+                            $this->info("Triggered for CSR {$pancakeUser->name} (ID: {$pancakeUser->id}) in workspace {$workspace->id}");
+                            $succeeded++;
+                        } else {
+                            $this->error("Failed for CSR {$pancakeUser->name} (ID: {$pancakeUser->id}) in workspace {$workspace->id} — HTTP {$response->status()}");
+                            $failed++;
+                        }
+                    } catch (\Exception $e) {
+                        $this->error("Error for CSR {$pancakeUser->name} (ID: {$pancakeUser->id}) in workspace {$workspace->id} — {$e->getMessage()}");
                         $failed++;
                     }
-                } catch (\Exception $e) {
-                    $this->error("Error for CSR {$pancakeUser->name} (ID: {$pancakeUser->id}) in workspace {$workspace->id} — {$e->getMessage()}");
-                    $failed++;
                 }
-            });
+            }
         });
 
         $this->newLine();
