@@ -28,7 +28,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PpwController;
-use Modules\Inventory\Http\Controllers\PurchaseOrderController;
+use Modules\Inventory\Http\Controllers\PurchasedOrderController;
 
 /*
 |--------------------------------------------------------------------------
@@ -181,8 +181,14 @@ Route::middleware(['auth'])->group(function () {
     })->name('workspaces.botcake');
     Route::get('/workspaces/{workspace}/botcake/flows', [FlowController::class, 'index'])->name('workspaces.botcake.flows.index');
     Route::get('/workspaces/{workspace}/botcake/sequences', [SequenceController::class, 'index'])->name('workspaces.botcake.sequences.index');
-    Route::get('/workspaces/{workspace}/inventory/purchased-orders', [PurchaseOrderController::class, 'index'])->name('workspaces.inventory.purchased-orders.index');
-    Route::get('/workspaces/{workspace}/inventory/purchased-orders/create', [PurchaseOrderController::class, 'create'])->name('workspaces.inventory.purchased-orders.create');
+    Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {
+        Route::get('/', [PurchasedOrderController::class, 'index'])->name('index');
+        Route::get('/create', [PurchasedOrderController::class, 'create'])->name('create');
+        Route::post('/', [PurchasedOrderController::class, 'store'])->name('store');
+        Route::get('/{purchasedOrder}/edit', [PurchasedOrderController::class, 'edit'])->name('edit');
+        Route::put('/{purchasedOrder}', [PurchasedOrderController::class, 'update'])->name('update');
+        Route::delete('/{purchasedOrder}', [PurchasedOrderController::class, 'destroy'])->name('destroy');
+    });
 
     // PPW ROUTES
     Route::prefix('/workspaces/{workspace}/inventory/ppws')->name('workspaces.inventory.ppw.')->group(function () {

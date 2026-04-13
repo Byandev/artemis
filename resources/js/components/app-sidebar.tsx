@@ -25,7 +25,7 @@ import {
     ClipboardList,
     Box,
     Layers,
-
+    ShoppingCart,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
@@ -97,6 +97,11 @@ export function AppSidebar() {
                     title: 'Inventory Items',
                     href: `/workspaces/${currentWorkspace.slug}/inventory/items`,
                     icon: Layers,
+                },
+                {
+                    title: 'Purchased Orders',
+                    href: `/workspaces/${currentWorkspace.slug}/inventory/purchased-orders`,
+                    icon: ShoppingCart,
                 },
             ],
         }] : []),
