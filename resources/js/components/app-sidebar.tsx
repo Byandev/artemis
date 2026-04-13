@@ -25,12 +25,12 @@ import {
     ClipboardList,
     Box,
     Layers,
-
+    ShoppingCart,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
 export function AppSidebar() {
-    const { currentWorkspace, appEnv } = usePage().props as unknown as { currentWorkspace: { slug: string }; appEnv: string };
+    const { currentWorkspace } = usePage().props as unknown as { currentWorkspace: { slug: string; show_inventory: boolean } };
 
     const dashboardUrl = currentWorkspace
         ? workspace.dashboard.url(currentWorkspace.slug)
@@ -79,27 +79,31 @@ export function AppSidebar() {
                 },
             ],
         },
-        ...(appEnv !== 'production' ? [{
-            title: 'Inventory',
-            icon: Box,
-            items: [
-                {
-                    title: 'PPW',
-                    href: `/workspaces/${currentWorkspace.slug}/inventory/ppws`,
-                    icon: BarChart2,
-                },
-                {
-                    title: 'Transaction Logs',
-                    href: `/workspaces/${currentWorkspace.slug}/inventory/transactions`,
-                    icon: ClipboardList,
-                },
-                {
-                    title: 'Inventory Items',
-                    href: `/workspaces/${currentWorkspace.slug}/inventory/items`,
-                    icon: Layers,
-                },
-            ],
-        }] : []),
+        ...(currentWorkspace.show_inventory
+            ? [
+                  {
+                      title: 'Inventory',
+                      icon: Box,
+                      items: [
+                          {
+                              title: 'Inventory Items',
+                              href: `/workspaces/${currentWorkspace.slug}/inventory/items`,
+                              icon: Layers,
+                          },
+                          {
+                              title: 'Transaction Logs',
+                              href: `/workspaces/${currentWorkspace.slug}/inventory/transactions`,
+                              icon: ClipboardList,
+                          },
+                          {
+                              title: 'Purchased Orders',
+                              href: `/workspaces/${currentWorkspace.slug}/inventory/purchased-orders`,
+                              icon: ShoppingCart,
+                          },
+                      ],
+                  },
+              ]
+            : []),
         {
             title: 'RTS',
             icon: RotateCcw,

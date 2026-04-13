@@ -66,10 +66,13 @@ class CSRController extends Controller
             ? CarbonImmutable::parse($request->input('to'))->toDateString()
             : CarbonImmutable::now()->toDateString();
 
+        $type = $request->input('type');
+
         $query = PancakeUserDailyReport::query()
             ->join('pancake_users as pu', 'pu.id', '=', 'pancake_user_daily_reports.pancake_user_id')
             ->where('pancake_user_daily_reports.workspace_id', $workspace->id)
             ->whereBetween('pancake_user_daily_reports.date', [$from, $to])
+            ->when($type, fn ($q) => $q->where('pancake_user_daily_reports.type', $type))
             ->groupBy('pancake_user_daily_reports.pancake_user_id', 'pu.name')
             ->selectRaw('
                 pancake_user_daily_reports.pancake_user_id,
@@ -103,7 +106,7 @@ class CSRController extends Controller
         return Inertia::render('workspaces/csr/analytics', [
             'workspace' => $workspace,
             'records'   => $records,
-            'query'     => $request->only(['sort', 'from', 'to', 'page']),
+            'query'     => $request->only(['sort', 'from', 'to', 'page', 'type']),
         ]);
     }
 
