@@ -15,7 +15,7 @@ final class RepeatOrderRatio
      */
     public function compute(int $workspaceId, array $dateRange, array $filter): float
     {
-        $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
         return $this->computeForWindow($workspaceId, $filter, $startAt, $endExclusive);
@@ -28,7 +28,7 @@ final class RepeatOrderRatio
         return collect($periods)->map(function (array $period) use ($workspaceId, $filter) {
             return (object) [
                 'period' => $period['label'],
-                'value'  => $this->computeForWindow(
+                'value' => $this->computeForWindow(
                     $workspaceId,
                     $filter,
                     $period['start'],
@@ -40,7 +40,7 @@ final class RepeatOrderRatio
 
     public function perPage(int $workspaceId, array $dateRange, array $filter)
     {
-        $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
@@ -73,7 +73,7 @@ final class RepeatOrderRatio
 
     public function perShop(int $workspaceId, array $dateRange, array $filter)
     {
-        $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
@@ -108,7 +108,7 @@ final class RepeatOrderRatio
 
     public function perUser(int $workspaceId, array $dateRange, array $filter)
     {
-        $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
@@ -149,10 +149,9 @@ final class RepeatOrderRatio
         $repeatCustomers = $this->buildRepeatSubquery($workspaceId, $endExclusive);
 
         $row = DB::table('pancake_orders as po')
-            ->when(! empty($pageIds) || ! empty($shopIds), fn ($q) =>
-                $q->join('pages', 'pages.id', '=', 'po.page_id')
-                  ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-                  ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->when(! empty($pageIds) || ! empty($shopIds), fn ($q) => $q->join('pages', 'pages.id', '=', 'po.page_id')
+                ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
+                ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
             )
             ->leftJoinSub($repeatCustomers, 'rc', fn ($j) => $j->on('rc.customer_id', '=', 'po.customer_id'))
             ->where('po.workspace_id', $workspaceId)
@@ -190,43 +189,45 @@ final class RepeatOrderRatio
 
     private function generatePeriods(array $dateRange, string $group): array
     {
-        $start   = Carbon::parse($dateRange['start_date'])->startOfDay();
-        $end     = Carbon::parse($dateRange['end_date'])->startOfDay();
+        $start = Carbon::parse($dateRange['start_date'])->startOfDay();
+        $end = Carbon::parse($dateRange['end_date'])->startOfDay();
         $periods = [];
 
         if ($group === 'monthly') {
             $cursor = $start->copy()->startOfMonth();
-            $last   = $end->copy()->startOfMonth();
+            $last = $end->copy()->startOfMonth();
             while ($cursor <= $last) {
                 $periods[] = [
-                    'label'         => $cursor->format('Y-m'),
-                    'start'         => $cursor->copy()->startOfMonth()->toDateTimeString(),
+                    'label' => $cursor->format('Y-m'),
+                    'start' => $cursor->copy()->startOfMonth()->toDateTimeString(),
                     'end_exclusive' => $cursor->copy()->addMonth()->startOfMonth()->toDateTimeString(),
                 ];
                 $cursor->addMonth();
             }
+
             return $periods;
         }
 
         if ($group === 'weekly') {
             $cursor = $start->copy()->startOfWeek(Carbon::MONDAY);
-            $last   = $end->copy()->startOfWeek(Carbon::MONDAY);
+            $last = $end->copy()->startOfWeek(Carbon::MONDAY);
             while ($cursor <= $last) {
                 $periods[] = [
-                    'label'         => $cursor->format('o-\WW'),
-                    'start'         => $cursor->copy()->toDateTimeString(),
+                    'label' => $cursor->format('o-\WW'),
+                    'start' => $cursor->copy()->toDateTimeString(),
                     'end_exclusive' => $cursor->copy()->addWeek()->toDateTimeString(),
                 ];
                 $cursor->addWeek();
             }
+
             return $periods;
         }
 
         $cursor = $start->copy();
         while ($cursor <= $end) {
             $periods[] = [
-                'label'         => $cursor->format('Y-m-d'),
-                'start'         => $cursor->copy()->startOfDay()->toDateTimeString(),
+                'label' => $cursor->format('Y-m-d'),
+                'start' => $cursor->copy()->startOfDay()->toDateTimeString(),
                 'end_exclusive' => $cursor->copy()->addDay()->startOfDay()->toDateTimeString(),
             ];
             $cursor->addDay();
@@ -237,7 +238,10 @@ final class RepeatOrderRatio
 
     private function resolveIds(mixed $ids): array
     {
-        if (empty($ids)) return [];
+        if (empty($ids)) {
+            return [];
+        }
+
         return array_map('intval', is_array($ids) ? $ids : explode(',', $ids));
     }
 }

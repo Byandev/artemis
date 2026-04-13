@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -15,11 +16,12 @@ class InventoryTransactionController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
         $inventory = QueryBuilder::for(InventoryTransaction::where('workspace_id', $workspace->id))
+            ->with(['inventoryItem.product'])
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where('ref_no', 'like', "%{$value}%");
@@ -41,6 +43,7 @@ class InventoryTransactionController extends Controller
         return Inertia::render('workspaces/inventory/inventory_transaction/index', [
             'workspace' => $workspace,
             'inventory' => $inventory,
+            'items' => InventoryItem::where('workspace_id', $workspace->id)->with('product')->get(),
             'query' => [
                 ...$request->only(['sort', 'page']),
                 'filter' => $request->input('filter', []),
@@ -52,6 +55,7 @@ class InventoryTransactionController extends Controller
     public function store(Request $request, Workspace $workspace)
     {
         $validated = $request->validate([
+            'inventory_item_id' => 'required|exists:inventory_items,id',
             'date' => 'required|date',
             'ref_no' => 'required|string|max:255|unique:inventory_transactions,ref_no,NULL,id,workspace_id,'.$workspace->id,
             'po_qty_in' => 'required|integer|min:0',
@@ -69,6 +73,7 @@ class InventoryTransactionController extends Controller
     public function update(Request $request, Workspace $workspace, InventoryTransaction $transaction)
     {
         $validated = $request->validate([
+            'inventory_item_id' => 'required|exists:inventory_items,id',
             'date' => 'required|date',
             'ref_no' => 'required|string|max:255|unique:inventory_transactions,ref_no,'.$transaction->id.',id,workspace_id,'.$workspace->id,
             'po_qty_in' => 'required|integer|min:0',

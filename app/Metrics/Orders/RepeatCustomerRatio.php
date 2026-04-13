@@ -16,7 +16,7 @@ final class RepeatCustomerRatio
      */
     public function compute(int $workspaceId, array $dateRange, array $filter): float
     {
-        $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
@@ -76,7 +76,7 @@ final class RepeatCustomerRatio
 
     public function perPage(int $workspaceId, array $dateRange, array $filter)
     {
-        $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
@@ -116,7 +116,7 @@ final class RepeatCustomerRatio
 
     public function perShop(int $workspaceId, array $dateRange, array $filter)
     {
-        $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
@@ -216,7 +216,7 @@ final class RepeatCustomerRatio
 
     public function perUser(int $workspaceId, array $dateRange, array $filter)
     {
-        $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);

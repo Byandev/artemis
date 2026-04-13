@@ -40,14 +40,16 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
-import { PaginatedData, User } from '@/types';
+import { PaginatedData, SharedData, User } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { MoreHorizontal, Send, Trash2, UserMinus, CopyleftIcon, UserCog } from 'lucide-react';
+import { MoreHorizontal, Send, Trash2, UserMinus, CopyleftIcon, UserCog, KeyRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Role } from '@/types/models/Role';
+import { toast } from 'sonner';
 
 interface Invitation {
     id: number;
@@ -79,6 +81,8 @@ interface Props {
 }
 
 export default function WorkspaceMembers({ workspace, members, pendingInvitations, isAdmin, query, roles }: Props) {
+    const { auth } = usePage<SharedData>().props;
+    const canRemoveMembers = auth?.user?.id === workspace.owner_id;
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
     const initialInvitationSorting = useMemo(() => toFrontendSort(query?.invitation_sort ?? null), [query?.invitation_sort]);
 
@@ -86,6 +90,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
     const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
     const [memberToUpdateRole, setMemberToUpdateRole] = useState<User | null>(null);
     const [invitationToRevoke, setInvitationToRevoke] = useState<Invitation | null>(null);
+    const [copiedMemberId, setCopiedMemberId] = useState<number | null>(null);
 
     const inviteForm = useForm({
         email: '',
@@ -95,6 +100,17 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
     const updateRoleForm = useForm({
         role_id: '',
     });
+
+    const showNoPermissionToast = () => {
+        toast.error("You don't have this permission.", {
+            duration: 3000,
+            closeButton: false,
+            classNames: {
+                toast: '!w-auto !min-w-0 !max-w-max max-w-[calc(100vw-1rem)] rounded-lg border border-black/8 bg-white px-2.5 py-1.5 shadow-theme-xs dark:border-white/10 dark:bg-zinc-900',
+                title: 'font-mono text-[12px] leading-tight font-semibold text-gray-800 dark:text-gray-100',
+            },
+        });
+    };
 
     const handleUpdateRole = (e: React.FormEvent) => {
         e.preventDefault();
@@ -138,11 +154,21 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
     const handleRemoveMember = () => {
         if (!memberToRemove) return;
 
+        if (!canRemoveMembers) {
+            showNoPermissionToast();
+            setMemberToRemove(null);
+            return;
+        }
+
         router.delete(
             workspaces.members.destroy.url({ workspace: workspace.slug, user: memberToRemove.id }),
             {
                 preserveScroll: true,
                 onSuccess: () => setMemberToRemove(null),
+                onError: () => {
+                    showNoPermissionToast();
+                    setMemberToRemove(null);
+                },
             }
         );
     };
@@ -160,6 +186,19 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
         router.post(workspaces.invitations.resend.url(invitationId), {}, {
             preserveScroll: true,
         });
+    };
+
+    const copyResetPasswordUrl = async (member: User) => {
+        try {
+            const res = await axios.post(
+                workspaces.members.resetPassword.url({ workspace: workspace.slug, user: member.id })
+            );
+            await navigator.clipboard.writeText(res.data.url);
+            setCopiedMemberId(member.id);
+            setTimeout(() => setCopiedMemberId(null), 2000);
+        } catch (error) {
+            console.error('Failed to generate reset link:', error);
+        }
     };
 
     const membersColumns: ColumnDef<User>[] = [
@@ -225,9 +264,20 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                                 <UserCog className="mr-2 h-4 w-4" />
                                 Change Role
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => copyResetPasswordUrl(member)}>
+                                <KeyRound className="mr-2 h-4 w-4" />
+                                {copiedMemberId === member.id ? 'Copied!' : 'Copy Reset Link'}
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                                onClick={() => setMemberToRemove(member)}
+                                onClick={() => {
+                                    if (!canRemoveMembers) {
+                                        showNoPermissionToast();
+                                        return;
+                                    }
+
+                                    setMemberToRemove(member);
+                                }}
                                 className="text-destructive focus:text-destructive"
                             >
                                 <UserMinus className="mr-2 h-4 w-4" />
@@ -440,6 +490,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                                     {
                                         sort: params?.sort,
                                         page: params?.page ?? 1,
+                                        per_page: params?.per_page,
                                         invitation_sort: query?.invitation_sort,
                                         invitation_page: query?.invitation_page,
                                     },
@@ -478,27 +529,27 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
             </div>
 
             {/* Remove Member Confirmation Dialog */}
-            {!!memberToRemove && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div
-                        className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px]"
-                        onClick={() => setMemberToRemove(null)}
-                    />
-                    <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl duration-150 animate-in fade-in zoom-in dark:bg-zinc-900">
-                        <div className="flex flex-col items-center p-6 text-center">
-                            <div className="mb-4 rounded-xl bg-red-50 p-3 dark:bg-red-950/30">
-                                <UserMinus className="h-6 w-6 text-red-500" />
-                            </div>
-                            <h3 className="mb-1 text-[15px] font-semibold text-gray-900 dark:text-gray-100">
+            <AlertDialog
+                open={!!memberToRemove}
+                onOpenChange={(open) => {
+                    if (!open) setMemberToRemove(null);
+                }}
+            >
+                <AlertDialogContent className="max-w-md rounded-2xl border border-black/8 p-0 dark:border-white/8">
+                    <div className="p-6">
+                        <AlertDialogHeader>
+                            <AlertDialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
                                 Remove Member
-                            </h3>
-                            <p className="mb-4 text-[12px] text-gray-500 dark:text-gray-400">
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="text-[12px] text-gray-500 dark:text-gray-400">
                                 Are you sure you want to remove{' '}
-                                <span className="font-semibold text-gray-800 dark:text-gray-200">{memberToRemove.name}</span>{' '}
+                                <span className="font-semibold text-gray-800 dark:text-gray-200">{memberToRemove?.name}</span>{' '}
                                 from this workspace?
-                            </p>
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
 
-                            <div className="mb-5 flex items-center gap-3 w-full rounded-[10px] border border-black/6 bg-stone-50 px-3 py-2.5 text-left dark:border-white/6 dark:bg-zinc-800">
+                        {memberToRemove && (
+                            <div className="mt-4 flex items-center gap-3 rounded-[10px] border border-black/6 bg-stone-50 px-3 py-2.5 text-left dark:border-white/6 dark:bg-zinc-800">
                                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 font-mono text-[12px] font-semibold text-red-600 dark:bg-red-900/40 dark:text-red-400">
                                     {memberToRemove.name?.charAt(0).toUpperCase()}
                                 </div>
@@ -507,33 +558,28 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                                     <p className="truncate font-mono text-[11px] text-gray-400 dark:text-gray-500">{memberToRemove.email}</p>
                                 </div>
                             </div>
+                        )}
 
-                            <div className="mb-5 w-full rounded-xl border border-red-100 bg-red-50/60 p-3 dark:border-red-900/30 dark:bg-red-950/20">
-                                <p className="text-[11px] font-medium text-red-700 dark:text-red-400">
-                                    They will lose access to all workspace resources immediately.
-                                </p>
-                            </div>
-
-                            <div className="flex w-full items-center gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setMemberToRemove(null)}
-                                    className="flex h-9 flex-1 items-center justify-center rounded-lg border border-black/8 bg-stone-100 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleRemoveMember}
-                                    className="flex h-9 flex-1 items-center justify-center rounded-lg bg-red-600 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-red-700"
-                                >
-                                    Remove Member
-                                </button>
-                            </div>
+                        <div className="mt-4 rounded-xl border border-red-100 bg-red-50/60 p-3 dark:border-red-900/30 dark:bg-red-950/20">
+                            <p className="text-[11px] font-medium text-red-700 dark:text-red-400">
+                                They will lose access to all workspace resources immediately.
+                            </p>
                         </div>
+
+                        <AlertDialogFooter className="mt-5">
+                            <AlertDialogCancel className="h-9 rounded-lg border border-black/8 bg-stone-100 font-mono text-[12px] font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700">
+                                Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={handleRemoveMember}
+                                className="h-9 rounded-lg bg-red-600 font-mono text-[12px] font-medium text-white transition-all hover:bg-red-700"
+                            >
+                                Remove Member
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
                     </div>
-                </div>
-            )}
+                </AlertDialogContent>
+            </AlertDialog>
 
             {/* Update Member Role Dialog */}
             <Dialog open={!!memberToUpdateRole} onOpenChange={(open) => { if (!open) { setMemberToUpdateRole(null); updateRoleForm.reset(); } }}>

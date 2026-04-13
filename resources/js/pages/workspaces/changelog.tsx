@@ -12,6 +12,145 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v2.4.4',
+        date: '2026-04-09',
+        sections: [
+            {
+                title: 'CSR Analytics',
+                items: [
+                    'Delivered and Returning columns now display as Philippine Peso currency',
+                    'All columns are now sortable — click any column header to sort ascending or descending',
+                    'Analytics data is now server-side paginated and sorted via QueryBuilder',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v2.4.3',
+        date: '2026-04-09',
+        sections: [
+            {
+                title: 'Internal',
+                items: [
+                    'CSR daily records are now stored in a dedicated table keyed by Pancake user ID',
+                    'Fixed 401 errors on internal API endpoints caused by session auth not being available on the API middleware stack',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v2.4.2',
+        date: '2026-04-09',
+        sections: [
+            {
+                title: 'Fixes',
+                items: [
+                    'New CSR users now default to ACTIVE status',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v2.4.1',
+        date: '2026-04-09',
+        sections: [
+            {
+                title: 'Fixes',
+                items: [
+                    'CSR Management — sorting and pagination now work correctly after the first load',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v2.4.0',
+        date: '2026-04-09',
+        sections: [
+            {
+                title: 'API Keys',
+                items: [
+                    'Generate API keys per workspace to connect external tools and platforms',
+                    'Each key has a name, prefix preview, and a last-used timestamp',
+                    'Reveal the full key at any time using the eye icon — no need to regenerate after a page refresh',
+                    'Revoke any key instantly from the API Keys settings page',
+                ],
+            },
+            {
+                title: 'Public API',
+                items: [
+                    'New public API endpoints authenticated via Bearer token: health check, workspace users, and CSR daily records',
+                    'Fixed CSRF token mismatch — public API routes are now stateless and no longer require a CSRF token',
+                    'User list endpoint supports search, pagination, and filtering by Pancake account',
+                    'CSR daily records endpoint supports upsert — safe to call multiple times for the same date',
+                ],
+            },
+            {
+                title: 'CSR Management',
+                items: [
+                    'New CSR Management page — view all CSRs in your workspace with their linked Pancake accounts',
+                    'New CSR Analytics page — daily performance table with total orders, sales, delivered, returning, RMO called, and RTS rate',
+                    'Filter CSR analytics by date range',
+                ],
+            },
+            {
+                title: 'Inventory Items',
+                items: [
+                    'New Inventory Items page — create, edit, and delete inventory items per workspace',
+                    'Each item has a name, SKU, unit, and description',
+                ],
+            },
+            {
+                title: 'Leaderboard',
+                items: [
+                    'Leaderboard now includes Called Activity and Delivery Success categories',
+                    'Group leaderboard by called activity or delivery performance',
+                ],
+            },
+            {
+                title: 'Auth Pages',
+                items: [
+                    'Login, register, and workspace setup pages have been redesigned with a cleaner, more premium look',
+                ],
+            },
+            {
+                title: 'Sidebar',
+                items: [
+                    'API Keys added to the workspace switcher menu for quick access',
+                    'Inventory section is hidden in production — only visible in non-production environments',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v2.3.0',
+        date: '2026-04-07',
+        sections: [
+            {
+                title: 'AI Chat — Dashboard & RTS Analytics',
+                items: [
+                    'Ask the AI questions about your data directly from the dashboard or the RTS analytics page',
+                    'Dashboard: analyze your sales metrics, page performance, shop performance, and team performance',
+                    'RTS Analytics: ask about returns by price, product, rider, customer risk, location, or order frequency',
+                    'Answers are based on the data currently on screen, not guesses',
+                ],
+            },
+            {
+                title: 'Members — Reset Password',
+                items: [
+                    'Admins can now generate a password reset link for any team member',
+                    'Click "Copy Reset Link" from the member\'s action menu — the link is copied to your clipboard and ready to share',
+                ],
+            },
+            {
+                title: 'RTS Analytics — Performance',
+                items: [
+                    'Analytics page loads noticeably faster — date filters now use index-friendly queries instead of per-row calculations',
+                    'New database indexes on key columns used by the RTS queries',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v2.2.0',
         date: '2026-04-01',
         sections: [
@@ -121,7 +260,7 @@ const changelog: ChangelogEntry[] = [
                 items: [
                     'Search, filter, and sort your pages list',
                     'Archive pages you no longer need and restore them anytime',
-                    'View order history directly from a page\'s detail view',
+                    "View order history directly from a page's detail view",
                 ],
             },
             {
@@ -133,9 +272,7 @@ const changelog: ChangelogEntry[] = [
             },
             {
                 title: 'Employees',
-                items: [
-                    'Employees section added to the sidebar navigation',
-                ],
+                items: ['Employees section added to the sidebar navigation'],
             },
             {
                 title: 'Improvements',
@@ -199,12 +336,28 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
-    'v2.2.0': 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20',
-    'v2.1.0': 'bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-blue-500/20',
-    'v2.0.1': 'bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-violet-500/20',
-    'v1.2.0': 'bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20',
-    'v1.1.0': 'bg-orange-500/10 text-orange-600 dark:text-orange-400 ring-orange-500/20',
-    'v1.0.0': 'bg-rose-500/10 text-rose-600 dark:text-rose-400 ring-rose-500/20',
+    'v2.4.3':
+        'bg-slate-500/10 text-slate-600 dark:text-slate-400 ring-slate-500/20',
+    'v2.4.2':
+        'bg-slate-500/10 text-slate-600 dark:text-slate-400 ring-slate-500/20',
+    'v2.4.1':
+        'bg-slate-500/10 text-slate-600 dark:text-slate-400 ring-slate-500/20',
+    'v2.4.0':
+        'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 ring-cyan-500/20',
+    'v2.3.0':
+        'bg-teal-500/10 text-teal-600 dark:text-teal-400 ring-teal-500/20',
+    'v2.2.0':
+        'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20',
+    'v2.1.0':
+        'bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-blue-500/20',
+    'v2.0.1':
+        'bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-violet-500/20',
+    'v1.2.0':
+        'bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20',
+    'v1.1.0':
+        'bg-orange-500/10 text-orange-600 dark:text-orange-400 ring-orange-500/20',
+    'v1.0.0':
+        'bg-rose-500/10 text-rose-600 dark:text-rose-400 ring-rose-500/20',
 };
 
 export default function Changelog() {

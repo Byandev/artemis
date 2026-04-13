@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Password;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
@@ -21,7 +22,7 @@ class WorkspaceMemberController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -52,7 +53,7 @@ class WorkspaceMemberController extends Controller
                 'pivot_created_at',
             ])
             ->defaultSort('-pivot_created_at')
-            ->paginate($request->input('perPage', 10))
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString()
             ->through(function ($user) {
                 $user->pivot = (object) [
@@ -103,7 +104,7 @@ class WorkspaceMemberController extends Controller
                 ...$request->only(['sort', 'perPage', 'page']),
                 'invitation_sort' => $request->input('invitation_sort'),
                 'invitation_page' => $request->input('invitation_page'),
-                'filter'          => $request->input('filter', []),
+                'filter' => $request->input('filter', []),
             ],
         ]);
     }
@@ -114,7 +115,7 @@ class WorkspaceMemberController extends Controller
     public function updateMember(Request $request, Workspace $workspace, User $user)
     {
 
-        if (!$request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isAdminOf($workspace)) {
             abort(403, 'You do not have permission to update member roles.');
         }
 
@@ -141,7 +142,7 @@ class WorkspaceMemberController extends Controller
     public function destroy(Request $request, Workspace $workspace, User $user)
     {
         // Only admins and owners can remove members
-        if (!$workspace->isOwner($request->user())) {
+        if (! $workspace->isOwner($request->user())) {
             abort(403, 'You do not have permission to remove members.');
         }
 
@@ -161,6 +162,23 @@ class WorkspaceMemberController extends Controller
         $workspace->removeMember($user);
 
         return back()->with('success', 'Member removed successfully.');
+    }
+
+    /**
+     * Generate a password reset link for a workspace member and return it as JSON
+     * so the admin can copy and share it directly.
+     */
+    public function generatePasswordReset(Request $request, Workspace $workspace, User $user)
+    {
+        // Only admins and owners can remove members
+        if (! $workspace->isOwner($request->user())) {
+            abort(403, 'You do not have permission.');
+        }
+
+        $token = Password::createToken($user);
+        $url = route('password.reset', ['token' => $token]).'?'.http_build_query(['email' => $user->email]);
+
+        return response()->json(['url' => $url]);
     }
 
     public function store(Request $request, Workspace $workspace)

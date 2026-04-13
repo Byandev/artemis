@@ -24,15 +24,18 @@ import {
     RotateCcw,
     BarChart2,
     MapPin,
+    ClipboardList,
+    Box,
+    Layers,
 
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
 export function AppSidebar() {
-    const { currentWorkspace } = usePage().props;
+    const { currentWorkspace, appEnv } = usePage().props as unknown as { currentWorkspace: { slug: string }; appEnv: string };
 
     const dashboardUrl = currentWorkspace
-        ? workspace.dashboard.url((currentWorkspace as { slug: string }).slug)
+        ? workspace.dashboard.url(currentWorkspace.slug)
         : dashboard().url;
 
     const mainNavItems: NavItem[] = [
@@ -43,48 +46,86 @@ export function AppSidebar() {
         },
         {
             title: 'Shops',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/shops`,
+            href: `/workspaces/${currentWorkspace.slug}/shops`,
             icon: Store,
         },
         {
             title: 'Pages',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
+            href: `/workspaces/${currentWorkspace.slug}/pages`,
             icon: BookOpenIcon,
         },
         {
             title: 'Products',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products/list`,
+            href: `/workspaces/${currentWorkspace.slug}/products/list`,
             icon: Package,
         },
         {
             title: 'Teams',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
+            href: `/workspaces/${currentWorkspace.slug}/teams`,
             icon: Users,
         },
+
         {
-            title: 'Employees',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/employees`,
+            title: 'CSR',
             icon: User,
+            items: [
+                {
+                    title: 'Management',
+                    href: `/workspaces/${currentWorkspace.slug}/csr/management`,
+                    icon: User,
+                },
+                {
+                    title: 'CSR Analytics',
+                    href: `/workspaces/${currentWorkspace.slug}/csr/analytics`,
+                    icon: BarChart2,
+                },
+            ],
         },
+        ...(appEnv !== 'production' ? [{
+            title: 'Inventory',
+            icon: Box,
+            items: [
+                {
+                    title: 'PPW',
+                    href: `/workspaces/${currentWorkspace.slug}/inventory/ppws`,
+                    icon: BarChart2,
+                },
+                {
+                    title: 'Transaction Logs',
+                    href: `/workspaces/${currentWorkspace.slug}/inventory/transactions`,
+                    icon: ClipboardList,
+                },
+                {
+                    title: 'Inventory Items',
+                    href: `/workspaces/${currentWorkspace.slug}/inventory/items`,
+                    icon: Layers,
+                },
+                {
+                    title: 'Purchased Orders',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/inventory/purchased-orders`,
+                    icon: ClipboardList,
+                },
+            ],
+        }] : []),
         {
             title: 'RTS',
             icon: RotateCcw,
             items: [
                 {
                     title: 'Analytics',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
+                    href: `/workspaces/${currentWorkspace.slug}/rts/analytics`,
                     icon: BarChart2,
                 },
                 {
                     title: 'Parcel Journey',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/parcel-journeys`,
+                    href: `/workspaces/${currentWorkspace.slug}/rts/parcel-journeys`,
                     icon: MapPin,
                 },
             ],
         },
         {
             title: 'Roles',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/roles`,
+            href: `/workspaces/${currentWorkspace.slug}/roles`,
             icon: ShieldIcon,
         },
                 {

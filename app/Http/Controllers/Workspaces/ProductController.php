@@ -35,7 +35,7 @@ class ProductController extends Controller
                 'created_at',
             ])
             ->defaultSort('-created_at')
-            ->paginate(10)
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         // Get unique categories for filter dropdown (exclude null/empty values)

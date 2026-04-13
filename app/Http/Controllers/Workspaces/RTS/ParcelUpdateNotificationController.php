@@ -39,7 +39,7 @@ class ParcelUpdateNotificationController extends Controller
                 AllowedSort::custom('order.page.product.name', new ProductNameSort),
             ])
             ->defaultSort('-created_at')
-            ->paginate(10)
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         return Inertia::render('workspaces/rts/parcel-update-notification', [

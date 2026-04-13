@@ -10,6 +10,7 @@ use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Pancake\Jobs\FetchShopCustomers;
+use Modules\Pancake\Jobs\FetchShopUsers;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -32,7 +33,7 @@ class ShopController extends Controller
                 'customers_last_synced_at',
                 'deleted_at',
             ])
-            ->paginate(10)
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         return Inertia::render('workspaces/shops/index', [
@@ -59,7 +60,8 @@ class ShopController extends Controller
 
         $shop->update(['customers_last_synced_at' => null]);
 
-        dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subYear()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subMonth()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
 
         return redirect()->route('workspaces.shops.index', $workspace);
     }

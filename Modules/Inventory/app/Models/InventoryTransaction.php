@@ -4,6 +4,7 @@ namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class InventoryTransaction extends Model
 {
@@ -15,6 +16,7 @@ class InventoryTransaction extends Model
 
     protected $fillable = [
         'workspace_id',
+        'inventory_item_id',
         'date',
         'ref_no',
         'po_qty_in',
@@ -24,4 +26,9 @@ class InventoryTransaction extends Model
         'rts_bad',
         'remaining_qty',
     ];
+
+    public function inventoryItem(): BelongsTo
+    {
+        return $this->belongsTo(InventoryItem::class);
+    }
 }

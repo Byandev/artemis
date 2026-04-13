@@ -31,21 +31,21 @@ abstract class BaseNotificationHandler implements NotifiesParcelJourney
         array $data,
     ): void {
         ParcelJourneyNotification::create([
-            'order_id'          => $order->id,
+            'order_id' => $order->id,
             'parcel_journey_id' => $parcelJourney->id,
-            'type'              => 'sms',
-            'receiver_name'     => $order->shippingAddress->full_name,
+            'type' => 'sms',
+            'receiver_name' => $order->shippingAddress->full_name,
             'receiver_identity' => $order->shippingAddress->phone_number,
-            'message'           => $this->renderer->render($this->workspace, 'sms', $activity, 'customer', $data),
+            'message' => $this->renderer->render($this->workspace, 'sms', $activity, 'customer', $data),
         ]);
 
         ParcelJourneyNotification::create([
-            'order_id'          => $order->id,
+            'order_id' => $order->id,
             'parcel_journey_id' => $parcelJourney->id,
-            'type'              => 'chat',
-            'receiver_name'     => $order->shippingAddress->full_name,
+            'type' => 'chat',
+            'receiver_name' => $order->shippingAddress->full_name,
             'receiver_identity' => $psid,
-            'message'           => $this->renderer->render($this->workspace, 'chat', $activity, 'customer', $data),
+            'message' => $this->renderer->render($this->workspace, 'chat', $activity, 'customer', $data),
         ]);
     }
 }

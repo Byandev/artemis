@@ -30,6 +30,7 @@ abstract class RtsBaseQuery
     ) {
         $this->query = Order::query();
         $this->applyWorkspaceFilter();
+        $this->applyStatusFilter();
         $this->applyDateFilter();
         $this->applyEntityFilters();
     }
@@ -39,15 +40,28 @@ abstract class RtsBaseQuery
         $this->query->where('pancake_orders.workspace_id', $this->workspace->id);
     }
 
+    /**
+     * Pre-filter to delivered/returned statuses only.
+     * Reduces rows before GROUP BY since METRICS_SQL only counts these statuses anyway.
+     */
+    private function applyStatusFilter(): void
+    {
+        $this->query->whereIn('pancake_orders.status', [3, 4, 5]);
+    }
+
+    /**
+     * Use direct range comparisons instead of DATE() to keep the filter sargable
+     * and allow MySQL to use indexes on delivered_at / returning_at.
+     */
     private function applyDateFilter(): void
     {
         $start = $this->request->input('start_date');
-        $end   = $this->request->input('end_date');
+        $end = $this->request->input('end_date');
 
         if ($start && $end) {
             $this->query->where(function ($q) use ($start, $end) {
-                $q->whereRaw('DATE(pancake_orders.delivered_at) >= ? AND DATE(pancake_orders.delivered_at) <= ?', [$start, $end])
-                  ->orWhereRaw('DATE(pancake_orders.returning_at) >= ? AND DATE(pancake_orders.returning_at) <= ?', [$start, $end]);
+                $q->whereBetween('pancake_orders.delivered_at', [$start, $end.' 23:59:59'])
+                    ->orWhereBetween('pancake_orders.returning_at', [$start, $end.' 23:59:59']);
             });
         }
     }

@@ -4,16 +4,16 @@ namespace App\Http\Controllers\Workspaces\RTS;
 
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\Order\ForDelivery\ConferrerNameSort;
-use App\Http\Sorts\Order\ForDelivery\CxRtsRateSort;
 use App\Http\Sorts\Order\ForDelivery\CustomerNameSort;
+use App\Http\Sorts\Order\ForDelivery\CxRtsRateSort;
 use App\Http\Sorts\Order\ForDelivery\LocationRtsRateSort;
-use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
-use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Http\Sorts\Order\ForDelivery\OrderAmountSort;
 use App\Http\Sorts\Order\ForDelivery\OrderDeliveryAttemptSort;
 use App\Http\Sorts\Order\ForDelivery\OrderNumberSort;
 use App\Http\Sorts\Order\ForDelivery\OrderParcelStatusSort;
 use App\Http\Sorts\Order\ForDelivery\OrderTrackingCodeSort;
+use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
+use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Models\Page;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
@@ -28,27 +28,45 @@ class ForDeliveryController extends Controller
 {
     public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
     {
-        $isRemoving = $request->has('removeAssignee') && $request->removeAssignee;
-
-        // Require userId unless explicitly removing the assignee
-        if (!$isRemoving && (!$request->has('userId') || !$request->userId)) {
-            return redirect()->back()->with('error', 'Please select a user before updating.');
-        }
-
-        // Find the order
         $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
 
-        if (!$orderForDelivery) {
+        if (! $orderForDelivery) {
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        // Update status and assignee
-        $orderForDelivery->update([
-            'status' => $request->status,
-            'assignee_id' => $isRemoving ? null : $request->userId,
-        ]);
+        $orderForDelivery->update(['status' => $request->status]);
 
         return redirect()->back()->with('success', 'Status updated successfully');
+    }
+
+    public function publicAssignUser(Workspace $workspace, $id, Request $request)
+    {
+        $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
+
+        if (! $orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        if (! $request->userId) {
+            return redirect()->back()->with('error', 'Please select a user before assigning.');
+        }
+
+        $orderForDelivery->update(['assignee_id' => $request->userId]);
+
+        return redirect()->back()->with('success', 'Assignee updated successfully' . $request->userId);
+    }
+
+    public function publicRemoveAssignee(Workspace $workspace, $id)
+    {
+        $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
+
+        if (! $orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        $orderForDelivery->update(['assignee_id' => null]);
+
+        return redirect()->back()->with('success', 'Assignee removed successfully');
     }
 
     public function public(Request $request, Workspace $workspace)
@@ -58,7 +76,7 @@ class ForDeliveryController extends Controller
             ->addSelect([
                 'pancake_order_for_delivery.*',
                 \DB::raw('(SELECT rts_rate FROM rider_delivery_summary WHERE rider_name = pancake_order_for_delivery.rider_name AND rider_phone = pancake_order_for_delivery.rider_phone LIMIT 1) as rider_rts_rate'),
-                \DB::raw('(' . RiskScoreSort::sql() . ') as risk_score'),
+                \DB::raw('('.RiskScoreSort::sql().') as risk_score'),
             ])
             ->with([
                 'order' => function ($query) {
@@ -122,7 +140,10 @@ class ForDeliveryController extends Controller
                     $query->where(function ($q) use ($value) {
                         $q->whereHas('order', function ($orderQuery) use ($value) {
                             $orderQuery->where('order_number', 'LIKE', "%{$value}%")
-                                ->orWhere('tracking_code', 'LIKE', "%{$value}%");
+                                ->orWhere('tracking_code', 'LIKE', "%{$value}%")
+                                ->orWhereHas('shippingAddress', function ($addrQuery) use ($value) {
+                                    $addrQuery->where('full_name', 'LIKE', "%{$value}%");
+                                });
                         })
                             ->orWhere('rider_name', 'LIKE', "%{$value}%")
                             ->orWhereHas('conferrer', function ($conferrerQuery) use ($value) {
@@ -151,7 +172,7 @@ class ForDeliveryController extends Controller
 
         // Build a base query for stats that respects page/shop filters
         $statsBase = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->where('delivery_date', now());
+            ->whereDate('delivery_date', now());
 
         $filterPageIds = $request->input('filter.page_id');
         if ($filterPageIds) {
@@ -166,40 +187,27 @@ class ForDeliveryController extends Controller
         }
 
         // 1️⃣ Total orders
-        $totalOrders = (clone $statsBase)->count();
-
-        // 2️⃣ Total for delivery today
-        $totalForDeliveryToday = (clone $statsBase)
-            ->whereHas('order', function ($query) {
-                $query->where('parcel_status', 'out_for_delivery')
-                    ->whereDate('created_at', now());
-            })
-            ->count();
+        $totalOrdersForDeliveryToday = (clone $statsBase)->count();
 
         // 3️⃣ Called rate (not pending)
         $totalCalled = (clone $statsBase)
             ->where('status', '!=', 'PENDING')
             ->count();
 
-        $calledRate = $totalOrders > 0 ? round(($totalCalled / $totalOrders) * 100, 1) : 0;
-
-        // 4️⃣ Successful rate (parcel delivered)
-        $totalParcel = (clone $statsBase)
-            ->whereHas('order', fn($q) => $q->whereNotNull('parcel_status'))
-            ->count();
+        $calledRate = $totalOrdersForDeliveryToday > 0 ? round(($totalCalled / $totalOrdersForDeliveryToday) * 100, 1) : 0;
 
         $totalDelivered = (clone $statsBase)
-            ->whereHas('order', fn($q) => $q->where('parcel_status', 'delivered'))
+            ->whereHas('order', fn ($q) => $q->where('parcel_status', 'delivered'))
             ->count();
 
-        $successfulRate = $totalParcel > 0 ? round(($totalDelivered / $totalParcel) * 100, 1) : 0;
+        $successfulRate = $totalOrdersForDeliveryToday > 0 ? round(($totalDelivered / $totalOrdersForDeliveryToday) * 100, 1) : 0;
 
         // 5️⃣ Unsuccessful rate (problematic + returning + undeliverable)
         $totalUnsuccessful = (clone $statsBase)
-            ->whereHas('order', fn($q) => $q->whereIn('parcel_status', ['problematic', 'returning', 'undeliverable']))
+            ->whereHas('order', fn ($q) => $q->whereIn('parcel_status', ['problematic', 'returning', 'undeliverable']))
             ->count();
 
-        $unsuccessfulRate = $totalParcel > 0 ? round(($totalUnsuccessful / $totalParcel) * 100, 1) : 0;
+        $unsuccessfulRate = $totalOrdersForDeliveryToday > 0 ? round(($totalUnsuccessful / $totalOrdersForDeliveryToday) * 100, 1) : 0;
 
         $users = User::get(['id', 'name']);
 
@@ -213,7 +221,7 @@ class ForDeliveryController extends Controller
                 'filter' => $request->input('filter', []),
             ],
             'users' => $users,
-            'total_for_delivery_today' => $totalForDeliveryToday,
+            'total_for_delivery_today' => $totalOrdersForDeliveryToday,
             'called_rate' => $calledRate,
             'successful_rate' => $successfulRate,
             'unsuccessful_rate' => $unsuccessfulRate,
@@ -224,7 +232,7 @@ class ForDeliveryController extends Controller
     {
         $userId = $request->query('user_id');
 
-        if (!$userId) {
+        if (! $userId) {
             return response()->json(['assigned' => 0, 'called' => 0]);
         }
 

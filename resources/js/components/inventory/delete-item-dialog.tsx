@@ -1,68 +1,89 @@
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
-import { Trash2 } from 'lucide-react';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Workspace } from '@/types/models/Workspace';
+import { router } from '@inertiajs/react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
-interface PurchasedOrderLike {
+interface Item {
     id: number;
-    delivery_no: string | null;
-    control_no: string | null;
+    sku: string;   
+    product_id: number;
+    sales_keywords: string;
+    transaction_keywords: string;
+    product?: {
+        id: number;
+        name: string;
+    };
 }
 
-interface DeleteItemDialogProps {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    rowToDelete: PurchasedOrderLike | null;
-    deleteSubmitting: boolean;
-    onConfirmDelete: () => void;
-    onCancel: () => void;
-    sansFont: string;
+interface Props {
+    item: Item | null;
+    workspace: Workspace;
+    onClose: () => void;                                                                                                            
 }
 
-export function DeleteItemDialog({
-    open,
-    onOpenChange,
-    rowToDelete,
-    deleteSubmitting,
-    onConfirmDelete,
-    onCancel,
-    sansFont,
-}: DeleteItemDialogProps) {
+export function DeleteItemDialog({ item, workspace, onClose }: Props) {
+    const [processing, setProcessing] = useState(false);
+
+    const handleDelete = () => {
+        if (!item) return;
+
+        router.delete(`/workspaces/${workspace.slug}/inventory/items/${item.id}`, {
+            preserveScroll: true,
+            onStart: () => setProcessing(true),
+            onSuccess: () => {
+                toast.success(`Item deleted successfully`);
+            onClose();
+            },
+            onFinish: () => setProcessing(false),
+        });
+    };
+
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent
-                hideClose
-                className="max-w-[400px] rounded-2xl border border-black/8 bg-white p-0 shadow-[0_16px_40px_rgba(0,0,0,0.1)] dark:border-white/10 dark:bg-zinc-900"
-                style={{ fontFamily: sansFont }}
-            >
-                <DialogTitle className="sr-only">Delete Item</DialogTitle>
-                <DialogDescription className="sr-only">Confirm deleting the selected purchase order record.</DialogDescription>
-                <div className="px-6 py-5 text-center">
-                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500 dark:bg-red-500/10">
-                        <Trash2 className="h-7 w-7" />
-                    </div>
-                    <h3 className="mt-3 text-[20px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">Delete Item</h3>
-                    <p className="mt-1 text-[12px] text-gray-500 dark:text-gray-400">Are you sure you want to delete this purchase order?</p>
-                    <p className="mt-1 text-[13px] font-medium text-gray-900 dark:text-gray-100">{rowToDelete?.control_no || rowToDelete?.delivery_no || 'N/A'}</p>
-                    <p className="mt-1 text-[12px] text-gray-400 dark:text-gray-500">This action cannot be undone.</p>
+        <AlertDialog open={!!item} onOpenChange={(open) => !open && onClose()}>
+            <AlertDialogContent className="max-w-[400px] border-none shadow-2xl dark:bg-zinc-900">
+                <AlertDialogHeader>
+                    <AlertDialogTitle className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
+                        Delete Inventory Record?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                        Are you sure you want to delete the record for{' '}
+                        <span className="font-medium text-gray-900 dark:text-gray-200">
+                            {item?.product?.name || 'this product'}
+                        </span>{' '}
+                        on <span className="font-mono text-emerald-600 dark:text-emerald-400">{item?.transaction_keywords}</span>? 
+                        This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
 
-                    <div className="mt-5 flex items-center justify-center gap-3">
-                        <button
-                            type="button"
-                            onClick={onCancel}
-                            className="h-10 min-w-24 rounded-lg border border-black/8 bg-white px-5 text-[13px] font-medium text-gray-600 transition-colors hover:bg-black/3 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-white/5"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            disabled={deleteSubmitting}
-                            onClick={onConfirmDelete}
-                            className="h-10 min-w-24 rounded-lg bg-red-600 px-5 text-[13px] font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-red-500 dark:hover:bg-red-400"
-                        >
-                            {deleteSubmitting ? 'Deleting...' : 'Delete'}
-                        </button>
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
+                <AlertDialogFooter className="mt-4 gap-2">
+                    <AlertDialogCancel
+                        disabled={processing}
+                        className="h-9 rounded-lg border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+                    >
+                        Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={(e) => {
+                            e.preventDefault();
+                            handleDelete();
+                        }}
+                        disabled={processing}
+                        className="h-9 rounded-lg bg-red-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-red-700 disabled:opacity-50"
+                    >
+                        {processing ? 'Deleting...' : 'Confirm Delete'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     );
 }

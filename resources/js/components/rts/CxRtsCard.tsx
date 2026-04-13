@@ -5,9 +5,10 @@ import { buildBaseParams, CX_RTS_LABELS, CxRtsRow, RtsCell, RtsQueryParams, View
 interface Props {
     workspaceSlug: string;
     queryParams: RtsQueryParams;
+    onDataLoaded?: (data: CxRtsRow[]) => void;
 }
 
-export default function CxRtsCard({ workspaceSlug, queryParams }: Props) {
+export default function CxRtsCard({ workspaceSlug, queryParams, onDataLoaded }: Props) {
     const [rows, setRows] = useState<CxRtsRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState<ViewMode>('chart');
@@ -21,7 +22,7 @@ export default function CxRtsCard({ workspaceSlug, queryParams }: Props) {
         p.append('type', type);
         fetch(`/workspaces/${workspaceSlug}/rts/analytics/group-by/cx-rts?${p}`, { credentials: 'same-origin' })
             .then((res) => (res.ok ? res.json() : []))
-            .then((data) => { if (!cancelled) { setRows(data); setLoading(false); } })
+            .then((data) => { if (!cancelled) { setRows(data); setLoading(false); onDataLoaded?.(data); } })
             .catch(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, [workspaceSlug, type, JSON.stringify(queryParams)]);

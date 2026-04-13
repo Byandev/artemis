@@ -81,4 +81,131 @@ class CsrPerformanceController extends Controller
 
         return $validated;
     }
+
+    private function rankRows(Collection $rows, string $period, string $sortBy, string $sortDir): Collection
+    {
+        return $rows
+            ->groupBy('period_start')
+            ->flatMap(function (Collection $group) use ($period, $sortBy, $sortDir) {
+                return $this->sortRows($group, $sortBy, $sortDir)
+                    ->values()
+                    ->map(function ($row, int $index) use ($period) {
+                        return [
+                            'csr_id' => (string) $row->csr_id,
+                            'period' => $period,
+                            'period_start' => $row->period_start,
+                            'rank' => $index + 1,
+                            'name' => $row->name,
+                            'total_orders' => (int) $row->total_orders,
+                            'total_sales' => (float) $row->total_sales,
+                        ];
+                    });
+            })
+            ->values();
+    }
+
+    private function sortRows(Collection $rows, string $sortBy, string $sortDir): Collection
+    {
+        $direction = $sortDir === 'asc' ? 1 : -1;
+
+        return $rows->sort(function ($left, $right) use ($sortBy, $direction) {
+            $comparison = match ($sortBy) {
+                'name' => strcasecmp((string) $left->name, (string) $right->name),
+                'sales' => $this->compareNumbers((float) $left->total_sales, (float) $right->total_sales),
+                'orders' => $this->compareNumbers((int) $left->total_orders, (int) $right->total_orders),
+                default => $this->compareRank($left, $right),
+            };
+
+            if ($comparison === 0) {
+                $comparison = strcasecmp((string) $left->name, (string) $right->name);
+            }
+
+            return $comparison * $direction;
+        })->values();
+    }
+
+    private function compareRank(object $left, object $right): int
+    {
+        $ordersComparison = $this->compareNumbers((int) $left->total_orders, (int) $right->total_orders);
+
+        if ($ordersComparison !== 0) {
+            return $ordersComparison;
+        }
+
+        return $this->compareNumbers((float) $left->total_sales, (float) $right->total_sales);
+    }
+
+    private function compareNumbers(int|float $left, int|float $right): int
+    {
+        return $left <=> $right;
+    }
+
+    private function resolvedPeriodStart(array $validated, string $period): string
+    {
+        $base = ! empty($validated['start_date'])
+            ? Carbon::parse($validated['start_date'])
+            : Carbon::now();
+
+        return match ($period) {
+            'daily' => $base->toDateString(),
+            'weekly' => $base->startOfWeek()->toDateString(),
+            default => $base->startOfMonth()->toDateString(),
+        };
+    }
+
+    public function leaderboards()
+    {
+        $startDate = Carbon::now()->startOfDay()->format('Y-m-d H:i:s');
+        $endDate = Carbon::now()->endOfDay()->format('Y-m-d H:i:s');
+
+        return PancakeUser::query()
+            ->withCount([
+                'orders' => function ($query) use ($startDate, $endDate) {
+                    $query->whereBetween('confirmed_at', [$startDate, $endDate]);
+                },
+            ])
+            ->withSum([
+                'orders as sales' => function ($query) use ($startDate, $endDate) {
+                    $query->whereBetween('confirmed_at', [$startDate, $endDate]);
+                },
+            ], 'final_amount')
+            ->whereHas('orders', function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('confirmed_at', [$startDate, $endDate]);
+            })
+            ->orderByDesc('sales')
+            ->get();
+    }
+
+    public function leaderboardsGroupByCalled()
+    {
+        $startDate = Carbon::now()->startOfDay()->format('Y-m-d H:i:s');
+        $endDate = Carbon::now()->endOfDay()->format('Y-m-d H:i:s');
+
+        return PancakeUser::query()
+            ->withCount([
+                'assignedOrderForDelivery' => function ($query) use ($startDate, $endDate) {
+                    $query->whereBetween('delivery_date', [$startDate, $endDate]);
+                },
+            ])
+            ->having('assigned_order_for_delivery_count', '>', 0) // Only get users with at least 1 assigned order
+            ->orderByDesc('assigned_order_for_delivery_count')
+            ->get();
+    }
+
+    public function leaderboardsGroupByDelivered()
+    {
+        $startDate = Carbon::now()->startOfDay()->format('Y-m-d H:i:s');
+        $endDate = Carbon::now()->endOfDay()->format('Y-m-d H:i:s');
+
+        return PancakeUser::query()
+            ->withCount([
+                'assignedOrderForDelivery' => function ($query) use ($startDate, $endDate) {
+                    $query->whereBetween('delivery_date', [$startDate, $endDate])
+                        ->where('status', 'Delivered');
+                },
+            ])
+            ->having('assigned_order_for_delivery_count', '>', 0) // Only get users with at least 1 delivered order
+            ->orderByDesc('assigned_order_for_delivery_count')
+            ->get();
+    }
 }

@@ -10,18 +10,22 @@ class SyncPhoneNumberReportsAction
 {
     public function execute(Order $savedOrder, array $order): void
     {
-        if (empty($order['reports_by_phone'])) return;
+        if (empty($order['reports_by_phone'])) {
+            return;
+        }
 
         foreach ($order['reports_by_phone'] as $phone => $report) {
             $reportData = [
-                'order_fail'    => $report['order_fail'] ?? 0,
+                'order_fail' => $report['order_fail'] ?? 0,
                 'order_success' => $report['order_success'] ?? 0,
-                'warning'       => $report['warning'] ?? 0,
+                'warning' => $report['warning'] ?? 0,
             ];
 
-            if (array_sum($reportData) === 0) continue;
+            if (array_sum($reportData) === 0) {
+                continue;
+            }
 
-            $normalizedPhone = '0' . substr((string) $phone, -10);
+            $normalizedPhone = '0'.substr((string) $phone, -10);
 
             // Global cumulative snapshot — always reflects latest API state
             PhoneNumberReport::updateOrCreate(

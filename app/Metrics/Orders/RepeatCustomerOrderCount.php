@@ -10,7 +10,7 @@ final class RepeatCustomerOrderCount
 {
     public function compute(int $workspaceId, array $dateRange, array $filter): int
     {
-        $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
         return $this->countForWindow($workspaceId, $filter, $startAt, $endExclusive);
@@ -23,7 +23,7 @@ final class RepeatCustomerOrderCount
         return collect($periods)->map(function (array $period) use ($workspaceId, $filter) {
             return (object) [
                 'period' => $period['label'],
-                'value'  => $this->countForWindow(
+                'value' => $this->countForWindow(
                     $workspaceId,
                     $filter,
                     $period['start'],
@@ -35,7 +35,7 @@ final class RepeatCustomerOrderCount
 
     public function perPage(int $workspaceId, array $dateRange, array $filter)
     {
-        $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
@@ -62,7 +62,7 @@ final class RepeatCustomerOrderCount
 
     public function perShop(int $workspaceId, array $dateRange, array $filter)
     {
-        $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
@@ -90,7 +90,7 @@ final class RepeatCustomerOrderCount
 
     public function perUser(int $workspaceId, array $dateRange, array $filter)
     {
-        $startAt      = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
@@ -157,20 +157,21 @@ final class RepeatCustomerOrderCount
 
     private function generatePeriods(array $dateRange, string $group): array
     {
-        $start   = Carbon::parse($dateRange['start_date'])->startOfDay();
-        $end     = Carbon::parse($dateRange['end_date'])->startOfDay();
+        $start = Carbon::parse($dateRange['start_date'])->startOfDay();
+        $end = Carbon::parse($dateRange['end_date'])->startOfDay();
         $periods = [];
 
         if ($group === 'monthly') {
             $cursor = $start->copy()->startOfMonth();
             while ($cursor <= $end->copy()->startOfMonth()) {
                 $periods[] = [
-                    'label'         => $cursor->format('Y-m'),
-                    'start'         => $cursor->copy()->startOfMonth()->toDateTimeString(),
+                    'label' => $cursor->format('Y-m'),
+                    'start' => $cursor->copy()->startOfMonth()->toDateTimeString(),
                     'end_exclusive' => $cursor->copy()->addMonth()->startOfMonth()->toDateTimeString(),
                 ];
                 $cursor->addMonth();
             }
+
             return $periods;
         }
 
@@ -178,20 +179,21 @@ final class RepeatCustomerOrderCount
             $cursor = $start->copy()->startOfWeek(Carbon::MONDAY);
             while ($cursor <= $end->copy()->startOfWeek(Carbon::MONDAY)) {
                 $periods[] = [
-                    'label'         => $cursor->format('o-\WW'),
-                    'start'         => $cursor->copy()->toDateTimeString(),
+                    'label' => $cursor->format('o-\WW'),
+                    'start' => $cursor->copy()->toDateTimeString(),
                     'end_exclusive' => $cursor->copy()->addWeek()->toDateTimeString(),
                 ];
                 $cursor->addWeek();
             }
+
             return $periods;
         }
 
         $cursor = $start->copy();
         while ($cursor <= $end) {
             $periods[] = [
-                'label'         => $cursor->format('Y-m-d'),
-                'start'         => $cursor->copy()->startOfDay()->toDateTimeString(),
+                'label' => $cursor->format('Y-m-d'),
+                'start' => $cursor->copy()->startOfDay()->toDateTimeString(),
                 'end_exclusive' => $cursor->copy()->addDay()->startOfDay()->toDateTimeString(),
             ];
             $cursor->addDay();
@@ -207,7 +209,10 @@ final class RepeatCustomerOrderCount
 
     private function resolveIds(mixed $ids): array
     {
-        if (empty($ids)) return [];
+        if (empty($ids)) {
+            return [];
+        }
+
         return array_map('intval', is_array($ids) ? $ids : explode(',', $ids));
     }
 }

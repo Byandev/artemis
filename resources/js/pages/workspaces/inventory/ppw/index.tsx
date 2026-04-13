@@ -12,7 +12,6 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
-import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
@@ -20,21 +19,27 @@ import { omit, debounce } from 'lodash';
 import { MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 
-interface Ppw {
+interface InventoryItem {
     id: number;
-    transaction_date: string;
-    count: number;
-    product_id: number;
+    sku: string;
     product?: {
         id: number;
         name: string;
     };
 }
 
+interface Ppw {
+    id: number;
+    transaction_date: string;
+    count: number;
+    inventory_item_id: number;
+    inventory_item?: InventoryItem;
+}
+
 interface Props {
     workspace: Workspace;
     ppws: PaginatedData<Ppw>;
-    products: Product[];
+    items: InventoryItem[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -43,7 +48,7 @@ interface Props {
     };
 }
 
-export default function PpwIndex({ workspace, ppws, products, query }: Props) {
+export default function PpwIndex({ workspace, ppws, items, query }: Props) {
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
 
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -81,15 +86,27 @@ export default function PpwIndex({ workspace, ppws, products, query }: Props) {
 
     const columns: ColumnDef<Ppw>[] = [
         {
-            id: 'product_name',
-            accessorFn: (row) => row.product?.name,
+            id: 'inventory_item',
+            accessorFn: (row) => row.inventory_item?.sku,
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Product Name" />,
-            cell: ({ row }) => (
-                <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
-                    {row.original.product?.name || '—'}
-                </span>
-            ),
+            header: ({ column }) => <SortableHeader column={column} title="Inventory Item" />,
+            cell: ({ row }) => {
+                const item = row.original.inventory_item;
+                return (
+                    <div className="flex h-10 items-center">
+                        {item ? (
+                            <div className="flex flex-col gap-0.5">
+                                <span className="font-mono text-[11px] font-medium text-gray-600 dark:text-gray-400">{item.sku}</span>
+                                {item.product && (
+                                    <span className="text-[10px] text-gray-400 dark:text-gray-500">{item.product.name}</span>
+                                )}
+                            </div>
+                        ) : (
+                            <span className="text-[12px] text-gray-400">—</span>
+                        )}
+                    </div>
+                );
+            },
         },
         {
             accessorKey: 'transaction_date',
@@ -152,7 +169,7 @@ export default function PpwIndex({ workspace, ppws, products, query }: Props) {
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
                     title="Pending Printed Waybill (PPW)"
-                    description="Monitor weekly inventory counts for your products."
+                    description="Monitor weekly inventory counts for your inventory items."
                 >
                     <button
                         onClick={() => setCreateDialogOpen(true)}
@@ -205,7 +222,7 @@ export default function PpwIndex({ workspace, ppws, products, query }: Props) {
                     }}
                     ppw={editingPpw}
                     workspace={workspace}
-                    products={products}
+                    items={items}
                 />
 
                 <DeletePpwDialog

@@ -24,6 +24,7 @@ export interface Props {
     icon?: LucideIcon | null;
     tooltipLabel?: string;
     reverseTrend?: boolean;
+    onValueLoaded?: (metric: string, value: number) => void;
 }
 
 type AnalyticsResponse = Record<string, number>;
@@ -74,6 +75,7 @@ const StatisticCard = ({
                            icon: Icon,
                            tooltipLabel,
                            reverseTrend = false,
+                           onValueLoaded,
                        }: Props) => {
     const [currentValue, setCurrentValue] = useState(0);
     const [previousValue, setPreviousValue] = useState(0);
@@ -152,8 +154,10 @@ const StatisticCard = ({
 
                 if (controller.signal.aborted) return;
 
-                setCurrentValue(Number(currentRes.data?.[metric] ?? 0));
+                const val = Number(currentRes.data?.[metric] ?? 0);
+                setCurrentValue(val);
                 setPreviousValue(Number(previousRes.data?.[metric] ?? 0));
+                onValueLoaded?.(metric, val);
             } catch (err: any) {
                 if (axios.isCancel?.(err) || err?.name === 'CanceledError') {
                     return;

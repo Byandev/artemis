@@ -37,7 +37,7 @@ class JourneyUpdateNormalizer
      */
     private function resolveRiderInfo(array $item): array
     {
-        $item['rider_name']   = null;
+        $item['rider_name'] = null;
         $item['rider_mobile'] = null;
 
         if ($item['status'] !== 'On Delivery') {
@@ -50,8 +50,8 @@ class JourneyUpdateNormalizer
 
         [$name, $rawMobile] = array_map('trim', explode(':', $matches[1][1], 2));
 
-        $item['rider_name']   = $name;
-        $item['rider_mobile'] = '0' . substr(preg_replace('/\D/', '', $rawMobile), -10);
+        $item['rider_name'] = $name;
+        $item['rider_mobile'] = '0'.substr(preg_replace('/\D/', '', $rawMobile), -10);
 
         return $item;
     }
@@ -65,14 +65,14 @@ class JourneyUpdateNormalizer
         $raw = $item['status'];
 
         $item['status'] = match (true) {
-            str_contains($raw, 'is sending')   => 'On Delivery',
+            str_contains($raw, 'is sending') => 'On Delivery',
             str_contains($raw, 'send package') => 'Arrival',
             str_contains($raw, 'Delivery Failed') => 'Problematic',
             str_contains($raw, 'Return Register') => 'Return Register',
             str_contains($raw, 'has been pick') => 'Picked Up',
             str_contains($raw, 'delivered successfully') => 'Delivered',
             str_contains($raw, 'Return successfully') => 'Return Delivered',
-            default                            => $raw,
+            default => $raw,
         };
 
         $item['note'] = $raw;

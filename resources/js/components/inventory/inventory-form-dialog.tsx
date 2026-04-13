@@ -1,19 +1,30 @@
 import { Workspace } from '@/types/models/Workspace';
-import { Inventory } from '@/types/models/InventoryTransaction';
+import { InventoryTransaction } from '@/types/models/InventoryTransaction';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useForm } from '@inertiajs/react';
 import React, { useEffect, useMemo } from 'react';
 
+interface InventoryItem {
+    id: number;
+    sku: string;
+    product?: {
+        id: number;
+        name: string;
+    };
+}
+
 interface Props {
     workspace: Workspace;
-    inventory?: Inventory;
+    inventory?: InventoryTransaction;
+    items?: InventoryItem[];
     open: boolean;
     onOpenChange: (value: boolean) => void;
     onSuccess?: () => void;
 }
 
-const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory }: Props) => {
+const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items = [] }: Props) => {
     const { data, setData, post, processing, errors, reset, patch } = useForm({
+        inventory_item_id: '',
         date: '',
         ref_no: '',
         po_qty_in: 0,
@@ -29,6 +40,7 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory }: Props
     useEffect(() => {
         if (inventory) {
             setData({
+                inventory_item_id: inventory.inventory_item_id?.toString() ?? '',
                 date: inventory.date || '',
                 ref_no: inventory.ref_no || '',
                 po_qty_in: inventory.po_qty_in || 0,
@@ -37,7 +49,6 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory }: Props
                 rts_goods_out: inventory.rts_goods_out || 0,
                 rts_bad: inventory.rts_bad || 0,
                 remaining_qty: inventory.remaining_qty || 0,
-
             });
         } else {
             reset();
@@ -95,6 +106,26 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory }: Props
 
                 <form onSubmit={handleSubmit}>
                     <div className="max-h-[60vh] items-center justify-center space-y-4 overflow-y-auto px-5 py-4">
+                        {/* Inventory Item Selector */}
+                        <div className="space-y-1.5">
+                            <label className={labelClass}>
+                                Inventory Item <span className="text-red-400">*</span>
+                            </label>
+                            <select
+                                value={data.inventory_item_id}
+                                onChange={(e) => setData('inventory_item_id', e.target.value)}
+                                className={inputClass}
+                            >
+                                <option value="">Select an inventory item...</option>
+                                {items.map((item) => (
+                                    <option key={item.id} value={item.id}>
+                                        {item.sku}{item.product ? ` — ${item.product.name}` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            {errors.inventory_item_id && <p className="text-[11px] text-red-500">{errors.inventory_item_id}</p>}
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="items-center justify-center space-y-1.5">
                                 <label className={labelClass}>

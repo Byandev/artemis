@@ -5,25 +5,28 @@ use App\Http\Controllers\Workspaces\AdsManager\AdController;
 use App\Http\Controllers\Workspaces\AdsManager\AdSetController;
 use App\Http\Controllers\Workspaces\AdsManager\CampaignController;
 use App\Http\Controllers\Workspaces\AdsManager\OptimizationRuleController;
+use App\Http\Controllers\Workspaces\AskDataController;
 use App\Http\Controllers\Workspaces\Botcake\FlowController;
 use App\Http\Controllers\Workspaces\Botcake\SequenceController;
-use App\Http\Controllers\Workspaces\EmployeeController;
+use App\Http\Controllers\Workspaces\CSRController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\RoleController;
-use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\TeamController;
+use App\Http\Controllers\Workspaces\WorkspaceApiKeyController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
+use Modules\Inventory\Http\Controllers\InventoryItemController;
+use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PpwController;
 use Modules\Inventory\Http\Controllers\PurchaseOrderController;
 
@@ -38,12 +41,13 @@ use Modules\Inventory\Http\Controllers\PurchaseOrderController;
 */
 Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'publicUpdateStatus'])->name('public-page.rmo-management.updateStatus');
+Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/assign', [ForDeliveryController::class, 'publicAssignUser'])->name('public-page.rmo-management.assign');
+Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/remove-assignee', [ForDeliveryController::class, 'publicRemoveAssignee'])->name('public-page.rmo-management.removeAssignee');
 
 Route::middleware(['auth'])->group(function () {
     // Workspace setup (first-time after registration)
     Route::get('/workspaces/setup', [WorkspaceSetupController::class, 'create'])->name('workspaces.setup');
     Route::post('/workspaces/setup', [WorkspaceSetupController::class, 'store'])->name('workspaces.setup.store');
-
 
     Route::prefix('workspaces/{workspace:slug}')->group(function () {
         Route::get('/inventory/transactions', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
@@ -52,7 +56,8 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'destroy'])->name('inventory.transactions.destroy');
     });
 
-
+    // AI
+    Route::post('/workspaces/{workspace}/ask', AskDataController::class)->name('workspace.ask');
 
     // Workspace dashboard
     Route::get('/workspaces/{workspace}/dashboard', [WorkspaceController::class, 'dashboard'])->name('workspace.dashboard');
@@ -75,6 +80,13 @@ Route::middleware(['auth'])->group(function () {
     //    Route::put('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'update'])->name('workspaces.members.update');
     Route::put('/workspaces/{workspace:slug}/members/{user}', [WorkspaceMemberController::class, 'updateMember'])->name('workspaces.members.update');
     Route::delete('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'destroy'])->name('workspaces.members.destroy');
+    Route::post('/workspaces/{workspace}/members/{user}/reset-password', [WorkspaceMemberController::class, 'generatePasswordReset'])->name('workspaces.members.reset-password');
+
+    // API Keys
+    Route::get('/workspaces/{workspace}/api-keys', [WorkspaceApiKeyController::class, 'index'])->name('workspaces.api-keys.index');
+    Route::post('/workspaces/{workspace}/api-keys', [WorkspaceApiKeyController::class, 'store'])->name('workspaces.api-keys.store');
+    Route::get('/workspaces/{workspace}/api-keys/{apiKey}/reveal', [WorkspaceApiKeyController::class, 'reveal'])->name('workspaces.api-keys.reveal');
+    Route::delete('/workspaces/{workspace}/api-keys/{apiKey}', [WorkspaceApiKeyController::class, 'destroy'])->name('workspaces.api-keys.destroy');
 
     // Invitation routes (authenticated users)
     Route::post('/workspaces/{workspace}/invitations', [WorkspaceInvitationController::class, 'store'])->name('workspaces.invitations.store');
@@ -154,7 +166,9 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'destroy'])->name('workspaces.api.optimization-rules.destroy');
 
     // Employee routes
-    Route::get('/workspaces/{workspace}/employees', [EmployeeController::class, 'index'])->name('workspaces.employees.index');
+    Route::put('/workspaces/{workspace:slug}/employees/{employee}', [CSRController::class, 'update'])->name('employees.update');
+    Route::get('/workspaces/{workspace}/csr/management', [CSRController::class, 'index'])->name('workspaces.csr.index');
+    Route::get('/workspaces/{workspace}/csr/analytics', [CSRController::class, 'analytics'])->name('workspaces.csr.analytics');
 
     // Team routes
     Route::get('/workspaces/{workspace}/teams', [TeamController::class, 'index'])->name('workspaces.teams.index');
@@ -179,8 +193,14 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{ppw}', [PpwController::class, 'destroy'])->name('destroy');
     });
 
-});
+    Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
+        Route::get('/', [InventoryItemController::class, 'index'])->name('index');
+        Route::post('/', [InventoryItemController::class, 'store'])->name('store');
+        Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
+        Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
+    });
 
+});
 
 // Public invitation routes (guest or authenticated)
 Route::get('/workspaces/invitations/{token}', [WorkspaceInvitationController::class, 'show'])->name('workspaces.invitations.show');
@@ -196,7 +216,4 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
     Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
     Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
 
-
-
 });
-

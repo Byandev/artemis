@@ -1,29 +1,37 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Workspace } from '@/types/models/Workspace';
-import { Product } from '@/types/models/Product';
 import { useForm } from '@inertiajs/react';
 import { useEffect } from 'react';
+
+interface InventoryItem {
+    id: number;
+    sku: string;
+    product?: {
+        id: number;
+        name: string;
+    };
+}
 
 interface Ppw {
     id: number;
     transaction_date: string;
     count: number;
-    product_id: number;
+    inventory_item_id: number;
 }
 
 interface PpwFormDialogProps {
     workspace: Workspace;
-    products: Product[];
+    items: InventoryItem[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
     ppw?: Ppw | null;
 }
 
-export function PpwFormDialog({ workspace, products, open, onOpenChange, ppw }: PpwFormDialogProps) {
+export function PpwFormDialog({ workspace, items, open, onOpenChange, ppw }: PpwFormDialogProps) {
     const isEditing = !!ppw;
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm({
-        product_id: '',
+        inventory_item_id: '',
         transaction_date: new Date().toISOString().split('T')[0],
         count: 0 as number | string,
     });
@@ -33,7 +41,7 @@ export function PpwFormDialog({ workspace, products, open, onOpenChange, ppw }: 
         if (open) {
             if (ppw) {
                 setData({
-                    product_id: ppw.product_id.toString(),
+                    inventory_item_id: ppw.inventory_item_id.toString(),
                     transaction_date: ppw.transaction_date,
                     count: ppw.count,
                 });
@@ -75,31 +83,31 @@ export function PpwFormDialog({ workspace, products, open, onOpenChange, ppw }: 
                             {isEditing ? 'Edit PPW Record' : 'Add PPW Record'}
                         </DialogTitle>
                         <DialogDescription className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5">
-                            {isEditing ? 'Update the stock count or date for this record.' : 'Log a new product count for a specific date.'}
+                            {isEditing ? 'Update the stock count or date for this record.' : 'Log a new inventory item count for a specific date.'}
                         </DialogDescription>
                     </DialogHeader>
                 </div>
 
                 <form onSubmit={handleSubmit}>
                     <div className="space-y-5 px-5 py-4">
-                        {/* Product Selector */}
+                        {/* Inventory Item Selector */}
                         <div className="space-y-1.5">
                             <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                Select Product <span className="text-red-400">*</span>
+                                Select Inventory Item <span className="text-red-400">*</span>
                             </label>
                             <select
-                                value={data.product_id}
-                                onChange={(e) => setData('product_id', e.target.value)}
+                                value={data.inventory_item_id}
+                                onChange={(e) => setData('inventory_item_id', e.target.value)}
                                 className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100"
                             >
-                                <option value="">Select a product...</option>
-                                {products.map((product) => (
-                                    <option key={product.id} value={product.id}>
-                                        {product.name}
+                                <option value="">Select an inventory item...</option>
+                                {items.map((item) => (
+                                    <option key={item.id} value={item.id}>
+                                        {item.sku}{item.product ? ` — ${item.product.name}` : ''}
                                     </option>
                                 ))}
                             </select>
-                            {errors.product_id && <p className="font-mono text-[11px] text-red-500 mt-1">{errors.product_id}</p>}
+                            {errors.inventory_item_id && <p className="font-mono text-[11px] text-red-500 mt-1">{errors.inventory_item_id}</p>}
                         </div>
 
                         {/* Transaction Date */}
@@ -125,7 +133,6 @@ export function PpwFormDialog({ workspace, products, open, onOpenChange, ppw }: 
                                 type="number"
                                 placeholder="0"
                                 value={data.count}
-                                // FIX: Handles empty input gracefully to prevent NaN
                                 onChange={(e) => setData('count', e.target.value === '' ? '' : parseInt(e.target.value))}
                                 className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100"
                             />
