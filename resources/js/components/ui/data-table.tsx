@@ -64,7 +64,15 @@ export function DataTable<TData, TValue>({
             const next = typeof updater === "function" ? updater(sorting) : updater
             setSorting(next)
 
-            if (onFetch) onFetch({ sort: toBackendSort(next), page: 1 })
+            if (onFetch) {
+                const currentPerPage = meta?.per_page ?? pagination.pageSize ?? 10
+                onFetch({
+                    sort: toBackendSort(next),
+                    page: 1,
+                    perPage: currentPerPage,
+                    per_page: currentPerPage,
+                })
+            }
         },
         getSortedRowModel: getSortedRowModel(),
         state: {
@@ -143,7 +151,15 @@ export function DataTable<TData, TValue>({
                                 <Select
                                     value={String(meta?.per_page ?? 15)}
                                     onValueChange={(val) => {
-                                        if (onFetch) onFetch({ per_page: Number(val), page: 1, sort: toBackendSort(sorting) })
+                                        if (onFetch) {
+                                            const nextPerPage = Number(val);
+                                            onFetch({
+                                                perPage: nextPerPage,
+                                                per_page: nextPerPage,
+                                                page: 1,
+                                                sort: toBackendSort(sorting),
+                                            });
+                                        }
                                     }}
                                 >
                                     <SelectTrigger className="h-7 w-[72px] rounded-[8px] border border-black/6 bg-stone-50 px-2.5 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
@@ -165,7 +181,15 @@ export function DataTable<TData, TValue>({
                         </div>
 
                         <Pagination currentPage={meta.current_page} totalPages={meta.last_page} onPageChange={(page) => {
-                            if (onFetch) onFetch({ page, sort: toBackendSort(sorting) })
+                            if (onFetch) {
+                                const currentPerPage = meta?.per_page ?? pagination.pageSize ?? 10
+                                onFetch({
+                                    page,
+                                    sort: toBackendSort(sorting),
+                                    perPage: currentPerPage,
+                                    per_page: currentPerPage,
+                                })
+                            }
                         }} />
                     </div>
                 </div>
