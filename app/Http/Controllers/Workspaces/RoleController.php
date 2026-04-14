@@ -21,7 +21,7 @@ class RoleController extends Controller
             ])
             ->allowedSorts(['name', 'description', 'created_at', 'deleted_at'])
             ->defaultSort('-created_at')
-            ->paginate(15)
+            ->paginate($request->integer('per_page', 15))
             ->withQueryString();
 
         return Inertia::render('roles/index', [
@@ -29,6 +29,7 @@ class RoleController extends Controller
             'roles' => $roles,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
+                'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
         ]);
