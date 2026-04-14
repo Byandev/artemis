@@ -183,7 +183,7 @@ type SortableHeaderProps<TData> = {
 }
 
 export function SortableHeader<TData>({ column, title, enabled = true, className = '' }: SortableHeaderProps<TData>) {
-    const sorted = useMemo(() => column.getIsSorted(), [column])
+    const sorted = column.getIsSorted();
 
     return (
         <div
