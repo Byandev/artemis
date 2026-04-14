@@ -12,6 +12,59 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v2.5.0',
+        date: '2026-04-14',
+        sections: [
+            {
+                title: 'Inventory Items',
+                items: [
+                    'New computed metric columns: Unfulfilled, Current Stocks, Waiting for Delivery, 3-Day Avg, Remaining After Fulfillment, Days It Can Last, PO Needed',
+                    'Lead Time — new field on inventory items; used in the PO Needed calculation',
+                    'Unfulfilled Count — stored column, editable from the item form; synced hourly from Pancake order quantities with status 1, 8, or 9',
+                    '3-Day Average — stored column, editable from the item form; synced hourly from confirmed orders over the last 3 full days',
+                    'Waiting for Delivery — now sourced only from Purchased Orders with status "Waiting For Delivery"',
+                    'All metric columns are center-aligned for easier scanning',
+                ],
+            },
+            {
+                title: 'Transaction Logs',
+                items: [
+                    'Lost — new field on transaction logs to record lost stock quantities',
+                    'Remaining Quantity — now a plain editable field (no automatic computation)',
+                ],
+            },
+            {
+                title: 'Purchased Orders',
+                items: [
+                    'Status field added with 8 states: For Approval, Approved, To Pay, Paid, For Purchase, Waiting For Delivery, Delivered, Cancelled',
+                    'Edit page added — purchased orders can now be fully edited after creation',
+                    'Issue date is now stored and displayed in YYYY-MM-DD format',
+                ],
+            },
+            {
+                title: 'Role Permissions',
+                items: [
+                    'New Manage Permissions page per role — checkbox grid grouped by category with select-all per group',
+                    '25 default permissions across 7 categories: Members, Roles, Orders, Products, Teams, Inventory, Reports',
+                    '"Manage Permissions" action added to the role dropdown on the Roles page',
+                ],
+            },
+            {
+                title: 'Workspace Settings',
+                items: [
+                    'show_inventory — new setting to control whether the Inventory sidebar group is displayed per workspace',
+                    'inventory_sync — new setting to enable hourly syncing of 3-day average and unfulfilled count for inventory items',
+                ],
+            },
+            {
+                title: 'Members',
+                items: [
+                    'Unauthorized remove action now shows an in-page permission toast instead of redirecting to a 403 page',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v2.4.4',
         date: '2026-04-09',
         sections: [
@@ -336,6 +389,10 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v2.5.0':
+        'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 ring-indigo-500/20',
+    'v2.4.4':
+        'bg-slate-500/10 text-slate-600 dark:text-slate-400 ring-slate-500/20',
     'v2.4.3':
         'bg-slate-500/10 text-slate-600 dark:text-slate-400 ring-slate-500/20',
     'v2.4.2':
