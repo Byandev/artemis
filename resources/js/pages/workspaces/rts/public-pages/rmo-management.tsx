@@ -675,7 +675,7 @@ export default function RmoManagement({
                                     ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
                                     page: params?.page ?? 1,
                                 },
-                                { preserveState: true, replace: true, preserveScroll: true },
+                                { preserveState: false, replace: true, preserveScroll: true },
                             );
                         }}
                     />

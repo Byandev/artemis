@@ -29,22 +29,24 @@ class SyncInventoryAverage extends Command
         $items = InventoryItem::whereIn('workspace_id', $workspaceIds)->get(['id', 'product_id']);
 
         foreach ($items as $item) {
-            // 3-day average: confirmed orders in the last 3 full days
-            $confirmedCount = DB::table('pancake_orders')
+            // 3-day average: sum of item quantities on confirmed orders in the last 3 full days
+            $totalQty = DB::table('pancake_order_items')
+                ->join('pancake_orders', 'pancake_orders.id', '=', 'pancake_order_items.order_id')
                 ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
                 ->where('pages.product_id', $item->product_id)
                 ->whereNotNull('pancake_orders.confirmed_at')
                 ->whereBetween('pancake_orders.confirmed_at', [$start, $end])
-                ->count();
+                ->sum('pancake_order_items.quantity');
 
-            $average = round($confirmedCount / 3, 4);
+            $average = round($totalQty / 3, 4);
 
-            // Unfulfilled count: orders with status in 1, 8, 9
-            $unfulfilled = DB::table('pancake_orders')
+            // Unfulfilled count: sum of item quantities on orders with status in 1, 8, 9
+            $unfulfilled = DB::table('pancake_order_items')
+                ->join('pancake_orders', 'pancake_orders.id', '=', 'pancake_order_items.order_id')
                 ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
                 ->where('pages.product_id', $item->product_id)
                 ->whereIn('pancake_orders.status', [1, 8, 9])
-                ->count();
+                ->sum('pancake_order_items.quantity');
 
             InventoryItem::where('id', $item->id)->update([
                 'three_days_average' => $average,
