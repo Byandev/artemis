@@ -12,7 +12,8 @@ class CustomerNameSort implements Sort
     {
         $query->orderBy(
             DB::table('pancake_orders')
-                ->select('final_amount')
+                ->leftJoin('shipping_addresses', 'shipping_addresses.order_id', '=', 'pancake_orders.id')
+                ->selectRaw('COALESCE(shipping_addresses.full_name, "")')
                 ->whereColumn('pancake_orders.id', 'pancake_order_for_delivery.order_id')
                 ->limit(1),
             $descending ? 'desc' : 'asc'
