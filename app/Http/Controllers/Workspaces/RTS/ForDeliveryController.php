@@ -17,6 +17,7 @@ use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Models\Page;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Modules\Pancake\Models\OrderForDelivery;
 use Modules\Pancake\Models\User;
@@ -71,12 +72,15 @@ class ForDeliveryController extends Controller
 
     public function public(Request $request, Workspace $workspace)
     {
+        $perPage = (int) ($request->input('perPage') ?? $request->input('per_page') ?? 10);
+        $perPage = in_array($perPage, [10, 25, 50, 100], true) ? $perPage : 10;
+
         $items = QueryBuilder::for(OrderForDelivery::class)
             ->where('workspace_id', $workspace->id)
             ->addSelect([
                 'pancake_order_for_delivery.*',
-                \DB::raw('(SELECT rts_rate FROM rider_delivery_summary WHERE rider_name = pancake_order_for_delivery.rider_name AND rider_phone = pancake_order_for_delivery.rider_phone LIMIT 1) as rider_rts_rate'),
-                \DB::raw('('.RiskScoreSort::sql().') as risk_score'),
+                DB::raw('(SELECT rts_rate FROM rider_delivery_summary WHERE rider_name = pancake_order_for_delivery.rider_name AND rider_phone = pancake_order_for_delivery.rider_phone LIMIT 1) as rider_rts_rate'),
+                DB::raw('('.RiskScoreSort::sql().') as risk_score'),
             ])
             ->with([
                 'order' => function ($query) {
@@ -168,7 +172,8 @@ class ForDeliveryController extends Controller
                 AllowedSort::custom('cx_rts_rate', new CxRtsRateSort),
             ])
             ->whereDate('delivery_date', now())
-            ->paginate(10);
+            ->paginate($perPage)
+            ->withQueryString();
 
         // Build a base query for stats that respects page/shop filters
         $statsBase = OrderForDelivery::where('workspace_id', $workspace->id)
@@ -217,7 +222,7 @@ class ForDeliveryController extends Controller
             'orders' => $items,
             'workspace' => $workspace,
             'query' => [
-                ...$request->only(['sort', 'perPage', 'page']),
+                ...$request->only(['sort', 'perPage', 'per_page', 'page']),
                 'filter' => $request->input('filter', []),
             ],
             'users' => $users,
