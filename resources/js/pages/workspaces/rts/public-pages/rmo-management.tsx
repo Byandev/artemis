@@ -99,6 +99,11 @@ export default function RmoManagement({
             : (query?.filter?.parcel_status ?? ''), [query?.filter?.parcel_status]
     );
 
+    const currentPerPage = useMemo(() => {
+        const value = Number(query?.perPage ?? orders?.per_page ?? 10);
+        return [10, 25, 50, 100].includes(value) ? value : 10;
+    }, [orders?.per_page, query?.perPage]);
+
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
 
     const initialFilterValue = useMemo<FilterValue>(
@@ -132,14 +137,15 @@ export default function RmoManagement({
                 ...(newPageIds.length ? { 'filter[page_id]': newPageIds.join(',') } : {}),
                 ...(newShopIds.length ? { 'filter[shop_id]': newShopIds.join(',') } : {}),
                 ...(newUserIds.length ? { 'filter[user_id]': newUserIds.join(',') } : {}),
+                perPage: currentPerPage,
                 page: 1,
             },
             { preserveState: true, replace: true, preserveScroll: true },
         );
-    }, [workspace, query?.sort, searchValue, currentStatus, currentParcelStatus]);
+    }, [workspace, query?.sort, searchValue, currentStatus, currentParcelStatus, currentPerPage]);
 
     const buildAllParams = useCallback(
-        (sort?: string | null, page?: number, status?: string, parcelStatus?: string) => ({
+        (sort?: string | null, page?: number, status?: string, parcelStatus?: string, perPage?: number) => ({
             sort: sort ?? undefined,
             'filter[search]': searchValue || undefined,
             ...(status !== undefined
@@ -151,9 +157,10 @@ export default function RmoManagement({
             ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
             ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
             ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
+            perPage: perPage ?? currentPerPage,
             page: page ?? 1,
         }),
-        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds],
+        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, currentPerPage],
     );
 
     const handleStatusChange = useCallback(
@@ -673,6 +680,7 @@ export default function RmoManagement({
                                     ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
                                     ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
                                     ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
+                                    perPage: Number(params?.perPage ?? currentPerPage),
                                     page: params?.page ?? 1,
                                 },
                                 { preserveState: true, replace: true, preserveScroll: true },
