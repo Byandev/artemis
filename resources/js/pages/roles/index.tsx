@@ -17,6 +17,7 @@ import {
     AlertTriangle,
     ShieldCheck,
     MoreHorizontal,
+    KeyRound,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast, Toaster } from 'sonner';
@@ -144,12 +145,16 @@ export default function Index({ roles, workspace, query }: Props) {
                                 <MoreHorizontal className="h-3.5 w-3.5" />
                             </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuContent align="end" className="w-48">
                             {!row.original.deleted_at ? (
                                 <>
                                     <DropdownMenuItem onClick={() => { setSelectedRole(row.original); setOpenFormModal(true); }}>
                                         <Pencil />
                                         Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => router.get(`/workspaces/${workspace.slug}/roles/${row.original.id}/permissions`)}>
+                                        <KeyRound />
+                                        Manage Permissions
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem variant="destructive" onClick={() => { setSelectedRole(row.original); setIsArchiveModalOpen(true); }}>
