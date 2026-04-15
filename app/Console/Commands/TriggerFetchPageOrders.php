@@ -33,6 +33,7 @@ class TriggerFetchPageOrders extends Command
             ->whereNotNull('botcake_token')
             ->whereNotNull('infotxt_token')
             ->whereNotNull('infotxt_user_id')
+            ->orderBy('created_at', 'asc')
             ->get()
             ->each(function (Page $page) {
                 dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::parse($page->orders_last_synced_at)->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
