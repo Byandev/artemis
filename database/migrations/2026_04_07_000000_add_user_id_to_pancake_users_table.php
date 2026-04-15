@@ -28,6 +28,8 @@ return new class extends Migration
     {
         Schema::table('pancake_users', function (Blueprint $table) {
             $table->dropColumn('user_id');
+
+            $table->dropColumn('user_id');
         });
     }
 };

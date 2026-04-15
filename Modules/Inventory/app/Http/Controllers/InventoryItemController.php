@@ -81,7 +81,7 @@ class InventoryItemController extends Controller
     {
         $request->validate([
             'product_id'            => 'required|exists:products,id',
-            'sku'                   => 'required|string|max:255',
+            'sku'                   => 'required|string|max:255|unique:inventory_items,sku,NULL,id,workspace_id,'.$workspace->id,
             'sales_keywords'        => 'nullable|string',
             'transaction_keywords'  => 'nullable|string',
             'lead_time'             => 'nullable|integer|min:0',

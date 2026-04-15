@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('workspaces', function (Blueprint $table) {
-            $table->boolean('show_inventory')->default(false)->after('description');
+            $table->boolean('show_inventory')->default(true)->after('description');
         });
     }
 
