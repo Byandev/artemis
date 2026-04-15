@@ -11,7 +11,7 @@ import {
 } from '@/types/models/Pancake/OrderForDelivery';
 import { Check, ChevronDown, Loader2 } from 'lucide-react';
 import { orderStatusConfig } from './rmo-config';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface Props {
     currentStatus: OrderStatus;
@@ -20,7 +20,11 @@ interface Props {
 }
 
 export function RmoStatusPicker({ currentStatus, onChangeStatus, disabled = false }: Props) {
-    const [status, setStatus] = useState(currentStatus)
+    const [status, setStatus] = useState(currentStatus);
+
+    useEffect(() => {
+        setStatus(currentStatus);
+    }, [currentStatus]);
 
     const cfg = useMemo(() => orderStatusConfig[status], [status]);
 

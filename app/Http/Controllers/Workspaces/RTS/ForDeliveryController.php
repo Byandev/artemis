@@ -168,7 +168,7 @@ class ForDeliveryController extends Controller
                 AllowedSort::custom('cx_rts_rate', new CxRtsRateSort),
             ])
             ->whereDate('delivery_date', now())
-            ->paginate(100);
+            ->paginate($request->input('per_page', 100));
 
         // Build a base query for stats that respects page/shop filters
         $statsBase = OrderForDelivery::where('workspace_id', $workspace->id)
