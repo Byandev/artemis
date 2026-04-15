@@ -139,7 +139,7 @@ export default function RmoManagement({
     }, [workspace, query?.sort, searchValue, currentStatus, currentParcelStatus]);
 
     const buildAllParams = useCallback(
-        (sort?: string | null, page?: number, status?: string, parcelStatus?: string) => ({
+        (sort?: string | null, page?: number, status?: string, parcelStatus?: string, perPage?: number) => ({
             sort: sort ?? undefined,
             'filter[search]': searchValue || undefined,
             ...(status !== undefined
@@ -152,6 +152,7 @@ export default function RmoManagement({
             ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
             ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
             page: page ?? 1,
+            ...(perPage ? { per_page: perPage } : {}),
         }),
         [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds],
     );
@@ -665,16 +666,13 @@ export default function RmoManagement({
                         onFetch={(params) => {
                             router.get(
                                 publicPage.rmoManagement({ workspace }),
-                                {
-                                    sort: params?.sort || undefined,
-                                    'filter[search]': searchValue || undefined,
-                                    ...(currentStatus ? { 'filter[status]': currentStatus } : {}),
-                                    ...(currentParcelStatus ? { 'filter[parcel_status]': currentParcelStatus } : {}),
-                                    ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
-                                    ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
-                                    ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
-                                    page: params?.page ?? 1,
-                                },
+                                buildAllParams(
+                                    params?.sort as string | null,
+                                    params?.page as number | undefined,
+                                    undefined,
+                                    undefined,
+                                    params?.per_page as number | undefined,
+                                ),
                                 { preserveState: true, replace: true, preserveScroll: true },
                             );
                         }}
