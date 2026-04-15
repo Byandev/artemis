@@ -28,7 +28,7 @@ class ForDeliveryController extends Controller
 {
     public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
     {
-        $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
+        $orderForDelivery = OrderForDelivery::find($id);
 
         if (! $orderForDelivery) {
             return redirect()->back()->with('error', 'Order not found.');
@@ -41,7 +41,7 @@ class ForDeliveryController extends Controller
 
     public function publicAssignUser(Workspace $workspace, $id, Request $request)
     {
-        $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
+        $orderForDelivery = OrderForDelivery::find($id);
 
         if (! $orderForDelivery) {
             return redirect()->back()->with('error', 'Order not found.');
@@ -58,7 +58,7 @@ class ForDeliveryController extends Controller
 
     public function publicRemoveAssignee(Workspace $workspace, $id)
     {
-        $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
+        $orderForDelivery = OrderForDelivery::find($id);
 
         if (! $orderForDelivery) {
             return redirect()->back()->with('error', 'Order not found.');
