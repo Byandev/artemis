@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\PublicApi;
 
 use App\Http\Controllers\Controller;
+use App\Models\Page;
+use App\Models\Shop;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Pancake\Models\OrderForDelivery;
 use Modules\Pancake\Models\User;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class RmoOrderController extends Controller
 {
@@ -31,14 +35,15 @@ class RmoOrderController extends Controller
         ]);
 
         $workspace = $request->attributes->get('workspace');
-        $search = $request->input('search');
 
-        $query = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->where('assignee_id', $request->input('user_id'))
-            ->whereDate('delivery_date', now())
+        $orders = QueryBuilder::for(
+            OrderForDelivery::where('workspace_id', $workspace->id)
+                ->where('assignee_id', $request->input('user_id'))
+                ->whereDate('delivery_date', now())
+        )
             ->with([
                 'order' => function ($query) {
-                    $query->select(['id', 'order_number'])
+                    $query->select(['id', 'order_number', 'parcel_status'])
                         ->with([
                             'shippingAddress' => function ($subQuery) {
                                 $subQuery->select(['order_id', 'full_name', 'full_address', 'phone_number']);
@@ -48,15 +53,37 @@ class RmoOrderController extends Controller
                             },
                         ]);
                 },
-            ]);
-
-        if ($search) {
-            $query->whereHas('order.shippingAddress', function ($q) use ($search) {
-                $q->where('full_name', 'LIKE', "%{$search}%");
-            });
-        }
-
-        $orders = $query->paginate($request->input('per_page', 15));
+                'page' => function ($query) {
+                    $query->select(['id', 'name']);
+                },
+            ])
+            ->allowedFilters([
+                AllowedFilter::callback('page_id', function ($query, $value) {
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $query->whereIn('page_id', $values);
+                }),
+                AllowedFilter::callback('shop_id', function ($query, $value) {
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $query->whereIn('shop_id', $values);
+                }),
+                AllowedFilter::callback('status', function ($query, $value) {
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $query->whereIn('status', $values);
+                }),
+                AllowedFilter::callback('parcel_status', function ($query, $value) {
+                    $values = is_string($value) ? explode(',', $value) : (array) $value;
+                    $values = array_map('strtolower', $values);
+                    $query->whereHas('order', function ($q) use ($values) {
+                        $q->whereIn('parcel_status', $values);
+                    });
+                }),
+                AllowedFilter::callback('search', function ($query, $value) {
+                    $query->whereHas('order.shippingAddress', function ($q) use ($value) {
+                        $q->where('full_name', 'LIKE', "%$value%");
+                    });
+                }),
+            ])
+            ->paginate($request->input('per_page', 15));
 
         $orders->getCollection()->transform(function ($item) {
             return [
@@ -67,6 +94,8 @@ class RmoOrderController extends Controller
                 'phone_number' => $item->order?->shippingAddress?->phone_number,
                 'rider_name' => $item->rider_name,
                 'rider_phone' => $item->rider_phone,
+                'page_name' => $item->page?->name,
+                'parcel_status' => $item->order?->parcel_status,
                 'items' => $item->order?->items?->map(fn ($i) => [
                     'name' => $i->name,
                     'quantity' => $i->quantity,
@@ -76,6 +105,26 @@ class RmoOrderController extends Controller
         });
 
         return response()->json($orders);
+    }
+
+    public function filters(Request $request): JsonResponse
+    {
+        $workspace = $request->attributes->get('workspace');
+
+        $pages = Page::where('workspace_id', $workspace->id)->get(['id', 'name']);
+        $shops = Shop::where('workspace_id', $workspace->id)->get(['id', 'name']);
+
+        $statuses = OrderForDelivery::where('workspace_id', $workspace->id)
+            ->whereDate('delivery_date', now())
+            ->distinct()
+            ->pluck('status');
+
+        return response()->json([
+            'pages' => $pages,
+            'shops' => $shops,
+            'statuses' => $statuses,
+            'parcel_statuses' => ['pending', 'delivering', 'delivered', 'problematic', 'returning', 'undeliverable'],
+        ]);
     }
 
     public function syncCallTracking(Request $request): JsonResponse
