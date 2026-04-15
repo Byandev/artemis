@@ -3,27 +3,55 @@ import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link } from '@inertiajs/react';
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, Wallet } from 'lucide-react';
+import { useMemo } from 'react';
 
-interface AccountLite {
+interface AccountRow {
     id: number;
     name: string;
     currency: string;
-    current_balance: number;
+    opening_balance: number | string;
+    is_active: boolean;
+    transactions: { id: number; account_id: number; type: 'in' | 'out'; amount: number | string; date: string }[];
 }
+
+interface TxnRow { id: number; type: 'in' | 'out'; amount: number | string; date: string }
+interface RemittanceRow { id: number; transaction_id: number | null }
 
 interface Props {
     workspace: Workspace;
-    accounts: AccountLite[];
-    totalBalance: number;
-    monthIn: number;
-    monthOut: number;
-    unreconciledCount: number;
+    accounts: AccountRow[];
+    transactions: TxnRow[];
+    remittances: RemittanceRow[];
 }
 
 const fmt = (v: number) => Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function FinanceDashboard({ workspace, accounts, totalBalance, monthIn, monthOut, unreconciledCount }: Props) {
+function balanceOf(a: AccountRow): number {
+    const inSum = a.transactions.filter(t => t.type === 'in').reduce((s, t) => s + Number(t.amount), 0);
+    const outSum = a.transactions.filter(t => t.type === 'out').reduce((s, t) => s + Number(t.amount), 0);
+    return Number(a.opening_balance) + inSum - outSum;
+}
+
+export default function FinanceDashboard({ workspace, accounts, transactions, remittances }: Props) {
     const base = `/workspaces/${workspace.slug}/finance`;
+
+    const active = useMemo(() => accounts.filter(a => a.is_active), [accounts]);
+    const totalBalance = useMemo(() => active.reduce((s, a) => s + balanceOf(a), 0), [active]);
+
+    const { monthIn, monthOut } = useMemo(() => {
+        const now = new Date();
+        const y = now.getFullYear(), m = now.getMonth();
+        let mi = 0, mo = 0;
+        for (const t of transactions) {
+            const d = new Date(t.date);
+            if (d.getFullYear() !== y || d.getMonth() !== m) continue;
+            if (t.type === 'in') mi += Number(t.amount);
+            else mo += Number(t.amount);
+        }
+        return { monthIn: mi, monthOut: mo };
+    }, [transactions]);
+
+    const unreconciledCount = useMemo(() => remittances.filter(r => r.transaction_id == null).length, [remittances]);
 
     return (
         <AppLayout>
@@ -49,16 +77,16 @@ export default function FinanceDashboard({ workspace, accounts, totalBalance, mo
                         Accounts
                     </div>
                     <div className="divide-y divide-black/6 dark:divide-white/6">
-                        {accounts.length === 0 && (
+                        {active.length === 0 && (
                             <div className="px-5 py-6 text-center text-[12px] text-gray-400">No active accounts yet.</div>
                         )}
-                        {accounts.map((a) => (
+                        {active.map((a) => (
                             <Link key={a.id} href={`${base}/accounts/${a.id}`} className="flex items-center justify-between px-5 py-3 hover:bg-stone-50 dark:hover:bg-white/2">
                                 <div className="flex flex-col gap-0.5">
                                     <span className="text-[13px] font-medium text-gray-800 dark:text-gray-100">{a.name}</span>
                                     <span className="font-mono text-[10px] uppercase tracking-wider text-gray-400">{a.currency}</span>
                                 </div>
-                                <span className="font-mono text-[13px] font-medium text-gray-700 dark:text-gray-200">{fmt(a.current_balance)}</span>
+                                <span className="font-mono text-[13px] font-medium text-gray-700 dark:text-gray-200">{fmt(balanceOf(a))}</span>
                             </Link>
                         ))}
                     </div>

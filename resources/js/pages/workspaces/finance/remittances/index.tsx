@@ -19,6 +19,16 @@ import { debounce, omit } from 'lodash';
 import { AlertTriangle, ExternalLink, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+interface TxnOpt {
+    id: number;
+    account_id: number;
+    date: string;
+    description: string;
+    amount: number | string;
+    type: 'in' | 'out';
+    account?: { id: number; name: string } | null;
+}
+
 interface Row extends FinanceRemittance {
     is_reconciled: boolean;
     transaction?: { id: number; account?: { id: number; name: string } | null } | null;
@@ -28,12 +38,13 @@ interface Props {
     workspace: Workspace;
     remittances: PaginatedData<Row>;
     unreconciledCount: number;
+    transactions: TxnOpt[];
     query?: { sort?: string | null; filter?: { search?: string; status?: string; unreconciled?: string } };
 }
 
 const fmt = (v: number | string) => Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function RemittancesIndex({ workspace, remittances, unreconciledCount, query }: Props) {
+export default function RemittancesIndex({ workspace, remittances, unreconciledCount, transactions, query }: Props) {
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
     const [createOpen, setCreateOpen] = useState(false);
     const [editing, setEditing] = useState<FinanceRemittance | null>(null);
@@ -56,33 +67,46 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
 
     const columns: ColumnDef<Row>[] = [
         {
-            accessorKey: 'date', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Date" />,
-            cell: ({ row }) => <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">{String(row.original.date).slice(0, 10)}</span>,
+            accessorKey: 'soa_number', enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="SOA No." />,
+            cell: ({ row }) => (
+                <Link href={`${baseUrl}/${row.original.id}`} className="font-mono text-[12px] font-medium text-gray-800 hover:text-emerald-600 dark:text-gray-100">
+                    {row.original.soa_number}
+                </Link>
+            ),
         },
         {
-            accessorKey: 'courier', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Courier" />,
-            cell: ({ row }) => <span className="text-[12px] text-gray-800 dark:text-gray-100">{row.original.courier}</span>,
+            id: 'billing_date',
+            header: () => <div className="font-mono text-[10px] uppercase tracking-wider text-gray-300">Billing Date</div>,
+            cell: ({ row }) => (
+                <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                    {String(row.original.billing_date_from).slice(0, 10)} → {String(row.original.billing_date_to).slice(0, 10)}
+                </span>
+            ),
         },
         {
-            accessorKey: 'reference_no', enableSorting: false,
-            header: () => <div className="font-mono text-[10px] uppercase tracking-wider text-gray-300">Ref No</div>,
-            cell: ({ row }) => <span className="font-mono text-[11px] text-gray-500">{row.original.reference_no ?? '—'}</span>,
+            accessorKey: 'gross_cod', enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Gross COD" className="justify-end" />,
+            cell: ({ row }) => <div className="text-right font-mono text-[12px] text-gray-700 dark:text-gray-200">{fmt(row.original.gross_cod)}</div>,
         },
         {
-            accessorKey: 'gross_amount', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Gross" className="justify-end" />,
-            cell: ({ row }) => <div className="text-right font-mono text-[12px] text-gray-700 dark:text-gray-200">{fmt(row.original.gross_amount)}</div>,
+            id: 'cod_fee',
+            header: () => <div className="text-right font-mono text-[10px] uppercase tracking-wider text-gray-300">COD Fee</div>,
+            cell: ({ row }) => <div className="text-right font-mono text-[12px] text-gray-500">{fmt(row.original.cod_fee)}</div>,
         },
         {
-            id: 'deductions',
-            header: () => <div className="text-right font-mono text-[10px] uppercase tracking-wider text-gray-300">Deductions</div>,
-            cell: ({ row }) => <div className="text-right font-mono text-[12px] text-gray-500">{fmt(row.original.deductions)}</div>,
+            id: 'shipping_fee',
+            header: () => <div className="text-right font-mono text-[10px] uppercase tracking-wider text-gray-300">Shipping</div>,
+            cell: ({ row }) => <div className="text-right font-mono text-[12px] text-gray-500">{fmt(row.original.shipping_fee)}</div>,
+        },
+        {
+            id: 'return_shipping',
+            header: () => <div className="text-right font-mono text-[10px] uppercase tracking-wider text-gray-300">Return Ship</div>,
+            cell: ({ row }) => <div className="text-right font-mono text-[12px] text-gray-500">{fmt(row.original.return_shipping)}</div>,
         },
         {
             accessorKey: 'net_amount', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Net" className="justify-end" />,
+            header: ({ column }) => <SortableHeader column={column} title="Net Amount" className="justify-end" />,
             cell: ({ row }) => <div className="text-right font-mono text-[12px] font-medium text-gray-800 dark:text-gray-100">{fmt(row.original.net_amount)}</div>,
         },
         {
@@ -97,14 +121,14 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
             ),
         },
         {
-            id: 'reconciled',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-300">Linked</div>,
+            id: 'transaction',
+            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-300">Transaction</div>,
             cell: ({ row }) => (
                 <div className="text-center">
                     {row.original.is_reconciled ? (
-                        <span className="font-mono text-[11px] text-emerald-600 dark:text-emerald-400">✓</span>
+                        <span className="font-mono text-[11px] text-emerald-600 dark:text-emerald-400">#{row.original.transaction_id}</span>
                     ) : (
-                        <span className="font-mono text-[11px] text-red-500 dark:text-red-400">unreconciled</span>
+                        <span className="font-mono text-[11px] text-red-500 dark:text-red-400">unlinked</span>
                     )}
                 </div>
             ),
@@ -150,7 +174,7 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
         <AppLayout>
             <Head title={`${workspace.name} - Finance Remittances`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <PageHeader title="Remittances" description="Courier remittance records.">
+                <PageHeader title="Remittances" description="Courier SOA (Statement of Account) records.">
                     <button
                         onClick={() => setCreateOpen(true)}
                         className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white hover:bg-emerald-700"
@@ -171,7 +195,7 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                         <input
                             className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pl-8 pr-3 font-mono! text-[12px]! text-gray-800 outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100"
-                            placeholder="Search courier or ref..."
+                            placeholder="Search SOA No or courier..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
@@ -180,7 +204,7 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
                         onClick={toggleUnreconciled}
                         className={`h-9 rounded-[10px] border px-3 font-mono! text-[12px]! font-medium transition-all ${unreconciled ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300' : 'border-black/6 bg-white text-gray-600 hover:bg-stone-50 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300'}`}
                     >
-                        {unreconciled ? 'Showing Unreconciled' : 'Show Unreconciled'}
+                        {unreconciled ? 'Showing Unlinked' : 'Show Unlinked'}
                     </button>
                 </div>
 
@@ -204,12 +228,13 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
                     onOpenChange={(o) => { if (!o) { setCreateOpen(false); setEditing(null); } }}
                     remittance={editing}
                     workspaceSlug={workspace.slug}
+                    transactions={transactions}
                 />
                 <FinanceDeleteDialog
                     open={!!toDelete}
                     onClose={() => setToDelete(null)}
                     title="Delete Remittance?"
-                    description={`Delete remittance from ${toDelete?.courier}?`}
+                    description={`Delete SOA ${toDelete?.soa_number ?? ''}?`}
                     url={toDelete ? `${baseUrl}/${toDelete.id}` : ''}
                     successMessage="Remittance deleted"
                 />

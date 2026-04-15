@@ -22,15 +22,7 @@ class TransactionRequest extends FormRequest
             'transaction_type' => ['required', Rule::in(['funds', 'profit_share', 'expenses', 'transfer', 'remittance'])],
             'amount' => ['required', 'numeric', 'min:0'],
             'category' => ['required', Rule::in(['remittance', 'expense', 'transfer', 'other'])],
-            'remittance_id' => ['nullable', 'exists:finance_remittances,id', 'required_if:category,remittance'],
             'notes' => ['nullable', 'string'],
         ];
-    }
-
-    protected function prepareForValidation(): void
-    {
-        if ($this->input('category') !== 'remittance') {
-            $this->merge(['remittance_id' => null]);
-        }
     }
 }

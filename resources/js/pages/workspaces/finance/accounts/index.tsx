@@ -20,10 +20,15 @@ import { ExternalLink, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-rea
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Account extends FinanceAccount {
-    current_balance: number;
-    total_in: number;
-    total_out: number;
+    transactions?: { id: number; account_id: number; type: 'in' | 'out'; amount: number | string }[];
 }
+
+const balanceOf = (a: Account) => {
+    const ts = a.transactions ?? [];
+    const inSum = ts.filter(t => t.type === 'in').reduce((s, t) => s + Number(t.amount), 0);
+    const outSum = ts.filter(t => t.type === 'out').reduce((s, t) => s + Number(t.amount), 0);
+    return Number(a.opening_balance) + inSum - outSum;
+};
 
 interface Props {
     workspace: Workspace;
@@ -75,7 +80,7 @@ export default function AccountsIndex({ workspace, accounts, query }: Props) {
             header: () => <div className="text-right font-mono text-[10px] uppercase tracking-wider text-gray-300">Current Balance</div>,
             cell: ({ row }) => (
                 <div className="text-right font-mono text-[12px] font-medium text-gray-700 dark:text-gray-200">
-                    {fmt(row.original.current_balance)}
+                    {fmt(balanceOf(row.original))}
                 </div>
             ),
         },

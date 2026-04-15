@@ -12,26 +12,23 @@ export interface FinanceTransaction {
     transaction_type: 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance';
     amount: number | string;
     category: 'remittance' | 'expense' | 'transfer' | 'other';
-    remittance_id: number | null;
     notes: string | null;
 }
 
 interface AccountOpt { id: number; name: string; currency: string }
-interface RemittanceOpt { id: number; courier: string; reference_no: string | null; date: string; net_amount: number | string }
 
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     transaction?: FinanceTransaction | null;
     accounts: AccountOpt[];
-    remittances: RemittanceOpt[];
     defaults?: Partial<FinanceTransaction>;
     workspaceSlug: string;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function TransactionFormDialog({ open, onOpenChange, transaction, accounts, remittances, defaults, workspaceSlug }: Props) {
+export function TransactionFormDialog({ open, onOpenChange, transaction, accounts, defaults, workspaceSlug }: Props) {
     const isEditing = !!transaction;
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm({
@@ -42,7 +39,6 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
         transaction_type: 'funds' as 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance',
         amount: '',
         category: 'other' as 'remittance' | 'expense' | 'transfer' | 'other',
-        remittance_id: '' as string,
         notes: '',
     });
 
@@ -57,7 +53,6 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
                     transaction_type: transaction.transaction_type ?? 'funds',
                     amount: String(transaction.amount ?? ''),
                     category: transaction.category,
-                    remittance_id: transaction.remittance_id ? String(transaction.remittance_id) : '',
                     notes: transaction.notes ?? '',
                 });
             } else {
@@ -65,16 +60,12 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
                 clearErrors();
                 if (defaults?.account_id) setData('account_id', String(defaults.account_id));
                 if (defaults?.category) setData('category', defaults.category);
-                if (defaults?.remittance_id) setData('remittance_id', String(defaults.remittance_id));
             }
         }
     }, [open, transaction]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (data.category !== 'remittance' && data.remittance_id) {
-            setData('remittance_id', '');
-        }
         const options = {
             preserveScroll: true,
             onSuccess: () => { reset(); onOpenChange(false); },
@@ -155,22 +146,6 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
                                 </select>
                             </Field>
                         </div>
-
-                        {data.category === 'remittance' && (
-                            <Field label="Linked Remittance" error={errors.remittance_id}>
-                                <select value={data.remittance_id} onChange={(e) => setData('remittance_id', e.target.value)} className={inputCls}>
-                                    <option value="">— none —</option>
-                                    {remittances.map((r) => (
-                                        <option key={r.id} value={r.id}>
-                                            {r.date} · {r.courier} · {r.reference_no ?? '—'} · net {Number(r.net_amount).toLocaleString()}
-                                        </option>
-                                    ))}
-                                    {transaction?.remittance_id && !remittances.some(r => r.id === transaction.remittance_id) && (
-                                        <option value={transaction.remittance_id}>Currently linked remittance #{transaction.remittance_id}</option>
-                                    )}
-                                </select>
-                            </Field>
-                        )}
 
                         <Field label="Notes" error={errors.notes}>
                             <textarea value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)} className={`${inputCls} min-h-[80px] py-2 resize-none`} />

@@ -3,7 +3,7 @@
 namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Remittance extends Model
 {
@@ -12,36 +12,38 @@ class Remittance extends Model
     protected $fillable = [
         'workspace_id',
         'courier',
-        'date',
-        'reference_no',
-        'gross_amount',
-        'deductions',
+        'soa_number',
+        'billing_date_from',
+        'billing_date_to',
+        'gross_cod',
+        'cod_fee',
+        'cod_fee_vat',
+        'shipping_fee',
+        'return_shipping',
         'net_amount',
-        'notes',
         'status',
+        'transaction_id',
+        'notes',
     ];
 
     protected $casts = [
-        'date' => 'date',
-        'gross_amount' => 'decimal:2',
-        'deductions' => 'decimal:2',
+        'billing_date_from' => 'date',
+        'billing_date_to' => 'date',
+        'gross_cod' => 'decimal:2',
+        'cod_fee' => 'decimal:2',
+        'cod_fee_vat' => 'decimal:2',
+        'shipping_fee' => 'decimal:2',
+        'return_shipping' => 'decimal:2',
         'net_amount' => 'decimal:2',
     ];
 
-    protected static function booted(): void
+    public function transaction(): BelongsTo
     {
-        static::saving(function (Remittance $remittance) {
-            $remittance->net_amount = (float) $remittance->gross_amount - (float) $remittance->deductions;
-        });
-    }
-
-    public function transaction(): HasOne
-    {
-        return $this->hasOne(Transaction::class);
+        return $this->belongsTo(Transaction::class, 'transaction_id');
     }
 
     public function getIsReconciledAttribute(): bool
     {
-        return $this->transaction()->exists();
+        return $this->transaction_id !== null;
     }
 }

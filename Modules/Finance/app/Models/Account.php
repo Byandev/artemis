@@ -27,22 +27,4 @@ class Account extends Model
     {
         return $this->hasMany(Transaction::class);
     }
-
-    public function getCurrentBalanceAttribute(): string
-    {
-        $in = (float) $this->transactions()->where('type', 'in')->sum('amount');
-        $out = (float) $this->transactions()->where('type', 'out')->sum('amount');
-
-        return number_format(((float) $this->opening_balance) + $in - $out, 2, '.', '');
-    }
-
-    public function getTotalInAttribute(): string
-    {
-        return number_format((float) $this->transactions()->where('type', 'in')->sum('amount'), 2, '.', '');
-    }
-
-    public function getTotalOutAttribute(): string
-    {
-        return number_format((float) $this->transactions()->where('type', 'out')->sum('amount'), 2, '.', '');
-    }
 }

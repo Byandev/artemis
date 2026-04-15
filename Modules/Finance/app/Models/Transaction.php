@@ -4,6 +4,7 @@ namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Transaction extends Model
 {
@@ -18,7 +19,6 @@ class Transaction extends Model
         'transaction_type',
         'amount',
         'category',
-        'remittance_id',
         'notes',
     ];
 
@@ -32,8 +32,8 @@ class Transaction extends Model
         return $this->belongsTo(Account::class);
     }
 
-    public function remittance(): BelongsTo
+    public function remittance(): HasOne
     {
-        return $this->belongsTo(Remittance::class);
+        return $this->hasOne(Remittance::class, 'transaction_id');
     }
 }

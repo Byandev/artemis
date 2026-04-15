@@ -21,17 +21,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Row extends FinanceTransaction {
     account: { id: number; name: string; currency: string } | null;
-    remittance: { id: number; courier: string; reference_no: string | null } | null;
+    remittance: { id: number; courier: string; soa_number: string } | null;
 }
 
 interface AccountOpt { id: number; name: string; currency: string }
-interface RemittanceOpt { id: number; courier: string; reference_no: string | null; date: string; net_amount: number | string }
 
 interface Props {
     workspace: Workspace;
     transactions: PaginatedData<Row>;
     accounts: AccountOpt[];
-    remittances: RemittanceOpt[];
     query?: { sort?: string | null; filter?: { search?: string } };
 }
 
@@ -45,7 +43,7 @@ const TXN_TYPE_STYLE: Record<string, { label: string; cls: string }> = {
     remittance: { label: 'remittance', cls: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' },
 };
 
-export default function TransactionsIndex({ workspace, transactions, accounts, remittances, query }: Props) {
+export default function TransactionsIndex({ workspace, transactions, accounts, query }: Props) {
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
     const [createOpen, setCreateOpen] = useState(false);
     const [editing, setEditing] = useState<FinanceTransaction | null>(null);
@@ -81,7 +79,7 @@ export default function TransactionsIndex({ workspace, transactions, accounts, r
                 <div className="flex flex-col gap-0.5">
                     <span className="text-[12px] text-gray-800 dark:text-gray-100">{row.original.description}</span>
                     {row.original.remittance && (
-                        <span className="text-[10px] text-gray-400">Remittance: {row.original.remittance.courier} #{row.original.remittance.reference_no ?? '—'}</span>
+                        <span className="text-[10px] text-gray-400">SOA {row.original.remittance.soa_number} · {row.original.remittance.courier}</span>
                     )}
                 </div>
             ),
@@ -143,7 +141,7 @@ export default function TransactionsIndex({ workspace, transactions, accounts, r
                                 description: row.original.description, type: row.original.type,
                                 transaction_type: row.original.transaction_type,
                                 amount: row.original.amount, category: row.original.category,
-                                remittance_id: row.original.remittance_id, notes: row.original.notes,
+                                notes: row.original.notes,
                             })}>
                                 <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                             </DropdownMenuItem>
@@ -203,7 +201,6 @@ export default function TransactionsIndex({ workspace, transactions, accounts, r
                     onOpenChange={(o) => { if (!o) { setCreateOpen(false); setEditing(null); } }}
                     transaction={editing}
                     accounts={accounts}
-                    remittances={remittances}
                     workspaceSlug={workspace.slug}
                 />
                 <FinanceDeleteDialog

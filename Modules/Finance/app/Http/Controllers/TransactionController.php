@@ -9,7 +9,6 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Modules\Finance\Http\Requests\TransactionRequest;
 use Modules\Finance\Models\Account;
-use Modules\Finance\Models\Remittance;
 use Modules\Finance\Models\Transaction;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -37,14 +36,6 @@ class TransactionController extends Controller
         if (! $accountOk) {
             throw ValidationException::withMessages(['account_id' => 'Invalid account for this workspace.']);
         }
-
-        if (! empty($data['remittance_id'])) {
-            $remittanceOk = Remittance::where('id', $data['remittance_id'])
-                ->where('workspace_id', $workspace->id)->exists();
-            if (! $remittanceOk) {
-                throw ValidationException::withMessages(['remittance_id' => 'Invalid remittance for this workspace.']);
-            }
-        }
     }
 
     public function index(Request $request, Workspace $workspace)
@@ -54,6 +45,7 @@ class TransactionController extends Controller
         $transactions = QueryBuilder::for(
             Transaction::where('workspace_id', $workspace->id)->with(['account', 'remittance'])
         )
+
             ->allowedFilters([
                 AllowedFilter::callback('search', fn ($q, $v) => $q->where('description', 'like', "%{$v}%")),
                 AllowedFilter::exact('account_id'),
@@ -71,10 +63,6 @@ class TransactionController extends Controller
             'transactions' => $transactions,
             'accounts' => Account::where('workspace_id', $workspace->id)
                 ->orderBy('name')->get(['id', 'name', 'currency']),
-            'remittances' => Remittance::where('workspace_id', $workspace->id)
-                ->doesntHave('transaction')
-                ->orderByDesc('date')
-                ->get(['id', 'courier', 'reference_no', 'date', 'net_amount']),
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),

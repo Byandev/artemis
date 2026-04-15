@@ -20,10 +20,6 @@ return new class extends Migration
             $table->enum('transaction_type', ['funds', 'profit_share', 'expenses', 'transfer', 'remittance'])->default('funds');
             $table->decimal('amount', 15, 2);
             $table->enum('category', ['remittance', 'expense', 'transfer', 'other'])->default('other');
-            $table->foreignId('remittance_id')
-                ->nullable()
-                ->constrained('finance_remittances')
-                ->nullOnDelete();
             $table->text('notes')->nullable();
             $table->timestamps();
 
