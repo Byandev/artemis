@@ -28,7 +28,6 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import FormModal from './formModal';
-import workspaces from '@/routes/workspaces';
 
 interface Props {
     orders: PaginatedData<OrderForDelivery>;
@@ -224,7 +223,7 @@ export default function RmoManagement({
             router.post(
                 `/public/workspaces/${workspace.slug}/rts/rmo-management/${id}`,
                 { status },
-                { preserveScroll: true },
+                { preserveScroll: true, preserveState: true },
             );
         },
         [workspace.slug],
