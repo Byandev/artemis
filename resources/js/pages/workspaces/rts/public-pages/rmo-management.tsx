@@ -66,7 +66,7 @@ export default function RmoManagement({
     const [userName, setUserName] = useState<string | false>(false);
     const [isOpen, setIsOpen] = useState(false);
     const [showStats, setShowStats] = useState(() => localStorage.getItem('rmo_show_stats') === 'true');
-    const [pendingAssign, setPendingAssign] = useState<{ orderId: number; currentStatus: string } | null>(null);
+    const [pendingAssign, setPendingAssign] = useState<{ id: number; currentStatus: string } | null>(null);
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
@@ -197,9 +197,9 @@ export default function RmoManagement({
 
 
     const handleAssignUser = useCallback(
-        (orderId: number, userId: string) => {
+        (id: number, userId: string) => {
             router.post(
-                `/public/workspaces/${workspace.slug}/rts/rmo-management/${orderId}/assign`,
+                `/public/workspaces/${workspace.slug}/rts/rmo-management/${id}/assign`,
                 { userId },
                 { preserveScroll: true },
             );
@@ -208,9 +208,9 @@ export default function RmoManagement({
     );
 
     const handleRemoveAssignee = useCallback(
-        (orderId: number) => {
+        (id: number) => {
             router.post(
-                `/public/workspaces/${workspace.slug}/rts/rmo-management/${orderId}/remove-assignee`,
+                `/public/workspaces/${workspace.slug}/rts/rmo-management/${id}/remove-assignee`,
                 {},
                 { preserveScroll: true },
             );
@@ -219,9 +219,9 @@ export default function RmoManagement({
     );
 
     const handleChangeStatus = useCallback(
-        (status: string, orderId: number) => {
+        (status: string, id: number) => {
             router.post(
-                `/public/workspaces/${workspace.slug}/rts/rmo-management/${orderId}`,
+                `/public/workspaces/${workspace.slug}/rts/rmo-management/${id}`,
                 { status },
                 { preserveScroll: true },
             );
@@ -230,12 +230,12 @@ export default function RmoManagement({
     );
 
     const handleAssignToMe = useCallback(
-        (orderId: number) => {
+        (id: number) => {
             const userId = localStorage.getItem('user_id');
             if (userId) {
-                handleAssignUser(orderId, userId);
+                handleAssignUser(id, userId);
             } else {
-                setPendingAssign({ orderId, currentStatus: '' });
+                setPendingAssign({ id, currentStatus: '' });
                 setIsOpen(true);
             }
         },
@@ -246,7 +246,7 @@ export default function RmoManagement({
         (userId: string) => {
             setUserName(localStorage.getItem('user_name') ?? '');
             if (pendingAssign) {
-                handleAssignUser(pendingAssign.orderId, userId);
+                handleAssignUser(pendingAssign.id, userId);
                 setPendingAssign(null);
             }
         },
@@ -461,12 +461,12 @@ export default function RmoManagement({
                 header: ({ column }) => <SortableHeader enabled={false} column={column} title="Assignee" />,
                 cell: ({ row }) => {
                     const assignee = row.original.assignee;
-                    const orderId = row.original.order_id;
+                    const id = row.original.id;
 
                     if (!assignee) {
                         return (
                             <button
-                                onClick={() => handleAssignToMe(orderId)}
+                                onClick={() => handleAssignToMe(id)}
                                 className="flex items-center gap-1.5 rounded-lg border border-dashed border-black/10 dark:border-white/10 px-2.5 py-1 text-[11px] font-medium text-gray-400 dark:text-gray-500 transition-all hover:border-emerald-300 dark:hover:border-emerald-500/40 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400"
                             >
                                 <UserPlus className="h-3 w-3" />
@@ -481,7 +481,7 @@ export default function RmoManagement({
                                 {assignee.name}
                             </span>
                             <button
-                                onClick={() => handleRemoveAssignee(orderId)}
+                                onClick={() => handleRemoveAssignee(id)}
                                 className="invisible flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-300 transition-colors hover:bg-red-50 hover:text-red-400 dark:text-gray-600 dark:hover:bg-red-500/10 dark:hover:text-red-400 group-hover:visible"
                             >
                                 <X className="h-3 w-3" />
@@ -497,7 +497,7 @@ export default function RmoManagement({
                 cell: ({ row }) => (
                     <RmoStatusPicker
                         currentStatus={row.original.status as OrderStatus}
-                        onChangeStatus={(status) => handleChangeStatus(status, row.original.order_id)}
+                        onChangeStatus={(status) => handleChangeStatus(status, row.original.id)}
                     />
                 ),
             },
