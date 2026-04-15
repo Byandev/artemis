@@ -92,7 +92,9 @@ class RmoOrderController extends Controller
                 'phone_number' => $item->order?->shippingAddress?->phone_number,
                 'rider_name' => $item->rider_name,
                 'rider_phone' => $item->rider_phone,
+                'page_id' => $item->page_id,
                 'page_name' => $item->page?->name,
+                'shop_id' => $item->shop_id,
                 'parcel_status' => $item->order?->parcel_status,
                 'items' => $item->order?->items?->map(fn ($i) => [
                     'name' => $i->name,
