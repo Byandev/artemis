@@ -223,7 +223,7 @@ export default function RmoManagement({
             router.post(
                 `/public/workspaces/${workspace.slug}/rts/rmo-management/${id}`,
                 { status },
-                { preserveScroll: true, preserveState: true },
+                { preserveScroll: true, preserveState: false },
             );
         },
         [workspace.slug],
