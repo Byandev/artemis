@@ -3,8 +3,6 @@
 namespace App\Http\Controllers\PublicApi;
 
 use App\Http\Controllers\Controller;
-use App\Models\Page;
-use App\Models\Shop;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Pancake\Models\OrderForDelivery;
@@ -105,26 +103,6 @@ class RmoOrderController extends Controller
         });
 
         return response()->json($orders);
-    }
-
-    public function filters(Request $request): JsonResponse
-    {
-        $workspace = $request->attributes->get('workspace');
-
-        $pages = Page::where('workspace_id', $workspace->id)->get(['id', 'name']);
-        $shops = Shop::where('workspace_id', $workspace->id)->get(['id', 'name']);
-
-        $statuses = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->whereDate('delivery_date', now())
-            ->distinct()
-            ->pluck('status');
-
-        return response()->json([
-            'pages' => $pages,
-            'shops' => $shops,
-            'statuses' => $statuses,
-            'parcel_statuses' => ['pending', 'delivering', 'delivered', 'problematic', 'returning', 'undeliverable'],
-        ]);
     }
 
     public function syncCallTracking(Request $request): JsonResponse
