@@ -28,7 +28,7 @@ class TriggerFetchPageOrders extends Command
     public function handle()
     {
         Page::whereNotNull('orders_last_synced_at')
-            ->whereShopId(100173429)
+//            ->whereShopId(100173429)
             ->whereNotNull('pos_token')
             ->whereNotNull('shop_id')
             ->whereNotNull('botcake_token')
