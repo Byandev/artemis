@@ -1,0 +1,185 @@
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Field, Footer, inputCls } from '@/components/finance/account-form-dialog';
+import { useForm } from '@inertiajs/react';
+import React, { useEffect } from 'react';
+
+export interface FinanceTransaction {
+    id: number;
+    account_id: number;
+    date: string;
+    description: string;
+    type: 'in' | 'out';
+    transaction_type: 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance';
+    amount: number | string;
+    category: 'remittance' | 'expense' | 'transfer' | 'other';
+    remittance_id: number | null;
+    notes: string | null;
+}
+
+interface AccountOpt { id: number; name: string; currency: string }
+interface RemittanceOpt { id: number; courier: string; reference_no: string | null; date: string; net_amount: number | string }
+
+interface Props {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    transaction?: FinanceTransaction | null;
+    accounts: AccountOpt[];
+    remittances: RemittanceOpt[];
+    defaults?: Partial<FinanceTransaction>;
+    workspaceSlug: string;
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+export function TransactionFormDialog({ open, onOpenChange, transaction, accounts, remittances, defaults, workspaceSlug }: Props) {
+    const isEditing = !!transaction;
+
+    const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm({
+        account_id: '',
+        date: today(),
+        description: '',
+        type: 'in' as 'in' | 'out',
+        transaction_type: 'funds' as 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance',
+        amount: '',
+        category: 'other' as 'remittance' | 'expense' | 'transfer' | 'other',
+        remittance_id: '' as string,
+        notes: '',
+    });
+
+    useEffect(() => {
+        if (open) {
+            if (transaction) {
+                setData({
+                    account_id: String(transaction.account_id),
+                    date: transaction.date,
+                    description: transaction.description ?? '',
+                    type: transaction.type,
+                    transaction_type: transaction.transaction_type ?? 'funds',
+                    amount: String(transaction.amount ?? ''),
+                    category: transaction.category,
+                    remittance_id: transaction.remittance_id ? String(transaction.remittance_id) : '',
+                    notes: transaction.notes ?? '',
+                });
+            } else {
+                reset();
+                clearErrors();
+                if (defaults?.account_id) setData('account_id', String(defaults.account_id));
+                if (defaults?.category) setData('category', defaults.category);
+                if (defaults?.remittance_id) setData('remittance_id', String(defaults.remittance_id));
+            }
+        }
+    }, [open, transaction]);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (data.category !== 'remittance' && data.remittance_id) {
+            setData('remittance_id', '');
+        }
+        const options = {
+            preserveScroll: true,
+            onSuccess: () => { reset(); onOpenChange(false); },
+        };
+        const base = `/workspaces/${workspaceSlug}/finance/transactions`;
+        if (isEditing) {
+            put(`${base}/${transaction!.id}`, options);
+        } else {
+            post(base, options);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden border-none shadow-2xl dark:bg-zinc-900">
+                <div className="px-5 pt-5 pb-4 border-b border-black/6 dark:border-white/6">
+                    <DialogHeader>
+                        <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
+                            {isEditing ? 'Edit Transaction' : 'Add Transaction'}
+                        </DialogTitle>
+                        <DialogDescription className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5">
+                            {isEditing ? 'Update this ledger entry.' : 'Record a new ledger entry.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                </div>
+
+                <form onSubmit={handleSubmit}>
+                    <div className="space-y-5 px-5 py-4 max-h-[70vh] overflow-y-auto">
+                        <Field label="Account" required error={errors.account_id}>
+                            <select value={data.account_id} onChange={(e) => setData('account_id', e.target.value)} className={inputCls}>
+                                <option value="">Select account...</option>
+                                {accounts.map((a) => (
+                                    <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>
+                                ))}
+                            </select>
+                        </Field>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <Field label="Date" required error={errors.date}>
+                                <input type="date" value={data.date} onChange={(e) => setData('date', e.target.value)} className={inputCls} />
+                            </Field>
+                            <Field label="Type" required error={errors.type}>
+                                <select value={data.type} onChange={(e) => setData('type', e.target.value as 'in' | 'out')} className={inputCls}>
+                                    <option value="in">IN (deposit)</option>
+                                    <option value="out">OUT (withdrawal)</option>
+                                </select>
+                            </Field>
+                        </div>
+
+                        <Field label="Transaction Type" required error={errors.transaction_type}>
+                            <select
+                                value={data.transaction_type}
+                                onChange={(e) => setData('transaction_type', e.target.value as 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance')}
+                                className={inputCls}
+                            >
+                                <option value="funds">Funds</option>
+                                <option value="profit_share">Profit Share</option>
+                                <option value="expenses">Expenses</option>
+                                <option value="transfer">Transfer</option>
+                                <option value="remittance">Remittance</option>
+                            </select>
+                        </Field>
+
+                        <Field label="Description" required error={errors.description}>
+                            <input type="text" value={data.description} onChange={(e) => setData('description', e.target.value)} className={inputCls} />
+                        </Field>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <Field label="Amount" required error={errors.amount}>
+                                <input type="number" step="0.01" min="0" value={data.amount} onChange={(e) => setData('amount', e.target.value)} className={inputCls} />
+                            </Field>
+                            <Field label="Category" required error={errors.category}>
+                                <select value={data.category} onChange={(e) => setData('category', e.target.value as typeof data.category)} className={inputCls}>
+                                    <option value="remittance">remittance</option>
+                                    <option value="expense">expense</option>
+                                    <option value="transfer">transfer</option>
+                                    <option value="other">other</option>
+                                </select>
+                            </Field>
+                        </div>
+
+                        {data.category === 'remittance' && (
+                            <Field label="Linked Remittance" error={errors.remittance_id}>
+                                <select value={data.remittance_id} onChange={(e) => setData('remittance_id', e.target.value)} className={inputCls}>
+                                    <option value="">— none —</option>
+                                    {remittances.map((r) => (
+                                        <option key={r.id} value={r.id}>
+                                            {r.date} · {r.courier} · {r.reference_no ?? '—'} · net {Number(r.net_amount).toLocaleString()}
+                                        </option>
+                                    ))}
+                                    {transaction?.remittance_id && !remittances.some(r => r.id === transaction.remittance_id) && (
+                                        <option value={transaction.remittance_id}>Currently linked remittance #{transaction.remittance_id}</option>
+                                    )}
+                                </select>
+                            </Field>
+                        )}
+
+                        <Field label="Notes" error={errors.notes}>
+                            <textarea value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)} className={`${inputCls} min-h-[80px] py-2 resize-none`} />
+                        </Field>
+                    </div>
+
+                    <Footer processing={processing} isEditing={isEditing} onCancel={() => onOpenChange(false)} />
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}

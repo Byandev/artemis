@@ -34,6 +34,10 @@ import {
     Copy,
     Check,
     ExternalLink,
+    Wallet,
+    Landmark,
+    ArrowLeftRight,
+    Send,
 } from 'lucide-react';
 import { useState } from 'react';
 import AppLogo from './app-logo';
@@ -113,6 +117,32 @@ export function AppSidebar() {
                   },
               ]
             : []),
+        {
+            title: 'Finance',
+            icon: Wallet,
+            items: [
+                {
+                    title: 'Dashboard',
+                    href: `/workspaces/${currentWorkspace.slug}/finance/dashboard`,
+                    icon: LayoutDashboard,
+                },
+                {
+                    title: 'Accounts',
+                    href: `/workspaces/${currentWorkspace.slug}/finance/accounts`,
+                    icon: Landmark,
+                },
+                {
+                    title: 'Transactions',
+                    href: `/workspaces/${currentWorkspace.slug}/finance/transactions`,
+                    icon: ArrowLeftRight,
+                },
+                {
+                    title: 'Remittances',
+                    href: `/workspaces/${currentWorkspace.slug}/finance/remittances`,
+                    icon: Send,
+                },
+            ],
+        },
         {
             title: 'RTS',
             icon: RotateCcw,
