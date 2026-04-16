@@ -16,7 +16,7 @@ class InventoryTransactionController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -57,8 +57,13 @@ class InventoryTransactionController extends Controller
     {
         $validated = $request->validate([
             'inventory_item_id' => 'required|exists:inventory_items,id',
-            'date' => 'required|date',
-            'ref_no' => 'required|string|max:255|unique:inventory_transactions,ref_no,NULL,id,workspace_id,'.$workspace->id,
+            'date' => [
+                'required',
+                'date',
+                'before_or_equal:9999-12-31',
+                'regex:/^\d{4}-\d{2}-\d{2}$/', 
+            ],
+            'ref_no' => 'required|string|max:255|unique:inventory_transactions,ref_no,NULL,id,workspace_id,' . $workspace->id,
             'po_qty_in' => 'required|integer|min:0',
             'po_qty_out' => 'required|integer|min:0',
             'rts_goods_in' => 'required|integer|min:0',
@@ -78,7 +83,7 @@ class InventoryTransactionController extends Controller
         $validated = $request->validate([
             'inventory_item_id' => 'required|exists:inventory_items,id',
             'date' => 'required|date',
-            'ref_no' => 'required|string|max:255|unique:inventory_transactions,ref_no,'.$transaction->id.',id,workspace_id,'.$workspace->id,
+            'ref_no' => 'required|string|max:255|unique:inventory_transactions,ref_no,' . $transaction->id . ',id,workspace_id,' . $workspace->id,
             'po_qty_in' => 'required|integer|min:0',
             'po_qty_out' => 'required|integer|min:0',
             'rts_goods_in' => 'required|integer|min:0',
