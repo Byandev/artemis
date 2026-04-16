@@ -42,6 +42,10 @@ class InventoryItemController extends Controller
                 'id',
                 'product_id',
                 'sku',
+                'lead_time',
+                'unfulfilled_count',
+                'three_days_average',
+                'created_at',
                 \Spatie\QueryBuilder\AllowedSort::field('product_name', 'products.name'),
             ])
             ->defaultSort('-created_at')

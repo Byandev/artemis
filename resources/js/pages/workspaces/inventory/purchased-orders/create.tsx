@@ -54,6 +54,7 @@ export default function Create({ workspace, items }: Props) {
 
     const inputClass = "h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600";
     const labelClass = "block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1.5";
+    const dateFormatRegex = /^\d{4}-\d{2}-\d{2}$/;
 
     const updateItem = (index: number, field: keyof OrderItem, value: string) => {
         const updated = data.items.map((item, i) => {
@@ -73,6 +74,28 @@ export default function Create({ workspace, items }: Props) {
 
     const removeItem = (index: number) =>
         setData('items', data.items.filter((_, i) => i !== index));
+
+    const hasValidItems = data.items.length > 0 && data.items.every((item) => {
+        const count = Number(item.count);
+        const amount = Number(item.amount);
+        return (
+            item.inventory_item_id !== ''
+            && Number.isFinite(count)
+            && count >= 1
+            && Number.isFinite(amount)
+            && amount >= 0
+        );
+    });
+
+    const isIssueDateValid = dateFormatRegex.test(data.issue_date);
+    const isSubmitDisabled = processing
+        || !isIssueDateValid
+        || data.status === ''
+        || data.delivery_fee === ''
+        || Number(data.delivery_fee) < 0
+        || data.total_amount === ''
+        || Number(data.total_amount) < 0
+        || !hasValidItems;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -113,6 +136,9 @@ export default function Create({ workspace, items }: Props) {
                             <div>
                                 <label className={labelClass}>Issue Date <span className="text-red-400">*</span></label>
                                 <input type="date" value={data.issue_date} onChange={(e) => setData('issue_date', e.target.value)} className={inputClass} />
+                                {data.issue_date !== '' && !isIssueDateValid && (
+                                    <p className="mt-1 font-mono text-[11px] text-red-500">Please enter a valid date in YYYY-MM-DD format.</p>
+                                )}
                                 {errors.issue_date && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.issue_date}</p>}
                             </div>
                             <div>
@@ -160,9 +186,9 @@ export default function Create({ workspace, items }: Props) {
                         <div className="space-y-3">
                             {/* Header */}
                             <div className="grid grid-cols-[1fr_100px_120px_120px_36px] gap-3">
-                                <span className={labelClass}>Inventory Item</span>
-                                <span className={labelClass}>Count</span>
-                                <span className={labelClass}>Amount</span>
+                                <span className={labelClass}>Inventory Item <span className="text-red-400">*</span></span>
+                                <span className={labelClass}>Count <span className="text-red-400">*</span></span>
+                                <span className={labelClass}>Amount <span className="text-red-400">*</span></span>
                                 <span className={labelClass}>Total</span>
                                 <span />
                             </div>
@@ -233,7 +259,7 @@ export default function Create({ workspace, items }: Props) {
                         </button>
                         <button
                             type="submit"
-                            disabled={processing}
+                            disabled={isSubmitDisabled}
                             className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                         >
                             {processing ? 'Creating…' : 'Create Order'}
