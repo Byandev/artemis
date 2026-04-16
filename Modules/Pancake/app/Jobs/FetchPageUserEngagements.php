@@ -23,6 +23,7 @@ class FetchPageUserEngagements implements ShouldQueue
         $response = Pancake::getCustomerEngagements($this->page->id, $this->page->pancake_token, $this->date);
 
         if (! ($response['success'] ?? false)) {
+            $this->fail($response['message'] ?? "Failed to fetch engagements");
             return;
         }
 
