@@ -78,9 +78,20 @@ export function AppSidebar() {
             icon: ListChecks,
         },
         {
-            title: 'Employees',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/employees`,
+            title: 'CSR',
             icon: User,
+            items: [
+                {
+                    title: 'Management',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/csr/management`,
+                    icon: User,
+                },
+                {
+                    title: 'Analytics',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/csr/analytics`,
+                    icon: BarChart2,
+                },
+            ],
         },
         {
             title: 'RTS',
