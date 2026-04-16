@@ -3,8 +3,6 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
-use App\Models\Page;
-use App\Models\Shop;
 use App\Models\Workspace;
 use App\Models\WorkspaceChecklist;
 use Illuminate\Http\Request;
@@ -98,50 +96,5 @@ class ChecklistController extends Controller
 
         return redirect()->route('workspaces.checklist.index', $workspace)
             ->with('success', 'Checklist item deleted successfully.');
-    }
-
-    public function view(Request $request, Workspace $workspace)
-    {
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
-
-        $hasPage = Page::query()->where('workspace_id', $workspace->id)->exists();
-        $hasShop = Shop::query()->where('workspace_id', $workspace->id)->exists();
-
-        $items = WorkspaceChecklist::query()
-            ->where('workspace_id', $workspace->id)
-            ->orderBy('id')
-            ->get()
-            ->map(function (WorkspaceChecklist $item) use ($hasPage, $hasShop) {
-                $isCompleted = $item->target === 'Page' ? $hasPage : $hasShop;
-
-                return [
-                    'id' => $item->id,
-                    'title' => $item->title,
-                    'target' => $item->target,
-                    'required' => (bool) $item->required,
-                    'is_completed' => $isCompleted,
-                ];
-            })
-            ->values();
-
-        $completed = $items->where('is_completed', true)->count();
-        $total = $items->count();
-        $percent = $total > 0 ? (int) round(($completed / $total) * 100) : 0;
-
-        return Inertia::render('workspaces/checklist/view', [
-            'workspace' => $workspace,
-            'items' => $items,
-            'progress' => [
-                'completed' => $completed,
-                'total' => $total,
-                'percent' => $percent,
-            ],
-            'signals' => [
-                'has_page' => $hasPage,
-                'has_shop' => $hasShop,
-            ],
-        ]);
     }
 }
