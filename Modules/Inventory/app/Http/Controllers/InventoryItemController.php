@@ -42,6 +42,10 @@ class InventoryItemController extends Controller
                 'id',
                 'product_id',
                 'sku',
+                'lead_time',
+                'unfulfilled_count',
+                'three_days_average',
+                'created_at',
                 \Spatie\QueryBuilder\AllowedSort::field('product_name', 'products.name'),
             ])
             ->defaultSort('-created_at')
@@ -82,7 +86,7 @@ class InventoryItemController extends Controller
     {
         $request->validate([
             'product_id'            => 'required|exists:products,id',
-            'sku'                   => 'required|string|max:255',
+            'sku'                   => 'required|string|max:255|unique:inventory_items,sku,NULL,id,workspace_id,'.$workspace->id,
             'sales_keywords'        => 'nullable|string',
             'transaction_keywords'  => 'nullable|string',
             'lead_time'             => 'nullable|integer|min:0',

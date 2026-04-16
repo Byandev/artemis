@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import { TargetChecklistDrawer } from '@/components/checklist/target-checklist-drawer';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -14,14 +15,33 @@ import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import clsx from 'clsx';
 import { omit } from 'lodash';
 import {
+    ListChecks,
     MoreHorizontal,
     RefreshCw,
     Search,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Shop } from '@/types/models/Shop';
+
+const ChecklistsBadge = ({ pending }: { pending: number }) => {
+    const hasPending = pending > 0;
+    return (
+        <span
+            className={clsx(
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
+                hasPending
+                    ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+                    : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+            )}
+        >
+            <span className={clsx('h-1.5 w-1.5 rounded-full', hasPending ? 'bg-amber-500' : 'bg-emerald-500')} />
+            {hasPending ? `${pending} Pending` : 'Complete'}
+        </span>
+    );
+};
 
 interface ShopsPage {
     workspace: Workspace;
@@ -43,6 +63,8 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
     }, [query?.sort]);
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [checklistDrawerOpen, setChecklistDrawerOpen] = useState(false);
+    const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
     const { post, processing } = useForm({});
 
     useEffect(() => {
@@ -71,6 +93,11 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
         });
     };
 
+    const openChecklist = (shop: Shop) => {
+        setSelectedShop(shop);
+        setChecklistDrawerOpen(true);
+    };
+
     const columns: ColumnDef<Shop>[] = [
         {
             accessorKey: 'name',
@@ -90,6 +117,15 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
             },
         },
         {
+            accessorKey: 'pending_required_checklists_count',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Checklists'} />
+            ),
+            cell: ({ row }) => (
+                <ChecklistsBadge pending={Number(row.original.pending_required_checklists_count ?? 0)} />
+            ),
+        },
+        {
             id: 'actions',
             cell: ({ row }) => {
                 const shop = row.original;
@@ -102,6 +138,10 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openChecklist(shop)}>
+                                <ListChecks className="mr-2 h-4 w-4" />
+                                View Checklist
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                                 onClick={() => refresh(shop)}
                                 disabled={processing}
@@ -166,6 +206,21 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                         }}
                     />
                 </div>
+
+                <TargetChecklistDrawer
+                    open={checklistDrawerOpen}
+                    onOpenChange={(open) => {
+                        setChecklistDrawerOpen(open);
+                        if (!open) {
+                            setSelectedShop(null);
+                            router.reload({ only: ['pages'] });
+                        }
+                    }}
+                    workspace={workspace}
+                    target="shop"
+                    targetId={selectedShop?.id ?? null}
+                    targetName={selectedShop?.name ?? ''}
+                />
             </div>
         </AppLayout>
     );

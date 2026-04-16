@@ -8,22 +8,33 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class PurchasedOrderController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
-        $orders = PurchasedOrder::where('workspace_id', $workspace->id)
+        $orders = QueryBuilder::for(PurchasedOrder::where('workspace_id', $workspace->id))
             ->with(['items.inventoryItem.product'])
-            ->latest()
-            ->paginate($request->integer('per_page', 15))
+            ->allowedSorts([
+                'issue_date',
+                'delivery_no',
+                'cust_po_no',
+                'control_no',
+                'delivery_fee',
+                'total_amount',
+                'status',
+                'created_at',
+            ])
+            ->defaultSort('-created_at')
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         return Inertia::render('workspaces/inventory/purchased-orders/index', [
             'workspace' => $workspace,
             'orders' => $orders,
             'query' => [
-                ...$request->only(['sort', 'page']),
+                ...$request->only(['sort', 'page', 'perPage']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),
             ],
         ]);
@@ -40,7 +51,7 @@ class PurchasedOrderController extends Controller
     public function store(Request $request, Workspace $workspace)
     {
         $request->validate([
-            'issue_date'    => 'required|date',
+            'issue_date'    => 'required|date_format:Y-m-d|date',
             'delivery_no'   => 'nullable|string|max:255',
             'cust_po_no'    => 'nullable|string|max:255',
             'control_no'    => 'nullable|string|max:255',
@@ -85,7 +96,7 @@ class PurchasedOrderController extends Controller
     public function update(Request $request, Workspace $workspace, PurchasedOrder $purchasedOrder)
     {
         $request->validate([
-            'issue_date'    => 'required|date',
+            'issue_date'    => 'required|date_format:Y-m-d|date',
             'delivery_no'   => 'nullable|string|max:255',
             'cust_po_no'    => 'nullable|string|max:255',
             'control_no'    => 'nullable|string|max:255',

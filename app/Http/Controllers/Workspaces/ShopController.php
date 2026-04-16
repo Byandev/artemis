@@ -3,15 +3,16 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
-use App\Models\Page;
+use App\Http\Sorts\PendingRequiredChecklistsSort;
 use App\Models\Shop;
-use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Modules\Pancake\Jobs\FetchShopCustomers;
 use Modules\Pancake\Jobs\FetchShopUsers;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class ShopController extends Controller
@@ -23,7 +24,25 @@ class ShopController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
-        $pages = QueryBuilder::for(Shop::where('workspace_id', $workspace->id))
+        $pendingChecklistsSub = DB::table('workspace_checklists as wc')
+            ->selectRaw('COUNT(*)')
+            ->where('wc.workspace_id', $workspace->id)
+            ->where('wc.target', 'Shop')
+            ->where('wc.required', true)
+            ->whereNotExists(function ($sub) use ($workspace) {
+                $sub->select(DB::raw(1))
+                    ->from('workspace_checklist_completions as wcc')
+                    ->whereColumn('wcc.workspace_checklist_id', 'wc.id')
+                    ->whereColumn('wcc.target_id', 'shops.id')
+                    ->where('wcc.workspace_id', $workspace->id)
+                    ->where('wcc.target_type', Shop::class);
+            });
+
+        $baseQuery = Shop::where('shops.workspace_id', $workspace->id)
+            ->select('shops.*')
+            ->selectSub($pendingChecklistsSub, 'pending_required_checklists_count');
+
+        $pages = QueryBuilder::for($baseQuery)
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),
             ])
@@ -32,6 +51,7 @@ class ShopController extends Controller
                 'created_at',
                 'customers_last_synced_at',
                 'deleted_at',
+                AllowedSort::custom('pending_required_checklists_count', new PendingRequiredChecklistsSort),
             ])
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
