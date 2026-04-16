@@ -1,13 +1,15 @@
 import PageHeader from '@/components/common/PageHeader';
 import DatePicker from '@/components/ui/date-picker';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import Pagination from '@/components/ui/pagination';
 import AppLayout from '@/layouts/app-layout';
+import { toFrontendSort } from '@/lib/sort';
+import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { format, subDays } from 'date-fns';
+import { omit } from 'lodash';
 import { useEffect, useMemo, useState } from 'react';
 
 interface CsrRecord {
@@ -23,10 +25,64 @@ interface CsrRecord {
 
 interface Props {
     workspace: Workspace;
+    records: PaginatedData<CsrRecord>;
+    query?: {
+        sort?: string | null;
+        from?: string | null;
+        to?: string | null;
+        page?: number | string;
+    };
 }
 
 const peso = (n: number) =>
     new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(n) || 0);
+
+function useStatCard(workspace: Workspace, endpoint: string, from: string, to: string, type: string) {
+    const [value, setValue] = useState<number | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        setLoading(true);
+        axios
+            .get(`/api/workspaces/${workspace.slug}/csrs/stats/${endpoint}`, {
+                params: { from, to, type },
+                signal: controller.signal,
+            })
+            .then((res) => setValue(Number(res.data?.value ?? 0)))
+            .catch((err) => {
+                if (!axios.isCancel(err)) console.error(err);
+            })
+            .finally(() => setLoading(false));
+        return () => controller.abort();
+    }, [workspace.slug, endpoint, from, to, type]);
+
+    return { value, loading };
+}
+
+interface StatCardProps {
+    title: string;
+    value: number | null;
+    loading: boolean;
+    format?: (n: number) => string;
+}
+
+function StatCard({ title, value, loading, format: fmt }: StatCardProps) {
+    return (
+        <div className="rounded-xl border border-black/6 bg-white p-4 dark:border-white/6 dark:bg-zinc-900">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                {title}
+            </p>
+            {loading ? (
+                <div className="mt-2 h-7 w-24 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+            ) : (
+                <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-900 dark:text-white">
+                    {fmt ? fmt(value ?? 0) : Number(value ?? 0).toLocaleString()}
+                </p>
+            )}
+        </div>
+    );
+}
 
 export default function Analytics({ workspace }: Props) {
     const today = new Date();
@@ -34,40 +90,40 @@ export default function Analytics({ workspace }: Props) {
         from: subDays(today, 6),
         to: today,
     });
-    const [records, setRecords] = useState<CsrRecord[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [paginatedRecords, setPaginatedRecords] = useState<PaginatedData<CsrRecord> | null>(null);
+    const [currentType, setCurrentType] = useState('pos');
+    const [sort, setSort] = useState('-total_sales');
     const [page, setPage] = useState(1);
-    const perPage = 15;
+
+    const fromStr = format(range.from, 'yyyy-MM-dd');
+    const toStr = format(range.to, 'yyyy-MM-dd');
+
+    const salesStat = useStatCard(workspace, 'total-sales', fromStr, toStr, currentType);
+    const ordersStat = useStatCard(workspace, 'total-orders', fromStr, toStr, currentType);
+    const deliveredStat = useStatCard(workspace, 'total-delivered', fromStr, toStr, currentType);
+    const returningStat = useStatCard(workspace, 'total-returning', fromStr, toStr, currentType);
+    const rtsStat = useStatCard(workspace, 'total-rts', fromStr, toStr, currentType);
+    const rmoCalledStat = useStatCard(workspace, 'total-rmo-called', fromStr, toStr, currentType);
 
     useEffect(() => {
         setPage(1);
-    }, [range?.from, range?.to]);
-
-    const totalPages = Math.max(1, Math.ceil(records.length / perPage));
-    const pagedRecords = useMemo(
-        () => records.slice((page - 1) * perPage, page * perPage),
-        [records, page],
-    );
+    }, [range?.from, range?.to, currentType]);
 
     useEffect(() => {
-        if (!range?.from || !range?.to) return;
         const controller = new AbortController();
-        setLoading(true);
         axios
             .get(`/api/workspaces/${workspace.slug}/csrs/daily-records`, {
-                params: {
-                    from: format(range.from, 'yyyy-MM-dd'),
-                    to: format(range.to, 'yyyy-MM-dd'),
-                },
+                params: { from: fromStr, to: toStr, type: currentType, sort, page },
                 signal: controller.signal,
             })
-            .then((res) => setRecords(res.data?.data ?? []))
+            .then((res) => setPaginatedRecords(res.data))
             .catch((err) => {
                 if (!axios.isCancel(err)) console.error(err);
-            })
-            .finally(() => setLoading(false));
+            });
         return () => controller.abort();
-    }, [workspace.slug, range?.from, range?.to]);
+    }, [workspace.slug, fromStr, toStr, currentType, sort, page]);
+
+    const initialSorting = useMemo(() => toFrontendSort(sort), [sort]);
 
     const columns = useMemo<ColumnDef<CsrRecord>[]>(
         () => [
@@ -90,12 +146,12 @@ export default function Analytics({ workspace }: Props) {
             {
                 accessorKey: 'delivered',
                 header: ({ column }) => <SortableHeader column={column} title="Delivered" />,
-                cell: ({ row }) => Number(row.original.delivered).toLocaleString(),
+                cell: ({ row }) => peso(row.original.delivered),
             },
             {
                 accessorKey: 'returning_count',
                 header: ({ column }) => <SortableHeader column={column} title="Returning" />,
-                cell: ({ row }) => Number(row.original.returning_count).toLocaleString(),
+                cell: ({ row }) => peso(row.original.returning_count),
             },
             {
                 accessorKey: 'rts_rate',
@@ -119,6 +175,25 @@ export default function Analytics({ workspace }: Props) {
                     title="CSR Analytics"
                     description="Aggregated CSR performance from daily records"
                 >
+                    <div className="flex items-center p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+                        {['erp', 'pos'].map((value) => {
+                            const label = value === 'erp' ? 'ERP' : 'POS';
+                            const isActive = currentType === value;
+                            return (
+                                <button
+                                    key={value}
+                                    onClick={() => setCurrentType(value)}
+                                    className={`rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                                        isActive
+                                            ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-600 dark:text-white'
+                                            : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            );
+                        })}
+                    </div>
                     <DatePicker
                         id="csr-analytics-date-range"
                         mode="range"
@@ -134,20 +209,32 @@ export default function Analytics({ workspace }: Props) {
                     />
                 </PageHeader>
 
+                <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+                    <StatCard title="Total Sales" value={salesStat.value} loading={salesStat.loading} format={peso} />
+                    <StatCard title="Total Orders" value={ordersStat.value} loading={ordersStat.loading} />
+                    <StatCard title="Total Delivered" value={deliveredStat.value} loading={deliveredStat.loading} />
+                    <StatCard title="Total Returning" value={returningStat.value} loading={returningStat.loading} />
+                    <StatCard title="RTS Rate" value={rtsStat.value} loading={rtsStat.loading} format={(n) => `${n.toFixed(2)}%`} />
+                    <StatCard title="RMO Called" value={rmoCalledStat.value} loading={rmoCalledStat.loading} />
+                </div>
+
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                    <DataTable columns={columns} data={pagedRecords} />
-                    <div className="flex flex-col gap-2 border-t border-black/6 px-4 py-3 xl:flex-row xl:items-center xl:justify-between dark:border-white/6">
-                        <p className="text-center font-mono text-xs font-light text-gray-400 xl:text-left">
-                            Showing {(page - 1) * perPage + 1} to{' '}
-                            {Math.min(page * perPage, records.length)} of{' '}
-                            {records.length} entries
-                        </p>
-                        <Pagination
-                            currentPage={page}
-                            totalPages={totalPages}
-                            onPageChange={setPage}
-                        />
-                    </div>
+                    <DataTable
+                        key={sort}
+                        columns={columns}
+                        data={paginatedRecords?.data ?? []}
+                        initialSorting={initialSorting}
+                        meta={paginatedRecords ? omit(paginatedRecords, ['data']) : undefined}
+                        onFetch={(params) => {
+                            if (params?.sort !== undefined) {
+                                setSort(params.sort as string);
+                                setPage(1);
+                            }
+                            if (params?.page !== undefined) {
+                                setPage(params.page as number);
+                            }
+                        }}
+                    />
                 </div>
             </div>
         </AppLayout>

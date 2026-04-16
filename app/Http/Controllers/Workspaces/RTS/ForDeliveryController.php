@@ -28,33 +28,56 @@ class ForDeliveryController extends Controller
 {
     public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
     {
-        $isRemoving = $request->has('removeAssignee') && $request->removeAssignee;
-
-        // Require userId unless explicitly removing the assignee
-        if (! $isRemoving && (! $request->has('userId') || ! $request->userId)) {
-            return redirect()->back()->with('error', 'Please select a user before updating.');
-        }
-
-        // Find the order
-        $orderForDelivery = OrderForDelivery::where('order_id', $id)->first();
+        $orderForDelivery = OrderForDelivery::find($id);
 
         if (! $orderForDelivery) {
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        // Update status and assignee
-        $orderForDelivery->update([
-            'status' => $request->status,
-            'assignee_id' => $isRemoving ? null : $request->userId,
-        ]);
+        $orderForDelivery->update(['status' => $request->status]);
 
         return redirect()->back()->with('success', 'Status updated successfully');
     }
 
+    public function publicAssignUser(Workspace $workspace, $id, Request $request)
+    {
+        $orderForDelivery = OrderForDelivery::find($id);
+
+        if (! $orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        if (! $request->userId) {
+            return redirect()->back()->with('error', 'Please select a user before assigning.');
+        }
+
+        $orderForDelivery->update(['assignee_id' => $request->userId]);
+
+        return redirect()->back()->with('success', 'Assignee updated successfully' . $request->userId);
+    }
+
+    public function publicRemoveAssignee(Workspace $workspace, $id)
+    {
+        $orderForDelivery = OrderForDelivery::find($id);
+
+        if (! $orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        $orderForDelivery->update(['assignee_id' => null]);
+
+        return redirect()->back()->with('success', 'Assignee removed successfully');
+    }
+
     public function public(Request $request, Workspace $workspace)
     {
-        $items = QueryBuilder::for(OrderForDelivery::class)
-            ->where('workspace_id', $workspace->id)
+        $baseQuery = OrderForDelivery::where('workspace_id', $workspace->id);
+
+        if ($request->input('assignee_id')) {
+            $baseQuery->where('assignee_id', $request->input('assignee_id'));
+        }
+
+        $items = QueryBuilder::for($baseQuery)
             ->addSelect([
                 'pancake_order_for_delivery.*',
                 \DB::raw('(SELECT rts_rate FROM rider_delivery_summary WHERE rider_name = pancake_order_for_delivery.rider_name AND rider_phone = pancake_order_for_delivery.rider_phone LIMIT 1) as rider_rts_rate'),
@@ -122,7 +145,10 @@ class ForDeliveryController extends Controller
                     $query->where(function ($q) use ($value) {
                         $q->whereHas('order', function ($orderQuery) use ($value) {
                             $orderQuery->where('order_number', 'LIKE', "%{$value}%")
-                                ->orWhere('tracking_code', 'LIKE', "%{$value}%");
+                                ->orWhere('tracking_code', 'LIKE', "%{$value}%")
+                                ->orWhereHas('shippingAddress', function ($addrQuery) use ($value) {
+                                    $addrQuery->where('full_name', 'LIKE', "%{$value}%");
+                                });
                         })
                             ->orWhere('rider_name', 'LIKE', "%{$value}%")
                             ->orWhereHas('conferrer', function ($conferrerQuery) use ($value) {
@@ -147,11 +173,11 @@ class ForDeliveryController extends Controller
                 AllowedSort::custom('cx_rts_rate', new CxRtsRateSort),
             ])
             ->whereDate('delivery_date', now())
-            ->paginate(10);
+            ->paginate($request->input('per_page', 100));
 
-        // Build a base query for stats that respects page/shop filters
+        // Build a base query for stats that respects page/shop/assignee filters
         $statsBase = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->where('delivery_date', now());
+            ->whereDate('delivery_date', now());
 
         $filterPageIds = $request->input('filter.page_id');
         if ($filterPageIds) {
@@ -165,41 +191,29 @@ class ForDeliveryController extends Controller
             $statsBase->whereIn('shop_id', $shopIds);
         }
 
-        // 1️⃣ Total orders
-        $totalOrders = (clone $statsBase)->count();
+        if ($request->input('assignee_id')) {
+            $statsBase->where('assignee_id', $request->input('assignee_id'));
+        }
 
-        // 2️⃣ Total for delivery today
-        $totalForDeliveryToday = (clone $statsBase)
-            ->whereHas('order', function ($query) {
-                $query->where('parcel_status', 'out_for_delivery')
-                    ->whereDate('created_at', now());
-            })
-            ->count();
+        // 1️⃣ Total orders
+        $totalOrdersForDeliveryToday = (clone $statsBase)->count();
 
         // 3️⃣ Called rate (not pending)
         $totalCalled = (clone $statsBase)
             ->where('status', '!=', 'PENDING')
             ->count();
 
-        $calledRate = $totalOrders > 0 ? round(($totalCalled / $totalOrders) * 100, 1) : 0;
-
-        // 4️⃣ Successful rate (parcel delivered)
-        $totalParcel = (clone $statsBase)
-            ->whereHas('order', fn ($q) => $q->whereNotNull('parcel_status'))
-            ->count();
-
         $totalDelivered = (clone $statsBase)
             ->whereHas('order', fn ($q) => $q->where('parcel_status', 'delivered'))
             ->count();
 
-        $successfulRate = $totalParcel > 0 ? round(($totalDelivered / $totalParcel) * 100, 1) : 0;
-
-        // 5️⃣ Unsuccessful rate (problematic + returning + undeliverable)
-        $totalUnsuccessful = (clone $statsBase)
-            ->whereHas('order', fn ($q) => $q->whereIn('parcel_status', ['problematic', 'returning', 'undeliverable']))
+        $totalReturning = (clone $statsBase)
+            ->whereHas('order', fn ($q) => $q->where('parcel_status', 'returning'))
             ->count();
 
-        $unsuccessfulRate = $totalParcel > 0 ? round(($totalUnsuccessful / $totalParcel) * 100, 1) : 0;
+        $totalProblematic = (clone $statsBase)
+            ->whereHas('order', fn ($q) => $q->whereIn('parcel_status', ['undeliverable']))
+            ->count();
 
         $users = User::get(['id', 'name']);
 
@@ -213,10 +227,11 @@ class ForDeliveryController extends Controller
                 'filter' => $request->input('filter', []),
             ],
             'users' => $users,
-            'total_for_delivery_today' => $totalForDeliveryToday,
-            'called_rate' => $calledRate,
-            'successful_rate' => $successfulRate,
-            'unsuccessful_rate' => $unsuccessfulRate,
+            'total_for_delivery_today' => $totalOrdersForDeliveryToday,
+            'called_count' => $totalCalled,
+            'delivered_count' => $totalDelivered,
+            'returning_count' => $totalReturning,
+            'problematic_count' => $totalProblematic,
         ]);
     }
 
@@ -225,18 +240,18 @@ class ForDeliveryController extends Controller
         $userId = $request->query('user_id');
 
         if (! $userId) {
-            return response()->json(['assigned' => 0, 'called' => 0]);
+            return response()->json(['total' => 0, 'called' => 0, 'delivered' => 0, 'returning' => 0]);
         }
 
-        $assigned = OrderForDelivery::where('workspace_id', $workspace->id)
+        $base = OrderForDelivery::where('workspace_id', $workspace->id)
             ->where('assignee_id', $userId)
-            ->count();
+            ->whereDate('delivery_date', now());
 
-        $called = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->where('caller_id', $userId)
-            ->whereIn('status', ['CX RINGING', 'RIDER RINGING'])
-            ->count();
-
-        return response()->json(['assigned' => $assigned, 'called' => $called]);
+        return response()->json([
+            'total' => (clone $base)->count(),
+            'called' => (clone $base)->where('status', '!=', 'PENDING')->count(),
+            'delivered' => (clone $base)->whereHas('order', fn ($q) => $q->where('parcel_status', 'delivered'))->count(),
+            'returning' => (clone $base)->whereHas('order', fn ($q) => $q->where('parcel_status', 'returning'))->count(),
+        ]);
     }
 }

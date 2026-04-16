@@ -20,11 +20,15 @@ class Workspace extends Model
         'slug',
         'description',
         'owner_id',
+        'show_inventory',
+        'inventory_sync',
     ];
 
     protected $casts = [
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
+        'created_at'     => 'datetime',
+        'updated_at'     => 'datetime',
+        'show_inventory' => 'boolean',
+        'inventory_sync' => 'boolean',
     ];
 
     protected static function boot()

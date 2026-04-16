@@ -29,7 +29,7 @@ class TeamController extends Controller
             ])
             ->allowedSorts(['name', 'created_at', 'members_count'])
             ->defaultSort('-created_at')
-            ->paginate(10)
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         $workspaceMembers = $workspace->users()

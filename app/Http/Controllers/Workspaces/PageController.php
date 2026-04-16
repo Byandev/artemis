@@ -45,7 +45,7 @@ class PageController extends Controller
                 'parcel_journey_enabled',
             ])
             ->with(['shop', 'owner'])
-            ->paginate(10)
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         $users = User::get(['id', 'name']);

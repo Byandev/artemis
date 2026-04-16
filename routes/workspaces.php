@@ -27,8 +27,9 @@ use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
-use Modules\Inventory\Http\Controllers\PpwController;
-use Modules\Inventory\Http\Controllers\PurchaseOrderController;
+use Modules\Inventory\Http\Controllers\InventoryItemController;
+use Modules\Inventory\Http\Controllers\InventoryTransactionController;
+use Modules\Inventory\Http\Controllers\PurchasedOrderController;
 
 /*
 |--------------------------------------------------------------------------
@@ -41,6 +42,8 @@ use Modules\Inventory\Http\Controllers\PurchaseOrderController;
 */
 Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'publicUpdateStatus'])->name('public-page.rmo-management.updateStatus');
+Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/assign', [ForDeliveryController::class, 'publicAssignUser'])->name('public-page.rmo-management.assign');
+Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/remove-assignee', [ForDeliveryController::class, 'publicRemoveAssignee'])->name('public-page.rmo-management.removeAssignee');
 
 Route::middleware(['auth'])->group(function () {
     // Workspace setup (first-time after registration)
@@ -187,16 +190,13 @@ Route::middleware(['auth'])->group(function () {
     })->name('workspaces.botcake');
     Route::get('/workspaces/{workspace}/botcake/flows', [FlowController::class, 'index'])->name('workspaces.botcake.flows.index');
     Route::get('/workspaces/{workspace}/botcake/sequences', [SequenceController::class, 'index'])->name('workspaces.botcake.sequences.index');
-    Route::get('/workspaces/{workspace}/inventory/po-management', [PurchaseOrderController::class, 'index'])->name('workspaces.inventory.po-management.index');
-    Route::get('/workspaces/{workspace}/inventory/purchased-orders', [PurchaseOrderController::class, 'index'])->name('workspaces.inventory.purchased-orders.index');
-    Route::get('/workspaces/{workspace}/inventory/purchased-orders/create', [PurchaseOrderController::class, 'create'])->name('workspaces.inventory.purchased-orders.create');
-
-    // PPW ROUTES
-    Route::prefix('/workspaces/{workspace}/inventory/ppws')->name('workspaces.inventory.ppw.')->group(function () {
-        Route::get('/', [PpwController::class, 'index'])->name('index');
-        Route::post('/', [PpwController::class, 'store'])->name('store');
-        Route::put('/{ppw}', [PpwController::class, 'update'])->name('update');
-        Route::delete('/{ppw}', [PpwController::class, 'destroy'])->name('destroy');
+    Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {
+        Route::get('/', [PurchasedOrderController::class, 'index'])->name('index');
+        Route::get('/create', [PurchasedOrderController::class, 'create'])->name('create');
+        Route::post('/', [PurchasedOrderController::class, 'store'])->name('store');
+        Route::get('/{purchasedOrder}/edit', [PurchasedOrderController::class, 'edit'])->name('edit');
+        Route::put('/{purchasedOrder}', [PurchasedOrderController::class, 'update'])->name('update');
+        Route::delete('/{purchasedOrder}', [PurchasedOrderController::class, 'destroy'])->name('destroy');
     });
 
 });

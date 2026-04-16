@@ -205,6 +205,7 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                                             'filter[page_name]': pageNameSearch || undefined,
                                             'filter[type]': typeFilter || undefined,
                                             page: params?.page ?? 1,
+                                            per_page: params?.per_page,
                                         },
                                         {
                                             preserveState: true,
