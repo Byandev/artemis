@@ -16,7 +16,7 @@ class PurchasedOrderController extends Controller
         $orders = PurchasedOrder::where('workspace_id', $workspace->id)
             ->with(['items.inventoryItem.product'])
             ->latest()
-            ->paginate($request->integer('per_page', 15))
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         return Inertia::render('workspaces/inventory/purchased-orders/index', [

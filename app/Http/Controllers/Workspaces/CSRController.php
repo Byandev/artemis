@@ -38,7 +38,7 @@ class CSRController extends Controller
             ])
             ->allowedSorts(['name', 'email', 'phone_number', 'created_at', 'status', 'user_name'])
             ->defaultSort('pancake_users.name')
-            ->paginate($request->integer('per_page', 15))
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         return Inertia::render('workspaces/csr/index', [
@@ -131,7 +131,7 @@ class CSRController extends Controller
                 AllowedSort::field('rts_rate'),
             ])
             ->defaultSort('-total_sales')
-            ->paginate($request->integer('per_page', 15))
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         return Inertia::render('workspaces/csr/analytics', [
