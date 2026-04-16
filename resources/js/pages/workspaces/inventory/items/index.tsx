@@ -109,7 +109,7 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
         },
         {
             accessorKey: 'lead_time',
-            enableSorting: false,
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Lead Time (days)" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center">
@@ -120,8 +120,8 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             ),
         },
         {
-            id: 'unfulfilled',
-            enableSorting: false,
+            accessorKey: 'unfulfilled_count',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Unfulfilled" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center"><MetricCell value={row.original.unfulfilled} color="text-red-500 dark:text-red-400" /></div>
@@ -144,8 +144,8 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             ),
         },
         {
-            id: 'three_days_average',
-            enableSorting: false,
+            accessorKey: 'three_days_average',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="3-Day Avg" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center"><MetricCell value={row.original.three_days_average} decimals={1} /></div>
