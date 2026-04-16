@@ -11,9 +11,9 @@ class CustomerNameSort implements Sort
     public function __invoke(Builder $query, bool $descending, string $property): void
     {
         $query->orderBy(
-            DB::table('pancake_orders')
-                ->select('final_amount')
-                ->whereColumn('pancake_orders.id', 'pancake_order_for_delivery.order_id')
+            DB::table('shipping_addresses')
+                ->select('full_name')
+                ->whereColumn('shipping_addresses.order_id', 'pancake_order_for_delivery.order_id')
                 ->limit(1),
             $descending ? 'desc' : 'asc'
         );

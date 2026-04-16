@@ -1,4 +1,4 @@
-import { AlertTriangleIcon, CheckCircleIcon, PercentIcon, TruckIcon } from 'lucide-react';
+import { AlertTriangleIcon, PackageCheckIcon, PhoneIcon, RotateCcwIcon, TruckIcon } from 'lucide-react';
 
 interface StatCardProps {
     title: string;
@@ -26,23 +26,26 @@ export function StatCard({ title, value, icon: Icon, suffix }: StatCardProps) {
 
 interface RmoStatCardsProps {
     total_for_delivery_today: number;
-    called_rate: number;
-    successful_rate: number;
-    unsuccessful_rate: number;
+    called_count: number;
+    delivered_count: number;
+    returning_count: number;
+    problematic_count: number;
 }
 
 export function RmoStatCards({
     total_for_delivery_today,
-    called_rate,
-    successful_rate,
-    unsuccessful_rate,
+    called_count,
+    delivered_count,
+    returning_count,
+    problematic_count,
 }: RmoStatCardsProps) {
     return (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             <StatCard title="Total For Delivery Today" value={total_for_delivery_today || 0} icon={TruckIcon} />
-            <StatCard title="Called Rate" value={called_rate || 0} icon={PercentIcon} suffix="%" />
-            <StatCard title="Successful Rate" value={successful_rate || 0} icon={CheckCircleIcon} suffix="%" />
-            <StatCard title="Unsuccessful Rate" value={unsuccessful_rate || 0} icon={AlertTriangleIcon} suffix="%" />
+            <StatCard title="Called" value={called_count || 0} icon={PhoneIcon} />
+            <StatCard title="Delivered" value={delivered_count || 0} icon={PackageCheckIcon} />
+            <StatCard title="Returning" value={returning_count || 0} icon={RotateCcwIcon} />
+            <StatCard title="Problematic" value={problematic_count || 0} icon={AlertTriangleIcon} />
         </div>
     );
 }
