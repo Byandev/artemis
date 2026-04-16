@@ -117,9 +117,9 @@ export default function RmoManagement({
         () => ({
             teamIds: [],
             productIds: [],
-            shopIds: selectedShopIds.map(Number),
-            pageIds: selectedPageIds.map(Number),
-            userIds: selectedUserIds.map(Number),
+            shopIds: [...selectedShopIds],
+            pageIds: [...selectedPageIds],
+            userIds: [...selectedUserIds],
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [],
