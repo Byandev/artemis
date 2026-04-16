@@ -71,7 +71,8 @@ export default function Index({ inventory, workspace, items = [], query }: Props
                         search: searchQuery || undefined,
                     },
                     page: searchQuery ? 1 : query?.page ?? 1,
-                    sort: query?.sort
+                    sort: query?.sort,
+                    per_page: query?.perPage ?? inventory.per_page,
                 },
                 {
                     preserveState: true,
@@ -352,8 +353,11 @@ export default function Index({ inventory, workspace, items = [], query }: Props
                                 `/workspaces/${workspace.slug}/inventory/transactions`,
                                 {
                                     sort: params?.sort,
-                                    search: searchQuery || undefined,
+                                    filter: {
+                                        search: searchQuery || undefined,
+                                    },
                                     page: params?.page ?? 1,
+                                    per_page: params?.per_page ?? query?.perPage ?? inventory.per_page,
                                 },
                                 {
                                     preserveState: true,

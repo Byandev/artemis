@@ -180,6 +180,7 @@ class ParcelUpdateNotificationTemplateController extends Controller
                 'end_date'   => $endDate,
                 'sort'       => $request->input('sort'),
                 'stats_page' => $request->integer('stats_page', 1),
+                'stats_per_page' => $request->integer('per_page_stats', 15),
             ],
         ]);
     }

@@ -14,7 +14,7 @@ class TriggerFetchCsrErpDailRecords extends Command
      *
      * @var string
      */
-    protected $signature = 'trigger-fetch-csr-erp-dail-records {--batch-size=5} {--delay=300}';
+    protected $signature = 'trigger-fetch-csr-erp-dail-records {--batch-size=5} {--delay=300} {--date=}';
 
     /**
      * The console command description.
@@ -32,14 +32,25 @@ class TriggerFetchCsrErpDailRecords extends Command
 
         if (empty($webhookUrl)) {
             $this->error('n8n webhook URL is not configured (services.n8n.webhook_url).');
+
             return 1;
         }
 
         $batchSize = (int) $this->option('batch-size');
         $delay = (int) $this->option('delay');
-        $date = Carbon::yesterday()->format('m/d/Y');
+
+        try {
+            $date = $this->option('date')
+                ? Carbon::parse($this->option('date'))->format('m/d/Y')
+                : Carbon::yesterday()->format('m/d/Y');
+        } catch (\Exception) {
+            $this->error("Invalid date provided: {$this->option('date')}");
+
+            return 1;
+        }
 
         $query = PancakeUser::query()
+            ->where('status', 'ACTIVE')
             ->whereHas('systemUser.workspaces.apiKeys')
             ->with('systemUser.workspaces.apiKeys')
             ->orderBy('id');
@@ -48,6 +59,7 @@ class TriggerFetchCsrErpDailRecords extends Command
 
         if ($total === 0) {
             $this->warn('No Pancake users found with linked workspaces and API keys.');
+
             return 0;
         }
 
@@ -74,6 +86,7 @@ class TriggerFetchCsrErpDailRecords extends Command
                     if (! $apiKey) {
                         $this->warn("Skipping workspace {$workspace->id} — no API key found.");
                         $failed++;
+
                         continue;
                     }
 
@@ -83,7 +96,7 @@ class TriggerFetchCsrErpDailRecords extends Command
                         'csr_id' => $pancakeUser->id,
                         'csr_name' => $pancakeUser->name,
                         'date' => $date,
-                        'webhook_url' => config('app.url') . '/api/v1/public/csr-daily-records',
+                        'webhook_url' => config('app.url').'/api/v1/public/csr-daily-records',
                     ];
 
                     try {

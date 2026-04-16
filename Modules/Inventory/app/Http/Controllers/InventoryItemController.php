@@ -45,7 +45,7 @@ class InventoryItemController extends Controller
                 \Spatie\QueryBuilder\AllowedSort::field('product_name', 'products.name'),
             ])
             ->defaultSort('-created_at')
-            ->paginate(10)
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         // Compute derived metrics on each item
@@ -72,6 +72,7 @@ class InventoryItemController extends Controller
             'workspace' => $workspace,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
+                'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
         ]);

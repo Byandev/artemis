@@ -76,11 +76,16 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
         debounce((search: string) => {
             router.get(
                 baseUrl,
-                { sort: query?.sort, 'filter[search]': search || undefined, page: 1 },
+                {
+                    sort: query?.sort,
+                    'filter[search]': search || undefined,
+                    page: 1,
+                    per_page: query?.perPage ?? items.per_page,
+                },
                 { preserveState: true, replace: true, preserveScroll: true, only: ['items'] }
             );
         }, 400),
-        [baseUrl, query?.sort]
+        [baseUrl, query?.sort, query?.perPage, items.per_page]
     );
 
     useEffect(() => {
@@ -251,7 +256,12 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
                         onFetch={(params) => {
                             router.get(
                                 baseUrl,
-                                { sort: params?.sort, 'filter[search]': searchValue || undefined, page: params?.page ?? 1 },
+                                {
+                                    sort: params?.sort,
+                                    'filter[search]': searchValue || undefined,
+                                    page: params?.page ?? 1,
+                                    per_page: params?.per_page ?? query?.perPage ?? items.per_page,
+                                },
                                 { preserveState: true, replace: true, preserveScroll: true }
                             );
                         }}
