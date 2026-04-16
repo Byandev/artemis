@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import { TargetChecklistDrawer } from '@/components/checklist/target-checklist-drawer';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -16,6 +17,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import {
+    ListChecks,
     MoreHorizontal,
     RefreshCw,
     Search,
@@ -43,6 +45,8 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
     }, [query?.sort]);
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [checklistDrawerOpen, setChecklistDrawerOpen] = useState(false);
+    const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
     const { post, processing } = useForm({});
 
     useEffect(() => {
@@ -69,6 +73,11 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
         post(workspaces.shops.refresh.url({ workspace, shop }), {
             onSuccess: () => alert('Refresh Started'),
         });
+    };
+
+    const openChecklist = (shop: Shop) => {
+        setSelectedShop(shop);
+        setChecklistDrawerOpen(true);
     };
 
     const columns: ColumnDef<Shop>[] = [
@@ -102,6 +111,10 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openChecklist(shop)}>
+                                <ListChecks className="mr-2 h-4 w-4" />
+                                View Checklist
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                                 onClick={() => refresh(shop)}
                                 disabled={processing}
@@ -166,6 +179,20 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                         }}
                     />
                 </div>
+
+                <TargetChecklistDrawer
+                    open={checklistDrawerOpen}
+                    onOpenChange={(open) => {
+                        setChecklistDrawerOpen(open);
+                        if (!open) {
+                            setSelectedShop(null);
+                        }
+                    }}
+                    workspace={workspace}
+                    target="shop"
+                    targetId={selectedShop?.id ?? null}
+                    targetName={selectedShop?.name ?? ''}
+                />
             </div>
         </AppLayout>
     );
