@@ -46,6 +46,7 @@ type Props = {
         end_date?: string;
         sort?: string | null;
         stats_page?: number;
+        stats_per_page?: number;
     };
 }
 
@@ -262,6 +263,7 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates, pageStats, an
                                 {
                                     sort: params?.sort,
                                     stats_page: params?.page ?? 1,
+                                    per_page_stats: params?.per_page ?? query?.stats_per_page ?? pageStats.per_page,
                                     start_date: dateRange[0],
                                     end_date: dateRange[1],
                                 },
