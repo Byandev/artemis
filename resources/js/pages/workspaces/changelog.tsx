@@ -12,6 +12,35 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v2.5.1',
+        date: '2026-04-16',
+        sections: [
+            {
+                title: 'CSR Analytics',
+                items: [
+                    'RMO Total For Delivery — new sortable column showing orders assigned to the CSR as conferrer within the selected date range',
+                    'RMO Productivity — new sortable column showing RMO called as a percentage of RMO Total For Delivery',
+                    'Assignee filter now counts total orders by confirmed_by, so the stat card matches the filtered CSR',
+                ],
+            },
+            {
+                title: 'RMO Management',
+                items: [
+                    'Status picker, Assign to me, and Remove assignee are disabled unless the order\'s delivery date is today — backend validation mirrors the UI',
+                    'Date picker moved to the right side of the toolbar, next to the Show/Hide Statistics button',
+                ],
+            },
+            {
+                title: 'CSR ERP Sync',
+                items: [
+                    'Schedule replaced: backfill runs at 2/3/4/5 AM for 2–5 days ago, plus 12 PM and 3 PM runs for yesterday (previously twice daily at 10 and 22)',
+                    'New --date option on trigger-fetch-csr-erp-dail-records accepts any Carbon-parseable value for ad-hoc backfills',
+                    'Sync now only targets ACTIVE Pancake users',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v2.5.0',
         date: '2026-04-14',
         sections: [
@@ -389,6 +418,8 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v2.5.1':
+        'bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 ring-fuchsia-500/20',
     'v2.5.0':
         'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 ring-indigo-500/20',
     'v2.4.4':
