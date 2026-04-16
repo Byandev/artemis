@@ -107,9 +107,6 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
 
     const columns = useMemo(
         () => getChecklistColumns({
-            onView: () => {
-                router.get(`/workspaces/${workspace.slug}/checklist/view`);
-            },
             onEdit: openEdit,
             onDelete: openDelete,
         }),
