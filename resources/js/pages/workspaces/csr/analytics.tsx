@@ -20,6 +20,8 @@ interface CsrRecord {
     delivered: number;
     returning_count: number;
     rmo_called: number;
+    rmo_total_for_delivery: number;
+    rmo_productivity: number;
     rts_rate: number;
 }
 
@@ -94,7 +96,7 @@ export default function Analytics({ workspace }: Props) {
     const [currentType, setCurrentType] = useState('pos');
     const [sort, setSort] = useState('-total_sales');
     const [page, setPage] = useState(1);
-    const [perPage, setPerPage] = useState(15);
+    const [perPage, setPerPage] = useState(10);
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
     const toStr = format(range.to, 'yyyy-MM-dd');
@@ -163,6 +165,16 @@ export default function Analytics({ workspace }: Props) {
                 accessorKey: 'rmo_called',
                 header: ({ column }) => <SortableHeader column={column} title="RMO Called" />,
                 cell: ({ row }) => Number(row.original.rmo_called).toLocaleString(),
+            },
+            {
+                accessorKey: 'rmo_total_for_delivery',
+                header: ({ column }) => <SortableHeader column={column} title="RMO Total For Delivery" />,
+                cell: ({ row }) => Number(row.original.rmo_total_for_delivery).toLocaleString(),
+            },
+            {
+                accessorKey: 'rmo_productivity',
+                header: ({ column }) => <SortableHeader column={column} title="RMO Productivity" />,
+                cell: ({ row }) => `${Number(row.original.rmo_productivity).toFixed(2)}%`,
             },
         ],
         [],

@@ -75,7 +75,7 @@ class ParcelUpdateNotificationTemplateController extends Controller
         }
 
         $templates = ParcelJourneyNotificationTemplate::where('workspace_id', $workspace->id)
-            ->paginate($request->integer('per_page', 15))
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         $startDate = $request->input('start_date', now()->startOfMonth()->toDateString());
@@ -160,7 +160,7 @@ class ParcelUpdateNotificationTemplateController extends Controller
             ])
             ->defaultSort('-parcel_journey_started')
             ->paginate(
-                perPage: $request->integer('per_page_stats', 15),
+                perPage: $request->integer('per_page_stats', 10),
                 pageName: 'stats_page',
             )
             ->withQueryString();
@@ -180,7 +180,7 @@ class ParcelUpdateNotificationTemplateController extends Controller
                 'end_date'   => $endDate,
                 'sort'       => $request->input('sort'),
                 'stats_page' => $request->integer('stats_page', 1),
-                'stats_per_page' => $request->integer('per_page_stats', 15),
+                'stats_per_page' => $request->integer('per_page_stats', 10),
             ],
         ]);
     }

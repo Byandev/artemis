@@ -89,7 +89,7 @@ export default function AdCard({ workspaceSlug, queryParams }: Props) {
                         onFetch={(params) => {
                             const s = params?.sort as string ?? '-total_orders';
                             setSort(s);
-                            fetchPage(Number(params?.page ?? 1), s, Number(params?.per_page ?? data?.per_page ?? 15));
+                            fetchPage(Number(params?.page ?? 1), s, Number(params?.per_page ?? data?.per_page ?? 10));
                         }}
                     />
                 )}
