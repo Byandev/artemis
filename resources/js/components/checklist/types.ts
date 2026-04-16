@@ -7,6 +7,8 @@ export type ChecklistItem = {
 
 export type ChecklistProgressItem = ChecklistItem & {
     is_completed: boolean;
+    checked_by_name?: string;
+    checked_at?: string;
 };
 
 export type AddTaskForm = {
