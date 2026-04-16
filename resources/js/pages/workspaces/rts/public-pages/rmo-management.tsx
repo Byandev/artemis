@@ -3,6 +3,7 @@ import { authParcelStatusConfig, orderStatusConfig, ParcelStatusEntry } from '@/
 import { RmoStatCards } from '@/components/rts/RmoStatCards';
 import { RmoStatusPicker } from '@/components/rts/RmoStatusPicker';
 import { Button } from '@/components/ui/button';
+import DatePicker from '@/components/ui/date-picker';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { currencyFormatter, percentageFormatter } from '@/lib/utils';
@@ -45,6 +46,7 @@ interface Props {
         };
         page?: number;
         perPage?: number;
+        delivery_date?: string;
     };
     users: User[];
     total_for_delivery_today: number;
@@ -102,6 +104,8 @@ export default function RmoManagement({
             : (query?.filter?.parcel_status ?? ''), [query?.filter?.parcel_status]
     );
 
+    const deliveryDate = query?.delivery_date ?? new Date().toISOString().slice(0, 10);
+
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
 
     const initialFilterValue = useMemo<FilterValue>(
@@ -156,9 +160,10 @@ export default function RmoManagement({
             ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
             page: page ?? 1,
             per_page: perPage ?? orders.per_page,
+            delivery_date: deliveryDate,
             ...(showMyOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
         }),
-        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyOnly, orders.per_page],
+        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyOnly, orders.per_page, deliveryDate],
     );
 
     const handleStatusChange = useCallback(
@@ -218,14 +223,37 @@ export default function RmoManagement({
         if (selectedPageIds.length) params.set('filter[page_id]', selectedPageIds.join(','));
         if (selectedShopIds.length) params.set('filter[shop_id]', selectedShopIds.join(','));
         if (selectedUserIds.length) params.set('filter[user_id]', selectedUserIds.join(','));
+        params.set('delivery_date', deliveryDate);
         if (showMyOnly && localStorage.getItem('user_id')) {
             params.set('assignee_id', localStorage.getItem('user_id') ?? '');
         }
 
         const qs = params.toString();
-        const url = `/public/workspaces/${workspace.slug}/rts/rmo-management/export${qs ? `?${qs}` : ''}`;
-        window.location.href = url;
-    }, [workspace.slug, searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyOnly]);
+        window.location.href = `/public/workspaces/${workspace.slug}/rts/rmo-management/export${qs ? `?${qs}` : ''}`;
+    }, [workspace.slug, searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyOnly, deliveryDate]);
+
+    const handleDateChange = useCallback(
+        (date: string) => {
+            router.get(
+                publicPage.rmoManagement({ workspace }),
+                {
+                    sort: query?.sort || undefined,
+                    'filter[search]': searchValue || undefined,
+                    ...(currentStatus ? { 'filter[status]': currentStatus } : {}),
+                    ...(currentParcelStatus ? { 'filter[parcel_status]': currentParcelStatus } : {}),
+                    ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
+                    ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
+                    ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
+                    ...(showMyOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
+                    delivery_date: date,
+                    page: 1,
+                    per_page: orders.per_page,
+                },
+                { preserveState: true, replace: true, preserveScroll: true },
+            );
+        },
+        [workspace, query?.sort, searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyOnly, orders.per_page],
+    );
 
     const handleAssignUser = useCallback(
         (id: number, userId: string) => {
@@ -606,7 +634,7 @@ export default function RmoManagement({
                             RMO Management
                         </h1>
                         <p className="mt-0.5 text-[13px] text-gray-400 dark:text-gray-500">
-                            Delivery tracking for today's assigned orders
+                            Delivery tracking for assigned orders on {new Date(deliveryDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -625,6 +653,16 @@ export default function RmoManagement({
                             />
                             <span className="text-[12px] font-medium text-gray-600 dark:text-gray-400">Only my data</span>
                         </label>
+                        <DatePicker
+                            id="delivery-date"
+                            mode="single"
+                            defaultDate={deliveryDate}
+                            placeholder="Select date"
+                            onChange={(_, dateStr) => {
+                                if (dateStr && dateStr !== deliveryDate) handleDateChange(dateStr);
+                            }}
+                        />
+
                         <Filters
                             workspace={workspace}
                             onChange={handleFilterChange}

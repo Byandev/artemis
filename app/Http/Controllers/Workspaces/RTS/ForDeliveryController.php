@@ -73,6 +73,8 @@ class ForDeliveryController extends Controller
 
     public function public(Request $request, Workspace $workspace)
     {
+        $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
+
         $baseQuery = OrderForDelivery::where('workspace_id', $workspace->id);
 
         if ($request->input('assignee_id')) {
@@ -174,12 +176,12 @@ class ForDeliveryController extends Controller
                 AllowedSort::custom('risk_score', new RiskScoreSort),
                 AllowedSort::custom('cx_rts_rate', new CxRtsRateSort),
             ])
-            ->whereDate('delivery_date', now())
+            ->whereDate('delivery_date', $deliveryDate)
             ->paginate($request->input('per_page', 100));
 
         // Build a base query for stats that respects page/shop/assignee filters
         $statsBase = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->whereDate('delivery_date', now());
+            ->whereDate('delivery_date', $deliveryDate);
 
         $filterPageIds = $request->input('filter.page_id');
         if ($filterPageIds) {
@@ -227,6 +229,7 @@ class ForDeliveryController extends Controller
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
+                'delivery_date' => $deliveryDate,
             ],
             'users' => $users,
             'total_for_delivery_today' => $totalOrdersForDeliveryToday,
@@ -239,6 +242,8 @@ class ForDeliveryController extends Controller
 
     public function publicExport(Request $request, Workspace $workspace)
     {
+        $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
+
         $baseQuery = OrderForDelivery::where('workspace_id', $workspace->id);
 
         if ($request->input('assignee_id')) {
@@ -314,9 +319,9 @@ class ForDeliveryController extends Controller
                     });
                 }),
             ])
-            ->whereDate('delivery_date', now());
+            ->whereDate('delivery_date', $deliveryDate);
 
-        $filename = 'rmo-management-'.now()->format('Y-m-d_His').'.xlsx';
+        $filename = 'rmo-management-'.$deliveryDate.'-'.now()->format('His').'.xlsx';
 
         return Excel::download(new RmoManagementExport($query), $filename);
     }
