@@ -216,12 +216,17 @@ class ForDeliveryController extends Controller
             $statsBase->whereIn('page_id', $ownerPageIds);
         }
 
+        $totalOrdersForDeliveryTodayQuery = (clone $statsBase);
+
         if ($request->input('assignee_id')) {
             $statsBase->where('assignee_id', $request->input('assignee_id'));
+            $totalOrdersForDeliveryTodayQuery->whereHas('order', function ($orderQuery) use ($request) {
+                $orderQuery->where('confirmed_by', $request->input('assignee_id'));
+            });
         }
 
         // 1️⃣ Total orders
-        $totalOrdersForDeliveryToday = (clone $statsBase)->count();
+        $totalOrdersForDeliveryToday = (clone $totalOrdersForDeliveryTodayQuery)->count();
 
         // 3️⃣ Called rate (not pending)
         $totalCalled = (clone $statsBase)
