@@ -104,7 +104,12 @@ export default function RmoManagement({
             : (query?.filter?.parcel_status ?? ''), [query?.filter?.parcel_status]
     );
 
-    const deliveryDate = query?.delivery_date ?? new Date().toISOString().slice(0, 10);
+    const todayLocal = (() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+    const deliveryDate = query?.delivery_date ?? todayLocal;
+    const isToday = deliveryDate === todayLocal;
 
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
 
@@ -557,11 +562,12 @@ export default function RmoManagement({
                     <RmoStatusPicker
                         currentStatus={row.original.status as OrderStatus}
                         onChangeStatus={(status) => handleChangeStatus(status, row.original.id)}
+                        disabled={!isToday}
                     />
                 ),
             },
         ],
-        [handleAssignToMe, handleRemoveAssignee, handleChangeStatus],
+        [handleAssignToMe, handleRemoveAssignee, handleChangeStatus, isToday],
     );
 
     return (
