@@ -22,7 +22,7 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
         if (open && employee) {
             setData({
                 status: employee.status || 'ACTIVE',
-                user_id: employee.user?.id || '',
+                user_id: (employee as any).system_user?.id || (employee as any).user_id || '',
             });
         } else if (!open) {
             clearErrors();
@@ -88,8 +88,8 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
                                 Employee Status
                             </label>
                             <select
-                                value={data.status}
-                                onChange={(e) => setData('status', e.target.value)}
+                                value={data.user_id ?? ''}
+                                onChange={(e) => setData('user_id', e.target.value)}
                                 className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 outline-none transition-all focus:border-emerald-500 dark:border-white/8 dark:bg-zinc-800 dark:text-white"
                             >
                                 <option value="ACTIVE">ACTIVE</option>

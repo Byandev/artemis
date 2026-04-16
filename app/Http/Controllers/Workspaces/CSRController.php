@@ -18,7 +18,7 @@ class CSRController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -36,7 +36,14 @@ class CSRController extends Controller
                     });
                 }),
             ])
-            ->allowedSorts(['name', 'email', 'phone_number', 'created_at', 'status', 'user_name'])
+            ->allowedSorts([
+                'name',
+                'email',
+                'phone_number',
+                'created_at',
+                'user_id',
+                AllowedSort::field('status', 'pancake_users.status'),
+            ])
             ->defaultSort('pancake_users.name')
             ->paginate($request->integer('per_page', 15))
             ->withQueryString();
@@ -48,13 +55,13 @@ class CSRController extends Controller
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
-            'systemUsers' => User::whereHas('workspaces', fn ($query) => $query->where('workspace_id', $workspace->id))->get()
+            'systemUsers' => User::whereHas('workspaces', fn($query) => $query->where('workspace_id', $workspace->id))->get()
         ]);
     }
 
     public function analytics(Request $request, Workspace $workspace)
     {
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -72,7 +79,7 @@ class CSRController extends Controller
             ->join('pancake_users as pu', 'pu.id', '=', 'pancake_user_daily_reports.pancake_user_id')
             ->where('pancake_user_daily_reports.workspace_id', $workspace->id)
             ->whereBetween('pancake_user_daily_reports.date', [$from, $to])
-            ->when($type, fn ($q) => $q->where('pancake_user_daily_reports.type', $type))
+            ->when($type, fn($q) => $q->where('pancake_user_daily_reports.type', $type))
             ->groupBy('pancake_user_daily_reports.pancake_user_id', 'pu.name')
             ->selectRaw('
                 pancake_user_daily_reports.pancake_user_id,
@@ -105,8 +112,8 @@ class CSRController extends Controller
 
         return Inertia::render('workspaces/csr/analytics', [
             'workspace' => $workspace,
-            'records'   => $records,
-            'query'     => $request->only(['sort', 'from', 'to', 'page', 'type']),
+            'records' => $records,
+            'query' => $request->only(['sort', 'from', 'to', 'page', 'type']),
         ]);
     }
 

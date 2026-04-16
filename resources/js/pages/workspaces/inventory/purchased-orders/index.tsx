@@ -14,6 +14,7 @@ import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Workspace } from '@/types/models/Workspace';
 import { omit } from 'lodash';
+import { DeleteOrderDialog } from '@/components/inventory/delete-order-dialog';
 
 interface PurchasedOrderItem {
     id: number;
@@ -64,14 +65,9 @@ interface Props {
 }
 
 export default function PurchasedOrderIndex({ workspace, orders }: Props) {
-    const [deletingId, setDeletingId] = useState<number | null>(null);
+   const [deletingOrder, setDeletingOrder] = useState<PurchasedOrder | null>(null);
 
-    const baseUrl = `/workspaces/${workspace.slug}/inventory/purchased-orders`;
-
-    const handleDelete = (id: number) => {
-        if (!confirm('Are you sure you want to delete this order?')) return;
-        router.delete(`${baseUrl}/${id}`, { preserveScroll: true });
-    };
+   const baseUrl = `/workspaces/${workspace.slug}/inventory/purchased-orders`;
 
     const columns: ColumnDef<PurchasedOrder>[] = [
         {
@@ -178,7 +174,7 @@ export default function PurchasedOrderIndex({ workspace, orders }: Props) {
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                     className="text-red-600 focus:text-red-600 dark:text-red-400"
-                                    onClick={() => handleDelete(order.id)}
+                                   onClick={() => setDeletingOrder(order)}
                                 >
                                     <Trash2 className="mr-2 h-3.5 w-3.5" />
                                     Delete
@@ -222,6 +218,11 @@ export default function PurchasedOrderIndex({ workspace, orders }: Props) {
                         }}
                     />
                 </div>
+                <DeleteOrderDialog 
+                    order={deletingOrder} 
+                    workspace={workspace} 
+                    onClose={() => setDeletingOrder(null)} 
+                />
             </div>
         </AppLayout>
     );

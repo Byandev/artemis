@@ -79,7 +79,7 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
                 cell: ({ row }) => row.original.phone_number || '-',
             },
             {
-                accessorKey: 'system_user',
+                accessorKey: 'user_id',
                 enableSorting: true,
                 size: 200,
                 header: ({ column }) => (
@@ -108,6 +108,7 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
             },
             {
                 accessorKey: 'status',
+                enableSorting: true,
                 header: ({ column }) => (
                     <SortableHeader column={column} title="Status" />
                 ),
