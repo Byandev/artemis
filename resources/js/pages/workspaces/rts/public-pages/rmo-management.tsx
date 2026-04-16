@@ -154,10 +154,10 @@ export default function RmoManagement({
             ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
             ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
             page: page ?? 1,
-            ...(perPage ? { per_page: perPage } : {}),
+            per_page: perPage ?? orders.per_page,
             ...(showMyOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
         }),
-        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyOnly],
+        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyOnly, orders.per_page],
     );
 
     const handleStatusChange = useCallback(
