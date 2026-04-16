@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import { TargetChecklistDrawer } from '@/components/checklist/target-checklist-drawer';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -19,6 +20,7 @@ import clsx from 'clsx';
 import { omit } from 'lodash';
 import {
     Edit,
+    ListChecks,
     MoreHorizontal,
     RefreshCw,
     Search,
@@ -78,6 +80,8 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
 
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [checklistDrawerOpen, setChecklistDrawerOpen] = useState(false);
+    const [selectedPage, setSelectedPage] = useState<Page | null>(null);
 
     const [processing, setProcessing] = useState(false);
 
@@ -116,6 +120,11 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             onSuccess: () => alert('Refresh Started'),
             onFinish: () => setProcessing(false),
         });
+    };
+
+    const openChecklist = (page: Page) => {
+        setSelectedPage(page);
+        setChecklistDrawerOpen(true);
     };
 
 
@@ -202,6 +211,10 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
+                                <DropdownMenuItem onClick={() => openChecklist(page)}>
+                                    <ListChecks />
+                                    View Checklist
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleEdit(page)}>
                                     <Edit />
                                     Edit
@@ -265,6 +278,20 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                         }}
                     />
                 </div>
+
+                <TargetChecklistDrawer
+                    open={checklistDrawerOpen}
+                    onOpenChange={(open) => {
+                        setChecklistDrawerOpen(open);
+                        if (!open) {
+                            setSelectedPage(null);
+                        }
+                    }}
+                    workspace={workspace}
+                    target="page"
+                    targetId={selectedPage?.id ?? null}
+                    targetName={selectedPage?.name ?? ''}
+                />
 
             </div>
         </AppLayout>
