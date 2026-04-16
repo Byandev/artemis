@@ -29,32 +29,14 @@ class RmoOrderController extends Controller
     {
         $request->validate([
             'user_id' => ['required', 'uuid'],
-            'search' => ['nullable', 'string', 'min:2'],
         ]);
 
         $workspace = $request->attributes->get('workspace');
 
-        $orders = QueryBuilder::for(
-            OrderForDelivery::where('workspace_id', $workspace->id)
-                ->where('assignee_id', $request->input('user_id'))
-                ->whereDate('delivery_date', now())
-        )
-            ->with([
-                'order' => function ($query) {
-                    $query->select(['id', 'order_number', 'parcel_status'])
-                        ->with([
-                            'shippingAddress' => function ($subQuery) {
-                                $subQuery->select(['order_id', 'full_name', 'full_address', 'phone_number']);
-                            },
-                            'items' => function ($subQuery) {
-                                $subQuery->select(['order_id', 'name', 'quantity']);
-                            },
-                        ]);
-                },
-                'page' => function ($query) {
-                    $query->select(['id', 'name']);
-                },
-            ])
+        $orders = QueryBuilder::for(OrderForDelivery::class)
+            ->where('workspace_id', $workspace->id)
+            ->where('assignee_id', $request->input('user_id'))
+            ->whereDate('delivery_date', now())
             ->allowedFilters([
                 AllowedFilter::callback('page_id', function ($query, $value) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
@@ -71,15 +53,30 @@ class RmoOrderController extends Controller
                 AllowedFilter::callback('parcel_status', function ($query, $value) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $values = array_map('strtolower', $values);
-                    $query->whereHas('order', function ($q) use ($values) {
-                        $q->whereIn('parcel_status', $values);
+                    $query->whereHas('order', function ($orderQuery) use ($values) {
+                        $orderQuery->whereIn('parcel_status', $values);
                     });
                 }),
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->whereHas('order.shippingAddress', function ($q) use ($value) {
-                        $q->where('full_name', 'LIKE', "%$value%");
+                        $q->where('full_name', 'LIKE', "%{$value}%");
                     });
                 }),
+            ])
+            ->with([
+                'page:id,name',
+                'shop:id,name',
+                'order' => function ($query) {
+                    $query->select(['id', 'order_number', 'parcel_status'])
+                        ->with([
+                            'shippingAddress' => function ($subQuery) {
+                                $subQuery->select(['order_id', 'full_name', 'full_address', 'phone_number']);
+                            },
+                            'items' => function ($subQuery) {
+                                $subQuery->select(['order_id', 'name', 'quantity']);
+                            },
+                        ]);
+                },
             ])
             ->paginate($request->input('per_page', 15));
 
@@ -95,12 +92,13 @@ class RmoOrderController extends Controller
                 'page_id' => $item->page_id,
                 'page_name' => $item->page?->name,
                 'shop_id' => $item->shop_id,
-                'parcel_status' => $item->order?->parcel_status,
+                'shop_name' => $item->shop?->name,
                 'items' => $item->order?->items?->map(fn ($i) => [
                     'name' => $i->name,
                     'quantity' => $i->quantity,
                 ]),
                 'status' => $item->status,
+                'parcel_status' => $item->order?->parcel_status,
             ];
         });
 
