@@ -1,5 +1,4 @@
 import PageHeader from '@/components/common/PageHeader';
-import { Button } from '@/components/ui/button';
 import { AddTaskDialog } from '@/components/checklist/add-task-dialog';
 import { DeleteChecklistDialog } from '@/components/checklist/delete-checklist-dialog';
 import { getChecklistColumns } from '@/components/checklist/checklist-columns';
@@ -126,7 +125,7 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                     title="Checklist"
                     description="Manage your tasks efficiently and never miss a requirement."
                 >
-                    <Button
+                    <button
                         type="button"
                         onClick={() => {
                             setDialogMode('add');
@@ -134,11 +133,11 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                             resetAddTaskForm();
                             setAddTaskOpen(true);
                         }}
-                        className="h-8 rounded-lg bg-emerald-600 px-3.5 text-[12px] font-medium text-white hover:bg-emerald-700"
+                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
                     >
                         <Plus className="mr-1.5 h-3.5 w-3.5" />
                         Add Task
-                    </Button>
+                    </button>
                 </PageHeader>
 
                 <AddTaskDialog
