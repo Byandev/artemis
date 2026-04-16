@@ -42,10 +42,14 @@ class InventoryItemController extends Controller
                 'id',
                 'product_id',
                 'sku',
+                'lead_time',
+                'unfulfilled_count',
+                'three_days_average',
+                'created_at',
                 \Spatie\QueryBuilder\AllowedSort::field('product_name', 'products.name'),
             ])
             ->defaultSort('-created_at')
-            ->paginate(10)
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         // Compute derived metrics on each item
@@ -72,6 +76,7 @@ class InventoryItemController extends Controller
             'workspace' => $workspace,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
+                'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
         ]);
@@ -81,7 +86,7 @@ class InventoryItemController extends Controller
     {
         $request->validate([
             'product_id'            => 'required|exists:products,id',
-            'sku'                   => 'required|string|max:255',
+            'sku'                   => 'required|string|max:255|unique:inventory_items,sku,NULL,id,workspace_id,'.$workspace->id,
             'sales_keywords'        => 'nullable|string',
             'transaction_keywords'  => 'nullable|string',
             'lead_time'             => 'nullable|integer|min:0',

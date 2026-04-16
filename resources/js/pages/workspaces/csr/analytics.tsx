@@ -20,7 +20,18 @@ interface CsrRecord {
     delivered: number;
     returning_count: number;
     rmo_called: number;
+    rmo_total_for_delivery: number;
+    rmo_productivity: number;
     rts_rate: number;
+    overall_engagement: number;
+    new_cx_engagement: number;
+    old_cx_engagement: number;
+    overall_orders: number;
+    new_cx_orders: number;
+    old_cx_orders: number;
+    new_cx_conversion_rate: number;
+    old_cx_conversion_rate: number;
+    overall_conversion_rate: number;
 }
 
 interface Props {
@@ -94,6 +105,7 @@ export default function Analytics({ workspace }: Props) {
     const [currentType, setCurrentType] = useState('pos');
     const [sort, setSort] = useState('-total_sales');
     const [page, setPage] = useState(1);
+    const [perPage, setPerPage] = useState(10);
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
     const toStr = format(range.to, 'yyyy-MM-dd');
@@ -113,7 +125,7 @@ export default function Analytics({ workspace }: Props) {
         const controller = new AbortController();
         axios
             .get(`/api/workspaces/${workspace.slug}/csrs/daily-records`, {
-                params: { from: fromStr, to: toStr, type: currentType, sort, page },
+                params: { from: fromStr, to: toStr, type: currentType, sort, page, per_page: perPage },
                 signal: controller.signal,
             })
             .then((res) => setPaginatedRecords(res.data))
@@ -121,7 +133,7 @@ export default function Analytics({ workspace }: Props) {
                 if (!axios.isCancel(err)) console.error(err);
             });
         return () => controller.abort();
-    }, [workspace.slug, fromStr, toStr, currentType, sort, page]);
+    }, [workspace.slug, fromStr, toStr, currentType, sort, page, perPage]);
 
     const initialSorting = useMemo(() => toFrontendSort(sort), [sort]);
 
@@ -162,6 +174,61 @@ export default function Analytics({ workspace }: Props) {
                 accessorKey: 'rmo_called',
                 header: ({ column }) => <SortableHeader column={column} title="RMO Called" />,
                 cell: ({ row }) => Number(row.original.rmo_called).toLocaleString(),
+            },
+            {
+                accessorKey: 'rmo_total_for_delivery',
+                header: ({ column }) => <SortableHeader column={column} title="RMO Total For Delivery" />,
+                cell: ({ row }) => Number(row.original.rmo_total_for_delivery).toLocaleString(),
+            },
+            {
+                accessorKey: 'rmo_productivity',
+                header: ({ column }) => <SortableHeader column={column} title="RMO Productivity" />,
+                cell: ({ row }) => `${Number(row.original.rmo_productivity).toFixed(2)}%`,
+            },
+            {
+                accessorKey: 'old_cx_engagement',
+                header: ({ column }) => <SortableHeader column={column} title="Old CX Engagement" />,
+                cell: ({ row }) => Number(row.original.old_cx_engagement).toLocaleString(),
+            },
+            {
+                accessorKey: 'new_cx_engagement',
+                header: ({ column }) => <SortableHeader column={column} title="New CX Engagement" />,
+                cell: ({ row }) => Number(row.original.new_cx_engagement).toLocaleString(),
+            },
+            {
+                accessorKey: 'overall_engagement',
+                header: ({ column }) => <SortableHeader column={column} title="Overall Engagement" />,
+                cell: ({ row }) => Number(row.original.overall_engagement).toLocaleString(),
+            },
+            {
+                accessorKey: 'old_cx_orders',
+                header: ({ column }) => <SortableHeader column={column} title="Old CX Orders" />,
+                cell: ({ row }) => Number(row.original.old_cx_orders).toLocaleString(),
+            },
+            {
+                accessorKey: 'new_cx_orders',
+                header: ({ column }) => <SortableHeader column={column} title="New CX Orders" />,
+                cell: ({ row }) => Number(row.original.new_cx_orders).toLocaleString(),
+            },
+            {
+                accessorKey: 'overall_orders',
+                header: ({ column }) => <SortableHeader column={column} title="Overall Orders" />,
+                cell: ({ row }) => Number(row.original.overall_orders).toLocaleString(),
+            },
+            {
+                accessorKey: 'new_cx_conversion_rate',
+                header: ({ column }) => <SortableHeader column={column} title="New CX Conversion Rate" />,
+                cell: ({ row }) => `${Number(row.original.new_cx_conversion_rate).toFixed(2)}%`,
+            },
+            {
+                accessorKey: 'old_cx_conversion_rate',
+                header: ({ column }) => <SortableHeader column={column} title="Old CX Conversion Rate" />,
+                cell: ({ row }) => `${Number(row.original.old_cx_conversion_rate).toFixed(2)}%`,
+            },
+            {
+                accessorKey: 'overall_conversion_rate',
+                header: ({ column }) => <SortableHeader column={column} title="Overall Conversion Rate" />,
+                cell: ({ row }) => `${Number(row.original.overall_conversion_rate).toFixed(2)}%`,
             },
         ],
         [],
@@ -228,6 +295,10 @@ export default function Analytics({ workspace }: Props) {
                         onFetch={(params) => {
                             if (params?.sort !== undefined) {
                                 setSort(params.sort as string);
+                                setPage(1);
+                            }
+                            if (params?.per_page !== undefined) {
+                                setPerPage(params.per_page as number);
                                 setPage(1);
                             }
                             if (params?.page !== undefined) {

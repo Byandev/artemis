@@ -115,11 +115,25 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
     const handleUpdateRole = (e: React.FormEvent) => {
         e.preventDefault();
         if (!memberToUpdateRole) return;
+
+        if (!isAdmin) {
+            showNoPermissionToast();
+            setMemberToUpdateRole(null);
+            updateRoleForm.reset();
+
+            return;
+        }
+
         updateRoleForm.put(
             workspaces.members.update.url({ workspace: workspace.slug, user: memberToUpdateRole.id }),
             {
                 preserveScroll: true,
                 onSuccess: () => {
+                    setMemberToUpdateRole(null);
+                    updateRoleForm.reset();
+                },
+                onError: () => {
+                    showNoPermissionToast();
                     setMemberToUpdateRole(null);
                     updateRoleForm.reset();
                 },
@@ -257,6 +271,12 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem
                                 onClick={() => {
+                                    if (!isAdmin) {
+                                        showNoPermissionToast();
+
+                                        return;
+                                    }
+
                                     setMemberToUpdateRole(member);
                                     updateRoleForm.setData('role_id', member.pivot?.role_id?.toString() ?? '');
                                 }}

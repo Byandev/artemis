@@ -3,6 +3,7 @@ import { authParcelStatusConfig, orderStatusConfig, ParcelStatusEntry } from '@/
 import { RmoStatCards } from '@/components/rts/RmoStatCards';
 import { RmoStatusPicker } from '@/components/rts/RmoStatusPicker';
 import { Button } from '@/components/ui/button';
+import DatePicker from '@/components/ui/date-picker';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { currencyFormatter, percentageFormatter } from '@/lib/utils';
@@ -19,6 +20,7 @@ import {
     BarChart3,
     ChevronDown,
     ChevronUp,
+    Download,
     MapPin,
     Phone,
     Search,
@@ -44,12 +46,14 @@ interface Props {
         };
         page?: number;
         perPage?: number;
+        delivery_date?: string;
     };
     users: User[];
     total_for_delivery_today: number;
-    called_rate: number;
-    successful_rate: number;
-    unsuccessful_rate: number;
+    called_count: number;
+    delivered_count: number;
+    returning_count: number;
+    problematic_count: number;
 }
 
 export default function RmoManagement({
@@ -58,13 +62,15 @@ export default function RmoManagement({
     query,
     users,
     total_for_delivery_today,
-    called_rate,
-    successful_rate,
-    unsuccessful_rate,
+    called_count,
+    delivered_count,
+    returning_count,
+    problematic_count,
 }: Props) {
     const [userName, setUserName] = useState<string | false>(false);
     const [isOpen, setIsOpen] = useState(false);
     const [showStats, setShowStats] = useState(() => localStorage.getItem('rmo_show_stats') === 'true');
+    const [showMyOnly, setShowMyOnly] = useState(() => localStorage.getItem('rmo_show_my_only') === 'true');
     const [pendingAssign, setPendingAssign] = useState<{ id: number; currentStatus: string } | null>(null);
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
@@ -98,15 +104,22 @@ export default function RmoManagement({
             : (query?.filter?.parcel_status ?? ''), [query?.filter?.parcel_status]
     );
 
+    const todayLocal = (() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+    const deliveryDate = query?.delivery_date ?? todayLocal;
+    const isToday = deliveryDate === todayLocal;
+
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
 
     const initialFilterValue = useMemo<FilterValue>(
         () => ({
             teamIds: [],
             productIds: [],
-            shopIds: selectedShopIds.map(Number),
-            pageIds: selectedPageIds.map(Number),
-            userIds: selectedUserIds.map(Number),
+            shopIds: [...selectedShopIds],
+            pageIds: [...selectedPageIds],
+            userIds: [...selectedUserIds],
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [],
@@ -151,9 +164,11 @@ export default function RmoManagement({
             ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
             ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
             page: page ?? 1,
-            ...(perPage ? { per_page: perPage } : {}),
+            per_page: perPage ?? orders.per_page,
+            delivery_date: deliveryDate,
+            ...(showMyOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
         }),
-        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds],
+        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyOnly, orders.per_page, deliveryDate],
     );
 
     const handleStatusChange = useCallback(
@@ -195,6 +210,55 @@ export default function RmoManagement({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchValue]);
 
+    useEffect(() => {
+        router.get(
+            publicPage.rmoManagement({ workspace }),
+            buildAllParams(query?.sort, 1),
+            { preserveState: true, replace: true, preserveScroll: true },
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showMyOnly]);
+
+
+    const handleExport = useCallback(() => {
+        const params = new URLSearchParams();
+        if (searchValue) params.set('filter[search]', searchValue);
+        if (currentStatus) params.set('filter[status]', currentStatus);
+        if (currentParcelStatus) params.set('filter[parcel_status]', currentParcelStatus);
+        if (selectedPageIds.length) params.set('filter[page_id]', selectedPageIds.join(','));
+        if (selectedShopIds.length) params.set('filter[shop_id]', selectedShopIds.join(','));
+        if (selectedUserIds.length) params.set('filter[user_id]', selectedUserIds.join(','));
+        params.set('delivery_date', deliveryDate);
+        if (showMyOnly && localStorage.getItem('user_id')) {
+            params.set('assignee_id', localStorage.getItem('user_id') ?? '');
+        }
+
+        const qs = params.toString();
+        window.location.href = `/public/workspaces/${workspace.slug}/rts/rmo-management/export${qs ? `?${qs}` : ''}`;
+    }, [workspace.slug, searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyOnly, deliveryDate]);
+
+    const handleDateChange = useCallback(
+        (date: string) => {
+            router.get(
+                publicPage.rmoManagement({ workspace }),
+                {
+                    sort: query?.sort || undefined,
+                    'filter[search]': searchValue || undefined,
+                    ...(currentStatus ? { 'filter[status]': currentStatus } : {}),
+                    ...(currentParcelStatus ? { 'filter[parcel_status]': currentParcelStatus } : {}),
+                    ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
+                    ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
+                    ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
+                    ...(showMyOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
+                    delivery_date: date,
+                    page: 1,
+                    per_page: orders.per_page,
+                },
+                { preserveState: true, replace: true, preserveScroll: true },
+            );
+        },
+        [workspace, query?.sort, searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyOnly, orders.per_page],
+    );
 
     const handleAssignUser = useCallback(
         (id: number, userId: string) => {
@@ -467,7 +531,8 @@ export default function RmoManagement({
                         return (
                             <button
                                 onClick={() => handleAssignToMe(id)}
-                                className="flex items-center gap-1.5 rounded-lg border border-dashed border-black/10 dark:border-white/10 px-2.5 py-1 text-[11px] font-medium text-gray-400 dark:text-gray-500 transition-all hover:border-emerald-300 dark:hover:border-emerald-500/40 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400"
+                                disabled={!isToday}
+                                className="flex items-center gap-1.5 rounded-lg border border-dashed border-black/10 dark:border-white/10 px-2.5 py-1 text-[11px] font-medium text-gray-400 dark:text-gray-500 transition-all hover:border-emerald-300 dark:hover:border-emerald-500/40 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-black/10 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:disabled:hover:border-white/10 dark:disabled:hover:bg-transparent dark:disabled:hover:text-gray-500"
                             >
                                 <UserPlus className="h-3 w-3" />
                                 Assign to me
@@ -480,12 +545,14 @@ export default function RmoManagement({
                             <span className="text-[12px] text-gray-700 dark:text-gray-300">
                                 {assignee.name}
                             </span>
-                            <button
-                                onClick={() => handleRemoveAssignee(id)}
-                                className="invisible flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-300 transition-colors hover:bg-red-50 hover:text-red-400 dark:text-gray-600 dark:hover:bg-red-500/10 dark:hover:text-red-400 group-hover:visible"
-                            >
-                                <X className="h-3 w-3" />
-                            </button>
+                            {isToday && (
+                                <button
+                                    onClick={() => handleRemoveAssignee(id)}
+                                    className="invisible flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-300 transition-colors hover:bg-red-50 hover:text-red-400 dark:text-gray-600 dark:hover:bg-red-500/10 dark:hover:text-red-400 group-hover:visible"
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
+                            )}
                         </div>
                     );
                 },
@@ -498,11 +565,12 @@ export default function RmoManagement({
                     <RmoStatusPicker
                         currentStatus={row.original.status as OrderStatus}
                         onChangeStatus={(status) => handleChangeStatus(status, row.original.id)}
+                        disabled={!isToday}
                     />
                 ),
             },
         ],
-        [handleAssignToMe, handleRemoveAssignee, handleChangeStatus],
+        [handleAssignToMe, handleRemoveAssignee, handleChangeStatus, isToday],
     );
 
     return (
@@ -569,21 +637,61 @@ export default function RmoManagement({
             </div>
 
             <div className="mx-auto w-full p-4 md:p-6">
-                <div className="mb-6 flex items-start justify-between">
+                <div className="mb-6 flex items-center justify-between">
                     <div>
                         <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">
                             RMO Management
                         </h1>
                         <p className="mt-0.5 text-[13px] text-gray-400 dark:text-gray-500">
-                            Delivery tracking for today's assigned orders
+                            Delivery tracking for assigned orders on {new Date(deliveryDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
+                        <label className="flex cursor-pointer items-center gap-2.5 select-none">
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={showMyOnly}
+                                onClick={() =>
+                                    setShowMyOnly((prev) => {
+                                        const next = !prev;
+                                        localStorage.setItem('rmo_show_my_only', String(next));
+                                        return next;
+                                    })
+                                }
+                                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 dark:focus-visible:ring-offset-zinc-950 ${
+                                    showMyOnly
+                                        ? 'border-emerald-600/40 bg-emerald-500 dark:border-emerald-400/50 dark:bg-emerald-500'
+                                        : 'border-black/8 bg-gray-200 dark:border-white/8 dark:bg-zinc-700'
+                                }`}
+                            >
+                                <span
+                                    className={`pointer-events-none absolute h-3.5 w-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.25)] transition-transform duration-200 ease-out ${
+                                        showMyOnly ? 'translate-x-[18px]' : 'translate-x-[2px]'
+                                    }`}
+                                />
+                            </button>
+                            <span className="text-[12px] font-medium text-gray-600 dark:text-gray-400">
+                                Only my data
+                            </span>
+                        </label>
+
                         <Filters
                             workspace={workspace}
                             onChange={handleFilterChange}
                             initialValue={initialFilterValue}
                         />
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleExport}
+                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                        >
+                            <Download className="h-3.5 w-3.5" />
+                            Export
+                        </Button>
+
                         <Button
                             variant="outline"
                             size="sm"
@@ -600,6 +708,16 @@ export default function RmoManagement({
                             {showStats ? 'Hide' : 'Show'} Statistics
                             {showStats ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                         </Button>
+
+                        <DatePicker
+                            id="delivery-date"
+                            mode="single"
+                            defaultDate={deliveryDate}
+                            placeholder="Select date"
+                            onChange={(_, dateStr) => {
+                                if (dateStr && dateStr !== deliveryDate) handleDateChange(dateStr);
+                            }}
+                        />
                     </div>
                 </div>
 
@@ -607,9 +725,10 @@ export default function RmoManagement({
                     <div className="mb-6">
                         <RmoStatCards
                             total_for_delivery_today={total_for_delivery_today}
-                            called_rate={called_rate}
-                            successful_rate={successful_rate}
-                            unsuccessful_rate={unsuccessful_rate}
+                            called_count={called_count}
+                            delivered_count={delivered_count}
+                            returning_count={returning_count}
+                            problematic_count={problematic_count}
                         />
                     </div>
                 )}

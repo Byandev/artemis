@@ -18,11 +18,11 @@ export default function ConfirmedByCard({ workspaceSlug, queryParams }: Props) {
     const [sort, setSort] = useState('-total_orders');
     const [view, setView] = useState<ViewMode>('table');
 
-    const fetchPage = (page: number, currentSort: string) => {
+    const fetchPage = (page: number, currentSort: string, perPage = 15) => {
         setLoading(true);
         const p = buildBaseParams(queryParams);
         p.append('page', String(page));
-        p.append('per_page', '15');
+        p.append('per_page', String(perPage));
         p.append('sort', currentSort);
         fetch(`/workspaces/${workspaceSlug}/rts/analytics/group-by/confirmed-by?${p}`, { credentials: 'same-origin' })
             .then((res) => (res.ok ? res.json() : null))
@@ -89,7 +89,7 @@ export default function ConfirmedByCard({ workspaceSlug, queryParams }: Props) {
                         onFetch={(params) => {
                             const s = params?.sort as string ?? '-total_orders';
                             setSort(s);
-                            fetchPage(Number(params?.page ?? 1), s);
+                            fetchPage(Number(params?.page ?? 1), s, Number(params?.per_page ?? data?.per_page ?? 10));
                         }}
                     />
                 )}
