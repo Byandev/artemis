@@ -66,7 +66,7 @@ class CSRController extends Controller
                 AllowedSort::field('rts_rate'),
             ])
             ->defaultSort('-total_sales')
-            ->paginate($request->integer('per_page', 15))
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         return response()->json($records);
