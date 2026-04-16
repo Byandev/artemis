@@ -20,26 +20,13 @@ import AppLogo from './app-logo';
 
 export function AdminSidebar() {
     const adminNavItems: NavItem[] = [
-        {
-            title: 'Admin Dashboard',
-            href: '/admin',
-            icon: LayoutDashboard,
-        },
+
         {
             title: 'Workspaces',
             href: '/admin/workspaces',
             icon: Layers,
-        },
-        {
-            title: 'User Management',
-            href: '/admin/users',
-            icon: Users,
-        },
-        {
-            title: 'System Settings',
-            href: '/admin/settings',
-            icon: Settings,
-        },
+        }
+
     ];
 
     return (
@@ -57,10 +44,6 @@ export function AdminSidebar() {
                                     <AppLogo />
                                 </Link>
                             </SidebarMenuButton>
-                            {/* Visual indicator that this is the Admin Panel */}
-                            <span className="mt-1 px-2 text-[10px] font-bold uppercase tracking-widest text-red-500">
-                                Admin Portal
-                            </span>
                         </div>
                     </SidebarMenuItem>
                 </SidebarMenu>
