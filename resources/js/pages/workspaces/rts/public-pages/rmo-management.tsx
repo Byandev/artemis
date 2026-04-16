@@ -592,20 +592,33 @@ export default function RmoManagement({
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <label className="flex cursor-pointer items-center gap-1.5">
-                            <input
-                                type="checkbox"
-                                checked={showMyOnly}
-                                onChange={() =>
+                        <label className="flex cursor-pointer items-center gap-2.5 select-none">
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={showMyOnly}
+                                onClick={() =>
                                     setShowMyOnly((prev) => {
                                         const next = !prev;
                                         localStorage.setItem('rmo_show_my_only', String(next));
                                         return next;
                                     })
                                 }
-                                className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                            />
-                            <span className="text-[12px] font-medium text-gray-600 dark:text-gray-400">Only my data</span>
+                                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 dark:focus-visible:ring-offset-zinc-950 ${
+                                    showMyOnly
+                                        ? 'border-emerald-600/40 bg-emerald-500 dark:border-emerald-400/50 dark:bg-emerald-500'
+                                        : 'border-black/8 bg-gray-200 dark:border-white/8 dark:bg-zinc-700'
+                                }`}
+                            >
+                                <span
+                                    className={`pointer-events-none absolute h-3.5 w-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.25)] transition-transform duration-200 ease-out ${
+                                        showMyOnly ? 'translate-x-[18px]' : 'translate-x-[2px]'
+                                    }`}
+                                />
+                            </button>
+                            <span className="text-[12px] font-medium text-gray-600 dark:text-gray-400">
+                                Only my data
+                            </span>
                         </label>
                         <Filters
                             workspace={workspace}
