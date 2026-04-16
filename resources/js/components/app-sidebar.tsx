@@ -2,6 +2,8 @@ import { NavMain } from '@/components/nav-main';
 import {
     Sidebar,
     SidebarContent,
+    SidebarGroup,
+    SidebarGroupLabel,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
@@ -26,7 +28,14 @@ import {
     Box,
     Layers,
     ShoppingCart,
+    Truck,
+    Trophy,
+    FileText,
+    Copy,
+    Check,
+    ExternalLink,
 } from 'lucide-react';
+import { useState } from 'react';
 import AppLogo from './app-logo';
 
 export function AppSidebar() {
@@ -149,11 +158,109 @@ export function AppSidebar() {
             <SidebarContent className="p-3">
                 <NavMain items={mainNavItems} group_label="Main" />
                 {/*<NavMain items={accountNavItems} group_label="Account" />*/}
+                <PublicLinks workspaceSlug={currentWorkspace.slug} />
             </SidebarContent>
 
             {/*<SidebarFooter>*/}
             {/*    <NavFooter items={footerNavItems} className="mt-auto" />*/}
             {/*</SidebarFooter>*/}
         </Sidebar>
+    );
+}
+
+function PublicLinks({ workspaceSlug }: { workspaceSlug: string }) {
+    const links = [
+        {
+            title: 'RMO Management',
+            href: `/public/workspaces/${workspaceSlug}/rts/rmo-management`,
+            icon: Truck,
+        },
+        { title: 'Leaderboards', href: '/leaderboards', icon: Trophy },
+        { title: 'Changelog', href: '/changelog', icon: FileText },
+    ];
+
+    return (
+        <SidebarGroup className="mt-auto">
+            <SidebarGroupLabel className="text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-300 dark:text-gray-600 px-3.5 mb-2">
+                Public Links
+            </SidebarGroupLabel>
+            <SidebarMenu className="mt-2">
+                {links.map((link) => (
+                    <PublicLinkItem key={link.title} {...link} />
+                ))}
+            </SidebarMenu>
+        </SidebarGroup>
+    );
+}
+
+function PublicLinkItem({
+    title,
+    href,
+    icon: Icon,
+}: {
+    title: string;
+    href: string;
+    icon: typeof Truck;
+}) {
+    const [copied, setCopied] = useState(false);
+
+    const copy = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const url =
+            typeof window !== 'undefined' ? window.location.origin + href : href;
+        try {
+            await navigator.clipboard?.writeText(url);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch {
+            // no-op
+        }
+    };
+
+    return (
+        <SidebarMenuItem>
+            <SidebarMenuButton
+                asChild
+                tooltip={{ children: title }}
+                className={[
+                    'group/public relative h-9 justify-between rounded-[10px] !text-[13px]',
+                    'text-gray-400 dark:text-gray-500',
+                    'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]',
+                    'transition-colors',
+                ].join(' ')}
+            >
+                <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center justify-between gap-3"
+                >
+                    <div className="flex items-center gap-3">
+                        <Icon className="h-4 w-4" />
+                        <span>{title}</span>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/public:opacity-100">
+                        <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={copy}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') copy(e as unknown as React.MouseEvent);
+                            }}
+                            aria-label={copied ? 'Copied' : 'Copy link'}
+                            className="flex h-5 w-5 cursor-pointer items-center justify-center rounded hover:bg-black/5 dark:hover:bg-white/10"
+                        >
+                            {copied ? (
+                                <Check className="h-3 w-3 text-emerald-500" />
+                            ) : (
+                                <Copy className="h-3 w-3" />
+                            )}
+                        </span>
+                        <ExternalLink className="h-3 w-3" />
+                    </div>
+                </a>
+            </SidebarMenuButton>
+        </SidebarMenuItem>
     );
 }
