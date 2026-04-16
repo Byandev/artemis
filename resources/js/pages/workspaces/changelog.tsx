@@ -12,6 +12,49 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v2.6.0',
+        date: '2026-04-16',
+        sections: [
+            {
+                title: 'Workspace Checklist',
+                items: [
+                    'New Checklist page in the workspace sidebar — define reusable tasks that apply to Shop or Page targets',
+                    'Each checklist item has a title, target type (Shop or Page), and a required flag shown as a yes/no badge',
+                    'Add, edit, and delete checklist items from a shared modal with validation',
+                    'Pages and Shops list rows now include a "View Checklist" action that opens a drawer showing per-target progress',
+                    'Optimistic toggle flow — checking or unchecking an item updates instantly and records who completed it',
+                    'Pages and Shops sort indicator now reflects how many required checklist items are still pending per target',
+                ],
+            },
+            {
+                title: 'Purchased Orders',
+                items: [
+                    'All columns are now sortable, with sort state persisted in the URL query string',
+                    'Create form enforces a strict YYYY-MM-DD issue date and disables submit until required fields are valid',
+                ],
+            },
+            {
+                title: 'Inventory Items',
+                items: [
+                    'Lead Time, Unfulfilled Count, 3-Day Average, and Created Date columns are now sortable',
+                ],
+            },
+            {
+                title: 'RMO Management',
+                items: [
+                    'Filter state is now preserved correctly after navigation — fixed a regression where assignee/status filters would reset',
+                ],
+            },
+            {
+                title: 'Tables',
+                items: [
+                    'Default page size is now 10 rows across CSR Management, CSR Analytics, RTS Analytics breakdowns (Ad, Confirmed By, Product, Rider), Parcel Templates, Roles, Inventory Purchased Orders, Ads Optimization Rules, and the public API endpoints (Users, RMO, CSR Daily Records)',
+                    'Row numbering now starts from the correct offset on every paginated table across the system',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v2.5.1',
         date: '2026-04-16',
         sections: [
@@ -418,6 +461,8 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v2.6.0':
+        'bg-pink-500/10 text-pink-600 dark:text-pink-400 ring-pink-500/20',
     'v2.5.1':
         'bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 ring-fuchsia-500/20',
     'v2.5.0':
