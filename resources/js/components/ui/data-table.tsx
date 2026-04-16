@@ -112,7 +112,7 @@ export function DataTable<TData, TValue>({
                                 <TableRow
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
-                                    className="hover:bg-emerald-500/[0.03] transition-colors"
+                                    className="hover:bg-emerald-500/3 transition-colors"
                                 >
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id} className='px-4 py-3  text-[12px] text-black dark:text-gray-400 border-b border-black/6 dark:border-white/6 align-top'>
@@ -150,12 +150,12 @@ export function DataTable<TData, TValue>({
                                     Rows
                                 </span>
                                 <Select
-                                    value={String(footerMeta?.per_page ?? 15)}
+                                    value={String(footerMeta?.per_page ?? 10)}
                                     onValueChange={(val) => {
                                         if (onFetch) onFetch({ per_page: Number(val), page: 1, sort: toBackendSort(sorting) })
                                     }}
                                 >
-                                    <SelectTrigger className="h-7 w-[72px] rounded-[8px] border border-black/6 bg-stone-50 px-2.5 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
+                                    <SelectTrigger className="h-7 w-[72px] rounded-lg border border-black/6 bg-stone-50 px-2.5 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent className="min-w-[72px]">
@@ -169,7 +169,7 @@ export function DataTable<TData, TValue>({
                             </div>
                             <div className="h-4 w-px bg-black/6 dark:bg-white/6" />
                             <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
-                                Showing {footerMeta?.from} to {footerMeta?.to} of {footerMeta?.total?.toLocaleString()} entries
+                                Showing {footerMeta?.from ?? 0} to {footerMeta?.to ?? 0} of {(footerMeta?.total ?? 0).toLocaleString()} entries
                             </p>
                         </div>
 
