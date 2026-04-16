@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Field, Footer, inputCls } from '@/components/finance/account-form-dialog';
+import { SUB_CATEGORIES, SubCategory } from '@/components/finance/sub-category';
 import { useForm } from '@inertiajs/react';
 import React, { useEffect } from 'react';
 
@@ -9,9 +10,9 @@ export interface FinanceTransaction {
     date: string;
     description: string;
     type: 'in' | 'out';
-    transaction_type: 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance';
+    transaction_type: 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance' | null;
     amount: number | string;
-    category: 'remittance' | 'expense' | 'transfer' | 'other';
+    sub_category: SubCategory | null;
     notes: string | null;
 }
 
@@ -38,7 +39,7 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
         type: 'in' as 'in' | 'out',
         transaction_type: 'funds' as 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance',
         amount: '',
-        category: 'other' as 'remittance' | 'expense' | 'transfer' | 'other',
+        sub_category: '' as SubCategory | '',
         notes: '',
     });
 
@@ -52,14 +53,14 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
                     type: transaction.type,
                     transaction_type: transaction.transaction_type ?? 'funds',
                     amount: String(transaction.amount ?? ''),
-                    category: transaction.category,
+                    sub_category: transaction.sub_category ?? '',
                     notes: transaction.notes ?? '',
                 });
             } else {
                 reset();
                 clearErrors();
                 if (defaults?.account_id) setData('account_id', String(defaults.account_id));
-                if (defaults?.category) setData('category', defaults.category);
+                if (defaults?.sub_category) setData('sub_category', defaults.sub_category);
             }
         }
     }, [open, transaction]);
@@ -137,12 +138,16 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
                             <Field label="Amount" required error={errors.amount}>
                                 <input type="number" step="0.01" min="0" value={data.amount} onChange={(e) => setData('amount', e.target.value)} className={inputCls} />
                             </Field>
-                            <Field label="Category" required error={errors.category}>
-                                <select value={data.category} onChange={(e) => setData('category', e.target.value as typeof data.category)} className={inputCls}>
-                                    <option value="remittance">remittance</option>
-                                    <option value="expense">expense</option>
-                                    <option value="transfer">transfer</option>
-                                    <option value="other">other</option>
+                            <Field label="Sub Category" error={errors.sub_category}>
+                                <select
+                                    value={data.sub_category}
+                                    onChange={(e) => setData('sub_category', e.target.value as SubCategory | '')}
+                                    className={inputCls}
+                                >
+                                    <option value="">— none —</option>
+                                    {SUB_CATEGORIES.map(s => (
+                                        <option key={s.value} value={s.value}>{s.label}</option>
+                                    ))}
                                 </select>
                             </Field>
                         </div>

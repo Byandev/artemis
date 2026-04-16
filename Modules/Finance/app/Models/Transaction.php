@@ -18,7 +18,8 @@ class Transaction extends Model
         'type',
         'transaction_type',
         'amount',
-        'category',
+        'running_balance',
+        'sub_category',
         'notes',
     ];
 

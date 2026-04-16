@@ -17,9 +17,13 @@ return new class extends Migration
             $table->date('date');
             $table->string('description');
             $table->enum('type', ['in', 'out']);
-            $table->enum('transaction_type', ['funds', 'profit_share', 'expenses', 'transfer', 'remittance'])->default('funds');
+            $table->enum('transaction_type', ['funds', 'profit_share', 'expenses', 'transfer', 'remittance'])->nullable();
             $table->decimal('amount', 15, 2);
-            $table->enum('category', ['remittance', 'expense', 'transfer', 'other'])->default('other');
+            $table->decimal('running_balance', 15, 2)->nullable();
+            $table->enum('sub_category', [
+                'ad_spent', 'cogs', 'subscription', 'shipping_fee',
+                'operation_expense', 'salary', 'transfer_fee', 'seminar_fee', 'others',
+            ])->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
 

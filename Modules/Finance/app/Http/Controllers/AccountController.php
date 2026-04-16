@@ -69,8 +69,8 @@ class AccountController extends Controller
 
         $transactions = $account->transactions()
             ->with('remittance:id,transaction_id,courier,soa_number')
-            ->orderBy('date')
-            ->orderBy('created_at')
+            ->orderByDesc('date')
+            ->orderByDesc('id')
             ->get();
 
         return Inertia::render('workspaces/finance/accounts/show', [

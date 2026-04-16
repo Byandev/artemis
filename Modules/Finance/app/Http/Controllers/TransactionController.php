@@ -51,10 +51,10 @@ class TransactionController extends Controller
                 AllowedFilter::exact('account_id'),
                 AllowedFilter::exact('type'),
                 AllowedFilter::exact('transaction_type'),
-                AllowedFilter::exact('category'),
+                AllowedFilter::exact('sub_category'),
             ])
-            ->allowedSorts(['id', 'date', 'amount', 'type', 'transaction_type', 'category', 'created_at'])
-            ->defaultSort('-date', '-created_at')
+            ->allowedSorts(['id', 'date', 'amount', 'type', 'transaction_type', 'sub_category', 'created_at'])
+            ->defaultSort('-date')
             ->paginate(15)
             ->withQueryString();
 
@@ -89,6 +89,44 @@ class TransactionController extends Controller
         $transaction->update($request->validated());
 
         return redirect()->back()->with('success', 'Transaction updated.');
+    }
+
+    public function import(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+
+        $validated = $request->validate([
+            'rows' => ['required', 'array', 'min:1'],
+            'rows.*.account_id' => ['required', 'integer'],
+            'rows.*.date' => ['required', 'date'],
+            'rows.*.description' => ['required', 'string', 'max:255'],
+            'rows.*.type' => ['required', 'in:in,out'],
+            'rows.*.transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance'],
+            'rows.*.amount' => ['required', 'numeric', 'min:0'],
+            'rows.*.running_balance' => ['nullable', 'numeric'],
+            'rows.*.sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,operation_expense,salary,transfer_fee,seminar_fee,others'],
+            'rows.*.notes' => ['nullable', 'string'],
+        ]);
+
+        $accountIds = collect($validated['rows'])->pluck('account_id')->unique();
+        $validAccountIds = Account::where('workspace_id', $workspace->id)
+            ->whereIn('id', $accountIds)->pluck('id')->all();
+
+        if (count($validAccountIds) !== $accountIds->count()) {
+            return redirect()->back()->withErrors(['rows' => 'One or more accounts do not belong to this workspace.']);
+        }
+
+        $now = now();
+        $records = collect($validated['rows'])->map(fn ($r) => [
+            ...$r,
+            'workspace_id' => $workspace->id,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ])->all();
+
+        Transaction::insert($records);
+
+        return redirect()->back()->with('success', count($records).' transactions imported.');
     }
 
     public function destroy(Request $request, Workspace $workspace, Transaction $transaction)

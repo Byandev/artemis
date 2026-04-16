@@ -9,6 +9,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
+import { SUB_CATEGORY_LABEL, SubCategory } from '@/components/finance/sub-category';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
@@ -29,9 +30,9 @@ interface Txn {
     date: string;
     description: string;
     type: 'in' | 'out';
-    transaction_type: 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance';
+    transaction_type: 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance' | null;
     amount: number | string;
-    category: 'remittance' | 'expense' | 'transfer' | 'other';
+    sub_category: SubCategory | null;
     notes: string | null;
     remittance?: { id: number; courier: string; soa_number: string } | null;
 }
@@ -93,7 +94,7 @@ export default function AccountShow({ workspace, account, transactions }: Props)
                     <table className="w-full text-[12px]">
                         <thead>
                             <tr className="border-b border-black/6 dark:border-white/6">
-                                {['Date', 'Description', 'Category', 'IN', 'OUT', 'Balance', ''].map((h, i) => (
+                                {['Date', 'Description', 'Sub Category', 'Credit', 'Debit', 'Balance', ''].map((h, i) => (
                                     <th key={i} className={`px-4 py-2.5 font-mono text-[10px] font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600 ${i >= 3 && i <= 5 ? 'text-right' : 'text-left'}`}>{h}</th>
                                 ))}
                             </tr>
@@ -103,22 +104,26 @@ export default function AccountShow({ workspace, account, transactions }: Props)
                                 <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">No transactions yet.</td></tr>
                             )}
                             {rows.map((r) => {
-                                const s = TXN_TYPE_STYLE[r.transaction_type] ?? TXN_TYPE_STYLE.funds;
+                                const s = r.transaction_type ? TXN_TYPE_STYLE[r.transaction_type] : TXN_TYPE_STYLE.funds;
                                 return (
                                     <tr key={r.id} className="border-b border-black/6 last:border-0 hover:bg-stone-50 dark:border-white/6 dark:hover:bg-white/2">
                                         <td className="px-4 py-2.5 font-mono text-[11px] text-gray-600 dark:text-gray-400">{String(r.date).slice(0, 10)}</td>
                                         <td className="px-4 py-2.5 text-gray-800 dark:text-gray-200">
-                                            <div>{r.description}</div>
+                                            <div className="max-w-[320px] truncate" title={r.description}>{r.description}</div>
                                             {r.remittance && (
-                                                <Link href={`${base}/remittances/${r.remittance.id}`} className="text-[10px] text-gray-400 hover:text-emerald-600">
+                                                <Link href={`${base}/remittances/${r.remittance.id}`} className="block max-w-[320px] truncate text-[10px] text-gray-400 hover:text-emerald-600">
                                                     SOA {r.remittance.soa_number} · {r.remittance.courier}
                                                 </Link>
                                             )}
                                         </td>
                                         <td className="px-4 py-2.5">
                                             <div className="flex flex-col gap-1">
-                                                <span className="inline-flex w-fit items-center rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] uppercase text-gray-500 dark:bg-zinc-800 dark:text-gray-400">{r.category}</span>
-                                                <span className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${s.cls}`}>{s.label}</span>
+                                                {r.sub_category && (
+                                                    <span className="inline-flex w-fit items-center rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] uppercase text-gray-500 dark:bg-zinc-800 dark:text-gray-400">{SUB_CATEGORY_LABEL[r.sub_category]}</span>
+                                                )}
+                                                {r.transaction_type && (
+                                                    <span className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${s.cls}`}>{s.label}</span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-4 py-2.5 text-right font-mono text-[12px] text-emerald-600 dark:text-emerald-400">{r.type === 'in' ? fmt(r.amount) : ''}</td>
@@ -137,7 +142,7 @@ export default function AccountShow({ workspace, account, transactions }: Props)
                                                             id: r.id, account_id: account.id, date: String(r.date).slice(0, 10),
                                                             description: r.description, type: r.type,
                                                             transaction_type: r.transaction_type,
-                                                            amount: r.amount, category: r.category, notes: r.notes,
+                                                            amount: r.amount, sub_category: r.sub_category, notes: r.notes,
                                                         })}>
                                                             <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                                                         </DropdownMenuItem>

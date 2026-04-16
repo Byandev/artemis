@@ -211,6 +211,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/transactions', [FinanceTransactionController::class, 'index'])->name('transactions.index');
         Route::post('/transactions', [FinanceTransactionController::class, 'store'])->name('transactions.store');
+        Route::post('/transactions/import', [FinanceTransactionController::class, 'import'])->name('transactions.import');
         Route::put('/transactions/{transaction}', [FinanceTransactionController::class, 'update'])->name('transactions.update');
         Route::delete('/transactions/{transaction}', [FinanceTransactionController::class, 'destroy'])->name('transactions.destroy');
 

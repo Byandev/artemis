@@ -19,9 +19,12 @@ class TransactionRequest extends FormRequest
             'date' => ['required', 'date'],
             'description' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::in(['in', 'out'])],
-            'transaction_type' => ['required', Rule::in(['funds', 'profit_share', 'expenses', 'transfer', 'remittance'])],
+            'transaction_type' => ['nullable', Rule::in(['funds', 'profit_share', 'expenses', 'transfer', 'remittance'])],
             'amount' => ['required', 'numeric', 'min:0'],
-            'category' => ['required', Rule::in(['remittance', 'expense', 'transfer', 'other'])],
+            'sub_category' => ['nullable', Rule::in([
+                'ad_spent', 'cogs', 'subscription', 'shipping_fee',
+                'operation_expense', 'salary', 'transfer_fee', 'seminar_fee', 'others',
+            ])],
             'notes' => ['nullable', 'string'],
         ];
     }

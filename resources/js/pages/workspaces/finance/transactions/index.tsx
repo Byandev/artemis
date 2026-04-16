@@ -1,5 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
 import { FinanceDeleteDialog } from '@/components/finance/delete-dialog';
+import { ImportTransactionsDialog } from '@/components/finance/import-transactions-dialog';
 import { FinanceTransaction, TransactionFormDialog } from '@/components/finance/transaction-form-dialog';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -16,7 +17,8 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Search, Trash2, Upload } from 'lucide-react';
+import { SUB_CATEGORY_LABEL, SubCategory } from '@/components/finance/sub-category';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Row extends FinanceTransaction {
@@ -46,6 +48,7 @@ const TXN_TYPE_STYLE: Record<string, { label: string; cls: string }> = {
 export default function TransactionsIndex({ workspace, transactions, accounts, query }: Props) {
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
     const [createOpen, setCreateOpen] = useState(false);
+    const [importOpen, setImportOpen] = useState(false);
     const [editing, setEditing] = useState<FinanceTransaction | null>(null);
     const [toDelete, setToDelete] = useState<Row | null>(null);
     const [search, setSearch] = useState(query?.filter?.search ?? '');
@@ -76,20 +79,22 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
             accessorKey: 'description', enableSorting: false,
             header: () => <div className="font-mono text-[10px] uppercase tracking-wider text-gray-300">Description</div>,
             cell: ({ row }) => (
-                <div className="flex flex-col gap-0.5">
-                    <span className="text-[12px] text-gray-800 dark:text-gray-100">{row.original.description}</span>
+                <div className="flex max-w-[320px] flex-col gap-0.5">
+                    <span className="truncate text-[12px] text-gray-800 dark:text-gray-100" title={row.original.description}>{row.original.description}</span>
                     {row.original.remittance && (
-                        <span className="text-[10px] text-gray-400">SOA {row.original.remittance.soa_number} · {row.original.remittance.courier}</span>
+                        <span className="truncate text-[10px] text-gray-400">SOA {row.original.remittance.soa_number} · {row.original.remittance.courier}</span>
                     )}
                 </div>
             ),
         },
         {
-            accessorKey: 'category', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Category" className="justify-center" />,
+            accessorKey: 'sub_category', enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Sub Category" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center">
-                    <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] uppercase text-gray-500 dark:bg-zinc-800 dark:text-gray-400">{row.original.category}</span>
+                    {row.original.sub_category
+                        ? <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] uppercase text-gray-500 dark:bg-zinc-800 dark:text-gray-400">{SUB_CATEGORY_LABEL[row.original.sub_category]}</span>
+                        : <span className="font-mono text-[10px] text-gray-300">—</span>}
                 </div>
             ),
         },
@@ -97,6 +102,7 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
             accessorKey: 'transaction_type', enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Txn Type" className="justify-center" />,
             cell: ({ row }) => {
+                if (!row.original.transaction_type) return <div className="text-center font-mono text-[10px] text-gray-300">—</div>;
                 const s = TXN_TYPE_STYLE[row.original.transaction_type] ?? TXN_TYPE_STYLE.funds;
                 return (
                     <div className="text-center">
@@ -106,21 +112,21 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
             },
         },
         {
-            accessorKey: 'type', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Type" className="justify-center" />,
+            id: 'credit',
+            header: () => <div className="text-right font-mono text-[10px] uppercase tracking-wider text-gray-300">Credit</div>,
             cell: ({ row }) => (
-                <div className="text-center">
-                    <span className={`font-mono text-[11px] font-medium ${row.original.type === 'in' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
-                        {row.original.type.toUpperCase()}
-                    </span>
+                <div className="text-right font-mono text-[12px] text-emerald-600 dark:text-emerald-400">
+                    {row.original.type === 'in' ? fmt(row.original.amount) : ''}
                 </div>
             ),
         },
         {
-            accessorKey: 'amount', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Amount" className="justify-end" />,
+            id: 'debit',
+            header: () => <div className="text-right font-mono text-[10px] uppercase tracking-wider text-gray-300">Debit</div>,
             cell: ({ row }) => (
-                <div className="text-right font-mono text-[12px] font-medium text-gray-700 dark:text-gray-200">{fmt(row.original.amount)}</div>
+                <div className="text-right font-mono text-[12px] text-red-500 dark:text-red-400">
+                    {row.original.type === 'out' ? fmt(row.original.amount) : ''}
+                </div>
             ),
         },
         {
@@ -140,7 +146,7 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                                 date: String(row.original.date).slice(0, 10),
                                 description: row.original.description, type: row.original.type,
                                 transaction_type: row.original.transaction_type,
-                                amount: row.original.amount, category: row.original.category,
+                                amount: row.original.amount, sub_category: row.original.sub_category,
                                 notes: row.original.notes,
                             })}>
                                 <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
@@ -161,6 +167,12 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
             <Head title={`${workspace.name} - Finance Transactions`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader title="Transactions" description="Ledger entries across all accounts.">
+                    <button
+                        onClick={() => setImportOpen(true)}
+                        className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
+                    >
+                        <Upload className="h-3.5 w-3.5" /> Import CSV
+                    </button>
                     <button
                         onClick={() => setCreateOpen(true)}
                         className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white hover:bg-emerald-700"
@@ -202,6 +214,12 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                     transaction={editing}
                     accounts={accounts}
                     workspaceSlug={workspace.slug}
+                />
+                <ImportTransactionsDialog
+                    open={importOpen}
+                    onOpenChange={setImportOpen}
+                    workspaceSlug={workspace.slug}
+                    accounts={accounts}
                 />
                 <FinanceDeleteDialog
                     open={!!toDelete}
