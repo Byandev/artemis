@@ -53,6 +53,10 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
+        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+            return redirect()->back()->with('error', 'Assignee can only be updated for orders scheduled for delivery today.');
+        }
+
         if (! $request->userId) {
             return redirect()->back()->with('error', 'Please select a user before assigning.');
         }
@@ -68,6 +72,10 @@ class ForDeliveryController extends Controller
 
         if (! $orderForDelivery) {
             return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+            return redirect()->back()->with('error', 'Assignee can only be removed for orders scheduled for delivery today.');
         }
 
         $orderForDelivery->update(['assignee_id' => null]);
