@@ -175,7 +175,6 @@ Route::middleware(['auth'])->group(function () {
 
     // Checklist routes
     Route::get('/workspaces/{workspace}/checklist', [ChecklistController::class, 'index'])->name('workspaces.checklist.index');
-    Route::get('/workspaces/{workspace}/checklist/view', [ChecklistController::class, 'view'])->name('workspaces.checklist.view');
     Route::post('/workspaces/{workspace}/checklist', [ChecklistController::class, 'store'])->name('workspaces.checklist.store');
     Route::put('/workspaces/{workspace}/checklist/{checklist}', [ChecklistController::class, 'update'])->name('workspaces.checklist.update');
     Route::delete('/workspaces/{workspace}/checklist/{checklist}', [ChecklistController::class, 'destroy'])->name('workspaces.checklist.destroy');
