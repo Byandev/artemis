@@ -116,6 +116,8 @@ export function ImportTransactionsDialog({ open, onOpenChange, workspaceSlug, ac
             const desc = (r[detailsCol] ?? '').trim();
             const credit = creditsCol >= 0 ? parseNumber(r[creditsCol] ?? '') : 0;
             const debit = debitsCol >= 0 ? parseNumber(r[debitsCol] ?? '') : 0;
+            const runningRaw = runningCol >= 0 ? (r[runningCol] ?? '').trim() : '';
+            const running = runningRaw ? parseNumber(runningRaw) : null;
             const rem = remarksCol >= 0 ? (r[remarksCol] ?? '').trim() : '';
 
             const notesParts = [rem && `Remarks: ${rem}`].filter(Boolean);
@@ -136,11 +138,12 @@ export function ImportTransactionsDialog({ open, onOpenChange, workspaceSlug, ac
                 description: desc,
                 type,
                 amount,
+                running_balance: running,
                 notes: notesParts.join(' · '),
                 _warn: warn.length ? warn.join(', ') : undefined,
             };
         });
-    }, [rawRows, dateCol, detailsCol, creditsCol, debitsCol, remarksCol]);
+    }, [rawRows, dateCol, detailsCol, creditsCol, debitsCol, runningCol, remarksCol]);
 
     const validRows = useMemo(() => mappedRows.filter(r => !r._warn), [mappedRows]);
     const skipRows = useMemo(() => mappedRows.filter(r => r._warn), [mappedRows]);
@@ -160,6 +163,7 @@ export function ImportTransactionsDialog({ open, onOpenChange, workspaceSlug, ac
                     type: r.type,
                     transaction_type: null,
                     amount: r.amount,
+                    running_balance: r.running_balance,
                     sub_category: null,
                     notes: r.notes || null,
                 })),
@@ -228,6 +232,7 @@ export function ImportTransactionsDialog({ open, onOpenChange, workspaceSlug, ac
                                     <Field label="Details → Description"><ColSelect value={detailsCol} onChange={setDetailsCol} /></Field>
                                     <Field label="Credits → IN amount"><ColSelect value={creditsCol} onChange={setCreditsCol} /></Field>
                                     <Field label="Debits → OUT amount"><ColSelect value={debitsCol} onChange={setDebitsCol} /></Field>
+                                    <Field label="Running Balance"><ColSelect value={runningCol} onChange={setRunningCol} /></Field>
                                     <Field label="Remarks → Notes"><ColSelect value={remarksCol} onChange={setRemarksCol} /></Field>
                                 </div>
                             </div>
@@ -242,8 +247,8 @@ export function ImportTransactionsDialog({ open, onOpenChange, workspaceSlug, ac
                                     <table className="w-full text-[11px]">
                                         <thead className="sticky top-0 bg-stone-50 dark:bg-zinc-800">
                                             <tr>
-                                                {['Date', 'Description', 'Credit', 'Debit', 'Notes', 'Status'].map((h, i) => (
-                                                    <th key={h} className={`px-3 py-2 ${i === 2 || i === 3 ? 'text-right' : 'text-left'} font-mono text-[10px] uppercase tracking-wider text-gray-400`}>{h}</th>
+                                                {['Date', 'Description', 'Credit', 'Debit', 'Running Balance', 'Notes', 'Status'].map((h, i) => (
+                                                    <th key={h} className={`px-3 py-2 ${i >= 2 && i <= 4 ? 'text-right' : 'text-left'} font-mono text-[10px] uppercase tracking-wider text-gray-400`}>{h}</th>
                                                 ))}
                                             </tr>
                                         </thead>
@@ -257,6 +262,9 @@ export function ImportTransactionsDialog({ open, onOpenChange, workspaceSlug, ac
                                                     </td>
                                                     <td className="px-3 py-1.5 text-right font-mono text-red-500 dark:text-red-400">
                                                         {r.type === 'out' && r.amount > 0 ? r.amount.toLocaleString('en-PH', { minimumFractionDigits: 2 }) : ''}
+                                                    </td>
+                                                    <td className="px-3 py-1.5 text-right font-mono text-gray-700 dark:text-gray-200">
+                                                        {r.running_balance != null ? r.running_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 }) : ''}
                                                     </td>
                                                     <td className="px-3 py-1.5 text-gray-500">{r.notes}</td>
                                                     <td className="px-3 py-1.5 font-mono text-[10px]">

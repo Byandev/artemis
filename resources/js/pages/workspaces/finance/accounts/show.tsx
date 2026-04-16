@@ -32,6 +32,7 @@ interface Txn {
     type: 'in' | 'out';
     transaction_type: 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance' | null;
     amount: number | string;
+    running_balance: number | string | null;
     sub_category: SubCategory | null;
     notes: string | null;
     remittance?: { id: number; courier: string; soa_number: string } | null;
@@ -60,15 +61,23 @@ export default function AccountShow({ workspace, account, transactions }: Props)
 
     const base = `/workspaces/${workspace.slug}/finance`;
 
+    // Server returns transactions sorted by date desc. For rows that don't have a
+    // stored running_balance (manual entries), compute one chronologically.
     const rows = useMemo(() => {
+        const asc = [...transactions].reverse();
         let running = Number(account.opening_balance);
-        return transactions.map(t => {
+        const computed = new Map<number, number>();
+        for (const t of asc) {
             running += t.type === 'in' ? Number(t.amount) : -Number(t.amount);
-            return { ...t, running_balance: running };
-        });
+            computed.set(t.id, running);
+        }
+        return transactions.map(t => ({
+            ...t,
+            display_balance: t.running_balance != null ? Number(t.running_balance) : (computed.get(t.id) ?? running),
+        }));
     }, [transactions, account.opening_balance]);
 
-    const currentBalance = rows.length ? rows[rows.length - 1].running_balance : Number(account.opening_balance);
+    const currentBalance = rows.length ? rows[0].display_balance : Number(account.opening_balance);
 
     return (
         <AppLayout>
@@ -128,7 +137,7 @@ export default function AccountShow({ workspace, account, transactions }: Props)
                                         </td>
                                         <td className="px-4 py-2.5 text-right font-mono text-[12px] text-emerald-600 dark:text-emerald-400">{r.type === 'in' ? fmt(r.amount) : ''}</td>
                                         <td className="px-4 py-2.5 text-right font-mono text-[12px] text-red-500 dark:text-red-400">{r.type === 'out' ? fmt(r.amount) : ''}</td>
-                                        <td className="px-4 py-2.5 text-right font-mono text-[12px] font-medium text-gray-700 dark:text-gray-200">{fmt(r.running_balance)}</td>
+                                        <td className="px-4 py-2.5 text-right font-mono text-[12px] font-medium text-gray-700 dark:text-gray-200">{fmt(r.display_balance)}</td>
                                         <td className="px-4 py-2.5">
                                             <div className="flex justify-center">
                                                 <DropdownMenu>
