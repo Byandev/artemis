@@ -23,6 +23,15 @@ interface CsrRecord {
     rmo_total_for_delivery: number;
     rmo_productivity: number;
     rts_rate: number;
+    overall_engagement: number;
+    new_cx_engagement: number;
+    old_cx_engagement: number;
+    overall_orders: number;
+    new_cx_orders: number;
+    old_cx_orders: number;
+    new_cx_conversion_rate: number;
+    old_cx_conversion_rate: number;
+    overall_conversion_rate: number;
 }
 
 interface Props {
@@ -175,6 +184,51 @@ export default function Analytics({ workspace }: Props) {
                 accessorKey: 'rmo_productivity',
                 header: ({ column }) => <SortableHeader column={column} title="RMO Productivity" />,
                 cell: ({ row }) => `${Number(row.original.rmo_productivity).toFixed(2)}%`,
+            },
+            {
+                accessorKey: 'old_cx_engagement',
+                header: ({ column }) => <SortableHeader column={column} title="Old CX Engagement" />,
+                cell: ({ row }) => Number(row.original.old_cx_engagement).toLocaleString(),
+            },
+            {
+                accessorKey: 'new_cx_engagement',
+                header: ({ column }) => <SortableHeader column={column} title="New CX Engagement" />,
+                cell: ({ row }) => Number(row.original.new_cx_engagement).toLocaleString(),
+            },
+            {
+                accessorKey: 'overall_engagement',
+                header: ({ column }) => <SortableHeader column={column} title="Overall Engagement" />,
+                cell: ({ row }) => Number(row.original.overall_engagement).toLocaleString(),
+            },
+            {
+                accessorKey: 'old_cx_orders',
+                header: ({ column }) => <SortableHeader column={column} title="Old CX Orders" />,
+                cell: ({ row }) => Number(row.original.old_cx_orders).toLocaleString(),
+            },
+            {
+                accessorKey: 'new_cx_orders',
+                header: ({ column }) => <SortableHeader column={column} title="New CX Orders" />,
+                cell: ({ row }) => Number(row.original.new_cx_orders).toLocaleString(),
+            },
+            {
+                accessorKey: 'overall_orders',
+                header: ({ column }) => <SortableHeader column={column} title="Overall Orders" />,
+                cell: ({ row }) => Number(row.original.overall_orders).toLocaleString(),
+            },
+            {
+                accessorKey: 'new_cx_conversion_rate',
+                header: ({ column }) => <SortableHeader column={column} title="New CX Conversion Rate" />,
+                cell: ({ row }) => `${Number(row.original.new_cx_conversion_rate).toFixed(2)}%`,
+            },
+            {
+                accessorKey: 'old_cx_conversion_rate',
+                header: ({ column }) => <SortableHeader column={column} title="Old CX Conversion Rate" />,
+                cell: ({ row }) => `${Number(row.original.old_cx_conversion_rate).toFixed(2)}%`,
+            },
+            {
+                accessorKey: 'overall_conversion_rate',
+                header: ({ column }) => <SortableHeader column={column} title="Overall Conversion Rate" />,
+                cell: ({ row }) => `${Number(row.original.overall_conversion_rate).toFixed(2)}%`,
             },
         ],
         [],

@@ -17,6 +17,9 @@ class CSRController extends Controller
         'csr_name', 'total_orders', 'total_sales',
         'delivered', 'returning_count', 'rmo_called', 'rmo_total_for_delivery',
         'rmo_productivity', 'rts_rate',
+        'overall_engagement', 'new_cx_engagement', 'old_cx_engagement',
+        'overall_orders', 'new_cx_orders', 'old_cx_orders',
+        'new_cx_conversion_rate', 'old_cx_conversion_rate', 'overall_conversion_rate',
     ];
 
     public function dailyRecords(Request $request, Workspace $workspace)
@@ -35,8 +38,21 @@ class CSRController extends Controller
 
         $type = $request->input('type');
 
+        $engagementSub = DB::table('pancake_user_daily_engagements')
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('date', [$from, $to])
+            ->groupBy('pancake_user_id')
+            ->selectRaw('
+                pancake_user_id,
+                SUM(total_engagement) as s_total_eng,
+                SUM(customer_engagement_new_inbox) as s_new_eng,
+                SUM(order_count) as s_eng_orders,
+                SUM(old_order_count) as s_old_orders
+            ');
+
         $query = PancakeUserDailyReport::query()
             ->join('pancake_users as pu', 'pu.id', '=', 'pancake_user_daily_reports.pancake_user_id')
+            ->leftJoinSub($engagementSub, 'eng', 'eng.pancake_user_id', '=', 'pu.id')
             ->where('pancake_user_daily_reports.workspace_id', $workspace->id)
             ->whereBetween('pancake_user_daily_reports.date', [$from, $to])
             ->when($type, fn ($q) => $q->where('pancake_user_daily_reports.type', $type))
@@ -49,6 +65,27 @@ class CSRController extends Controller
                 SUM(pancake_user_daily_reports.delivered)    as delivered,
                 SUM(pancake_user_daily_reports.`returning`)  as returning_count,
                 SUM(pancake_user_daily_reports.rmo_called)   as rmo_called,
+                COALESCE(MAX(eng.s_total_eng), 0) as overall_engagement,
+                COALESCE(MAX(eng.s_new_eng), 0) as new_cx_engagement,
+                COALESCE(MAX(eng.s_total_eng), 0) - COALESCE(MAX(eng.s_new_eng), 0) as old_cx_engagement,
+                COALESCE(MAX(eng.s_eng_orders), 0) as overall_orders,
+                COALESCE(MAX(eng.s_old_orders), 0) as old_cx_orders,
+                COALESCE(MAX(eng.s_eng_orders), 0) - COALESCE(MAX(eng.s_old_orders), 0) as new_cx_orders,
+                CASE
+                    WHEN COALESCE(MAX(eng.s_new_eng), 0) > 0
+                    THEN ROUND(((COALESCE(MAX(eng.s_eng_orders), 0) - COALESCE(MAX(eng.s_old_orders), 0)) / MAX(eng.s_new_eng)) * 100, 2)
+                    ELSE 0
+                END as new_cx_conversion_rate,
+                CASE
+                    WHEN (COALESCE(MAX(eng.s_total_eng), 0) - COALESCE(MAX(eng.s_new_eng), 0)) > 0
+                    THEN ROUND((COALESCE(MAX(eng.s_old_orders), 0) / (MAX(eng.s_total_eng) - MAX(eng.s_new_eng))) * 100, 2)
+                    ELSE 0
+                END as old_cx_conversion_rate,
+                CASE
+                    WHEN COALESCE(MAX(eng.s_total_eng), 0) > 0
+                    THEN ROUND((COALESCE(MAX(eng.s_eng_orders), 0) / MAX(eng.s_total_eng)) * 100, 2)
+                    ELSE 0
+                END as overall_conversion_rate,
                 (
                     SELECT COUNT(*)
                     FROM pancake_order_for_delivery ofd
@@ -85,17 +122,7 @@ class CSRController extends Controller
             ]);
 
         $records = QueryBuilder::for($query)
-            ->allowedSorts([
-                AllowedSort::field('csr_name'),
-                AllowedSort::field('total_orders'),
-                AllowedSort::field('total_sales'),
-                AllowedSort::field('delivered'),
-                AllowedSort::field('returning_count'),
-                AllowedSort::field('rmo_called'),
-                AllowedSort::field('rmo_total_for_delivery'),
-                AllowedSort::field('rmo_productivity'),
-                AllowedSort::field('rts_rate'),
-            ])
+            ->allowedSorts(array_map(fn ($s) => AllowedSort::field($s), self::ALLOWED_SORTS))
             ->defaultSort('-total_sales')
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
