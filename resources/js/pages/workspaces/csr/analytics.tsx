@@ -94,7 +94,7 @@ export default function Analytics({ workspace }: Props) {
     const [currentType, setCurrentType] = useState('pos');
     const [sort, setSort] = useState('-total_sales');
     const [page, setPage] = useState(1);
-    const [perPage, setPerPage] = useState(15);
+    const [perPage, setPerPage] = useState(10);
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
     const toStr = format(range.to, 'yyyy-MM-dd');
