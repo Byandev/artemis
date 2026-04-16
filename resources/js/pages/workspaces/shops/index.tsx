@@ -15,6 +15,7 @@ import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import clsx from 'clsx';
 import { omit } from 'lodash';
 import {
     ListChecks,
@@ -24,6 +25,23 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Shop } from '@/types/models/Shop';
+
+const ChecklistsBadge = ({ pending }: { pending: number }) => {
+    const hasPending = pending > 0;
+    return (
+        <span
+            className={clsx(
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
+                hasPending
+                    ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+                    : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+            )}
+        >
+            <span className={clsx('h-1.5 w-1.5 rounded-full', hasPending ? 'bg-amber-500' : 'bg-emerald-500')} />
+            {hasPending ? `${pending} Pending` : 'Complete'}
+        </span>
+    );
+};
 
 interface ShopsPage {
     workspace: Workspace;
@@ -97,6 +115,15 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                 const date = row.original.customers_last_synced_at;
                 return date ? new Date(date).toLocaleString() : 'Never';
             },
+        },
+        {
+            accessorKey: 'pending_required_checklists_count',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Checklists'} />
+            ),
+            cell: ({ row }) => (
+                <ChecklistsBadge pending={Number(row.original.pending_required_checklists_count ?? 0)} />
+            ),
         },
         {
             id: 'actions',
@@ -186,6 +213,7 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                         setChecklistDrawerOpen(open);
                         if (!open) {
                             setSelectedShop(null);
+                            router.reload({ only: ['pages'] });
                         }
                     }}
                     workspace={workspace}

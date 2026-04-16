@@ -73,6 +73,23 @@ const EnableBadge = ({ isEnabled }: { isEnabled: boolean }) => {
     );
 };
 
+const ChecklistsBadge = ({ pending }: { pending: number }) => {
+    const hasPending = pending > 0;
+    return (
+        <span
+            className={clsx(
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
+                hasPending
+                    ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+                    : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+            )}
+        >
+            <span className={clsx('h-1.5 w-1.5 rounded-full', hasPending ? 'bg-amber-500' : 'bg-emerald-500')} />
+            {hasPending ? `${pending} Pending` : 'Complete'}
+        </span>
+    );
+};
+
 const Pages = ({ pages, workspace, query }: PagesProps) => {
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
@@ -164,20 +181,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             ),
             cell: ({ row }) => {
                 const date = row.original.orders_last_synced_at;
-                const isUpdated = Boolean(row.original.is_sync_logic_updated);
-                return (
-                    <div className="flex items-center gap-2">
-                        <span>{date ? new Date(date).toLocaleString() : 'Never'}</span>
-                        <span className={clsx(
-                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
-                            isUpdated
-                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
-                                : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400',
-                        )}>
-                            {isUpdated ? 'Updated' : 'Legacy'}
-                        </span>
-                    </div>
-                );
+                return <span>{date ? new Date(date).toLocaleString() : 'Never'}</span>;
             },
         },
         {
@@ -197,6 +201,15 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
 
                 return <EnableBadge isEnabled={isEnabled} />;
             },
+        },
+        {
+            accessorKey: 'pending_required_checklists_count',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Checklists'} />
+            ),
+            cell: ({ row }) => (
+                <ChecklistsBadge pending={Number(row.original.pending_required_checklists_count ?? 0)} />
+            ),
         },
         {
             id: 'actions',
@@ -285,6 +298,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                         setChecklistDrawerOpen(open);
                         if (!open) {
                             setSelectedPage(null);
+                            router.reload({ only: ['pages'] });
                         }
                     }}
                     workspace={workspace}
