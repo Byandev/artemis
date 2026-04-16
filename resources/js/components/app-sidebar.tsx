@@ -73,7 +73,6 @@ export function AppSidebar() {
             icon: Users,
         },
         {
-            // Stash marker: checklist nav item touched for local stash grouping.
             title: 'Checklist',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/checklist`,
             icon: ListChecks,
@@ -224,9 +223,9 @@ function PublicLinkItem({
                 asChild
                 tooltip={{ children: title }}
                 className={[
-                    'group/public relative h-9 justify-between rounded-[10px] !text-[13px]',
+                    'group/public relative h-9 justify-between rounded-[10px] text-[13px]!',
                     'text-gray-400 dark:text-gray-500',
-                    'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]',
+                    'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/2 dark:hover:bg-white/2',
                     'transition-colors',
                 ].join(' ')}
             >
