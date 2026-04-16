@@ -53,6 +53,10 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
+        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+            return redirect()->back()->with('error', 'Assignee can only be updated for orders scheduled for delivery today.');
+        }
+
         if (! $request->userId) {
             return redirect()->back()->with('error', 'Please select a user before assigning.');
         }
@@ -68,6 +72,10 @@ class ForDeliveryController extends Controller
 
         if (! $orderForDelivery) {
             return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+            return redirect()->back()->with('error', 'Assignee can only be removed for orders scheduled for delivery today.');
         }
 
         $orderForDelivery->update(['assignee_id' => null]);
@@ -199,12 +207,26 @@ class ForDeliveryController extends Controller
             $statsBase->whereIn('shop_id', $shopIds);
         }
 
+        $filterUserId = $request->input('filter.user_id');
+        if ($filterUserId) {
+            $userIds = is_string($filterUserId) ? explode(',', $filterUserId) : (array) $filterUserId;
+            $ownerPageIds = Page::whereIn('owner_id', $userIds)
+                ->where('workspace_id', $workspace->id)
+                ->pluck('id');
+            $statsBase->whereIn('page_id', $ownerPageIds);
+        }
+
+        $totalOrdersForDeliveryTodayQuery = (clone $statsBase);
+
         if ($request->input('assignee_id')) {
             $statsBase->where('assignee_id', $request->input('assignee_id'));
+            $totalOrdersForDeliveryTodayQuery->whereHas('order', function ($orderQuery) use ($request) {
+                $orderQuery->where('confirmed_by', $request->input('assignee_id'));
+            });
         }
 
         // 1️⃣ Total orders
-        $totalOrdersForDeliveryToday = (clone $statsBase)->count();
+        $totalOrdersForDeliveryToday = (clone $totalOrdersForDeliveryTodayQuery)->count();
 
         // 3️⃣ Called rate (not pending)
         $totalCalled = (clone $statsBase)

@@ -117,9 +117,9 @@ export default function RmoManagement({
         () => ({
             teamIds: [],
             productIds: [],
-            shopIds: selectedShopIds.map(Number),
-            pageIds: selectedPageIds.map(Number),
-            userIds: selectedUserIds.map(Number),
+            shopIds: [...selectedShopIds],
+            pageIds: [...selectedPageIds],
+            userIds: [...selectedUserIds],
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [],
@@ -531,7 +531,8 @@ export default function RmoManagement({
                         return (
                             <button
                                 onClick={() => handleAssignToMe(id)}
-                                className="flex items-center gap-1.5 rounded-lg border border-dashed border-black/10 dark:border-white/10 px-2.5 py-1 text-[11px] font-medium text-gray-400 dark:text-gray-500 transition-all hover:border-emerald-300 dark:hover:border-emerald-500/40 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400"
+                                disabled={!isToday}
+                                className="flex items-center gap-1.5 rounded-lg border border-dashed border-black/10 dark:border-white/10 px-2.5 py-1 text-[11px] font-medium text-gray-400 dark:text-gray-500 transition-all hover:border-emerald-300 dark:hover:border-emerald-500/40 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-black/10 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:disabled:hover:border-white/10 dark:disabled:hover:bg-transparent dark:disabled:hover:text-gray-500"
                             >
                                 <UserPlus className="h-3 w-3" />
                                 Assign to me
@@ -544,12 +545,14 @@ export default function RmoManagement({
                             <span className="text-[12px] text-gray-700 dark:text-gray-300">
                                 {assignee.name}
                             </span>
-                            <button
-                                onClick={() => handleRemoveAssignee(id)}
-                                className="invisible flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-300 transition-colors hover:bg-red-50 hover:text-red-400 dark:text-gray-600 dark:hover:bg-red-500/10 dark:hover:text-red-400 group-hover:visible"
-                            >
-                                <X className="h-3 w-3" />
-                            </button>
+                            {isToday && (
+                                <button
+                                    onClick={() => handleRemoveAssignee(id)}
+                                    className="invisible flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-300 transition-colors hover:bg-red-50 hover:text-red-400 dark:text-gray-600 dark:hover:bg-red-500/10 dark:hover:text-red-400 group-hover:visible"
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
+                            )}
                         </div>
                     );
                 },
@@ -634,7 +637,7 @@ export default function RmoManagement({
             </div>
 
             <div className="mx-auto w-full p-4 md:p-6">
-                <div className="mb-6 flex items-start justify-between">
+                <div className="mb-6 flex items-center justify-between">
                     <div>
                         <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">
                             RMO Management
@@ -672,15 +675,6 @@ export default function RmoManagement({
                                 Only my data
                             </span>
                         </label>
-                        <DatePicker
-                            id="delivery-date"
-                            mode="single"
-                            defaultDate={deliveryDate}
-                            placeholder="Select date"
-                            onChange={(_, dateStr) => {
-                                if (dateStr && dateStr !== deliveryDate) handleDateChange(dateStr);
-                            }}
-                        />
 
                         <Filters
                             workspace={workspace}
@@ -714,6 +708,16 @@ export default function RmoManagement({
                             {showStats ? 'Hide' : 'Show'} Statistics
                             {showStats ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                         </Button>
+
+                        <DatePicker
+                            id="delivery-date"
+                            mode="single"
+                            defaultDate={deliveryDate}
+                            placeholder="Select date"
+                            onChange={(_, dateStr) => {
+                                if (dateStr && dateStr !== deliveryDate) handleDateChange(dateStr);
+                            }}
+                        />
                     </div>
                 </div>
 

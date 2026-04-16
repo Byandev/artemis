@@ -15,7 +15,8 @@ class CSRController extends Controller
 {
     private const ALLOWED_SORTS = [
         'csr_name', 'total_orders', 'total_sales',
-        'delivered', 'returning_count', 'rmo_called', 'rts_rate',
+        'delivered', 'returning_count', 'rmo_called', 'rmo_total_for_delivery',
+        'rmo_productivity', 'rts_rate',
     ];
 
     public function dailyRecords(Request $request, Workspace $workspace)
@@ -48,12 +49,40 @@ class CSRController extends Controller
                 SUM(pancake_user_daily_reports.delivered)    as delivered,
                 SUM(pancake_user_daily_reports.`returning`)  as returning_count,
                 SUM(pancake_user_daily_reports.rmo_called)   as rmo_called,
+                (
+                    SELECT COUNT(*)
+                    FROM pancake_order_for_delivery ofd
+                    WHERE ofd.conferrer_id = pu.id
+                      AND ofd.workspace_id = ?
+                      AND ofd.delivery_date BETWEEN ? AND ?
+                ) as rmo_total_for_delivery,
+                CASE
+                    WHEN (
+                        SELECT COUNT(*)
+                        FROM pancake_order_for_delivery ofd2
+                        WHERE ofd2.conferrer_id = pu.id
+                          AND ofd2.workspace_id = ?
+                          AND ofd2.delivery_date BETWEEN ? AND ?
+                    ) > 0
+                    THEN ROUND((SUM(pancake_user_daily_reports.rmo_called) / (
+                        SELECT COUNT(*)
+                        FROM pancake_order_for_delivery ofd3
+                        WHERE ofd3.conferrer_id = pu.id
+                          AND ofd3.workspace_id = ?
+                          AND ofd3.delivery_date BETWEEN ? AND ?
+                    )) * 100, 2)
+                    ELSE 0
+                END as rmo_productivity,
                 CASE
                     WHEN SUM(pancake_user_daily_reports.delivered) + SUM(pancake_user_daily_reports.`returning`) > 0
                     THEN ROUND((SUM(pancake_user_daily_reports.`returning`) / (SUM(pancake_user_daily_reports.delivered) + SUM(pancake_user_daily_reports.`returning`))) * 100, 2)
                     ELSE 0
                 END as rts_rate
-            ');
+            ', [
+                $workspace->id, $from, $to,
+                $workspace->id, $from, $to,
+                $workspace->id, $from, $to,
+            ]);
 
         $records = QueryBuilder::for($query)
             ->allowedSorts([
@@ -63,10 +92,12 @@ class CSRController extends Controller
                 AllowedSort::field('delivered'),
                 AllowedSort::field('returning_count'),
                 AllowedSort::field('rmo_called'),
+                AllowedSort::field('rmo_total_for_delivery'),
+                AllowedSort::field('rmo_productivity'),
                 AllowedSort::field('rts_rate'),
             ])
             ->defaultSort('-total_sales')
-            ->paginate($request->integer('per_page', 15))
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         return response()->json($records);

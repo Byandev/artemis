@@ -16,15 +16,16 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     LayoutDashboard,
     Package,
+    ClipboardList,
+    ListChecks,
     Store,
     Users,
     BookOpenIcon,
+    Settings,
     User,
-    ShieldIcon,
     RotateCcw,
     BarChart2,
     MapPin,
-    ClipboardList,
     Box,
     Layers,
     ShoppingCart,
@@ -42,7 +43,7 @@ export function AppSidebar() {
     const { currentWorkspace } = usePage().props as unknown as { currentWorkspace: { slug: string; show_inventory: boolean } };
 
     const dashboardUrl = currentWorkspace
-        ? workspace.dashboard.url(currentWorkspace.slug)
+        ? workspace.dashboard.url((currentWorkspace as { slug: string }).slug)
         : dashboard().url;
 
     const mainNavItems: NavItem[] = [
@@ -53,38 +54,47 @@ export function AppSidebar() {
         },
         {
             title: 'Shops',
-            href: `/workspaces/${currentWorkspace.slug}/shops`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/shops`,
             icon: Store,
         },
         {
             title: 'Pages',
-            href: `/workspaces/${currentWorkspace.slug}/pages`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
             icon: BookOpenIcon,
         },
         {
             title: 'Products',
-            href: `/workspaces/${currentWorkspace.slug}/products/list`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products/list`,
             icon: Package,
         },
         {
             title: 'Teams',
-            href: `/workspaces/${currentWorkspace.slug}/teams`,
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
             icon: Users,
         },
-
         {
-            title: 'CSR',
+            title: 'Checklist',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/checklist`,
+            icon: ListChecks,
+        },
+        {
+            title: 'Employees',
+            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/employees`,
             icon: User,
+        },
+        {
+            title: 'RTS',
+            icon: RotateCcw,
             items: [
                 {
-                    title: 'Management',
-                    href: `/workspaces/${currentWorkspace.slug}/csr/management`,
-                    icon: User,
+                    title: 'Analytics',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
+                    icon: BarChart2,
                 },
                 {
-                    title: 'CSR Analytics',
-                    href: `/workspaces/${currentWorkspace.slug}/csr/analytics`,
-                    icon: BarChart2,
+                    title: 'Parcel Journey',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/parcel-journeys`,
+                    icon: MapPin,
                 },
             ],
         },
@@ -114,28 +124,17 @@ export function AppSidebar() {
               ]
             : []),
         {
-            title: 'RTS',
-            icon: RotateCcw,
-            items: [
-                {
-                    title: 'Analytics',
-                    href: `/workspaces/${currentWorkspace.slug}/rts/analytics`,
-                    icon: BarChart2,
-                },
-                {
-                    title: 'Parcel Journey',
-                    href: `/workspaces/${currentWorkspace.slug}/rts/parcel-journeys`,
-                    icon: MapPin,
-                },
-            ],
+            title: 'Profile',
+            href: '/profile',
+            icon: User,
         },
+
         {
-            title: 'Roles',
-            href: `/workspaces/${currentWorkspace.slug}/roles`,
-            icon: ShieldIcon,
+            title: 'Settings',
+            href: `/settings`,
+            icon: Settings,
         },
     ];
-
 
     return (
         <Sidebar
@@ -224,9 +223,9 @@ function PublicLinkItem({
                 asChild
                 tooltip={{ children: title }}
                 className={[
-                    'group/public relative h-9 justify-between rounded-[10px] !text-[13px]',
+                    'group/public relative h-9 justify-between rounded-[10px] text-[13px]!',
                     'text-gray-400 dark:text-gray-500',
-                    'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]',
+                    'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/2 dark:hover:bg-white/2',
                     'transition-colors',
                 ].join(' ')}
             >
