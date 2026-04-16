@@ -47,9 +47,10 @@ interface Props {
     };
     users: User[];
     total_for_delivery_today: number;
-    called_rate: number;
-    successful_rate: number;
-    unsuccessful_rate: number;
+    called_count: number;
+    delivered_count: number;
+    returning_count: number;
+    problematic_count: number;
 }
 
 export default function RmoManagement({
@@ -58,13 +59,15 @@ export default function RmoManagement({
     query,
     users,
     total_for_delivery_today,
-    called_rate,
-    successful_rate,
-    unsuccessful_rate,
+    called_count,
+    delivered_count,
+    returning_count,
+    problematic_count,
 }: Props) {
     const [userName, setUserName] = useState<string | false>(false);
     const [isOpen, setIsOpen] = useState(false);
     const [showStats, setShowStats] = useState(() => localStorage.getItem('rmo_show_stats') === 'true');
+    const [showMyOnly, setShowMyOnly] = useState(() => localStorage.getItem('rmo_show_my_only') === 'true');
     const [pendingAssign, setPendingAssign] = useState<{ id: number; currentStatus: string } | null>(null);
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
@@ -152,8 +155,9 @@ export default function RmoManagement({
             ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
             page: page ?? 1,
             ...(perPage ? { per_page: perPage } : {}),
+            ...(showMyOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
         }),
-        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds],
+        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyOnly],
     );
 
     const handleStatusChange = useCallback(
@@ -194,6 +198,15 @@ export default function RmoManagement({
         return () => clearTimeout(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchValue]);
+
+    useEffect(() => {
+        router.get(
+            publicPage.rmoManagement({ workspace }),
+            buildAllParams(query?.sort, 1),
+            { preserveState: true, replace: true, preserveScroll: true },
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showMyOnly]);
 
 
     const handleAssignUser = useCallback(
@@ -579,11 +592,27 @@ export default function RmoManagement({
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
+                        <label className="flex cursor-pointer items-center gap-1.5">
+                            <input
+                                type="checkbox"
+                                checked={showMyOnly}
+                                onChange={() =>
+                                    setShowMyOnly((prev) => {
+                                        const next = !prev;
+                                        localStorage.setItem('rmo_show_my_only', String(next));
+                                        return next;
+                                    })
+                                }
+                                className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <span className="text-[12px] font-medium text-gray-600 dark:text-gray-400">Only my data</span>
+                        </label>
                         <Filters
                             workspace={workspace}
                             onChange={handleFilterChange}
                             initialValue={initialFilterValue}
                         />
+
                         <Button
                             variant="outline"
                             size="sm"
@@ -607,9 +636,10 @@ export default function RmoManagement({
                     <div className="mb-6">
                         <RmoStatCards
                             total_for_delivery_today={total_for_delivery_today}
-                            called_rate={called_rate}
-                            successful_rate={successful_rate}
-                            unsuccessful_rate={unsuccessful_rate}
+                            called_count={called_count}
+                            delivered_count={delivered_count}
+                            returning_count={returning_count}
+                            problematic_count={problematic_count}
                         />
                     </div>
                 )}
