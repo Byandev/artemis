@@ -17,11 +17,11 @@ export default function RiderCard({ workspaceSlug, queryParams, onDataLoaded }: 
     const [loading, setLoading] = useState(true);
     const [sort, setSort] = useState('-total_orders');
 
-    const fetchPage = (page: number, currentSort: string, isInitial = false) => {
+    const fetchPage = (page: number, currentSort: string, perPage = 15, isInitial = false) => {
         setLoading(true);
         const p = buildBaseParams(queryParams);
         p.append('page', String(page));
-        p.append('per_page', '15');
+        p.append('per_page', String(perPage));
         p.append('sort', currentSort);
         fetch(`/workspaces/${workspaceSlug}/rts/analytics/group-by/rider?${p}`, { credentials: 'same-origin' })
             .then((res) => (res.ok ? res.json() : null))
@@ -80,7 +80,7 @@ export default function RiderCard({ workspaceSlug, queryParams, onDataLoaded }: 
                         onFetch={(params) => {
                             const s = params?.sort as string ?? '-total_orders';
                             setSort(s);
-                            fetchPage(Number(params?.page ?? 1), s);
+                            fetchPage(Number(params?.page ?? 1), s, Number(params?.per_page ?? data?.per_page ?? 15));
                         }}
                     />
                 )}

@@ -51,6 +51,15 @@ export function DataTable<TData, TValue>({
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
 
+    const hasPaginationMeta = Boolean(
+        meta
+        && typeof meta.current_page === 'number'
+        && typeof meta.last_page === 'number'
+        && typeof meta.per_page === 'number'
+        && typeof meta.total === 'number'
+    )
+    const footerMeta = hasPaginationMeta ? meta : null
+
     const pagination = useMemo<PaginationState>(() => ({
         pageIndex: meta?.current_page ? meta.current_page - 1 : 0,
         pageSize: meta?.per_page ?? 10
@@ -132,7 +141,7 @@ export function DataTable<TData, TValue>({
             </div>
 
             {
-                meta?.links?.length &&
+                hasPaginationMeta &&
                 <div className="border-t border-black/6 dark:border-white/6 px-4 py-3">
                     <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                         <div className="flex items-center gap-3">
@@ -141,7 +150,7 @@ export function DataTable<TData, TValue>({
                                     Rows
                                 </span>
                                 <Select
-                                    value={String(meta?.per_page ?? 15)}
+                                    value={String(footerMeta?.per_page ?? 15)}
                                     onValueChange={(val) => {
                                         if (onFetch) onFetch({ per_page: Number(val), page: 1, sort: toBackendSort(sorting) })
                                     }}
@@ -160,11 +169,11 @@ export function DataTable<TData, TValue>({
                             </div>
                             <div className="h-4 w-px bg-black/6 dark:bg-white/6" />
                             <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
-                                Showing {meta?.from} to {meta?.to} of {meta?.total?.toLocaleString()} entries
+                                Showing {footerMeta?.from} to {footerMeta?.to} of {footerMeta?.total?.toLocaleString()} entries
                             </p>
                         </div>
 
-                        <Pagination currentPage={meta.current_page} totalPages={meta.last_page} onPageChange={(page) => {
+                        <Pagination currentPage={footerMeta?.current_page ?? 1} totalPages={footerMeta?.last_page ?? 1} onPageChange={(page) => {
                             if (onFetch) onFetch({ page, sort: toBackendSort(sorting) })
                         }} />
                     </div>

@@ -43,6 +43,7 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
                     page: searchValue ? 1 : query?.page ?? 1,
+                    per_page: query?.perPage ?? employees.per_page,
                 },
                 { preserveState: true, replace: true, preserveScroll: true },
             );
@@ -186,14 +187,13 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
                         initialSorting={initialSorting}
                         meta={{ ...omit(employees, ['data']) }}
                         onFetch={(params) => {
-                            console.log(params)
                             router.get(
                                 `/workspaces/${workspace.slug}/csr/management`,
                                 {
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
                                     page: params?.page ?? 1,
-                                    per_page: params?.per_page,
+                                    per_page: params?.per_page ?? query?.perPage ?? employees.per_page,
                                 },
                                 {
                                     preserveState: true,
