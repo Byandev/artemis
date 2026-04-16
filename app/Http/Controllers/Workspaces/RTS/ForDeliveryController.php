@@ -207,6 +207,15 @@ class ForDeliveryController extends Controller
             $statsBase->whereIn('shop_id', $shopIds);
         }
 
+        $filterUserId = $request->input('filter.user_id');
+        if ($filterUserId) {
+            $userIds = is_string($filterUserId) ? explode(',', $filterUserId) : (array) $filterUserId;
+            $ownerPageIds = Page::whereIn('owner_id', $userIds)
+                ->where('workspace_id', $workspace->id)
+                ->pluck('id');
+            $statsBase->whereIn('page_id', $ownerPageIds);
+        }
+
         if ($request->input('assignee_id')) {
             $statsBase->where('assignee_id', $request->input('assignee_id'));
         }
