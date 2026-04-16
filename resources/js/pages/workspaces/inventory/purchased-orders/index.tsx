@@ -61,9 +61,13 @@ interface Props {
         current_page: number;
         per_page: number;
     };
+    query?: {
+        perPage?: number | string;
+        page?: number | string;
+    };
 }
 
-export default function PurchasedOrderIndex({ workspace, orders }: Props) {
+export default function PurchasedOrderIndex({ workspace, orders, query }: Props) {
     const [deletingId, setDeletingId] = useState<number | null>(null);
 
     const baseUrl = `/workspaces/${workspace.slug}/inventory/purchased-orders`;
@@ -216,7 +220,10 @@ export default function PurchasedOrderIndex({ workspace, orders }: Props) {
                         onFetch={(params) => {
                             router.get(
                                 baseUrl,
-                                { page: params?.page ?? 1 },
+                                {
+                                    page: params?.page ?? 1,
+                                    per_page: params?.per_page ?? query?.perPage ?? orders.per_page,
+                                },
                                 { preserveState: true, replace: true, preserveScroll: true }
                             );
                         }}
