@@ -93,6 +93,7 @@ class CSRController extends Controller
                 AllowedSort::field('returning_count'),
                 AllowedSort::field('rmo_called'),
                 AllowedSort::field('rmo_total_for_delivery'),
+                AllowedSort::field('rmo_productivity'),
                 AllowedSort::field('rts_rate'),
             ])
             ->defaultSort('-total_sales')
