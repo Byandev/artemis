@@ -19,6 +19,7 @@ import {
     BarChart3,
     ChevronDown,
     ChevronUp,
+    Download,
     MapPin,
     Phone,
     Search,
@@ -208,6 +209,23 @@ export default function RmoManagement({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showMyOnly]);
 
+
+    const handleExport = useCallback(() => {
+        const params = new URLSearchParams();
+        if (searchValue) params.set('filter[search]', searchValue);
+        if (currentStatus) params.set('filter[status]', currentStatus);
+        if (currentParcelStatus) params.set('filter[parcel_status]', currentParcelStatus);
+        if (selectedPageIds.length) params.set('filter[page_id]', selectedPageIds.join(','));
+        if (selectedShopIds.length) params.set('filter[shop_id]', selectedShopIds.join(','));
+        if (selectedUserIds.length) params.set('filter[user_id]', selectedUserIds.join(','));
+        if (showMyOnly && localStorage.getItem('user_id')) {
+            params.set('assignee_id', localStorage.getItem('user_id') ?? '');
+        }
+
+        const qs = params.toString();
+        const url = `/public/workspaces/${workspace.slug}/rts/rmo-management/export${qs ? `?${qs}` : ''}`;
+        window.location.href = url;
+    }, [workspace.slug, searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyOnly]);
 
     const handleAssignUser = useCallback(
         (id: number, userId: string) => {
@@ -612,6 +630,16 @@ export default function RmoManagement({
                             onChange={handleFilterChange}
                             initialValue={initialFilterValue}
                         />
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleExport}
+                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                        >
+                            <Download className="h-3.5 w-3.5" />
+                            Export
+                        </Button>
 
                         <Button
                             variant="outline"
