@@ -46,6 +46,7 @@ class CSRController extends Controller
             'employees' => $employees,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
+                'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
             'systemUsers' => User::whereHas('workspaces', fn ($query) => $query->where('workspace_id', $workspace->id))->get()

@@ -77,6 +77,7 @@ export default function Index({ roles, workspace, query }: Props) {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
                     page: searchValue ? 1 : query?.page ?? 1,
+                    per_page: query?.perPage ?? roles.per_page,
                 },
                 { preserveState: true, replace: true, preserveScroll: true, only: ['roles'] },
             );
@@ -230,6 +231,7 @@ export default function Index({ roles, workspace, query }: Props) {
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
                                     page: params?.page ?? 1,
+                                    per_page: params?.per_page ?? query?.perPage ?? roles.per_page,
                                 },
                                 { preserveState: true, replace: true, preserveScroll: true },
                             );
