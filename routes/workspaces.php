@@ -7,6 +7,7 @@ use App\Http\Controllers\Workspaces\AdsManager\CampaignController;
 use App\Http\Controllers\Workspaces\AdsManager\OptimizationRuleController;
 use App\Http\Controllers\Workspaces\Botcake\FlowController;
 use App\Http\Controllers\Workspaces\Botcake\SequenceController;
+use App\Http\Controllers\Workspaces\CSRController;
 use App\Http\Controllers\Workspaces\EmployeeController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
@@ -169,8 +170,9 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'update'])->name('workspaces.api.optimization-rules.update');
     Route::delete('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'destroy'])->name('workspaces.api.optimization-rules.destroy');
 
-    // Employee routes
-    Route::get('/workspaces/{workspace}/employees', [EmployeeController::class, 'index'])->name('workspaces.employees.index');
+    Route::put('/workspaces/{workspace:slug}/employees/{employee}', [CSRController::class, 'update'])->name('employees.update');
+    Route::get('/workspaces/{workspace}/csr/management', [CSRController::class, 'index'])->name('workspaces.csr.index');
+    Route::get('/workspaces/{workspace}/csr/analytics', [CSRController::class, 'analytics'])->name('workspaces.csr.analytics');
 
     // Checklist routes
     Route::get('/workspaces/{workspace}/checklist', [ChecklistController::class, 'index'])->name('workspaces.checklist.index');
@@ -190,6 +192,12 @@ Route::middleware(['auth'])->group(function () {
     })->name('workspaces.botcake');
     Route::get('/workspaces/{workspace}/botcake/flows', [FlowController::class, 'index'])->name('workspaces.botcake.flows.index');
     Route::get('/workspaces/{workspace}/botcake/sequences', [SequenceController::class, 'index'])->name('workspaces.botcake.sequences.index');
+    Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
+        Route::get('/', [InventoryItemController::class, 'index'])->name('index');
+        Route::post('/', [InventoryItemController::class, 'store'])->name('store');
+        Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
+        Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
+    });
     Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {
         Route::get('/', [PurchasedOrderController::class, 'index'])->name('index');
         Route::get('/create', [PurchasedOrderController::class, 'create'])->name('create');
