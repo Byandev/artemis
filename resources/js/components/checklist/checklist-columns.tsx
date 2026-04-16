@@ -6,16 +6,15 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ColumnDef } from '@tanstack/react-table';
-import { Eye, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { ChecklistItem } from './types';
 
 type ChecklistColumnActions = {
-    onView: (item: ChecklistItem) => void;
     onEdit: (item: ChecklistItem) => void;
     onDelete: (item: ChecklistItem) => void;
 };
 
-export function getChecklistColumns({ onView, onEdit, onDelete }: ChecklistColumnActions): ColumnDef<ChecklistItem>[] {
+export function getChecklistColumns({ onEdit, onDelete }: ChecklistColumnActions): ColumnDef<ChecklistItem>[] {
     return [
         {
             accessorKey: 'title',
@@ -69,10 +68,6 @@ export function getChecklistColumns({ onView, onEdit, onDelete }: ChecklistColum
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-[165px] p-1.5">
-                            <DropdownMenuItem onClick={() => onView(row.original)}>
-                                <Eye className="mr-1.5 h-3.5 w-3.5" />
-                                View
-                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => onEdit(row.original)}>
                                 <Pencil className="mr-1.5 h-3.5 w-3.5" />
                                 Edit
