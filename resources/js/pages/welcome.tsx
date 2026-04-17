@@ -734,7 +734,7 @@ export default function Welcome() {
                         </h2>
                         <p className="mx-auto mb-10 max-w-xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">
                             14 days free. Connect 1 Pancake page, get 1 month of
-                            data. Parcel Journey + chat support. Handa ka na ba?
+                            data. Parcel Journey + chat support. Are you ready?
                         </p>
                         <div className="flex flex-col items-center justify-center gap-3.5 sm:flex-row">
                             <Link
@@ -829,24 +829,24 @@ export default function Welcome() {
                                     Company
                                 </h5>
                                 <div className="flex flex-col gap-2">
-                                    <a
-                                        href="#"
+                                    <Link
+                                        href="/about"
                                         className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
                                     >
                                         About
-                                    </a>
+                                    </Link>
                                     <Link
                                         href="/blog"
                                         className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
                                     >
                                         Blog
                                     </Link>
-                                    <a
-                                        href="#"
+                                    <Link
+                                        href="/contact"
                                         className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
                                     >
                                         Contact
-                                    </a>
+                                    </Link>
                                 </div>
                             </div>
                             <div>
