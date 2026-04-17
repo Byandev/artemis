@@ -232,8 +232,8 @@ export default function Welcome() {
                             Protect your margin.
                         </h1>
 
-                        <p className="mx-auto mb-4 max-w-xl text-lg leading-relaxed text-gray-500 md:text-xl dark:text-gray-400">
-                            Artemis is the analytics & automation platform for
+                        <p className="mx-auto mb-4 max-w-xl text-base leading-relaxed text-gray-500 sm:text-lg md:text-xl dark:text-gray-400">
+                            Artemis is the <span className="font-semibold text-brand-500">1st</span> analytics & automation platform for
                             Philippine COD e-commerce. Track every metric that
                             matters, cut return-to-sender rates, and keep every
                             customer informed.
@@ -252,7 +252,7 @@ export default function Welcome() {
                         <div className="mb-4 flex flex-col items-center justify-center gap-3.5 sm:flex-row">
                             <Link
                                 href={ctaHref}
-                                className="inline-flex h-12 items-center gap-2.5 rounded-xl bg-brand-500! px-8 text-base font-semibold text-white shadow-lg shadow-brand-500/20 transition-all hover:-translate-y-0.5 hover:bg-brand-600"
+                                className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-brand-500! px-8 text-base font-semibold text-white shadow-lg shadow-brand-500/20 transition-all hover:-translate-y-0.5 hover:bg-brand-600 sm:w-auto"
                             >
                                 {ctaLabel}
                                 <svg
@@ -271,7 +271,7 @@ export default function Welcome() {
                             </Link>
                             <a
                                 href="#how"
-                                className="inline-flex h-12 items-center rounded-xl border border-gray-200 bg-white px-8 text-base font-semibold text-gray-700 transition-all hover:border-brand-300 hover:text-brand-600 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300 dark:hover:border-brand-500/40 dark:hover:text-brand-400"
+                                className="inline-flex h-12 w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-8 text-base font-semibold text-gray-700 transition-all hover:border-brand-300 hover:text-brand-600 sm:w-auto dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300 dark:hover:border-brand-500/40 dark:hover:text-brand-400"
                             >
                                 See how it works
                             </a>
@@ -362,7 +362,7 @@ export default function Welcome() {
                             </svg>
                         </Link>
 
-                        <div className="grid gap-5 md:grid-cols-3">
+                        <div className="grid gap-4 text-left sm:gap-5 md:grid-cols-3">
                             {[
                                 {
                                     num: '20–40%',
@@ -382,10 +382,10 @@ export default function Welcome() {
                             ].map((b, i) => (
                                 <div
                                     key={i}
-                                    className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white p-8 transition-all hover:-translate-y-1 hover:border-brand-400 dark:border-white/8 dark:bg-zinc-900"
+                                    className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white p-6 transition-all hover:-translate-y-1 hover:border-brand-400 sm:p-8 dark:border-white/8 dark:bg-zinc-900"
                                 >
                                     <div className="absolute top-0 right-0 left-0 h-0.5 bg-gradient-to-r from-brand-400 to-brand-600" />
-                                    <div className="mb-4 bg-gradient-to-br from-brand-500 to-brand-700 bg-clip-text text-6xl leading-none font-bold tracking-tight text-transparent italic">
+                                    <div className="mb-3 bg-gradient-to-br from-brand-500 to-brand-700 bg-clip-text text-5xl leading-none font-bold tracking-tight text-transparent italic sm:mb-4 sm:text-6xl">
                                         {b.num}
                                     </div>
                                     <h3 className="mb-3 text-xl font-semibold text-gray-900 dark:text-gray-100">
@@ -419,19 +419,19 @@ export default function Welcome() {
                             e-commerce actually runs.
                         </p>
 
-                        <div className="grid gap-5 md:grid-cols-2">
+                        <div className="grid gap-4 sm:gap-5 md:grid-cols-2">
                             {features.map((f) => (
                                 <div
                                     key={f.title}
-                                    className="group rounded-xl border border-gray-200 bg-white p-8 transition-all hover:-translate-y-1 hover:border-brand-300 dark:border-white/8 dark:bg-zinc-900 dark:hover:border-brand-500/30"
+                                    className="group rounded-xl border border-gray-200 bg-white p-6 text-left transition-all hover:-translate-y-1 hover:border-brand-300 sm:p-8 dark:border-white/8 dark:bg-zinc-900 dark:hover:border-brand-500/30"
                                 >
-                                    <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-xl border border-brand-200 bg-brand-50 text-brand-500 dark:border-brand-500/25 dark:bg-brand-500/10">
+                                    <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-brand-200 bg-brand-50 text-brand-500 sm:mb-6 dark:border-brand-500/25 dark:bg-brand-500/10">
                                         {f.icon}
                                     </div>
-                                    <h3 className="mb-2.5 text-xl font-semibold tracking-tight text-gray-900 md:text-2xl dark:text-gray-100">
+                                    <h3 className="mb-2 text-lg font-semibold tracking-tight text-gray-900 sm:mb-2.5 sm:text-xl md:text-2xl dark:text-gray-100">
                                         {f.title}
                                     </h3>
-                                    <p className="text-[15px] leading-relaxed text-gray-500 dark:text-gray-400">
+                                    <p className="text-[14px] leading-relaxed text-gray-500 sm:text-[15px] dark:text-gray-400">
                                         {f.description}
                                     </p>
                                 </div>
@@ -598,7 +598,7 @@ export default function Welcome() {
                             {[
                                 {
                                     name: 'Health & Wellness Brand',
-                                    category: 'spray · 10M+ parcels',
+                                    category: 'Herbal spray · 10M+ parcels',
                                     before: '17.27%',
                                     after: '14.35%',
                                     change: '-17%',
@@ -606,7 +606,7 @@ export default function Welcome() {
                                     detail: 'Started with no SMS/chat notifications. After enabling Parcel Journey tracking, RTS dropped steadily from 17.27% to 14.35% — consistent improvement month over month.',
                                 },
                                 {
-                                    name: 'Health & Wellness Brand',
+                                    name: 'Care Brand',
                                     category: 'Inhaler product · 9M+ parcels',
                                     before: '32.95%',
                                     after: '17.21%',
@@ -615,8 +615,8 @@ export default function Welcome() {
                                     detail: 'Went from zero customer notifications to full SMS + chat coverage. RTS cut from 32.95% to 17.21% in just 3 months.',
                                 },
                                 {
-                                    name: 'Health & Wellness Brand',
-                                    category: 'Spray product · 4.5M+ parcels',
+                                    name: 'Herbal Brand',
+                                    category: 'Capsule product · 4.5M+ parcels',
                                     before: '14.12%',
                                     after: '9.72%',
                                     change: '-31%',
@@ -624,7 +624,7 @@ export default function Welcome() {
                                     detail: 'Already running decent ops. Artemis helped fine-tune — consistently sub-15% RTS, now consistently under 10%.',
                                 },
                                 {
-                                    name: 'Health & Wellness Brand',
+                                    name: 'Pain Relief Brand',
                                     category: 'Topical cream · 8.4M+ parcels',
                                     before: '18.29%',
                                     after: '12.74%',
@@ -635,7 +635,7 @@ export default function Welcome() {
                             ].map((c) => (
                                 <div
                                     key={c.name}
-                                    className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-7 transition-all hover:-translate-y-1 hover:border-brand-300 md:p-8 dark:border-white/8 dark:bg-zinc-900 dark:hover:border-brand-500/30"
+                                    className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 transition-all hover:-translate-y-1 hover:border-brand-300 sm:p-7 md:p-8 dark:border-white/8 dark:bg-zinc-900 dark:hover:border-brand-500/30"
                                 >
                                     <div className="absolute top-0 right-0 left-0 h-0.5 bg-gradient-to-r from-brand-400 to-brand-600" />
 
@@ -648,12 +648,12 @@ export default function Welcome() {
                                         </p>
                                     </div>
 
-                                    <div className="mb-5 flex items-center gap-4">
+                                    <div className="mb-5 flex flex-wrap items-center gap-3 sm:gap-4">
                                         <div>
                                             <p className="font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
                                                 Before
                                             </p>
-                                            <p className="text-2xl font-bold tracking-tight text-gray-400 line-through decoration-gray-300 dark:text-gray-500 dark:decoration-gray-600">
+                                            <p className="text-xl font-bold tracking-tight text-gray-400 line-through decoration-gray-300 sm:text-2xl dark:text-gray-500 dark:decoration-gray-600">
                                                 {c.before}
                                             </p>
                                         </div>
@@ -674,11 +674,11 @@ export default function Welcome() {
                                             <p className="font-mono text-[10px] tracking-wider text-brand-600 uppercase dark:text-brand-400">
                                                 After
                                             </p>
-                                            <p className="text-2xl font-bold tracking-tight text-brand-600 dark:text-brand-400">
+                                            <p className="text-xl font-bold tracking-tight text-brand-600 sm:text-2xl dark:text-brand-400">
                                                 {c.after}
                                             </p>
                                         </div>
-                                        <div className="ml-auto">
+                                        <div className="sm:ml-auto">
                                             <span className="inline-flex items-center rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 font-mono text-[11px] font-semibold text-brand-700 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-400">
                                                 {c.change}
                                             </span>
@@ -739,7 +739,7 @@ export default function Welcome() {
                         <div className="flex flex-col items-center justify-center gap-3.5 sm:flex-row">
                             <Link
                                 href={ctaHref}
-                                className="inline-flex h-12 items-center gap-2.5 rounded-xl bg-brand-500! px-8 text-base font-semibold text-white shadow-lg shadow-brand-500/20 transition-all hover:-translate-y-0.5 hover:bg-brand-600"
+                                className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-brand-500! px-8 text-base font-semibold text-white shadow-lg shadow-brand-500/20 transition-all hover:-translate-y-0.5 hover:bg-brand-600 sm:w-auto"
                             >
                                 {ctaLabel}
                                 <svg
@@ -758,7 +758,7 @@ export default function Welcome() {
                             </Link>
                             <Link
                                 href="/rts-calculator"
-                                className="inline-flex h-12 items-center rounded-xl border border-gray-200 bg-white px-8 text-base font-semibold text-gray-700 transition-all hover:border-brand-300 hover:text-brand-600 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300 dark:hover:border-brand-500/40 dark:hover:text-brand-400"
+                                className="inline-flex h-12 w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-8 text-base font-semibold text-gray-700 transition-all hover:border-brand-300 hover:text-brand-600 sm:w-auto dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300 dark:hover:border-brand-500/40 dark:hover:text-brand-400"
                             >
                                 Calculate your RTS bleed
                             </Link>
@@ -769,8 +769,8 @@ export default function Welcome() {
                 {/* Footer */}
                 <footer className="border-t border-gray-200 dark:border-white/8">
                     <div className="mx-auto max-w-[1200px] px-5 py-16 md:px-10">
-                        <div className="mb-12 grid gap-10 md:grid-cols-[2fr_1fr_1fr_1fr] md:gap-12">
-                            <div>
+                        <div className="mb-12 grid grid-cols-2 gap-8 sm:gap-10 md:grid-cols-[2fr_1fr_1fr_1fr] md:gap-12">
+                            <div className="col-span-2 md:col-span-1">
                                 <div className="mb-3 flex items-center gap-3">
                                     <img
                                         src="/img/logo/artemis.png"
