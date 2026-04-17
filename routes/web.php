@@ -19,6 +19,10 @@ Route::get('/calculator', function () {
     return Inertia::render('calculator');
 })->name('calculator');
 
+Route::get('/rts-calculator', function () {
+    return Inertia::render('rts-calculator');
+})->name('rts.calculator');
+
 Route::get('/design-guidelines', function () {
     return view('design-guidelines');
 });
