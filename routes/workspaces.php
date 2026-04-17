@@ -27,6 +27,10 @@ use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
+use Modules\Finance\Http\Controllers\AccountController as FinanceAccountController;
+use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardController;
+use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
+use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
@@ -207,6 +211,35 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{purchasedOrder}/edit', [PurchasedOrderController::class, 'edit'])->name('edit');
         Route::put('/{purchasedOrder}', [PurchasedOrderController::class, 'update'])->name('update');
         Route::delete('/{purchasedOrder}', [PurchasedOrderController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
+        Route::get('/', [InventoryItemController::class, 'index'])->name('index');
+        Route::post('/', [InventoryItemController::class, 'store'])->name('store');
+        Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
+        Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::prefix('/workspaces/{workspace:slug}/finance')->name('workspaces.finance.')->group(function () {
+        Route::get('/dashboard', FinanceDashboardController::class)->name('dashboard');
+
+        Route::get('/accounts', [FinanceAccountController::class, 'index'])->name('accounts.index');
+        Route::post('/accounts', [FinanceAccountController::class, 'store'])->name('accounts.store');
+        Route::get('/accounts/{account}', [FinanceAccountController::class, 'show'])->name('accounts.show');
+        Route::put('/accounts/{account}', [FinanceAccountController::class, 'update'])->name('accounts.update');
+        Route::delete('/accounts/{account}', [FinanceAccountController::class, 'destroy'])->name('accounts.destroy');
+
+        Route::get('/transactions', [FinanceTransactionController::class, 'index'])->name('transactions.index');
+        Route::post('/transactions', [FinanceTransactionController::class, 'store'])->name('transactions.store');
+        Route::post('/transactions/import', [FinanceTransactionController::class, 'import'])->name('transactions.import');
+        Route::put('/transactions/{transaction}', [FinanceTransactionController::class, 'update'])->name('transactions.update');
+        Route::delete('/transactions/{transaction}', [FinanceTransactionController::class, 'destroy'])->name('transactions.destroy');
+
+        Route::get('/remittances', [FinanceRemittanceController::class, 'index'])->name('remittances.index');
+        Route::post('/remittances', [FinanceRemittanceController::class, 'store'])->name('remittances.store');
+        Route::get('/remittances/{remittance}', [FinanceRemittanceController::class, 'show'])->name('remittances.show');
+        Route::put('/remittances/{remittance}', [FinanceRemittanceController::class, 'update'])->name('remittances.update');
+        Route::delete('/remittances/{remittance}', [FinanceRemittanceController::class, 'destroy'])->name('remittances.destroy');
     });
 
 });

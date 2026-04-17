@@ -35,12 +35,16 @@ import {
     Copy,
     Check,
     ExternalLink,
+    Wallet,
+    Landmark,
+    ArrowLeftRight,
+    Send,
 } from 'lucide-react';
 import { useState } from 'react';
 import AppLogo from './app-logo';
 
 export function AppSidebar() {
-    const { currentWorkspace } = usePage().props as unknown as { currentWorkspace: { slug: string; show_inventory: boolean } };
+    const { currentWorkspace } = usePage().props as unknown as { currentWorkspace: { slug: string; show_inventory: boolean; show_finance: boolean } };
 
     const dashboardUrl = currentWorkspace
         ? workspace.dashboard.url((currentWorkspace as { slug: string }).slug)
@@ -134,10 +138,51 @@ export function AppSidebar() {
                   },
               ]
             : []),
+        ...(currentWorkspace.show_finance
+            ? [
+                  {
+                      title: 'Finance',
+                      icon: Wallet,
+                      items: [
+                          {
+                              title: 'Dashboard',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/dashboard`,
+                              icon: LayoutDashboard,
+                          },
+                          {
+                              title: 'Accounts',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/accounts`,
+                              icon: Landmark,
+                          },
+                          {
+                              title: 'Transactions',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/transactions`,
+                              icon: ArrowLeftRight,
+                          },
+                          {
+                              title: 'Remittances',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/remittances`,
+                              icon: Send,
+                          },
+                      ],
+                  },
+              ]
+            : []),
         {
-            title: 'Profile',
-            href: '/profile',
-            icon: User,
+            title: 'RTS',
+            icon: RotateCcw,
+            items: [
+                {
+                    title: 'Analytics',
+                    href: `/workspaces/${currentWorkspace.slug}/rts/analytics`,
+                    icon: BarChart2,
+                },
+                {
+                    title: 'Parcel Journey',
+                    href: `/workspaces/${currentWorkspace.slug}/rts/parcel-journeys`,
+                    icon: MapPin,
+                },
+            ],
         },
 
         {
