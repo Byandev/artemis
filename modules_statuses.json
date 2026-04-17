@@ -2,5 +2,6 @@
     "AdsManager": true,
     "Botcake": true,
     "Pancake": true,
-    "Inventory": true
+    "Inventory": true,
+    "Finance": true
 }
