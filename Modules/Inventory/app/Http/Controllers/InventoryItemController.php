@@ -65,7 +65,7 @@ class InventoryItemController extends Controller
 
             $item->remaining_after_fulfillment = round($remaining, 2);
             $item->days_it_can_last = $avg > 0 ? round($remaining / $avg, 1) : null;
-            $item->po_needed = round(max(0, ($leadTime * $avg) - $waiting), 2);
+            $item->po_needed = round(max(0, ($leadTime * $avg) - $waiting - $remaining), 2);
 
             return $item;
         });
