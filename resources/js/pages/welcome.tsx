@@ -70,75 +70,17 @@ const features = [
     },
 ];
 
-const tiers = [
-    {
-        num: '01',
-        name: 'Visibility',
-        description: 'See what\'s happening. Keep customers informed. The essentials, automated.',
-        price: '2,999',
-        priceSub: '14-day free trial',
-        features: [
-            'Full analytics dashboard',
-            'Sales, delivery & RTS analytics',
-            'Parcel journey tracking',
-            'Auto SMS / Viber / Messenger',
-            'Up to 3,000 orders / month',
-            'Email support',
-        ],
-        cta: 'Start free trial',
-        featured: false,
-    },
-    {
-        num: '02',
-        name: 'Strategy',
-        description: 'Everything in Visibility, plus a monthly consultation with our analysts.',
-        price: '12,999',
-        priceSub: '14-day free trial',
-        features: [
-            'Everything in Visibility',
-            'Monthly 1-on-1 strategy call',
-            'Custom "what to fix" report',
-            'Category benchmarking vs peers',
-            'Quarterly business review',
-            'Priority chat support',
-            'Up to 10,000 orders / month',
-        ],
-        cta: 'Start free trial',
-        featured: true,
-        badge: 'Most popular',
-    },
-    {
-        num: '03',
-        name: 'Control',
-        description: 'Full profit protection. We don\'t just show leaks — we help plug them.',
-        price: '29,999',
-        priceSub: 'Or performance-based pricing',
-        features: [
-            'Everything in Strategy',
-            'Buyer risk scoring engine',
-            'Profit simulator & sweet-spot finder',
-            'Auto-confirmation flows',
-            'Address validation',
-            'Courier & channel API integration',
-            'Unlimited orders',
-            'Dedicated success manager',
-        ],
-        cta: 'Talk to sales',
-        featured: false,
-    },
-];
-
 const steps = [
     { num: '01 / SIGN UP', title: 'Create your workspace', description: 'Enter your business name and a few basics. No credit card, no lengthy forms.' },
-    { num: '02 / CONNECT', title: 'Link your data', description: 'Connect your couriers and sales channels — or upload a CSV of your recent orders.' },
+    { num: '02 / CONNECT', title: 'Connect Pancake', description: 'Link your Pancake POS page — we pull your orders, customers, and delivery data automatically.' },
     { num: '03 / SEE', title: 'Your first insight', description: 'Within minutes, see your real RTS rate, lost profit, and highest-risk zones.' },
     { num: '04 / ACT', title: 'Move the number', description: 'Turn on notifications, follow our recommendations, and watch RTS drop month over month.' },
 ];
 
 const faqs = [
     {
-        q: 'Do I need to integrate my courier account right away?',
-        a: 'No — you can start by uploading a CSV of your recent orders. We\'ll show you your baseline analytics within minutes. Courier API integration unlocks real-time tracking, but it\'s optional.',
+        q: 'How does Artemis get my data?',
+        a: 'We connect directly to your Pancake POS account. Just link your page and we pull your orders, customers, and delivery data automatically — no manual uploads needed.',
     },
     {
         q: 'Does Artemis really reduce RTS? By how much?',
@@ -149,16 +91,16 @@ const faqs = [
         a: 'Totally fine — most sellers don\'t track it formally. During onboarding we\'ll ask for your average monthly expenses and auto-compute margin from your sales data. Or you can pick your product category and we\'ll use industry averages.',
     },
     {
-        q: 'Which couriers and sales channels do you support?',
-        a: 'J&T, Flash Express, LBC, Ninja Van, SPX, and more. For channels: Shopee, Lazada, TikTok Shop, your own Shopify/Woo storefront, and manual uploads. Adding new integrations continuously.',
+        q: 'Do I need anything other than Pancake POS?',
+        a: 'Nope. If you\'re running your COD business on Pancake, that\'s all we need. We pull orders, delivery statuses, and customer data directly from your Pancake pages.',
     },
     {
         q: 'Is my customer data safe?',
         a: 'Yes. We\'re Data Privacy Act (RA 10173) compliant, store data encrypted at rest, and never share your numbers with anyone else. Your dashboard is your dashboard.',
     },
     {
-        q: 'Can I cancel anytime?',
-        a: 'Yes. No lock-in, no cancellation fees. If Artemis isn\'t working for your business, you can export your data and leave whenever.',
+        q: 'What do I get with the free trial?',
+        a: '14-day free trial — connect 1 Pancake page and get 1 month of order and delivery data, plus Parcel Journey tracking via chat. No credit card required.',
     },
 ];
 
@@ -214,7 +156,7 @@ export default function Welcome() {
                         </Link>
                         <div className="flex items-center gap-6 text-sm">
                             <a href="#features" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">Features</a>
-                            <a href="#pricing" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">Pricing</a>
+                            <a href="#free-trial" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">Free trial</a>
                             <a href="#how" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">How it works</a>
                             <Link href="/rts-calculator" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">RTS Calculator</Link>
                             <div className="hidden h-4 w-px bg-gray-200 dark:bg-white/10 md:block" />
@@ -278,7 +220,7 @@ export default function Welcome() {
                             </a>
                         </div>
                         <span className="block font-mono text-[11px] uppercase tracking-[0.1em] text-gray-400 dark:text-gray-600">
-                            — No credit card · 14-day free trial · Cancel anytime
+                            — No credit card · Connect 1 Pancake page · 14-day free trial
                         </span>
 
                         {/* Stats */}
@@ -305,13 +247,13 @@ export default function Welcome() {
                 {/* Problem */}
                 <section className="relative overflow-hidden bg-gray-50 py-24 dark:bg-zinc-900/50 md:py-28">
                     <div className="pointer-events-none absolute right-[-200px] top-1/2 h-[600px] w-[600px] -translate-y-1/2 bg-[radial-gradient(circle,rgba(16,211,161,0.08),transparent_65%)]" />
-                    <div className="relative mx-auto max-w-[1200px] px-5 md:px-10">
+                    <div className="relative mx-auto max-w-[1200px] px-5 text-center md:px-10">
                         <p className="mb-5 font-mono text-[11px] uppercase tracking-[0.2em] text-brand-500">— The silent margin killer</p>
-                        <h2 className="mb-6 max-w-3xl text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
+                        <h2 className="mb-6 text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
                             Every failed parcel is{' '}
                             <span className="text-brand-500 italic">pure loss.</span>
                         </h2>
-                        <p className="mb-6 max-w-xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">
+                        <p className="mx-auto mb-6 max-w-xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">
                             For Filipino COD sellers, RTS isn't just a number — it's money walking out the door. Shipping paid twice, packaging wasted, inventory tied up, and no sale to show for it.
                         </p>
                         <Link
@@ -346,14 +288,14 @@ export default function Welcome() {
 
                 {/* Features */}
                 <section id="features" className="py-24 md:py-28">
-                    <div className="mx-auto max-w-[1200px] px-5 md:px-10">
+                    <div className="mx-auto max-w-[1200px] px-5 text-center md:px-10">
                         <p className="mb-5 font-mono text-[11px] uppercase tracking-[0.2em] text-brand-500">— What Artemis does</p>
-                        <h2 className="mb-6 max-w-3xl text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
+                        <h2 className="mb-6 text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
                             Every metric that{' '}
                             <span className="text-brand-500 italic">actually moves</span>{' '}
                             your business.
                         </h2>
-                        <p className="mb-14 max-w-xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">
+                        <p className="mx-auto mb-14 max-w-xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">
                             From order to delivery — across every page, shop, and courier. Built specifically for how Filipino e-commerce actually runs.
                         </p>
 
@@ -374,79 +316,71 @@ export default function Welcome() {
                     </div>
                 </section>
 
-                {/* Pricing */}
-                <section id="pricing" className="border-t border-b border-gray-200 bg-gray-50 py-24 dark:border-white/8 dark:bg-zinc-900/50 md:py-28">
-                    <div className="mx-auto max-w-[1200px] px-5 md:px-10">
-                        <p className="mb-5 font-mono text-[11px] uppercase tracking-[0.2em] text-brand-500">— Pricing that grows with you</p>
-                        <h2 className="mb-6 max-w-3xl text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
-                            Start free.{' '}
-                            <span className="text-brand-500 italic">Scale when ready.</span>
-                        </h2>
-                        <p className="mb-14 max-w-xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">
-                            Three tiers built around where you are in the journey. Start with clarity, add strategy, then unlock full profit control.
-                        </p>
+                {/* Free Trial Offer */}
+                <section id="free-trial" className="relative overflow-hidden border-t border-b border-gray-200 bg-gray-50 py-24 dark:border-white/8 dark:bg-zinc-900/50 md:py-28">
+                    <div className="pointer-events-none absolute left-1/2 top-1/2 h-[500px] w-[700px] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse,rgba(16,211,161,0.08),transparent_65%)]" />
+                    <div className="relative mx-auto max-w-[1200px] px-5 md:px-10">
+                        <div className="mx-auto max-w-3xl text-center">
+                            <p className="mb-5 font-mono text-[11px] uppercase tracking-[0.2em] text-brand-500">— Launch offer</p>
+                            <h2 className="mb-6 text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
+                                Start free.{' '}
+                                <span className="text-brand-500 italic">See it work.</span>
+                            </h2>
+                            <p className="mx-auto mb-12 max-w-lg text-lg leading-relaxed text-gray-500 dark:text-gray-400">
+                                14 days free. Connect one Pancake page and get 1 month of data — enough to see your real numbers and start moving them.
+                            </p>
+                        </div>
 
-                        <div className="grid gap-5 md:grid-cols-3">
-                            {tiers.map((tier) => (
-                                <div
-                                    key={tier.num}
-                                    className={`relative flex flex-col rounded-xl border p-10 transition-all hover:-translate-y-1 ${
-                                        tier.featured
-                                            ? 'border-brand-500 bg-gradient-to-b from-brand-50 to-white shadow-xl shadow-brand-500/10 dark:from-brand-500/8 dark:to-zinc-900 md:scale-[1.02]'
-                                            : 'border-gray-200 bg-white dark:border-white/8 dark:bg-zinc-900'
-                                    }`}
-                                >
-                                    {tier.featured && (
-                                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-500 px-3.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-white">
-                                            {tier.badge}
-                                        </span>
-                                    )}
-                                    <p className={`mb-3.5 font-mono text-[11px] uppercase tracking-[0.2em] ${tier.featured ? 'text-brand-500' : 'text-gray-400 dark:text-gray-500'}`}>
-                                        — Tier {tier.num}
-                                    </p>
-                                    <h3 className="mb-2.5 text-4xl font-bold tracking-tight text-gray-900 dark:text-gray-100">{tier.name}</h3>
-                                    <p className="mb-7 min-h-[44px] text-sm leading-relaxed text-gray-500 dark:text-gray-400">{tier.description}</p>
-                                    <div className="mb-1 flex items-baseline gap-2 text-4xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
-                                        ₱{tier.price}
-                                        <span className="text-sm font-normal text-gray-400">/ month</span>
-                                    </div>
-                                    <p className="mb-7 font-mono text-[11px] uppercase tracking-[0.15em] text-gray-400 dark:text-gray-500">{tier.priceSub}</p>
-                                    <div className="mb-6 h-px bg-gray-200 dark:bg-white/8" />
-                                    <ul className="mb-8 flex-1 space-y-0">
-                                        {tier.features.map((feat) => (
-                                            <li key={feat} className="relative py-2.5 pl-7 text-sm text-gray-600 dark:text-gray-300">
-                                                <span className="absolute left-0 top-3 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-brand-500 bg-brand-50 dark:bg-brand-500/10">
-                                                    <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
-                                                        <path d="M1 3l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-brand-500" />
-                                                    </svg>
-                                                </span>
-                                                {feat}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                    <div className="mt-auto">
-                                        <Link
-                                            href={tier.featured ? ctaHref : '#'}
-                                            className={`inline-flex h-11 w-full items-center justify-center rounded-lg text-sm font-semibold transition-all ${
-                                                tier.featured
-                                                    ? 'bg-brand-500! text-white shadow-lg shadow-brand-500/20 hover:bg-brand-600'
-                                                    : 'border border-gray-200 bg-white text-gray-700 hover:border-brand-300 hover:text-brand-600 dark:border-white/10 dark:bg-zinc-800 dark:text-gray-300 dark:hover:border-brand-500/40 dark:hover:text-brand-400'
-                                            }`}
-                                        >
-                                            {tier.cta}
-                                        </Link>
-                                    </div>
+                        <div className="relative mx-auto max-w-2xl overflow-hidden rounded-2xl border-2 border-brand-500/80 bg-gradient-to-b from-brand-50/90 to-white shadow-xl shadow-brand-500/8 dark:border-brand-500/60 dark:from-brand-500/[0.06] dark:to-zinc-900">
+                            <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-brand-500/10 blur-3xl" />
+                            <div className="relative px-8 py-10 text-center md:px-12">
+                                <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-300 bg-brand-50 px-4 py-1.5 dark:border-brand-500/30 dark:bg-brand-500/10">
+                                    <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">14-day free trial</span>
                                 </div>
-                            ))}
+
+                                <h3 className="mb-3 text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 md:text-4xl">₱0</h3>
+                                <p className="mb-8 text-sm text-gray-500 dark:text-gray-400">No credit card required · No commitment</p>
+
+                                <div className="mb-8 h-px bg-gray-200 dark:bg-white/8" />
+
+                                <ul className="mx-auto mb-10 max-w-sm space-y-0 text-left">
+                                    {[
+                                        'Connect 1 Pancake page',
+                                        '1 month of order & delivery data',
+                                        'Parcel Journey tracking via chat',
+                                        'Chat support',
+                                    ].map((feat) => (
+                                        <li key={feat} className="relative py-3 pl-8 text-[15px] text-gray-700 dark:text-gray-300">
+                                            <span className="absolute left-0 top-3.5 flex h-4 w-4 items-center justify-center rounded-full border border-brand-500 bg-brand-50 dark:bg-brand-500/10">
+                                                <svg width="9" height="7" viewBox="0 0 8 6" fill="none">
+                                                    <path d="M1 3l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-brand-500" />
+                                                </svg>
+                                            </span>
+                                            {feat}
+                                        </li>
+                                    ))}
+                                </ul>
+
+                                <Link
+                                    href={ctaHref}
+                                    className="inline-flex h-12 w-full max-w-sm items-center justify-center gap-2.5 rounded-xl bg-brand-500! text-base font-semibold text-white shadow-lg shadow-brand-500/20 transition-all hover:-translate-y-0.5 hover:bg-brand-600"
+                                >
+                                    {ctaLabel}
+                                    <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 6h14m0 0L10 1m5 5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                                </Link>
+                                <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.15em] text-gray-400 dark:text-gray-500">
+                                    Setup takes under 2 minutes
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </section>
 
                 {/* How it works */}
                 <section id="how" className="py-24 md:py-28">
-                    <div className="mx-auto max-w-[1200px] px-5 md:px-10">
+                    <div className="mx-auto max-w-[1200px] px-5 text-center md:px-10">
                         <p className="mb-5 font-mono text-[11px] uppercase tracking-[0.2em] text-brand-500">— How it works</p>
-                        <h2 className="mb-6 max-w-3xl text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
+                        <h2 className="mb-6 text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
                             From signup to first insight —{' '}
                             <span className="text-brand-500 italic">in under five minutes.</span>
                         </h2>
@@ -482,7 +416,7 @@ export default function Welcome() {
 
                 {/* FAQ */}
                 <section id="faq" className="py-24 md:py-28">
-                    <div className="mx-auto max-w-[1200px] px-5 md:px-10">
+                    <div className="mx-auto max-w-[1200px] px-5 text-center md:px-10">
                         <p className="mb-5 font-mono text-[11px] uppercase tracking-[0.2em] text-brand-500">— Questions, answered</p>
                         <h2 className="mb-6 text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
                             The short{' '}
@@ -506,22 +440,22 @@ export default function Welcome() {
                             <span className="text-brand-500 italic">Let's move it.</span>
                         </h2>
                         <p className="mx-auto mb-10 max-w-xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">
-                            14 days free. No credit card. First insight in under five minutes. Handa ka na ba?
+                            14 days free. Connect 1 Pancake page, get 1 month of data. Parcel Journey + chat support. Handa ka na ba?
                         </p>
                         <div className="flex flex-col items-center justify-center gap-3.5 sm:flex-row">
                             <Link
                                 href={ctaHref}
                                 className="inline-flex h-12 items-center gap-2.5 rounded-xl bg-brand-500! px-8 text-base font-semibold text-white shadow-lg shadow-brand-500/20 transition-all hover:bg-brand-600 hover:-translate-y-0.5"
                             >
-                                Start free trial
+                                {ctaLabel}
                                 <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 6h14m0 0L10 1m5 5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
                             </Link>
-                            <a
-                                href="#"
+                            <Link
+                                href="/rts-calculator"
                                 className="inline-flex h-12 items-center rounded-xl border border-gray-200 bg-white px-8 text-base font-semibold text-gray-700 transition-all hover:border-brand-300 hover:text-brand-600 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300 dark:hover:border-brand-500/40 dark:hover:text-brand-400"
                             >
-                                Book a demo call
-                            </a>
+                                Calculate your RTS bleed
+                            </Link>
                         </div>
                     </div>
                 </section>
@@ -543,7 +477,7 @@ export default function Welcome() {
                                 <h5 className="mb-4 font-mono text-[10px] uppercase tracking-[0.2em] text-gray-400 dark:text-gray-600">Product</h5>
                                 <div className="flex flex-col gap-2">
                                     <a href="#features" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">Features</a>
-                                    <a href="#pricing" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">Pricing</a>
+                                    <a href="#free-trial" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">Free trial</a>
                                     <a href="#how" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">How it works</a>
                                     <a href="#faq" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">FAQ</a>
                                     <Link href="/rts-calculator" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">RTS Calculator</Link>

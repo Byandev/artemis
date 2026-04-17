@@ -252,8 +252,8 @@ export default function RtsCalculator() {
                             <Link href="/#features" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">
                                 Features
                             </Link>
-                            <Link href="/#pricing" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">
-                                Pricing
+                            <Link href="/#free-trial" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">
+                                Free trial
                             </Link>
                             <Link href="/#how" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">
                                 How it works
@@ -708,7 +708,7 @@ export default function RtsCalculator() {
                             <div className="flex items-center gap-6 text-[12px] text-gray-400 dark:text-gray-500">
                                 <Link href="/" className="transition-colors hover:text-brand-500">Home</Link>
                                 <Link href="/#features" className="transition-colors hover:text-brand-500">Features</Link>
-                                <Link href="/#pricing" className="transition-colors hover:text-brand-500">Pricing</Link>
+                                <Link href="/#free-trial" className="transition-colors hover:text-brand-500">Free trial</Link>
                             </div>
                             <p className="font-mono text-[11px] tracking-[0.08em] text-gray-400 dark:text-gray-600">
                                 &copy; {new Date().getFullYear()} Artemis
