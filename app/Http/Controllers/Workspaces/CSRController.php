@@ -82,9 +82,22 @@ class CSRController extends Controller
                 SUM(old_order_count) as s_old_orders
             ');
 
+        $rmoCallSub = DB::table('pancake_order_for_delivery')
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('delivery_date', [$from, $to])
+            ->groupBy('conferrer_id')
+            ->selectRaw('
+                conferrer_id,
+                SUM(customer_call_attempts) as s_customer_attempts,
+                SUM(customer_call_duration) as s_customer_duration,
+                SUM(rider_call_attempts) as s_rider_attempts,
+                SUM(rider_call_duration) as s_rider_duration
+            ');
+
         $query = PancakeUserDailyReport::query()
             ->join('pancake_users as pu', 'pu.id', '=', 'pancake_user_daily_reports.pancake_user_id')
             ->leftJoinSub($engagementSub, 'eng', 'eng.pancake_user_id', '=', 'pu.id')
+            ->leftJoinSub($rmoCallSub, 'ofd_sum', 'ofd_sum.conferrer_id', '=', 'pu.id')
             ->where('pancake_user_daily_reports.workspace_id', $workspace->id)
             ->whereBetween('pancake_user_daily_reports.date', [$from, $to])
             ->when($type, fn ($q) => $q->where('pancake_user_daily_reports.type', $type))
@@ -118,6 +131,8 @@ class CSRController extends Controller
                     THEN ROUND((COALESCE(MAX(eng.s_eng_orders), 0) / MAX(eng.s_total_eng)) * 100, 2)
                     ELSE 0
                 END as overall_conversion_rate,
+                COALESCE(MAX(ofd_sum.s_customer_attempts), 0) + COALESCE(MAX(ofd_sum.s_rider_attempts), 0) as rmo_total_attempts,
+                COALESCE(MAX(ofd_sum.s_customer_duration), 0) + COALESCE(MAX(ofd_sum.s_rider_duration), 0) as total_call_time,
                 (
                     SELECT COUNT(*)
                     FROM pancake_order_for_delivery ofd
@@ -173,6 +188,8 @@ class CSRController extends Controller
                 AllowedSort::field('new_cx_conversion_rate'),
                 AllowedSort::field('old_cx_conversion_rate'),
                 AllowedSort::field('overall_conversion_rate'),
+                AllowedSort::field('rmo_total_attempts'),
+                AllowedSort::field('total_call_time'),
             ])
             ->defaultSort('-total_sales')
             ->paginate($request->integer('per_page', 10))

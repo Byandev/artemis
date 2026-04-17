@@ -20,6 +20,7 @@ class Workspace extends Model
         'slug',
         'description',
         'owner_id',
+        'monthly_order_volume',
         'show_inventory',
         'inventory_sync',
     ];
