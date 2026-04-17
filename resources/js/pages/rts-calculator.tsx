@@ -25,6 +25,7 @@ interface Inputs {
     aov: number;
     rtsPct: number;
     marginPct: number;
+    adCostPerOrder: number;
     forward: number;
     returnFee: number;
     packaging: number;
@@ -37,6 +38,7 @@ const DEFAULTS: Inputs = {
     aov: 500,
     rtsPct: 30,
     marginPct: 35,
+    adCostPerOrder: 50,
     forward: 120,
     returnFee: 100,
     packaging: 15,
@@ -55,20 +57,25 @@ function compute(i: Inputs) {
     const damagePct = clamp(i.damagePct || 0, 0, 100);
     const cogs = Math.max(0, i.cogs || 0);
 
+    const adCostPerOrder = Math.max(0, i.adCostPerOrder || 0);
+
     const failedOrders = orders * (rtsPct / 100);
     const profitPerOrder = aov * (marginPct / 100);
     const damageLoss = (damagePct / 100) * cogs;
+    const costPerAcquisition = adCostPerOrder;
+    const wastedAdSpend = failedOrders * costPerAcquisition;
     const costPerRts = forward + returnFee + packaging + damageLoss + profitPerOrder;
+    const costPerRtsWithAds = costPerRts + costPerAcquisition;
 
     const conservativeMonthly = failedOrders * profitPerOrder;
     const conservativeYearly = conservativeMonthly * 12;
 
-    const fullMonthly = failedOrders * costPerRts;
+    const fullMonthly = failedOrders * costPerRtsWithAds;
     const fullYearly = fullMonthly * 12;
 
     const reducedRtsPct = rtsPct * 0.9;
     const reducedFailed = orders * (reducedRtsPct / 100);
-    const reducedBleed = reducedFailed * costPerRts;
+    const reducedBleed = reducedFailed * costPerRtsWithAds;
     const monthlySavings = fullMonthly - reducedBleed;
     const yearlySavings = monthlySavings * 12;
 
@@ -82,6 +89,9 @@ function compute(i: Inputs) {
         profitPerOrder,
         damageLoss,
         costPerRts,
+        costPerAcquisition,
+        wastedAdSpend,
+        costPerRtsWithAds,
         conservativeMonthly,
         conservativeYearly,
         fullMonthly,
@@ -181,6 +191,7 @@ function NumberInput({
 }
 
 const BAR_SEGMENTS_META = [
+    { key: 'ads', label: 'Wasted ad spend', color: '#E11D48' },
     { key: 'forward', label: 'Forward shipping', color: '#0BA5EC' },
     { key: 'return', label: 'Return shipping', color: '#36BFFA' },
     { key: 'packaging', label: 'Packaging', color: '#98A2B3' },
@@ -201,11 +212,11 @@ export default function RtsCalculator() {
         setInputs((prev) => ({ ...prev, [key]: val }));
     }, []);
 
-    const barValues = [r.forward, r.returnFee, r.packaging, r.damageLoss, r.profitPerOrder];
+    const barValues = [r.costPerAcquisition, r.forward, r.returnFee, r.packaging, r.damageLoss, r.profitPerOrder];
     const barTotal = barValues.reduce((s, v) => s + v, 0);
 
     const handleCopy = async () => {
-        const text = `I'm losing ${fmtPeso(r.fullMonthly)}/month to RTS on my PH COD business.\nThat's ${fmtPeso(r.fullYearly)}/year.\n\nBreakdown per failed parcel:\n- Unrealized profit: ${fmtPeso(r.profitPerOrder)}\n- Forward shipping: ${fmtPeso(r.forward)}\n- Return shipping: ${fmtPeso(r.returnFee)}\n- Packaging: ${fmtPeso(r.packaging)}\n- Damage loss: ${fmtPeso(r.damageLoss)}\n\nCalculated with Artemis — artemis.com/rts-calculator`;
+        const text = `I'm losing ${fmtPeso(r.fullMonthly)}/month to RTS on my PH COD business.\nThat's ${fmtPeso(r.fullYearly)}/year.\n\nBreakdown per failed parcel:\n- Wasted ad spend: ${fmtPeso(r.costPerAcquisition)}\n- Unrealized profit: ${fmtPeso(r.profitPerOrder)}\n- Forward shipping: ${fmtPeso(r.forward)}\n- Return shipping: ${fmtPeso(r.returnFee)}\n- Packaging: ${fmtPeso(r.packaging)}\n- Damage loss: ${fmtPeso(r.damageLoss)}\n\nWasted ad spend on RTS: ${fmtPeso(r.wastedAdSpend)}/mo\n\nCalculated with Artemis — artemis.com/rts-calculator`;
         try {
             await navigator.clipboard.writeText(text);
             setCopied(true);
@@ -332,7 +343,7 @@ export default function RtsCalculator() {
                                 >
                                     <div>
                                         <span className="text-[13px] font-semibold text-gray-800 dark:text-gray-200">Advanced inputs</span>
-                                        <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Shipping, packaging, damage & COGS</p>
+                                        <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Ad spend, shipping, packaging, damage & COGS</p>
                                     </div>
                                     <div className={`flex h-7 w-7 items-center justify-center rounded-full border transition-all ${showAdvanced ? 'rotate-180 border-emerald-400 bg-emerald-50 dark:border-emerald-500/40 dark:bg-emerald-500/10' : 'border-gray-200 dark:border-white/10'}`}>
                                         <svg className={`h-3.5 w-3.5 ${showAdvanced ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -342,6 +353,7 @@ export default function RtsCalculator() {
                                 </button>
                                 {showAdvanced && (
                                     <div className="space-y-5 border-t border-black/4 px-6 py-6 dark:border-white/5">
+                                        <NumberInput id="adCostPerOrder" label="Ad spend per order" value={inputs.adCostPerOrder} onChange={(v) => set('adCostPerOrder', v)} prefix="₱" tooltip="Your ad cost to acquire one order. Total monthly ad spend ÷ total orders." />
                                         <NumberInput id="forward" label="Forward shipping cost" value={inputs.forward} onChange={(v) => set('forward', v)} prefix="₱" />
                                         <NumberInput id="returnFee" label="Return shipping cost" value={inputs.returnFee} onChange={(v) => set('returnFee', v)} prefix="₱" />
                                         <NumberInput id="packaging" label="Packaging cost per parcel" value={inputs.packaging} onChange={(v) => set('packaging', v)} prefix="₱" />
@@ -465,14 +477,15 @@ export default function RtsCalculator() {
                                     <div className="border-t border-brand-200/50 bg-brand-50/30 px-7 py-5 dark:border-brand-500/10 dark:bg-brand-500/[0.03] md:px-8">
                                         <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-brand-600/70 dark:text-brand-400/70">What this counts</p>
                                         <p className="mb-4 text-[13px] leading-relaxed text-gray-600 dark:text-gray-400">
-                                            The <span className="font-semibold text-gray-800 dark:text-gray-200">real cost</span> of every RTS goes far beyond lost profit. You paid to ship it there. You pay to ship it back. The packaging is wasted. Some items come back damaged. This adds up to the <span className="font-semibold text-brand-600 dark:text-brand-400">true bleed</span> — what RTS actually costs your business.
+                                            The <span className="font-semibold text-gray-800 dark:text-gray-200">real cost</span> of every RTS goes far beyond lost profit. You paid for the ad that acquired that customer. You paid to ship it there. You pay to ship it back. The packaging is wasted. Some items come back damaged. This adds up to the <span className="font-semibold text-brand-600 dark:text-brand-400">true bleed</span> — what RTS actually costs your business.
                                         </p>
 
                                         {/* Formula breakdown */}
                                         <div className="space-y-2">
-                                            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-400 dark:text-gray-500">Cost per failed parcel = {fmtPeso(r.costPerRts)}</p>
+                                            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-400 dark:text-gray-500">Cost per failed parcel = {fmtPeso(r.costPerRtsWithAds)}</p>
                                             <div className="space-y-1.5 rounded-lg border border-gray-200/80 bg-white px-4 py-3 dark:border-white/6 dark:bg-zinc-800/60">
                                                 {[
+                                                    { label: 'Wasted ad spend', value: r.costPerAcquisition, desc: 'The ad cost to acquire this customer' },
                                                     { label: 'Forward shipping', value: r.forward, desc: 'You paid to send it' },
                                                     { label: 'Return shipping', value: r.returnFee, desc: 'You pay to get it back' },
                                                     { label: 'Packaging', value: r.packaging, desc: 'Box, tape, filler — wasted' },
@@ -489,7 +502,7 @@ export default function RtsCalculator() {
                                                 ))}
                                                 <div className="mt-2 flex items-center justify-between border-t border-dashed border-gray-200 pt-2 dark:border-white/8">
                                                     <span className="text-[12px] font-bold text-gray-900 dark:text-gray-100">Total per RTS parcel</span>
-                                                    <span className="font-mono text-[13px] font-bold text-brand-600 dark:text-brand-400">{fmtPeso(r.costPerRts)}</span>
+                                                    <span className="font-mono text-[13px] font-bold text-brand-600 dark:text-brand-400">{fmtPeso(r.costPerRtsWithAds)}</span>
                                                 </div>
                                             </div>
                                             <p className="mt-1 font-mono text-[11px] text-gray-400 dark:text-gray-500">
@@ -511,7 +524,7 @@ export default function RtsCalculator() {
                                 <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-brand-500">Cost anatomy</p>
                                 <h3 className="mb-2 text-xl font-bold tracking-tight text-gray-900 dark:text-gray-100 md:text-2xl">
                                     Where the{' '}
-                                    <span className="text-brand-500">{fmtPeso(r.costPerRts)}</span>{' '}
+                                    <span className="text-brand-500">{fmtPeso(r.costPerRtsWithAds)}</span>{' '}
                                     per failed parcel goes
                                 </h3>
                                 <p className="mb-8 max-w-xl text-[13px] leading-relaxed text-gray-400 dark:text-gray-500">

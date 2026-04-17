@@ -39,6 +39,10 @@ Route::get('/security', function () {
     return Inertia::render('legal/security');
 })->name('security');
 
+Route::get('/pitch', function () {
+    return Inertia::render('pitch');
+})->name('pitch');
+
 Route::get('/about', function () {
     return Inertia::render('about');
 })->name('about');
