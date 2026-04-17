@@ -22,6 +22,7 @@ class Workspace extends Model
         'owner_id',
         'monthly_order_volume',
         'show_inventory',
+        'show_finance',
         'inventory_sync',
     ];
 
@@ -29,6 +30,7 @@ class Workspace extends Model
         'created_at'     => 'datetime',
         'updated_at'     => 'datetime',
         'show_inventory' => 'boolean',
+        'show_finance'   => 'boolean',
         'inventory_sync' => 'boolean',
     ];
 
