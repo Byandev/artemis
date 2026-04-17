@@ -32,6 +32,8 @@ interface CsrRecord {
     new_cx_conversion_rate: number;
     old_cx_conversion_rate: number;
     overall_conversion_rate: number;
+    rmo_total_attempts: number;
+    total_call_time: number;
 }
 
 interface Props {
@@ -47,6 +49,15 @@ interface Props {
 
 const peso = (n: number) =>
     new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(n) || 0);
+
+const formatCallTime = (seconds: number) => {
+    const s = Math.max(0, Math.floor(Number(seconds) || 0));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+};
 
 function useStatCard(workspace: Workspace, endpoint: string, from: string, to: string, type: string) {
     const [value, setValue] = useState<number | null>(null);
@@ -229,6 +240,16 @@ export default function Analytics({ workspace }: Props) {
                 accessorKey: 'overall_conversion_rate',
                 header: ({ column }) => <SortableHeader column={column} title="Overall Conversion Rate" />,
                 cell: ({ row }) => `${Number(row.original.overall_conversion_rate).toFixed(2)}%`,
+            },
+            {
+                accessorKey: 'rmo_total_attempts',
+                header: ({ column }) => <SortableHeader column={column} title="RMO Total Attempts" />,
+                cell: ({ row }) => Number(row.original.rmo_total_attempts).toLocaleString(),
+            },
+            {
+                accessorKey: 'total_call_time',
+                header: ({ column }) => <SortableHeader column={column} title="Total Call Time" />,
+                cell: ({ row }) => formatCallTime(row.original.total_call_time),
             },
         ],
         [],
