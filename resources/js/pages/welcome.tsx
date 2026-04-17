@@ -854,30 +854,30 @@ export default function Welcome() {
                                     Legal
                                 </h5>
                                 <div className="flex flex-col gap-2">
-                                    <a
-                                        href="#"
+                                    <Link
+                                        href="/privacy"
                                         className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
                                     >
                                         Privacy
-                                    </a>
-                                    <a
-                                        href="#"
+                                    </Link>
+                                    <Link
+                                        href="/terms"
                                         className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
                                     >
                                         Terms
-                                    </a>
-                                    <a
-                                        href="#"
+                                    </Link>
+                                    <Link
+                                        href="/data-policy"
                                         className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
                                     >
                                         Data policy
-                                    </a>
-                                    <a
-                                        href="#"
+                                    </Link>
+                                    <Link
+                                        href="/security"
                                         className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
                                     >
                                         Security
-                                    </a>
+                                    </Link>
                                 </div>
                             </div>
                         </div>

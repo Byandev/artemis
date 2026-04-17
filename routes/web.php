@@ -23,6 +23,22 @@ Route::get('/rts-calculator', function () {
     return Inertia::render('rts-calculator');
 })->name('rts.calculator');
 
+Route::get('/privacy', function () {
+    return Inertia::render('legal/privacy');
+})->name('privacy');
+
+Route::get('/terms', function () {
+    return Inertia::render('legal/terms');
+})->name('terms');
+
+Route::get('/data-policy', function () {
+    return Inertia::render('legal/data-policy');
+})->name('data-policy');
+
+Route::get('/security', function () {
+    return Inertia::render('legal/security');
+})->name('security');
+
 Route::get('/about', function () {
     return Inertia::render('about');
 })->name('about');
