@@ -12,6 +12,78 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v2.6.0',
+        date: '2026-04-16',
+        sections: [
+            {
+                title: 'Workspace Checklist',
+                items: [
+                    'New Checklist page in the workspace sidebar — define reusable tasks that apply to Shop or Page targets',
+                    'Each checklist item has a title, target type (Shop or Page), and a required flag shown as a yes/no badge',
+                    'Add, edit, and delete checklist items from a shared modal with validation',
+                    'Pages and Shops list rows now include a "View Checklist" action that opens a drawer showing per-target progress',
+                    'Optimistic toggle flow — checking or unchecking an item updates instantly and records who completed it',
+                    'Pages and Shops sort indicator now reflects how many required checklist items are still pending per target',
+                ],
+            },
+            {
+                title: 'Purchased Orders',
+                items: [
+                    'All columns are now sortable, with sort state persisted in the URL query string',
+                    'Create form enforces a strict YYYY-MM-DD issue date and disables submit until required fields are valid',
+                ],
+            },
+            {
+                title: 'Inventory Items',
+                items: [
+                    'Lead Time, Unfulfilled Count, 3-Day Average, and Created Date columns are now sortable',
+                ],
+            },
+            {
+                title: 'RMO Management',
+                items: [
+                    'Filter state is now preserved correctly after navigation — fixed a regression where assignee/status filters would reset',
+                ],
+            },
+            {
+                title: 'Tables',
+                items: [
+                    'Default page size is now 10 rows across CSR Management, CSR Analytics, RTS Analytics breakdowns (Ad, Confirmed By, Product, Rider), Parcel Templates, Roles, Inventory Purchased Orders, Ads Optimization Rules, and the public API endpoints (Users, RMO, CSR Daily Records)',
+                    'Row numbering now starts from the correct offset on every paginated table across the system',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v2.5.1',
+        date: '2026-04-16',
+        sections: [
+            {
+                title: 'CSR Analytics',
+                items: [
+                    'RMO Total For Delivery — new sortable column showing orders assigned to the CSR as conferrer within the selected date range',
+                    'RMO Productivity — new sortable column showing RMO called as a percentage of RMO Total For Delivery',
+                    'Assignee filter now counts total orders by confirmed_by, so the stat card matches the filtered CSR',
+                ],
+            },
+            {
+                title: 'RMO Management',
+                items: [
+                    'Status picker, Assign to me, and Remove assignee are disabled unless the order\'s delivery date is today — backend validation mirrors the UI',
+                    'Date picker moved to the right side of the toolbar, next to the Show/Hide Statistics button',
+                ],
+            },
+            {
+                title: 'CSR ERP Sync',
+                items: [
+                    'Schedule replaced: backfill runs at 2/3/4/5 AM for 2–5 days ago, plus 12 PM and 3 PM runs for yesterday (previously twice daily at 10 and 22)',
+                    'New --date option on trigger-fetch-csr-erp-dail-records accepts any Carbon-parseable value for ad-hoc backfills',
+                    'Sync now only targets ACTIVE Pancake users',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v2.5.0',
         date: '2026-04-14',
         sections: [
@@ -389,6 +461,10 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v2.6.0':
+        'bg-pink-500/10 text-pink-600 dark:text-pink-400 ring-pink-500/20',
+    'v2.5.1':
+        'bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 ring-fuchsia-500/20',
     'v2.5.0':
         'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 ring-indigo-500/20',
     'v2.4.4':

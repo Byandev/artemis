@@ -19,6 +19,46 @@ Route::get('/calculator', function () {
     return Inertia::render('calculator');
 })->name('calculator');
 
+Route::get('/rts-calculator', function () {
+    return Inertia::render('rts-calculator');
+})->name('rts.calculator');
+
+Route::get('/privacy', function () {
+    return Inertia::render('legal/privacy');
+})->name('privacy');
+
+Route::get('/terms', function () {
+    return Inertia::render('legal/terms');
+})->name('terms');
+
+Route::get('/data-policy', function () {
+    return Inertia::render('legal/data-policy');
+})->name('data-policy');
+
+Route::get('/security', function () {
+    return Inertia::render('legal/security');
+})->name('security');
+
+Route::get('/pitch', function () {
+    return Inertia::render('pitch');
+})->name('pitch');
+
+Route::get('/about', function () {
+    return Inertia::render('about');
+})->name('about');
+
+Route::get('/contact', function () {
+    return Inertia::render('contact');
+})->name('contact');
+
+Route::get('/blog', function () {
+    return Inertia::render('blog/index');
+})->name('blog.index');
+
+Route::get('/blog/{slug}', function (string $slug) {
+    return Inertia::render('blog/' . $slug);
+})->name('blog.show')->where('slug', '[a-z0-9\-]+');
+
 Route::get('/design-guidelines', function () {
     return view('design-guidelines');
 });
