@@ -141,36 +141,70 @@ export default function Welcome() {
     return (
         <>
             <Head title="Artemis — Hunt down RTS. Protect your margin." />
-            <div className="relative min-h-screen bg-white text-gray-900 dark:bg-zinc-950 dark:text-gray-100 overflow-hidden">
-
+            <div className="relative min-h-screen overflow-hidden bg-white text-gray-900 dark:bg-zinc-950 dark:text-gray-100">
                 {/* Background decorations */}
-                <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 h-[500px] w-[900px] bg-[radial-gradient(ellipse,rgba(16,211,161,0.12),transparent_70%)]" />
-                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.03)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:60px_60px]" />
+                <div className="pointer-events-none absolute -top-40 left-1/2 h-[500px] w-[900px] -translate-x-1/2 bg-[radial-gradient(ellipse,rgba(16,211,161,0.12),transparent_70%)]" />
+                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.03)_1px,transparent_1px)] bg-[size:60px_60px] dark:bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)]" />
 
                 {/* Nav */}
                 <nav className="sticky top-0 z-50 border-b border-gray-200/80 bg-white/80 backdrop-blur-2xl dark:border-white/6 dark:bg-zinc-950/80">
                     <div className="mx-auto flex max-w-[1200px] items-center justify-between px-5 py-4 md:px-10">
                         <Link href="/" className="flex items-center gap-3">
-                            <img src="/img/logo/artemis.png" alt="Artemis" className="h-9 w-9 object-contain" />
-                            <span className="text-[22px] font-semibold tracking-tight">Artemis</span>
+                            <img
+                                src="/img/logo/artemis.png"
+                                alt="Artemis"
+                                className="h-9 w-9 object-contain"
+                            />
+                            <span className="text-[22px] font-semibold tracking-tight">
+                                Artemis
+                            </span>
                         </Link>
                         <div className="flex items-center gap-6 text-sm">
-                            <a href="#features" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">Features</a>
-                            <a href="#free-trial" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">Free trial</a>
-                            <a href="#how" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">How it works</a>
-                            <Link href="/rts-calculator" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">RTS Calculator</Link>
-                            <div className="hidden h-4 w-px bg-gray-200 dark:bg-white/10 md:block" />
+                            <a
+                                href="#features"
+                                className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 md:block dark:text-gray-400 dark:hover:text-brand-400"
+                            >
+                                Features
+                            </a>
+                            <a
+                                href="#free-trial"
+                                className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 md:block dark:text-gray-400 dark:hover:text-brand-400"
+                            >
+                                Free trial
+                            </a>
+                            <a
+                                href="#how"
+                                className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 md:block dark:text-gray-400 dark:hover:text-brand-400"
+                            >
+                                How it works
+                            </a>
+                            <Link
+                                href="/rts-calculator"
+                                className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 md:block dark:text-gray-400 dark:hover:text-brand-400"
+                            >
+                                RTS Calculator
+                            </Link>
+                            <div className="hidden h-4 w-px bg-gray-200 md:block dark:bg-white/10" />
                             <AppearanceToggleDropdown />
                             {auth.user ? (
-                                <Link href={dashboard()} className="inline-flex h-9 items-center rounded-lg bg-brand-500! px-5 text-[13px] font-semibold text-white shadow-sm shadow-brand-500/20 transition-all hover:bg-brand-600 hover:shadow-md hover:shadow-brand-500/25">
+                                <Link
+                                    href={dashboard()}
+                                    className="inline-flex h-9 items-center rounded-lg bg-brand-500! px-5 text-[13px] font-semibold text-white shadow-sm shadow-brand-500/20 transition-all hover:bg-brand-600 hover:shadow-md hover:shadow-brand-500/25"
+                                >
                                     Dashboard
                                 </Link>
                             ) : (
                                 <>
-                                    <Link href={login()} className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">
+                                    <Link
+                                        href={login()}
+                                        className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 md:block dark:text-gray-400 dark:hover:text-brand-400"
+                                    >
                                         Log in
                                     </Link>
-                                    <Link href={register()} className="inline-flex h-9 items-center rounded-lg bg-brand-500! px-5 text-[13px] font-semibold text-white shadow-sm shadow-brand-500/20 transition-all hover:bg-brand-600 hover:shadow-md hover:shadow-brand-500/25">
+                                    <Link
+                                        href={register()}
+                                        className="inline-flex h-9 items-center rounded-lg bg-brand-500! px-5 text-[13px] font-semibold text-white shadow-sm shadow-brand-500/20 transition-all hover:bg-brand-600 hover:shadow-md hover:shadow-brand-500/25"
+                                    >
                                         Start free
                                     </Link>
                                 </>
@@ -180,37 +214,60 @@ export default function Welcome() {
                 </nav>
 
                 {/* Hero */}
-                <section className="relative px-5 pb-20 pt-24 md:px-10 md:pt-28">
+                <section className="relative px-5 pt-24 pb-20 md:px-10 md:pt-28">
                     <div className="relative mx-auto max-w-[1200px] text-center">
                         <div className="mb-10 inline-flex items-center gap-2.5 rounded-full border border-brand-200 bg-brand-50 px-4 py-2 dark:border-brand-500/20 dark:bg-brand-500/10">
                             <span className="h-1.5 w-1.5 rounded-full bg-brand-500 shadow-[0_0_8px_theme(colors.brand-500)]" />
-                            <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 dark:text-brand-400">
+                            <span className="font-mono text-[11px] font-semibold tracking-[0.18em] text-brand-700 uppercase dark:text-brand-400">
                                 Now hunting · Built for PH COD sellers
                             </span>
                         </div>
 
-                        <h1 className="mx-auto mb-7 text-5xl! font-bold leading-[0.98] tracking-tight md:text-7xl lg:text-[104px]">
+                        <h1 className="mx-auto mb-7 text-5xl! leading-[0.98] font-bold tracking-tight md:text-7xl lg:text-[104px]">
                             Hunt down{' '}
-                            <span className="bg-gradient-to-br from-brand-500 to-brand-700 bg-clip-text font-bold italic text-transparent">RTS.</span>
+                            <span className="bg-gradient-to-br from-brand-500 to-brand-700 bg-clip-text font-bold text-transparent italic">
+                                RTS.
+                            </span>
                             <br />
                             Protect your margin.
                         </h1>
 
-                        <p className="mx-auto mb-4 max-w-xl text-lg leading-relaxed text-gray-500 dark:text-gray-400 md:text-xl">
-                            Artemis is the analytics & automation platform for Philippine COD e-commerce. Track every metric that matters, cut return-to-sender rates, and keep every customer informed.
+                        <p className="mx-auto mb-4 max-w-xl text-lg leading-relaxed text-gray-500 md:text-xl dark:text-gray-400">
+                            Artemis is the analytics & automation platform for
+                            Philippine COD e-commerce. Track every metric that
+                            matters, cut return-to-sender rates, and keep every
+                            customer informed.
                         </p>
 
-                        <p className="mb-12 font-mono text-xs uppercase tracking-[0.15em] text-gray-400 dark:text-gray-600">
-                            Sales <span className="mx-2 text-brand-500">·</span> Operations <span className="mx-2 text-brand-500">·</span> Delivery <span className="mx-2 text-brand-500">·</span> RTS <span className="mx-2 text-brand-500">·</span> Parcel Journey
+                        <p className="mb-12 font-mono text-xs tracking-[0.15em] text-gray-400 uppercase dark:text-gray-600">
+                            Sales <span className="mx-2 text-brand-500">·</span>{' '}
+                            Operations{' '}
+                            <span className="mx-2 text-brand-500">·</span>{' '}
+                            Delivery{' '}
+                            <span className="mx-2 text-brand-500">·</span> RTS{' '}
+                            <span className="mx-2 text-brand-500">·</span>{' '}
+                            Parcel Journey
                         </p>
 
                         <div className="mb-4 flex flex-col items-center justify-center gap-3.5 sm:flex-row">
                             <Link
                                 href={ctaHref}
-                                className="inline-flex h-12 items-center gap-2.5 rounded-xl bg-brand-500! px-8 text-base font-semibold text-white shadow-lg shadow-brand-500/20 transition-all hover:bg-brand-600 hover:-translate-y-0.5"
+                                className="inline-flex h-12 items-center gap-2.5 rounded-xl bg-brand-500! px-8 text-base font-semibold text-white shadow-lg shadow-brand-500/20 transition-all hover:-translate-y-0.5 hover:bg-brand-600"
                             >
                                 {ctaLabel}
-                                <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 6h14m0 0L10 1m5 5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                                <svg
+                                    width="16"
+                                    height="12"
+                                    viewBox="0 0 16 12"
+                                    fill="none"
+                                >
+                                    <path
+                                        d="M1 6h14m0 0L10 1m5 5l-5 5"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                    />
+                                </svg>
                             </Link>
                             <a
                                 href="#how"
@@ -219,23 +276,45 @@ export default function Welcome() {
                                 See how it works
                             </a>
                         </div>
-                        <span className="block font-mono text-[11px] uppercase tracking-[0.1em] text-gray-400 dark:text-gray-600">
-                            — No credit card · Connect 1 Pancake page · 14-day free trial
+                        <span className="block font-mono text-[11px] tracking-[0.1em] text-gray-400 uppercase dark:text-gray-600">
+                            — No credit card · Connect 1 Pancake page · 14-day
+                            free trial
                         </span>
 
                         {/* Stats */}
-                        <div className="mx-auto mt-16 grid max-w-3xl grid-cols-2 gap-6 border-t border-gray-200 pt-12 dark:border-white/8 md:grid-cols-4 md:gap-0">
+                        <div className="mx-auto mt-16 grid max-w-3xl grid-cols-2 gap-6 border-t border-gray-200 pt-12 md:grid-cols-4 md:gap-0 dark:border-white/8">
                             {[
-                                { num: '30%', em: true, label: 'Avg RTS rate\nbefore Artemis' },
-                                { num: '10%', em: false, label: 'Typical reduction\nwithin 90 days' },
-                                { num: '₱120k+', em: false, label: 'Avg profit recovered\n/ year · mid seller' },
-                                { num: '2 min', em: false, label: 'Onboarding to\nfirst insight' },
+                                {
+                                    num: '30%',
+                                    em: true,
+                                    label: 'Avg RTS rate\nbefore Artemis',
+                                },
+                                {
+                                    num: '10%',
+                                    em: false,
+                                    label: 'Typical reduction\nwithin 90 days',
+                                },
+                                {
+                                    num: '₱120k+',
+                                    em: false,
+                                    label: 'Avg profit recovered\n/ year · mid seller',
+                                },
+                                {
+                                    num: '2 min',
+                                    em: false,
+                                    label: 'Onboarding to\nfirst insight',
+                                },
                             ].map((s, i) => (
-                                <div key={i} className="text-left md:border-r md:border-gray-200 md:px-6 md:last:border-r-0 md:first:pl-0 dark:md:border-white/8">
-                                    <div className={`mb-2.5 text-4xl font-bold tracking-tight ${s.em ? 'text-brand-500' : 'text-gray-900 dark:text-gray-100'}`}>
+                                <div
+                                    key={i}
+                                    className="text-left md:border-r md:border-gray-200 md:px-6 md:first:pl-0 md:last:border-r-0 dark:md:border-white/8"
+                                >
+                                    <div
+                                        className={`mb-2.5 text-4xl font-bold tracking-tight ${s.em ? 'text-brand-500' : 'text-gray-900 dark:text-gray-100'}`}
+                                    >
                                         {s.num}
                                     </div>
-                                    <div className="whitespace-pre-line font-mono text-[10px] uppercase leading-snug tracking-[0.15em] text-gray-400 dark:text-gray-500">
+                                    <div className="font-mono text-[10px] leading-snug tracking-[0.15em] whitespace-pre-line text-gray-400 uppercase dark:text-gray-500">
                                         {s.label}
                                     </div>
                                 </div>
@@ -245,41 +324,76 @@ export default function Welcome() {
                 </section>
 
                 {/* Problem */}
-                <section className="relative overflow-hidden bg-gray-50 py-24 dark:bg-zinc-900/50 md:py-28">
-                    <div className="pointer-events-none absolute right-[-200px] top-1/2 h-[600px] w-[600px] -translate-y-1/2 bg-[radial-gradient(circle,rgba(16,211,161,0.08),transparent_65%)]" />
+                <section className="relative overflow-hidden bg-gray-50 py-24 md:py-28 dark:bg-zinc-900/50">
+                    <div className="pointer-events-none absolute top-1/2 right-[-200px] h-[600px] w-[600px] -translate-y-1/2 bg-[radial-gradient(circle,rgba(16,211,161,0.08),transparent_65%)]" />
                     <div className="relative mx-auto max-w-[1200px] px-5 text-center md:px-10">
-                        <p className="mb-5 font-mono text-[11px] uppercase tracking-[0.2em] text-brand-500">— The silent margin killer</p>
+                        <p className="mb-5 font-mono text-[11px] tracking-[0.2em] text-brand-500 uppercase">
+                            — The silent margin killer
+                        </p>
                         <h2 className="mb-6 text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
                             Every failed parcel is{' '}
-                            <span className="text-brand-500 italic">pure loss.</span>
+                            <span className="text-brand-500 italic">
+                                pure loss.
+                            </span>
                         </h2>
                         <p className="mx-auto mb-6 max-w-xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">
-                            For Filipino COD sellers, RTS isn't just a number — it's money walking out the door. Shipping paid twice, packaging wasted, inventory tied up, and no sale to show for it.
+                            For Filipino COD sellers, RTS isn't just a number —
+                            it's money walking out the door. Shipping paid
+                            twice, packaging wasted, inventory tied up, and no
+                            sale to show for it.
                         </p>
                         <Link
                             href="/rts-calculator"
                             className="mb-14 inline-flex items-center gap-2 text-sm font-semibold text-brand-500 transition-colors hover:text-brand-600"
                         >
                             Calculate your RTS bleed
-                            <svg width="14" height="10" viewBox="0 0 16 12" fill="none"><path d="M1 6h14m0 0L10 1m5 5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                            <svg
+                                width="14"
+                                height="10"
+                                viewBox="0 0 16 12"
+                                fill="none"
+                            >
+                                <path
+                                    d="M1 6h14m0 0L10 1m5 5l-5 5"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                />
+                            </svg>
                         </Link>
 
                         <div className="grid gap-5 md:grid-cols-3">
                             {[
-                                { num: '20–40%', title: 'Typical RTS rate', desc: 'Most PH COD sellers run between 20–40% return-to-sender. Marami hindi alam ang totoong number nila kasi walang proper tool.' },
-                                { num: '₱150+', title: 'Cost per failed parcel', desc: 'Shipping both ways, packaging, handling, and inventory time. Every RTS quietly eats ₱150–₱250 off your margin.' },
-                                { num: '₱50k+', title: 'Monthly bleed · mid seller', desc: '1,000 orders × 30% RTS × ₱175 in unrealized profit. That\'s half a year of rent — gone every single month.' },
+                                {
+                                    num: '20–40%',
+                                    title: 'Typical RTS rate',
+                                    desc: 'Most PH COD sellers run between 20–40% return-to-sender. Marami hindi alam ang totoong number nila kasi walang proper tool.',
+                                },
+                                {
+                                    num: '₱150+',
+                                    title: 'Cost per failed parcel',
+                                    desc: 'Shipping both ways, packaging, handling, and inventory time. Every RTS quietly eats ₱150–₱250 off your margin.',
+                                },
+                                {
+                                    num: '₱50k+',
+                                    title: 'Monthly bleed · mid seller',
+                                    desc: "1,000 orders × 30% RTS × ₱175 in unrealized profit. That's half a year of rent — gone every single month.",
+                                },
                             ].map((b, i) => (
                                 <div
                                     key={i}
                                     className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white p-8 transition-all hover:-translate-y-1 hover:border-brand-400 dark:border-white/8 dark:bg-zinc-900"
                                 >
-                                    <div className="absolute left-0 right-0 top-0 h-0.5 bg-gradient-to-r from-brand-400 to-brand-600" />
-                                    <div className="mb-4 bg-gradient-to-br from-brand-500 to-brand-700 bg-clip-text text-6xl font-bold italic leading-none tracking-tight text-transparent">
+                                    <div className="absolute top-0 right-0 left-0 h-0.5 bg-gradient-to-r from-brand-400 to-brand-600" />
+                                    <div className="mb-4 bg-gradient-to-br from-brand-500 to-brand-700 bg-clip-text text-6xl leading-none font-bold tracking-tight text-transparent italic">
                                         {b.num}
                                     </div>
-                                    <h3 className="mb-3 text-xl font-semibold text-gray-900 dark:text-gray-100">{b.title}</h3>
-                                    <p className="text-[15px] leading-relaxed text-gray-500 dark:text-gray-400">{b.desc}</p>
+                                    <h3 className="mb-3 text-xl font-semibold text-gray-900 dark:text-gray-100">
+                                        {b.title}
+                                    </h3>
+                                    <p className="text-[15px] leading-relaxed text-gray-500 dark:text-gray-400">
+                                        {b.desc}
+                                    </p>
                                 </div>
                             ))}
                         </div>
@@ -289,14 +403,20 @@ export default function Welcome() {
                 {/* Features */}
                 <section id="features" className="py-24 md:py-28">
                     <div className="mx-auto max-w-[1200px] px-5 text-center md:px-10">
-                        <p className="mb-5 font-mono text-[11px] uppercase tracking-[0.2em] text-brand-500">— What Artemis does</p>
+                        <p className="mb-5 font-mono text-[11px] tracking-[0.2em] text-brand-500 uppercase">
+                            — What Artemis does
+                        </p>
                         <h2 className="mb-6 text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
                             Every metric that{' '}
-                            <span className="text-brand-500 italic">actually moves</span>{' '}
+                            <span className="text-brand-500 italic">
+                                actually moves
+                            </span>{' '}
                             your business.
                         </h2>
                         <p className="mx-auto mb-14 max-w-xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">
-                            From order to delivery — across every page, shop, and courier. Built specifically for how Filipino e-commerce actually runs.
+                            From order to delivery — across every page, shop,
+                            and courier. Built specifically for how Filipino
+                            e-commerce actually runs.
                         </p>
 
                         <div className="grid gap-5 md:grid-cols-2">
@@ -308,8 +428,12 @@ export default function Welcome() {
                                     <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-xl border border-brand-200 bg-brand-50 text-brand-500 dark:border-brand-500/25 dark:bg-brand-500/10">
                                         {f.icon}
                                     </div>
-                                    <h3 className="mb-2.5 text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100 md:text-2xl">{f.title}</h3>
-                                    <p className="text-[15px] leading-relaxed text-gray-500 dark:text-gray-400">{f.description}</p>
+                                    <h3 className="mb-2.5 text-xl font-semibold tracking-tight text-gray-900 md:text-2xl dark:text-gray-100">
+                                        {f.title}
+                                    </h3>
+                                    <p className="text-[15px] leading-relaxed text-gray-500 dark:text-gray-400">
+                                        {f.description}
+                                    </p>
                                 </div>
                             ))}
                         </div>
@@ -317,29 +441,44 @@ export default function Welcome() {
                 </section>
 
                 {/* Free Trial Offer */}
-                <section id="free-trial" className="relative overflow-hidden border-t border-b border-gray-200 bg-gray-50 py-24 dark:border-white/8 dark:bg-zinc-900/50 md:py-28">
-                    <div className="pointer-events-none absolute left-1/2 top-1/2 h-[500px] w-[700px] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse,rgba(16,211,161,0.08),transparent_65%)]" />
+                <section
+                    id="free-trial"
+                    className="relative overflow-hidden border-t border-b border-gray-200 bg-gray-50 py-24 md:py-28 dark:border-white/8 dark:bg-zinc-900/50"
+                >
+                    <div className="pointer-events-none absolute top-1/2 left-1/2 h-[500px] w-[700px] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse,rgba(16,211,161,0.08),transparent_65%)]" />
                     <div className="relative mx-auto max-w-[1200px] px-5 md:px-10">
                         <div className="mx-auto max-w-3xl text-center">
-                            <p className="mb-5 font-mono text-[11px] uppercase tracking-[0.2em] text-brand-500">— Launch offer</p>
+                            <p className="mb-5 font-mono text-[11px] tracking-[0.2em] text-brand-500 uppercase">
+                                — Launch offer
+                            </p>
                             <h2 className="mb-6 text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
                                 Start free.{' '}
-                                <span className="text-brand-500 italic">See it work.</span>
+                                <span className="text-brand-500 italic">
+                                    See it work.
+                                </span>
                             </h2>
                             <p className="mx-auto mb-12 max-w-lg text-lg leading-relaxed text-gray-500 dark:text-gray-400">
-                                14 days free. Connect one Pancake page and get 1 month of data — enough to see your real numbers and start moving them.
+                                14 days free. Connect one Pancake page and get 1
+                                month of data — enough to see your real numbers
+                                and start moving them.
                             </p>
                         </div>
 
                         <div className="relative mx-auto max-w-2xl overflow-hidden rounded-2xl border-2 border-brand-500/80 bg-gradient-to-b from-brand-50/90 to-white shadow-xl shadow-brand-500/8 dark:border-brand-500/60 dark:from-brand-500/[0.06] dark:to-zinc-900">
-                            <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-brand-500/10 blur-3xl" />
+                            <div className="absolute -top-16 -right-16 h-40 w-40 rounded-full bg-brand-500/10 blur-3xl" />
                             <div className="relative px-8 py-10 text-center md:px-12">
                                 <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-300 bg-brand-50 px-4 py-1.5 dark:border-brand-500/30 dark:bg-brand-500/10">
-                                    <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">14-day free trial</span>
+                                    <span className="font-mono text-[10px] font-semibold tracking-[0.2em] text-brand-600 uppercase dark:text-brand-400">
+                                        14-day free trial
+                                    </span>
                                 </div>
 
-                                <h3 className="mb-3 text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 md:text-4xl">₱0</h3>
-                                <p className="mb-8 text-sm text-gray-500 dark:text-gray-400">No credit card required · No commitment</p>
+                                <h3 className="mb-3 text-3xl font-bold tracking-tight text-gray-900 md:text-4xl dark:text-gray-100">
+                                    ₱0
+                                </h3>
+                                <p className="mb-8 text-sm text-gray-500 dark:text-gray-400">
+                                    No credit card required · No commitment
+                                </p>
 
                                 <div className="mb-8 h-px bg-gray-200 dark:bg-white/8" />
 
@@ -350,10 +489,25 @@ export default function Welcome() {
                                         'Parcel Journey tracking via chat',
                                         'Chat support',
                                     ].map((feat) => (
-                                        <li key={feat} className="relative py-3 pl-8 text-[15px] text-gray-700 dark:text-gray-300">
-                                            <span className="absolute left-0 top-3.5 flex h-4 w-4 items-center justify-center rounded-full border border-brand-500 bg-brand-50 dark:bg-brand-500/10">
-                                                <svg width="9" height="7" viewBox="0 0 8 6" fill="none">
-                                                    <path d="M1 3l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-brand-500" />
+                                        <li
+                                            key={feat}
+                                            className="relative py-3 pl-8 text-[15px] text-gray-700 dark:text-gray-300"
+                                        >
+                                            <span className="absolute top-3.5 left-0 flex h-4 w-4 items-center justify-center rounded-full border border-brand-500 bg-brand-50 dark:bg-brand-500/10">
+                                                <svg
+                                                    width="9"
+                                                    height="7"
+                                                    viewBox="0 0 8 6"
+                                                    fill="none"
+                                                >
+                                                    <path
+                                                        d="M1 3l2 2 4-4"
+                                                        stroke="currentColor"
+                                                        strokeWidth="1.5"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        className="text-brand-500"
+                                                    />
                                                 </svg>
                                             </span>
                                             {feat}
@@ -366,9 +520,21 @@ export default function Welcome() {
                                     className="inline-flex h-12 w-full max-w-sm items-center justify-center gap-2.5 rounded-xl bg-brand-500! text-base font-semibold text-white shadow-lg shadow-brand-500/20 transition-all hover:-translate-y-0.5 hover:bg-brand-600"
                                 >
                                     {ctaLabel}
-                                    <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 6h14m0 0L10 1m5 5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                                    <svg
+                                        width="16"
+                                        height="12"
+                                        viewBox="0 0 16 12"
+                                        fill="none"
+                                    >
+                                        <path
+                                            d="M1 6h14m0 0L10 1m5 5l-5 5"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                        />
+                                    </svg>
                                 </Link>
-                                <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.15em] text-gray-400 dark:text-gray-500">
+                                <p className="mt-4 font-mono text-[10px] tracking-[0.15em] text-gray-400 uppercase dark:text-gray-500">
                                     Setup takes under 2 minutes
                                 </p>
                             </div>
@@ -379,45 +545,170 @@ export default function Welcome() {
                 {/* How it works */}
                 <section id="how" className="py-24 md:py-28">
                     <div className="mx-auto max-w-[1200px] px-5 text-center md:px-10">
-                        <p className="mb-5 font-mono text-[11px] uppercase tracking-[0.2em] text-brand-500">— How it works</p>
+                        <p className="mb-5 font-mono text-[11px] tracking-[0.2em] text-brand-500 uppercase">
+                            — How it works
+                        </p>
                         <h2 className="mb-6 text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
                             From signup to first insight —{' '}
-                            <span className="text-brand-500 italic">in under five minutes.</span>
+                            <span className="text-brand-500 italic">
+                                in under five minutes.
+                            </span>
                         </h2>
 
                         <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                             {steps.map((s) => (
-                                <div key={s.num} className="relative border-t-2 border-brand-500 pt-7">
-                                    <p className="mb-4 font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-brand-500">{s.num}</p>
-                                    <h4 className="mb-2.5 text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">{s.title}</h4>
-                                    <p className="text-sm leading-relaxed text-gray-500 dark:text-gray-400">{s.description}</p>
+                                <div
+                                    key={s.num}
+                                    className="relative border-t-2 border-brand-500 pt-7"
+                                >
+                                    <p className="mb-4 font-mono text-[11px] font-medium tracking-[0.2em] text-brand-500 uppercase">
+                                        {s.num}
+                                    </p>
+                                    <h4 className="mb-2.5 text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+                                        {s.title}
+                                    </h4>
+                                    <p className="text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                                        {s.description}
+                                    </p>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </section>
 
-                {/* Testimonial */}
-                <section className="relative overflow-hidden border-t border-b border-gray-200 bg-gray-50 py-28 dark:border-white/8 dark:bg-zinc-900/50 md:py-32">
-                    <div className="pointer-events-none absolute left-1/2 top-1/2 h-[500px] w-[800px] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse,rgba(16,211,161,0.08),transparent_70%)]" />
-                    <div className="relative mx-auto max-w-3xl px-5 text-center md:px-10">
-                        <span className="mb-6 block text-8xl font-bold leading-[0.3] text-brand-500 opacity-60">"</span>
-                        <p className="mb-10 text-2xl font-light italic leading-snug tracking-tight text-gray-900 dark:text-gray-100 md:text-3xl lg:text-4xl">
-                            For the first time, we actually know which pages and cities are killing our margin. Nabawasan RTS namin ng 9 points in two months — and that's literally six figures back in our pocket.
+                {/* Results from real sellers */}
+                <section className="relative overflow-hidden border-t border-gray-200 py-24 md:py-28 dark:border-white/8">
+                    <div className="mx-auto max-w-[1200px] px-5 text-center md:px-10">
+                        <p className="mb-5 font-mono text-[11px] tracking-[0.2em] text-brand-500 uppercase">
+                            — Real results from real sellers
                         </p>
-                        <div>
-                            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">Patricia L.</p>
-                            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">
-                                Founder · Fashion brand, 4,000 orders/month
-                            </p>
+                        <h2 className="mb-6 text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
+                            The numbers{' '}
+                            <span className="text-brand-500 italic">
+                                speak.
+                            </span>
+                        </h2>
+                        <p className="mx-auto mb-14 max-w-xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">
+                            These are actual RTS results from Pancake sellers
+                            using Artemis — tracked across months, not
+                            cherry-picked.
+                        </p>
+
+                        <div className="grid gap-5 text-left md:grid-cols-2">
+                            {[
+                                {
+                                    name: 'Health & Wellness Brand',
+                                    category: 'spray · 10M+ parcels',
+                                    before: '17.27%',
+                                    after: '14.35%',
+                                    change: '-17%',
+                                    period: 'over 5 months',
+                                    detail: 'Started with no SMS/chat notifications. After enabling Parcel Journey tracking, RTS dropped steadily from 17.27% to 14.35% — consistent improvement month over month.',
+                                },
+                                {
+                                    name: 'Health & Wellness Brand',
+                                    category: 'Inhaler product · 9M+ parcels',
+                                    before: '32.95%',
+                                    after: '17.21%',
+                                    change: '-48%',
+                                    period: 'in 3 months',
+                                    detail: 'Went from zero customer notifications to full SMS + chat coverage. RTS cut from 32.95% to 17.21% in just 3 months.',
+                                },
+                                {
+                                    name: 'Health & Wellness Brand',
+                                    category: 'Spray product · 4.5M+ parcels',
+                                    before: '14.12%',
+                                    after: '9.72%',
+                                    change: '-31%',
+                                    period: 'steady over 8 months',
+                                    detail: 'Already running decent ops. Artemis helped fine-tune — consistently sub-15% RTS, now consistently under 10%.',
+                                },
+                                {
+                                    name: 'Health & Wellness Brand',
+                                    category: 'Topical cream · 8.4M+ parcels',
+                                    before: '18.29%',
+                                    after: '12.74%',
+                                    change: '-30%',
+                                    period: 'over 8 months',
+                                    detail: 'High-volume seller running across multiple regions. Consistent downward trend in RTS — from 18.29% down to 12.74% with SMS + chat notifications active.',
+                                },
+                            ].map((c) => (
+                                <div
+                                    key={c.name}
+                                    className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-7 transition-all hover:-translate-y-1 hover:border-brand-300 md:p-8 dark:border-white/8 dark:bg-zinc-900 dark:hover:border-brand-500/30"
+                                >
+                                    <div className="absolute top-0 right-0 left-0 h-0.5 bg-gradient-to-r from-brand-400 to-brand-600" />
+
+                                    <div className="mb-5">
+                                        <h3 className="text-[15px] font-bold text-gray-900 dark:text-gray-100">
+                                            {c.name}
+                                        </h3>
+                                        <p className="mt-0.5 font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                            {c.category}
+                                        </p>
+                                    </div>
+
+                                    <div className="mb-5 flex items-center gap-4">
+                                        <div>
+                                            <p className="font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                                Before
+                                            </p>
+                                            <p className="text-2xl font-bold tracking-tight text-gray-400 line-through decoration-gray-300 dark:text-gray-500 dark:decoration-gray-600">
+                                                {c.before}
+                                            </p>
+                                        </div>
+                                        <svg
+                                            className="h-4 w-4 shrink-0 text-brand-500"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                            strokeWidth={2.5}
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
+                                            />
+                                        </svg>
+                                        <div>
+                                            <p className="font-mono text-[10px] tracking-wider text-brand-600 uppercase dark:text-brand-400">
+                                                After
+                                            </p>
+                                            <p className="text-2xl font-bold tracking-tight text-brand-600 dark:text-brand-400">
+                                                {c.after}
+                                            </p>
+                                        </div>
+                                        <div className="ml-auto">
+                                            <span className="inline-flex items-center rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 font-mono text-[11px] font-semibold text-brand-700 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-400">
+                                                {c.change}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <p className="mb-3 text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                                        {c.detail}
+                                    </p>
+                                    <p className="font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                        {c.period}
+                                    </p>
+                                </div>
+                            ))}
                         </div>
+
+                        <p className="mt-8 text-[12px] text-gray-400 dark:text-gray-500">
+                            Data sourced from actual Pancake POS pages. Brand
+                            names anonymized. Results vary by product, audience,
+                            and courier.
+                        </p>
                     </div>
                 </section>
 
                 {/* FAQ */}
                 <section id="faq" className="py-24 md:py-28">
                     <div className="mx-auto max-w-[1200px] px-5 text-center md:px-10">
-                        <p className="mb-5 font-mono text-[11px] uppercase tracking-[0.2em] text-brand-500">— Questions, answered</p>
+                        <p className="mb-5 font-mono text-[11px] tracking-[0.2em] text-brand-500 uppercase">
+                            — Questions, answered
+                        </p>
                         <h2 className="mb-6 text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
                             The short{' '}
                             <span className="text-brand-500 italic">FAQ.</span>
@@ -433,22 +724,37 @@ export default function Welcome() {
 
                 {/* Final CTA */}
                 <section className="relative overflow-hidden py-32 md:py-36">
-                    <div className="pointer-events-none absolute left-1/2 top-1/2 h-[600px] w-full -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse,rgba(16,211,161,0.15),transparent_60%)]" />
+                    <div className="pointer-events-none absolute top-1/2 left-1/2 h-[600px] w-full -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse,rgba(16,211,161,0.15),transparent_60%)]" />
                     <div className="relative mx-auto max-w-[1200px] px-5 text-center md:px-10">
                         <h2 className="mx-auto mb-6 max-w-3xl text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
                             Your RTS is a number.{' '}
-                            <span className="text-brand-500 italic">Let's move it.</span>
+                            <span className="text-brand-500 italic">
+                                Let's move it.
+                            </span>
                         </h2>
                         <p className="mx-auto mb-10 max-w-xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">
-                            14 days free. Connect 1 Pancake page, get 1 month of data. Parcel Journey + chat support. Handa ka na ba?
+                            14 days free. Connect 1 Pancake page, get 1 month of
+                            data. Parcel Journey + chat support. Handa ka na ba?
                         </p>
                         <div className="flex flex-col items-center justify-center gap-3.5 sm:flex-row">
                             <Link
                                 href={ctaHref}
-                                className="inline-flex h-12 items-center gap-2.5 rounded-xl bg-brand-500! px-8 text-base font-semibold text-white shadow-lg shadow-brand-500/20 transition-all hover:bg-brand-600 hover:-translate-y-0.5"
+                                className="inline-flex h-12 items-center gap-2.5 rounded-xl bg-brand-500! px-8 text-base font-semibold text-white shadow-lg shadow-brand-500/20 transition-all hover:-translate-y-0.5 hover:bg-brand-600"
                             >
                                 {ctaLabel}
-                                <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 6h14m0 0L10 1m5 5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                                <svg
+                                    width="16"
+                                    height="12"
+                                    viewBox="0 0 16 12"
+                                    fill="none"
+                                >
+                                    <path
+                                        d="M1 6h14m0 0L10 1m5 5l-5 5"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                    />
+                                </svg>
                             </Link>
                             <Link
                                 href="/rts-calculator"
@@ -466,44 +772,126 @@ export default function Welcome() {
                         <div className="mb-12 grid gap-10 md:grid-cols-[2fr_1fr_1fr_1fr] md:gap-12">
                             <div>
                                 <div className="mb-3 flex items-center gap-3">
-                                    <img src="/img/logo/artemis.png" alt="Artemis" className="h-8 w-8 object-contain" />
-                                    <span className="text-2xl font-semibold tracking-tight">Artemis</span>
+                                    <img
+                                        src="/img/logo/artemis.png"
+                                        alt="Artemis"
+                                        className="h-8 w-8 object-contain"
+                                    />
+                                    <span className="text-2xl font-semibold tracking-tight">
+                                        Artemis
+                                    </span>
                                 </div>
                                 <p className="max-w-xs text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-                                    The analytics & automation platform for Philippine COD e-commerce. From order to delivery — every metric that matters.
+                                    The analytics & automation platform for
+                                    Philippine COD e-commerce. From order to
+                                    delivery — every metric that matters.
                                 </p>
                             </div>
                             <div>
-                                <h5 className="mb-4 font-mono text-[10px] uppercase tracking-[0.2em] text-gray-400 dark:text-gray-600">Product</h5>
+                                <h5 className="mb-4 font-mono text-[10px] tracking-[0.2em] text-gray-400 uppercase dark:text-gray-600">
+                                    Product
+                                </h5>
                                 <div className="flex flex-col gap-2">
-                                    <a href="#features" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">Features</a>
-                                    <a href="#free-trial" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">Free trial</a>
-                                    <a href="#how" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">How it works</a>
-                                    <a href="#faq" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">FAQ</a>
-                                    <Link href="/rts-calculator" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">RTS Calculator</Link>
+                                    <a
+                                        href="#features"
+                                        className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
+                                    >
+                                        Features
+                                    </a>
+                                    <a
+                                        href="#free-trial"
+                                        className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
+                                    >
+                                        Free trial
+                                    </a>
+                                    <a
+                                        href="#how"
+                                        className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
+                                    >
+                                        How it works
+                                    </a>
+                                    <a
+                                        href="#faq"
+                                        className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
+                                    >
+                                        FAQ
+                                    </a>
+                                    <Link
+                                        href="/rts-calculator"
+                                        className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
+                                    >
+                                        RTS Calculator
+                                    </Link>
                                 </div>
                             </div>
                             <div>
-                                <h5 className="mb-4 font-mono text-[10px] uppercase tracking-[0.2em] text-gray-400 dark:text-gray-600">Company</h5>
+                                <h5 className="mb-4 font-mono text-[10px] tracking-[0.2em] text-gray-400 uppercase dark:text-gray-600">
+                                    Company
+                                </h5>
                                 <div className="flex flex-col gap-2">
-                                    <a href="#" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">About</a>
-                                    <a href="#" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">Blog</a>
-                                    <a href="#" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">Careers</a>
-                                    <a href="#" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">Contact</a>
+                                    <a
+                                        href="#"
+                                        className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
+                                    >
+                                        About
+                                    </a>
+                                    <a
+                                        href="#"
+                                        className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
+                                    >
+                                        Blog
+                                    </a>
+                                    <a
+                                        href="#"
+                                        className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
+                                    >
+                                        Careers
+                                    </a>
+                                    <a
+                                        href="#"
+                                        className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
+                                    >
+                                        Contact
+                                    </a>
                                 </div>
                             </div>
                             <div>
-                                <h5 className="mb-4 font-mono text-[10px] uppercase tracking-[0.2em] text-gray-400 dark:text-gray-600">Legal</h5>
+                                <h5 className="mb-4 font-mono text-[10px] tracking-[0.2em] text-gray-400 uppercase dark:text-gray-600">
+                                    Legal
+                                </h5>
                                 <div className="flex flex-col gap-2">
-                                    <a href="#" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">Privacy</a>
-                                    <a href="#" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">Terms</a>
-                                    <a href="#" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">Data policy</a>
-                                    <a href="#" className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300">Security</a>
+                                    <a
+                                        href="#"
+                                        className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
+                                    >
+                                        Privacy
+                                    </a>
+                                    <a
+                                        href="#"
+                                        className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
+                                    >
+                                        Terms
+                                    </a>
+                                    <a
+                                        href="#"
+                                        className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
+                                    >
+                                        Data policy
+                                    </a>
+                                    <a
+                                        href="#"
+                                        className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
+                                    >
+                                        Security
+                                    </a>
                                 </div>
                             </div>
                         </div>
-                        <div className="flex flex-col items-center justify-between gap-3 border-t border-gray-200 pt-6 font-mono text-[11px] tracking-[0.1em] text-gray-400 dark:border-white/8 dark:text-gray-600 md:flex-row">
-                            <span>&copy; {new Date().getFullYear()} Artemis. All rights reserved.</span>
+                        <div className="flex flex-col items-center justify-between gap-3 border-t border-gray-200 pt-6 font-mono text-[11px] tracking-[0.1em] text-gray-400 md:flex-row dark:border-white/8 dark:text-gray-600">
+                            <span>
+                                &copy; {new Date().getFullYear()} Artemis. All
+                                rights reserved.
+                            </span>
                             <span>Built in the Philippines</span>
                         </div>
                     </div>
