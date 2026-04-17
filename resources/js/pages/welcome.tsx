@@ -835,18 +835,12 @@ export default function Welcome() {
                                     >
                                         About
                                     </a>
-                                    <a
-                                        href="#"
+                                    <Link
+                                        href="/blog"
                                         className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
                                     >
                                         Blog
-                                    </a>
-                                    <a
-                                        href="#"
-                                        className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
-                                    >
-                                        Careers
-                                    </a>
+                                    </Link>
                                     <a
                                         href="#"
                                         className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"

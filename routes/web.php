@@ -23,6 +23,14 @@ Route::get('/rts-calculator', function () {
     return Inertia::render('rts-calculator');
 })->name('rts.calculator');
 
+Route::get('/blog', function () {
+    return Inertia::render('blog/index');
+})->name('blog.index');
+
+Route::get('/blog/{slug}', function (string $slug) {
+    return Inertia::render('blog/' . $slug);
+})->name('blog.show')->where('slug', '[a-z0-9\-]+');
+
 Route::get('/design-guidelines', function () {
     return view('design-guidelines');
 });
