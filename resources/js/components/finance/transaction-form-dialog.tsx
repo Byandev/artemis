@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Field, Footer, inputCls } from '@/components/finance/account-form-dialog';
 import { SUB_CATEGORIES, SubCategory } from '@/components/finance/sub-category';
+import { TRANSACTION_TYPES, TransactionType } from '@/components/finance/transaction-type';
 import { useForm } from '@inertiajs/react';
 import React, { useEffect } from 'react';
 
@@ -10,7 +11,7 @@ export interface FinanceTransaction {
     date: string;
     description: string;
     type: 'in' | 'out';
-    transaction_type: 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance' | null;
+    transaction_type: TransactionType | null;
     amount: number | string;
     sub_category: SubCategory | null;
     notes: string | null;
@@ -37,7 +38,7 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
         date: today(),
         description: '',
         type: 'in' as 'in' | 'out',
-        transaction_type: 'funds' as 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance',
+        transaction_type: 'funds' as TransactionType,
         amount: '',
         sub_category: '' as SubCategory | '',
         notes: '',
@@ -119,14 +120,12 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
                         <Field label="Transaction Type" required error={errors.transaction_type}>
                             <select
                                 value={data.transaction_type}
-                                onChange={(e) => setData('transaction_type', e.target.value as 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance')}
+                                onChange={(e) => setData('transaction_type', e.target.value as TransactionType)}
                                 className={inputCls}
                             >
-                                <option value="funds">Funds</option>
-                                <option value="profit_share">Profit Share</option>
-                                <option value="expenses">Expenses</option>
-                                <option value="transfer">Transfer</option>
-                                <option value="remittance">Remittance</option>
+                                {TRANSACTION_TYPES.map((t) => (
+                                    <option key={t.value} value={t.value}>{t.label}</option>
+                                ))}
                             </select>
                         </Field>
 

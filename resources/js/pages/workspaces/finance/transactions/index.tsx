@@ -20,6 +20,7 @@ import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
 import { MoreHorizontal, Pencil, Search, Trash2, Upload, X } from 'lucide-react';
 import { SUB_CATEGORIES, SUB_CATEGORY_LABEL, SubCategory } from '@/components/finance/sub-category';
+import { TRANSACTION_TYPES, TRANSACTION_TYPE_LABEL, TRANSACTION_TYPE_STYLE, TransactionType } from '@/components/finance/transaction-type';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Row extends FinanceTransaction {
@@ -49,13 +50,6 @@ interface Props {
 
 const fmt = (v: number | string) => Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const TXN_TYPE_STYLE: Record<string, { label: string; cls: string }> = {
-    funds: { label: 'funds', cls: 'bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400' },
-    profit_share: { label: 'profit share', cls: 'bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400' },
-    expenses: { label: 'expenses', cls: 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400' },
-    transfer: { label: 'transfer', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-500/10 dark:text-slate-300' },
-    remittance: { label: 'remittance', cls: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' },
-};
 
 export default function TransactionsIndex({ workspace, transactions, accounts, query }: Props) {
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
@@ -72,7 +66,7 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
     const [missingType, setMissingType] = useState<boolean>(boolish(query?.filter?.missing_type));
     const [expensesMissingSub, setExpensesMissingSub] = useState<boolean>(boolish(query?.filter?.expenses_missing_sub));
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-    const [bulkType, setBulkType] = useState<'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance' | ''>('');
+    const [bulkType, setBulkType] = useState<TransactionType | ''>('');
     const [bulkSubCategory, setBulkSubCategory] = useState<SubCategory | ''>('');
     const [bulkProcessing, setBulkProcessing] = useState(false);
 
@@ -188,10 +182,12 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
             header: ({ column }) => <SortableHeader column={column} title="Txn Type" className="justify-center" />,
             cell: ({ row }) => {
                 if (!row.original.transaction_type) return <div className="text-center font-mono text-[10px] text-gray-300">—</div>;
-                const s = TXN_TYPE_STYLE[row.original.transaction_type] ?? TXN_TYPE_STYLE.funds;
+                const key = row.original.transaction_type as TransactionType;
+                const s = TRANSACTION_TYPE_STYLE[key] ?? TRANSACTION_TYPE_STYLE.funds;
+                const label = TRANSACTION_TYPE_LABEL[key] ?? key;
                 return (
                     <div className="text-center">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${s.cls}`}>{s.label}</span>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${s.cls}`}>{label}</span>
                     </div>
                 );
             },
@@ -303,11 +299,9 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                         className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-2.5 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
                     >
                         <option value="">All txn types</option>
-                        <option value="funds">Funds</option>
-                        <option value="profit_share">Profit Share</option>
-                        <option value="expenses">Expenses</option>
-                        <option value="transfer">Transfer</option>
-                        <option value="remittance">Remittance</option>
+                        {TRANSACTION_TYPES.map((t) => (
+                            <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
                     </select>
                     <select
                         value={subCategoryFilter}
@@ -377,11 +371,9 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                             className="h-8 rounded-lg border border-black/8 bg-white px-2 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
                         >
                             <option value="">— clear —</option>
-                            <option value="funds">Funds</option>
-                            <option value="profit_share">Profit Share</option>
-                            <option value="expenses">Expenses</option>
-                            <option value="transfer">Transfer</option>
-                            <option value="remittance">Remittance</option>
+                            {TRANSACTION_TYPES.map((t) => (
+                                <option key={t.value} value={t.value}>{t.label}</option>
+                            ))}
                         </select>
                         <button
                             onClick={applyBulkType}
