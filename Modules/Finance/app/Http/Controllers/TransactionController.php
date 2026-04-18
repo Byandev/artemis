@@ -52,10 +52,14 @@ class TransactionController extends Controller
                 AllowedFilter::exact('type'),
                 AllowedFilter::exact('transaction_type'),
                 AllowedFilter::exact('sub_category'),
+                AllowedFilter::callback('missing_type', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN) ? $q->whereNull('transaction_type') : $q),
+                AllowedFilter::callback('expenses_missing_sub', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN)
+                    ? $q->where('transaction_type', 'expenses')->whereNull('sub_category')
+                    : $q),
             ])
             ->allowedSorts(['id', 'date', 'amount', 'type', 'transaction_type', 'sub_category', 'created_at'])
-            ->defaultSort('-date')
-            ->paginate(15)
+            ->defaultSort('-id')
+            ->paginate((int) $request->input('per_page', 100))
             ->withQueryString();
 
         return Inertia::render('workspaces/finance/transactions/index', [
@@ -127,6 +131,40 @@ class TransactionController extends Controller
         Transaction::insert($records);
 
         return redirect()->back()->with('success', count($records).' transactions imported.');
+    }
+
+    public function bulkUpdateType(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+            'transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance'],
+        ]);
+
+        $updated = Transaction::where('workspace_id', $workspace->id)
+            ->whereIn('id', $validated['ids'])
+            ->update(['transaction_type' => $validated['transaction_type'] ?? null]);
+
+        return redirect()->back()->with('success', "{$updated} transactions updated.");
+    }
+
+    public function bulkUpdateSubCategory(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+            'sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,operation_expense,salary,transfer_fee,seminar_fee,others'],
+        ]);
+
+        $updated = Transaction::where('workspace_id', $workspace->id)
+            ->whereIn('id', $validated['ids'])
+            ->update(['sub_category' => $validated['sub_category'] ?? null]);
+
+        return redirect()->back()->with('success', "{$updated} transactions updated.");
     }
 
     public function destroy(Request $request, Workspace $workspace, Transaction $transaction)
