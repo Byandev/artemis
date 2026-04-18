@@ -55,20 +55,10 @@ const parseNumber = (v: string): number => {
     return isNaN(n) ? 0 : n;
 };
 
-// Gotyme date format: try ISO, "MMM DD, YYYY", "YYYY-MM-DD", "MM/DD/YYYY".
-// IMPORTANT: never call toISOString() on a local-parsed Date — it shifts by the
-// local UTC offset and silently changes the calendar day (e.g. PH +08:00).
+// CSV is expected to have the date already in YYYY-MM-DD. Pass it through as-is.
 const toIsoDate = (v: string): string => {
-    const s = String(v).trim();
-    if (!s) return '';
-    const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
-    const d = new Date(s);
-    if (isNaN(d.getTime())) return '';
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
+    const s = String(v ?? '').trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
 };
 
 export function ImportTransactionsDialog({ open, onOpenChange, workspaceSlug, accounts }: Props) {
