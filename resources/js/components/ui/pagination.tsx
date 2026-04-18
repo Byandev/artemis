@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useMemo } from 'react';
 
 interface PaginationProps {
@@ -19,11 +19,22 @@ const Pagination = ({ currentPage, totalPages, onPageChange }: PaginationProps) 
     const navBtn = "inline-flex items-center justify-center h-8 gap-1.5 px-3 rounded-lg border text-[11px]! font-medium tracking-wide transition-all duration-150 disabled:pointer-events-none disabled:opacity-35 select-none";
     const navBtnActive = "border-black/10 bg-white text-gray-600 shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-gray-50 hover:border-black/15 dark:border-white/10 dark:bg-zinc-800 dark:text-gray-300 dark:shadow-none dark:hover:bg-zinc-700";
 
+    const atFirst = currentPage <= 1;
+    const atLast = currentPage >= totalPages;
+
     return (
         <div className="flex items-center justify-center gap-1.5">
             <button
+                onClick={() => onPageChange(1)}
+                disabled={atFirst}
+                aria-label="First page"
+                className={`${navBtn} ${navBtnActive} px-2`}
+            >
+                <ChevronsLeft className="h-3.5 w-3.5" />
+            </button>
+            <button
                 onClick={() => onPageChange(currentPage - 1)}
-                disabled={currentPage === 1}
+                disabled={atFirst}
                 className={`${navBtn} ${navBtnActive}`}
             >
                 <ChevronLeft className="h-3.5 w-3.5" />
@@ -54,11 +65,19 @@ const Pagination = ({ currentPage, totalPages, onPageChange }: PaginationProps) 
 
             <button
                 onClick={() => onPageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
+                disabled={atLast}
                 className={`${navBtn} ${navBtnActive}`}
             >
                 <span>Next</span>
                 <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+            <button
+                onClick={() => onPageChange(totalPages)}
+                disabled={atLast}
+                aria-label="Last page"
+                className={`${navBtn} ${navBtnActive} px-2`}
+            >
+                <ChevronsRight className="h-3.5 w-3.5" />
             </button>
         </div>
     );
