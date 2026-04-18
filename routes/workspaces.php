@@ -5,8 +5,11 @@ use App\Http\Controllers\Workspaces\AdsManager\AdController;
 use App\Http\Controllers\Workspaces\AdsManager\AdSetController;
 use App\Http\Controllers\Workspaces\AdsManager\CampaignController;
 use App\Http\Controllers\Workspaces\AdsManager\OptimizationRuleController;
+use App\Http\Controllers\Workspaces\AskDataController;
 use App\Http\Controllers\Workspaces\Botcake\FlowController;
 use App\Http\Controllers\Workspaces\Botcake\SequenceController;
+use App\Http\Controllers\Workspaces\ChecklistController;
+use App\Http\Controllers\Workspaces\ChecklistProgressController;
 use App\Http\Controllers\Workspaces\CSRController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
@@ -17,12 +20,9 @@ use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\TeamController;
-use App\Http\Controllers\Workspaces\AskDataController;
-use App\Http\Controllers\Workspaces\ChecklistController;
-use App\Http\Controllers\Workspaces\ChecklistProgressController;
+use App\Http\Controllers\Workspaces\WorkspaceApiKeyController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
-use App\Http\Controllers\Workspaces\WorkspaceApiKeyController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
 use App\Models\Workspace;
@@ -55,15 +55,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/setup', [WorkspaceSetupController::class, 'create'])->name('workspaces.setup');
     Route::post('/workspaces/setup', [WorkspaceSetupController::class, 'store'])->name('workspaces.setup.store');
 
-
     Route::prefix('workspaces/{workspace:slug}')->group(function () {
         Route::get('/inventory/transactions', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
         Route::post('/inventory/transactions', [InventoryTransactionController::class, 'store'])->name('inventory.transactions.store');
         Route::patch('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'update'])->name('inventory.transactions.update');
         Route::delete('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'destroy'])->name('inventory.transactions.destroy');
     });
-
-
 
     // AI
     Route::post('/workspaces/{workspace}/ask', AskDataController::class)->name('workspace.ask');
@@ -232,6 +229,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/transactions', [FinanceTransactionController::class, 'index'])->name('transactions.index');
         Route::post('/transactions', [FinanceTransactionController::class, 'store'])->name('transactions.store');
         Route::post('/transactions/import', [FinanceTransactionController::class, 'import'])->name('transactions.import');
+        Route::put('/transactions/bulk-update-type', [FinanceTransactionController::class, 'bulkUpdateType'])->name('transactions.bulk-update-type');
+        Route::put('/transactions/bulk-update-sub-category', [FinanceTransactionController::class, 'bulkUpdateSubCategory'])->name('transactions.bulk-update-sub-category');
         Route::put('/transactions/{transaction}', [FinanceTransactionController::class, 'update'])->name('transactions.update');
         Route::delete('/transactions/{transaction}', [FinanceTransactionController::class, 'destroy'])->name('transactions.destroy');
 
@@ -243,7 +242,6 @@ Route::middleware(['auth'])->group(function () {
     });
 
 });
-
 
 // Public invitation routes (guest or authenticated)
 Route::get('/workspaces/invitations/{token}', [WorkspaceInvitationController::class, 'show'])->name('workspaces.invitations.show');
@@ -259,7 +257,4 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
     Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
     Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
 
-
-
 });
-

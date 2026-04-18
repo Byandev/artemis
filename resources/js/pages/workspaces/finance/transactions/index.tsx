@@ -2,6 +2,7 @@ import PageHeader from '@/components/common/PageHeader';
 import { FinanceDeleteDialog } from '@/components/finance/delete-dialog';
 import { ImportTransactionsDialog } from '@/components/finance/import-transactions-dialog';
 import { FinanceTransaction, TransactionFormDialog } from '@/components/finance/transaction-form-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     DropdownMenu,
@@ -15,10 +16,10 @@ import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
-import { ColumnDef } from '@tanstack/react-table';
+import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { MoreHorizontal, Pencil, Search, Trash2, Upload } from 'lucide-react';
-import { SUB_CATEGORY_LABEL, SubCategory } from '@/components/finance/sub-category';
+import { MoreHorizontal, Pencil, Search, Trash2, Upload, X } from 'lucide-react';
+import { SUB_CATEGORIES, SUB_CATEGORY_LABEL, SubCategory } from '@/components/finance/sub-category';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Row extends FinanceTransaction {
@@ -32,7 +33,16 @@ interface Props {
     workspace: Workspace;
     transactions: PaginatedData<Row>;
     accounts: AccountOpt[];
-    query?: { sort?: string | null; filter?: { search?: string } };
+    query?: {
+        sort?: string | null;
+        filter?: {
+            search?: string;
+            type?: 'in' | 'out';
+            account_id?: string | number;
+            missing_type?: string | boolean;
+            expenses_missing_sub?: string | boolean;
+        };
+    };
 }
 
 const fmt = (v: number | string) => Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -52,20 +62,100 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
     const [editing, setEditing] = useState<FinanceTransaction | null>(null);
     const [toDelete, setToDelete] = useState<Row | null>(null);
     const [search, setSearch] = useState(query?.filter?.search ?? '');
+    const [typeFilter, setTypeFilter] = useState<'' | 'in' | 'out'>(query?.filter?.type ?? '');
+    const [accountFilter, setAccountFilter] = useState<string>(query?.filter?.account_id != null ? String(query.filter.account_id) : '');
+    const boolish = (v: string | boolean | undefined) => v === true || v === '1' || v === 'true';
+    const [missingType, setMissingType] = useState<boolean>(boolish(query?.filter?.missing_type));
+    const [expensesMissingSub, setExpensesMissingSub] = useState<boolean>(boolish(query?.filter?.expenses_missing_sub));
+    const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+    const [bulkType, setBulkType] = useState<'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance' | ''>('');
+    const [bulkSubCategory, setBulkSubCategory] = useState<SubCategory | ''>('');
+    const [bulkProcessing, setBulkProcessing] = useState(false);
 
     const baseUrl = `/workspaces/${workspace.slug}/finance/transactions`;
 
+    const selectedIds = useMemo(() => Object.keys(rowSelection).filter((id) => rowSelection[id]), [rowSelection]);
+    const selectedCount = selectedIds.length;
+
+    useEffect(() => { setRowSelection({}); }, [transactions.data]);
+
+    const applyBulkType = () => {
+        if (!selectedCount) return;
+        setBulkProcessing(true);
+        router.put(
+            `${baseUrl}/bulk-update-type`,
+            { ids: selectedIds.map(Number), transaction_type: bulkType === '' ? null : bulkType },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onFinish: () => setBulkProcessing(false),
+                onSuccess: () => { setRowSelection({}); setBulkType(''); },
+            },
+        );
+    };
+
+    const applyBulkSubCategory = () => {
+        if (!selectedCount) return;
+        setBulkProcessing(true);
+        router.put(
+            `${baseUrl}/bulk-update-sub-category`,
+            { ids: selectedIds.map(Number), sub_category: bulkSubCategory === '' ? null : bulkSubCategory },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onFinish: () => setBulkProcessing(false),
+                onSuccess: () => { setRowSelection({}); setBulkSubCategory(''); },
+            },
+        );
+    };
+
     const performQuery = useCallback(
-        debounce((s: string) => {
-            router.get(baseUrl, { sort: query?.sort, 'filter[search]': s || undefined, page: 1 },
-                { preserveState: true, replace: true, preserveScroll: true, only: ['transactions'] });
+        debounce((s: string, t: '' | 'in' | 'out', a: string, mt: boolean, ems: boolean) => {
+            router.get(baseUrl, {
+                sort: query?.sort,
+                'filter[search]': s || undefined,
+                'filter[type]': t || undefined,
+                'filter[account_id]': a || undefined,
+                'filter[missing_type]': mt ? 1 : undefined,
+                'filter[expenses_missing_sub]': ems ? 1 : undefined,
+                page: 1,
+            }, { preserveState: true, replace: true, preserveScroll: true, only: ['transactions'] });
         }, 400),
         [baseUrl, query?.sort]
     );
 
-    useEffect(() => { performQuery(search); return () => performQuery.cancel(); }, [search, performQuery]);
+    useEffect(() => { performQuery(search, typeFilter, accountFilter, missingType, expensesMissingSub); return () => performQuery.cancel(); }, [search, typeFilter, accountFilter, missingType, expensesMissingSub, performQuery]);
 
     const columns: ColumnDef<Row>[] = [
+        {
+            id: 'select',
+            enableSorting: false,
+            header: ({ table }) => (
+                <div className="flex h-5 items-center justify-center">
+                    <Checkbox
+                        checked={
+                            table.getRowModel().rows.length > 0 &&
+                            table.getRowModel().rows.every((r) => r.getIsSelected())
+                        }
+                        onCheckedChange={(value) => {
+                            const next: RowSelectionState = { ...rowSelection };
+                            table.getRowModel().rows.forEach((r) => { next[r.id] = !!value; });
+                            setRowSelection(next);
+                        }}
+                        aria-label="Select all"
+                    />
+                </div>
+            ),
+            cell: ({ row }) => (
+                <div className="flex h-5 items-center justify-center">
+                    <Checkbox
+                        checked={row.getIsSelected()}
+                        onCheckedChange={(value) => row.toggleSelected(!!value)}
+                        aria-label="Select row"
+                    />
+                </div>
+            ),
+        },
         {
             accessorKey: 'date', enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Date" />,
@@ -88,17 +178,6 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
             ),
         },
         {
-            accessorKey: 'sub_category', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Sub Category" className="justify-center" />,
-            cell: ({ row }) => (
-                <div className="text-center">
-                    {row.original.sub_category
-                        ? <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] uppercase text-gray-500 dark:bg-zinc-800 dark:text-gray-400">{SUB_CATEGORY_LABEL[row.original.sub_category]}</span>
-                        : <span className="font-mono text-[10px] text-gray-300">—</span>}
-                </div>
-            ),
-        },
-        {
             accessorKey: 'transaction_type', enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Txn Type" className="justify-center" />,
             cell: ({ row }) => {
@@ -110,6 +189,17 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                     </div>
                 );
             },
+        },
+        {
+            accessorKey: 'sub_category', enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Sub Category" className="justify-center" />,
+            cell: ({ row }) => (
+                <div className="text-center">
+                    {row.original.sub_category
+                        ? <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] uppercase text-gray-500 dark:bg-zinc-800 dark:text-gray-400">{SUB_CATEGORY_LABEL[row.original.sub_category]}</span>
+                        : <span className="font-mono text-[10px] text-gray-300">—</span>}
+                </div>
+            ),
         },
         {
             id: 'credit',
@@ -181,7 +271,7 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                     </button>
                 </PageHeader>
 
-                <div className="mb-3 flex items-center gap-2">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
                     <div className="relative w-full max-w-xs">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                         <input
@@ -191,7 +281,114 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
+                    <select
+                        value={accountFilter}
+                        onChange={(e) => setAccountFilter(e.target.value)}
+                        className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-2.5 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
+                    >
+                        <option value="">All accounts</option>
+                        {accounts.map((a) => (
+                            <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>
+                        ))}
+                    </select>
+                    <div className="inline-flex h-9 overflow-hidden rounded-[10px] border border-black/6 bg-stone-100 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
+                        {([
+                            { value: '', label: 'All' },
+                            { value: 'in', label: 'Credit' },
+                            { value: 'out', label: 'Debit' },
+                        ] as const).map((opt) => (
+                            <button
+                                key={opt.value || 'all'}
+                                onClick={() => setTypeFilter(opt.value)}
+                                className={`px-3 transition-colors ${
+                                    typeFilter === opt.value
+                                        ? (opt.value === 'in'
+                                            ? 'bg-emerald-600 text-white'
+                                            : opt.value === 'out'
+                                                ? 'bg-red-500 text-white'
+                                                : 'bg-gray-700 text-white dark:bg-gray-200 dark:text-gray-900')
+                                        : 'text-gray-600 hover:bg-stone-200 dark:text-gray-300 dark:hover:bg-zinc-700'
+                                }`}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+                    <button
+                        onClick={() => setMissingType((v) => !v)}
+                        className={`h-9 rounded-[10px] border px-3 font-mono! text-[11px]! transition-colors ${
+                            missingType
+                                ? 'border-amber-500 bg-amber-500 text-white'
+                                : 'border-black/6 bg-stone-100 text-gray-600 hover:bg-stone-200 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700'
+                        }`}
+                    >
+                        No Txn Type
+                    </button>
+                    <button
+                        onClick={() => setExpensesMissingSub((v) => !v)}
+                        className={`h-9 rounded-[10px] border px-3 font-mono! text-[11px]! transition-colors ${
+                            expensesMissingSub
+                                ? 'border-amber-500 bg-amber-500 text-white'
+                                : 'border-black/6 bg-stone-100 text-gray-600 hover:bg-stone-200 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700'
+                        }`}
+                    >
+                        Expenses w/o Sub Cat
+                    </button>
                 </div>
+
+                {selectedCount > 0 && (
+                    <div className="mb-3 flex flex-wrap items-center gap-2 rounded-[10px] border border-emerald-200 bg-emerald-50/60 px-3 py-2 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+                        <span className="font-mono text-[11px] text-emerald-700 dark:text-emerald-300">
+                            {selectedCount} selected
+                        </span>
+                        <span className="h-4 w-px bg-emerald-200 dark:bg-emerald-500/30" />
+                        <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">Txn type:</span>
+                        <select
+                            value={bulkType}
+                            onChange={(e) => setBulkType(e.target.value as typeof bulkType)}
+                            className="h-8 rounded-lg border border-black/8 bg-white px-2 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
+                        >
+                            <option value="">— clear —</option>
+                            <option value="funds">Funds</option>
+                            <option value="profit_share">Profit Share</option>
+                            <option value="expenses">Expenses</option>
+                            <option value="transfer">Transfer</option>
+                            <option value="remittance">Remittance</option>
+                        </select>
+                        <button
+                            onClick={applyBulkType}
+                            disabled={bulkProcessing}
+                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3 font-mono! text-[11px]! font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                            {bulkProcessing ? 'Applying…' : 'Apply'}
+                        </button>
+                        <span className="h-4 w-px bg-emerald-200 dark:bg-emerald-500/30" />
+                        <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">Sub category:</span>
+                        <select
+                            value={bulkSubCategory}
+                            onChange={(e) => setBulkSubCategory(e.target.value as SubCategory | '')}
+                            className="h-8 rounded-lg border border-black/8 bg-white px-2 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
+                        >
+                            <option value="">— clear —</option>
+                            {SUB_CATEGORIES.map((s) => (
+                                <option key={s.value} value={s.value}>{s.label}</option>
+                            ))}
+                        </select>
+                        <button
+                            onClick={applyBulkSubCategory}
+                            disabled={bulkProcessing}
+                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3 font-mono! text-[11px]! font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                            {bulkProcessing ? 'Applying…' : 'Apply'}
+                        </button>
+                        <button
+                            onClick={() => setRowSelection({})}
+                            className="ml-auto flex h-8 items-center gap-1 rounded-lg border border-black/8 bg-white px-2.5 font-mono! text-[11px]! text-gray-600 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300"
+                        >
+                            <X className="h-3 w-3" /> Clear
+                        </button>
+                    </div>
+                )}
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
@@ -200,9 +397,21 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                         data={transactions.data || []}
                         initialSorting={initialSorting}
                         meta={{ ...omit(transactions, ['data']) }}
+                        rowSelection={rowSelection}
+                        onRowSelectionChange={setRowSelection}
+                        getRowId={(row) => String(row.id)}
                         onFetch={(params) => {
                             router.get(baseUrl,
-                                { sort: params?.sort, 'filter[search]': search || undefined, page: params?.page ?? 1 },
+                                {
+                                    sort: params?.sort,
+                                    'filter[search]': search || undefined,
+                                    'filter[type]': typeFilter || undefined,
+                                    'filter[account_id]': accountFilter || undefined,
+                                    'filter[missing_type]': missingType ? 1 : undefined,
+                                    'filter[expenses_missing_sub]': expensesMissingSub ? 1 : undefined,
+                                    page: params?.page ?? 1,
+                                    per_page: params?.per_page ?? undefined,
+                                },
                                 { preserveState: true, replace: true, preserveScroll: true });
                         }}
                     />
