@@ -159,7 +159,7 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
         {
             accessorKey: 'date', enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Date" />,
-            cell: ({ row }) => <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">{String(row.original.date).slice(0, 10)}</span>,
+            cell: ({ row }) => <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">{row.original.date}</span>,
         },
         {
             id: 'account', header: () => <div className="font-mono text-[10px] uppercase tracking-wider text-gray-300">Account</div>,

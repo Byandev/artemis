@@ -24,7 +24,6 @@ class Transaction extends Model
     ];
 
     protected $casts = [
-        'date' => 'date',
         'amount' => 'decimal:2',
     ];
 
