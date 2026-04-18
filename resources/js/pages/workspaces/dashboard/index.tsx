@@ -1,11 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { useState, useCallback } from 'react';
 import { Workspace } from '@/types/models/Workspace';
-import {
-    currencyFormatter,
-    numberFormatter,
-    percentageFormatter,
-} from '@/lib/utils';
 import DatePicker from '@/components/ui/date-picker';
 import Filters, { FilterValue } from '@/components/filters/Filters';
 import moment from 'moment';
@@ -16,17 +11,6 @@ import { StatisticBreakdown } from '@/pages/workspaces/dashboard/partials/Statis
 import ComponentCard from '@/components/common/ComponentCard';
 import PageBreakdown from '@/pages/workspaces/dashboard/partials/PageBreakdown';
 import ShopBreakdown from '@/pages/workspaces/dashboard/partials/ShopBreakdown';
-import {
-    Clock3,
-    PackageCheck,
-    PhilippinePeso,
-    ReceiptText,
-    Repeat,
-    ShoppingCart,
-    Truck,
-    Undo2,
-    Wallet,
-} from 'lucide-react';
 import UserBreakdown from '@/pages/workspaces/dashboard/partials/UserBreakdown';
 import { formatDate } from 'date-fns';
 import MetricPicker from '@/components/metrics/MetricPicker';

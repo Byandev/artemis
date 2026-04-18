@@ -38,31 +38,27 @@ export default function FinanceDashboard({ workspace, accounts, transactions, re
     const active = useMemo(() => accounts.filter(a => a.is_active), [accounts]);
     const totalBalance = useMemo(() => active.reduce((s, a) => s + balanceOf(a), 0), [active]);
 
-    const { monthIn, monthOut } = useMemo(() => {
-        const now = new Date();
-        const y = now.getFullYear(), m = now.getMonth();
+    const { totalIn, totalOut } = useMemo(() => {
         let mi = 0, mo = 0;
         for (const t of transactions) {
-            const d = new Date(t.date);
-            if (d.getFullYear() !== y || d.getMonth() !== m) continue;
             if (t.type === 'in') mi += Number(t.amount);
             else mo += Number(t.amount);
         }
-        return { monthIn: mi, monthOut: mo };
+        return { totalIn: mi, totalOut: mo };
     }, [transactions]);
 
     const unreconciledCount = useMemo(() => remittances.filter(r => r.transaction_id == null).length, [remittances]);
 
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - Finance Dashboard`} />
+            <Head title={`${workspace.name} - Live Cashflow`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <PageHeader title="Finance Dashboard" description="Overview of accounts, activity, and unreconciled remittances." />
+                <PageHeader title="Live Cashflow" description="Overview of accounts, activity, and unreconciled remittances." />
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <StatCard icon={<Wallet className="h-4 w-4" />} label="Total Balance" value={fmt(totalBalance)} />
-                    <StatCard icon={<ArrowUpRight className="h-4 w-4 text-emerald-500" />} label="IN This Month" value={fmt(monthIn)} />
-                    <StatCard icon={<ArrowDownRight className="h-4 w-4 text-red-500" />} label="OUT This Month" value={fmt(monthOut)} />
+                    <StatCard icon={<ArrowUpRight className="h-4 w-4 text-emerald-500" />} label="Total IN" value={fmt(totalIn)} />
+                    <StatCard icon={<ArrowDownRight className="h-4 w-4 text-red-500" />} label="Total OUT" value={fmt(totalOut)} />
                     <Link href={`${base}/remittances?filter[unreconciled]=1`} className="block">
                         <StatCard
                             icon={<AlertTriangle className="h-4 w-4 text-amber-500" />}
