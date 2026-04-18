@@ -43,7 +43,8 @@ class TransactionController extends Controller
         $this->guard($request, $workspace);
 
         $transactions = QueryBuilder::for(
-            Transaction::where('workspace_id', $workspace->id)->with(['account', 'remittance'])
+            Transaction::where('workspace_id', $workspace->id)
+                ->with(['account', 'remittance'])
         )
 
             ->allowedFilters([
@@ -108,7 +109,7 @@ class TransactionController extends Controller
             'rows.*.transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement'],
             'rows.*.amount' => ['required', 'numeric', 'min:0'],
             'rows.*.running_balance' => ['nullable', 'numeric'],
-            'rows.*.sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,operation_expense,salary,transfer_fee,seminar_fee,others'],
+            'rows.*.sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,operation_expense,salary,transfer_fee,seminar_fee,rent,others'],
             'rows.*.notes' => ['nullable', 'string'],
         ]);
 
@@ -157,7 +158,7 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
-            'sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,operation_expense,salary,transfer_fee,seminar_fee,others'],
+            'sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,operation_expense,salary,transfer_fee,seminar_fee,rent,others'],
         ]);
 
         $updated = Transaction::where('workspace_id', $workspace->id)

@@ -23,7 +23,7 @@ class TransactionRequest extends FormRequest
             'amount' => ['required', 'numeric', 'min:0'],
             'sub_category' => ['nullable', Rule::in([
                 'ad_spent', 'cogs', 'subscription', 'shipping_fee',
-                'operation_expense', 'salary', 'transfer_fee', 'seminar_fee', 'others',
+                'operation_expense', 'salary', 'transfer_fee', 'seminar_fee', 'rent', 'others',
             ])],
             'notes' => ['nullable', 'string'],
         ];

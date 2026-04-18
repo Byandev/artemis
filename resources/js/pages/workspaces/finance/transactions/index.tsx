@@ -222,6 +222,18 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
             ),
         },
         {
+            id: 'running_balance',
+            header: () => <div className="text-right font-mono text-[10px] uppercase tracking-wider text-gray-300">Balance</div>,
+            cell: ({ row }) => {
+                const bal = Number(row.original.running_balance ?? 0);
+                return (
+                    <div className={`text-right font-mono text-[12px] font-semibold ${bal >= 0 ? 'text-gray-900 dark:text-gray-100' : 'text-red-500'}`}>
+                        {fmt(bal)}
+                    </div>
+                );
+            },
+        },
+        {
             id: 'actions',
             header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-300">Actions</div>,
             cell: ({ row }) => (
