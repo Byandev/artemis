@@ -39,6 +39,8 @@ interface Props {
             search?: string;
             type?: 'in' | 'out';
             account_id?: string | number;
+            transaction_type?: string;
+            sub_category?: string;
             missing_type?: string | boolean;
             expenses_missing_sub?: string | boolean;
         };
@@ -64,6 +66,8 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
     const [search, setSearch] = useState(query?.filter?.search ?? '');
     const [typeFilter, setTypeFilter] = useState<'' | 'in' | 'out'>(query?.filter?.type ?? '');
     const [accountFilter, setAccountFilter] = useState<string>(query?.filter?.account_id != null ? String(query.filter.account_id) : '');
+    const [txnTypeFilter, setTxnTypeFilter] = useState<string>(query?.filter?.transaction_type ?? '');
+    const [subCategoryFilter, setSubCategoryFilter] = useState<string>(query?.filter?.sub_category ?? '');
     const boolish = (v: string | boolean | undefined) => v === true || v === '1' || v === 'true';
     const [missingType, setMissingType] = useState<boolean>(boolish(query?.filter?.missing_type));
     const [expensesMissingSub, setExpensesMissingSub] = useState<boolean>(boolish(query?.filter?.expenses_missing_sub));
@@ -110,12 +114,14 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
     };
 
     const performQuery = useCallback(
-        debounce((s: string, t: '' | 'in' | 'out', a: string, mt: boolean, ems: boolean) => {
+        debounce((s: string, t: '' | 'in' | 'out', a: string, tt: string, sc: string, mt: boolean, ems: boolean) => {
             router.get(baseUrl, {
                 sort: query?.sort,
                 'filter[search]': s || undefined,
                 'filter[type]': t || undefined,
                 'filter[account_id]': a || undefined,
+                'filter[transaction_type]': tt || undefined,
+                'filter[sub_category]': sc || undefined,
                 'filter[missing_type]': mt ? 1 : undefined,
                 'filter[expenses_missing_sub]': ems ? 1 : undefined,
                 page: 1,
@@ -124,7 +130,7 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
         [baseUrl, query?.sort]
     );
 
-    useEffect(() => { performQuery(search, typeFilter, accountFilter, missingType, expensesMissingSub); return () => performQuery.cancel(); }, [search, typeFilter, accountFilter, missingType, expensesMissingSub, performQuery]);
+    useEffect(() => { performQuery(search, typeFilter, accountFilter, txnTypeFilter, subCategoryFilter, missingType, expensesMissingSub); return () => performQuery.cancel(); }, [search, typeFilter, accountFilter, txnTypeFilter, subCategoryFilter, missingType, expensesMissingSub, performQuery]);
 
     const columns: ColumnDef<Row>[] = [
         {
@@ -291,6 +297,28 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                             <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>
                         ))}
                     </select>
+                    <select
+                        value={txnTypeFilter}
+                        onChange={(e) => setTxnTypeFilter(e.target.value)}
+                        className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-2.5 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
+                    >
+                        <option value="">All txn types</option>
+                        <option value="funds">Funds</option>
+                        <option value="profit_share">Profit Share</option>
+                        <option value="expenses">Expenses</option>
+                        <option value="transfer">Transfer</option>
+                        <option value="remittance">Remittance</option>
+                    </select>
+                    <select
+                        value={subCategoryFilter}
+                        onChange={(e) => setSubCategoryFilter(e.target.value)}
+                        className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-2.5 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
+                    >
+                        <option value="">All sub categories</option>
+                        {SUB_CATEGORIES.map((s) => (
+                            <option key={s.value} value={s.value}>{s.label}</option>
+                        ))}
+                    </select>
                     <div className="inline-flex h-9 overflow-hidden rounded-[10px] border border-black/6 bg-stone-100 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
                         {([
                             { value: '', label: 'All' },
@@ -407,6 +435,8 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                                     'filter[search]': search || undefined,
                                     'filter[type]': typeFilter || undefined,
                                     'filter[account_id]': accountFilter || undefined,
+                                    'filter[transaction_type]': txnTypeFilter || undefined,
+                                    'filter[sub_category]': subCategoryFilter || undefined,
                                     'filter[missing_type]': missingType ? 1 : undefined,
                                     'filter[expenses_missing_sub]': expensesMissingSub ? 1 : undefined,
                                     page: params?.page ?? 1,
