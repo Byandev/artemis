@@ -11,43 +11,24 @@ interface AccountRow {
     currency: string;
     opening_balance: number | string;
     is_active: boolean;
-    transactions: { id: number; account_id: number; type: 'in' | 'out'; amount: number | string; date: string }[];
+    balance: number;
 }
-
-interface TxnRow { id: number; type: 'in' | 'out'; amount: number | string; date: string }
-interface RemittanceRow { id: number; transaction_id: number | null }
 
 interface Props {
     workspace: Workspace;
     accounts: AccountRow[];
-    transactions: TxnRow[];
-    remittances: RemittanceRow[];
+    totalIn: number;
+    totalOut: number;
+    unreconciledCount: number;
 }
 
 const fmt = (v: number) => Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-function balanceOf(a: AccountRow): number {
-    const inSum = a.transactions.filter(t => t.type === 'in').reduce((s, t) => s + Number(t.amount), 0);
-    const outSum = a.transactions.filter(t => t.type === 'out').reduce((s, t) => s + Number(t.amount), 0);
-    return Number(a.opening_balance) + inSum - outSum;
-}
-
-export default function FinanceDashboard({ workspace, accounts, transactions, remittances }: Props) {
+export default function FinanceDashboard({ workspace, accounts, totalIn, totalOut, unreconciledCount }: Props) {
     const base = `/workspaces/${workspace.slug}/finance`;
 
     const active = useMemo(() => accounts.filter(a => a.is_active), [accounts]);
-    const totalBalance = useMemo(() => active.reduce((s, a) => s + balanceOf(a), 0), [active]);
-
-    const { totalIn, totalOut } = useMemo(() => {
-        let mi = 0, mo = 0;
-        for (const t of transactions) {
-            if (t.type === 'in') mi += Number(t.amount);
-            else mo += Number(t.amount);
-        }
-        return { totalIn: mi, totalOut: mo };
-    }, [transactions]);
-
-    const unreconciledCount = useMemo(() => remittances.filter(r => r.transaction_id == null).length, [remittances]);
+    const totalBalance = useMemo(() => active.reduce((s, a) => s + a.balance, 0), [active]);
 
     return (
         <AppLayout>
@@ -69,7 +50,7 @@ export default function FinanceDashboard({ workspace, accounts, transactions, re
                 </div>
 
                 <div className="mt-6 rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                    <div className="border-b border-black/6 px-5 py-3 text-[11px] font-mono font-medium uppercase tracking-wider text-gray-400 dark:border-white/6 dark:text-gray-500">
+                    <div className="border-b border-black/6 px-5 py-3 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:border-white/6 dark:text-gray-500">
                         Accounts
                     </div>
                     <div className="divide-y divide-black/6 dark:divide-white/6">
@@ -82,7 +63,7 @@ export default function FinanceDashboard({ workspace, accounts, transactions, re
                                     <span className="text-[13px] font-medium text-gray-800 dark:text-gray-100">{a.name}</span>
                                     <span className="font-mono text-[10px] uppercase tracking-wider text-gray-400">{a.currency}</span>
                                 </div>
-                                <span className="font-mono text-[13px] font-medium text-gray-700 dark:text-gray-200">{fmt(balanceOf(a))}</span>
+                                <span className={`font-mono text-[13px] font-medium ${a.balance >= 0 ? 'text-gray-700 dark:text-gray-200' : 'text-red-500'}`}>{fmt(a.balance)}</span>
                             </Link>
                         ))}
                     </div>
@@ -95,7 +76,7 @@ export default function FinanceDashboard({ workspace, accounts, transactions, re
 function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
     return (
         <div className="rounded-[14px] border border-black/6 bg-white p-4 dark:border-white/6 dark:bg-zinc-900">
-            <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 {icon}
                 <span>{label}</span>
             </div>
