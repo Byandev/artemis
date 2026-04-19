@@ -34,6 +34,7 @@ use Modules\Finance\Http\Controllers\TransactionController as FinanceTransaction
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
+use App\Http\Controllers\Admin\AdminWorkspaceController;
 
 /*
 |--------------------------------------------------------------------------
@@ -256,5 +257,14 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
     Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
     Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
     Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
+
+});
+
+// Admin Routes //
+
+Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(function () {
+    // This defines the URL: artemis.test/admin/workspaces
+    Route::get('/workspaces', [AdminWorkspaceController::class, 'index'])
+        ->name('workspaces.index');
 
 });
