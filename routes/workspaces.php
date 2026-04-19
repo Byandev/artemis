@@ -216,10 +216,10 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
 });
 
 // Admin Routes //
-
-Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(function () {
-    // This defines the URL: artemis.test/admin/workspaces
-    Route::get('/workspaces', [AdminWorkspaceController::class, 'index'])
-        ->name('workspaces.index');
-
-});
+Route::middleware(['auth', 'verified', 'admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::get('/workspaces', [AdminWorkspaceController::class, 'index'])
+            ->name('workspaces.index');
+    });
