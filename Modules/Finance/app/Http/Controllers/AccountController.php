@@ -47,7 +47,7 @@ class AccountController extends Controller
         $lastBalances = Transaction::where('workspace_id', $workspace->id)
             ->whereIn('account_id', $accountIds)
             ->whereIn('id', function ($q) use ($workspace, $accountIds) {
-                $q->selectRaw('(SELECT t2.id FROM finance_transactions t2 WHERE t2.account_id = finance_transactions.account_id AND t2.workspace_id = ? ORDER BY t2.date DESC, t2.id DESC LIMIT 1)', [$workspace->id])
+                $q->selectRaw('(SELECT t2.id FROM finance_transactions t2 WHERE t2.account_id = finance_transactions.account_id AND t2.workspace_id = ? ORDER BY t2.date DESC, t2.position DESC LIMIT 1)', [$workspace->id])
                     ->from('finance_transactions')
                     ->where('workspace_id', $workspace->id)
                     ->whereIn('account_id', $accountIds)
@@ -91,7 +91,7 @@ class AccountController extends Controller
         $transactions = $account->transactions()
             ->with('remittance:id,transaction_id,courier,soa_number')
             ->orderByDesc('date')
-            ->orderByDesc('running_balance')
+            ->orderByDesc('position')
             ->get();
 
         return Inertia::render('workspaces/finance/accounts/show', [

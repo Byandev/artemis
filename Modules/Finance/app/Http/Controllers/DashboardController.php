@@ -24,7 +24,7 @@ class DashboardController extends Controller
         // Get the last transaction per account (by date desc, id desc) for running_balance
         $lastTxnPerAccount = Transaction::where('workspace_id', $workspace->id)
             ->whereIn('id', function ($q) use ($workspace) {
-                $q->selectRaw('(SELECT t2.id FROM finance_transactions t2 WHERE t2.account_id = finance_transactions.account_id AND t2.workspace_id = ? ORDER BY t2.date DESC, t2.id DESC LIMIT 1)', [$workspace->id])
+                $q->selectRaw('(SELECT t2.id FROM finance_transactions t2 WHERE t2.account_id = finance_transactions.account_id AND t2.workspace_id = ? ORDER BY t2.date DESC, t2.position DESC LIMIT 1)', [$workspace->id])
                     ->from('finance_transactions')
                     ->where('workspace_id', $workspace->id)
                     ->groupBy('account_id');
