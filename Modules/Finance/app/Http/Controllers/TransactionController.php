@@ -48,7 +48,11 @@ class TransactionController extends Controller
         )
 
             ->allowedFilters([
-                AllowedFilter::callback('search', fn ($q, $v) => $q->where('description', 'like', "%{$v}%")),
+                AllowedFilter::callback('search', fn ($q, $v) => $q->where(function ($q2) use ($v) {
+                    $q2->where('description', 'like', "%{$v}%")
+                        ->orWhere('running_balance', $v)
+                        ->orWhere('amount', $v);
+                })),
                 AllowedFilter::exact('account_id'),
                 AllowedFilter::exact('type'),
                 AllowedFilter::exact('transaction_type'),
@@ -58,8 +62,8 @@ class TransactionController extends Controller
                     ? $q->where('transaction_type', 'expenses')->whereNull('sub_category')
                     : $q),
             ])
-            ->allowedSorts(['id', 'date', 'amount', 'type', 'transaction_type', 'sub_category', 'created_at'])
-            ->defaultSort('-id')
+            ->orderBy('date', 'desc')
+            ->orderBy('running_balance', 'desc')
             ->paginate((int) $request->input('per_page', 100))
             ->withQueryString();
 
