@@ -13,6 +13,7 @@ export interface FinanceTransaction {
     type: 'in' | 'out';
     transaction_type: TransactionType | null;
     amount: number | string;
+    position?: number | null;
     sub_category: SubCategory | null;
     notes: string | null;
 }
@@ -40,6 +41,7 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
         type: 'in' as 'in' | 'out',
         transaction_type: 'funds' as TransactionType,
         amount: '',
+        position: '',
         sub_category: '' as SubCategory | '',
         notes: '',
     });
@@ -54,6 +56,7 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
                     type: transaction.type,
                     transaction_type: transaction.transaction_type ?? 'funds',
                     amount: String(transaction.amount ?? ''),
+                    position: String(transaction.position ?? ''),
                     sub_category: transaction.sub_category ?? '',
                     notes: transaction.notes ?? '',
                 });
@@ -133,9 +136,12 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
                             <input type="text" value={data.description} onChange={(e) => setData('description', e.target.value)} className={inputCls} />
                         </Field>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-3 gap-3">
                             <Field label="Amount" required error={errors.amount}>
                                 <input type="number" step="0.01" min="0" value={data.amount} onChange={(e) => setData('amount', e.target.value)} className={inputCls} />
+                            </Field>
+                            <Field label="Position" error={errors.position}>
+                                <input type="number" min="1" step="1" value={data.position} onChange={(e) => setData('position', e.target.value)} placeholder="Auto" className={inputCls} />
                             </Field>
                             <Field label="Sub Category" error={errors.sub_category}>
                                 <select

@@ -24,6 +24,8 @@ import { TRANSACTION_TYPES, TRANSACTION_TYPE_LABEL, TRANSACTION_TYPE_STYLE, Tran
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Row extends FinanceTransaction {
+    running_balance?: number | string | null;
+    position?: number | null;
     account: { id: number; name: string; currency: string } | null;
     remittance: { id: number; courier: string; soa_number: string } | null;
 }
@@ -170,7 +172,10 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
             header: () => <div className="font-mono text-[10px] uppercase tracking-wider text-gray-300">Description</div>,
             cell: ({ row }) => (
                 <div className="flex max-w-[320px] flex-col gap-0.5">
-                    <span className="truncate text-[12px] text-gray-800 dark:text-gray-100" title={row.original.description}>{row.original.description}</span>
+                    <span className="truncate text-[12px] text-gray-800 dark:text-gray-100" title={row.original.description}>
+                        <span className="font-mono text-[10px] text-gray-400 dark:text-gray-500">[{row.original.position ?? '—'}]</span>{' '}
+                        {row.original.description}
+                    </span>
                     {row.original.remittance && (
                         <span className="truncate text-[10px] text-gray-400">SOA {row.original.remittance.soa_number} · {row.original.remittance.courier}</span>
                     )}
@@ -250,8 +255,8 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                                 date: String(row.original.date).slice(0, 10),
                                 description: row.original.description, type: row.original.type,
                                 transaction_type: row.original.transaction_type,
-                                amount: row.original.amount, sub_category: row.original.sub_category,
-                                notes: row.original.notes,
+                                amount: row.original.amount, position: row.original.position,
+                                sub_category: row.original.sub_category, notes: row.original.notes,
                             })}>
                                 <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                             </DropdownMenuItem>
