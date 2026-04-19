@@ -45,8 +45,16 @@ class DashboardController extends Controller
             ];
         });
 
-        // Compute totals via aggregate
+        // Compute totals via aggregate (exclude transfers)
         $totals = Transaction::where('workspace_id', $workspace->id)
+            ->where(function ($q) {
+                $q->whereNull('transaction_type')
+                    ->orWhereNotIn('transaction_type', ['transfer']);
+            })
+            ->where(function ($q) {
+                $q->whereNull('sub_category')
+                    ->orWhereNotIn('sub_category', ['transfer_fee']);
+            })
             ->selectRaw("
                 SUM(CASE WHEN type = 'in' THEN amount ELSE 0 END) as total_in,
                 SUM(CASE WHEN type = 'out' THEN amount ELSE 0 END) as total_out
