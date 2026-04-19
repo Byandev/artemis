@@ -20,15 +20,8 @@ import { ExternalLink, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-rea
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Account extends FinanceAccount {
-    transactions?: { id: number; account_id: number; type: 'in' | 'out'; amount: number | string }[];
+    current_balance?: number;
 }
-
-const balanceOf = (a: Account) => {
-    const ts = a.transactions ?? [];
-    const inSum = ts.filter(t => t.type === 'in').reduce((s, t) => s + Number(t.amount), 0);
-    const outSum = ts.filter(t => t.type === 'out').reduce((s, t) => s + Number(t.amount), 0);
-    return Number(a.opening_balance) + inSum - outSum;
-};
 
 interface Props {
     workspace: Workspace;
@@ -78,11 +71,14 @@ export default function AccountsIndex({ workspace, accounts, query }: Props) {
         {
             id: 'current_balance',
             header: () => <div className="text-right font-mono text-[10px] uppercase tracking-wider text-gray-300">Current Balance</div>,
-            cell: ({ row }) => (
-                <div className="text-right font-mono text-[12px] font-medium text-gray-700 dark:text-gray-200">
-                    {fmt(balanceOf(row.original))}
-                </div>
-            ),
+            cell: ({ row }) => {
+                const bal = Number(row.original.current_balance ?? row.original.opening_balance ?? 0);
+                return (
+                    <div className={`text-right font-mono text-[12px] font-medium ${bal >= 0 ? 'text-gray-700 dark:text-gray-200' : 'text-red-500'}`}>
+                        {fmt(bal)}
+                    </div>
+                );
+            },
         },
         {
             accessorKey: 'is_active',

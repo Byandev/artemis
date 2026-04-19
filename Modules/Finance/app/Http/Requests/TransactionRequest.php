@@ -22,7 +22,7 @@ class TransactionRequest extends FormRequest
             'transaction_type' => ['nullable', Rule::in(['funds', 'profit_share', 'expenses', 'transfer', 'remittance', 'loan', 'loan_payment', 'refund', 'voided', 'courier_damaged_settlement'])],
             'amount' => ['required', 'numeric', 'min:0'],
             'sub_category' => ['nullable', Rule::in([
-                'ad_spent', 'cogs', 'subscription', 'shipping_fee',
+                'ad_spent', 'cogs', 'subscription', 'shipping_fee', 'delivery_fee',
                 'operation_expense', 'salary', 'transfer_fee', 'seminar_fee', 'rent', 'others',
             ])],
             'notes' => ['nullable', 'string'],

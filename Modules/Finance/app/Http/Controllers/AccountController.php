@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Finance\Http\Requests\AccountRequest;
 use Modules\Finance\Models\Account;
+use Modules\Finance\Models\Transaction;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -38,9 +39,29 @@ class AccountController extends Controller
             ])
             ->allowedSorts(['id', 'name', 'currency', 'is_active', 'created_at'])
             ->defaultSort('name')
-            ->with(['transactions:id,account_id,type,amount'])
             ->paginate(15)
             ->withQueryString();
+
+        // Get last transaction per account for running_balance
+        $accountIds = collect($accounts->items())->pluck('id');
+        $lastBalances = Transaction::where('workspace_id', $workspace->id)
+            ->whereIn('account_id', $accountIds)
+            ->whereIn('id', function ($q) use ($workspace, $accountIds) {
+                $q->selectRaw('(SELECT t2.id FROM finance_transactions t2 WHERE t2.account_id = finance_transactions.account_id AND t2.workspace_id = ? ORDER BY t2.date DESC, t2.id DESC LIMIT 1)', [$workspace->id])
+                    ->from('finance_transactions')
+                    ->where('workspace_id', $workspace->id)
+                    ->whereIn('account_id', $accountIds)
+                    ->groupBy('account_id');
+            })
+            ->pluck('running_balance', 'account_id');
+
+        // Append current_balance to each account
+        $accounts->through(function ($account) use ($lastBalances) {
+            $account->current_balance = $lastBalances->has($account->id)
+                ? (float) $lastBalances->get($account->id)
+                : (float) $account->opening_balance;
+            return $account;
+        });
 
         return Inertia::render('workspaces/finance/accounts/index', [
             'workspace' => $workspace,

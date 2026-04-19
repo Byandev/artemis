@@ -1,5 +1,5 @@
 export type SubCategory =
-    | 'ad_spent' | 'cogs' | 'subscription' | 'shipping_fee'
+    | 'ad_spent' | 'cogs' | 'subscription' | 'shipping_fee' | 'delivery_fee'
     | 'operation_expense' | 'salary' | 'transfer_fee' | 'seminar_fee' | 'rent' | 'others';
 
 export const SUB_CATEGORIES: { value: SubCategory; label: string }[] = [
@@ -7,6 +7,7 @@ export const SUB_CATEGORIES: { value: SubCategory; label: string }[] = [
     { value: 'cogs', label: 'COGS' },
     { value: 'subscription', label: 'Subscription' },
     { value: 'shipping_fee', label: 'Shipping Fee' },
+    { value: 'delivery_fee', label: 'Delivery Fee' },
     { value: 'operation_expense', label: 'Operation Expense' },
     { value: 'salary', label: 'Salary' },
     { value: 'transfer_fee', label: 'Transfer Fee' },
