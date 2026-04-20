@@ -55,13 +55,10 @@ const parseNumber = (v: string): number => {
     return isNaN(n) ? 0 : n;
 };
 
-// Gotyme date format: try ISO, "MMM DD, YYYY", "YYYY-MM-DD", "MM/DD/YYYY".
+// CSV is expected to have the date already in YYYY-MM-DD. Pass it through as-is.
 const toIsoDate = (v: string): string => {
-    const s = String(v).trim();
-    if (!s) return '';
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
-    return '';
+    const s = String(v ?? '').trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
 };
 
 export function ImportTransactionsDialog({ open, onOpenChange, workspaceSlug, accounts }: Props) {

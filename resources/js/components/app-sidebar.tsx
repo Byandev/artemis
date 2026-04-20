@@ -39,6 +39,7 @@ import {
     Landmark,
     ArrowLeftRight,
     Send,
+    PieChart,
 } from 'lucide-react';
 import { useState } from 'react';
 import AppLogo from './app-logo';
@@ -145,9 +146,14 @@ export function AppSidebar() {
                       icon: Wallet,
                       items: [
                           {
-                              title: 'Dashboard',
+                              title: 'Live Cashflow',
                               href: `/workspaces/${currentWorkspace.slug}/finance/dashboard`,
                               icon: LayoutDashboard,
+                          },
+                          {
+                              title: 'Dashboard',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/expenses`,
+                              icon: PieChart,
                           },
                           {
                               title: 'Accounts',

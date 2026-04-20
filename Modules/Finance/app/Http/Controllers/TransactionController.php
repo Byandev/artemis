@@ -43,11 +43,16 @@ class TransactionController extends Controller
         $this->guard($request, $workspace);
 
         $transactions = QueryBuilder::for(
-            Transaction::where('workspace_id', $workspace->id)->with(['account', 'remittance'])
+            Transaction::where('workspace_id', $workspace->id)
+                ->with(['account', 'remittance'])
         )
 
             ->allowedFilters([
-                AllowedFilter::callback('search', fn ($q, $v) => $q->where('description', 'like', "%{$v}%")),
+                AllowedFilter::callback('search', fn ($q, $v) => $q->where(function ($q2) use ($v) {
+                    $q2->where('description', 'like', "%{$v}%")
+                        ->orWhere('running_balance', $v)
+                        ->orWhere('amount', $v);
+                })),
                 AllowedFilter::exact('account_id'),
                 AllowedFilter::exact('type'),
                 AllowedFilter::exact('transaction_type'),
@@ -57,8 +62,8 @@ class TransactionController extends Controller
                     ? $q->where('transaction_type', 'expenses')->whereNull('sub_category')
                     : $q),
             ])
-            ->allowedSorts(['id', 'date', 'amount', 'type', 'transaction_type', 'sub_category', 'created_at'])
-            ->defaultSort('-id')
+            ->orderBy('date', 'desc')
+            ->orderBy('position', 'desc')
             ->paginate((int) $request->input('per_page', 100))
             ->withQueryString();
 
@@ -79,7 +84,26 @@ class TransactionController extends Controller
         $this->guard($request, $workspace);
         $this->validateWorkspaceFor($workspace, $request->validated());
 
-        Transaction::create([...$request->validated(), 'workspace_id' => $workspace->id]);
+        $data = $request->validated();
+
+        // If position is provided (squeezing in), shift existing rows at that position and after
+        if (! empty($data['position'])) {
+            Transaction::where('workspace_id', $workspace->id)
+                ->where('account_id', $data['account_id'])
+                ->where('date', $data['date'])
+                ->where('position', '>=', $data['position'])
+                ->increment('position');
+        } else {
+            // Auto-assign: next position for this account+date
+            $maxPos = Transaction::where('workspace_id', $workspace->id)
+                ->where('account_id', $data['account_id'])
+                ->where('date', $data['date'])
+                ->max('position') ?? 0;
+
+            $data['position'] = $maxPos + 1;
+        }
+
+        Transaction::create([...$data, 'workspace_id' => $workspace->id]);
 
         return redirect()->back()->with('success', 'Transaction created.');
     }
@@ -105,10 +129,11 @@ class TransactionController extends Controller
             'rows.*.date' => ['required', 'date'],
             'rows.*.description' => ['required', 'string', 'max:255'],
             'rows.*.type' => ['required', 'in:in,out'],
-            'rows.*.transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance'],
+            'rows.*.transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement'],
             'rows.*.amount' => ['required', 'numeric', 'min:0'],
             'rows.*.running_balance' => ['nullable', 'numeric'],
-            'rows.*.sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,operation_expense,salary,transfer_fee,seminar_fee,others'],
+            'rows.*.position' => ['nullable', 'integer', 'min:1'],
+            'rows.*.sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,delivery_fee,operation_expense,salary,transfer_fee,seminar_fee,rent,others'],
             'rows.*.notes' => ['nullable', 'string'],
         ]);
 
@@ -120,13 +145,30 @@ class TransactionController extends Controller
             return redirect()->back()->withErrors(['rows' => 'One or more accounts do not belong to this workspace.']);
         }
 
+        // Auto-assign positions per (account_id, date) group if not provided
+        $positionCounters = [];
         $now = now();
-        $records = collect($validated['rows'])->map(fn ($r) => [
-            ...$r,
-            'workspace_id' => $workspace->id,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ])->all();
+        $records = collect($validated['rows'])->map(function ($r) use ($workspace, &$positionCounters, $now) {
+            $key = $r['account_id'] . '|' . $r['date'];
+            if (! isset($positionCounters[$key])) {
+                $positionCounters[$key] = Transaction::where('workspace_id', $workspace->id)
+                    ->where('account_id', $r['account_id'])
+                    ->where('date', $r['date'])
+                    ->max('position') ?? 0;
+            }
+
+            if (empty($r['position'])) {
+                $positionCounters[$key]++;
+                $r['position'] = $positionCounters[$key];
+            }
+
+            return [
+                ...$r,
+                'workspace_id' => $workspace->id,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        })->all();
 
         Transaction::insert($records);
 
@@ -140,7 +182,7 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
-            'transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance'],
+            'transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement'],
         ]);
 
         $updated = Transaction::where('workspace_id', $workspace->id)
@@ -157,7 +199,7 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
-            'sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,operation_expense,salary,transfer_fee,seminar_fee,others'],
+            'sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,delivery_fee,operation_expense,salary,transfer_fee,seminar_fee,rent,others'],
         ]);
 
         $updated = Transaction::where('workspace_id', $workspace->id)
