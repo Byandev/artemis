@@ -10,6 +10,8 @@ const SLIDES = [
     { id: 'revenue', label: 'Revenue Model' },
     { id: 'equity', label: 'Equity' },
     { id: 'roles', label: 'Roles' },
+    { id: 'costs', label: 'Costs' },
+    { id: 'roadmap', label: 'Future Plans' },
     { id: 'value', label: 'What It\'s Worth' },
     { id: 'next-steps', label: 'Next Steps' },
 ];
@@ -425,77 +427,163 @@ export default function Partnership() {
                                     </>
                                 )}
 
-                                {/* SLIDE 7: What It's Worth */}
+                                {/* SLIDE 7: Operating Costs */}
                                 {i === 6 && (
                                     <>
-                                        <Reveal active={a === 6}><p className="mb-5 font-mono text-[10px] font-semibold uppercase tracking-[0.25em] text-brand-500">What It's Worth</p></Reveal>
-                                        <Reveal active={a === 6} delay={100}><h2 className="mb-6 max-w-3xl text-[clamp(1.75rem,4.5vw,3.25rem)] font-bold leading-[1.08] tracking-tight">Equity in a working SaaS is <span className="text-brand-500 italic">not nothing.</span></h2></Reveal>
-                                        <Reveal active={a === 6} delay={200}><p className="mb-12 max-w-2xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">Artemis is a real product in a niche with zero competitors. Here's what your stake could be worth at different stages.</p></Reveal>
+                                        <Reveal active={a === 6}><p className="mb-5 font-mono text-[10px] font-semibold uppercase tracking-[0.25em] text-brand-500">Operating Costs</p></Reveal>
+                                        <Reveal active={a === 6} delay={100}><h2 className="mb-6 max-w-3xl text-[clamp(1.75rem,4.5vw,3.25rem)] font-bold leading-[1.08] tracking-tight">What it takes to <span className="text-brand-500 italic">run Artemis.</span></h2></Reveal>
+                                        <Reveal active={a === 6} delay={200}><p className="mb-12 max-w-2xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">All operating costs are funded by Bryan. Partners are not expected to contribute financially.</p></Reveal>
                                         <Reveal active={a === 6} delay={300}>
-                                            <div className="grid gap-4 md:grid-cols-2">
-                                                {/* 5% table */}
-                                                <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm dark:border-white/6 dark:bg-zinc-900/80">
-                                                    <div className="border-b border-gray-100 bg-stone-50/80 px-6 py-4 dark:border-white/5 dark:bg-white/[0.02]">
-                                                        <p className="font-mono text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">10% equity — Mark & Keljash (each)</p>
-                                                    </div>
-                                                    {[
-                                                        { stage: 'Month 6', arr: '₱2.6M ARR', value: '₱260,000/yr' },
-                                                        { stage: 'Month 12', arr: '₱8.5M ARR', value: '₱850,000/yr' },
-                                                        { stage: 'Year 2', arr: '₱17M ARR', value: '₱1,700,000/yr' },
-                                                        { stage: 'Exit (5x)', arr: '₱42.5M val.', value: '₱4,250,000' },
-                                                    ].map((r, ri) => (
-                                                        <div key={r.stage} className={`flex items-center justify-between border-b border-gray-100 px-6 py-3.5 last:border-0 dark:border-white/5 ${ri === 3 ? 'bg-brand-50/40 dark:bg-brand-500/[0.03]' : ''}`}>
-                                                            <div className="flex items-center gap-3">
-                                                                <span className="w-20 font-mono text-[11px] font-bold text-brand-600 dark:text-brand-400">{r.stage}</span>
-                                                                <span className="text-[12px] text-gray-400">{r.arr}</span>
-                                                            </div>
-                                                            <span className={`font-mono text-[14px] font-bold ${ri === 3 ? 'text-brand-600 dark:text-brand-400' : ''}`}>{r.value}</span>
-                                                        </div>
-                                                    ))}
+                                            <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm dark:border-white/6 dark:bg-zinc-900/80">
+                                                <div className="border-b border-gray-100 bg-stone-50/80 px-7 py-4 dark:border-white/5 dark:bg-white/[0.02]">
+                                                    <p className="font-mono text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Fixed monthly costs</p>
                                                 </div>
-                                                {/* 10% table */}
-                                                <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm dark:border-white/6 dark:bg-zinc-900/80">
-                                                    <div className="border-b border-gray-100 bg-stone-50/80 px-6 py-4 dark:border-white/5 dark:bg-white/[0.02]">
-                                                        <p className="font-mono text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">10% equity — Beta Company</p>
-                                                    </div>
-                                                    {[
-                                                        { stage: 'Month 6', arr: '₱2.6M ARR', value: '₱260,000/yr' },
-                                                        { stage: 'Month 12', arr: '₱8.5M ARR', value: '₱850,000/yr' },
-                                                        { stage: 'Year 2', arr: '₱17M ARR', value: '₱1,700,000/yr' },
-                                                        { stage: 'Exit (5x)', arr: '₱42.5M val.', value: '₱4,250,000' },
-                                                    ].map((r, ri) => (
-                                                        <div key={r.stage} className={`flex items-center justify-between border-b border-gray-100 px-6 py-3.5 last:border-0 dark:border-white/5 ${ri === 3 ? 'bg-brand-50/40 dark:bg-brand-500/[0.03]' : ''}`}>
-                                                            <div className="flex items-center gap-3">
-                                                                <span className="w-20 font-mono text-[11px] font-bold text-brand-600 dark:text-brand-400">{r.stage}</span>
-                                                                <span className="text-[12px] text-gray-400">{r.arr}</span>
-                                                            </div>
-                                                            <span className={`font-mono text-[14px] font-bold ${ri === 3 ? 'text-brand-600 dark:text-brand-400' : ''}`}>{r.value}</span>
+                                                {[
+                                                    { l: 'Server / Infrastructure', v: '₱3,000/mo', note: 'Minimum — scales proportionally with client base', c: 'bg-blue-light-500' },
+                                                    { l: 'Domain', v: '₱1,500/yr', note: 'Annual renewal (~₱125/mo)', c: 'bg-gray-400' },
+                                                    { l: 'Full-time Developer', v: '₱18,000/mo', note: 'Development and client support', c: 'bg-brand-500' },
+                                                ].map((r) => (
+                                                    <div key={r.l} className="flex items-center gap-4 border-b border-gray-100 px-7 py-4 last:border-0 dark:border-white/5">
+                                                        <span className={`h-2.5 w-2.5 shrink-0 rounded-sm ${r.c}`} />
+                                                        <div className="flex-1">
+                                                            <span className="text-[14px] font-semibold text-gray-700 dark:text-gray-300">{r.l}</span>
+                                                            <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">{r.note}</p>
                                                         </div>
-                                                    ))}
+                                                        <span className="font-mono text-[15px] font-bold text-gray-900 dark:text-gray-100">{r.v}</span>
+                                                    </div>
+                                                ))}
+                                                <div className="flex items-center justify-between bg-brand-50/60 px-7 py-5 dark:bg-brand-500/5">
+                                                    <span className="text-[15px] font-bold text-gray-900 dark:text-gray-100">Total (minimum)</span>
+                                                    <span className="font-mono text-2xl font-bold text-brand-600 dark:text-brand-400">~₱21,125/mo</span>
                                                 </div>
                                             </div>
                                         </Reveal>
                                         <Reveal active={a === 6} delay={500}>
-                                            <p className="mt-6 text-center text-[13px] text-gray-400 dark:text-gray-500">Based on moderate revenue projections. Actual value depends on growth and market conditions.</p>
+                                            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                                                <div className="rounded-2xl border border-gray-200/80 bg-white px-6 py-5 dark:border-white/6 dark:bg-zinc-900/80">
+                                                    <p className="font-mono text-[9px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Cover operating costs</p>
+                                                    <p className="mt-1 text-2xl font-bold tracking-tight">~10<span className="ml-1 text-sm font-normal text-gray-400">customers</span></p>
+                                                    <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">~₱23k MRR — server + domain + developer</p>
+                                                </div>
+                                                <div className="rounded-2xl border-2 border-brand-500/80 bg-gradient-to-b from-brand-50/90 to-white px-6 py-5 shadow-lg shadow-brand-500/5 dark:border-brand-500/60 dark:from-brand-500/[0.06] dark:to-zinc-900">
+                                                    <p className="font-mono text-[9px] uppercase tracking-wider text-brand-600 dark:text-brand-400">Profitable operation</p>
+                                                    <p className="mt-1 text-2xl font-bold tracking-tight text-brand-600 dark:text-brand-400">~30<span className="ml-1 text-sm font-normal text-gray-400">customers</span></p>
+                                                    <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">~₱70k MRR — all costs covered, healthy margin</p>
+                                                </div>
+                                            </div>
+                                        </Reveal>
+                                        <Reveal active={a === 6} delay={700}>
+                                            <div className="mt-6 rounded-2xl border border-gray-200/80 bg-stone-50/80 px-7 py-5 dark:border-white/6 dark:bg-white/[0.02]">
+                                                <p className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                                                    <span className="font-semibold text-gray-700 dark:text-gray-300">Server costs scale significantly with growth.</span> Starting at ₱3,000/mo but grows fast — ~₱10k at 80 customers, ~₱30k at 250, ~₱60k at 500. More clients means more data, more API calls, more processing power. The developer hire frees Bryan to focus on product strategy and growth.
+                                                </p>
+                                            </div>
                                         </Reveal>
                                     </>
                                 )}
 
-                                {/* SLIDE 8: Next Steps */}
+                                {/* SLIDE 8: Future Plans */}
                                 {i === 7 && (
+                                    <>
+                                        <Reveal active={a === 7}><p className="mb-5 font-mono text-[10px] font-semibold uppercase tracking-[0.25em] text-brand-500">Future Plans</p></Reveal>
+                                        <Reveal active={a === 7} delay={100}><h2 className="mb-6 max-w-3xl text-[clamp(1.75rem,4.5vw,3.25rem)] font-bold leading-[1.08] tracking-tight">What's <span className="text-brand-500 italic">coming next.</span></h2></Reveal>
+                                        <Reveal active={a === 7} delay={200}><p className="mb-12 max-w-2xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">Artemis is just getting started. Here's the roadmap — from features already in development to what we're researching.</p></Reveal>
+                                        <Reveal active={a === 7} delay={300}>
+                                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                                {[
+                                                    { t: 'RMO Call Statistics', d: 'Sync RMO call data directly into Artemis for unified analytics and reporting.', status: 'In Development', color: 'brand' },
+                                                    { t: 'FB Ads Analytics', d: 'Full Facebook Ads analytics built into Artemis — a Super Ads replacement. Beta company currently pays ₱10k/mo for a similar tool.', status: 'Feasible', color: 'blue' },
+                                                    { t: 'Auto Scale / Descale Ads', d: 'Automated ad budget scaling and descaling based on performance rules and thresholds.', status: 'Feasible', color: 'blue' },
+                                                    { t: 'AUTO RMO Call', d: 'Automated RMO calls to customers — both standard scripted messages and AI-connected conversations.', status: 'In Research', color: 'amber' },
+                                                    { t: 'Auto Process', d: 'End-to-end automation of order processing workflows to reduce manual work.', status: 'In Research', color: 'amber' },
+                                                ].map((f, fi) => (
+                                                    <Reveal key={f.t} active={a === 7} delay={400 + fi * 80}>
+                                                        <div className="rounded-2xl border border-gray-200/80 bg-white p-6 dark:border-white/6 dark:bg-zinc-900/80">
+                                                            <div className="mb-3 flex items-center gap-2">
+                                                                <span className={`rounded-full border px-2 py-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.15em] ${
+                                                                    f.color === 'brand' ? 'border-brand-200 bg-brand-50 text-brand-600 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-400' :
+                                                                    f.color === 'blue' ? 'border-blue-200 bg-blue-50 text-blue-600 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-400' :
+                                                                    'border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-400'
+                                                                }`}>{f.status}</span>
+                                                            </div>
+                                                            <h3 className="mb-2 text-[14px] font-bold">{f.t}</h3>
+                                                            <p className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">{f.d}</p>
+                                                        </div>
+                                                    </Reveal>
+                                                ))}
+                                            </div>
+                                        </Reveal>
+                                        <Reveal active={a === 7} delay={800}>
+                                            <div className="mt-6 rounded-2xl border border-gray-200/80 bg-stone-50/80 px-7 py-5 dark:border-white/6 dark:bg-white/[0.02]">
+                                                <p className="mb-2 text-[13px] font-semibold text-gray-700 dark:text-gray-300">Feature requests from partners</p>
+                                                <p className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                                                    The beta company may request features for Artemis. However, <span className="font-semibold text-gray-700 dark:text-gray-300">Bryan retains full discretion</span> on whether to prioritize and build them — especially if a requested feature is specific to the beta company only and not applicable to the broader customer base. The roadmap serves all Artemis customers, not just one partner.
+                                                </p>
+                                            </div>
+                                        </Reveal>
+                                    </>
+                                )}
+
+                                {/* SLIDE 9: What It's Worth */}
+                                {i === 8 && (
+                                    <>
+                                        <Reveal active={a === 8}><p className="mb-5 font-mono text-[10px] font-semibold uppercase tracking-[0.25em] text-brand-500">What It's Worth</p></Reveal>
+                                        <Reveal active={a === 8} delay={100}><h2 className="mb-6 max-w-3xl text-[clamp(1.75rem,4.5vw,3.25rem)] font-bold leading-[1.08] tracking-tight">Equity in a working SaaS is <span className="text-brand-500 italic">not nothing.</span></h2></Reveal>
+                                        <Reveal active={a === 8} delay={200}><p className="mb-12 max-w-2xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">Equity value is based on <span className="font-semibold text-gray-700 dark:text-gray-300">net profit after operating expenses</span> — not raw revenue. Here's what 10% could be worth.</p></Reveal>
+
+                                        {/* Full breakdown table */}
+                                        <Reveal active={a === 8} delay={300}>
+                                            <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm dark:border-white/6 dark:bg-zinc-900/80">
+                                                <div className="border-b border-gray-100 bg-stone-50/80 px-7 py-4 dark:border-white/5 dark:bg-white/[0.02]">
+                                                    <p className="font-mono text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Revenue vs. net profit — 10% equity value</p>
+                                                </div>
+                                                {[
+                                                    { stage: 'Month 6', cust: '~80', mrr: '₱215k', opex: '₱28k', net: '₱187k', annual: '₱2.24M', tenPct: '₱224,000/yr' },
+                                                    { stage: 'Month 12', cust: '~250', mrr: '₱712k', opex: '₱48k', net: '₱664k', annual: '₱7.97M', tenPct: '₱797,000/yr' },
+                                                    { stage: 'Year 2', cust: '~500', mrr: '₱1.4M', opex: '₱78k', net: '₱1.32M', annual: '₱15.9M', tenPct: '₱1,590,000/yr' },
+                                                ].map((r, ri) => (
+                                                    <div key={r.stage} className="border-b border-gray-100 px-7 py-4 last:border-0 dark:border-white/5">
+                                                        <div className="mb-2 flex items-center gap-3">
+                                                            <span className="font-mono text-[11px] font-bold text-brand-600 dark:text-brand-400">{r.stage}</span>
+                                                            <span className="text-[11px] text-gray-400">({r.cust} customers)</span>
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                                                            <div><p className="font-mono text-[8px] uppercase tracking-wider text-gray-400 dark:text-gray-500">MRR</p><p className="text-[13px] font-bold">{r.mrr}</p></div>
+                                                            <div><p className="font-mono text-[8px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Opex/mo</p><p className="text-[13px] font-bold text-rose-500">-{r.opex}</p></div>
+                                                            <div><p className="font-mono text-[8px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Net/mo</p><p className="text-[13px] font-bold">{r.net}</p></div>
+                                                            <div><p className="font-mono text-[8px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Net/yr</p><p className="text-[13px] font-bold">{r.annual}</p></div>
+                                                            <div><p className="font-mono text-[8px] uppercase tracking-wider text-brand-500">10% share</p><p className="text-[13px] font-bold text-brand-600 dark:text-brand-400">{r.tenPct}</p></div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </Reveal>
+
+                                        <Reveal active={a === 8} delay={500}>
+                                            <div className="mt-6 rounded-2xl border border-gray-200/80 bg-stone-50/80 px-7 py-5 dark:border-white/6 dark:bg-white/[0.02]">
+                                                <p className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                                                    <span className="font-semibold text-gray-700 dark:text-gray-300">Opex assumptions:</span> Server starts at ₱3k/mo minimum, scaling significantly with client base — ~₱10k at 80 customers, ~₱30k at 250, ~₱60k at 500 (more data, API calls, processing). Developer at ₱18k/mo. Domain ₱125/mo. All funded by Bryan.
+                                                </p>
+                                            </div>
+                                        </Reveal>
+                                    </>
+                                )}
+
+                                {/* SLIDE 10: Next Steps */}
+                                {i === 9 && (
                                     <div className="relative text-center">
                                         <div className="pointer-events-none absolute left-1/2 top-1/2 h-[500px] w-[700px] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse,rgba(16,211,161,0.1),transparent_55%)]" />
-                                        <Reveal active={a === 7}><p className="mb-5 font-mono text-[10px] font-semibold uppercase tracking-[0.25em] text-brand-500">Next Steps</p></Reveal>
-                                        <Reveal active={a === 7} delay={100}><h2 className="mb-10 text-[clamp(2rem,5vw,3.5rem)] font-bold leading-[1.08] tracking-tight">Let's make this <span className="text-brand-500 italic">official.</span></h2></Reveal>
-                                        <Reveal active={a === 7} delay={200}>
+                                        <Reveal active={a === 9}><p className="mb-5 font-mono text-[10px] font-semibold uppercase tracking-[0.25em] text-brand-500">Next Steps</p></Reveal>
+                                        <Reveal active={a === 9} delay={100}><h2 className="mb-10 text-[clamp(2rem,5vw,3.5rem)] font-bold leading-[1.08] tracking-tight">Let's make this <span className="text-brand-500 italic">official.</span></h2></Reveal>
+                                        <Reveal active={a === 9} delay={200}>
                                             <div className="mx-auto grid max-w-2xl gap-4 text-left sm:grid-cols-2">
                                                 {[
-                                                    { n: '01', t: 'Align on terms', d: 'Review this proposal. Discuss equity percentages, vesting, and conditions.' },
+                                                    { n: '01', t: 'Align on terms', d: 'Review this proposal. Discuss equity percentages and conditions.' },
                                                     { n: '02', t: 'Agree on roles', d: 'Define what continued contribution looks like for each partner going forward.' },
                                                     { n: '03', t: 'Legal paperwork', d: 'Engage a lawyer to draft a shareholders\' agreement and IP assignment.' },
-                                                    { n: '04', t: 'Build together', d: 'Start the vesting clock. Ship the product. Grow the business.' },
+                                                    { n: '04', t: 'Build together', d: 'Ship the product. Grow the business. Execute the roadmap.' },
                                                 ].map((s, si) => (
-                                                    <Reveal key={s.n} active={a === 7} delay={300 + si * 100}>
+                                                    <Reveal key={s.n} active={a === 9} delay={300 + si * 100}>
                                                         <div className="rounded-2xl border border-gray-200/80 bg-white p-6 dark:border-white/6 dark:bg-zinc-900/80">
                                                             <p className="mb-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-brand-500">{s.n}</p>
                                                             <h4 className="mb-1.5 text-[15px] font-bold tracking-tight">{s.t}</h4>
@@ -505,7 +593,7 @@ export default function Partnership() {
                                                 ))}
                                             </div>
                                         </Reveal>
-                                        <Reveal active={a === 7} delay={700}>
+                                        <Reveal active={a === 9} delay={700}>
                                             <div className="mt-12 mb-5 flex items-center justify-center gap-4">
                                                 <div className="h-px w-16 bg-gradient-to-r from-transparent to-gray-200 dark:to-white/8" />
                                                 <img src="/img/logo/artemis.png" alt="" className="h-12 w-12 object-contain" />

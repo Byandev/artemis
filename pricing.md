@@ -10,6 +10,7 @@
 | **Data retention** | 1 month | 3 months | 6 months | 12 months |
 | **Analytics** | Sales + RTS + Delivery | Sales + RTS + Delivery | All analytics | All analytics |
 | **Parcel Journey** | Free | ₱0.50/delivered order | ₱0.35/delivered order | ₱0.20/delivered order |
+| **Parcel Journey via SMS** | — | — | 3rd party API | 3rd party API |
 | **Support** | Chat | Chat | Priority chat | Dedicated |
 
 ## Parcel Journey Pricing
@@ -125,5 +126,6 @@ Product-market fit confirmed. Expanding outreach, possibly adding more integrati
 - Free trial: 14 days, unlimited orders, 1 page only, 1 month data retention, Parcel Journey via Chat only (free), no credit card required
 - Pages: 1 page on Free Trial, unlimited on all paid plans
 - Parcel Journey is tiered: ₱0.50 (Starter), ₱0.35 (Growth), ₱0.20 (Scale) per tracked delivered order — RTS parcels are not billed
+- Parcel Journey via SMS available on Growth and Scale plans only — uses 3rd party SMS API (additional SMS costs may apply)
 - Above 30,000 orders/mo: custom/enterprise pricing — contact sales
 - Annual discount: TBD (consider 2 months free on annual billing)
