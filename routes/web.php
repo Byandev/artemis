@@ -43,6 +43,10 @@ Route::get('/pitch', function () {
     return Inertia::render('pitch');
 })->name('pitch');
 
+Route::get('/x9k2m7p4', function () {
+    return Inertia::render('partnership');
+})->name('partnership');
+
 Route::get('/about', function () {
     return Inertia::render('about');
 })->name('about');
