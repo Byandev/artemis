@@ -19,12 +19,12 @@ class Transaction extends Model
         'transaction_type',
         'amount',
         'running_balance',
+        'position',
         'sub_category',
         'notes',
     ];
 
     protected $casts = [
-        'date' => 'date',
         'amount' => 'decimal:2',
     ];
 

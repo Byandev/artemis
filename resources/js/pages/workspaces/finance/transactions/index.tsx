@@ -20,9 +20,12 @@ import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
 import { MoreHorizontal, Pencil, Search, Trash2, Upload, X } from 'lucide-react';
 import { SUB_CATEGORIES, SUB_CATEGORY_LABEL, SubCategory } from '@/components/finance/sub-category';
+import { TRANSACTION_TYPES, TRANSACTION_TYPE_LABEL, TRANSACTION_TYPE_STYLE, TransactionType } from '@/components/finance/transaction-type';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Row extends FinanceTransaction {
+    running_balance?: number | string | null;
+    position?: number | null;
     account: { id: number; name: string; currency: string } | null;
     remittance: { id: number; courier: string; soa_number: string } | null;
 }
@@ -39,6 +42,8 @@ interface Props {
             search?: string;
             type?: 'in' | 'out';
             account_id?: string | number;
+            transaction_type?: string;
+            sub_category?: string;
             missing_type?: string | boolean;
             expenses_missing_sub?: string | boolean;
         };
@@ -47,13 +52,6 @@ interface Props {
 
 const fmt = (v: number | string) => Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const TXN_TYPE_STYLE: Record<string, { label: string; cls: string }> = {
-    funds: { label: 'funds', cls: 'bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400' },
-    profit_share: { label: 'profit share', cls: 'bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400' },
-    expenses: { label: 'expenses', cls: 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400' },
-    transfer: { label: 'transfer', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-500/10 dark:text-slate-300' },
-    remittance: { label: 'remittance', cls: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' },
-};
 
 export default function TransactionsIndex({ workspace, transactions, accounts, query }: Props) {
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
@@ -64,11 +62,13 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
     const [search, setSearch] = useState(query?.filter?.search ?? '');
     const [typeFilter, setTypeFilter] = useState<'' | 'in' | 'out'>(query?.filter?.type ?? '');
     const [accountFilter, setAccountFilter] = useState<string>(query?.filter?.account_id != null ? String(query.filter.account_id) : '');
+    const [txnTypeFilter, setTxnTypeFilter] = useState<string>(query?.filter?.transaction_type ?? '');
+    const [subCategoryFilter, setSubCategoryFilter] = useState<string>(query?.filter?.sub_category ?? '');
     const boolish = (v: string | boolean | undefined) => v === true || v === '1' || v === 'true';
     const [missingType, setMissingType] = useState<boolean>(boolish(query?.filter?.missing_type));
     const [expensesMissingSub, setExpensesMissingSub] = useState<boolean>(boolish(query?.filter?.expenses_missing_sub));
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-    const [bulkType, setBulkType] = useState<'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance' | ''>('');
+    const [bulkType, setBulkType] = useState<TransactionType | ''>('');
     const [bulkSubCategory, setBulkSubCategory] = useState<SubCategory | ''>('');
     const [bulkProcessing, setBulkProcessing] = useState(false);
 
@@ -110,12 +110,14 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
     };
 
     const performQuery = useCallback(
-        debounce((s: string, t: '' | 'in' | 'out', a: string, mt: boolean, ems: boolean) => {
+        debounce((s: string, t: '' | 'in' | 'out', a: string, tt: string, sc: string, mt: boolean, ems: boolean) => {
             router.get(baseUrl, {
                 sort: query?.sort,
                 'filter[search]': s || undefined,
                 'filter[type]': t || undefined,
                 'filter[account_id]': a || undefined,
+                'filter[transaction_type]': tt || undefined,
+                'filter[sub_category]': sc || undefined,
                 'filter[missing_type]': mt ? 1 : undefined,
                 'filter[expenses_missing_sub]': ems ? 1 : undefined,
                 page: 1,
@@ -124,7 +126,7 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
         [baseUrl, query?.sort]
     );
 
-    useEffect(() => { performQuery(search, typeFilter, accountFilter, missingType, expensesMissingSub); return () => performQuery.cancel(); }, [search, typeFilter, accountFilter, missingType, expensesMissingSub, performQuery]);
+    useEffect(() => { performQuery(search, typeFilter, accountFilter, txnTypeFilter, subCategoryFilter, missingType, expensesMissingSub); return () => performQuery.cancel(); }, [search, typeFilter, accountFilter, txnTypeFilter, subCategoryFilter, missingType, expensesMissingSub, performQuery]);
 
     const columns: ColumnDef<Row>[] = [
         {
@@ -159,7 +161,7 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
         {
             accessorKey: 'date', enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Date" />,
-            cell: ({ row }) => <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">{String(row.original.date).slice(0, 10)}</span>,
+            cell: ({ row }) => <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">{row.original.date}</span>,
         },
         {
             id: 'account', header: () => <div className="font-mono text-[10px] uppercase tracking-wider text-gray-300">Account</div>,
@@ -170,7 +172,10 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
             header: () => <div className="font-mono text-[10px] uppercase tracking-wider text-gray-300">Description</div>,
             cell: ({ row }) => (
                 <div className="flex max-w-[320px] flex-col gap-0.5">
-                    <span className="truncate text-[12px] text-gray-800 dark:text-gray-100" title={row.original.description}>{row.original.description}</span>
+                    <span className="truncate text-[12px] text-gray-800 dark:text-gray-100" title={row.original.description}>
+                        <span className="font-mono text-[10px] text-gray-400 dark:text-gray-500">[{row.original.position ?? '—'}]</span>{' '}
+                        {row.original.description}
+                    </span>
                     {row.original.remittance && (
                         <span className="truncate text-[10px] text-gray-400">SOA {row.original.remittance.soa_number} · {row.original.remittance.courier}</span>
                     )}
@@ -182,10 +187,12 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
             header: ({ column }) => <SortableHeader column={column} title="Txn Type" className="justify-center" />,
             cell: ({ row }) => {
                 if (!row.original.transaction_type) return <div className="text-center font-mono text-[10px] text-gray-300">—</div>;
-                const s = TXN_TYPE_STYLE[row.original.transaction_type] ?? TXN_TYPE_STYLE.funds;
+                const key = row.original.transaction_type as TransactionType;
+                const s = TRANSACTION_TYPE_STYLE[key] ?? TRANSACTION_TYPE_STYLE.funds;
+                const label = TRANSACTION_TYPE_LABEL[key] ?? key;
                 return (
                     <div className="text-center">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${s.cls}`}>{s.label}</span>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${s.cls}`}>{label}</span>
                     </div>
                 );
             },
@@ -220,6 +227,18 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
             ),
         },
         {
+            id: 'running_balance',
+            header: () => <div className="text-right font-mono text-[10px] uppercase tracking-wider text-gray-300">Balance</div>,
+            cell: ({ row }) => {
+                const bal = Number(row.original.running_balance ?? 0);
+                return (
+                    <div className={`text-right font-mono text-[12px] font-semibold ${bal >= 0 ? 'text-gray-900 dark:text-gray-100' : 'text-red-500'}`}>
+                        {fmt(bal)}
+                    </div>
+                );
+            },
+        },
+        {
             id: 'actions',
             header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-300">Actions</div>,
             cell: ({ row }) => (
@@ -236,8 +255,8 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                                 date: String(row.original.date).slice(0, 10),
                                 description: row.original.description, type: row.original.type,
                                 transaction_type: row.original.transaction_type,
-                                amount: row.original.amount, sub_category: row.original.sub_category,
-                                notes: row.original.notes,
+                                amount: row.original.amount, position: row.original.position,
+                                sub_category: row.original.sub_category, notes: row.original.notes,
                             })}>
                                 <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                             </DropdownMenuItem>
@@ -289,6 +308,26 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                         <option value="">All accounts</option>
                         {accounts.map((a) => (
                             <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>
+                        ))}
+                    </select>
+                    <select
+                        value={txnTypeFilter}
+                        onChange={(e) => setTxnTypeFilter(e.target.value)}
+                        className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-2.5 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
+                    >
+                        <option value="">All txn types</option>
+                        {TRANSACTION_TYPES.map((t) => (
+                            <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                    </select>
+                    <select
+                        value={subCategoryFilter}
+                        onChange={(e) => setSubCategoryFilter(e.target.value)}
+                        className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-2.5 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
+                    >
+                        <option value="">All sub categories</option>
+                        {SUB_CATEGORIES.map((s) => (
+                            <option key={s.value} value={s.value}>{s.label}</option>
                         ))}
                     </select>
                     <div className="inline-flex h-9 overflow-hidden rounded-[10px] border border-black/6 bg-stone-100 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
@@ -349,11 +388,9 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                             className="h-8 rounded-lg border border-black/8 bg-white px-2 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
                         >
                             <option value="">— clear —</option>
-                            <option value="funds">Funds</option>
-                            <option value="profit_share">Profit Share</option>
-                            <option value="expenses">Expenses</option>
-                            <option value="transfer">Transfer</option>
-                            <option value="remittance">Remittance</option>
+                            {TRANSACTION_TYPES.map((t) => (
+                                <option key={t.value} value={t.value}>{t.label}</option>
+                            ))}
                         </select>
                         <button
                             onClick={applyBulkType}
@@ -407,6 +444,8 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                                     'filter[search]': search || undefined,
                                     'filter[type]': typeFilter || undefined,
                                     'filter[account_id]': accountFilter || undefined,
+                                    'filter[transaction_type]': txnTypeFilter || undefined,
+                                    'filter[sub_category]': subCategoryFilter || undefined,
                                     'filter[missing_type]': missingType ? 1 : undefined,
                                     'filter[expenses_missing_sub]': expensesMissingSub ? 1 : undefined,
                                     page: params?.page ?? 1,

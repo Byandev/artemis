@@ -29,6 +29,7 @@ use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Modules\Finance\Http\Controllers\AccountController as FinanceAccountController;
 use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardController;
+use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
@@ -219,6 +220,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::prefix('/workspaces/{workspace:slug}/finance')->name('workspaces.finance.')->group(function () {
         Route::get('/dashboard', FinanceDashboardController::class)->name('dashboard');
+        Route::get('/expenses', FinanceExpensesController::class)->name('expenses');
 
         Route::get('/accounts', [FinanceAccountController::class, 'index'])->name('accounts.index');
         Route::post('/accounts', [FinanceAccountController::class, 'store'])->name('accounts.store');

@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Field, Footer, inputCls } from '@/components/finance/account-form-dialog';
 import { SUB_CATEGORIES, SubCategory } from '@/components/finance/sub-category';
+import { TRANSACTION_TYPES, TransactionType } from '@/components/finance/transaction-type';
 import { useForm } from '@inertiajs/react';
 import React, { useEffect } from 'react';
 
@@ -10,8 +11,10 @@ export interface FinanceTransaction {
     date: string;
     description: string;
     type: 'in' | 'out';
-    transaction_type: 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance' | null;
+    transaction_type: TransactionType | null;
     amount: number | string;
+    running_balance?: number | string | null;
+    position?: number | null;
     sub_category: SubCategory | null;
     notes: string | null;
 }
@@ -37,8 +40,10 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
         date: today(),
         description: '',
         type: 'in' as 'in' | 'out',
-        transaction_type: 'funds' as 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance',
+        transaction_type: 'funds' as TransactionType,
         amount: '',
+        running_balance: '',
+        position: '',
         sub_category: '' as SubCategory | '',
         notes: '',
     });
@@ -53,6 +58,8 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
                     type: transaction.type,
                     transaction_type: transaction.transaction_type ?? 'funds',
                     amount: String(transaction.amount ?? ''),
+                    running_balance: String(transaction.running_balance ?? ''),
+                    position: String(transaction.position ?? ''),
                     sub_category: transaction.sub_category ?? '',
                     notes: transaction.notes ?? '',
                 });
@@ -119,14 +126,12 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
                         <Field label="Transaction Type" required error={errors.transaction_type}>
                             <select
                                 value={data.transaction_type}
-                                onChange={(e) => setData('transaction_type', e.target.value as 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance')}
+                                onChange={(e) => setData('transaction_type', e.target.value as TransactionType)}
                                 className={inputCls}
                             >
-                                <option value="funds">Funds</option>
-                                <option value="profit_share">Profit Share</option>
-                                <option value="expenses">Expenses</option>
-                                <option value="transfer">Transfer</option>
-                                <option value="remittance">Remittance</option>
+                                {TRANSACTION_TYPES.map((t) => (
+                                    <option key={t.value} value={t.value}>{t.label}</option>
+                                ))}
                             </select>
                         </Field>
 
@@ -137,6 +142,15 @@ export function TransactionFormDialog({ open, onOpenChange, transaction, account
                         <div className="grid grid-cols-2 gap-3">
                             <Field label="Amount" required error={errors.amount}>
                                 <input type="number" step="0.01" min="0" value={data.amount} onChange={(e) => setData('amount', e.target.value)} className={inputCls} />
+                            </Field>
+                            <Field label="Running Balance" error={errors.running_balance}>
+                                <input type="number" step="0.01" value={data.running_balance} onChange={(e) => setData('running_balance', e.target.value)} placeholder="Optional" className={inputCls} />
+                            </Field>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <Field label="Position" error={errors.position}>
+                                <input type="number" min="1" step="1" value={data.position} onChange={(e) => setData('position', e.target.value)} placeholder="Auto" className={inputCls} />
                             </Field>
                             <Field label="Sub Category" error={errors.sub_category}>
                                 <select
