@@ -202,7 +202,7 @@ export default function Partnership() {
                                             {[
                                                 { n: '1st', l: 'Mover advantage', s: 'No competitors in PH COD analytics' },
                                                 { n: '47', l: 'Pages tracked', s: 'Active seller pages on the platform' },
-                                                { n: '268M+', l: 'Parcels tracked', s: 'Delivered + returned across all pages' },
+                                                { n: '15.86%', l: 'Avg RTS rate tracked', s: 'Across all monitored pages' },
                                                 { n: '306K+', l: 'Notifications sent', s: 'SMS + Chat parcel journey alerts' },
                                             ].map((c, ci) => (
                                                 <Reveal key={c.l} active={a === 2} delay={300 + ci * 100}>
