@@ -2,15 +2,13 @@
 
 namespace Modules\Pancake\Models;
 
+use App\Models\CallLog;
 use App\Models\Page;
 use App\Models\Shop;
 use Illuminate\Database\Eloquent\Model;
 
 class OrderForDelivery extends Model
 {
-    /**
-     * The attributes that are mass assignable.
-     */
     protected $guarded = [];
 
     protected $table = 'pancake_order_for_delivery';
@@ -38,5 +36,15 @@ class OrderForDelivery extends Model
     public function assignee(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class, 'assignee_id');
+    }
+
+    public function customerCallLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(CallLog::class, 'phone_number', 'customer_number');
+    }
+
+    public function riderCallLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(CallLog::class, 'phone_number', 'rider_phone');
     }
 }
