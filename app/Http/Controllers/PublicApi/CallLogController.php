@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Models\OrderForDelivery;
 
 class CallLogController extends Controller
@@ -47,6 +48,9 @@ class CallLogController extends Controller
         $matched = 0;
         $unmatched = 0;
 
+        // Accumulate updates per delivery ID to avoid N queries per call log
+        $pendingUpdates = []; // delivery_id => [customer_call_attempts, customer_call_duration, customer_last_call, rider_call_attempts, rider_call_duration, rider_last_call]
+
         foreach ($request->input('call_logs') as $log) {
             $phone = $log['phone_number'];
             $duration = $log['duration'];
@@ -55,9 +59,24 @@ class CallLogController extends Controller
             // Match against customer phones
             if (isset($customerMap[$phone])) {
                 foreach ($customerMap[$phone] as $delivery) {
-                    $delivery->increment('customer_call_attempts');
-                    $delivery->increment('customer_call_duration', $duration);
-                    $delivery->update(['customer_last_call' => $calledAt]);
+                    $id = $delivery->id;
+                    if (! isset($pendingUpdates[$id])) {
+                        $pendingUpdates[$id] = [
+                            'customer_call_attempts' => 0,
+                            'customer_call_duration' => 0,
+                            'customer_last_call' => null,
+                            'rider_call_attempts' => 0,
+                            'rider_call_duration' => 0,
+                            'rider_last_call' => null,
+                        ];
+                    }
+                    $pendingUpdates[$id]['customer_call_attempts']++;
+                    $pendingUpdates[$id]['customer_call_duration'] += $duration;
+
+                    $existing = $pendingUpdates[$id]['customer_last_call'];
+                    if (! $existing || $calledAt->greaterThan($existing)) {
+                        $pendingUpdates[$id]['customer_last_call'] = $calledAt;
+                    }
                 }
                 $matched++;
 
@@ -67,9 +86,24 @@ class CallLogController extends Controller
             // Match against rider phones
             if (isset($riderMap[$phone])) {
                 foreach ($riderMap[$phone] as $delivery) {
-                    $delivery->increment('rider_call_attempts');
-                    $delivery->increment('rider_call_duration', $duration);
-                    $delivery->update(['rider_last_call' => $calledAt]);
+                    $id = $delivery->id;
+                    if (! isset($pendingUpdates[$id])) {
+                        $pendingUpdates[$id] = [
+                            'customer_call_attempts' => 0,
+                            'customer_call_duration' => 0,
+                            'customer_last_call' => null,
+                            'rider_call_attempts' => 0,
+                            'rider_call_duration' => 0,
+                            'rider_last_call' => null,
+                        ];
+                    }
+                    $pendingUpdates[$id]['rider_call_attempts']++;
+                    $pendingUpdates[$id]['rider_call_duration'] += $duration;
+
+                    $existing = $pendingUpdates[$id]['rider_last_call'];
+                    if (! $existing || $calledAt->greaterThan($existing)) {
+                        $pendingUpdates[$id]['rider_last_call'] = $calledAt;
+                    }
                 }
                 $matched++;
 
@@ -77,6 +111,35 @@ class CallLogController extends Controller
             }
 
             $unmatched++;
+        }
+
+        // Flush accumulated updates — one query per delivery instead of 3 per call log
+        foreach ($pendingUpdates as $deliveryId => $updates) {
+            $data = [];
+
+            if ($updates['customer_call_attempts'] > 0) {
+                $data['customer_call_attempts'] = DB::raw(
+                    'customer_call_attempts + '.(int) $updates['customer_call_attempts']
+                );
+                $data['customer_call_duration'] = DB::raw(
+                    'customer_call_duration + '.(int) $updates['customer_call_duration']
+                );
+                $data['customer_last_call'] = $updates['customer_last_call'];
+            }
+
+            if ($updates['rider_call_attempts'] > 0) {
+                $data['rider_call_attempts'] = DB::raw(
+                    'rider_call_attempts + '.(int) $updates['rider_call_attempts']
+                );
+                $data['rider_call_duration'] = DB::raw(
+                    'rider_call_duration + '.(int) $updates['rider_call_duration']
+                );
+                $data['rider_last_call'] = $updates['rider_last_call'];
+            }
+
+            if (! empty($data)) {
+                OrderForDelivery::where('id', $deliveryId)->update($data);
+            }
         }
 
         return response()->json([
