@@ -90,7 +90,7 @@ const Sequences = ({ workspace }: {workspace: Workspace}) => {
 
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - Botcake Flows`} />
+            <Head title={`${workspace.name} - Botcake Sequences`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader title="Sequences" description="Schedule and manage automated message sequences" />
 
