@@ -21,8 +21,8 @@ return new class extends Migration
             $table->unsignedBigInteger('total_phone_number')->default(0);
             $table->timestamps();
 
-            $table->unique(['sequence_message_id', 'date']);
-            $table->index('date');
+            $table->unique(['sequence_message_id', 'date'], 'botcake_seq_msg_daily_unique');
+            $table->index('date', 'botcake_seq_msg_daily_date_idx');
         });
     }
 
