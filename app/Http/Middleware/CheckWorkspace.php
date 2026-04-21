@@ -18,6 +18,22 @@ class CheckWorkspace
     {
         $workspace_id = $request->header('X-Workspace-Id');
 
+        // Fallback to route-bound workspace for URL-scoped routes.
+        if (! $workspace_id) {
+            $routeWorkspace = $request->route('workspace');
+
+            if ($routeWorkspace instanceof Workspace) {
+                $workspace_id = $routeWorkspace->id;
+            } elseif (! empty($routeWorkspace)) {
+                $workspace_id = $routeWorkspace;
+            }
+        }
+
+        // Fallback to the user's active workspace in session.
+        if (! $workspace_id) {
+            $workspace_id = session('current_workspace_id');
+        }
+
         if (! $workspace_id) {
             return response()->json([
                 'success' => false,
