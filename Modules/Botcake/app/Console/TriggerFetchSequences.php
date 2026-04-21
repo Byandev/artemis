@@ -11,7 +11,14 @@ class TriggerFetchSequences extends Command
     /**
      * The name and signature of the console command.
      */
-    protected $signature = 'trigger-fetch-sequences';
+    protected $signature = 'botcake:trigger-fetch-sequences';
+
+    /**
+     * The console command aliases.
+     *
+     * @var array<int, string>
+     */
+    protected $aliases = ['trigger-fetch-sequences'];
 
     /**
      * The console command description.
