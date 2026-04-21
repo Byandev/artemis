@@ -76,7 +76,7 @@ class InventoryTransactionController extends Controller
         $workspace->inventoryTransactions()->create($validated);
 
         return redirect()->back()->with('success', 'Entry created successfully.');
-    }
+    } 
 
     public function update(Request $request, Workspace $workspace, InventoryTransaction $transaction)
     {
