@@ -85,7 +85,7 @@ readonly class SyncParcelTrackingAction
                         'conferrer_id'    => $savedOrder->confirmed_by,
                         'status'          => 'PENDING',
                         'customer_name'   => $shippingAddress?->full_name,
-                        'customer_number' => $shippingAddress?->phone_number,
+                        'customer_phone' => $shippingAddress?->phone_number,
                         'created_at'      => $update['updated_at'],
                     ]
                 );

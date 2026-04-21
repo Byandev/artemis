@@ -9,6 +9,6 @@ class CallLog extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'called_at' => 'datetime',
+        'call_date' => 'date',
     ];
 }

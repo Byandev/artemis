@@ -40,11 +40,17 @@ class OrderForDelivery extends Model
 
     public function customerCallLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(CallLog::class, 'phone_number', 'customer_number');
+        return $this->hasMany(CallLog::class, 'phone_number', 'customer_phone')
+            ->whereColumn('call_logs.user_id', 'pancake_order_for_delivery.assignee_id')
+            ->whereColumn('call_logs.workspace_id', 'pancake_order_for_delivery.workspace_id')
+            ->whereColumn('call_logs.call_date', 'pancake_order_for_delivery.delivery_date');
     }
 
     public function riderCallLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(CallLog::class, 'phone_number', 'rider_phone');
+        return $this->hasMany(CallLog::class, 'phone_number', 'rider_phone')
+            ->whereColumn('call_logs.user_id', 'pancake_order_for_delivery.assignee_id')
+            ->whereColumn('call_logs.workspace_id', 'pancake_order_for_delivery.workspace_id')
+            ->whereColumn('call_logs.call_date', 'pancake_order_for_delivery.delivery_date');
     }
 }

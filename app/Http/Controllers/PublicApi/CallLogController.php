@@ -25,16 +25,33 @@ class CallLogController extends Controller
         $workspace = $request->attributes->get('workspace');
         $now = now();
 
-        $rows = array_map(fn ($log) => [
-            'workspace_id' => $workspace->id,
-            'user_id' => $request->input('user_id'),
-            'phone_number' => $log['phone_number'],
-            'type' => $log['type'],
-            'duration' => $log['duration'],
-            'called_at' => Carbon::parse($log['timestamp']),
-            'created_at' => $now,
-            'updated_at' => $now,
-        ], $request->input('call_logs'));
+//        $rows = array_map(fn ($log) => [
+//            'workspace_id' => $workspace->id,
+//            'user_id' => $request->input('user_id'),
+//            'phone_number' => $log['phone_number'],
+//            'type' => $log['type'],
+//            'duration' => $log['duration'],
+//            'called_at' => Carbon::parse($log['timestamp']),
+//            'created_at' => $now,
+//            'updated_at' => $now,
+//        ], $request->input('call_logs'));
+
+        $rows = array_map(function ($log) use ($workspace, $request, $now) {
+            $timestamp = Carbon::parse($log['timestamp']);
+
+            return [
+                'workspace_id' => $workspace->id,
+                'user_id' => $request->input('user_id'),
+                'phone_number' => $log['phone_number'],
+                'type' => $log['type'],
+                'duration' => $log['duration'],
+                'call_date' => $timestamp->toDateString(),
+                'call_time' => $timestamp->toTimeString(),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+
+        }, $request->input('call_logs'));
 
         foreach (array_chunk($rows, 500) as $chunk) {
             CallLog::insert($chunk);
@@ -53,9 +70,11 @@ class CallLogController extends Controller
 
         $workspace = $request->attributes->get('workspace');
 
+        $date = $request->input('date', now()->toDateString());
+
         $deliveries = OrderForDelivery::where('workspace_id', $workspace->id)
             ->where('assignee_id', $request->input('user_id'))
-            ->whereDate('delivery_date', $request->input('date', now()->toDateString()))
+            ->whereDate('delivery_date', $date)
             ->withCount(['customerCallLogs', 'riderCallLogs'])
             ->get();
 
@@ -65,12 +84,18 @@ class CallLogController extends Controller
         $totalCalled = $deliveries->filter(fn ($d) => $d->customer_call_logs_count > 0 || $d->rider_call_logs_count > 0)->count();
         $totalAttempts = $deliveries->sum('customer_call_logs_count') + $deliveries->sum('rider_call_logs_count');
 
+        $totalTalkTime = CallLog::where('workspace_id', $workspace->id)
+            ->where('user_id', $request->input('user_id'))
+            ->whereDate('call_date', $date)
+            ->sum('duration');
+
         return response()->json([
             'total_called' => $totalCalled,
             'total_orders' => $totalOrders,
             'riders_called' => $ridersCalled,
             'customers_called' => $customersCalled,
             'total_attempts' => $totalAttempts,
+            'total_talk_time' => (int) $totalTalkTime,
         ]);
     }
 }
