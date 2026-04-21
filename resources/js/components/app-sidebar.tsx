@@ -40,6 +40,7 @@ import {
     ArrowLeftRight,
     Send,
     PieChart,
+    MessageSquare,
 } from 'lucide-react';
 import { useState } from 'react';
 import AppLogo from './app-logo';
@@ -81,6 +82,22 @@ export function AppSidebar() {
             title: 'Checklist',
             href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/checklist`,
             icon: ListChecks,
+        },
+        {
+            title: 'Botcake',
+            icon: MessageSquare,
+            items: [
+                {
+                    title: 'Sequences',
+                    href: `/workspaces/${currentWorkspace.slug}/botcake/sequences`,
+                    icon: MessageSquare,
+                },
+                {
+                    title: 'Flows',
+                    href: `/workspaces/${currentWorkspace.slug}/botcake/flows`,
+                    icon: ClipboardList,
+                },
+            ],
         },
         {
             title: 'CSR',
@@ -174,23 +191,6 @@ export function AppSidebar() {
                   },
               ]
             : []),
-        {
-            title: 'RTS',
-            icon: RotateCcw,
-            items: [
-                {
-                    title: 'Analytics',
-                    href: `/workspaces/${currentWorkspace.slug}/rts/analytics`,
-                    icon: BarChart2,
-                },
-                {
-                    title: 'Parcel Journey',
-                    href: `/workspaces/${currentWorkspace.slug}/rts/parcel-journeys`,
-                    icon: MapPin,
-                },
-            ],
-        },
-
         {
             title: 'Settings',
             href: `/settings`,
