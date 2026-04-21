@@ -12,6 +12,11 @@ class Flow extends Model
 
     protected $table = 'botcake_flows';
 
+    public function dailyStats(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(FlowDailyStat::class);
+    }
+
     public function page(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Page::class);
