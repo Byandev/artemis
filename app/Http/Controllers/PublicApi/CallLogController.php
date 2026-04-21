@@ -25,17 +25,6 @@ class CallLogController extends Controller
         $workspace = $request->attributes->get('workspace');
         $now = now();
 
-//        $rows = array_map(fn ($log) => [
-//            'workspace_id' => $workspace->id,
-//            'user_id' => $request->input('user_id'),
-//            'phone_number' => $log['phone_number'],
-//            'type' => $log['type'],
-//            'duration' => $log['duration'],
-//            'called_at' => Carbon::parse($log['timestamp']),
-//            'created_at' => $now,
-//            'updated_at' => $now,
-//        ], $request->input('call_logs'));
-
         $rows = array_map(function ($log) use ($workspace, $request, $now) {
             $timestamp = Carbon::parse($log['timestamp']);
 
