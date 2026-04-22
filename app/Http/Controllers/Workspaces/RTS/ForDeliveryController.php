@@ -15,6 +15,7 @@ use App\Http\Sorts\Order\ForDelivery\OrderParcelStatusSort;
 use App\Http\Sorts\Order\ForDelivery\OrderTrackingCodeSort;
 use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
 use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
+use App\Models\CallLog;
 use App\Models\Page;
 use App\Models\Workspace;
 use Carbon\Carbon;
@@ -402,7 +403,7 @@ class ForDeliveryController extends Controller
             'date' => ['required', 'date'],
         ]);
 
-        $logs = \App\Models\CallLog::where('workspace_id', $workspace->id)
+        $logs = CallLog::where('workspace_id', $workspace->id)
             ->where('phone_number', $request->input('phone_number'))
             ->whereDate('call_date', $request->input('date'))
             ->orderBy('call_time', 'desc')

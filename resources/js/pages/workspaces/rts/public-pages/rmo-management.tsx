@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FormModal from './formModal';
+import { CallLog } from '@/types/models/CallLog';
 
 interface Props {
     orders: PaginatedData<OrderForDelivery>;
@@ -114,16 +115,6 @@ function EditablePhone({ value, onSave }: { value: string; onSave: (v: string) =
     );
 }
 
-interface CallLogEntry {
-    id: number;
-    user_id: string;
-    phone_number: string;
-    type: string;
-    duration: number;
-    call_date: string;
-    call_time: string;
-}
-
 function CallLogModal({
     open,
     onOpenChange,
@@ -141,7 +132,7 @@ function CallLogModal({
     workspaceSlug: string;
     date: string;
 }) {
-    const [logs, setLogs] = useState<CallLogEntry[]>([]);
+    const [logs, setLogs] = useState<CallLog[]>([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -1006,7 +997,13 @@ export default function RmoManagement({
                         data={orders.data || []}
                         initialSorting={initialSorting}
                         meta={{ ...omit(orders, ['data']) }}
-                        onFetch={(params) => {
+                        onFetch={(paramsid: number;
+                            user_id: string;
+                            phone_number: string;
+                            type: string;
+                            duration: number;
+                            call_date: string;
+                            call_time: string;) => {
                             router.get(
                                 publicPage.rmoManagement({ workspace }),
                                 buildAllParams(
