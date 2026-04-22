@@ -22,16 +22,25 @@ class SyncCsrRmoDailyRecords extends Command
 
         $this->info("Syncing RMO CSR daily records for {$date}...");
 
-        $rows = DB::table('pancake_order_for_delivery')
-            ->whereNotNull('caller_id')
-            ->where('delivery_date', $date)
-            ->groupBy('workspace_id', 'caller_id')
-            ->selectRaw("
-                workspace_id,
-                caller_id AS pancake_user_id,
-                SUM(CASE WHEN status <> 'PENDING' THEN 1 ELSE 0 END) AS total_called,
-                COALESCE(SUM(customer_call_duration), 0) + COALESCE(SUM(rider_call_duration), 0) AS total_call_time
-            ")
+        $rows = DB::table('pancake_order_for_delivery AS ofd')
+            ->whereNotNull('ofd.assignee_id')
+            ->where('ofd.delivery_date', $date)
+            ->groupBy('ofd.workspace_id', 'ofd.assignee_id')
+            ->selectRaw('
+                ofd.workspace_id,
+                ofd.assignee_id AS pancake_user_id,
+                SUM(
+                    CASE WHEN EXISTS (
+                        SELECT 1
+                        FROM call_logs cl
+                        WHERE cl.workspace_id = ofd.workspace_id
+                          AND cl.user_id = ofd.assignee_id
+                          AND cl.call_date = ofd.delivery_date
+                          AND cl.phone_number IN (ofd.rider_phone, ofd.customer_phone)
+                    ) THEN 1 ELSE 0 END
+                ) AS total_called,
+                COALESCE(SUM(ofd.customer_call_duration), 0) + COALESCE(SUM(ofd.rider_call_duration), 0) AS total_call_time
+            ')
             ->get();
 
         $count = $rows->each(function ($row) use ($date) {
