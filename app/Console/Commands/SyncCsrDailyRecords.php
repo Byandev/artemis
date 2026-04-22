@@ -2,83 +2,40 @@
 
 namespace App\Console\Commands;
 
-use App\Models\PancakeUserPosDailyReport;
+use App\Models\Workspace;
+use App\Support\AnalyticsRollup\CsrPosRollupBuilder;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 class SyncCsrDailyRecords extends Command
 {
     protected $signature = 'sync:csr-daily-records
-                            {--date= : Target date in Y-m-d format (defaults to yesterday)}';
+                            {--date= : Target date in Y-m-d format (defaults to yesterday)}
+                            {--trailing-days=1 : Rebuild this many days back from the target date}';
 
-    protected $description = 'Aggregate per-CSR POS order metrics for a given date and upsert into pancake_user_pos_daily_reports.';
+    protected $description = 'Rebuild per-CSR POS rollup rows. Thin wrapper over the analytics rollup builder; prefer `analytics:rollup --only=csr_pos`.';
 
-    public function handle(): int
+    public function handle(CsrPosRollupBuilder $builder): int
     {
-        $date = $this->option('date')
-            ? CarbonImmutable::parse($this->option('date'))->toDateString()
-            : CarbonImmutable::yesterday()->toDateString();
+        $target = $this->option('date')
+            ? CarbonImmutable::parse($this->option('date'))
+            : CarbonImmutable::yesterday();
 
-        $start = $date.' 00:00:00';
-        $end = $date.' 23:59:59';
+        $trailing = max(1, (int) $this->option('trailing-days'));
+        $from = $target->subDays($trailing - 1)->toDateString();
+        $to = $target->toDateString();
 
-        $this->info("Syncing POS CSR daily records for {$date}...");
+        $this->info("Syncing POS CSR daily rollup from {$from} to {$to}.");
 
-        $rows = DB::table('pancake_orders as po')
-            ->join('pancake_users as pu', 'pu.id', '=', 'po.confirmed_by')
-            ->where(function ($q) use ($start, $end) {
-                $q->where(fn ($q) => $q->where('po.status', 3)->whereBetween('po.delivered_at', [$start, $end]))
-                    ->orWhere(fn ($q) => $q->whereIn('po.status', [4, 5])->whereBetween('po.returning_at', [$start, $end]))
-                    ->orWhereBetween('po.confirmed_at', [$start, $end]);
-            })
-            ->groupBy('po.workspace_id', 'pu.id')
-            ->selectRaw('
-                po.workspace_id,
-                pu.id                                                                                    AS pancake_user_id,
-                SUM(po.confirmed_at BETWEEN ? AND ?)                                                     AS total_orders,
-                SUM(CASE WHEN po.confirmed_at BETWEEN ? AND ? THEN po.final_amount ELSE 0 END)           AS total_sales,
-                SUM(po.status IN (4,5) AND po.returning_at BETWEEN ? AND ?)                              AS returning_count,
-                SUM(CASE WHEN po.status IN (4,5) AND po.returning_at BETWEEN ? AND ? THEN po.final_amount ELSE 0 END) AS returning,
-                SUM(po.status = 3 AND po.delivered_at BETWEEN ? AND ?)                                   AS delivered_count,
-                SUM(CASE WHEN po.status = 3 AND po.delivered_at BETWEEN ? AND ? THEN po.final_amount ELSE 0 END)      AS delivered,
-                ROUND(
-                    SUM(po.status IN (4,5) AND po.returning_at BETWEEN ? AND ?) * 100.0
-                    / NULLIF(
-                        SUM(po.status = 3   AND po.delivered_at  BETWEEN ? AND ?)
-                      + SUM(po.status IN (4,5) AND po.returning_at BETWEEN ? AND ?), 0),
-                2)                                                                                        AS rts_rate
-            ', [
-                $start, $end,
-                $start, $end,
-                $start, $end,
-                $start, $end,
-                $start, $end,
-                $start, $end,
-                $start, $end,
-                $start, $end,
-                $start, $end,
-            ])
-            ->get();
+        $count = 0;
+        Workspace::query()->select('id')->orderBy('id')->chunkById(50, function ($workspaces) use ($builder, $from, $to, &$count) {
+            foreach ($workspaces as $workspace) {
+                $builder->forDateRange($workspace->id, $from, $to);
+                $count++;
+            }
+        });
 
-        $count = $rows->each(function ($row) use ($date) {
-            PancakeUserPosDailyReport::updateOrCreate(
-                [
-                    'workspace_id' => $row->workspace_id,
-                    'pancake_user_id' => $row->pancake_user_id,
-                    'date' => $date,
-                ],
-                [
-                    'total_orders' => (int) $row->total_orders,
-                    'total_sales' => (float) $row->total_sales,
-                    'returning' => (float) $row->returning,
-                    'delivered' => (float) $row->delivered,
-                    'rts_rate' => (float) $row->rts_rate,
-                ]
-            );
-        })->count();
-
-        $this->info("Synced {$count} POS CSR daily record(s) for {$date}.");
+        $this->info("Done. Processed {$count} workspace(s).");
 
         return self::SUCCESS;
     }
