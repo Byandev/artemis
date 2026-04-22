@@ -7,11 +7,6 @@ use Illuminate\Support\Facades\DB;
 
 trait ReadsRollup
 {
-    protected function useRollup(string $key): bool
-    {
-        return (bool) config("analytics.use_rollup.{$key}", false);
-    }
-
     protected function rollupBaseQuery(int $workspaceId, array $dateRange, array $filter): Builder
     {
         $pageIds = ! empty($filter['page_ids'])
