@@ -66,6 +66,24 @@ class ForDeliveryController extends Controller
         return redirect()->back()->with('success', 'Assignee updated successfully' . $request->userId);
     }
 
+    public function publicUpdatePhones(Workspace $workspace, $id, Request $request)
+    {
+        $orderForDelivery = OrderForDelivery::find($id);
+
+        if (! $orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        $data = $request->validate([
+            'customer_phone' => ['nullable', 'string'],
+            'rider_phone' => ['nullable', 'string'],
+        ]);
+
+        $orderForDelivery->update($data);
+
+        return redirect()->back()->with('success', 'Phone numbers updated successfully');
+    }
+
     public function publicRemoveAssignee(Workspace $workspace, $id)
     {
         $orderForDelivery = OrderForDelivery::find($id);
