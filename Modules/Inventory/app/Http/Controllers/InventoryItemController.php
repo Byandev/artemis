@@ -48,7 +48,7 @@ class InventoryItemController extends Controller
                     ELSE NULL
                 END as days_it_can_last,
 
-                GREATEST(0, (lead_time * three_days_average) - COALESCE($waitingStocksSql, 0)) as po_needed
+                GREATEST(0, (lead_time * three_days_average) - COALESCE($waitingStocksSql, 0) - COALESCE($currentStocksSql, 0)) as po_needed
             ")
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
