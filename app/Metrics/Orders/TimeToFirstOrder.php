@@ -120,12 +120,12 @@ final class TimeToFirstOrder
     private function rollupBase(int $workspaceId, array $dateRange)
     {
         return DB::table('workspace_customer_facts')
-            ->where('workspace_id', $workspaceId)
-            ->whereBetween('first_confirmed_at', [
+            ->where('workspace_customer_facts.workspace_id', $workspaceId)
+            ->whereBetween('workspace_customer_facts.first_confirmed_at', [
                 $dateRange['start_date'].' 00:00:00',
                 $dateRange['end_date'].' 23:59:59',
             ])
-            ->whereNotNull('customer_created_at');
+            ->whereNotNull('workspace_customer_facts.customer_created_at');
     }
 
     private function hasEntityFilter(array $filter): bool

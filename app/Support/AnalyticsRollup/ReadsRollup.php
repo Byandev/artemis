@@ -17,8 +17,8 @@ trait ReadsRollup
             : null;
 
         return DB::table('workspace_daily_metrics')
-            ->where('workspace_id', $workspaceId)
-            ->whereBetween('date', [$dateRange['start_date'], $dateRange['end_date']])
+            ->where('workspace_daily_metrics.workspace_id', $workspaceId)
+            ->whereBetween('workspace_daily_metrics.date', [$dateRange['start_date'], $dateRange['end_date']])
             ->when($pageIds, fn ($q) => $q->whereIn('workspace_daily_metrics.page_id', $pageIds))
             ->when($shopIds, function ($q) use ($shopIds) {
                 $q->whereIn('workspace_daily_metrics.page_id', function ($sub) use ($shopIds) {
