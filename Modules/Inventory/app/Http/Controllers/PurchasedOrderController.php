@@ -51,29 +51,29 @@ class PurchasedOrderController extends Controller
     public function store(Request $request, Workspace $workspace)
     {
         $request->validate([
-            'issue_date'    => 'required|date_format:Y-m-d|date',
-            'delivery_no'   => 'nullable|string|max:255',
-            'cust_po_no'    => 'nullable|string|max:255',
-            'control_no'    => 'nullable|string|max:255',
-            'delivery_fee'  => 'required|numeric|min:0',
-            'total_amount'  => 'required|numeric|min:0',
-            'status'        => 'required|integer|in:1,2,3,4,5,6,7,8',
-            'items'         => 'required|array|min:1',
+            'issue_date' => 'required|date_format:Y-m-d|date',
+            'delivery_no' => 'nullable|string|max:255',
+            'cust_po_no' => 'nullable|string|max:255',
+            'control_no' => 'nullable|string|max:255',
+            'delivery_fee' => 'required|numeric|min:0',
+            'total_amount' => 'required|numeric|min:0',
+            'status' => 'required|integer|in:1,2,3,4,5,6,7,8',
+            'items' => 'required|array|min:1',
             'items.*.inventory_item_id' => 'required|exists:inventory_items,id',
-            'items.*.count'             => 'required|integer|min:1',
-            'items.*.amount'            => 'required|numeric|min:0',
-            'items.*.total_amount'      => 'required|numeric|min:0',
+            'items.*.count' => 'required|integer|min:1',
+            'items.*.amount' => 'required|numeric|min:0',
+            'items.*.total_amount' => 'required|numeric|min:0',
         ]);
 
         $order = PurchasedOrder::create([
             'workspace_id' => $workspace->id,
-            'issue_date'   => $request->issue_date,
-            'delivery_no'  => $request->delivery_no,
-            'cust_po_no'   => $request->cust_po_no,
-            'control_no'   => $request->control_no,
+            'issue_date' => $request->issue_date,
+            'delivery_no' => $request->delivery_no,
+            'cust_po_no' => $request->cust_po_no,
+            'control_no' => $request->control_no,
             'delivery_fee' => $request->delivery_fee,
             'total_amount' => $request->total_amount,
-            'status'       => $request->status,
+            'status' => $request->status,
         ]);
 
         foreach ($request->items as $item) {
@@ -96,28 +96,28 @@ class PurchasedOrderController extends Controller
     public function update(Request $request, Workspace $workspace, PurchasedOrder $purchasedOrder)
     {
         $request->validate([
-            'issue_date'    => 'required|date_format:Y-m-d|date',
-            'delivery_no'   => 'nullable|string|max:255',
-            'cust_po_no'    => 'nullable|string|max:255',
-            'control_no'    => 'nullable|string|max:255',
-            'delivery_fee'  => 'required|numeric|min:0',
-            'total_amount'  => 'required|numeric|min:0',
-            'status'        => 'required|integer|in:1,2,3,4,5,6,7,8',
-            'items'         => 'required|array|min:1',
+            'issue_date' => 'required|date_format:Y-m-d|date',
+            'delivery_no' => 'nullable|string|max:255',
+            'cust_po_no' => 'nullable|string|max:255',
+            'control_no' => 'nullable|string|max:255',
+            'delivery_fee' => 'required|numeric|min:0',
+            'total_amount' => 'required|numeric|min:0',
+            'status' => 'required|integer|in:1,2,3,4,5,6,7,8',
+            'items' => 'required|array|min:1',
             'items.*.inventory_item_id' => 'required|exists:inventory_items,id',
-            'items.*.count'             => 'required|integer|min:1',
-            'items.*.amount'            => 'required|numeric|min:0',
-            'items.*.total_amount'      => 'required|numeric|min:0',
+            'items.*.count' => 'required|integer|min:1',
+            'items.*.amount' => 'required|numeric|min:0',
+            'items.*.total_amount' => 'required|numeric|min:0',
         ]);
 
         $purchasedOrder->update([
-            'issue_date'   => $request->issue_date,
-            'delivery_no'  => $request->delivery_no,
-            'cust_po_no'   => $request->cust_po_no,
-            'control_no'   => $request->control_no,
+            'issue_date' => $request->issue_date,
+            'delivery_no' => $request->delivery_no,
+            'cust_po_no' => $request->cust_po_no,
+            'control_no' => $request->control_no,
             'delivery_fee' => $request->delivery_fee,
             'total_amount' => $request->total_amount,
-            'status'       => $request->status,
+            'status' => $request->status,
         ]);
 
         $purchasedOrder->items()->delete();

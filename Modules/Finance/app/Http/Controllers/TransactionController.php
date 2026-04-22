@@ -149,7 +149,7 @@ class TransactionController extends Controller
         $positionCounters = [];
         $now = now();
         $records = collect($validated['rows'])->map(function ($r) use ($workspace, &$positionCounters, $now) {
-            $key = $r['account_id'] . '|' . $r['date'];
+            $key = $r['account_id'].'|'.$r['date'];
             if (! isset($positionCounters[$key])) {
                 $positionCounters[$key] = Transaction::where('workspace_id', $workspace->id)
                     ->where('account_id', $r['account_id'])

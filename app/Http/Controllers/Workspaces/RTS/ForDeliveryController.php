@@ -17,6 +17,7 @@ use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
 use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Models\Page;
 use App\Models\Workspace;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -36,7 +37,7 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
             return redirect()->back()->with('error', 'Status can only be updated for orders scheduled for delivery today.');
         }
 
@@ -53,7 +54,7 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
             return redirect()->back()->with('error', 'Assignee can only be updated for orders scheduled for delivery today.');
         }
 
@@ -63,7 +64,7 @@ class ForDeliveryController extends Controller
 
         $orderForDelivery->update(['assignee_id' => $request->userId]);
 
-        return redirect()->back()->with('success', 'Assignee updated successfully' . $request->userId);
+        return redirect()->back()->with('success', 'Assignee updated successfully'.$request->userId);
     }
 
     public function publicUpdatePhones(Workspace $workspace, $id, Request $request)
@@ -92,7 +93,7 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
             return redirect()->back()->with('error', 'Assignee can only be removed for orders scheduled for delivery today.');
         }
 

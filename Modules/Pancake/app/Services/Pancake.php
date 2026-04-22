@@ -2,6 +2,7 @@
 
 namespace Modules\Pancake\Services;
 
+use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
@@ -42,7 +43,7 @@ class Pancake
      * @throws RequestException
      * @throws ConnectionException
      */
-    public static function getCustomerEngagements(int $pageId, string $pageAccessToken, \Carbon\Carbon $date): array
+    public static function getCustomerEngagements(int $pageId, string $pageAccessToken, Carbon $date): array
     {
         $start = $date->copy()->startOfDay()->format('d/m/Y H:i:s');
         $end = $date->copy()->addDay()->startOfDay()->format('d/m/Y H:i:s');

@@ -23,10 +23,10 @@ class PurchasedOrder extends Model
     ];
 
     protected $casts = [
-        'issue_date'   => 'date:Y-m-d',
+        'issue_date' => 'date:Y-m-d',
         'delivery_fee' => 'decimal:2',
         'total_amount' => 'decimal:2',
-        'status'       => 'integer',
+        'status' => 'integer',
     ];
 
     public const STATUSES = [

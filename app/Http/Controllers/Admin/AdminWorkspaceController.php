@@ -27,4 +27,3 @@ class AdminWorkspaceController extends Controller
         ]);
     }
 }
-

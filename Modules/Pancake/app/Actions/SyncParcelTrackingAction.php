@@ -30,7 +30,6 @@ readonly class SyncParcelTrackingAction
             'parcel_status' => $order['partner']['partner_status'],
         ]);
 
-
         if (empty($order['partner']['extend_update'])) {
             return;
         }
@@ -74,20 +73,20 @@ readonly class SyncParcelTrackingAction
 
                 $order_for_delivery = OrderForDelivery::firstOrCreate(
                     [
-                        'order_id'      => $savedOrder->id,
-                        'page_id'       => $savedOrder->page_id,
-                        'shop_id'       => $savedOrder->shop_id,
-                        'workspace_id'  => $savedOrder->workspace_id,
-                        'rider_name'    => $update['rider_name'],
-                        'rider_phone'   => $update['rider_mobile'],
+                        'order_id' => $savedOrder->id,
+                        'page_id' => $savedOrder->page_id,
+                        'shop_id' => $savedOrder->shop_id,
+                        'workspace_id' => $savedOrder->workspace_id,
+                        'rider_name' => $update['rider_name'],
+                        'rider_phone' => $update['rider_mobile'],
                         'delivery_date' => Carbon::parse($update['updated_at'])->format('Y-m-d'),
                     ],
                     [
-                        'conferrer_id'    => $savedOrder->confirmed_by,
-                        'status'          => 'PENDING',
-                        'customer_name'   => $shippingAddress?->full_name,
+                        'conferrer_id' => $savedOrder->confirmed_by,
+                        'status' => 'PENDING',
+                        'customer_name' => $shippingAddress?->full_name,
                         'customer_phone' => $shippingAddress?->phone_number,
-                        'created_at'      => $update['updated_at'],
+                        'created_at' => $update['updated_at'],
                     ]
                 );
 

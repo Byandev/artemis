@@ -15,7 +15,7 @@ return new class extends Migration
             Schema::table('pancake_customers', function (Blueprint $table) {
                 $table->dropUnique(['fb_id']);
             });
-        } catch (\Throwable $th) {
+        } catch (Throwable $th) {
         }
     }
 
