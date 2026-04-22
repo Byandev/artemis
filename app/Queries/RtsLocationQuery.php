@@ -52,26 +52,20 @@ class RtsLocationQuery extends RtsBaseQuery
 
     public function paginate(int $perPage = 10)
     {
-        if ($this->hasEntityFilter()) {
-            return $this->paginateFromLive($perPage);
-        }
-
-        return $this->paginateFromRollup($perPage);
-    }
-
-    private function hasEntityFilter(): bool
-    {
-        return $this->request->filled('page_ids') || $this->request->filled('shop_ids');
-    }
-
-    private function paginateFromRollup(int $perPage)
-    {
         $start = $this->request->input('start_date');
         $end = $this->request->input('end_date');
+        $pageIds = $this->request->filled('page_ids') ? (array) $this->request->input('page_ids') : null;
+        $shopIds = $this->request->filled('shop_ids') ? (array) $this->request->input('shop_ids') : null;
 
         $query = DB::table('workspace_daily_metrics_by_location')
             ->where('workspace_id', $this->workspace->id)
-            ->when($start && $end, fn ($q) => $q->whereBetween('date', [$start, $end]));
+            ->when($start && $end, fn ($q) => $q->whereBetween('date', [$start, $end]))
+            ->when($pageIds, fn ($q) => $q->whereIn('page_id', $pageIds))
+            ->when($shopIds, function ($q) use ($shopIds) {
+                $q->whereIn('page_id', function ($sub) use ($shopIds) {
+                    $sub->from('pages')->whereIn('shop_id', $shopIds)->select('id');
+                });
+            });
 
         if ($this->mode === 'province') {
             $query->selectRaw('
@@ -108,39 +102,6 @@ class RtsLocationQuery extends RtsBaseQuery
 
         return $query
             ->havingRaw('SUM(delivered_count + returning_count + returned_count) > 0')
-            ->orderBy($this->sortColumn, $this->sortDirection)
-            ->paginate($perPage);
-    }
-
-    private function paginateFromLive(int $perPage)
-    {
-        $this->query->leftJoin('shipping_addresses', 'shipping_addresses.order_id', '=', 'pancake_orders.id');
-
-        if ($this->mode === 'province') {
-            $this->query
-                ->selectRaw('shipping_addresses.province_name AS province_name, '.self::METRICS_SQL)
-                ->groupBy('shipping_addresses.province_name')
-                ->havingRaw(self::HAVING_SQL);
-        } else {
-            $this->query
-                ->selectRaw('shipping_addresses.district_name AS city_name, shipping_addresses.province_name AS province_name, '.self::METRICS_SQL)
-                ->groupBy('shipping_addresses.district_name', 'shipping_addresses.province_name')
-                ->havingRaw(self::HAVING_SQL);
-        }
-
-        if ($this->searchTerm !== '') {
-            $term = $this->searchTerm;
-            if ($this->mode === 'province') {
-                $this->query->where('shipping_addresses.province_name', 'LIKE', "%{$term}%");
-            } else {
-                $this->query->where(fn ($q) => $q
-                    ->where('shipping_addresses.district_name', 'LIKE', "%{$term}%")
-                    ->orWhere('shipping_addresses.province_name', 'LIKE', "%{$term}%")
-                );
-            }
-        }
-
-        return $this->query
             ->orderBy($this->sortColumn, $this->sortDirection)
             ->paginate($perPage);
     }

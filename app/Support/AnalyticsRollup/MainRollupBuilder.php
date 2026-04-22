@@ -26,6 +26,8 @@ class MainRollupBuilder
             $this->aggregateReturning($workspaceId, $date, $start, $endExclusive);
             $this->aggregateEnteredReturning($workspaceId, $date, $start, $endExclusive);
             $this->aggregateReturned($workspaceId, $date, $start, $endExclusive);
+            $this->aggregateForDelivery($workspaceId, $date, $start, $endExclusive);
+            $this->aggregateNotifications($workspaceId, $date, $start, $endExclusive);
         });
     }
 
@@ -214,8 +216,9 @@ class MainRollupBuilder
     }
 
     /**
-     * DeliveredAvgDeliveryAttempts: delivered_at in range, returning_at IS NULL, no status filter.
-     * Denominator = delivered_clean_count. Separate from aggregateDelivered because of the returning_at IS NULL filter.
+     * DeliveredAvgDeliveryAttempts + DeliveredAvgCustomerRts:
+     * delivered_at in range, returning_at IS NULL, no status filter.
+     * Denominator = delivered_clean_count.
      */
     private function aggregateDeliveredClean(int $workspaceId, string $date, string $start, string $endExclusive): void
     {
@@ -224,6 +227,7 @@ class MainRollupBuilder
                 workspace_id, date, page_id,
                 delivered_clean_count,
                 sum_delivery_attempts_delivered,
+                sum_customer_rts_rate_delivered,
                 created_at, updated_at
             )
             SELECT
@@ -232,8 +236,16 @@ class MainRollupBuilder
                 po.page_id,
                 COUNT(*) AS delivered_clean_count,
                 COALESCE(SUM(po.delivery_attempts), 0) AS sum_delivery_attempts_delivered,
+                COALESCE(SUM(COALESCE(pr.customer_rts_rate, 0)), 0) AS sum_customer_rts_rate_delivered,
                 NOW(), NOW()
             FROM pancake_orders po
+            LEFT JOIN (
+                SELECT
+                    order_id,
+                    COALESCE(SUM(order_fail) / NULLIF(SUM(order_fail) + SUM(order_success), 0), 0) AS customer_rts_rate
+                FROM pancake_order_phone_number_reports
+                GROUP BY order_id
+            ) pr ON pr.order_id = po.id
             WHERE po.workspace_id = ?
               AND po.delivered_at >= ?
               AND po.delivered_at < ?
@@ -243,6 +255,7 @@ class MainRollupBuilder
             ON DUPLICATE KEY UPDATE
                 delivered_clean_count = VALUES(delivered_clean_count),
                 sum_delivery_attempts_delivered = VALUES(sum_delivery_attempts_delivered),
+                sum_customer_rts_rate_delivered = VALUES(sum_customer_rts_rate_delivered),
                 updated_at = NOW()
             SQL, [$date, $workspaceId, $start, $endExclusive]);
     }
@@ -280,8 +293,9 @@ class MainRollupBuilder
     }
 
     /**
-     * ReturnedAvgDeliveryAttempts: returning_at in range, no status filter, no returned_at filter.
-     * Denominator = entered_returning_count (any state, just "entered return flow").
+     * ReturnedAvgDeliveryAttempts + ReturnedAvgCustomerRts:
+     * returning_at in range, no status filter, no returned_at filter.
+     * Denominator = entered_returning_count.
      */
     private function aggregateEnteredReturning(int $workspaceId, string $date, string $start, string $endExclusive): void
     {
@@ -290,6 +304,7 @@ class MainRollupBuilder
                 workspace_id, date, page_id,
                 entered_returning_count,
                 sum_delivery_attempts_returned,
+                sum_customer_rts_rate_returned,
                 created_at, updated_at
             )
             SELECT
@@ -298,8 +313,16 @@ class MainRollupBuilder
                 po.page_id,
                 COUNT(*) AS entered_returning_count,
                 COALESCE(SUM(po.delivery_attempts), 0) AS sum_delivery_attempts_returned,
+                COALESCE(SUM(COALESCE(pr.customer_rts_rate, 0)), 0) AS sum_customer_rts_rate_returned,
                 NOW(), NOW()
             FROM pancake_orders po
+            LEFT JOIN (
+                SELECT
+                    order_id,
+                    COALESCE(SUM(order_fail) / NULLIF(SUM(order_fail) + SUM(order_success), 0), 0) AS customer_rts_rate
+                FROM pancake_order_phone_number_reports
+                GROUP BY order_id
+            ) pr ON pr.order_id = po.id
             WHERE po.workspace_id = ?
               AND po.returning_at >= ?
               AND po.returning_at < ?
@@ -308,6 +331,7 @@ class MainRollupBuilder
             ON DUPLICATE KEY UPDATE
                 entered_returning_count = VALUES(entered_returning_count),
                 sum_delivery_attempts_returned = VALUES(sum_delivery_attempts_returned),
+                sum_customer_rts_rate_returned = VALUES(sum_customer_rts_rate_returned),
                 updated_at = NOW()
             SQL, [$date, $workspaceId, $start, $endExclusive]);
     }
@@ -350,6 +374,73 @@ class MainRollupBuilder
                 returned_amount = VALUES(returned_amount),
                 sum_days_returning_to_returned = VALUES(sum_days_returning_to_returned),
                 count_returning_to_returned = VALUES(count_returning_to_returned),
+                updated_at = NOW()
+            SQL, [$date, $workspaceId, $start, $endExclusive]);
+    }
+
+    /**
+     * TotalForDeliveryCount: parcel_journeys with status='On Delivery', bucketed by pj.created_at.
+     */
+    private function aggregateForDelivery(int $workspaceId, string $date, string $start, string $endExclusive): void
+    {
+        DB::statement(<<<'SQL'
+            INSERT INTO workspace_daily_metrics (
+                workspace_id, date, page_id,
+                for_delivery_count,
+                created_at, updated_at
+            )
+            SELECT
+                po.workspace_id,
+                ? AS date,
+                po.page_id,
+                COUNT(*) AS for_delivery_count,
+                NOW(), NOW()
+            FROM parcel_journeys pj
+            INNER JOIN pancake_orders po ON po.id = pj.order_id
+            WHERE po.workspace_id = ?
+              AND pj.status = 'On Delivery'
+              AND pj.created_at >= ?
+              AND pj.created_at < ?
+              AND po.page_id IS NOT NULL
+            GROUP BY po.workspace_id, po.page_id
+            ON DUPLICATE KEY UPDATE
+                for_delivery_count = VALUES(for_delivery_count),
+                updated_at = NOW()
+            SQL, [$date, $workspaceId, $start, $endExclusive]);
+    }
+
+    /**
+     * TrackedOrdersCount / SmsSentCount / ChatSentCount:
+     * parcel_journey_notifications with status='sent', bucketed by pjn.created_at.
+     */
+    private function aggregateNotifications(int $workspaceId, string $date, string $start, string $endExclusive): void
+    {
+        DB::statement(<<<'SQL'
+            INSERT INTO workspace_daily_metrics (
+                workspace_id, date, page_id,
+                tracked_orders_count, sms_sent_count, chat_sent_count,
+                created_at, updated_at
+            )
+            SELECT
+                po.workspace_id,
+                ? AS date,
+                po.page_id,
+                COUNT(DISTINCT po.id) AS tracked_orders_count,
+                SUM(CASE WHEN pjn.type = 'sms' THEN 1 ELSE 0 END) AS sms_sent_count,
+                SUM(CASE WHEN pjn.type = 'chat' THEN 1 ELSE 0 END) AS chat_sent_count,
+                NOW(), NOW()
+            FROM parcel_journey_notifications pjn
+            INNER JOIN pancake_orders po ON po.id = pjn.order_id
+            WHERE po.workspace_id = ?
+              AND pjn.status = 'sent'
+              AND pjn.created_at >= ?
+              AND pjn.created_at < ?
+              AND po.page_id IS NOT NULL
+            GROUP BY po.workspace_id, po.page_id
+            ON DUPLICATE KEY UPDATE
+                tracked_orders_count = VALUES(tracked_orders_count),
+                sms_sent_count = VALUES(sms_sent_count),
+                chat_sent_count = VALUES(chat_sent_count),
                 updated_at = NOW()
             SQL, [$date, $workspaceId, $start, $endExclusive]);
     }

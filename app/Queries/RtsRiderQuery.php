@@ -26,26 +26,20 @@ class RtsRiderQuery extends RtsBaseQuery
 
     public function get(int $perPage = 15): LengthAwarePaginator
     {
-        if ($this->hasEntityFilter()) {
-            return $this->getFromLive($perPage);
-        }
-
-        return $this->getFromRollup($perPage);
-    }
-
-    private function hasEntityFilter(): bool
-    {
-        return $this->request->filled('page_ids') || $this->request->filled('shop_ids');
-    }
-
-    private function getFromRollup(int $perPage): LengthAwarePaginator
-    {
         $start = $this->request->input('start_date');
         $end = $this->request->input('end_date');
+        $pageIds = $this->request->filled('page_ids') ? (array) $this->request->input('page_ids') : null;
+        $shopIds = $this->request->filled('shop_ids') ? (array) $this->request->input('shop_ids') : null;
 
         return DB::table('workspace_daily_metrics_by_rider')
             ->where('workspace_id', $this->workspace->id)
             ->when($start && $end, fn ($q) => $q->whereBetween('date', [$start, $end]))
+            ->when($pageIds, fn ($q) => $q->whereIn('page_id', $pageIds))
+            ->when($shopIds, function ($q) use ($shopIds) {
+                $q->whereIn('page_id', function ($sub) use ($shopIds) {
+                    $sub->from('pages')->whereIn('shop_id', $shopIds)->select('id');
+                });
+            })
             ->selectRaw('
                 rider_name,
                 SUM(delivered_count + returning_count + returned_count) AS total_orders,
@@ -59,27 +53,6 @@ class RtsRiderQuery extends RtsBaseQuery
             ')
             ->groupBy('rider_name')
             ->havingRaw('SUM(delivered_count + returning_count + returned_count) > 0')
-            ->orderBy($this->sortColumn, $this->sortDirection)
-            ->paginate($perPage);
-    }
-
-    private function getFromLive(int $perPage): LengthAwarePaginator
-    {
-        $latestRider = DB::table('parcel_journeys as pj')
-            ->select('pj.order_id', 'pj.rider_name')
-            ->whereNotNull('pj.rider_name')
-            ->whereIn('pj.id', function ($q) {
-                $q->from('parcel_journeys')
-                    ->selectRaw('MAX(id)')
-                    ->where('status', 'On Delivery')
-                    ->groupBy('order_id');
-            });
-
-        return $this->query
-            ->selectRaw('lr.rider_name,'.self::METRICS_SQL)
-            ->joinSub($latestRider, 'lr', 'lr.order_id', '=', 'pancake_orders.id')
-            ->groupBy('lr.rider_name')
-            ->havingRaw(self::HAVING_SQL)
             ->orderBy($this->sortColumn, $this->sortDirection)
             ->paginate($perPage);
     }

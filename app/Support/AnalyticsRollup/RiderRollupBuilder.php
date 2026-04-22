@@ -43,7 +43,7 @@ class RiderRollupBuilder
     {
         $sql = "
             INSERT INTO workspace_daily_metrics_by_rider (
-                workspace_id, date, rider_name,
+                workspace_id, date, rider_name, page_id,
                 {$column},
                 created_at, updated_at
             )
@@ -51,6 +51,7 @@ class RiderRollupBuilder
                 po.workspace_id,
                 ? AS date,
                 SUBSTRING(lpj.rider_name, 1, 255) AS rider_name,
+                COALESCE(po.page_id, 0) AS page_id,
                 COUNT(*) AS {$column},
                 NOW(), NOW()
             FROM pancake_orders po
@@ -69,7 +70,7 @@ class RiderRollupBuilder
               AND po.status = ?
               AND po.{$dateColumn} >= ?
               AND po.{$dateColumn} < ?
-            GROUP BY po.workspace_id, rider_name
+            GROUP BY po.workspace_id, rider_name, page_id
             ON DUPLICATE KEY UPDATE
                 {$column} = VALUES({$column}),
                 updated_at = NOW()

@@ -43,7 +43,7 @@ class LocationRollupBuilder
     {
         $sql = "
             INSERT INTO workspace_daily_metrics_by_location (
-                workspace_id, date, province_name, district_name,
+                workspace_id, date, province_name, district_name, page_id,
                 {$column},
                 created_at, updated_at
             )
@@ -52,6 +52,7 @@ class LocationRollupBuilder
                 ? AS date,
                 COALESCE(sa.province_name, '') AS province_name,
                 COALESCE(sa.district_name, '') AS district_name,
+                COALESCE(po.page_id, 0) AS page_id,
                 COUNT(*) AS {$column},
                 NOW(), NOW()
             FROM pancake_orders po
@@ -60,7 +61,7 @@ class LocationRollupBuilder
               AND po.status = ?
               AND po.{$dateColumn} >= ?
               AND po.{$dateColumn} < ?
-            GROUP BY po.workspace_id, COALESCE(sa.province_name, ''), COALESCE(sa.district_name, '')
+            GROUP BY po.workspace_id, COALESCE(sa.province_name, ''), COALESCE(sa.district_name, ''), page_id
             ON DUPLICATE KEY UPDATE
                 {$column} = VALUES({$column}),
                 updated_at = NOW()

@@ -14,6 +14,102 @@ Turn dashboard + RTS analytics cold-load from multi-second aggregations over `pa
 
 ---
 
+## ⭐ Current state (as of 2026-04-22)
+
+**Phases 1–6 + all "optimize further" follow-ups are shipped.** This section is the TL;DR for picking up later.
+
+### Tables in place
+
+| Table | Grain | Populated by | Powers |
+|-------|-------|--------------|--------|
+| `workspace_daily_metrics` | `(workspace_id, date, page_id)` | `MainRollupBuilder` (8 aggregate passes) | TotalSales, TotalOrders, DeliveredAmount, ReturningAmount, ReturnedAmount, Aov, DeliveredAvgDeliveryAttempts, ReturnedAvgDeliveryAttempts, all 7 Average*Days + AverageFirstDeliveryDays |
+| `workspace_daily_metrics_by_rider` | `(workspace_id, date, rider_name)` | `RiderRollupBuilder` | `RtsRiderQuery` (when no page/shop filter) |
+| `workspace_daily_metrics_by_item` | `(workspace_id, date, item_name)` | `ItemRollupBuilder` | `RtsOrderItemQuery` (when no page/shop filter) |
+| `workspace_daily_metrics_by_location` | `(workspace_id, date, province_name, district_name)` + FULLTEXT | `LocationRollupBuilder` | `RtsLocationQuery` (when no page/shop filter), FULLTEXT search |
+| `pancake_user_pos_daily_reports` *(extended)* | `(workspace_id, date, pancake_user_id)` | `CsrPosRollupBuilder` | CSR dashboards (`Workspaces/CSRController`, API `CSRController`), `RtsConfirmedByQuery` |
+| `workspace_customer_facts` | `(workspace_id, customer_id)` — **lifetime** | `CustomerFactsRollupBuilder` (incremental: dirty customers only) | `TimeToFirstOrder.compute`, `AverageLifetimeValue.compute` |
+| `workspace_customer_activity_daily` | `(workspace_id, customer_id, date, page_id)` | `CustomerActivityRollupBuilder` | `UniqueCustomerCount`, `RepeatCustomerRatio`, `RepeatOrderRatio`, `RepeatCustomerOrderCount` |
+
+### Still live (intentionally NOT rolled up)
+
+| Metric / query | Why kept live |
+|----------------|---------------|
+| `RtsRate`, `RtsCxQuery`, `RtsPriceQuery`, `RtsAdQuery`, `RtsDeliveryAttemptsQuery`, `RtsOrderFrequencyQuery` | Benefit from the `RtsBaseQuery::applyDateFilter` UNION fix (per-index OR → `joinSub(UNION of IDs)`). Rollup would be overkill for these dimensions. |
+| `RtsConfirmedByQuery` **when** page_ids/shop_ids filter is set | Dual-path kept because `pancake_user_pos_daily_reports` doesn't have `page_id`. Less common filter path. |
+
+### Deploy checklist for any future environment
+
+```bash
+# 1. Run all migrations (creates all 7 rollup tables + schema mods)
+php artisan migrate
+
+# 2. Backfill — single wide chunk so CustomerFactsRollupBuilder's memoization
+#    uses the full history window on first call.
+php artisan analytics:rollup-backfill --from=<earliest pancake_orders.confirmed_at> --chunk-days=9999
+
+# 3. Parity check a few metrics vs live (see "Validation" section)
+
+# 4. Confirm schedule in routes/console.php:
+#    - hourly for today
+#    - daily 01:00 for yesterday
+#    - daily 02:00 for trailing 14 days
+```
+
+### Key design decisions to remember
+
+1. **Event-based vs state-based semantics.** Main table columns are event-based (`delivered_count` = orders whose `delivered_at` in range, no status filter). RTS sibling tables are state-based (`delivered_count` = orders currently `status=3`). Named the same, semantics differ. Each table is internally consistent.
+2. **No stored averages or ratios.** Every AVG/ratio is SUM/COUNT components at write time, divided at read time. No `rts_rate`/`aov` stored. See "Design principles" section below.
+3. **CSR dashboard `rts_rate` column was dropped.** No controller changes needed — both CSR controllers already compute it via CASE expressions.
+4. **RTS sibling tables don't store `page_id`.** Keeps grain sane. Page/shop filter on `Rts*Query` falls back to live — explicit dual-path in those classes.
+5. **`CustomerFactsRollupBuilder` is incremental.** Uses `pancake_orders.updated_at >= dirty_since` to find dirty customers. Memoized per-process so backfill chunking doesn't cause redundant rebuilds. Backfill MUST use `--chunk-days=9999` (or at least larger than history) to get a wide dirty window on first call.
+6. **`RepeatCustomerRatio.compute` changed from lifetime- to window-based repeat semantic** when swapping to rollup. All `Repeat*` metrics now consistently use window semantic (customer has ≥2 orders in window, not ≥2 lifetime orders as of end_date).
+7. **`AverageLifetimeValue.compute` via rollup is "current state as of rebuild."** For end_date = today/yesterday, drift is <24h. For historical end_dates, the rollup answer differs from the historical live answer (live would re-compute lifetime sums as they were at that point in time). Live fallback triggers when page/shop filter is set, not when end_date is historical.
+8. **`CsrPosRollupBuilder.syncLegacyColumns`** writes the legacy amount columns (`total_orders`, `delivered`, `returning`) from the new count/amount columns at the end of each (workspace, date) rebuild. Existing CSR dashboards keep working unchanged.
+
+### If you want to optimize further
+
+All 5 follow-ups from earlier revisions are now shipped. Next candidates:
+
+1. **CSR rollup (`pancake_user_pos_daily_reports`) with page_id dimension** — would remove the RtsConfirmedByQuery dual-path. Same pattern as the RTS siblings got — add `page_id` column, broaden unique key, update `CsrPosRollupBuilder`. Only worth it if CSR dashboards start filtering by page/shop regularly.
+2. **Hourly rollup for same-day dashboard freshness** — `workspace_hourly_metrics` table, rebuilt every 15-30 min for today only. Daily rollup already refreshes today hourly via the scheduled command, but limited to 1-hour granularity.
+3. **RTS CX bucket pre-aggregation** — `RtsCxQuery` computes per-order `customer_rts_rate` bucket at query time. Could be denormalized onto `pancake_orders` via trigger or a new daily rollup dimension.
+4. **Dashboard per-metric caching in `WorkspaceMetrics::extract`** — cheap win (~1 hr). Currently all 27 metrics share one cache key; flipping a filter invalidates the whole bundle.
+5. **Read replica routing for analytics** — separate initiative; orthogonal to rollup.
+
+### File map (where everything lives)
+
+```
+database/migrations/2026_04_22_1200*
+  120000 create_workspace_daily_metrics_table
+  120100 rename_columns_on_workspace_daily_metrics_table           (returning_in_transit → returning, returned_final → returned)
+  120200 add_clean_denominator_columns_to_workspace_daily_metrics  (delivered_clean_count, entered_returning_count)
+  120300 create_workspace_daily_metrics_sibling_tables             (by_rider, by_item, by_location)
+  120400 extend_pancake_user_pos_daily_reports_for_rollup          (count+amount columns, drops rts_rate)
+  120500 create_workspace_customer_facts_table
+  120600 create_workspace_customer_activity_daily_table
+  120700 add_page_id_to_rts_sibling_tables              (by_rider, by_item, by_location now filterable by page)
+
+app/Support/AnalyticsRollup/
+  MainRollupBuilder.php              → workspace_daily_metrics (8 aggregate methods)
+  RiderRollupBuilder.php             → workspace_daily_metrics_by_rider
+  ItemRollupBuilder.php              → workspace_daily_metrics_by_item
+  LocationRollupBuilder.php          → workspace_daily_metrics_by_location
+  CsrPosRollupBuilder.php            → pancake_user_pos_daily_reports
+  CustomerFactsRollupBuilder.php     → workspace_customer_facts (incremental, memoized)
+  CustomerActivityRollupBuilder.php  → workspace_customer_activity_daily
+  ReadsRollup.php                    → shared trait (rollupBaseQuery, rollupPeriodSql, rollupAvgSql)
+
+app/Console/Commands/
+  AnalyticsRollup.php                → analytics:rollup (orchestrator, --only flag)
+  AnalyticsRollupBackfill.php        → analytics:rollup-backfill
+  SyncCsrDailyRecords.php            → thin wrapper over CsrPosRollupBuilder
+
+app/Queries/RtsBaseQuery.php         → UNION date-filter fix (applyDateFilter)
+app/Queries/Rts{Rider,OrderItem,Location,ConfirmedBy}Query.php → dual-path (rollup/live)
+```
+
+---
+
 ## Architecture
 
 Six new tables plus new commands:

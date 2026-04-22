@@ -26,26 +26,20 @@ class RtsOrderItemQuery extends RtsBaseQuery
 
     public function get(int $perPage = 15): LengthAwarePaginator
     {
-        if ($this->hasEntityFilter()) {
-            return $this->getFromLive($perPage);
-        }
-
-        return $this->getFromRollup($perPage);
-    }
-
-    private function hasEntityFilter(): bool
-    {
-        return $this->request->filled('page_ids') || $this->request->filled('shop_ids');
-    }
-
-    private function getFromRollup(int $perPage): LengthAwarePaginator
-    {
         $start = $this->request->input('start_date');
         $end = $this->request->input('end_date');
+        $pageIds = $this->request->filled('page_ids') ? (array) $this->request->input('page_ids') : null;
+        $shopIds = $this->request->filled('shop_ids') ? (array) $this->request->input('shop_ids') : null;
 
         return DB::table('workspace_daily_metrics_by_item')
             ->where('workspace_id', $this->workspace->id)
             ->when($start && $end, fn ($q) => $q->whereBetween('date', [$start, $end]))
+            ->when($pageIds, fn ($q) => $q->whereIn('page_id', $pageIds))
+            ->when($shopIds, function ($q) use ($shopIds) {
+                $q->whereIn('page_id', function ($sub) use ($shopIds) {
+                    $sub->from('pages')->whereIn('shop_id', $shopIds)->select('id');
+                });
+            })
             ->selectRaw('
                 item_name,
                 SUM(delivered_count + returning_count + returned_count) AS total_orders,
@@ -59,17 +53,6 @@ class RtsOrderItemQuery extends RtsBaseQuery
             ')
             ->groupBy('item_name')
             ->havingRaw('SUM(delivered_count + returning_count + returned_count) > 0')
-            ->orderBy($this->sortColumn, $this->sortDirection)
-            ->paginate($perPage);
-    }
-
-    private function getFromLive(int $perPage): LengthAwarePaginator
-    {
-        return $this->query
-            ->selectRaw('pancake_order_items.name AS item_name, '.self::METRICS_SQL)
-            ->join('pancake_order_items', 'pancake_order_items.order_id', '=', 'pancake_orders.id')
-            ->groupBy('pancake_order_items.name')
-            ->havingRaw(self::HAVING_SQL)
             ->orderBy($this->sortColumn, $this->sortDirection)
             ->paginate($perPage);
     }

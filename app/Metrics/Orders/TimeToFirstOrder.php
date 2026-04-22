@@ -8,57 +8,22 @@ use Illuminate\Support\Facades\DB;
 final class TimeToFirstOrder
 {
     /**
-     * Avg time from customer.created_at -> customer's true first confirmed order (in HOURS)
+     * Avg time from customer.created_at -> customer's true first confirmed order (in HOURS).
      * Only includes customers whose first confirmed order falls within the selected range.
      *
-     * Read from workspace_customer_facts (pre-aggregated per customer). page_ids/shop_ids
-     * filter falls back to live because the rollup stores only first_confirmed_page_id.
+     * Reads from workspace_customer_facts. page/shop filters fall back to live because
+     * customer_facts only stores first_confirmed_page_id (single page), not customer×page.
      */
     public function compute(int $workspaceId, array $date_range, array $filter): float
     {
-        if (! empty($filter['page_ids']) || ! empty($filter['shop_ids'])) {
+        if ($this->hasEntityFilter($filter)) {
             return $this->computeLive($workspaceId, $date_range, $filter);
         }
 
-        $row = DB::table('workspace_customer_facts')
-            ->where('workspace_id', $workspaceId)
-            ->whereBetween('first_confirmed_at', [
-                $date_range['start_date'].' 00:00:00',
-                $date_range['end_date'].' 23:59:59',
-            ])
-            ->whereNotNull('customer_created_at')
+        $row = $this->rollupBase($workspaceId, $date_range)
             ->selectRaw('
                 ROUND(
-                    COALESCE(
-                        AVG(TIMESTAMPDIFF(HOUR, customer_created_at, first_confirmed_at)),
-                        0
-                    ),
-                    2
-                ) as value
-            ')
-            ->first();
-
-        return (float) ($row->value ?? 0);
-    }
-
-    private function computeLive(int $workspaceId, array $date_range, array $filter): float
-    {
-        $firstOrderPerCustomer = $this->firstOrderPerCustomerQuery($workspaceId, $filter);
-
-        $row = DB::query()
-            ->fromSub($firstOrderPerCustomer, 't')
-            ->join('pancake_customers as c', 'c.customer_id', '=', 't.customer_id')
-            ->whereNotNull('c.created_at')
-            ->whereBetween('t.first_confirmed_at', [
-                $date_range['start_date'].' 00:00:00',
-                $date_range['end_date'].' 23:59:59',
-            ])
-            ->selectRaw('
-                ROUND(
-                    COALESCE(
-                        AVG(TIMESTAMPDIFF(HOUR, c.created_at, t.first_confirmed_at)),
-                        0
-                    ),
+                    COALESCE(AVG(TIMESTAMPDIFF(HOUR, customer_created_at, first_confirmed_at)), 0),
                     2
                 ) as value
             ')
@@ -69,30 +34,21 @@ final class TimeToFirstOrder
 
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
+        if ($this->hasEntityFilter($filter)) {
+            return $this->breakdownLive($workspaceId, $date_range, $filter, $group);
+        }
+
         $periodSql = match ($group) {
-            'daily' => 'DATE(t.first_confirmed_at)',
-            'weekly' => "DATE_FORMAT(t.first_confirmed_at, '%x-W%v')",
-            'monthly' => "DATE_FORMAT(t.first_confirmed_at, '%Y-%m')",
-            default => 'DATE(t.first_confirmed_at)',
+            'weekly' => "DATE_FORMAT(first_confirmed_at, '%x-W%v')",
+            'monthly' => "DATE_FORMAT(first_confirmed_at, '%Y-%m')",
+            default => 'DATE(first_confirmed_at)',
         };
 
-        $firstOrderPerCustomer = $this->firstOrderPerCustomerQuery($workspaceId, $filter);
-
-        return DB::query()
-            ->fromSub($firstOrderPerCustomer, 't')
-            ->join('pancake_customers as c', 'c.customer_id', '=', 't.customer_id')
-            ->whereNotNull('c.created_at')
-            ->whereBetween('t.first_confirmed_at', [
-                $date_range['start_date'].' 00:00:00',
-                $date_range['end_date'].' 23:59:59',
-            ])
+        return $this->rollupBase($workspaceId, $date_range)
             ->selectRaw("
                 $periodSql as period,
                 ROUND(
-                    COALESCE(
-                        AVG(TIMESTAMPDIFF(HOUR, c.created_at, t.first_confirmed_at)),
-                        0
-                    ),
+                    COALESCE(AVG(TIMESTAMPDIFF(HOUR, customer_created_at, first_confirmed_at)), 0),
                     2
                 ) as value
             ")
@@ -101,139 +57,125 @@ final class TimeToFirstOrder
             ->get();
     }
 
+    /**
+     * perPage: groups by first_confirmed_page_id (customer's first-order page).
+     * Semantic differs slightly from live (live groups by page the customer ever ordered from).
+     */
     public function perPage(int $workspaceId, array $date_range, array $filter)
     {
-        $firstOrderPerCustomerPerPage = $this->firstOrderPerCustomerPerPageQuery($workspaceId, $filter);
-
-        return DB::query()
-            ->fromSub($firstOrderPerCustomerPerPage, 't')
-            ->join('pancake_customers as c', 'c.customer_id', '=', 't.customer_id')
-            ->whereNotNull('c.created_at')
-            ->whereBetween('t.first_confirmed_at', [
-                $date_range['start_date'].' 00:00:00',
-                $date_range['end_date'].' 23:59:59',
-            ])
+        return $this->rollupBase($workspaceId, $date_range)
+            ->join('pages', 'pages.id', '=', 'workspace_customer_facts.first_confirmed_page_id')
+            ->whereNotNull('workspace_customer_facts.first_confirmed_page_id')
             ->selectRaw('
-                t.page_id,
-                t.page_name,
+                pages.id as page_id,
+                pages.name as page_name,
                 ROUND(
-                    COALESCE(
-                        AVG(TIMESTAMPDIFF(HOUR, c.created_at, t.first_confirmed_at)),
-                        0
-                    ),
+                    COALESCE(AVG(TIMESTAMPDIFF(HOUR, workspace_customer_facts.customer_created_at, workspace_customer_facts.first_confirmed_at)), 0),
                     2
                 ) as value
             ')
-            ->groupBy('t.page_id', 't.page_name')
+            ->groupBy('pages.id', 'pages.name')
             ->orderByDesc('value')
             ->get();
     }
 
     public function perShop(int $workspaceId, array $date_range, array $filter)
     {
-        $firstOrderPerCustomerPerStore = $this->firstOrderPerCustomerPerStoreQuery($workspaceId, $filter);
-
-        return DB::query()
-            ->fromSub($firstOrderPerCustomerPerStore, 't')
-            ->join('pancake_customers as c', 'c.customer_id', '=', 't.customer_id')
-            ->whereNotNull('c.created_at')
-            ->whereBetween('t.first_confirmed_at', [
-                $date_range['start_date'].' 00:00:00',
-                $date_range['end_date'].' 23:59:59',
-            ])
+        return $this->rollupBase($workspaceId, $date_range)
+            ->join('pages', 'pages.id', '=', 'workspace_customer_facts.first_confirmed_page_id')
+            ->join('shops', 'shops.id', '=', 'pages.shop_id')
+            ->whereNotNull('pages.shop_id')
             ->selectRaw('
-                t.shop_id,
-                t.shop_name,
+                shops.id as shop_id,
+                shops.name as shop_name,
                 ROUND(
-                    COALESCE(
-                        AVG(TIMESTAMPDIFF(HOUR, c.created_at, t.first_confirmed_at)),
-                        0
-                    ),
+                    COALESCE(AVG(TIMESTAMPDIFF(HOUR, workspace_customer_facts.customer_created_at, workspace_customer_facts.first_confirmed_at)), 0),
                     2
                 ) as value
             ')
-            ->groupBy('t.shop_id', 't.shop_name')
+            ->groupBy('shops.id', 'shops.name')
             ->orderByDesc('value')
             ->get();
     }
 
     public function perUser(int $workspaceId, array $date_range, array $filter)
     {
-        $shopIds = ! empty($filter['shop_ids']) ? $this->parseIds($filter['shop_ids']) : null;
-        $pageIds = ! empty($filter['page_ids']) ? $this->parseIds($filter['page_ids']) : null;
+        return $this->rollupBase($workspaceId, $date_range)
+            ->join('pages', 'pages.id', '=', 'workspace_customer_facts.first_confirmed_page_id')
+            ->join('users', 'users.id', '=', 'pages.owner_id')
+            ->whereNotNull('pages.owner_id')
+            ->selectRaw('
+                users.id as user_id,
+                users.name as user_name,
+                ROUND(
+                    COALESCE(AVG(TIMESTAMPDIFF(HOUR, workspace_customer_facts.customer_created_at, workspace_customer_facts.first_confirmed_at)), 0),
+                    2
+                ) as value
+            ')
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc('value')
+            ->get();
+    }
 
-        $userNames = DB::table('users')
-            ->join('pages', 'pages.owner_id', '=', 'users.id')
-            ->where('pages.workspace_id', $workspaceId)
-            ->when($shopIds, fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
-            ->when($pageIds, fn ($q) => $q->whereIn('pages.id', $pageIds))
-            ->select('users.id', 'users.name')
-            ->distinct()
-            ->pluck('name', 'id');
+    private function rollupBase(int $workspaceId, array $dateRange)
+    {
+        return DB::table('workspace_customer_facts')
+            ->where('workspace_id', $workspaceId)
+            ->whereBetween('first_confirmed_at', [
+                $dateRange['start_date'].' 00:00:00',
+                $dateRange['end_date'].' 23:59:59',
+            ])
+            ->whereNotNull('customer_created_at');
+    }
 
-        if ($userNames->isEmpty()) {
-            return collect();
-        }
+    private function hasEntityFilter(array $filter): bool
+    {
+        return ! empty($filter['page_ids']) || ! empty($filter['shop_ids']);
+    }
 
-        $firstOrderPerCustomerPerUser = $this->firstOrderPerCustomerPerUserQuery($workspaceId, $filter);
-
-        $averages = DB::query()
-            ->fromSub($firstOrderPerCustomerPerUser, 't')
+    private function computeLive(int $workspaceId, array $date_range, array $filter): float
+    {
+        $row = DB::query()
+            ->fromSub($this->firstOrderPerCustomerQuery($workspaceId, $filter), 't')
             ->join('pancake_customers as c', 'c.customer_id', '=', 't.customer_id')
             ->whereNotNull('c.created_at')
-            ->whereIn('t.user_id', $userNames->keys())
             ->whereBetween('t.first_confirmed_at', [
                 $date_range['start_date'].' 00:00:00',
                 $date_range['end_date'].' 23:59:59',
             ])
             ->selectRaw('
-                t.user_id,
-                ROUND(
-                    COALESCE(
-                        AVG(TIMESTAMPDIFF(HOUR, c.created_at, t.first_confirmed_at)),
-                        0
-                    ),
-                    2
-                ) as value
+                ROUND(COALESCE(AVG(TIMESTAMPDIFF(HOUR, c.created_at, t.first_confirmed_at)), 0), 2) as value
             ')
-            ->groupBy('t.user_id')
-            ->pluck('value', 'user_id');
+            ->first();
 
-        return $userNames->map(fn ($name, $id) => (object) [
-            'user_id' => $id,
-            'user_name' => $name,
-            'value' => (float) ($averages[$id] ?? 0),
-        ])->sortByDesc('value')->values();
+        return (float) ($row->value ?? 0);
     }
 
-    /**
-     * True first confirmed order per customer per page-owner (user)
-     */
-    private function firstOrderPerCustomerPerUserQuery(int $workspaceId, array $filter): Builder
+    private function breakdownLive(int $workspaceId, array $date_range, array $filter, string $group)
     {
-        return DB::table('pancake_orders')
-            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotNull('pancake_orders.customer_id')
-            ->whereNotNull('pancake_orders.confirmed_at')
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
-            })
-            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
-            })
-            ->groupBy('pages.owner_id', 'pancake_orders.customer_id')
-            ->selectRaw('
-                pages.owner_id as user_id,
-                pancake_orders.customer_id as customer_id,
-                MIN(pancake_orders.confirmed_at) as first_confirmed_at
-            ');
+        $periodSql = match ($group) {
+            'weekly' => "DATE_FORMAT(t.first_confirmed_at, '%x-W%v')",
+            'monthly' => "DATE_FORMAT(t.first_confirmed_at, '%Y-%m')",
+            default => 'DATE(t.first_confirmed_at)',
+        };
+
+        return DB::query()
+            ->fromSub($this->firstOrderPerCustomerQuery($workspaceId, $filter), 't')
+            ->join('pancake_customers as c', 'c.customer_id', '=', 't.customer_id')
+            ->whereNotNull('c.created_at')
+            ->whereBetween('t.first_confirmed_at', [
+                $date_range['start_date'].' 00:00:00',
+                $date_range['end_date'].' 23:59:59',
+            ])
+            ->selectRaw("
+                $periodSql as period,
+                ROUND(COALESCE(AVG(TIMESTAMPDIFF(HOUR, c.created_at, t.first_confirmed_at)), 0), 2) as value
+            ")
+            ->groupByRaw($periodSql)
+            ->orderByRaw($periodSql)
+            ->get();
     }
 
-    /**
-     * True first confirmed order per customer
-     */
     private function firstOrderPerCustomerQuery(int $workspaceId, array $filter): Builder
     {
         return DB::table('pancake_orders')
@@ -254,64 +196,7 @@ final class TimeToFirstOrder
                 }
             )
             ->groupBy('pancake_orders.customer_id')
-            ->selectRaw('
-                pancake_orders.customer_id as customer_id,
-                MIN(pancake_orders.confirmed_at) as first_confirmed_at
-            ');
-    }
-
-    /**
-     * True first confirmed order per customer per page
-     */
-    private function firstOrderPerCustomerPerPageQuery(int $workspaceId, array $filter): Builder
-    {
-        return DB::table('pancake_orders')
-            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotNull('pancake_orders.customer_id')
-            ->whereNotNull('pancake_orders.confirmed_at')
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
-            })
-            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
-            })
-            ->groupBy('pages.id', 'pages.name', 'pancake_orders.customer_id')
-            ->selectRaw('
-                pages.id as page_id,
-                pages.name as page_name,
-                pancake_orders.customer_id as customer_id,
-                MIN(pancake_orders.confirmed_at) as first_confirmed_at
-            ');
-    }
-
-    /**
-     * True first confirmed order per customer per store
-     */
-    private function firstOrderPerCustomerPerStoreQuery(int $workspaceId, array $filter): Builder
-    {
-        return DB::table('pancake_orders')
-            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->join('shops', 'shops.id', '=', 'pages.shop_id')
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotNull('pancake_orders.customer_id')
-            ->whereNotNull('pancake_orders.confirmed_at')
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
-            })
-            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
-            })
-            ->whereNotNull('pages.shop_id')
-            ->groupBy('shops.id', 'shops.name', 'pancake_orders.customer_id')
-            ->selectRaw('
-                shops.id as shop_id,
-                shops.name as shop_name,
-                pancake_orders.customer_id as customer_id,
-                MIN(pancake_orders.confirmed_at) as first_confirmed_at
-            ');
+            ->selectRaw('pancake_orders.customer_id, MIN(pancake_orders.confirmed_at) as first_confirmed_at');
     }
 
     private function parseIds(array|string $value): array

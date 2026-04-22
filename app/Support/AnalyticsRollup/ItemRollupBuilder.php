@@ -43,7 +43,7 @@ class ItemRollupBuilder
     {
         $sql = "
             INSERT INTO workspace_daily_metrics_by_item (
-                workspace_id, date, item_name,
+                workspace_id, date, item_name, page_id,
                 {$column}, total_quantity,
                 created_at, updated_at
             )
@@ -51,6 +51,7 @@ class ItemRollupBuilder
                 po.workspace_id,
                 ? AS date,
                 COALESCE(poi.name, '') AS item_name,
+                COALESCE(po.page_id, 0) AS page_id,
                 COUNT(*) AS {$column},
                 COALESCE(SUM(poi.quantity), 0) AS total_quantity,
                 NOW(), NOW()
@@ -60,7 +61,7 @@ class ItemRollupBuilder
               AND po.status = ?
               AND po.{$dateColumn} >= ?
               AND po.{$dateColumn} < ?
-            GROUP BY po.workspace_id, COALESCE(poi.name, '')
+            GROUP BY po.workspace_id, COALESCE(poi.name, ''), page_id
             ON DUPLICATE KEY UPDATE
                 {$column} = VALUES({$column}),
                 total_quantity = total_quantity + VALUES(total_quantity),
