@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 use Modules\Inventory\Models\InventoryTransaction;
+use App\Models\WorkspaceChecklist;
 
 class Workspace extends Model
 {
@@ -19,7 +20,9 @@ class Workspace extends Model
         'slug',
         'description',
         'owner_id',
+        'monthly_order_volume',
         'show_inventory',
+        'show_finance',
         'inventory_sync',
     ];
 
@@ -27,6 +30,7 @@ class Workspace extends Model
         'created_at'     => 'datetime',
         'updated_at'     => 'datetime',
         'show_inventory' => 'boolean',
+        'show_finance'   => 'boolean',
         'inventory_sync' => 'boolean',
     ];
 
@@ -212,5 +216,10 @@ class Workspace extends Model
     public function apiKeys(): HasMany
     {
         return $this->hasMany(WorkspaceApiKey::class);
+    }
+
+    public function checklists(): HasMany
+    {
+        return $this->hasMany(WorkspaceChecklist::class, 'workspace_id');
     }
 }

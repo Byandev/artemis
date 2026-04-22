@@ -51,6 +51,7 @@ class ProductController extends Controller
             'workspace' => $workspace,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
+                'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
             'categories' => $categories,

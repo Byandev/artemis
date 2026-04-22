@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\API\Workspace;
 
 use App\Http\Controllers\Controller;
-use App\Models\PancakeUserDailyReport;
+use App\Models\PancakeUserErpDailyReport;
+use App\Models\PancakeUserPosDailyReport;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Modules\Pancake\Models\User as PancakeUser;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -15,8 +17,31 @@ class CSRController extends Controller
 {
     private const ALLOWED_SORTS = [
         'csr_name', 'total_orders', 'total_sales',
-        'delivered', 'returning_count', 'rmo_called', 'rts_rate',
+        'delivered', 'returning_count', 'rts_rate',
+        'total_called', 'total_call_time',
     ];
+
+    private function reportTable(Request $request): string
+    {
+        $type = strtolower((string) $request->input('type', 'pos'));
+
+        return $type === 'erp'
+            ? (new PancakeUserErpDailyReport)->getTable()
+            : (new PancakeUserPosDailyReport)->getTable();
+    }
+
+    private function range(Request $request): array
+    {
+        $from = $request->input('from')
+            ? CarbonImmutable::parse($request->input('from'))->toDateString()
+            : CarbonImmutable::now()->subDays(6)->toDateString();
+
+        $to = $request->input('to')
+            ? CarbonImmutable::parse($request->input('to'))->toDateString()
+            : CarbonImmutable::now()->toDateString();
+
+        return [$from, $to];
+    }
 
     public function dailyRecords(Request $request, Workspace $workspace)
     {
@@ -24,49 +49,62 @@ class CSRController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
-        $from = $request->input('from')
-            ? CarbonImmutable::parse($request->input('from'))->toDateString()
-            : CarbonImmutable::now()->subDays(6)->toDateString();
+        [$from, $to] = $this->range($request);
+        $reportTable = $this->reportTable($request);
 
-        $to = $request->input('to')
-            ? CarbonImmutable::parse($request->input('to'))->toDateString()
-            : CarbonImmutable::now()->toDateString();
-
-        $type = $request->input('type');
-
-        $query = PancakeUserDailyReport::query()
-            ->join('pancake_users as pu', 'pu.id', '=', 'pancake_user_daily_reports.pancake_user_id')
-            ->where('pancake_user_daily_reports.workspace_id', $workspace->id)
-            ->whereBetween('pancake_user_daily_reports.date', [$from, $to])
-            ->when($type, fn ($q) => $q->where('pancake_user_daily_reports.type', $type))
-            ->groupBy('pancake_user_daily_reports.pancake_user_id', 'pu.name')
+        $dailyReportsSub = DB::table($reportTable)
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('date', [$from, $to])
+            ->groupBy('pancake_user_id')
             ->selectRaw('
-                pancake_user_daily_reports.pancake_user_id,
+                pancake_user_id,
+                SUM(total_orders) as total_orders,
+                SUM(total_sales) as total_sales,
+                SUM(delivered) as delivered,
+                SUM(`returning`) as returning_count
+            ');
+
+        $rmoSub = DB::table('pancake_user_rmo_daily_reports')
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('date', [$from, $to])
+            ->groupBy('pancake_user_id')
+            ->selectRaw('
+                pancake_user_id,
+                SUM(total_called) as total_called,
+                SUM(total_call_time) as total_call_time
+            ');
+
+        $query = PancakeUser::query()
+            ->from('pancake_users as pu')
+            ->whereExists(function ($q) use ($workspace) {
+                $q->select(DB::raw(1))
+                    ->from('pancake_shop_users as psu')
+                    ->join('shops as s', 's.id', '=', 'psu.shop_id')
+                    ->whereColumn('psu.user_id', 'pu.id')
+                    ->where('s.workspace_id', $workspace->id);
+            })
+            ->leftJoinSub($dailyReportsSub, 'dr', 'dr.pancake_user_id', '=', 'pu.id')
+            ->leftJoinSub($rmoSub, 'rmo', 'rmo.pancake_user_id', '=', 'pu.id')
+            ->selectRaw('
+                pu.id as pancake_user_id,
                 pu.name as csr_name,
-                SUM(pancake_user_daily_reports.total_orders) as total_orders,
-                SUM(pancake_user_daily_reports.total_sales)  as total_sales,
-                SUM(pancake_user_daily_reports.delivered)    as delivered,
-                SUM(pancake_user_daily_reports.`returning`)  as returning_count,
-                SUM(pancake_user_daily_reports.rmo_called)   as rmo_called,
+                COALESCE(dr.total_orders, 0) as total_orders,
+                COALESCE(dr.total_sales, 0) as total_sales,
+                COALESCE(dr.delivered, 0) as delivered,
+                COALESCE(dr.returning_count, 0) as returning_count,
+                COALESCE(rmo.total_called, 0) as total_called,
+                COALESCE(rmo.total_call_time, 0) as total_call_time,
                 CASE
-                    WHEN SUM(pancake_user_daily_reports.delivered) + SUM(pancake_user_daily_reports.`returning`) > 0
-                    THEN ROUND((SUM(pancake_user_daily_reports.`returning`) / (SUM(pancake_user_daily_reports.delivered) + SUM(pancake_user_daily_reports.`returning`))) * 100, 2)
+                    WHEN (COALESCE(dr.delivered, 0) + COALESCE(dr.returning_count, 0)) > 0
+                    THEN ROUND((COALESCE(dr.returning_count, 0) / (dr.delivered + dr.returning_count)) * 100, 2)
                     ELSE 0
                 END as rts_rate
             ');
 
         $records = QueryBuilder::for($query)
-            ->allowedSorts([
-                AllowedSort::field('csr_name'),
-                AllowedSort::field('total_orders'),
-                AllowedSort::field('total_sales'),
-                AllowedSort::field('delivered'),
-                AllowedSort::field('returning_count'),
-                AllowedSort::field('rmo_called'),
-                AllowedSort::field('rts_rate'),
-            ])
+            ->allowedSorts(array_map(fn ($s) => AllowedSort::field($s), self::ALLOWED_SORTS))
             ->defaultSort('-total_sales')
-            ->paginate($request->integer('per_page', 15))
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         return response()->json($records);
@@ -74,20 +112,11 @@ class CSRController extends Controller
 
     private function statQuery(Request $request, Workspace $workspace)
     {
-        $from = $request->input('from')
-            ? CarbonImmutable::parse($request->input('from'))->toDateString()
-            : CarbonImmutable::now()->subDays(6)->toDateString();
+        [$from, $to] = $this->range($request);
 
-        $to = $request->input('to')
-            ? CarbonImmutable::parse($request->input('to'))->toDateString()
-            : CarbonImmutable::now()->toDateString();
-
-        $type = $request->input('type');
-
-        return DB::table('pancake_user_daily_reports')
+        return DB::table($this->reportTable($request))
             ->where('workspace_id', $workspace->id)
-            ->whereBetween('date', [$from, $to])
-            ->when($type, fn ($q) => $q->where('type', $type));
+            ->whereBetween('date', [$from, $to]);
     }
 
     public function statTotalSales(Request $request, Workspace $workspace)
@@ -132,7 +161,12 @@ class CSRController extends Controller
 
     public function statTotalRmoCalled(Request $request, Workspace $workspace)
     {
-        $value = $this->statQuery($request, $workspace)->sum('rmo_called');
+        [$from, $to] = $this->range($request);
+
+        $value = DB::table('pancake_user_rmo_daily_reports')
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('date', [$from, $to])
+            ->sum('total_called');
 
         return response()->json(['value' => $value]);
     }
