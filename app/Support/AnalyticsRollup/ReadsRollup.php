@@ -35,4 +35,13 @@ trait ReadsRollup
             default => 'workspace_daily_metrics.date',
         };
     }
+
+    /**
+     * Safe AVG expression from a sum/count column pair.
+     * Returns 0 when the denominator is 0.
+     */
+    protected function rollupAvgSql(string $sumColumn, string $countColumn, int $precision = 2): string
+    {
+        return "ROUND(COALESCE(SUM(workspace_daily_metrics.$sumColumn) / NULLIF(SUM(workspace_daily_metrics.$countColumn), 0), 0), $precision)";
+    }
 }
