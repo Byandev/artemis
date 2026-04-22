@@ -10,7 +10,7 @@ final class DeliveredAvgCustomerRts
 
     private const SUM = 'sum_customer_rts_rate_delivered';
 
-    private const COUNT = 'delivered_clean_count';
+    private const COUNT = 'delivered_count';
 
     public function compute(int $workspaceId, array $date_range, array $filter): float
     {

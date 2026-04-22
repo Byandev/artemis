@@ -16,7 +16,6 @@ class WorkspaceDailyMetric extends Model
         'shipped_count',
         'first_delivery_attempt_count',
         'delivered_count',
-        'delivered_clean_count',
         'returning_count',
         'entered_returning_count',
         'returned_count',

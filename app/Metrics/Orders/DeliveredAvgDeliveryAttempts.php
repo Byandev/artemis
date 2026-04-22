@@ -10,7 +10,7 @@ final class DeliveredAvgDeliveryAttempts
 
     private const SUM = 'sum_delivery_attempts_delivered';
 
-    private const COUNT = 'delivered_clean_count';
+    private const COUNT = 'delivered_count';
 
     public function compute(int $workspaceId, array $date_range, array $filter): float
     {
