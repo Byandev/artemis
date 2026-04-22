@@ -14,8 +14,38 @@ final class AverageLifetimeValue
      *
      * Formula:
      * total confirmed sales up to end date / unique confirmed customers up to end date
+     *
+     * Read from workspace_customer_facts. If end_date is today/yesterday (the default),
+     * the rollup reflects current customer totals. Older end_dates fall back to live for
+     * historical accuracy. page_ids/shop_ids filter also falls back to live (rollup keys
+     * on customer, not customer x page).
      */
     public function compute(int $workspaceId, array $dateRange, array $filter): float
+    {
+        if (! empty($filter['page_ids']) || ! empty($filter['shop_ids'])) {
+            return $this->computeLive($workspaceId, $dateRange, $filter);
+        }
+
+        $endExclusive = Carbon::parse($dateRange['end_date'])
+            ->addDay()
+            ->startOfDay()
+            ->toDateTimeString();
+
+        $row = DB::table('workspace_customer_facts')
+            ->where('workspace_id', $workspaceId)
+            ->where('first_confirmed_at', '<', $endExclusive)
+            ->selectRaw('
+                COALESCE(
+                    SUM(total_confirmed_spend) / NULLIF(COUNT(*), 0),
+                    0
+                ) as avg_lifetime_value
+            ')
+            ->first();
+
+        return round((float) ($row->avg_lifetime_value ?? 0), 2);
+    }
+
+    private function computeLive(int $workspaceId, array $dateRange, array $filter): float
     {
         $endExclusive = Carbon::parse($dateRange['end_date'])
             ->addDay()

@@ -3,7 +3,12 @@
 namespace App\Console\Commands;
 
 use App\Models\Workspace;
+use App\Support\AnalyticsRollup\CsrPosRollupBuilder;
+use App\Support\AnalyticsRollup\CustomerFactsRollupBuilder;
+use App\Support\AnalyticsRollup\ItemRollupBuilder;
+use App\Support\AnalyticsRollup\LocationRollupBuilder;
 use App\Support\AnalyticsRollup\MainRollupBuilder;
+use App\Support\AnalyticsRollup\RiderRollupBuilder;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 
@@ -13,12 +18,33 @@ class AnalyticsRollupBackfill extends Command
                             {--from= : Earliest date (Y-m-d), required}
                             {--to= : Latest date (Y-m-d), defaults to yesterday}
                             {--workspace= : Limit to a specific workspace ID}
-                            {--chunk-days=7 : Days per logging chunk}';
+                            {--chunk-days=7 : Days per logging chunk}
+                            {--only= : Comma-separated subset of builders to run (main,rider,item,location,csr_pos,customer_facts)}';
 
-    protected $description = 'One-shot historical backfill of workspace_daily_metrics. Runs per workspace, per day, walking backward from --to to --from.';
+    protected $description = 'One-shot historical backfill of all workspace_daily_metrics rollup tables. Runs per workspace, per day, walking backward from --to to --from.';
 
-    public function handle(MainRollupBuilder $builder): int
-    {
+    public function handle(
+        MainRollupBuilder $main,
+        RiderRollupBuilder $rider,
+        ItemRollupBuilder $item,
+        LocationRollupBuilder $location,
+        CsrPosRollupBuilder $csrPos,
+        CustomerFactsRollupBuilder $customerFacts,
+    ): int {
+        $all = [
+            'main' => $main,
+            'rider' => $rider,
+            'item' => $item,
+            'location' => $location,
+            'csr_pos' => $csrPos,
+            'customer_facts' => $customerFacts,
+        ];
+
+        $only = $this->option('only')
+            ? array_map('trim', explode(',', $this->option('only')))
+            : array_keys($all);
+
+        $builders = array_intersect_key($all, array_flip($only));
         if (! $this->option('from')) {
             $this->error('--from is required.');
 
@@ -47,7 +73,7 @@ class AnalyticsRollupBackfill extends Command
         }
 
         $workspaceCount = 0;
-        $workspaceQuery->chunkById(50, function ($workspaces) use ($builder, $from, $to, $chunkDays, &$workspaceCount) {
+        $workspaceQuery->chunkById(50, function ($workspaces) use ($builders, $from, $to, $chunkDays, &$workspaceCount) {
             foreach ($workspaces as $workspace) {
                 $this->line("Workspace {$workspace->id}…");
 
@@ -59,11 +85,13 @@ class AnalyticsRollupBackfill extends Command
                         $chunkStart = $from;
                     }
 
-                    $builder->forDateRange(
-                        $workspace->id,
-                        $chunkStart->toDateString(),
-                        $chunkEnd->toDateString()
-                    );
+                    foreach ($builders as $builder) {
+                        $builder->forDateRange(
+                            $workspace->id,
+                            $chunkStart->toDateString(),
+                            $chunkEnd->toDateString()
+                        );
+                    }
 
                     $this->line("  workspace={$workspace->id} {$chunkStart->toDateString()} → {$chunkEnd->toDateString()} done");
 

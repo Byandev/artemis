@@ -3,7 +3,12 @@
 namespace App\Console\Commands;
 
 use App\Models\Workspace;
+use App\Support\AnalyticsRollup\CsrPosRollupBuilder;
+use App\Support\AnalyticsRollup\CustomerFactsRollupBuilder;
+use App\Support\AnalyticsRollup\ItemRollupBuilder;
+use App\Support\AnalyticsRollup\LocationRollupBuilder;
 use App\Support\AnalyticsRollup\MainRollupBuilder;
+use App\Support\AnalyticsRollup\RiderRollupBuilder;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 
@@ -14,15 +19,37 @@ class AnalyticsRollup extends Command
                             {--from= : Start of date range (Y-m-d)}
                             {--to= : End of date range (Y-m-d)}
                             {--workspace= : Limit to a specific workspace ID}
-                            {--trailing-days=14 : Default rebuild window when no date args given}';
+                            {--trailing-days=14 : Default rebuild window when no date args given}
+                            {--only= : Comma-separated subset of builders to run (main,rider,item,location,csr_pos,customer_facts)}';
 
     protected $description = 'Rebuild workspace_daily_metrics rollup rows for the given date range or trailing window.';
 
-    public function handle(MainRollupBuilder $builder): int
-    {
+    public function handle(
+        MainRollupBuilder $main,
+        RiderRollupBuilder $rider,
+        ItemRollupBuilder $item,
+        LocationRollupBuilder $location,
+        CsrPosRollupBuilder $csrPos,
+        CustomerFactsRollupBuilder $customerFacts,
+    ): int {
         [$from, $to] = $this->resolveRange();
 
-        $this->info("Rolling up workspace_daily_metrics from {$from} to {$to}.");
+        $all = [
+            'main' => $main,
+            'rider' => $rider,
+            'item' => $item,
+            'location' => $location,
+            'csr_pos' => $csrPos,
+            'customer_facts' => $customerFacts,
+        ];
+
+        $only = $this->option('only')
+            ? array_map('trim', explode(',', $this->option('only')))
+            : array_keys($all);
+
+        $builders = array_intersect_key($all, array_flip($only));
+
+        $this->info('Rolling up ['.implode(',', array_keys($builders))."] from {$from} to {$to}.");
 
         $query = Workspace::query()->select('id');
         if ($workspaceId = $this->option('workspace')) {
@@ -30,9 +57,11 @@ class AnalyticsRollup extends Command
         }
 
         $count = 0;
-        $query->orderBy('id')->chunkById(50, function ($workspaces) use ($builder, $from, $to, &$count) {
+        $query->orderBy('id')->chunkById(50, function ($workspaces) use ($builders, $from, $to, &$count) {
             foreach ($workspaces as $workspace) {
-                $builder->forDateRange($workspace->id, $from, $to);
+                foreach ($builders as $builder) {
+                    $builder->forDateRange($workspace->id, $from, $to);
+                }
                 $count++;
                 if ($count % 10 === 0) {
                     $this->line("  processed {$count} workspace(s)");

@@ -10,8 +10,38 @@ final class TimeToFirstOrder
     /**
      * Avg time from customer.created_at -> customer's true first confirmed order (in HOURS)
      * Only includes customers whose first confirmed order falls within the selected range.
+     *
+     * Read from workspace_customer_facts (pre-aggregated per customer). page_ids/shop_ids
+     * filter falls back to live because the rollup stores only first_confirmed_page_id.
      */
     public function compute(int $workspaceId, array $date_range, array $filter): float
+    {
+        if (! empty($filter['page_ids']) || ! empty($filter['shop_ids'])) {
+            return $this->computeLive($workspaceId, $date_range, $filter);
+        }
+
+        $row = DB::table('workspace_customer_facts')
+            ->where('workspace_id', $workspaceId)
+            ->whereBetween('first_confirmed_at', [
+                $date_range['start_date'].' 00:00:00',
+                $date_range['end_date'].' 23:59:59',
+            ])
+            ->whereNotNull('customer_created_at')
+            ->selectRaw('
+                ROUND(
+                    COALESCE(
+                        AVG(TIMESTAMPDIFF(HOUR, customer_created_at, first_confirmed_at)),
+                        0
+                    ),
+                    2
+                ) as value
+            ')
+            ->first();
+
+        return (float) ($row->value ?? 0);
+    }
+
+    private function computeLive(int $workspaceId, array $date_range, array $filter): float
     {
         $firstOrderPerCustomer = $this->firstOrderPerCustomerQuery($workspaceId, $filter);
 
