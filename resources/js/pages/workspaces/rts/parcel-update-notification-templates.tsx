@@ -144,6 +144,21 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates, pageStats, an
             ),
         },
         {
+            accessorKey: 'is_enabled',
+            header: 'Status',
+            cell: ({ row }) => (
+                row.original.is_enabled ? (
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-medium text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
+                        Enabled
+                    </span>
+                ) : (
+                    <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] font-medium text-gray-500 dark:bg-zinc-800 dark:text-gray-400">
+                        Disabled
+                    </span>
+                )
+            ),
+        },
+        {
             id: 'actions',
             cell: ({ row }) => (
                 <div className="flex justify-end">

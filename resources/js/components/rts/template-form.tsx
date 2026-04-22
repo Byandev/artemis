@@ -1,6 +1,7 @@
 import { Workspace } from '@/types/models/Workspace';
 import { ParcelJourneyNotificationTemplate } from '@/types/models/ParcelJourneyNotificationTemplate';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useForm } from '@inertiajs/react';
 import workspaces from '@/routes/workspaces';
@@ -18,11 +19,15 @@ const TemplateForm = ({ initialValue, open, onOpenChange, workspace }: Props) =>
 
     const { data, setData, put, processing } = useForm({
         message: initialValue?.message ?? '',
+        is_enabled: initialValue?.is_enabled ?? true,
     });
 
     useEffect(() => {
-        setData('message', initialValue?.message as string);
-    }, [initialValue?.message, setData]);
+        setData({
+            message: initialValue?.message ?? '',
+            is_enabled: initialValue?.is_enabled ?? true,
+        });
+    }, [initialValue?.id, initialValue?.message, initialValue?.is_enabled, setData]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -93,6 +98,21 @@ const TemplateForm = ({ initialValue, open, onOpenChange, workspace }: Props) =>
 
                 <form onSubmit={handleSubmit}>
                     <div className="space-y-4 px-5 py-4">
+                        <div className="flex items-center justify-between rounded-[10px] border border-black/8 bg-stone-50 px-3 py-2.5 dark:border-white/8 dark:bg-zinc-800">
+                            <div>
+                                <p className="font-mono text-[11px] font-medium text-gray-700 dark:text-gray-200">
+                                    Enabled
+                                </p>
+                                <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                    Notifications for this template are only sent when enabled.
+                                </p>
+                            </div>
+                            <Switch
+                                checked={data.is_enabled}
+                                onCheckedChange={(checked) => setData('is_enabled', checked)}
+                            />
+                        </div>
+
                         <div className="space-y-1.5">
                             <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
                                 Message <span className="text-red-400">*</span>
