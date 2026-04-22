@@ -9,26 +9,36 @@ class MessageRenderer
 {
     /**
      * Resolve the correct template and interpolate {{ variable }} placeholders.
+     * Returns null when the workspace has explicitly disabled the template.
      */
-    public function render(Workspace $workspace, string $type, string $activity, string $receiver, array $data): string
+    public function render(Workspace $workspace, string $type, string $activity, string $receiver, array $data): ?string
     {
         $template = $this->resolveTemplate($workspace, $type, $activity, $receiver);
+
+        if ($template === null) {
+            return null;
+        }
 
         return $this->interpolate($template, $data);
     }
 
-    private function resolveTemplate(Workspace $workspace, string $type, string $activity, string $receiver): string
+    private function resolveTemplate(Workspace $workspace, string $type, string $activity, string $receiver): ?string
     {
-        return $workspace->parcelJourneyNotificationTemplates()
+        $row = $workspace->parcelJourneyNotificationTemplates()
+            ->where('type', $type)
+            ->where('activity', $activity)
+            ->where('receiver', $receiver)
+            ->first(['message', 'is_enabled']);
+
+        if ($row !== null) {
+            return $row->is_enabled ? $row->message : null;
+        }
+
+        return ParcelJourneyNotificationTemplate::defaults()
             ->where('type', $type)
             ->where('activity', $activity)
             ->where('receiver', $receiver)
             ->value('message')
-            ?? ParcelJourneyNotificationTemplate::defaults()
-                ->where('type', $type)
-                ->where('activity', $activity)
-                ->where('receiver', $receiver)
-                ->value('message')
             ?? '';
     }
 
