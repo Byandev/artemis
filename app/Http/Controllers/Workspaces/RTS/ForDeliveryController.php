@@ -117,6 +117,9 @@ class ForDeliveryController extends Controller
                 \DB::raw('(SELECT rts_rate FROM rider_delivery_summary WHERE rider_name = pancake_order_for_delivery.rider_name AND rider_phone = pancake_order_for_delivery.rider_phone LIMIT 1) as rider_rts_rate'),
                 \DB::raw('('.RiskScoreSort::sql().') as risk_score'),
             ])
+            ->withCount(['customerCallLogs', 'riderCallLogs'])
+            ->withSum('customerCallLogs as customer_call_duration', 'duration')
+            ->withSum('riderCallLogs as rider_call_duration', 'duration')
             ->with([
                 'order' => function ($query) {
                     $query
@@ -384,5 +387,21 @@ class ForDeliveryController extends Controller
             'delivered' => (clone $base)->where('parcel_status', 'delivered')->count(),
             'returning' => (clone $base)->where('parcel_status', 'returning')->count(),
         ]);
+    }
+
+    public function callLogs(Workspace $workspace, Request $request)
+    {
+        $request->validate([
+            'phone_number' => ['required', 'string'],
+            'date' => ['required', 'date'],
+        ]);
+
+        $logs = \App\Models\CallLog::where('workspace_id', $workspace->id)
+            ->where('phone_number', $request->input('phone_number'))
+            ->whereDate('call_date', $request->input('date'))
+            ->orderBy('call_time', 'desc')
+            ->get(['id', 'user_id', 'phone_number', 'type', 'duration', 'call_date', 'call_time']);
+
+        return response()->json($logs);
     }
 }
