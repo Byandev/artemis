@@ -22,13 +22,14 @@ import {
     ChevronUp,
     Download,
     MapPin,
+    Pencil,
     Phone,
     Search,
     User as UserIcon,
     UserPlus,
     X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FormModal from './formModal';
 
 interface Props {
@@ -54,6 +55,55 @@ interface Props {
     delivered_count: number;
     returning_count: number;
     problematic_count: number;
+}
+
+function EditablePhone({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState(value);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (editing) inputRef.current?.focus();
+    }, [editing]);
+
+    useEffect(() => {
+        setDraft(value);
+    }, [value]);
+
+    const save = () => {
+        setEditing(false);
+        if (draft.trim() !== value) {
+            onSave(draft.trim());
+        }
+    };
+
+    if (editing) {
+        return (
+            <input
+                ref={inputRef}
+                type="text"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={save}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') save();
+                    if (e.key === 'Escape') { setDraft(value); setEditing(false); }
+                }}
+                className="h-6 w-28 rounded border border-emerald-300 px-1.5 text-[11px] outline-none focus:ring-1 focus:ring-emerald-400 dark:border-emerald-600 dark:bg-zinc-800 dark:text-gray-300"
+            />
+        );
+    }
+
+    return (
+        <button
+            onClick={() => setEditing(true)}
+            className="group/phone flex items-center gap-1 text-[11px] text-gray-400 hover:text-emerald-600 dark:text-gray-500 dark:hover:text-emerald-400"
+        >
+            <Phone className="h-3 w-3 shrink-0" />
+            {value || '—'}
+            <Pencil className="h-2.5 w-2.5 shrink-0 opacity-0 group-hover/phone:opacity-100" />
+        </button>
+    );
 }
 
 export default function RmoManagement({
@@ -306,6 +356,17 @@ export default function RmoManagement({
         [handleAssignUser],
     );
 
+    const handleUpdatePhone = useCallback(
+        (id: number, field: 'customer_phone' | 'rider_phone', value: string) => {
+            router.post(
+                `/public/workspaces/${workspace.slug}/rts/rmo-management/${id}/update-phones`,
+                { [field]: value },
+                { preserveScroll: true },
+            );
+        },
+        [workspace.slug],
+    );
+
     const handleUserSelected = useCallback(
         (userId: string) => {
             setUserName(localStorage.getItem('user_name') ?? '');
@@ -369,12 +430,10 @@ export default function RmoManagement({
                         <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
                             {row.original.rider_name || '—'}
                         </p>
-                        {row.original.rider_phone && (
-                            <p className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
-                                <Phone className="h-3 w-3 shrink-0" />
-                                {row.original.rider_phone}
-                            </p>
-                        )}
+                        <EditablePhone
+                            value={row.original.rider_phone ?? ''}
+                            onSave={(v) => handleUpdatePhone(row.original.id, 'rider_phone', v)}
+                        />
                     </div>
                 ),
             },
@@ -390,12 +449,10 @@ export default function RmoManagement({
                             <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
                                 {addr?.full_name || '—'}
                             </p>
-                            {addr?.phone_number && (
-                                <p className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
-                                    <Phone className="h-3 w-3 shrink-0" />
-                                    {addr.phone_number}
-                                </p>
-                            )}
+                            <EditablePhone
+                                value={row.original.customer_phone ?? addr?.phone_number ?? ''}
+                                onSave={(v) => handleUpdatePhone(row.original.id, 'customer_phone', v)}
+                            />
                             {addr?.full_address && (
                                 <Tooltip>
                                     <TooltipTrigger asChild>
@@ -570,7 +627,7 @@ export default function RmoManagement({
                 ),
             },
         ],
-        [handleAssignToMe, handleRemoveAssignee, handleChangeStatus, isToday],
+        [handleAssignToMe, handleRemoveAssignee, handleChangeStatus, handleUpdatePhone, isToday],
     );
 
     return (

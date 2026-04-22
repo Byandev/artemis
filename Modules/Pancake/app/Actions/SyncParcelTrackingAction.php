@@ -69,6 +69,8 @@ readonly class SyncParcelTrackingAction
             );
 
             if ($update['status'] === 'On Delivery' && $update['rider_name'] && $update['rider_mobile'] && Carbon::parse($update['updated_at'])->isToday()) {
+                $shippingAddress = $savedOrder->shippingAddress;
+
                 OrderForDelivery::firstOrCreate(
                     [
                         'order_id'      => $savedOrder->id,
@@ -80,9 +82,11 @@ readonly class SyncParcelTrackingAction
                         'delivery_date' => Carbon::parse($update['updated_at'])->format('Y-m-d'),
                     ],
                     [
-                        'conferrer_id' => $savedOrder->confirmed_by,
-                        'status'       => 'PENDING',
-                        'created_at'   => $update['updated_at'],
+                        'conferrer_id'    => $savedOrder->confirmed_by,
+                        'status'          => 'PENDING',
+                        'customer_name'   => $shippingAddress?->full_name,
+                        'customer_phone' => $shippingAddress?->phone_number,
+                        'created_at'      => $update['updated_at'],
                     ]
                 );
             }
