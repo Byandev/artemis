@@ -116,20 +116,8 @@ final class AverageDaysFromConfirmedToDelivered
             return collect();
         }
 
-        $averages = DB::table('pancake_orders')
-            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->where('pages.workspace_id', $workspaceId)
-            ->when($shopIds, fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
-            ->when($pageIds, fn ($q) => $q->whereIn('pages.id', $pageIds))
+        $averages = $this->baseQuery($workspaceId, $date_range, $filter, true)
             ->whereIn('pages.owner_id', $userNames->keys())
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->whereNotNull('pancake_orders.confirmed_at')
-            ->whereNotNull('pancake_orders.delivered_at')
-            ->whereBetween('pancake_orders.delivered_at', [
-                $date_range['start_date'].' 00:00:00',
-                $date_range['end_date'].' 23:59:59',
-            ])
             ->selectRaw('
                 pages.owner_id as user_id,
                 ROUND(

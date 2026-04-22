@@ -129,58 +129,76 @@ final class TimeToFirstOrder
 
     public function perUser(int $workspaceId, array $date_range, array $filter)
     {
-        $users = DB::table('users')
+        $shopIds = ! empty($filter['shop_ids']) ? $this->parseIds($filter['shop_ids']) : null;
+        $pageIds = ! empty($filter['page_ids']) ? $this->parseIds($filter['page_ids']) : null;
+
+        $userNames = DB::table('users')
             ->join('pages', 'pages.owner_id', '=', 'users.id')
             ->where('pages.workspace_id', $workspaceId)
-            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                $shopIds = is_array($filter['shop_ids'])
-                    ? $filter['shop_ids']
-                    : explode(',', $filter['shop_ids']);
-
-                $query->whereIn('pages.shop_id', $shopIds);
-            })
-            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                $pageIds = is_array($filter['page_ids'])
-                    ? $filter['page_ids']
-                    : explode(',', $filter['page_ids']);
-
-                $query->whereIn('pages.id', $pageIds);
-            })
+            ->when($shopIds, fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->when($pageIds, fn ($q) => $q->whereIn('pages.id', $pageIds))
             ->select('users.id', 'users.name')
             ->distinct()
-            ->get();
+            ->pluck('name', 'id');
 
-        return $users->map(function ($user) use ($workspaceId, $date_range, $filter) {
-            $userFilter = $filter;
-            $userFilter['page_ids'] = DB::table('pages')
-                ->where('workspace_id', $workspaceId)
-                ->where('owner_id', $user->id)
-                ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                    $shopIds = is_array($filter['shop_ids'])
-                        ? $filter['shop_ids']
-                        : explode(',', $filter['shop_ids']);
+        if ($userNames->isEmpty()) {
+            return collect();
+        }
 
-                    $query->whereIn('shop_id', $shopIds);
-                })
-                ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                    $pageIds = is_array($filter['page_ids'])
-                        ? $filter['page_ids']
-                        : explode(',', $filter['page_ids']);
+        $firstOrderPerCustomerPerUser = $this->firstOrderPerCustomerPerUserQuery($workspaceId, $filter);
 
-                    $query->whereIn('id', $pageIds);
-                })
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
+        $averages = DB::query()
+            ->fromSub($firstOrderPerCustomerPerUser, 't')
+            ->join('pancake_customers as c', 'c.customer_id', '=', 't.customer_id')
+            ->whereNotNull('c.created_at')
+            ->whereIn('t.user_id', $userNames->keys())
+            ->whereBetween('t.first_confirmed_at', [
+                $date_range['start_date'].' 00:00:00',
+                $date_range['end_date'].' 23:59:59',
+            ])
+            ->selectRaw('
+                t.user_id,
+                ROUND(
+                    COALESCE(
+                        AVG(TIMESTAMPDIFF(HOUR, c.created_at, t.first_confirmed_at)),
+                        0
+                    ),
+                    2
+                ) as value
+            ')
+            ->groupBy('t.user_id')
+            ->pluck('value', 'user_id');
 
-            return (object) [
-                'user_id' => $user->id,
-                'user_name' => $user->name,
-                'value' => ! empty($userFilter['page_ids'])
-                    ? $this->compute($workspaceId, $date_range, $userFilter)
-                    : 0,
-            ];
-        })->sortByDesc('value')->values();
+        return $userNames->map(fn ($name, $id) => (object) [
+            'user_id' => $id,
+            'user_name' => $name,
+            'value' => (float) ($averages[$id] ?? 0),
+        ])->sortByDesc('value')->values();
+    }
+
+    /**
+     * True first confirmed order per customer per page-owner (user)
+     */
+    private function firstOrderPerCustomerPerUserQuery(int $workspaceId, array $filter): Builder
+    {
+        return DB::table('pancake_orders')
+            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
+            ->where('pancake_orders.workspace_id', $workspaceId)
+            ->whereNotNull('pancake_orders.customer_id')
+            ->whereNotNull('pancake_orders.confirmed_at')
+            ->whereNotIn('pancake_orders.status', [6, 7])
+            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
+                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
+            })
+            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
+                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
+            })
+            ->groupBy('pages.owner_id', 'pancake_orders.customer_id')
+            ->selectRaw('
+                pages.owner_id as user_id,
+                pancake_orders.customer_id as customer_id,
+                MIN(pancake_orders.confirmed_at) as first_confirmed_at
+            ');
     }
 
     /**

@@ -234,43 +234,54 @@ final class AverageLifetimeValue
 
     public function perUser(int $workspaceId, array $dateRange, array $filter)
     {
-        $users = DB::table('users')
+        $endExclusive = Carbon::parse($dateRange['end_date'])
+            ->addDay()
+            ->startOfDay()
+            ->toDateTimeString();
+
+        $shopIds = ! empty($filter['shop_ids']) ? $this->parseIds($filter['shop_ids']) : null;
+        $pageIds = ! empty($filter['page_ids']) ? $this->parseIds($filter['page_ids']) : null;
+
+        $userNames = DB::table('users')
             ->join('pages', 'pages.owner_id', '=', 'users.id')
             ->where('pages.workspace_id', $workspaceId)
-            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
-            })
-            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
-            })
+            ->when($shopIds, fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->when($pageIds, fn ($q) => $q->whereIn('pages.id', $pageIds))
             ->select('users.id', 'users.name')
             ->distinct()
-            ->get();
+            ->pluck('name', 'id');
 
-        return $users->map(function ($user) use ($workspaceId, $dateRange, $filter) {
-            $userFilter = $filter;
+        if ($userNames->isEmpty()) {
+            return collect();
+        }
 
-            $userFilter['page_ids'] = DB::table('pages')
-                ->where('workspace_id', $workspaceId)
-                ->where('owner_id', $user->id)
-                ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                    $query->whereIn('shop_id', $this->parseIds($filter['shop_ids']));
-                })
-                ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                    $query->whereIn('id', $this->parseIds($filter['page_ids']));
-                })
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
+        $averages = DB::table('pancake_orders')
+            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
+            ->where('pancake_orders.workspace_id', $workspaceId)
+            ->where('pancake_orders.confirmed_at', '<', $endExclusive)
+            ->whereNotNull('pancake_orders.customer_id')
+            ->whereNotIn('pancake_orders.status', [6, 7])
+            ->when($pageIds, fn ($q) => $q->whereIn('pages.id', $pageIds))
+            ->when($shopIds, fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->whereIn('pages.owner_id', $userNames->keys())
+            ->selectRaw('
+                pages.owner_id as user_id,
+                ROUND(
+                    COALESCE(
+                        SUM(pancake_orders.final_amount) / NULLIF(COUNT(DISTINCT pancake_orders.customer_id), 0),
+                        0
+                    ),
+                    2
+                ) as value
+            ')
+            ->groupBy('pages.owner_id')
+            ->pluck('value', 'user_id');
 
-            return (object) [
-                'user_id' => $user->id,
-                'user_name' => $user->name,
-                'value' => ! empty($userFilter['page_ids'])
-                    ? $this->compute($workspaceId, $dateRange, $userFilter)
-                    : 0,
-            ];
-        })->sortByDesc('value')->values();
+        return $userNames->map(fn ($name, $id) => (object) [
+            'user_id' => $id,
+            'user_name' => $name,
+            'value' => (float) ($averages[$id] ?? 0),
+        ])->sortByDesc('value')->values();
     }
 
     private function baseOrdersQuery(
