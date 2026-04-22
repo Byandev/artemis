@@ -74,11 +74,16 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
         debounce((search: string) => {
             router.get(
                 baseUrl,
-                { sort: query?.sort, 'filter[search]': search || undefined, page: 1 },
+                {
+                    sort: query?.sort,
+                    'filter[search]': search || undefined,
+                    page: 1,
+                    per_page: query?.perPage ?? items.per_page,
+                },
                 { preserveState: true, replace: true, preserveScroll: true, only: ['items'] }
             );
         }, 400),
-        [baseUrl, query?.sort]
+        [baseUrl, query?.sort, query?.perPage, items.per_page]
     );
 
     // FIXED: Only trigger search when the input actually changes, 
@@ -106,8 +111,8 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
         },
         {
             accessorKey: 'lead_time',
-            enableSorting: false,
-            header: ({ column }) => <SortableHeader column={column} title="Lead Time" className="justify-center" />,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Lead Time (days)" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center">
                     <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-400">
@@ -117,7 +122,8 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             ),
         },
         {
-            id: 'unfulfilled',
+            accessorKey: 'unfulfilled_count',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Unfulfilled" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center"><MetricCell value={row.original.unfulfilled} color="text-red-500 dark:text-red-400" /></div>
@@ -138,7 +144,8 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             ),
         },
         {
-            id: 'three_days_average',
+            accessorKey: 'three_days_average',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="3-Day Avg" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center"><MetricCell value={row.original.three_days_average} decimals={1} /></div>
@@ -247,12 +254,13 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
                         onFetch={(params) => {
                             router.get(
                                 baseUrl,
-                                { 
-                                    sort: params?.sort, 
-                                    'filter[search]': searchValue || undefined, 
-                                    page: params?.page ?? 1 
+                                {
+                                    sort: params?.sort,
+                                    'filter[search]': searchValue || undefined,
+                                    page: params?.page ?? 1,
+                                    per_page: params?.per_page ?? query?.perPage ?? items.per_page,
                                 },
-                                { preserveState: true, replace: true, preserveScroll: true, only: ['items'] }
+                                { preserveState: true, replace: true, preserveScroll: true }
                             );
                         }}
                     />

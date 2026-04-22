@@ -6,6 +6,9 @@ use App\Models\Page;
 use App\Models\ParcelJourney;
 use App\Models\ShippingAddress;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
 {
@@ -17,27 +20,27 @@ class Order extends Model
         'status' => 'integer',
     ];
 
-    public function shippingAddress(): \Illuminate\Database\Eloquent\Relations\HasOne|\App\Models\Order
+    public function shippingAddress(): HasOne|\App\Models\Order
     {
         return $this->hasOne(ShippingAddress::class);
     }
 
-    public function parcelJourney(): \Illuminate\Database\Eloquent\Relations\HasOne|Order
+    public function parcelJourney(): HasOne|Order
     {
         return $this->hasOne(ParcelJourney::class);
     }
 
-    public function parcelJourneys(): \Illuminate\Database\Eloquent\Relations\HasMany|Order
+    public function parcelJourneys(): HasMany|Order
     {
         return $this->hasMany(ParcelJourney::class);
     }
 
-    public function page(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function page(): BelongsTo
     {
         return $this->belongsTo(Page::class);
     }
 
-    public function phoneNumberReports(): Order|\Illuminate\Database\Eloquent\Relations\HasMany
+    public function phoneNumberReports(): Order|HasMany
     {
         return $this->hasMany(OrderPhoneNumberReport::class, 'order_id', 'id');
     }

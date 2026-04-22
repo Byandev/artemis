@@ -34,7 +34,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('inventory_purchased_order_id');
             $table->foreign('inventory_purchased_order_id', 'ipo_items_order_id_foreign')
-                  ->references('id')->on('inventory_purchased_orders')->onDelete('cascade');
+                ->references('id')->on('inventory_purchased_orders')->onDelete('cascade');
             $table->foreignId('inventory_item_id')->constrained('inventory_items')->onDelete('cascade');
             $table->integer('count')->default(0);
             $table->decimal('amount', 12, 2)->default(0);

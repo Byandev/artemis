@@ -5,6 +5,7 @@ namespace Modules\Botcake\Models;
 use App\Models\Page;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Flow extends Model
 {
@@ -12,7 +13,7 @@ class Flow extends Model
 
     protected $table = 'botcake_flows';
 
-    public function page(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function page(): BelongsTo
     {
         return $this->belongsTo(Page::class);
     }

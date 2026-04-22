@@ -46,6 +46,7 @@ type Props = {
         end_date?: string;
         sort?: string | null;
         stats_page?: number;
+        stats_per_page?: number;
     };
 }
 
@@ -140,6 +141,21 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates, pageStats, an
                 <div className="truncate max-w-3xl font-mono text-[11px] text-gray-500 dark:text-gray-400">
                     {row.original.message}
                 </div>
+            ),
+        },
+        {
+            accessorKey: 'is_enabled',
+            header: 'Status',
+            cell: ({ row }) => (
+                row.original.is_enabled ? (
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-medium text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
+                        Enabled
+                    </span>
+                ) : (
+                    <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] font-medium text-gray-500 dark:bg-zinc-800 dark:text-gray-400">
+                        Disabled
+                    </span>
+                )
             ),
         },
         {
@@ -262,6 +278,7 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates, pageStats, an
                                 {
                                     sort: params?.sort,
                                     stats_page: params?.page ?? 1,
+                                    per_page_stats: params?.per_page ?? query?.stats_per_page ?? pageStats.per_page,
                                     start_date: dateRange[0],
                                     end_date: dateRange[1],
                                 },

@@ -10,6 +10,7 @@ use Inertia\Inertia;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class InventoryTransactionController extends Controller
@@ -20,7 +21,7 @@ class InventoryTransactionController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
-        $inventory = QueryBuilder::for(InventoryTransaction::where('workspace_id', $workspace->id))
+        $inventory = QueryBuilder::for(InventoryTransaction::where('inventory_transactions.workspace_id', $workspace->id))
             ->with(['inventoryItem.product'])
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -33,9 +34,25 @@ class InventoryTransactionController extends Controller
                     $query->whereDate('date', '<=', $value);
                 }),
             ])
-            ->allowedSorts(['date', 'ref_no', 'po_qty_in', 'po_qty_out', 'rts_goods_in', 'rts_goods_out', 'rts_bad', 'lost', 'remaining_qty', 'created_at'])
+            ->allowedSorts([
+                'date',
+                'ref_no',
+                'po_qty_in',
+                'po_qty_out',
+                'rts_goods_in',
+                'rts_goods_out',
+                'rts_bad',
+                'lost',
+                'remaining_qty',
+                'created_at',
+                AllowedSort::callback('inventory_item', function ($query, $descending) {
+                    $query->join('inventory_items', 'inventory_transactions.inventory_item_id', '=', 'inventory_items.id')
+                        ->orderBy('inventory_items.sku', $descending ? 'desc' : 'asc')
+                        ->select('inventory_transactions.*');
+                }),
+           ])
             ->defaultSort('-date')
-            ->paginate(10)
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         $users = User::get(['id', 'name']);
@@ -46,6 +63,7 @@ class InventoryTransactionController extends Controller
             'items' => InventoryItem::where('workspace_id', $workspace->id)->with('product')->get(),
             'query' => [
                 ...$request->only(['sort', 'page']),
+                'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
             'users' => $users,
@@ -56,7 +74,12 @@ class InventoryTransactionController extends Controller
     {
         $validated = $request->validate([
             'inventory_item_id' => 'required|exists:inventory_items,id',
-            'date' => 'required|date',
+            'date' => [
+                'required',
+                'date',
+                'before_or_equal:9999-12-31',
+                'regex:/^\d{4}-\d{2}-\d{2}$/',
+            ],
             'ref_no' => 'required|string|max:255|unique:inventory_transactions,ref_no,NULL,id,workspace_id,'.$workspace->id,
             'po_qty_in' => 'required|integer|min:0',
             'po_qty_out' => 'required|integer|min:0',
