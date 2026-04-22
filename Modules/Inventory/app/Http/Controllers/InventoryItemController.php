@@ -13,7 +13,7 @@ use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class InventoryItemController extends Controller
-{
+{ 
     public function index(Request $request, Workspace $workspace)
     {
         $items = QueryBuilder::for(InventoryItem::where('inventory_items.workspace_id', $workspace->id))

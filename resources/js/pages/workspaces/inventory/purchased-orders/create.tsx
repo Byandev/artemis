@@ -3,6 +3,9 @@ import PageHeader from '@/components/common/PageHeader';
 import { Head, useForm, router } from '@inertiajs/react';
 import { Workspace } from '@/types/models/Workspace';
 import { Plus, Trash2 } from 'lucide-react';
+import { useEffect } from 'react';
+
+
 
 interface InventoryItem {
     id: number;
@@ -46,15 +49,29 @@ export default function Create({ workspace, items }: Props) {
         delivery_no: '',
         cust_po_no: '',
         control_no: '',
-        delivery_fee: '',
+        delivery_fee: '0',
         total_amount: '',
         status: '1',
         items: [emptyItem()],
     });
 
+    useEffect(() => {
+        const itemsTotal = data.items.reduce((sum, item) => {
+            const val = parseFloat(item.total_amount);
+            return sum + (isNaN(val) ? 0 : val);
+        }, 0);
+
+        const deliveryFee = parseFloat(data.delivery_fee) || 0;
+        const grandTotal = (itemsTotal + deliveryFee).toFixed(2);
+
+        if (data.total_amount !== grandTotal) {
+            setData('total_amount', grandTotal);
+        }
+    }, [data.items, data.delivery_fee]);
+
+   
     const inputClass = "h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600";
     const labelClass = "block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1.5";
-
     const updateItem = (index: number, field: keyof OrderItem, value: string) => {
         const updated = data.items.map((item, i) => {
             if (i !== index) return item;
@@ -87,18 +104,12 @@ export default function Create({ workspace, items }: Props) {
                     title="Create Purchased Order"
                     description="Add a new purchased order record."
                 >
-                    <button
-                        type="button"
-                        onClick={() => router.get(`/workspaces/${workspace.slug}/inventory/purchased-orders`)}
-                        className="flex h-8 items-center rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300"
-                    >
-                        Cancel
-                    </button>
+
                 </PageHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Order Details */}
-                    <div className="rounded-[14px] border border-black/6 bg-white p-5 dark:border-white/6 dark:bg-zinc-900">
+                    <div className="rounded-[14px] border border-black/6 bg-white p-5 dark:border-white/6 dark:bg-zinc-900 shadow-sm">
                         <h3 className="mb-4 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Order Details</h3>
                         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                             <div>
@@ -108,43 +119,32 @@ export default function Create({ workspace, items }: Props) {
                                         <option key={s.value} value={s.value}>{s.label}</option>
                                     ))}
                                 </select>
-                                {errors.status && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.status}</p>}
                             </div>
                             <div>
                                 <label className={labelClass}>Issue Date <span className="text-red-400">*</span></label>
                                 <input type="date" value={data.issue_date} onChange={(e) => setData('issue_date', e.target.value)} className={inputClass} />
-                                {errors.issue_date && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.issue_date}</p>}
                             </div>
                             <div>
                                 <label className={labelClass}>Delivery No.</label>
                                 <input type="text" value={data.delivery_no} onChange={(e) => setData('delivery_no', e.target.value)} placeholder="DR-001" className={inputClass} />
-                                {errors.delivery_no && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.delivery_no}</p>}
                             </div>
                             <div>
                                 <label className={labelClass}>Cust PO No.</label>
                                 <input type="text" value={data.cust_po_no} onChange={(e) => setData('cust_po_no', e.target.value)} placeholder="PO-001" className={inputClass} />
-                                {errors.cust_po_no && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.cust_po_no}</p>}
                             </div>
                             <div>
                                 <label className={labelClass}>Control No.</label>
                                 <input type="text" value={data.control_no} onChange={(e) => setData('control_no', e.target.value)} placeholder="CN-001" className={inputClass} />
-                                {errors.control_no && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.control_no}</p>}
                             </div>
                             <div>
                                 <label className={labelClass}>Delivery Fee <span className="text-red-400">*</span></label>
                                 <input type="number" step="0.01" min="0" value={data.delivery_fee} onChange={(e) => setData('delivery_fee', e.target.value)} placeholder="0.00" className={inputClass} />
-                                {errors.delivery_fee && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.delivery_fee}</p>}
-                            </div>
-                            <div>
-                                <label className={labelClass}>Total Amount <span className="text-red-400">*</span></label>
-                                <input type="number" step="0.01" min="0" value={data.total_amount} onChange={(e) => setData('total_amount', e.target.value)} placeholder="0.00" className={inputClass} />
-                                {errors.total_amount && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.total_amount}</p>}
                             </div>
                         </div>
                     </div>
 
-                    {/* Order Items */}
-                    <div className="rounded-[14px] border border-black/6 bg-white p-5 dark:border-white/6 dark:bg-zinc-900">
+                    {/* Order Items Card */}
+                    <div className="rounded-[14px] border border-black/6 bg-white p-5 dark:border-white/6 dark:bg-zinc-900 shadow-sm">
                         <div className="mb-4 flex items-center justify-between">
                             <h3 className="font-mono text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Order Items</h3>
                             <button
@@ -158,7 +158,6 @@ export default function Create({ workspace, items }: Props) {
                         </div>
 
                         <div className="space-y-3">
-                            {/* Header */}
                             <div className="grid grid-cols-[1fr_100px_120px_120px_36px] gap-3">
                                 <span className={labelClass}>Inventory Item</span>
                                 <span className={labelClass}>Count</span>
@@ -181,37 +180,14 @@ export default function Create({ workspace, items }: Props) {
                                             </option>
                                         ))}
                                     </select>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        placeholder="0"
-                                        value={item.count}
-                                        onChange={(e) => updateItem(i, 'count', e.target.value)}
-                                        className={inputClass}
-                                    />
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        placeholder="0.00"
-                                        value={item.amount}
-                                        onChange={(e) => updateItem(i, 'amount', e.target.value)}
-                                        className={inputClass}
-                                    />
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        placeholder="0.00"
-                                        value={item.total_amount}
-                                        onChange={(e) => updateItem(i, 'total_amount', e.target.value)}
-                                        className={inputClass}
-                                    />
+                                    <input type="number" min="1" placeholder="0" value={item.count} onChange={(e) => updateItem(i, 'count', e.target.value)} className={inputClass} />
+                                    <input type="number" step="0.01" min="0" placeholder="0.00" value={item.amount} onChange={(e) => updateItem(i, 'amount', e.target.value)} className={inputClass} />
+                                    <input type="text" readOnly value={item.total_amount} className={`${inputClass} bg-black/5 opacity-50 cursor-not-allowed`} />
                                     <button
                                         type="button"
                                         onClick={() => removeItem(i)}
                                         disabled={data.items.length === 1}
-                                        className="flex h-10 w-9 items-center justify-center rounded-[10px] border border-black/8 text-gray-400 transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30 dark:border-white/8 dark:hover:border-red-800 dark:hover:bg-red-950 dark:hover:text-red-400"
+                                        className="flex h-10 w-9 items-center justify-center rounded-[10px] border border-black/8 text-gray-400 transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30 dark:border-white/8"
                                     >
                                         <Trash2 className="h-3.5 w-3.5" />
                                     </button>
@@ -219,22 +195,43 @@ export default function Create({ workspace, items }: Props) {
                             ))}
                         </div>
 
-                        {errors.items && <p className="mt-2 font-mono text-[11px] text-red-500">{errors.items}</p>}
+                        {/* TOTAL AMOUNT SECTION - NASA RIGHT SIDE (Aligned with totals) */}
+                       <div className="mt-4 grid grid-cols-[1fr_100px_120px_120px_36px] gap-3">
+                            <div className="col-span-3" /> 
+                            
+                            <div>
+                                <label className={labelClass}>Total Amount <span className="text-red-400">*</span></label>
+                                <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    min="0" 
+                                    value={data.total_amount} 
+                                    onChange={(e) => setData('total_amount', e.target.value)} 
+                                    placeholder="0.00" 
+                                    className={inputClass} 
+                                />
+                                {errors.total_amount && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.total_amount}</p>}
+                            </div>
+                            
+                            <div />
+                        </div>
+
+                        {errors.items && <p className="mt-4 font-mono text-[11px] text-red-500">{errors.items}</p>}
                     </div>
 
-                    {/* Footer */}
+                    {/* Footer Actions */}
                     <div className="flex justify-end gap-2">
                         <button
                             type="button"
                             onClick={() => router.get(`/workspaces/${workspace.slug}/inventory/purchased-orders`)}
-                            className="flex h-9 items-center rounded-lg border border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300"
+                            className="flex h-10 items-center rounded-lg border border-black/8 bg-white px-5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={processing}
-                            className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
+                            className="flex h-10 items-center rounded-lg bg-emerald-600 px-6 font-mono! text-[12px]! font-bold uppercase tracking-wide text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                         >
                             {processing ? 'Creating…' : 'Create Order'}
                         </button>
