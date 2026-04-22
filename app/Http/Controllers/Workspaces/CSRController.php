@@ -20,7 +20,7 @@ class CSRController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -64,7 +64,7 @@ class CSRController extends Controller
 
     public function analytics(Request $request, Workspace $workspace)
     {
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
