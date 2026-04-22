@@ -60,6 +60,7 @@ class AccountController extends Controller
             $account->current_balance = $lastBalances->has($account->id)
                 ? (float) $lastBalances->get($account->id)
                 : (float) $account->opening_balance;
+
             return $account;
         });
 

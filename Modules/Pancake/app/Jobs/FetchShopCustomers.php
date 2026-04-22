@@ -5,11 +5,12 @@ namespace Modules\Pancake\Jobs;
 use App\Models\Shop;
 use Carbon\Carbon;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
 use Modules\Pancake\Services\Pancake;
 
 class FetchShopCustomers implements ShouldQueue
 {
-    use \Illuminate\Foundation\Queue\Queueable;
+    use Queueable;
 
     public int $tries = 5;
 

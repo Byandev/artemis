@@ -166,19 +166,19 @@ class ParcelUpdateNotificationTemplateController extends Controller
             ->withQueryString();
 
         return Inertia::render('workspaces/rts/parcel-update-notification-templates', [
-            'workspace'  => $workspace,
-            'templates'  => $templates,
-            'pageStats'  => $pageStats,
-            'analytics'  => [
+            'workspace' => $workspace,
+            'templates' => $templates,
+            'pageStats' => $pageStats,
+            'analytics' => [
                 'tracked_orders' => $trackedOrders,
-                'sms_sent'       => $smsSent,
-                'chat_sent'      => $chatSent,
-                'total_sent'     => $totalSent,
+                'sms_sent' => $smsSent,
+                'chat_sent' => $chatSent,
+                'total_sent' => $totalSent,
             ],
             'query' => [
                 'start_date' => $startDate,
-                'end_date'   => $endDate,
-                'sort'       => $request->input('sort'),
+                'end_date' => $endDate,
+                'sort' => $request->input('sort'),
                 'stats_page' => $request->integer('stats_page', 1),
                 'stats_per_page' => $request->integer('per_page_stats', 10),
             ],
@@ -189,6 +189,7 @@ class ParcelUpdateNotificationTemplateController extends Controller
     {
         $data = $request->validate([
             'message' => 'required|string',
+            'is_enabled' => 'required|boolean',
         ]);
 
         $template->update($data);

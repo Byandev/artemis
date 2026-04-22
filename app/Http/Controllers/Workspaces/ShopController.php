@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Sorts\PendingRequiredChecklistsSort;
 use App\Models\Shop;
 use App\Models\Workspace;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -80,7 +81,7 @@ class ShopController extends Controller
 
         $shop->update(['customers_last_synced_at' => null]);
 
-        dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subMonth()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopCustomers($shop, 1, Carbon::now()->subMonth()->unix(), Carbon::now()->unix()))->onQueue('pancake');
         dispatch(new FetchShopUsers($shop))->onQueue('pancake');
 
         return redirect()->route('workspaces.shops.index', $workspace);

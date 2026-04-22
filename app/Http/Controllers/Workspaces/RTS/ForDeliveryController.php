@@ -17,6 +17,7 @@ use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
 use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Models\Page;
 use App\Models\Workspace;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -36,7 +37,7 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
             return redirect()->back()->with('error', 'Status can only be updated for orders scheduled for delivery today.');
         }
 
@@ -53,7 +54,7 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
             return redirect()->back()->with('error', 'Assignee can only be updated for orders scheduled for delivery today.');
         }
 
@@ -63,7 +64,7 @@ class ForDeliveryController extends Controller
 
         $orderForDelivery->update(['assignee_id' => $request->userId]);
 
-        return redirect()->back()->with('success', 'Assignee updated successfully' . $request->userId);
+        return redirect()->back()->with('success', 'Assignee updated successfully'.$request->userId);
     }
 
     public function publicUpdatePhones(Workspace $workspace, $id, Request $request)
@@ -92,7 +93,7 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
             return redirect()->back()->with('error', 'Assignee can only be removed for orders scheduled for delivery today.');
         }
 
@@ -244,25 +245,23 @@ class ForDeliveryController extends Controller
             });
         }
 
-        // 1️⃣ Total orders
-        $totalOrdersForDeliveryToday = (clone $totalOrdersForDeliveryTodayQuery)->count();
+        // Total uses its own base (optionally filtered via whereHas on confirmed_by)
+        $totalOrdersForDeliveryToday = $totalOrdersForDeliveryTodayQuery->count();
 
-        // 3️⃣ Called rate (not pending)
-        $totalCalled = (clone $statsBase)
-            ->where('status', '!=', 'PENDING')
-            ->count();
+        // The other 4 stats share $statsBase — roll them into a single aggregate query
+        $statusBreakdown = $statsBase
+            ->selectRaw("
+                SUM(CASE WHEN status != 'PENDING' THEN 1 ELSE 0 END) as called,
+                SUM(CASE WHEN parcel_status = 'delivered' THEN 1 ELSE 0 END) as delivered,
+                SUM(CASE WHEN parcel_status = 'returning' THEN 1 ELSE 0 END) as returning_count,
+                SUM(CASE WHEN parcel_status = 'undeliverable' THEN 1 ELSE 0 END) as problematic
+            ")
+            ->first();
 
-        $totalDelivered = (clone $statsBase)
-            ->where('parcel_status', 'delivered')
-            ->count();
-
-        $totalReturning = (clone $statsBase)
-            ->where('parcel_status', 'returning')
-            ->count();
-
-        $totalProblematic = (clone $statsBase)
-            ->whereIn('parcel_status', ['undeliverable'])
-            ->count();
+        $totalCalled = (int) ($statusBreakdown->called ?? 0);
+        $totalDelivered = (int) ($statusBreakdown->delivered ?? 0);
+        $totalReturning = (int) ($statusBreakdown->returning_count ?? 0);
+        $totalProblematic = (int) ($statusBreakdown->problematic ?? 0);
 
         $users = User::get(['id', 'name']);
 
@@ -377,15 +376,22 @@ class ForDeliveryController extends Controller
             return response()->json(['total' => 0, 'called' => 0, 'delivered' => 0, 'returning' => 0]);
         }
 
-        $base = OrderForDelivery::where('workspace_id', $workspace->id)
+        $row = OrderForDelivery::where('workspace_id', $workspace->id)
             ->where('assignee_id', $userId)
-            ->whereDate('delivery_date', now());
+            ->whereDate('delivery_date', now())
+            ->selectRaw("
+                COUNT(*) as total,
+                SUM(CASE WHEN status != 'PENDING' THEN 1 ELSE 0 END) as called,
+                SUM(CASE WHEN parcel_status = 'delivered' THEN 1 ELSE 0 END) as delivered,
+                SUM(CASE WHEN parcel_status = 'returning' THEN 1 ELSE 0 END) as returning_count
+            ")
+            ->first();
 
         return response()->json([
-            'total' => (clone $base)->count(),
-            'called' => (clone $base)->where('status', '!=', 'PENDING')->count(),
-            'delivered' => (clone $base)->where('parcel_status', 'delivered')->count(),
-            'returning' => (clone $base)->where('parcel_status', 'returning')->count(),
+            'total' => (int) ($row->total ?? 0),
+            'called' => (int) ($row->called ?? 0),
+            'delivered' => (int) ($row->delivered ?? 0),
+            'returning' => (int) ($row->returning_count ?? 0),
         ]);
     }
 
