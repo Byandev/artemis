@@ -10,7 +10,6 @@ use Inertia\Inertia;
 
 class PurchaseOrderController extends Controller
 {
-    
     public function index(Workspace $workspace)
     {
         return Inertia::render('workspaces/inventory/purchased-orders/index', [

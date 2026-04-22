@@ -14,7 +14,7 @@ use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class InventoryItemController extends Controller
-{ 
+{
     public function index(Request $request, Workspace $workspace)
     {
 
