@@ -42,17 +42,13 @@ Read path: metric classes gain a `rollup/` variant that the existing `compute/br
 
 ### 1. `workspace_daily_metrics` (main)
 
-Grain: `(workspace_id, date, page_id)`. One row per page per day. `shop_id` and `owner_id` denormalized so reads never join `pages`.
+Grain: `(workspace_id, date, page_id)`. One row per page per day. `shop_id` and `owner_id` are **not** denormalized — `perShop` / `perUser` reads do a small JOIN to `pages` at query time. Trades a trivial read-side JOIN for zero denormalization drift when a page is reassigned to a different shop or owner.
 
 ```sql
 CREATE TABLE workspace_daily_metrics (
     workspace_id BIGINT UNSIGNED NOT NULL,
     date DATE NOT NULL,
     page_id BIGINT UNSIGNED NOT NULL,
-
-    -- denormalized dimensions (pulled from pages at rollup time)
-    shop_id BIGINT UNSIGNED NULL,
-    owner_id BIGINT UNSIGNED NULL,
 
     -- order counts, each bound to the relevant event date
     confirmed_count INT UNSIGNED NOT NULL DEFAULT 0,         -- confirmed_at = date
@@ -101,9 +97,7 @@ CREATE TABLE workspace_daily_metrics (
     updated_at TIMESTAMP NOT NULL,
 
     PRIMARY KEY (workspace_id, date, page_id),
-    KEY idx_workspace_date (workspace_id, date),
-    KEY idx_workspace_shop_date (workspace_id, shop_id, date),
-    KEY idx_workspace_owner_date (workspace_id, owner_id, date)
+    KEY idx_workspace_date (workspace_id, date)
 );
 ```
 
@@ -546,7 +540,7 @@ Parity tests are non-negotiable. For each phase:
 ## Risks & mitigations
 
 | Risk | Mitigation |
-|------|-----------|
+|------|------------|
 | Rollup drift when order statuses change beyond 14-day window | Monthly full rebuild command (`analytics:rollup:backfill --from=now-60d --to=now-15d`); alert if reconciliation gap > threshold |
 | Schema change on `pancake_orders` (new status enum value) | Code review checklist for anything touching status transitions; rollup command fails loudly on unknown status |
 | Backfill wedges production DB | Run off-hours; chunk by `--chunk-days=1` if needed; monitor replication lag |
