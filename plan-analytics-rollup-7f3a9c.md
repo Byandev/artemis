@@ -50,20 +50,20 @@ CREATE TABLE workspace_daily_metrics (
     date DATE NOT NULL,
     page_id BIGINT UNSIGNED NOT NULL,
 
-    -- order counts, each bound to the relevant event date
-    confirmed_count INT UNSIGNED NOT NULL DEFAULT 0,         -- confirmed_at = date
+    -- order counts (event-based: matched to the live dashboard metric filters)
+    confirmed_count INT UNSIGNED NOT NULL DEFAULT 0,         -- confirmed_at = date, status NOT IN (6,7)
     shipped_count INT UNSIGNED NOT NULL DEFAULT 0,           -- shipped_at = date
     first_delivery_attempt_count INT UNSIGNED NOT NULL DEFAULT 0, -- first_delivery_attempt = date
-    delivered_count INT UNSIGNED NOT NULL DEFAULT 0,         -- status=3, delivered_at = date
-    returning_in_transit_count INT UNSIGNED NOT NULL DEFAULT 0, -- status=4, returning_at = date
-    returned_final_count INT UNSIGNED NOT NULL DEFAULT 0,    -- status=5, returning_at = date
+    delivered_count INT UNSIGNED NOT NULL DEFAULT 0,         -- delivered_at = date (no status filter)
+    returning_count INT UNSIGNED NOT NULL DEFAULT 0,         -- returning_at = date, returned_at IS NULL (no status filter)
+    returned_count INT UNSIGNED NOT NULL DEFAULT 0,          -- returned_at = date (no status filter)
     for_delivery_count INT UNSIGNED NOT NULL DEFAULT 0,      -- from parcel_journeys: status='On Delivery'
 
-    -- revenue sums (denominated by same event as the matching count)
-    total_sales DECIMAL(18,2) NOT NULL DEFAULT 0,            -- SUM(final_amount) on confirmed_at
-    delivered_amount DECIMAL(18,2) NOT NULL DEFAULT 0,       -- SUM(final_amount) on delivered_at, status=3
-    returning_amount DECIMAL(18,2) NOT NULL DEFAULT 0,       -- SUM(final_amount) on returning_at, status=4
-    returned_amount DECIMAL(18,2) NOT NULL DEFAULT 0,        -- SUM(final_amount) on returning_at, status=5
+    -- revenue sums (same filter as the matching count)
+    total_sales DECIMAL(18,2) NOT NULL DEFAULT 0,            -- SUM(final_amount) with confirmed filter above
+    delivered_amount DECIMAL(18,2) NOT NULL DEFAULT 0,       -- SUM(final_amount) with delivered filter above
+    returning_amount DECIMAL(18,2) NOT NULL DEFAULT 0,       -- SUM(final_amount) with returning filter above
+    returned_amount DECIMAL(18,2) NOT NULL DEFAULT 0,        -- SUM(final_amount) with returned filter above
 
     -- delivery attempt totals (divide by count at read time for avg)
     sum_delivery_attempts_delivered INT UNSIGNED NOT NULL DEFAULT 0,  -- SUM(delivery_attempts) on delivered_at, status=3
@@ -103,11 +103,12 @@ CREATE TABLE workspace_daily_metrics (
 
 **Derived at read time (do not store):**
 - `aov = total_sales / confirmed_count`
-- `rts_rate = (returning_in_transit_count + returned_final_count) / (delivered_count + returning_in_transit_count + returned_final_count) * 100`
 - `delivered_avg_delivery_attempts = sum_delivery_attempts_delivered / delivered_count`
-- `returned_avg_delivery_attempts = sum_delivery_attempts_returned / (returning_in_transit_count + returned_final_count)`
+- `returned_avg_delivery_attempts = sum_delivery_attempts_returned / returned_count`
 - All `Average*Days` metrics: `sum_days_* / count_*`
 - `delivered_avg_customer_rts = sum_customer_rts_rate_delivered / count_customer_rts_rate_delivered`
+
+**`rts_rate` is NOT served from this table.** The live RTS computation (`RtsBaseQuery`) is state-based — it reads the *current* `status` of each order to decide which bucket it belongs to. The columns above are event-based (an order delivered on D always contributes to `delivered_count` on D, regardless of whether it later returned). Serving both semantics would require doubling the column count. Keep RTS queries live (the `applyDateFilter` UNION fix makes them fast enough) and revisit in Phase 3 if a dedicated state-based column set becomes worth it.
 
 ### 2. `workspace_daily_metrics_by_rider`
 

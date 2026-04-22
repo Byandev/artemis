@@ -5,6 +5,7 @@ namespace App\Queries;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Models\Order;
 
 abstract class RtsBaseQuery
@@ -50,20 +51,39 @@ abstract class RtsBaseQuery
     }
 
     /**
-     * Use direct range comparisons instead of DATE() to keep the filter sargable
-     * and allow MySQL to use indexes on delivered_at / returning_at.
+     * OR across two indexed columns prevents single-index use. Split into a UNION of IDs
+     * (one branch per date column, each uses its own index) and join back.
      */
     private function applyDateFilter(): void
     {
         $start = $this->request->input('start_date');
         $end = $this->request->input('end_date');
 
-        if ($start && $end) {
-            $this->query->where(function ($q) use ($start, $end) {
-                $q->whereBetween('pancake_orders.delivered_at', [$start, $end.' 23:59:59'])
-                    ->orWhereBetween('pancake_orders.returning_at', [$start, $end.' 23:59:59']);
-            });
+        if (! $start || ! $end) {
+            return;
         }
+
+        $endInclusive = $end.' 23:59:59';
+        $workspaceId = $this->workspace->id;
+
+        $pageIds = $this->request->filled('page_ids')
+            ? (array) $this->request->input('page_ids')
+            : null;
+        $shopIds = $this->request->filled('shop_ids')
+            ? (array) $this->request->input('shop_ids')
+            : null;
+
+        $branch = fn (string $dateColumn) => DB::table('pancake_orders')
+            ->selectRaw('id AS event_order_id')
+            ->where('workspace_id', $workspaceId)
+            ->whereIn('status', [3, 4, 5])
+            ->whereBetween($dateColumn, [$start, $endInclusive])
+            ->when($pageIds, fn ($q) => $q->whereIn('page_id', $pageIds))
+            ->when($shopIds, fn ($q) => $q->whereIn('shop_id', $shopIds));
+
+        $eventIds = $branch('delivered_at')->union($branch('returning_at'));
+
+        $this->query->joinSub($eventIds, 'event_ids', 'event_ids.event_order_id', '=', 'pancake_orders.id');
     }
 
     private function applyEntityFilters(): void
