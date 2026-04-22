@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Workspace;
 use App\Support\AnalyticsRollup\CsrPosRollupBuilder;
+use App\Support\AnalyticsRollup\CustomerActivityRollupBuilder;
 use App\Support\AnalyticsRollup\CustomerFactsRollupBuilder;
 use App\Support\AnalyticsRollup\ItemRollupBuilder;
 use App\Support\AnalyticsRollup\LocationRollupBuilder;
@@ -20,7 +21,7 @@ class AnalyticsRollup extends Command
                             {--to= : End of date range (Y-m-d)}
                             {--workspace= : Limit to a specific workspace ID}
                             {--trailing-days=14 : Default rebuild window when no date args given}
-                            {--only= : Comma-separated subset of builders to run (main,rider,item,location,csr_pos,customer_facts)}';
+                            {--only= : Comma-separated subset of builders to run (main,rider,item,location,csr_pos,customer_facts,customer_activity)}';
 
     protected $description = 'Rebuild workspace_daily_metrics rollup rows for the given date range or trailing window.';
 
@@ -31,6 +32,7 @@ class AnalyticsRollup extends Command
         LocationRollupBuilder $location,
         CsrPosRollupBuilder $csrPos,
         CustomerFactsRollupBuilder $customerFacts,
+        CustomerActivityRollupBuilder $customerActivity,
     ): int {
         [$from, $to] = $this->resolveRange();
 
@@ -41,6 +43,7 @@ class AnalyticsRollup extends Command
             'location' => $location,
             'csr_pos' => $csrPos,
             'customer_facts' => $customerFacts,
+            'customer_activity' => $customerActivity,
         ];
 
         $only = $this->option('only')

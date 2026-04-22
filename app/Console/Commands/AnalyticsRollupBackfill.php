@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Workspace;
 use App\Support\AnalyticsRollup\CsrPosRollupBuilder;
+use App\Support\AnalyticsRollup\CustomerActivityRollupBuilder;
 use App\Support\AnalyticsRollup\CustomerFactsRollupBuilder;
 use App\Support\AnalyticsRollup\ItemRollupBuilder;
 use App\Support\AnalyticsRollup\LocationRollupBuilder;
@@ -19,7 +20,7 @@ class AnalyticsRollupBackfill extends Command
                             {--to= : Latest date (Y-m-d), defaults to yesterday}
                             {--workspace= : Limit to a specific workspace ID}
                             {--chunk-days=7 : Days per logging chunk}
-                            {--only= : Comma-separated subset of builders to run (main,rider,item,location,csr_pos,customer_facts)}';
+                            {--only= : Comma-separated subset of builders to run (main,rider,item,location,csr_pos,customer_facts,customer_activity)}';
 
     protected $description = 'One-shot historical backfill of all workspace_daily_metrics rollup tables. Runs per workspace, per day, walking backward from --to to --from.';
 
@@ -30,6 +31,7 @@ class AnalyticsRollupBackfill extends Command
         LocationRollupBuilder $location,
         CsrPosRollupBuilder $csrPos,
         CustomerFactsRollupBuilder $customerFacts,
+        CustomerActivityRollupBuilder $customerActivity,
     ): int {
         $all = [
             'main' => $main,
@@ -38,6 +40,7 @@ class AnalyticsRollupBackfill extends Command
             'location' => $location,
             'csr_pos' => $csrPos,
             'customer_facts' => $customerFacts,
+            'customer_activity' => $customerActivity,
         ];
 
         $only = $this->option('only')
