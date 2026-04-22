@@ -54,12 +54,7 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user() ? [
-                    'id' => $request->user()->id,
-                    'name' => $request->user()->name,
-                    'email' => $request->user()->email,
-                    'is_super_admin' => $request->user()->is_super_admin,
-                ] : null,
+                'user' => $request->user() ?? null,
             ],
             'workspaces' => $workspaces,
             'currentWorkspace' => $currentWorkspace,
