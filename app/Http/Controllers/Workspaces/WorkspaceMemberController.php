@@ -13,20 +13,21 @@ use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class WorkspaceMemberController extends Controller
 {
-    /**
-     * Display workspace members.
-     */
+
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
-        // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
+        if (!$request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
-        // Get members with pagination, sorting, and filtering
+        $this->authorize('View Members', $workspace);
+
         $members = QueryBuilder::for(User::class)
             ->join('workspace_user', 'users.id', '=', 'workspace_user.user_id')
             ->leftJoin('roles', 'workspace_user.role_id', '=', 'roles.id')
@@ -62,25 +63,18 @@ class WorkspaceMemberController extends Controller
                     'created_at' => $user->pivot_created_at,
                 ];
                 unset($user->pivot_role_id, $user->pivot_role_name, $user->pivot_created_at);
-
                 return $user;
             });
 
-        // Get pending invitations with pagination — uses invitation_sort / invitation_page params
         $invitationRequest = $request->duplicate(
-            query: array_merge(
-                $request->query(),
-                $request->has('invitation_sort') ? ['sort' => $request->input('invitation_sort')] : []
-            )
+            query: array_merge($request->query(), $request->has('invitation_sort') ? ['sort' => $request->input('invitation_sort')] : [])
         );
 
         $pendingInvitations = QueryBuilder::for($workspace->pendingInvitations()->getQuery(), $invitationRequest)
             ->leftJoin('roles', 'roles.id', '=', 'workspace_invitations.role_id')
             ->select('workspace_invitations.*')
             ->with(['inviter', 'role'])
-            ->allowedFilters([
-                AllowedFilter::partial('search', 'email'),
-            ])
+            ->allowedFilters([AllowedFilter::partial('search', 'email')])
             ->allowedSorts([
                 'id',
                 'email',
@@ -92,13 +86,11 @@ class WorkspaceMemberController extends Controller
             ->paginate($request->input('perPage', 10), ['*'], 'invitation_page')
             ->withQueryString();
 
-        $isAdmin = $request->user()->isAdminOf($workspace);
-
         return Inertia::render('workspaces/members', [
             'workspace' => $workspace,
             'members' => $members,
             'pendingInvitations' => $pendingInvitations,
-            'isAdmin' => $isAdmin,
+            'isAdmin' => $request->user()->isAdminOf($workspace),
             'roles' => Role::where('workspace_id', $workspace->id)->get(),
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
@@ -109,22 +101,30 @@ class WorkspaceMemberController extends Controller
         ]);
     }
 
-    /**
-     * Update a member's role.
-     */
+    public function store(Request $request, Workspace $workspace)
+    {
+        $this->authorize('Invite Members', $workspace);
+
+        $request->validate([
+            'email' => 'required|email',
+            'role_id' => 'required|exists:roles,id',
+        ]);
+
+        $workspace->invitations()->create([
+            'email' => $request->email,
+            'role_id' => $request->role_id,
+        ]);
+
+        return back()->with('success', 'Invitation sent.');
+    }
+
     public function updateMember(Request $request, Workspace $workspace, User $user)
     {
-
-        if (! $request->user()->isAdminOf($workspace)) {
-            abort(403, 'You do not have permission to update member roles.');
-        }
+        // NEW: Check granular permission
+        $this->authorize('Edit Members', $workspace);
 
         if ($workspace->isOwner($user)) {
             return back()->withErrors(['error' => 'Cannot change the workspace owner\'s role.']);
-        }
-
-        if ($workspace->owner_id === $user->id) {
-            return back()->withErrors(['role' => 'Owner roles are protected.']);
         }
 
         $validated = $request->validate([
@@ -136,63 +136,32 @@ class WorkspaceMemberController extends Controller
         return back()->with('success', 'Member role updated successfully.');
     }
 
-    /**
-     * Remove a member from the workspace.
-     */
     public function destroy(Request $request, Workspace $workspace, User $user)
     {
-        // Only admins and owners can remove members
-        if (! $workspace->isOwner($request->user())) {
-            abort(403, 'You do not have permission to remove members.');
+        if ($request->user()->id !== $user->id) {
+            $this->authorize('Remove Members', $workspace);
         }
 
-        // Cannot remove the owner
         if ($workspace->isOwner($user)) {
             return back()->withErrors(['error' => 'Cannot remove the workspace owner.']);
         }
 
-        // Users can remove themselves
-        if ($request->user()->id === $user->id) {
-            $workspace->removeMember($user);
-
-            return redirect()->route('workspaces.index')
-                ->with('success', 'You have left the workspace.');
-        }
-
         $workspace->removeMember($user);
+
+        if ($request->user()->id === $user->id) {
+            return redirect()->route('workspaces.index')->with('success', 'You have left the workspace.');
+        }
 
         return back()->with('success', 'Member removed successfully.');
     }
 
-    /**
-     * Generate a password reset link for a workspace member and return it as JSON
-     * so the admin can copy and share it directly.
-     */
     public function generatePasswordReset(Request $request, Workspace $workspace, User $user)
     {
-        // Only admins and owners can remove members
-        if (! $workspace->isOwner($request->user())) {
-            abort(403, 'You do not have permission.');
-        }
+        $this->authorize('Reset Member Password', $workspace);
 
         $token = Password::createToken($user);
-        $url = route('password.reset', ['token' => $token]).'?'.http_build_query(['email' => $user->email]);
+        $url = route('password.reset', ['token' => $token]) . '?' . http_build_query(['email' => $user->email]);
 
         return response()->json(['url' => $url]);
-    }
-
-    public function store(Request $request, Workspace $workspace)
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'role_id' => 'required|exists:roles,id',
-        ]);
-
-        $workspace->invitations()->create([
-            'email' => $request->email,
-            'role_id' => $request->role_id,
-        ]);
-
-        return back();
     }
 }

@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Workspace;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Illuminate\Support\Facades\DB;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -51,7 +53,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function workspaces()
     {
         return $this->belongsToMany(Workspace::class, 'workspace_user')
-            ->withPivot('role')
+            ->withPivot('role_id') // Ensure this matches your DB schema
             ->withTimestamps();
     }
 
@@ -94,7 +96,10 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isMemberOf(Workspace $workspace): bool
     {
-        return $this->workspaces()->where('workspace_id', $workspace->id)->exists();
+        return DB::table('workspace_user')
+            ->where('user_id', $this->id)
+            ->where('workspace_id', $workspace->id)
+            ->exists();
     }
 
     /**
@@ -102,14 +107,15 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isAdminOf(Workspace $workspace): bool
     {
-        // If they are a global superadmin, they are an admin of everything
-        if ($this->isSuperAdmin()) {
+        if ($this->isSuperAdmin() || $this->ownsWorkspace($workspace)) {
             return true;
         }
 
-        return $this->workspaces()
-            ->where('workspace_id', $workspace->id)
-            ->whereIn('workspace_user.role', ['owner', 'admin'])
+        return DB::table('workspace_user')
+            ->join('roles', 'workspace_user.role_id', '=', 'roles.id')
+            ->where('workspace_user.user_id', $this->id)
+            ->where('workspace_user.workspace_id', $workspace->id)
+            ->whereIn('roles.name', ['Owner', 'Admin'])
             ->exists();
     }
 
@@ -118,14 +124,16 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function ownsWorkspace(Workspace $workspace): bool
     {
-        return $workspace->owner_id === $this->id;
+        return (int) $workspace->owner_id === (int) $this->id;
     }
 
     public function hasWorkspaceRole(Workspace $workspace, string $role): bool
     {
-        return $this->workspaces()
-            ->where('workspace_id', $workspace->id)
-            ->where('workspace_user.role', $role)
+        return DB::table('workspace_user')
+            ->join('roles', 'workspace_user.role_id', '=', 'roles.id')
+            ->where('workspace_user.user_id', $this->id)
+            ->where('workspace_user.workspace_id', $workspace->id)
+            ->where('roles.name', $role)
             ->exists();
     }
 
@@ -134,7 +142,6 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isSuperAdmin(): bool
     {
-        // This checks the 'role' column on the 'users' table
         return $this->role === 'superadmin';
     }
 
@@ -147,13 +154,40 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->role === $requiredRole;
     }
 
-    public function pages(): User|\Illuminate\Database\Eloquent\Relations\HasMany
+    public function pages(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Page::class, 'owner_id');
     }
 
-    public function pancakeAccounts(): User|\Illuminate\Database\Eloquent\Relations\HasMany
+    public function pancakeAccounts(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(\Modules\Pancake\Models\User::class);
+    }
+
+    /**
+     * FIXED: This method now uses DB::table to avoid triggering the
+     * Gate::before infinite loop which caused the 502/Timeout.
+     */
+    public function hasPermission(string $permissionName, Workspace $workspace): bool
+    {
+        if ($this->isSuperAdmin() || $this->ownsWorkspace($workspace)) {
+            return true;
+        }
+
+        // Direct DB query to bypass Eloquent relations and events
+        $roleId = DB::table('workspace_user')
+            ->where('user_id', $this->id)
+            ->where('workspace_id', $workspace->id)
+            ->value('role_id');
+
+        if (!$roleId) {
+            return false;
+        }
+
+        return DB::table('role_permissions')
+            ->join('permissions', 'role_permissions.permission_id', '=', 'permissions.id')
+            ->where('role_permissions.role_id', $roleId)
+            ->where('permissions.name', $permissionName)
+            ->exists();
     }
 }

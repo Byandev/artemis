@@ -11,14 +11,15 @@ use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class InventoryTransactionController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
+        $this->authorize('View Transaction Logs', $workspace);
 
         $inventory = QueryBuilder::for(InventoryTransaction::where('workspace_id', $workspace->id))
             ->with(['inventoryItem.product'])
@@ -38,8 +39,6 @@ class InventoryTransactionController extends Controller
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
-        $users = User::get(['id', 'name']);
-
         return Inertia::render('workspaces/inventory/inventory_transaction/index', [
             'workspace' => $workspace,
             'inventory' => $inventory,
@@ -49,12 +48,14 @@ class InventoryTransactionController extends Controller
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
-            'users' => $users,
+            'users' => User::get(['id', 'name']),
         ]);
     }
 
     public function store(Request $request, Workspace $workspace)
     {
+        $this->authorize('Create Transaction Logs', $workspace);
+
         $validated = $request->validate([
             'inventory_item_id' => 'required|exists:inventory_items,id',
             'date' => 'required|date',
@@ -75,6 +76,8 @@ class InventoryTransactionController extends Controller
 
     public function update(Request $request, Workspace $workspace, InventoryTransaction $transaction)
     {
+        $this->authorize('Edit Transaction Logs', $workspace);
+
         $validated = $request->validate([
             'inventory_item_id' => 'required|exists:inventory_items,id',
             'date' => 'required|date',
@@ -95,6 +98,8 @@ class InventoryTransactionController extends Controller
 
     public function destroy(Workspace $workspace, InventoryTransaction $transaction)
     {
+        $this->authorize('Delete Transaction Logs', $workspace);
+
         $transaction->delete();
 
         return redirect()->back()->with('success', 'Entry permanently deleted.');

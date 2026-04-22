@@ -13,8 +13,9 @@ class PermissionSeeder extends Seeder
             // Members
             ['category' => 'Members', 'name' => 'View Members'],
             ['category' => 'Members', 'name' => 'Invite Members'],
+            ['category' => 'Members', 'name' => 'Edit Members'],
             ['category' => 'Members', 'name' => 'Remove Members'],
-            ['category' => 'Members', 'name' => 'Edit Member Roles'],
+            ['category' => 'Members', 'name' => 'Reset Member Password'],
 
             // Roles
             ['category' => 'Roles', 'name' => 'View Roles'],
@@ -23,9 +24,12 @@ class PermissionSeeder extends Seeder
             ['category' => 'Roles', 'name' => 'Delete Roles'],
             ['category' => 'Roles', 'name' => 'Manage Role Permissions'],
 
-            // Orders
-            ['category' => 'Orders', 'name' => 'View Orders'],
-            ['category' => 'Orders', 'name' => 'Export Orders'],
+            // Pages
+            ['category' => 'Pages', 'name' => 'View Pages'],
+            ['category' => 'Pages', 'name' => 'Create Pages'],
+            ['category' => 'Pages', 'name' => 'Edit Pages'],
+            ['category' => 'Pages', 'name' => 'Archive Pages'],
+            ['category' => 'Pages', 'name' => 'Refresh Pages'],
 
             // Products
             ['category' => 'Products', 'name' => 'View Products'],
@@ -39,20 +43,38 @@ class PermissionSeeder extends Seeder
             ['category' => 'Teams', 'name' => 'Edit Teams'],
             ['category' => 'Teams', 'name' => 'Delete Teams'],
 
-            // Inventory
-            ['category' => 'Inventory', 'name' => 'View Inventory'],
-            ['category' => 'Inventory', 'name' => 'Manage Inventory Items'],
-            ['category' => 'Inventory', 'name' => 'Manage Transaction Logs'],
-            ['category' => 'Inventory', 'name' => 'Manage Purchased Orders'],
+            // RTS
+            ['category' => 'RTS', 'name' => 'View RTS Analytics'],
+            ['category' => 'RTS', 'name' => 'Manage Parcel Journey Templates'],
 
-            // Reports
-            ['category' => 'Reports', 'name' => 'View Reports'],
-            ['category' => 'Reports', 'name' => 'Export Reports'],
+            // CSR
+            ['category' => 'CSR', 'name' => 'View CSR Management'],
+            ['category' => 'CSR', 'name' => 'Edit CSR Employees'],
+            ['category' => 'CSR', 'name' => 'View CSR Analytics'],
+
+            // Inventory
+            ['category' => 'Inventory', 'name' => 'View Inventory Items'],
+            ['category' => 'Inventory', 'name' => 'Create Inventory Items'],
+            ['category' => 'Inventory', 'name' => 'Edit Inventory Items'],
+            ['category' => 'Inventory', 'name' => 'Delete Inventory Items'],
+            ['category' => 'Inventory', 'name' => 'View Transaction Logs'],
+            ['category' => 'Inventory', 'name' => 'Create Transaction Logs'],
+            ['category' => 'Inventory', 'name' => 'Edit Transaction Logs'],
+            ['category' => 'Inventory', 'name' => 'Delete Transaction Logs'],
+            ['category' => 'Inventory', 'name' => 'View Purchased Orders'],
+            ['category' => 'Inventory', 'name' => 'Create Purchased Orders'],
+            ['category' => 'Inventory', 'name' => 'Edit Purchased Orders'],
+            ['category' => 'Inventory', 'name' => 'Delete Purchased Orders'],
+
+            // Settings
+            ['category' => 'Settings', 'name' => 'Edit Workspace Settings'],
+            ['category' => 'Settings', 'name' => 'Manage API Keys'],
         ];
 
         foreach ($permissions as $permission) {
             Permission::firstOrCreate(
-                ['category' => $permission['category'], 'name' => $permission['name']]
+                ['name' => $permission['name']], // Unique identifier
+                ['category' => $permission['category']]
             );
         }
     }

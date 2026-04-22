@@ -11,19 +11,21 @@ use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class InventoryItemController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
+        $this->authorize('View Inventory Items', $workspace);
+
         $items = QueryBuilder::for(InventoryItem::where('inventory_items.workspace_id', $workspace->id))
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
             ->select('inventory_items.*')
             ->with(['product'])
-            // unfulfilled_count is a stored column updated manually
-            // waiting for delivery = purchased order items where order status = 6 (Waiting For Delivery)
             ->withSum('waitingForDeliveryItems as waiting_for_delivery_stocks', 'count')
-            // current stocks = latest remaining_qty from transactions
             ->addSelect([
                 'current_stocks' => InventoryTransaction::select('remaining_qty')
                     ->whereColumn('inventory_item_id', 'inventory_items.id')
@@ -31,7 +33,6 @@ class InventoryItemController extends Controller
                     ->orderByDesc('id')
                     ->limit(1),
             ])
-            // three_days_average is a stored column updated hourly by inventory:update-averages
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where('sku', 'like', "%{$value}%");
@@ -48,7 +49,6 @@ class InventoryItemController extends Controller
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
-        // Compute derived metrics on each item
         $items->through(function (InventoryItem $item) {
             $current  = (float) ($item->current_stocks ?? 0);
             $waiting  = (float) ($item->waiting_for_delivery_stocks ?? 0);
@@ -80,6 +80,8 @@ class InventoryItemController extends Controller
 
     public function store(Request $request, Workspace $workspace)
     {
+        $this->authorize('Create Inventory Items', $workspace);
+
         $request->validate([
             'product_id'            => 'required|exists:products,id',
             'sku'                   => 'required|string|max:255',
@@ -107,6 +109,8 @@ class InventoryItemController extends Controller
 
     public function update(Request $request, Workspace $workspace, InventoryItem $item)
     {
+        $this->authorize('Edit Inventory Items', $workspace);
+
         $request->validate([
             'product_id'            => 'required|exists:products,id',
             'sku'                   => 'required|string|max:255',
@@ -133,6 +137,8 @@ class InventoryItemController extends Controller
 
     public function destroy(Workspace $workspace, InventoryItem $item)
     {
+        $this->authorize('Delete Inventory Items', $workspace);
+
         $item->delete();
 
         return redirect()->route('workspaces.inventory.item.index', $workspace->slug);

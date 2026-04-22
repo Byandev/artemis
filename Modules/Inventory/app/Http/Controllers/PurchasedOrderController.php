@@ -8,11 +8,16 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class PurchasedOrderController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
+        $this->authorize('View Purchased Orders', $workspace);
+
         $orders = PurchasedOrder::where('workspace_id', $workspace->id)
             ->with(['items.inventoryItem.product'])
             ->latest()
@@ -31,6 +36,8 @@ class PurchasedOrderController extends Controller
 
     public function create(Workspace $workspace)
     {
+        $this->authorize('Create Purchased Orders', $workspace);
+
         return Inertia::render('workspaces/inventory/purchased-orders/create', [
             'workspace' => $workspace,
             'items' => InventoryItem::where('workspace_id', $workspace->id)->with('product')->get(),
@@ -39,6 +46,8 @@ class PurchasedOrderController extends Controller
 
     public function store(Request $request, Workspace $workspace)
     {
+        $this->authorize('Create Purchased Orders', $workspace);
+
         $request->validate([
             'issue_date'    => 'required|date',
             'delivery_no'   => 'nullable|string|max:255',
@@ -75,6 +84,8 @@ class PurchasedOrderController extends Controller
 
     public function edit(Workspace $workspace, PurchasedOrder $purchasedOrder)
     {
+        $this->authorize('Edit Purchased Orders', $workspace);
+
         return Inertia::render('workspaces/inventory/purchased-orders/edit', [
             'workspace' => $workspace,
             'order' => $purchasedOrder->load('items.inventoryItem.product'),
@@ -84,6 +95,8 @@ class PurchasedOrderController extends Controller
 
     public function update(Request $request, Workspace $workspace, PurchasedOrder $purchasedOrder)
     {
+        $this->authorize('Edit Purchased Orders', $workspace);
+
         $request->validate([
             'issue_date'    => 'required|date',
             'delivery_no'   => 'nullable|string|max:255',
@@ -99,15 +112,9 @@ class PurchasedOrderController extends Controller
             'items.*.total_amount'      => 'required|numeric|min:0',
         ]);
 
-        $purchasedOrder->update([
-            'issue_date'   => $request->issue_date,
-            'delivery_no'  => $request->delivery_no,
-            'cust_po_no'   => $request->cust_po_no,
-            'control_no'   => $request->control_no,
-            'delivery_fee' => $request->delivery_fee,
-            'total_amount' => $request->total_amount,
-            'status'       => $request->status,
-        ]);
+        $purchasedOrder->update($request->only([
+            'issue_date', 'delivery_no', 'cust_po_no', 'control_no', 'delivery_fee', 'total_amount', 'status'
+        ]));
 
         $purchasedOrder->items()->delete();
         foreach ($request->items as $item) {
@@ -120,6 +127,8 @@ class PurchasedOrderController extends Controller
 
     public function destroy(Workspace $workspace, PurchasedOrder $purchasedOrder)
     {
+        $this->authorize('Delete Purchased Orders', $workspace);
+
         $purchasedOrder->delete();
 
         return redirect()->route('workspaces.inventory.purchased-orders.index', $workspace->slug)

@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\Workspace;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -31,7 +33,7 @@ class AppServiceProvider extends ServiceProvider
             $workspaceKey = is_object($workspace) ? ($workspace->slug ?? $workspace->id ?? 'unknown') : ($workspace ?? 'unknown');
 
             return [
-                Limit::perMinute(20)->by($request->ip().'|'.$workspaceKey),
+                Limit::perMinute(20)->by($request->ip() . '|' . $workspaceKey),
             ];
         });
 
@@ -40,8 +42,20 @@ class AppServiceProvider extends ServiceProvider
             $workspaceKey = is_object($workspace) ? ($workspace->slug ?? $workspace->id ?? 'unknown') : ($workspace ?? 'unknown');
 
             return [
-                Limit::perMinute(30)->by($request->ip().'|'.$workspaceKey),
+                Limit::perMinute(30)->by($request->ip() . '|' . $workspaceKey),
             ];
+        });
+
+        Gate::before(function ($user, $ability, $params) {
+            $workspace = $params[0] ?? null;
+
+            if ($workspace instanceof Workspace) {
+                $hasPermission = $user->hasPermission($ability, $workspace);
+
+                return $hasPermission ? true : null;
+            }
+
+            return null;
         });
     }
 }

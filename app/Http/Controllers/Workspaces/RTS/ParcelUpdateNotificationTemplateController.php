@@ -13,11 +13,16 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class ParcelUpdateNotificationTemplateController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Workspace $workspace, Request $request)
     {
+        $this->authorize('Manage Parcel Journey Templates', $workspace);
+
         if ($workspace->parcelJourneyNotificationTemplates()->count() === 0) {
             ParcelJourneyNotificationTemplate::upsert([
                 [
@@ -187,6 +192,8 @@ class ParcelUpdateNotificationTemplateController extends Controller
 
     public function update(Request $request, Workspace $workspace, ParcelJourneyNotificationTemplate $template)
     {
+        $this->authorize('Manage Parcel Journey Templates', $workspace);
+
         $data = $request->validate([
             'message' => 'required|string',
         ]);

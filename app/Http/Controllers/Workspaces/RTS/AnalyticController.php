@@ -17,11 +17,16 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class AnalyticController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Workspace $workspace)
     {
+        $this->authorize('View RTS Analytics', $workspace);
+
         return Inertia::render('workspaces/rts/analytics', [
             'workspace' => $workspace->loadMissing([
                 'shops' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name'),
@@ -33,6 +38,8 @@ class AnalyticController extends Controller
 
     public function groupByOrderItem(Request $request, Workspace $workspace)
     {
+        $this->authorize('View RTS Analytics', $workspace);
+
         $key = $this->cacheKey($workspace, 'order-item', $request);
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsOrderItemQuery($workspace, $request))
@@ -45,6 +52,8 @@ class AnalyticController extends Controller
 
     public function groupByPrice(Request $request, Workspace $workspace)
     {
+        $this->authorize('View RTS Analytics', $workspace);
+
         $key = $this->cacheKey($workspace, 'price', $request);
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsPriceQuery($workspace, $request))->get();
@@ -55,6 +64,8 @@ class AnalyticController extends Controller
 
     public function groupByDeliveryAttempts(Request $request, Workspace $workspace)
     {
+        $this->authorize('View RTS Analytics', $workspace);
+
         $key = $this->cacheKey($workspace, 'delivery-attempts', $request);
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsDeliveryAttemptsQuery($workspace, $request))->get();
@@ -65,6 +76,8 @@ class AnalyticController extends Controller
 
     public function groupByCxRts(Request $request, Workspace $workspace)
     {
+        $this->authorize('View RTS Analytics', $workspace);
+
         $key = $this->cacheKey($workspace, 'cx-rts', $request);
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsCxQuery($workspace, $request))
@@ -77,6 +90,8 @@ class AnalyticController extends Controller
 
     public function groupByAd(Request $request, Workspace $workspace)
     {
+        $this->authorize('View RTS Analytics', $workspace);
+
         $key = $this->cacheKey($workspace, 'ad', $request);
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsAdQuery($workspace, $request))
@@ -89,6 +104,8 @@ class AnalyticController extends Controller
 
     public function groupByConfirmedBy(Request $request, Workspace $workspace)
     {
+        $this->authorize('View RTS Analytics', $workspace);
+
         $key = $this->cacheKey($workspace, 'confirmed-by', $request);
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsConfirmedByQuery($workspace, $request))
@@ -101,6 +118,8 @@ class AnalyticController extends Controller
 
     public function groupByOrderFrequency(Request $request, Workspace $workspace)
     {
+        $this->authorize('View RTS Analytics', $workspace);
+
         $key = $this->cacheKey($workspace, 'order-frequency', $request);
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsOrderFrequencyQuery($workspace, $request))->get();
@@ -111,6 +130,8 @@ class AnalyticController extends Controller
 
     public function groupByRider(Request $request, Workspace $workspace)
     {
+        $this->authorize('View RTS Analytics', $workspace);
+
         $key = $this->cacheKey($workspace, 'rider', $request);
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsRiderQuery($workspace, $request))
@@ -123,6 +144,8 @@ class AnalyticController extends Controller
 
     public function groupByProvinces(Request $request, Workspace $workspace)
     {
+        $this->authorize('View RTS Analytics', $workspace);
+
         $key = $this->cacheKey($workspace, 'provinces', $request);
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsLocationQuery($workspace, $request))
@@ -137,6 +160,8 @@ class AnalyticController extends Controller
 
     public function groupByCities(Request $request, Workspace $workspace)
     {
+        $this->authorize('View RTS Analytics', $workspace);
+
         $key = $this->cacheKey($workspace, 'cities', $request);
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsLocationQuery($workspace, $request))
@@ -159,9 +184,6 @@ class AnalyticController extends Controller
         return 'rts:'.$workspace->id.':'.$group.':'.md5(json_encode($params));
     }
 
-    /**
-     * 24-hour TTL for fully historical ranges; 5 minutes when the range touches today.
-     */
     private function ttl(Request $request): int
     {
         $endDate = $request->input('end_date');
