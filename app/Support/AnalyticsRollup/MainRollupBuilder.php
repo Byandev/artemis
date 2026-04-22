@@ -379,7 +379,8 @@ class MainRollupBuilder
     }
 
     /**
-     * TotalForDeliveryCount: parcel_journeys with status='On Delivery', bucketed by pj.created_at.
+     * TotalForDeliveryCount: distinct orders with a parcel_journey row of status='On Delivery'
+     * bucketed by pj.created_at. An order with multiple 'On Delivery' rows counts once.
      */
     private function aggregateForDelivery(int $workspaceId, string $date, string $start, string $endExclusive): void
     {
@@ -393,7 +394,7 @@ class MainRollupBuilder
                 po.workspace_id,
                 ? AS date,
                 po.page_id,
-                COUNT(*) AS for_delivery_count,
+                COUNT(DISTINCT po.id) AS for_delivery_count,
                 NOW(), NOW()
             FROM parcel_journeys pj
             INNER JOIN pancake_orders po ON po.id = pj.order_id
