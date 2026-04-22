@@ -78,7 +78,8 @@ class AuthenticatedSessionController extends Controller
             }
         }
 
-        if ($user->isSuperAdmin) {
+
+        if ($user->is_super_admin) {
             return redirect()->route('admin.workspaces.index');
         }
 

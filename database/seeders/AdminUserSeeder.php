@@ -12,12 +12,14 @@ class AdminUserSeeder extends Seeder
      */
     public function run(): void
     {
-        \App\Models\User::create([
-            'name' => 'System Admin',
-            'email' => 'admin1@gmail.com',
-            'password' => bcrypt('password123'),
-            'IsSuperAdmin' => true,
-            'email_verified_at' => now(),
-        ]);
+        \App\Models\User::firstOrCreate(
+            ['email' => 'admin1@gmail.com'],
+            [
+                'name' => 'System Admin',
+                'password' => bcrypt('password123'),
+                'is_super_admin' => true,
+                'email_verified_at' => now(),
+            ]
+        );
     }
 }
