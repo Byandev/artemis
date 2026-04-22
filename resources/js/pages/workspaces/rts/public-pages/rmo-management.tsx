@@ -388,7 +388,7 @@ export default function RmoManagement({
                 cell: ({ row }) => {
                     const items = row.original.order.items ?? [];
                     const trackingCode = row.original.order.tracking_code;
-                    const key = (row.original.order.parcel_status ?? '').toLowerCase();
+                    const key = (row.original.parcel_status ?? row.original.order.parcel_status ?? '').toLowerCase();
                     const cfg = authParcelStatusConfig[key] as ParcelStatusEntry | undefined;
                     return (
                         <div className="space-y-1.5">

@@ -164,9 +164,7 @@ class ForDeliveryController extends Controller
                 AllowedFilter::callback('parcel_status', function ($query, $value) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $values = array_map('strtolower', $values);
-                    $query->whereHas('order', function ($orderQuery) use ($values) {
-                        $orderQuery->whereIn('parcel_status', $values);
-                    });
+                    $query->whereIn('parcel_status', $values);
                 }),
                 AllowedFilter::callback('user_id', function ($query, $value) use ($workspace) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
@@ -252,15 +250,15 @@ class ForDeliveryController extends Controller
             ->count();
 
         $totalDelivered = (clone $statsBase)
-            ->whereHas('order', fn ($q) => $q->where('parcel_status', 'delivered'))
+            ->where('parcel_status', 'delivered')
             ->count();
 
         $totalReturning = (clone $statsBase)
-            ->whereHas('order', fn ($q) => $q->where('parcel_status', 'returning'))
+            ->where('parcel_status', 'returning')
             ->count();
 
         $totalProblematic = (clone $statsBase)
-            ->whereHas('order', fn ($q) => $q->whereIn('parcel_status', ['undeliverable']))
+            ->whereIn('parcel_status', ['undeliverable'])
             ->count();
 
         $users = User::get(['id', 'name']);
@@ -336,9 +334,7 @@ class ForDeliveryController extends Controller
                 AllowedFilter::callback('parcel_status', function ($query, $value) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $values = array_map('strtolower', $values);
-                    $query->whereHas('order', function ($orderQuery) use ($values) {
-                        $orderQuery->whereIn('parcel_status', $values);
-                    });
+                    $query->whereIn('parcel_status', $values);
                 }),
                 AllowedFilter::callback('user_id', function ($query, $value) use ($workspace) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
@@ -385,8 +381,8 @@ class ForDeliveryController extends Controller
         return response()->json([
             'total' => (clone $base)->count(),
             'called' => (clone $base)->where('status', '!=', 'PENDING')->count(),
-            'delivered' => (clone $base)->whereHas('order', fn ($q) => $q->where('parcel_status', 'delivered'))->count(),
-            'returning' => (clone $base)->whereHas('order', fn ($q) => $q->where('parcel_status', 'returning'))->count(),
+            'delivered' => (clone $base)->where('parcel_status', 'delivered')->count(),
+            'returning' => (clone $base)->where('parcel_status', 'returning')->count(),
         ]);
     }
 }
