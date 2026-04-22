@@ -10,9 +10,6 @@ use Inertia\Inertia;
 
 class PurchaseOrderController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Workspace $workspace)
     {
         return Inertia::render('workspaces/inventory/purchased-orders/index', [

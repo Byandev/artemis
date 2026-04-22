@@ -49,8 +49,7 @@ class RemittanceController extends Controller
             Remittance::where('workspace_id', $workspace->id)->with('transaction.account')
         )
             ->allowedFilters([
-                AllowedFilter::callback('search', fn ($q, $v) =>
-                    $q->where('soa_number', 'like', "%{$v}%")->orWhere('courier', 'like', "%{$v}%")),
+                AllowedFilter::callback('search', fn ($q, $v) => $q->where('soa_number', 'like', "%{$v}%")->orWhere('courier', 'like', "%{$v}%")),
                 AllowedFilter::exact('status'),
                 AllowedFilter::callback('unreconciled', function ($q, $v) {
                     if ((bool) $v) {

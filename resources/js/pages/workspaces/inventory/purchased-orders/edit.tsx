@@ -3,6 +3,8 @@ import PageHeader from '@/components/common/PageHeader';
 import { Head, useForm, router } from '@inertiajs/react';
 import { Workspace } from '@/types/models/Workspace';
 import { Plus, Trash2 } from 'lucide-react';
+import { useEffect } from 'react';
+
 
 interface InventoryItem {
     id: number;
@@ -68,6 +70,20 @@ export default function Edit({ workspace, order, items }: Props) {
             total_amount: String(item.total_amount),
         })),
     });
+
+    useEffect(() => {
+        const itemsTotal = data.items.reduce((sum, item) => {
+            const val = parseFloat(item.total_amount);
+            return sum + (isNaN(val) ? 0 : val);
+        }, 0);
+
+        const deliveryFee = parseFloat(data.delivery_fee) || 0;
+        const grandTotal = (itemsTotal + deliveryFee).toFixed(2);
+
+        if (data.total_amount !== grandTotal) {
+            setData('total_amount', grandTotal);
+        }
+    }, [data.items, data.delivery_fee]);
 
     const inputClass = "h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600";
     const labelClass = "block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1.5";
@@ -152,11 +168,6 @@ export default function Edit({ workspace, order, items }: Props) {
                                 <input type="number" step="0.01" min="0" value={data.delivery_fee} onChange={(e) => setData('delivery_fee', e.target.value)} placeholder="0.00" className={inputClass} />
                                 {errors.delivery_fee && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.delivery_fee}</p>}
                             </div>
-                            <div>
-                                <label className={labelClass}>Total Amount <span className="text-red-400">*</span></label>
-                                <input type="number" step="0.01" min="0" value={data.total_amount} onChange={(e) => setData('total_amount', e.target.value)} placeholder="0.00" className={inputClass} />
-                                {errors.total_amount && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.total_amount}</p>}
-                            </div>
                         </div>
                     </div>
 
@@ -233,6 +244,26 @@ export default function Edit({ workspace, order, items }: Props) {
                                     </button>
                                 </div>
                             ))}
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-[1fr_100px_120px_120px_36px] gap-3">
+                            <div className="col-span-3" /> 
+                            
+                            <div>
+                                <label className={labelClass}>Total Amount <span className="text-red-400">*</span></label>
+                                <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    min="0" 
+                                    value={data.total_amount} 
+                                    onChange={(e) => setData('total_amount', e.target.value)} 
+                                    placeholder="0.00" 
+                                    className={inputClass} 
+                                />
+                                {errors.total_amount && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.total_amount}</p>}
+                            </div>
+                            
+                            <div />
                         </div>
 
                         {errors.items && <p className="mt-2 font-mono text-[11px] text-red-500">{errors.items}</p>}

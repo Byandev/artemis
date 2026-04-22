@@ -10,6 +10,7 @@ use Modules\Inventory\Models\InventoryItem;
 class SyncInventoryAverage extends Command
 {
     protected $signature = 'inventory:sync-averages';
+
     protected $description = 'Update three_days_average and unfulfilled_count on inventory items for workspaces with inventory_sync enabled';
 
     public function handle(): void
@@ -18,13 +19,14 @@ class SyncInventoryAverage extends Command
 
         if ($workspaceIds->isEmpty()) {
             $this->info('No workspaces have inventory_sync enabled.');
+
             return;
         }
 
         // Last 3 full days, excluding today.
         // e.g. if today is Apr 13, range is Apr 10 00:00:00 → Apr 13 00:00:00 (exclusive)
         $start = now()->subDays(3)->startOfDay();
-        $end   = now()->startOfDay();
+        $end = now()->startOfDay();
 
         $items = InventoryItem::whereIn('workspace_id', $workspaceIds)->get(['id', 'product_id']);
 
@@ -50,7 +52,7 @@ class SyncInventoryAverage extends Command
 
             InventoryItem::where('id', $item->id)->update([
                 'three_days_average' => $average,
-                'unfulfilled_count'  => $unfulfilled,
+                'unfulfilled_count' => $unfulfilled,
             ]);
         }
 

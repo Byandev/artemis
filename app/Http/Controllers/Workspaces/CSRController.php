@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
-use App\Models\PancakeUserDailyReport;
+use App\Models\PancakeUserErpDailyReport;
+use App\Models\PancakeUserPosDailyReport;
+use App\Models\PancakeUserRmoDailyReport;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Modules\Pancake\Models\User as PancakeUser;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -37,7 +38,14 @@ class CSRController extends Controller
                     });
                 }),
             ])
-            ->allowedSorts(['name', 'email', 'phone_number', 'created_at', 'status', 'user_name'])
+            ->allowedSorts([
+                'name',
+                'email',
+                'phone_number',
+                'created_at',
+                'user_id',
+                AllowedSort::field('status', 'pancake_users.status'),
+            ])
             ->defaultSort('pancake_users.name')
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
@@ -68,105 +76,38 @@ class CSRController extends Controller
             ? CarbonImmutable::parse($request->input('to'))->toDateString()
             : CarbonImmutable::now()->toDateString();
 
-        $type = $request->input('type');
+        $type = strtolower((string) $request->input('type', 'pos'));
+        $drClass = $type === 'erp' ? PancakeUserErpDailyReport::class : PancakeUserPosDailyReport::class;
 
-        $engagementSub = DB::table('pancake_user_daily_engagements')
-            ->where('workspace_id', $workspace->id)
-            ->whereBetween('date', [$from, $to])
-            ->groupBy('pancake_user_id')
-            ->selectRaw('
-                pancake_user_id,
-                SUM(total_engagement) as s_total_eng,
-                SUM(customer_engagement_new_inbox) as s_new_eng,
-                SUM(order_count) as s_eng_orders,
-                SUM(old_order_count) as s_old_orders
-            ');
+        $drSub = fn () => $drClass::query()
+            ->forWorkspaceRange($workspace->id, $from, $to)
+            ->whereColumn('pancake_user_id', 'pancake_users.id');
 
-        $rmoCallSub = DB::table('pancake_order_for_delivery')
-            ->where('workspace_id', $workspace->id)
-            ->whereBetween('delivery_date', [$from, $to])
-            ->groupBy('conferrer_id')
-            ->selectRaw('
-                conferrer_id,
-                SUM(customer_call_attempts) as s_customer_attempts,
-                SUM(customer_call_duration) as s_customer_duration,
-                SUM(rider_call_attempts) as s_rider_attempts,
-                SUM(rider_call_duration) as s_rider_duration
-            ');
+        $rmoSub = fn () => PancakeUserRmoDailyReport::query()
+            ->forWorkspaceRange($workspace->id, $from, $to)
+            ->whereColumn('pancake_user_id', 'pancake_users.id');
 
-        $query = PancakeUserDailyReport::query()
-            ->join('pancake_users as pu', 'pu.id', '=', 'pancake_user_daily_reports.pancake_user_id')
-            ->leftJoinSub($engagementSub, 'eng', 'eng.pancake_user_id', '=', 'pu.id')
-            ->leftJoinSub($rmoCallSub, 'ofd_sum', 'ofd_sum.conferrer_id', '=', 'pu.id')
-            ->where('pancake_user_daily_reports.workspace_id', $workspace->id)
-            ->whereBetween('pancake_user_daily_reports.date', [$from, $to])
-            ->when($type, fn ($q) => $q->where('pancake_user_daily_reports.type', $type))
-            ->groupBy('pancake_user_daily_reports.pancake_user_id', 'pu.name')
-            ->selectRaw('
-                pancake_user_daily_reports.pancake_user_id,
-                pu.name as csr_name,
-                SUM(pancake_user_daily_reports.total_orders) as total_orders,
-                SUM(pancake_user_daily_reports.total_sales)  as total_sales,
-                SUM(pancake_user_daily_reports.delivered)    as delivered,
-                SUM(pancake_user_daily_reports.`returning`)  as returning_count,
-                SUM(pancake_user_daily_reports.rmo_called)   as rmo_called,
-                COALESCE(MAX(eng.s_total_eng), 0) as overall_engagement,
-                COALESCE(MAX(eng.s_new_eng), 0) as new_cx_engagement,
-                COALESCE(MAX(eng.s_total_eng), 0) - COALESCE(MAX(eng.s_new_eng), 0) as old_cx_engagement,
-                COALESCE(MAX(eng.s_eng_orders), 0) as overall_orders,
-                COALESCE(MAX(eng.s_old_orders), 0) as old_cx_orders,
-                COALESCE(MAX(eng.s_eng_orders), 0) - COALESCE(MAX(eng.s_old_orders), 0) as new_cx_orders,
-                CASE
-                    WHEN COALESCE(MAX(eng.s_new_eng), 0) > 0
-                    THEN ROUND(((COALESCE(MAX(eng.s_eng_orders), 0) - COALESCE(MAX(eng.s_old_orders), 0)) / MAX(eng.s_new_eng)) * 100, 2)
-                    ELSE 0
-                END as new_cx_conversion_rate,
-                CASE
-                    WHEN (COALESCE(MAX(eng.s_total_eng), 0) - COALESCE(MAX(eng.s_new_eng), 0)) > 0
-                    THEN ROUND((COALESCE(MAX(eng.s_old_orders), 0) / (MAX(eng.s_total_eng) - MAX(eng.s_new_eng))) * 100, 2)
-                    ELSE 0
-                END as old_cx_conversion_rate,
-                CASE
-                    WHEN COALESCE(MAX(eng.s_total_eng), 0) > 0
-                    THEN ROUND((COALESCE(MAX(eng.s_eng_orders), 0) / MAX(eng.s_total_eng)) * 100, 2)
-                    ELSE 0
-                END as overall_conversion_rate,
-                COALESCE(MAX(ofd_sum.s_customer_attempts), 0) + COALESCE(MAX(ofd_sum.s_rider_attempts), 0) as rmo_total_attempts,
-                COALESCE(MAX(ofd_sum.s_customer_duration), 0) + COALESCE(MAX(ofd_sum.s_rider_duration), 0) as total_call_time,
-                (
-                    SELECT COUNT(*)
-                    FROM pancake_order_for_delivery ofd
-                    WHERE ofd.conferrer_id = pu.id
-                      AND ofd.workspace_id = ?
-                      AND ofd.delivery_date BETWEEN ? AND ?
-                ) as rmo_total_for_delivery,
-                CASE
-                    WHEN (
-                        SELECT COUNT(*)
-                        FROM pancake_order_for_delivery ofd2
-                        WHERE ofd2.conferrer_id = pu.id
-                          AND ofd2.workspace_id = ?
-                          AND ofd2.delivery_date BETWEEN ? AND ?
-                    ) > 0
-                    THEN ROUND((SUM(pancake_user_daily_reports.rmo_called) / (
-                        SELECT COUNT(*)
-                        FROM pancake_order_for_delivery ofd3
-                        WHERE ofd3.conferrer_id = pu.id
-                          AND ofd3.workspace_id = ?
-                          AND ofd3.delivery_date BETWEEN ? AND ?
-                    )) * 100, 2)
-                    ELSE 0
-                END as rmo_productivity,
-                CASE
-                    WHEN SUM(pancake_user_daily_reports.delivered) + SUM(pancake_user_daily_reports.`returning`) > 0
-                    THEN ROUND((SUM(pancake_user_daily_reports.`returning`) / (SUM(pancake_user_daily_reports.delivered) + SUM(pancake_user_daily_reports.`returning`))) * 100, 2)
-                    ELSE 0
-                END as rts_rate
-            ', [
-                $workspace->id, $from, $to,
-                $workspace->id, $from, $to,
-                $workspace->id, $from, $to,
-            ]);
+        $query = PancakeUser::query()
+            ->select([
+                'pancake_users.id as pancake_user_id',
+                'pancake_users.name as csr_name',
+            ])
+            ->selectSub($drSub()->selectRaw('COALESCE(SUM(total_orders), 0)'), 'total_orders')
+            ->selectSub($drSub()->selectRaw('COALESCE(SUM(total_sales), 0)'), 'total_sales')
+            ->selectSub($drSub()->selectRaw('COALESCE(SUM(delivered), 0)'), 'delivered')
+            ->selectSub($drSub()->selectRaw('COALESCE(SUM(`returning`), 0)'), 'returning_count')
+            ->selectSub($rmoSub()->selectRaw('COALESCE(SUM(total_called), 0)'), 'total_called')
+            ->selectSub($rmoSub()->selectRaw('COALESCE(SUM(total_call_time), 0)'), 'total_call_time')
+            ->selectSub(
+                $drSub()->selectRaw('
+                    CASE
+                        WHEN COALESCE(SUM(delivered), 0) + COALESCE(SUM(`returning`), 0) > 0
+                        THEN ROUND((COALESCE(SUM(`returning`), 0) / (COALESCE(SUM(delivered), 0) + COALESCE(SUM(`returning`), 0))) * 100, 2)
+                        ELSE 0
+                    END
+                '),
+                'rts_rate'
+            );
 
         $records = QueryBuilder::for($query)
             ->allowedSorts([
@@ -175,20 +116,8 @@ class CSRController extends Controller
                 AllowedSort::field('total_sales'),
                 AllowedSort::field('delivered'),
                 AllowedSort::field('returning_count'),
-                AllowedSort::field('rmo_called'),
-                AllowedSort::field('rmo_total_for_delivery'),
-                AllowedSort::field('rmo_productivity'),
                 AllowedSort::field('rts_rate'),
-                AllowedSort::field('overall_engagement'),
-                AllowedSort::field('new_cx_engagement'),
-                AllowedSort::field('old_cx_engagement'),
-                AllowedSort::field('overall_orders'),
-                AllowedSort::field('new_cx_orders'),
-                AllowedSort::field('old_cx_orders'),
-                AllowedSort::field('new_cx_conversion_rate'),
-                AllowedSort::field('old_cx_conversion_rate'),
-                AllowedSort::field('overall_conversion_rate'),
-                AllowedSort::field('rmo_total_attempts'),
+                AllowedSort::field('total_called'),
                 AllowedSort::field('total_call_time'),
             ])
             ->defaultSort('-total_sales')

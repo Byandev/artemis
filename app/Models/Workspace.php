@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\WorkspaceMetrics;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,7 +10,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 use Modules\Inventory\Models\InventoryTransaction;
-use App\Models\WorkspaceChecklist;
 
 class Workspace extends Model
 {
@@ -27,10 +27,10 @@ class Workspace extends Model
     ];
 
     protected $casts = [
-        'created_at'     => 'datetime',
-        'updated_at'     => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
         'show_inventory' => 'boolean',
-        'show_finance'   => 'boolean',
+        'show_finance' => 'boolean',
         'inventory_sync' => 'boolean',
     ];
 
@@ -171,9 +171,9 @@ class Workspace extends Model
         return $this->belongsToMany(FacebookAccount::class, 'workspace_facebook_account');
     }
 
-    public function metrics(array $dateRange, array $filter): \App\Support\WorkspaceMetrics
+    public function metrics(array $dateRange, array $filter): WorkspaceMetrics
     {
-        return new \App\Support\WorkspaceMetrics($this, $dateRange, $filter);
+        return new WorkspaceMetrics($this, $dateRange, $filter);
     }
 
     public function shops(): HasMany|Workspace

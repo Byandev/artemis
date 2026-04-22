@@ -35,13 +35,13 @@ interface Inputs {
 
 const DEFAULTS: Inputs = {
     orders: 1000,
-    aov: 500,
+    aov: 399,
     rtsPct: 30,
     marginPct: 35,
-    adCostPerOrder: 50,
-    forward: 120,
-    returnFee: 100,
-    packaging: 15,
+    adCostPerOrder: 120,
+    forward: 70,
+    returnFee: 0,
+    packaging: 2,
     damagePct: 10,
     cogs: 200,
 };

@@ -6,5 +6,6 @@ export interface ParcelJourneyNotificationTemplate
     type: 'sms' | 'chat',
     activity: 'for-delivery' | 'arrival' | 'departure',
     receiver: 'customer' | 'rider',
-    message: string
+    message: string,
+    is_enabled: boolean,
 }
