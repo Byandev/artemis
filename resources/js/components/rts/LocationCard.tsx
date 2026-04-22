@@ -21,17 +21,19 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
     const [provincesLoading, setProvincesLoading] = useState(true);
     const [provinceSort, setProvinceSort] = useState('-total_orders');
     const [provinceSearch, setProvinceSearch] = useState('');
+    const [provincePerPage, setProvincePerPage] = useState(10);
 
     const [cities, setCities] = useState<PaginatedData<CityRow> | null>(null);
     const [citiesLoading, setCitiesLoading] = useState(true);
     const [citySort, setCitySort] = useState('-total_orders');
     const [citySearch, setCitySearch] = useState('');
+    const [cityPerPage, setCityPerPage] = useState(10);
 
-    const fetchProvinces = (page = 1, search = provinceSearch, sort = provinceSort) => {
+    const fetchProvinces = (page = 1, search = provinceSearch, sort = provinceSort, perPage = provincePerPage) => {
         setProvincesLoading(true);
         const p = buildBaseParams(queryParams);
         p.append('page', String(page));
-        p.append('per_page', '10');
+        p.append('per_page', String(perPage));
         if (search) p.append('search', search);
         p.append('sort', sort);
         fetch(`/workspaces/${workspaceSlug}/rts/analytics/group-by/provinces?${p}`, { credentials: 'same-origin' })
@@ -40,11 +42,11 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
             .catch(() => setProvincesLoading(false));
     };
 
-    const fetchCities = (page = 1, search = citySearch, sort = citySort) => {
+    const fetchCities = (page = 1, search = citySearch, sort = citySort, perPage = cityPerPage) => {
         setCitiesLoading(true);
         const p = buildBaseParams(queryParams);
         p.append('page', String(page));
-        p.append('per_page', '10');
+        p.append('per_page', String(perPage));
         if (search) p.append('search', search);
         p.append('sort', sort);
         fetch(`/workspaces/${workspaceSlug}/rts/analytics/group-by/cities?${p}`, { credentials: 'same-origin' })
@@ -58,25 +60,30 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
         setProvincesLoading(true);
         const p = buildBaseParams(queryParams);
         p.append('page', '1');
-        p.append('per_page', '10');
+        p.append('per_page', String(provincePerPage));
         p.append('sort', provinceSort);
         fetch(`/workspaces/${workspaceSlug}/rts/analytics/group-by/provinces?${p}`, { credentials: 'same-origin' })
             .then((res) => (res.ok ? res.json() : null))
-            .then((data) => { setProvinces(data); setProvincesLoading(false); onDataLoaded?.(data?.data ?? []); })
+            .then((data) => {
+                setProvinces(data);
+                setProvincePerPage(Number(data?.per_page ?? provincePerPage));
+                setProvincesLoading(false);
+                onDataLoaded?.(data?.data ?? []);
+            })
             .catch(() => setProvincesLoading(false));
-        fetchCities(1, '', citySort);
+        fetchCities(1, '', citySort, cityPerPage);
     }, [workspaceSlug, JSON.stringify(queryParams)]);
 
     useEffect(() => {
-        if (groupBy === 'province') fetchProvinces(1);
-        else fetchCities(1);
+        if (groupBy === 'province') fetchProvinces(1, provinceSearch, provinceSort, provincePerPage);
+        else fetchCities(1, citySearch, citySort, cityPerPage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [groupBy]);
 
     const provinceSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => {
         if (provinceSearchTimer.current) clearTimeout(provinceSearchTimer.current);
-        provinceSearchTimer.current = setTimeout(() => fetchProvinces(1, provinceSearch), 400);
+        provinceSearchTimer.current = setTimeout(() => fetchProvinces(1, provinceSearch, provinceSort, provincePerPage), 400);
         return () => { if (provinceSearchTimer.current) clearTimeout(provinceSearchTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [provinceSearch]);
@@ -84,7 +91,7 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
     const citySearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => {
         if (citySearchTimer.current) clearTimeout(citySearchTimer.current);
-        citySearchTimer.current = setTimeout(() => fetchCities(1, citySearch), 400);
+        citySearchTimer.current = setTimeout(() => fetchCities(1, citySearch, citySort, cityPerPage), 400);
         return () => { if (citySearchTimer.current) clearTimeout(citySearchTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [citySearch]);
@@ -211,8 +218,10 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
                             initialSorting={toFrontendSort(provinceSort)}
                             onFetch={(params) => {
                                 const s = params?.sort as string ?? '-total_orders';
+                                const perPage = Number(params?.per_page ?? provinces?.per_page ?? provincePerPage);
                                 setProvinceSort(s);
-                                fetchProvinces(Number(params?.page ?? 1), provinceSearch, s);
+                                setProvincePerPage(perPage);
+                                fetchProvinces(Number(params?.page ?? 1), provinceSearch, s, perPage);
                             }}
                         />
                     )
@@ -228,8 +237,10 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
                             initialSorting={toFrontendSort(citySort)}
                             onFetch={(params) => {
                                 const s = params?.sort as string ?? '-total_orders';
+                                const perPage = Number(params?.per_page ?? cities?.per_page ?? cityPerPage);
                                 setCitySort(s);
-                                fetchCities(Number(params?.page ?? 1), citySearch, s);
+                                setCityPerPage(perPage);
+                                fetchCities(Number(params?.page ?? 1), citySearch, s, perPage);
                             }}
                         />
                     )

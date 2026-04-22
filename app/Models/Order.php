@@ -4,6 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
 {
@@ -13,17 +16,17 @@ class Order extends Model
 
     protected $guarded = [];
 
-    public function shippingAddress(): \Illuminate\Database\Eloquent\Relations\HasOne|Order
+    public function shippingAddress(): HasOne|Order
     {
         return $this->hasOne(ShippingAddress::class);
     }
 
-    public function parcelJourney(): \Illuminate\Database\Eloquent\Relations\HasOne|Order
+    public function parcelJourney(): HasOne|Order
     {
         return $this->hasOne(ParcelJourney::class);
     }
 
-    public function page(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function page(): BelongsTo
     {
         return $this->belongsTo(Page::class);
     }
@@ -117,7 +120,7 @@ class Order extends Model
         return $query;
     }
 
-    public function parcelJourneyNotifications(): Order|\Illuminate\Database\Eloquent\Relations\HasMany
+    public function parcelJourneyNotifications(): Order|HasMany
     {
         return $this->hasMany(ParcelJourneyNotification::class);
     }
@@ -200,7 +203,7 @@ class Order extends Model
         }
     }
 
-    public function tags(): Order|\Illuminate\Database\Eloquent\Relations\HasMany
+    public function tags(): Order|HasMany
     {
         return $this->hasMany(OrderTag::class);
     }

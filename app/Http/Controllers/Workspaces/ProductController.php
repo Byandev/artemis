@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
+use App\Models\Page;
 use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
@@ -51,6 +52,7 @@ class ProductController extends Controller
             'workspace' => $workspace,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
+                'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
             'categories' => $categories,
@@ -59,7 +61,7 @@ class ProductController extends Controller
 
     public function create(Workspace $workspace)
     {
-        $pages = \App\Models\Page::ofWorkspace($workspace)
+        $pages = Page::ofWorkspace($workspace)
             ->select('id', 'name')
             ->orderBy('name')
             ->get();
@@ -109,7 +111,7 @@ class ProductController extends Controller
         // Assign pages to this product
         if ($request->filled('page_ids') && is_array($request->page_ids) && count($request->page_ids) > 0) {
             \Log::info('Assigning pages to product', ['product_id' => $product->id, 'page_ids' => $request->page_ids]);
-            \App\Models\Page::whereIn('id', $request->page_ids)
+            Page::whereIn('id', $request->page_ids)
                 ->where('workspace_id', $workspace->id)
                 ->update(['product_id' => $product->id]);
         }
@@ -119,7 +121,7 @@ class ProductController extends Controller
 
     public function edit(Workspace $workspace, Product $product)
     {
-        $pages = \App\Models\Page::ofWorkspace($workspace)
+        $pages = Page::ofWorkspace($workspace)
             ->select('id', 'name')
             ->orderBy('name')
             ->get();
@@ -165,13 +167,13 @@ class ProductController extends Controller
         }
 
         // Remove all existing page connections for this product
-        \App\Models\Page::where('product_id', $product->id)
+        Page::where('product_id', $product->id)
             ->where('workspace_id', $workspace->id)
             ->update(['product_id' => null]);
 
         // Assign new page selections
         if ($request->filled('page_ids') && is_array($request->page_ids) && count($request->page_ids) > 0) {
-            \App\Models\Page::whereIn('id', $request->page_ids)
+            Page::whereIn('id', $request->page_ids)
                 ->where('workspace_id', $workspace->id)
                 ->update(['product_id' => $product->id]);
         }

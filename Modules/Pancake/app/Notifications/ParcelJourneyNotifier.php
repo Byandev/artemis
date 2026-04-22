@@ -45,6 +45,9 @@ class ParcelJourneyNotifier
                 'page_name' => $order->page->name,
                 'customer_name' => $order->shippingAddress?->full_name,
                 'shipping_address' => $order->shippingAddress?->full_address,
+                'province' => $order->shippingAddress?->province_name,
+                'city' => $order->shippingAddress?->district_name,
+                'barangay' => $order->shippingAddress?->commune_name,
             ]);
         }
 
