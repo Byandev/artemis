@@ -21,7 +21,7 @@ Slow paths found during investigation:
 ## 2. Root causes (summary)
 
 1. **Non-sargable `DATE()` calls in WHERE clauses** prevent index usage on timestamps.
-2. **Missing composite indexes** on hot tables (`pancake_orders`, `pancake_order_items`, `shipping_addresses`, `pancake_order_phone_number_reports`, `ad_records`, `pancake_user_daily_engagements`).
+2. **Missing composite indexes** on hot tables (`pancake_orders`, `pancake_order_items`, `shipping_addresses`, `pancake_order_phone_number_reports`, `ad_records`).
 3. **`whereHas()` chains** (3–4 relations deep) to scope records by workspace — no direct `workspace_id` column on tables like `ad_records`.
 4. **Per-metric cloned queries** (5× `count()` per request in RTS, 4× subqueries per product metrics request) instead of single aggregation queries.
 5. **No pre-aggregation** — dashboard recomputes every request; no rollup/summary tables except `csr_daily_records`.
@@ -46,7 +46,6 @@ Create `database/migrations/2026_04_20_000000_add_performance_indexes.php`:
 | `pancake_orders` | `(workspace_id, confirmed_at, delivered_at, returning_at)` | Covers `getChartData()` range scan. |
 | `shipping_addresses` | `(order_id, province_name, district_name)` | Covers `RtsLocationQuery`. |
 | `pancake_order_phone_number_reports` | `(order_id, type)` | Covers `RtsCxQuery` join at `RtsCxQuery.php:46`. |
-| `pancake_user_daily_engagements` | `(workspace_id, date)` and `(workspace_id, pancake_user_id, date)` | Currently has **no indexes**. |
 | `pancake_user_daily_reports` | `(workspace_id, date)` | For date-range aggregates without user grouping. |
 | `csr_daily_records` | `(workspace_id, date)` | Filtering by workspace + date. |
 | `ad_records` | `(ad_id, date)` (regular, in addition to the existing unique) | Range scans on date. |
