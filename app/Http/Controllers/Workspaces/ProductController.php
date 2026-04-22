@@ -9,11 +9,16 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class ProductController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
+        $this->authorize('View Products', $workspace);
+
         $products = QueryBuilder::for(Product::ofWorkspace($workspace))
             ->with('owner')
             ->allowedFilters([
@@ -38,7 +43,6 @@ class ProductController extends Controller
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
-        // Get unique categories for filter dropdown (exclude null/empty values)
         $categories = Product::ofWorkspace($workspace)
             ->select('category')
             ->whereNotNull('category')
@@ -60,6 +64,8 @@ class ProductController extends Controller
 
     public function create(Workspace $workspace)
     {
+        $this->authorize('Create Products', $workspace);
+
         $pages = \App\Models\Page::ofWorkspace($workspace)
             ->select('id', 'name')
             ->orderBy('name')
@@ -73,12 +79,7 @@ class ProductController extends Controller
 
     public function store(Request $request, Workspace $workspace)
     {
-        // Debug logging
-        \Log::info('Product Store Request', [
-            'all_data' => $request->all(),
-            'page_ids' => $request->page_ids,
-            'filled' => $request->filled('page_ids'),
-        ]);
+        $this->authorize('Create Products', $workspace);
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -107,9 +108,7 @@ class ProductController extends Controller
                 ->toMediaCollection('PRODUCT_IMAGE');
         }
 
-        // Assign pages to this product
         if ($request->filled('page_ids') && is_array($request->page_ids) && count($request->page_ids) > 0) {
-            \Log::info('Assigning pages to product', ['product_id' => $product->id, 'page_ids' => $request->page_ids]);
             \App\Models\Page::whereIn('id', $request->page_ids)
                 ->where('workspace_id', $workspace->id)
                 ->update(['product_id' => $product->id]);
@@ -120,12 +119,17 @@ class ProductController extends Controller
 
     public function edit(Workspace $workspace, Product $product)
     {
+        $this->authorize('Edit Products', $workspace);
+
+        if ($product->workspace_id !== $workspace->id) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $pages = \App\Models\Page::ofWorkspace($workspace)
             ->select('id', 'name')
             ->orderBy('name')
             ->get();
 
-        // Load pages with the necessary columns (id, name, and product_id for the relationship)
         $product->load(['pages' => function ($query) {
             $query->select('id', 'name', 'product_id');
         }]);
@@ -139,6 +143,12 @@ class ProductController extends Controller
 
     public function update(Request $request, Workspace $workspace, Product $product)
     {
+        $this->authorize('Edit Products', $workspace);
+
+        if ($product->workspace_id !== $workspace->id) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:10|unique:products,code,'.$product->id.',id,workspace_id,'.$workspace->id,
@@ -165,12 +175,10 @@ class ProductController extends Controller
                 ->toMediaCollection('PRODUCT_IMAGE');
         }
 
-        // Remove all existing page connections for this product
         \App\Models\Page::where('product_id', $product->id)
             ->where('workspace_id', $workspace->id)
             ->update(['product_id' => null]);
 
-        // Assign new page selections
         if ($request->filled('page_ids') && is_array($request->page_ids) && count($request->page_ids) > 0) {
             \App\Models\Page::whereIn('id', $request->page_ids)
                 ->where('workspace_id', $workspace->id)
@@ -182,6 +190,12 @@ class ProductController extends Controller
 
     public function destroy(Workspace $workspace, Product $product)
     {
+        $this->authorize('Delete Products', $workspace);
+
+        if ($product->workspace_id !== $workspace->id) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $product->delete();
 
         return redirect()->route('workspaces.products.index', $workspace->slug);

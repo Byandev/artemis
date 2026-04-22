@@ -8,12 +8,12 @@ use App\Models\Order;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class WorkspaceController extends Controller
 {
-    /**
-     * Display a listing of user's workspaces.
-     */
+    use AuthorizesRequests;
+
     public function index(Request $request)
     {
         $workspaces = $request->user()
@@ -28,17 +28,11 @@ class WorkspaceController extends Controller
         ]);
     }
 
-    /**
-     * Show the form for creating a new workspace.
-     */
     public function create()
     {
         return Inertia::render('workspaces/create');
     }
 
-    /**
-     * Store a newly created workspace in storage.
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -52,63 +46,33 @@ class WorkspaceController extends Controller
             'owner_id' => $request->user()->id,
         ]);
 
-        // Add the user as owner in the pivot table
         $workspace->users()->attach($request->user()->id, ['role' => 'owner']);
 
         return redirect()->route('workspaces.show', $workspace->slug)
             ->with('success', 'Workspace created successfully.');
     }
 
-    /**
-     * Display the specified workspace.
-     */
     public function show(Request $request, Workspace $workspace)
     {
-        // Check if user has access to this workspace
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
-        $workspace->load([
-            'owner',
-            'users' => function ($query) {
-                $query->withPivot('role')->latest();
-            },
-        ]);
-
-        $userRole = $workspace->users()
-            ->where('user_id', $request->user()->id)
-            ->first()
-            ->pivot
-            ->role;
-
         return redirect()->route('workspace.dashboard', $workspace->slug);
     }
 
-    /**
-     * Show the form for editing the specified workspace.
-     */
     public function edit(Request $request, Workspace $workspace)
     {
-        // Only owner and admins can edit workspace
-        if (! $request->user()->isAdminOf($workspace)) {
-            abort(403, 'You do not have permission to edit this workspace.');
-        }
+        $this->authorize('Edit Workspace Settings', $workspace);
 
         return Inertia::render('workspaces/edit', [
             'workspace' => $workspace,
         ]);
     }
 
-    /**
-     * Update the specified workspace in storage.
-     */
     public function update(Request $request, Workspace $workspace)
     {
-        // Only owner and admins can update workspace
-        if (! $request->user()->isAdminOf($workspace)) {
-            abort(403, 'You do not have permission to update this workspace.');
-        }
+        $this->authorize('Edit Workspace Settings', $workspace);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -121,12 +85,8 @@ class WorkspaceController extends Controller
             ->with('success', 'Workspace updated successfully.');
     }
 
-    /**
-     * Remove the specified workspace from storage.
-     */
     public function destroy(Request $request, Workspace $workspace)
     {
-        // Only the owner can delete the workspace
         if (! $request->user()->ownsWorkspace($workspace)) {
             abort(403, 'Only the workspace owner can delete it.');
         }
@@ -137,26 +97,18 @@ class WorkspaceController extends Controller
             ->with('success', 'Workspace deleted successfully.');
     }
 
-    /**
-     * Switch to a different workspace.
-     */
     public function switch(Request $request, Workspace $workspace)
     {
-        // Check if user has access to this workspace
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
-        // Store current workspace ID in session
         session(['current_workspace_id' => $workspace->id]);
 
         return redirect()->route('workspace.dashboard', $workspace->slug)
             ->with('success', "Switched to {$workspace->name}.");
     }
 
-    /**
-     * Display the workspace dashboard.
-     */
     public function dashboard(Request $request, Workspace $workspace)
     {
         if (! $request->user()->isMemberOf($workspace)) {
@@ -176,28 +128,19 @@ class WorkspaceController extends Controller
         ]);
     }
 
-    /**
-     * Get historical sales vs ad spend data for charts.
-     */
     public function getChartData(Request $request, Workspace $workspace)
     {
-        // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
+        $this->authorize('View RTS Analytics', $workspace);
 
-        // Get the number of days to fetch (default: last 30 days)
         $days = $request->query('days', 30);
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
 
-        // If no date range provided, default to last N days
         if (! $startDate && ! $endDate) {
             $endDate = now()->format('Y-m-d');
             $startDate = now()->subDays($days)->format('Y-m-d');
         }
 
-        // Get entity filters from query
         $filters = [
             'team_ids' => $request->query('team_ids'),
             'product_ids' => $request->query('product_ids'),
@@ -205,7 +148,6 @@ class WorkspaceController extends Controller
             'shop_ids' => $request->query('shop_ids'),
         ];
 
-        // Get sales data by date
         $salesData = Order::where('workspace_id', $workspace->id)
             ->whereNotNull('confirmed_at')
             ->applyEntityFilters($filters)
@@ -216,7 +158,6 @@ class WorkspaceController extends Controller
             ->get()
             ->pluck('total_sales', 'date');
 
-        // Get ad spend data by date
         $adSpendData = AdRecord::ofWorkspace($workspace)
             ->applyDateFilter($startDate, $endDate, 'date')
             ->applyEntityFilters($filters)
@@ -226,7 +167,6 @@ class WorkspaceController extends Controller
             ->get()
             ->pluck('total_spend', 'date');
 
-        // Get RTS data by date using order status (3=delivered, 4,5=returned)
         $rtsData = Order::where('workspace_id', $workspace->id)
             ->whereNotNull('confirmed_at')
             ->applyEntityFilters($filters)
@@ -247,7 +187,6 @@ class WorkspaceController extends Controller
             ->get()
             ->keyBy('date');
 
-        // Merge data and create chart data
         $allDates = collect(array_unique(array_merge(
             $salesData->keys()->toArray(),
             $adSpendData->keys()->toArray(),
@@ -257,12 +196,8 @@ class WorkspaceController extends Controller
         $chartData = $allDates->map(function ($date) use ($salesData, $adSpendData, $rtsData) {
             $sales = $salesData->get($date, 0);
             $spend = $adSpendData->get($date, 0);
-
-            // Get RTS data for this date
             $rtsRecord = $rtsData->get($date);
             $rtsRate = $rtsRecord ? (float) $rtsRecord->rts_rate_percentage : 0.0;
-
-            // Calculate ROAS: Return on Ad Spend = Sales / Spend
             $roas = $spend > 0 ? round($sales / $spend, 2) : 0;
 
             return [
