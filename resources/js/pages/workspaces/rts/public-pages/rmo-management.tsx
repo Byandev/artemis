@@ -5,6 +5,7 @@ import { RmoStatusPicker } from '@/components/rts/RmoStatusPicker';
 import { Button } from '@/components/ui/button';
 import DatePicker from '@/components/ui/date-picker';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { currencyFormatter, percentageFormatter } from '@/lib/utils';
 import { toFrontendSort } from '@/lib/sort';
@@ -24,6 +25,7 @@ import {
     MapPin,
     Pencil,
     Phone,
+    PhoneCall,
     Search,
     User as UserIcon,
     UserPlus,
@@ -31,6 +33,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FormModal from './formModal';
+import { CallLog } from '@/types/models/CallLog';
 
 interface Props {
     orders: PaginatedData<OrderForDelivery>;
@@ -55,6 +58,12 @@ interface Props {
     delivered_count: number;
     returning_count: number;
     problematic_count: number;
+}
+
+function formatDuration(seconds: number): string {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
 function EditablePhone({ value, onSave }: { value: string; onSave: (v: string) => void }) {
@@ -106,6 +115,127 @@ function EditablePhone({ value, onSave }: { value: string; onSave: (v: string) =
     );
 }
 
+function CallLogModal({
+    open,
+    onOpenChange,
+    phoneNumber,
+    label,
+    assigneeName,
+    workspaceSlug,
+    date,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    phoneNumber: string;
+    label: string;
+    assigneeName: string;
+    workspaceSlug: string;
+    date: string;
+}) {
+    const [logs, setLogs] = useState<CallLog[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!open || !phoneNumber) return;
+        setLoading(true);
+        fetch(`/public/workspaces/${workspaceSlug}/rts/rmo-management/call-logs?phone_number=${encodeURIComponent(phoneNumber)}&date=${date}`)
+            .then((r) => r.json())
+            .then((data) => setLogs(data))
+            .finally(() => setLoading(false));
+    }, [open, phoneNumber, workspaceSlug, date]);
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="text-sm font-semibold">
+                        Call Logs — {label}
+                    </DialogTitle>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                        {phoneNumber} · {date}
+                    </p>
+                </DialogHeader>
+                {loading ? (
+                    <p className="py-6 text-center text-[12px] text-gray-400">Loading...</p>
+                ) : logs.length === 0 ? (
+                    <p className="py-6 text-center text-[12px] text-gray-400">No call logs found</p>
+                ) : (
+                    <div className="max-h-72 overflow-y-auto">
+                        <table className="w-full text-[12px]">
+                            <thead>
+                                <tr className="border-b text-left text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                    <th className="pb-2 pr-3">Time</th>
+                                    <th className="pb-2 pr-3">Type</th>
+                                    <th className="pb-2 pr-3">By</th>
+                                    <th className="pb-2 pr-3 text-right">Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {logs.map((log) => (
+                                    <tr key={log.id} className="border-b border-black/5 dark:border-white/5">
+                                        <td className="py-2 pr-3 font-mono text-gray-600 dark:text-gray-300">
+                                            {log.call_time}
+                                        </td>
+                                        <td className="py-2 pr-3">
+                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                                log.type === 'outgoing'
+                                                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
+                                                    : log.type === 'incoming'
+                                                    ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                                    : 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+                                            }`}>
+                                                {log.type}
+                                            </span>
+                                        </td>
+                                        <td className="py-2 pr-3 text-[11px] text-gray-600 dark:text-gray-300">
+                                            {log.type === 'outgoing' ? assigneeName : label}
+                                        </td>
+                                        <td className="py-2 pr-3 text-right font-mono text-gray-600 dark:text-gray-300">
+                                            {formatDuration(log.duration)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        <div className="mt-3 flex justify-between border-t pt-2 text-[11px] text-gray-500 dark:text-gray-400">
+                            <span>{logs.length} call{logs.length !== 1 ? 's' : ''}</span>
+                            <span>Total: {formatDuration(logs.reduce((sum, l) => sum + l.duration, 0))}</span>
+                        </div>
+                    </div>
+                )}
+                <div className="flex justify-end">
+                    <button
+                        onClick={() => onOpenChange(false)}
+                        className="rounded-lg border border-black/10 px-4 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 dark:border-white/10 dark:text-gray-400 dark:hover:bg-zinc-800"
+                    >
+                        Close
+                    </button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function CallLogBadge({
+    attempts,
+    duration,
+    onClick,
+}: {
+    attempts: number;
+    duration: number;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            onClick={onClick}
+            className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-emerald-600 hover:underline dark:text-gray-500 dark:hover:text-emerald-400"
+        >
+            <PhoneCall className="h-2.5 w-2.5 shrink-0" />
+            {attempts} call{attempts !== 1 ? 's' : ''} · {formatDuration(duration)}
+        </button>
+    );
+}
+
 export default function RmoManagement({
     orders,
     workspace,
@@ -122,6 +252,7 @@ export default function RmoManagement({
     const [showStats, setShowStats] = useState(() => localStorage.getItem('rmo_show_stats') === 'true');
     const [showMyOnly, setShowMyOnly] = useState(() => localStorage.getItem('rmo_show_my_only') === 'true');
     const [pendingAssign, setPendingAssign] = useState<{ id: number; currentStatus: string } | null>(null);
+    const [callLogModal, setCallLogModal] = useState<{ phone: string; label: string; assigneeName: string } | null>(null);
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
@@ -425,17 +556,27 @@ export default function RmoManagement({
             {
                 accessorKey: 'rider_name',
                 header: ({ column }) => <SortableHeader column={column} title="Rider" />,
-                cell: ({ row }) => (
-                    <div className="space-y-1.5">
-                        <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
-                            {row.original.rider_name || '—'}
-                        </p>
-                        <EditablePhone
-                            value={row.original.rider_phone ?? ''}
-                            onSave={(v) => handleUpdatePhone(row.original.id, 'rider_phone', v)}
-                        />
-                    </div>
-                ),
+                cell: ({ row }) => {
+                    const attempts = row.original.rider_call_logs_count ?? 0;
+                    const duration = row.original.rider_call_duration ?? 0;
+                    const phone = row.original.rider_phone ?? '';
+                    return (
+                        <div className="space-y-1.5">
+                            <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
+                                {row.original.rider_name || '—'}
+                            </p>
+                            <EditablePhone
+                                value={phone}
+                                onSave={(v) => handleUpdatePhone(row.original.id, 'rider_phone', v)}
+                            />
+                            <CallLogBadge
+                                attempts={attempts}
+                                duration={duration}
+                                onClick={() => phone && setCallLogModal({ phone, label: row.original.rider_name || 'Rider', assigneeName: row.original.assignee?.name || 'Assignee' })}
+                            />
+                        </div>
+                    );
+                },
             },
             {
                 id: 'order_shipping_address_full_name',
@@ -444,14 +585,22 @@ export default function RmoManagement({
                 header: ({ column }) => <SortableHeader column={column} title="Customer" />,
                 cell: ({ row }) => {
                     const addr = row.original.order.shipping_address;
+                    const attempts = row.original.customer_call_logs_count ?? 0;
+                    const duration = row.original.customer_call_duration ?? 0;
+                    const phone = row.original.customer_phone ?? addr?.phone_number ?? '';
                     return (
                         <div className="space-y-1.5">
                             <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
                                 {addr?.full_name || '—'}
                             </p>
                             <EditablePhone
-                                value={row.original.customer_phone ?? addr?.phone_number ?? ''}
+                                value={phone}
                                 onSave={(v) => handleUpdatePhone(row.original.id, 'customer_phone', v)}
+                            />
+                            <CallLogBadge
+                                attempts={attempts}
+                                duration={duration}
+                                onClick={() => phone && setCallLogModal({ phone, label: addr?.full_name || 'Customer', assigneeName: row.original.assignee?.name || 'Assignee' })}
                             />
                             {addr?.full_address && (
                                 <Tooltip>
@@ -640,6 +789,16 @@ export default function RmoManagement({
                 }}
                 users={users}
                 onSubmit={handleUserSelected}
+            />
+
+            <CallLogModal
+                open={!!callLogModal}
+                onOpenChange={(open) => { if (!open) setCallLogModal(null); }}
+                phoneNumber={callLogModal?.phone ?? ''}
+                label={callLogModal?.label ?? ''}
+                assigneeName={callLogModal?.assigneeName ?? ''}
+                workspaceSlug={workspace.slug}
+                date={deliveryDate}
             />
 
             {/* Top bar */}
@@ -838,7 +997,13 @@ export default function RmoManagement({
                         data={orders.data || []}
                         initialSorting={initialSorting}
                         meta={{ ...omit(orders, ['data']) }}
-                        onFetch={(params) => {
+                        onFetch={(paramsid: number;
+                            user_id: string;
+                            phone_number: string;
+                            type: string;
+                            duration: number;
+                            call_date: string;
+                            call_time: string;) => {
                             router.get(
                                 publicPage.rmoManagement({ workspace }),
                                 buildAllParams(
