@@ -30,8 +30,6 @@ readonly class SyncParcelTrackingAction
             'parcel_status' => $order['partner']['partner_status'],
         ]);
 
-        OrderForDelivery::where('order_id', $savedOrder->id)
-            ->update(['parcel_status' => $order['partner']['partner_status']]);
 
         if (empty($order['partner']['extend_update'])) {
             return;
@@ -97,7 +95,7 @@ readonly class SyncParcelTrackingAction
                     'parcel_status' => $savedOrder->parcel_status,
                 ]);
 
-            }   
+            }
 
             if ($this->isNotifiable($savedOrder, $journey)) {
                 $latestNotifiable = $journey;
