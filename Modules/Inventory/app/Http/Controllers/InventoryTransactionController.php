@@ -50,7 +50,7 @@ class InventoryTransactionController extends Controller
                         ->orderBy('inventory_items.sku', $descending ? 'desc' : 'asc')
                         ->select('inventory_transactions.*');
                 }),
-           ])
+            ])
             ->defaultSort('-date')
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();

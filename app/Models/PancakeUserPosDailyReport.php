@@ -16,13 +16,25 @@ class PancakeUserPosDailyReport extends Model
         'total_sales',
         'returning',
         'delivered',
-        'rts_rate',
+        'confirmed_count',
+        'delivered_count',
+        'returning_count',
+        'returned_count',
+        'delivered_amount',
+        'returning_amount',
+        'returned_amount',
+        'sum_delivery_attempts_delivered',
+        'sum_delivery_attempts_returned',
     ];
 
     protected $casts = [
         'date' => 'date',
         'total_sales' => 'decimal:2',
-        'rts_rate' => 'decimal:2',
+        'delivered' => 'decimal:2',
+        'returning' => 'decimal:2',
+        'delivered_amount' => 'decimal:2',
+        'returning_amount' => 'decimal:2',
+        'returned_amount' => 'decimal:2',
         'pancake_user_id' => 'string',
     ];
 

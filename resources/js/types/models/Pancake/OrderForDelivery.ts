@@ -107,6 +107,10 @@ export interface OrderForDelivery {
     rider_phone: string;
     customer_name: string | null;
     customer_phone: string | null;
+    customer_call_logs_count: number;
+    rider_call_logs_count: number;
+    customer_call_duration: number | null;
+    rider_call_duration: number | null;
     rider_rts_rate: number | null;
     risk_score: number | null;
     caller_id: string | null;
