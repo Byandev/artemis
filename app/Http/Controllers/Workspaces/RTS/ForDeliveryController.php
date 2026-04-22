@@ -17,6 +17,7 @@ use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
 use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Models\Page;
 use App\Models\Workspace;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -36,7 +37,7 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
             return redirect()->back()->with('error', 'Status can only be updated for orders scheduled for delivery today.');
         }
 
@@ -53,7 +54,7 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
             return redirect()->back()->with('error', 'Assignee can only be updated for orders scheduled for delivery today.');
         }
 
@@ -63,7 +64,25 @@ class ForDeliveryController extends Controller
 
         $orderForDelivery->update(['assignee_id' => $request->userId]);
 
-        return redirect()->back()->with('success', 'Assignee updated successfully' . $request->userId);
+        return redirect()->back()->with('success', 'Assignee updated successfully'.$request->userId);
+    }
+
+    public function publicUpdatePhones(Workspace $workspace, $id, Request $request)
+    {
+        $orderForDelivery = OrderForDelivery::find($id);
+
+        if (! $orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        $data = $request->validate([
+            'customer_phone' => ['nullable', 'string'],
+            'rider_phone' => ['nullable', 'string'],
+        ]);
+
+        $orderForDelivery->update($data);
+
+        return redirect()->back()->with('success', 'Phone numbers updated successfully');
     }
 
     public function publicRemoveAssignee(Workspace $workspace, $id)
@@ -74,7 +93,7 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
             return redirect()->back()->with('error', 'Assignee can only be removed for orders scheduled for delivery today.');
         }
 
@@ -146,9 +165,7 @@ class ForDeliveryController extends Controller
                 AllowedFilter::callback('parcel_status', function ($query, $value) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $values = array_map('strtolower', $values);
-                    $query->whereHas('order', function ($orderQuery) use ($values) {
-                        $orderQuery->whereIn('parcel_status', $values);
-                    });
+                    $query->whereIn('parcel_status', $values);
                 }),
                 AllowedFilter::callback('user_id', function ($query, $value) use ($workspace) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
@@ -234,15 +251,15 @@ class ForDeliveryController extends Controller
             ->count();
 
         $totalDelivered = (clone $statsBase)
-            ->whereHas('order', fn ($q) => $q->where('parcel_status', 'delivered'))
+            ->where('parcel_status', 'delivered')
             ->count();
 
         $totalReturning = (clone $statsBase)
-            ->whereHas('order', fn ($q) => $q->where('parcel_status', 'returning'))
+            ->where('parcel_status', 'returning')
             ->count();
 
         $totalProblematic = (clone $statsBase)
-            ->whereHas('order', fn ($q) => $q->whereIn('parcel_status', ['undeliverable']))
+            ->whereIn('parcel_status', ['undeliverable'])
             ->count();
 
         $users = User::get(['id', 'name']);
@@ -318,9 +335,7 @@ class ForDeliveryController extends Controller
                 AllowedFilter::callback('parcel_status', function ($query, $value) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $values = array_map('strtolower', $values);
-                    $query->whereHas('order', function ($orderQuery) use ($values) {
-                        $orderQuery->whereIn('parcel_status', $values);
-                    });
+                    $query->whereIn('parcel_status', $values);
                 }),
                 AllowedFilter::callback('user_id', function ($query, $value) use ($workspace) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
@@ -367,8 +382,8 @@ class ForDeliveryController extends Controller
         return response()->json([
             'total' => (clone $base)->count(),
             'called' => (clone $base)->where('status', '!=', 'PENDING')->count(),
-            'delivered' => (clone $base)->whereHas('order', fn ($q) => $q->where('parcel_status', 'delivered'))->count(),
-            'returning' => (clone $base)->whereHas('order', fn ($q) => $q->where('parcel_status', 'returning'))->count(),
+            'delivered' => (clone $base)->where('parcel_status', 'delivered')->count(),
+            'returning' => (clone $base)->where('parcel_status', 'returning')->count(),
         ]);
     }
 }

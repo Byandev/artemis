@@ -15,7 +15,7 @@ return new class extends Migration
             Schema::table('pancake_order_phone_number_reports', function (Blueprint $table) {
                 $table->dropUnique(['order_id', 'phone_number']);
             });
-        } catch (\Throwable $th) {
+        } catch (Throwable $th) {
 
         }
 
@@ -23,7 +23,7 @@ return new class extends Migration
             Schema::table('pancake_order_phone_number_reports', function (Blueprint $table) {
                 $table->unique(['order_id', 'phone_number', 'type']);
             });
-        } catch (\Throwable $th) {
+        } catch (Throwable $th) {
 
         }
     }

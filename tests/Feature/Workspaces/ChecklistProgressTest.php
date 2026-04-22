@@ -5,11 +5,12 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceChecklist;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 uses(RefreshDatabase::class);
 
 test('user can complete a checklist item for a shop', function () {
-    /** @var \Tests\TestCase $this */
+    /** @var TestCase $this */
     $user = User::factory()->create();
     $workspace = Workspace::factory()->forOwner($user)->create();
 
@@ -39,7 +40,7 @@ test('user can complete a checklist item for a shop', function () {
 });
 
 test('user can uncheck a checklist item for a shop', function () {
-    /** @var \Tests\TestCase $this */
+    /** @var TestCase $this */
     $user = User::factory()->create();
     $workspace = Workspace::factory()->forOwner($user)->create();
 
@@ -76,7 +77,7 @@ test('user can uncheck a checklist item for a shop', function () {
 });
 
 test('target from another workspace returns forbidden', function () {
-    /** @var \Tests\TestCase $this */
+    /** @var TestCase $this */
     $user = User::factory()->create();
 
     $workspace = Workspace::factory()->forOwner($user)->create();

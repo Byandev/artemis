@@ -138,6 +138,7 @@ class RmoOrderController extends Controller
 
             if (! $order) {
                 $notFound[] = $item['order_id'];
+
                 continue;
             }
 

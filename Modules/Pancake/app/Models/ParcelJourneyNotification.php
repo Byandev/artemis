@@ -5,12 +5,13 @@ namespace Modules\Pancake\Models;
 use App\Jobs\SendParcelUpdateNotification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ParcelJourneyNotification extends Model
 {
     protected $guarded = [];
 
-    public function order(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
     }
