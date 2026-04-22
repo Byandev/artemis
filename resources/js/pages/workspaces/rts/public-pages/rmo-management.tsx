@@ -388,7 +388,7 @@ export default function RmoManagement({
                 cell: ({ row }) => {
                     const items = row.original.order.items ?? [];
                     const trackingCode = row.original.order.tracking_code;
-                    const key = (row.original.order.parcel_status ?? '').toLowerCase();
+                    const key = (row.original.parcel_status ?? row.original.order.parcel_status ?? '').toLowerCase();
                     const cfg = authParcelStatusConfig[key] as ParcelStatusEntry | undefined;
                     return (
                         <div className="space-y-1.5">
@@ -821,7 +821,7 @@ export default function RmoManagement({
                             onChange={(e) => handleParcelStatusChange(e.target.value)}
                             className="h-8 rounded-lg border border-black/6 bg-stone-100 px-2 text-[12px]! text-gray-700 outline-none focus:border-emerald-500 dark:bg-zinc-800 dark:text-gray-300"
                         >
-                            <option value="">All J&amp;T Statuses</option>
+                            <option value="">All Parcel Statuses</option>
                             {Object.entries(authParcelStatusConfig).map(([key, config]) => (
                                 <option key={key} value={key}>
                                     {config.label}

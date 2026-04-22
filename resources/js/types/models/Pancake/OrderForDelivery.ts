@@ -102,6 +102,7 @@ export interface OrderForDelivery {
     shop_id: number;
     workspace_id: number;
     status: OrderStatus;
+    parcel_status: string | null;
     rider_name: string;
     rider_phone: string;
     customer_name: string | null;

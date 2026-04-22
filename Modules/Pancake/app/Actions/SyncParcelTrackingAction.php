@@ -30,6 +30,7 @@ readonly class SyncParcelTrackingAction
             'parcel_status' => $order['partner']['partner_status'],
         ]);
 
+
         if (empty($order['partner']['extend_update'])) {
             return;
         }
@@ -71,7 +72,7 @@ readonly class SyncParcelTrackingAction
             if ($update['status'] === 'On Delivery' && $update['rider_name'] && $update['rider_mobile'] && Carbon::parse($update['updated_at'])->isToday()) {
                 $shippingAddress = $savedOrder->shippingAddress;
 
-                OrderForDelivery::firstOrCreate(
+                $order_for_delivery = OrderForDelivery::firstOrCreate(
                     [
                         'order_id'      => $savedOrder->id,
                         'page_id'       => $savedOrder->page_id,
@@ -89,6 +90,11 @@ readonly class SyncParcelTrackingAction
                         'created_at'      => $update['updated_at'],
                     ]
                 );
+
+                $order_for_delivery->update([
+                    'parcel_status' => $savedOrder->parcel_status,
+                ]);
+
             }
 
             if ($this->isNotifiable($savedOrder, $journey)) {
