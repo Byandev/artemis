@@ -20,17 +20,16 @@ class InventoryItemController extends Controller
 
         $currentStocksSql = '(SELECT remaining_qty FROM inventory_transactions WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)';
 
-        $waitingStocksSql = '(SELECT SUM(count) FROM purchased_order_items 
-                              WHERE inventory_item_id = inventory_items.id 
-                              AND EXISTS (SELECT 1 FROM purchased_orders 
-                                          WHERE purchased_orders.id = purchased_order_items.purchased_order_id 
+        $waitingStocksSql = '(SELECT SUM(count) FROM inventory_purchased_order_items
+                              WHERE inventory_item_id = inventory_items.id
+                              AND EXISTS (SELECT 1 FROM inventory_purchased_orders
+                                          WHERE inventory_purchased_orders.id = inventory_purchased_order_items.inventory_purchased_order_id
                                           AND status = 6))';
 
         $items = QueryBuilder::for(InventoryItem::where('inventory_items.workspace_id', $workspace->id))
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
             ->select('inventory_items.*')
             ->with(['product'])
-            // 2. Add subqueried/summed values for display
             ->withSum('waitingForDeliveryItems as waiting_for_delivery_stocks', 'count')
             ->addSelect([
                 'current_stocks' => InventoryTransaction::select('remaining_qty')
@@ -42,11 +41,11 @@ class InventoryItemController extends Controller
 
             ->selectRaw("
                 (COALESCE($currentStocksSql, 0) + COALESCE($waitingStocksSql, 0) - inventory_items.unfulfilled_count) as remaining_after_fulfillment,
-                
-                CASE 
-                    WHEN three_days_average > 0 
-                    THEN (COALESCE($currentStocksSql, 0) + COALESCE($waitingStocksSql, 0) - inventory_items.unfulfilled_count) / three_days_average 
-                    ELSE NULL 
+
+                CASE
+                    WHEN three_days_average > 0
+                    THEN (COALESCE($currentStocksSql, 0) + COALESCE($waitingStocksSql, 0) - inventory_items.unfulfilled_count) / three_days_average
+                    ELSE NULL
                 END as days_it_can_last,
 
                 GREATEST(0, (lead_time * three_days_average) - COALESCE($waitingStocksSql, 0)) as po_needed
