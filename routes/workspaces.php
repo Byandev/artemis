@@ -35,6 +35,7 @@ use Modules\Finance\Http\Controllers\TransactionController as FinanceTransaction
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
+use App\Http\Controllers\Admin\AdminWorkspaceController;
 
 /*
 |--------------------------------------------------------------------------
@@ -261,3 +262,12 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
     Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
 
 });
+
+// Admin Routes //
+Route::middleware(['auth', 'verified', 'admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::get('/workspaces', [AdminWorkspaceController::class, 'index'])
+            ->name('workspaces.index');
+    });

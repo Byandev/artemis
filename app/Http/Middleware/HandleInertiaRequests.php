@@ -54,12 +54,16 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user(),
+                'user' => $request->user() ? [
+                    'id' => $request->user()->id,
+                    'name' => $request->user()->name,
+                    'email' => $request->user()->email,
+                    'is_super_admin' => $request->user()->is_super_admin,
+                ] : null,
             ],
             'workspaces' => $workspaces,
             'currentWorkspace' => $currentWorkspace,
-            'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
-            // Minimal Ziggy config just for current location tracking
+            'sidebarOpen' => !$request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'ziggy' => [
                 'location' => $request->url(),
             ],
