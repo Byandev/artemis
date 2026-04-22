@@ -38,7 +38,14 @@ class CSRController extends Controller
                     });
                 }),
             ])
-            ->allowedSorts(['name', 'email', 'phone_number', 'created_at', 'status', 'user_name'])
+            ->allowedSorts([
+                'name',
+                'email',
+                'phone_number',
+                'created_at',
+                'user_id',
+                AllowedSort::field('status', 'pancake_users.status'),
+            ])
             ->defaultSort('pancake_users.name')
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
