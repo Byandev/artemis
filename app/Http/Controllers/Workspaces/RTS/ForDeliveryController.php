@@ -364,9 +364,14 @@ class ForDeliveryController extends Controller
             ])
             ->whereDate('delivery_date', $deliveryDate);
 
+        $columns = $request->input('columns', []);
+        if (is_string($columns)) {
+            $columns = array_filter(explode(',', $columns));
+        }
+
         $filename = 'rmo-management-'.$deliveryDate.'-'.now()->format('His').'.xlsx';
 
-        return Excel::download(new RmoManagementExport($query), $filename);
+        return Excel::download(new RmoManagementExport($query, $columns), $filename);
     }
 
     public function myAssignedCount(Request $request, Workspace $workspace)
