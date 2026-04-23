@@ -12,6 +12,70 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v2.7.0',
+        date: '2026-04-22',
+        sections: [
+            {
+                title: 'Analytics Optimization',
+                items: [
+                    'Analytics rollup — new scheduled command precomputes order metrics so dashboards load from aggregated data instead of recalculating per request',
+                    'Backfill command for populating analytics rollups across historical date ranges',
+                    'Order metrics (AOV, totals, lifetime value, repeat/retention, delivery timing, RTS averages) refactored to read from rollups — significantly faster queries',
+                    'Parcel journey metrics (SMS sent, tracked orders, total for delivery) now use the same optimized pipeline',
+                ],
+            },
+            {
+                title: 'Inventory Items',
+                items: [
+                    'Purchased Orders view per inventory item, with pagination',
+                    'Fixed inventory transaction bugs affecting stock calculations',
+                ],
+            },
+            {
+                title: 'RMO Management',
+                items: [
+                    'Call logs are now visible directly on the RMO management dashboard',
+                    'Phone numbers can be edited in place from the RMO management view',
+                    'Parcel status label updated and redundant update logic removed',
+                ],
+            },
+            {
+                title: 'CSR Mobile API',
+                items: [
+                    'New call log synchronization and KPI endpoints for the CSR mobile client',
+                    'Call logs moved to a dedicated table with separated KPI calculations for improved accuracy',
+                    'Call log sync batches database updates to reduce load during large imports',
+                ],
+            },
+            {
+                title: 'SuperAdmin Panel',
+                items: [
+                    'SuperAdmin panel added with cross-workspace oversight views',
+                    'Casing and styling adjustments for consistency with the rest of the app',
+                ],
+            },
+            {
+                title: 'Finance',
+                items: [
+                    'Initial rollout of finance features (feat/finance)',
+                ],
+            },
+            {
+                title: 'Parcel Journey',
+                items: [
+                    'Parcel journey template support added (feat/pj-template)',
+                    'parcel_status added to OrderForDelivery for faster filtering and is now nullable',
+                ],
+            },
+            {
+                title: 'Internal',
+                items: [
+                    'Sentry integration added for error monitoring',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v2.6.0',
         date: '2026-04-16',
         sections: [
@@ -461,6 +525,8 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v2.7.0':
+        'bg-purple-500/10 text-purple-600 dark:text-purple-400 ring-purple-500/20',
     'v2.6.0':
         'bg-pink-500/10 text-pink-600 dark:text-pink-400 ring-pink-500/20',
     'v2.5.1':

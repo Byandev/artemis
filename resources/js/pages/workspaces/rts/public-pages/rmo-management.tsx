@@ -997,13 +997,7 @@ export default function RmoManagement({
                         data={orders.data || []}
                         initialSorting={initialSorting}
                         meta={{ ...omit(orders, ['data']) }}
-                        onFetch={(paramsid: number;
-                            user_id: string;
-                            phone_number: string;
-                            type: string;
-                            duration: number;
-                            call_date: string;
-                            call_time: string;) => {
+                        onFetch={(params) => {
                             router.get(
                                 publicPage.rmoManagement({ workspace }),
                                 buildAllParams(

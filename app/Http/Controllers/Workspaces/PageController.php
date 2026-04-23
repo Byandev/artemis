@@ -254,4 +254,68 @@ class PageController extends Controller
 
         return redirect()->route('workspaces.pages.index', $workspace);
     }
+
+    public function validatePancakeToken(Request $request, Workspace $workspace)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $validated = $request->validate([
+            'shop_id' => 'required|string',
+            'token' => 'required|string',
+        ]);
+
+        try {
+            $response = Http::timeout(10)->get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
+                'api_key' => $validated['token'],
+            ]);
+
+            if ($response->successful()) {
+                return response()->json(['valid' => true, 'message' => 'Pancake token is valid.']);
+            }
+
+            return response()->json([
+                'valid' => false,
+                'message' => 'Invalid Pancake token or shop ID.',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'valid' => false,
+                'message' => 'Could not reach Pancake API.',
+            ]);
+        }
+    }
+
+    public function validateBotcakeToken(Request $request, Workspace $workspace)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $validated = $request->validate([
+            'page_id' => 'required|string',
+            'token' => 'required|string',
+        ]);
+
+        try {
+            $response = Http::timeout(10)
+                ->withHeader('access-token', $validated['token'])
+                ->get('https://botcake.io/api/public_api/v1/pages/'.$validated['page_id'].'/flows/');
+
+            if ($response->successful()) {
+                return response()->json(['valid' => true, 'message' => 'Botcake token is valid.']);
+            }
+
+            return response()->json([
+                'valid' => false,
+                'message' => 'Invalid Botcake token or page ID.',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'valid' => false,
+                'message' => 'Could not reach Botcake API.',
+            ]);
+        }
+    }
 }

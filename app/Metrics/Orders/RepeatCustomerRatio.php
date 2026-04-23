@@ -3,28 +3,58 @@
 namespace App\Metrics\Orders;
 
 use Carbon\Carbon;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 final class RepeatCustomerRatio
 {
+    /**
+     * Overall repeat-customer rate.
+     *
+     * @return float ratio 0..1
+     */
     public function compute(int $workspaceId, array $dateRange, array $filter): float
     {
-        $row = $this->baseQuery($workspaceId, $dateRange, $filter)
-            ->joinSub($this->customerTotalsSub($workspaceId, $dateRange, $filter), 'ct', 'ct.customer_id', '=', 'a.customer_id')
-            ->selectRaw('
-                ROUND(
-                    COALESCE(
-                        COUNT(DISTINCT CASE WHEN ct.total >= 2 THEN a.customer_id END) * 1.0
-                        / NULLIF(COUNT(DISTINCT a.customer_id), 0),
-                        0
-                    ),
-                    4
-                ) as ratio
-            ')
-            ->first();
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
-        return (float) ($row->ratio ?? 0);
+        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
+        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
+
+        $base = DB::table('pancake_orders')
+            ->when(! empty($pageIds) || ! empty($shopIds), function ($q) use ($pageIds, $shopIds) {
+                $q->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
+                    ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
+                    ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds));
+            })
+            ->where('pancake_orders.workspace_id', $workspaceId)
+            ->where('pancake_orders.confirmed_at', '>=', $startAt)
+            ->where('pancake_orders.confirmed_at', '<', $endExclusive)
+            ->whereNotNull('pancake_orders.customer_id')
+            ->whereNotIn('pancake_orders.status', [6, 7]);
+
+        $uniqueCustomers = (int) (clone $base)->selectRaw('COUNT(DISTINCT pancake_orders.customer_id) as total')->value('total');
+
+        if ($uniqueCustomers === 0) {
+            return 0.0;
+        }
+
+        $repeatCustomers = DB::table('pancake_orders')
+            ->where('workspace_id', $workspaceId)
+            ->where('confirmed_at', '<', $endExclusive)
+            ->whereNotNull('customer_id')
+            ->whereNotIn('status', [6, 7])
+            ->groupBy('customer_id')
+            ->havingRaw('COUNT(*) >= 2')
+            ->select('customer_id');
+
+        $repeatCount = (int) (clone $base)
+            ->joinSub($repeatCustomers, 'rc', fn ($j) => $j->on('rc.customer_id', '=', 'pancake_orders.customer_id'))
+            ->selectRaw('COUNT(DISTINCT pancake_orders.customer_id) as total')
+            ->value('total');
+
+        return round($repeatCount / $uniqueCustomers, 4);
     }
 
     public function breakdown(int $workspaceId, array $dateRange, array $filter, string $group = 'daily'): Collection
@@ -34,10 +64,11 @@ final class RepeatCustomerRatio
         return collect($periods)->map(function (array $period) use ($workspaceId, $filter) {
             return (object) [
                 'period' => $period['label'],
-                'value' => $this->compute(
+                'value' => $this->computeRatioForWindow(
                     $workspaceId,
-                    ['start_date' => $period['start_date'], 'end_date' => $period['end_date']],
-                    $filter
+                    $filter,
+                    $period['start'],
+                    $period['end_exclusive']
                 ),
             ];
         });
@@ -45,138 +76,272 @@ final class RepeatCustomerRatio
 
     public function perPage(int $workspaceId, array $dateRange, array $filter)
     {
-        return $this->baseQuery($workspaceId, $dateRange, $filter)
-            ->join('pages', 'pages.id', '=', 'a.page_id')
-            ->joinSub($this->customerTotalsSub($workspaceId, $dateRange, $filter), 'ct', 'ct.customer_id', '=', 'a.customer_id')
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
+
+        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
+        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
+
+        $customerTotals = DB::table('pancake_orders')
+            ->where('workspace_id', $workspaceId)
+            ->where('confirmed_at', '>=', $startAt)
+            ->where('confirmed_at', '<', $endExclusive)
+            ->whereNotNull('customer_id')
+            ->whereNotIn('status', [6, 7])
+            ->groupBy('customer_id')
+            ->selectRaw('customer_id, COUNT(*) as total_orders');
+
+        return DB::table('pancake_orders as po')
+            ->join('pages', 'pages.id', '=', 'po.page_id')
+            ->joinSub($customerTotals, 'ct', fn ($j) => $j->on('ct.customer_id', '=', 'po.customer_id'))
+            ->where('po.workspace_id', $workspaceId)
+            ->where('po.confirmed_at', '>=', $startAt)
+            ->where('po.confirmed_at', '<', $endExclusive)
+            ->whereNotNull('po.customer_id')
+            ->whereNotIn('po.status', [6, 7])
+            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
+            ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->groupBy('pages.id', 'pages.name')
             ->selectRaw('
                 pages.id as page_id,
                 pages.name as page_name,
                 ROUND(
-                    COALESCE(
-                        COUNT(DISTINCT CASE WHEN ct.total >= 2 THEN a.customer_id END) * 1.0
-                        / NULLIF(COUNT(DISTINCT a.customer_id), 0),
-                        0
-                    ),
-                    4
-                ) as value
+                    COALESCE(SUM(CASE WHEN ct.total_orders >= 2 THEN 1 ELSE 0 END) * 1.0
+                    / NULLIF(COUNT(DISTINCT po.customer_id), 0), 0),
+                4) as value
             ')
-            ->groupBy('pages.id', 'pages.name')
             ->orderByDesc('value')
             ->get();
     }
 
     public function perShop(int $workspaceId, array $dateRange, array $filter)
     {
-        return $this->baseQuery($workspaceId, $dateRange, $filter)
-            ->join('pages', 'pages.id', '=', 'a.page_id')
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
+
+        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
+        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
+
+        $customerTotals = DB::table('pancake_orders')
+            ->where('workspace_id', $workspaceId)
+            ->where('confirmed_at', '>=', $startAt)
+            ->where('confirmed_at', '<', $endExclusive)
+            ->whereNotNull('customer_id')
+            ->whereNotIn('status', [6, 7])
+            ->groupBy('customer_id')
+            ->selectRaw('customer_id, COUNT(*) as total_orders');
+
+        return DB::table('pancake_orders as po')
+            ->join('pages', 'pages.id', '=', 'po.page_id')
             ->join('shops', 'shops.id', '=', 'pages.shop_id')
+            ->joinSub($customerTotals, 'ct', fn ($j) => $j->on('ct.customer_id', '=', 'po.customer_id'))
+            ->where('po.workspace_id', $workspaceId)
+            ->where('po.confirmed_at', '>=', $startAt)
+            ->where('po.confirmed_at', '<', $endExclusive)
+            ->whereNotNull('po.customer_id')
+            ->whereNotIn('po.status', [6, 7])
             ->whereNotNull('pages.shop_id')
-            ->joinSub($this->customerTotalsSub($workspaceId, $dateRange, $filter), 'ct', 'ct.customer_id', '=', 'a.customer_id')
+            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
+            ->when(! empty($shopIds), fn ($q) => $q->whereIn('shops.id', $shopIds))
+            ->groupBy('shops.id', 'shops.name')
             ->selectRaw('
                 shops.id as shop_id,
                 shops.name as shop_name,
                 ROUND(
-                    COALESCE(
-                        COUNT(DISTINCT CASE WHEN ct.total >= 2 THEN a.customer_id END) * 1.0
-                        / NULLIF(COUNT(DISTINCT a.customer_id), 0),
-                        0
-                    ),
-                    4
-                ) as value
+                    COALESCE(SUM(CASE WHEN ct.total_orders >= 2 THEN 1 ELSE 0 END) * 1.0
+                    / NULLIF(COUNT(DISTINCT po.customer_id), 0), 0),
+                4) as value
             ')
-            ->groupBy('shops.id', 'shops.name')
             ->orderByDesc('value')
             ->get();
+    }
+
+    private function computeRatioForWindow(
+        int $workspaceId,
+        array $filter,
+        string $startAt,
+        string $endExclusive
+    ): float {
+        $cohort = $this->buildCohortQuery($workspaceId, $filter, $startAt, $endExclusive);
+
+        $ordersUpToEnd = DB::table('pancake_orders as po')
+            ->when($this->needsPagesJoin($filter), function (Builder $query) {
+                $query->join('pages', 'pages.id', '=', 'po.page_id');
+            })
+            ->joinSub(
+                $this->buildCohortCustomerIdsQuery($workspaceId, $filter, $startAt, $endExclusive),
+                'c2',
+                function ($join) {
+                    $join->on('c2.customer_id', '=', 'po.customer_id');
+                }
+            )
+            ->where('po.workspace_id', $workspaceId)
+            ->where('po.confirmed_at', '>=', $startAt)
+            ->where('po.confirmed_at', '<', $endExclusive)
+            ->whereNotNull('po.customer_id')
+            ->whereNotIn('po.status', [6, 7])
+            ->when(! empty($filter['page_ids']), function (Builder $query) use ($filter) {
+                $pageIds = is_array($filter['page_ids'])
+                    ? $filter['page_ids']
+                    : explode(',', $filter['page_ids']);
+
+                $query->whereIn('pages.id', $pageIds);
+            })
+            ->when(! empty($filter['shop_ids']), function (Builder $query) use ($filter) {
+                $shopIds = is_array($filter['shop_ids'])
+                    ? $filter['shop_ids']
+                    : explode(',', $filter['shop_ids']);
+
+                $query->whereIn('pages.shop_id', $shopIds);
+            })
+            ->groupBy('po.customer_id')
+            ->selectRaw('po.customer_id as customer_key, COUNT(*) as orders_count');
+
+        $row = DB::query()
+            ->fromSub($cohort, 'c')
+            ->leftJoinSub($ordersUpToEnd, 'o', function ($join) {
+                $join->on('o.customer_key', '=', 'c.customer_key');
+            })
+            ->selectRaw('
+                COALESCE(
+                    SUM(CASE WHEN COALESCE(o.orders_count, 0) >= 2 THEN 1 ELSE 0 END) * 1.0
+                    / NULLIF(COUNT(*), 0),
+                    0
+                ) as repeat_ratio
+            ')
+            ->first();
+
+        return round((float) ($row->repeat_ratio ?? 0), 4);
     }
 
     public function perUser(int $workspaceId, array $dateRange, array $filter)
     {
-        return $this->baseQuery($workspaceId, $dateRange, $filter)
-            ->join('pages', 'pages.id', '=', 'a.page_id')
+        $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
+        $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
+
+        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
+        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
+
+        $customerTotals = DB::table('pancake_orders')
+            ->where('workspace_id', $workspaceId)
+            ->where('confirmed_at', '>=', $startAt)
+            ->where('confirmed_at', '<', $endExclusive)
+            ->whereNotNull('customer_id')
+            ->whereNotIn('status', [6, 7])
+            ->groupBy('customer_id')
+            ->selectRaw('customer_id, COUNT(*) as total_orders');
+
+        return DB::table('pancake_orders as po')
+            ->join('pages', 'pages.id', '=', 'po.page_id')
             ->join('users', 'users.id', '=', 'pages.owner_id')
-            ->whereNotNull('pages.owner_id')
-            ->joinSub($this->customerTotalsSub($workspaceId, $dateRange, $filter), 'ct', 'ct.customer_id', '=', 'a.customer_id')
+            ->joinSub($customerTotals, 'ct', fn ($j) => $j->on('ct.customer_id', '=', 'po.customer_id'))
+            ->where('po.workspace_id', $workspaceId)
+            ->where('po.confirmed_at', '>=', $startAt)
+            ->where('po.confirmed_at', '<', $endExclusive)
+            ->whereNotNull('po.customer_id')
+            ->whereNotIn('po.status', [6, 7])
+            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
+            ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->groupBy('users.id', 'users.name')
             ->selectRaw('
                 users.id as user_id,
                 users.name as user_name,
                 ROUND(
-                    COALESCE(
-                        COUNT(DISTINCT CASE WHEN ct.total >= 2 THEN a.customer_id END) * 1.0
-                        / NULLIF(COUNT(DISTINCT a.customer_id), 0),
-                        0
-                    ),
-                    4
-                ) as value
+                    COALESCE(SUM(CASE WHEN ct.total_orders >= 2 THEN 1 ELSE 0 END) * 1.0
+                    / NULLIF(COUNT(DISTINCT po.customer_id), 0), 0),
+                4) as value
             ')
-            ->groupBy('users.id', 'users.name')
             ->orderByDesc('value')
             ->get();
     }
 
-    private function baseQuery(int $workspaceId, array $dateRange, array $filter)
-    {
-        [$pageIds, $shopIds] = $this->parseFilters($filter);
-
-        return DB::table('workspace_customer_activity_daily as a')
-            ->where('a.workspace_id', $workspaceId)
-            ->whereBetween('a.date', [$dateRange['start_date'], $dateRange['end_date']])
-            ->when($pageIds, fn ($q) => $q->whereIn('a.page_id', $pageIds))
-            ->when($shopIds, function ($q) use ($shopIds) {
-                $q->whereIn('a.page_id', function ($sub) use ($shopIds) {
-                    $sub->from('pages')->whereIn('shop_id', $shopIds)->select('id');
-                });
-            });
-    }
-
-    /**
-     * Per-customer total order count within the window, summed across all pages.
-     * Customers with total >= 2 are "repeat" for this window.
-     */
-    private function customerTotalsSub(int $workspaceId, array $dateRange, array $filter)
-    {
-        [$pageIds, $shopIds] = $this->parseFilters($filter);
-
-        return DB::table('workspace_customer_activity_daily')
-            ->where('workspace_id', $workspaceId)
-            ->whereBetween('date', [$dateRange['start_date'], $dateRange['end_date']])
-            ->when($pageIds, fn ($q) => $q->whereIn('page_id', $pageIds))
-            ->when($shopIds, function ($q) use ($shopIds) {
-                $q->whereIn('page_id', function ($sub) use ($shopIds) {
-                    $sub->from('pages')->whereIn('shop_id', $shopIds)->select('id');
-                });
+    private function buildCohortQuery(
+        int $workspaceId,
+        array $filter,
+        string $startAt,
+        string $endExclusive
+    ): Builder {
+        return DB::table('pancake_orders')
+            ->when($this->needsPagesJoin($filter), function (Builder $query) {
+                $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id');
             })
-            ->selectRaw('customer_id, SUM(confirmed_count) as total')
-            ->groupBy('customer_id');
+            ->where('pancake_orders.workspace_id', $workspaceId)
+            ->where('pancake_orders.confirmed_at', '>=', $startAt)
+            ->where('pancake_orders.confirmed_at', '<', $endExclusive)
+            ->whereNotNull('pancake_orders.customer_id')
+            ->whereNotIn('pancake_orders.status', [6, 7])
+            ->when(! empty($filter['page_ids']), function (Builder $query) use ($filter) {
+                $pageIds = is_array($filter['page_ids'])
+                    ? $filter['page_ids']
+                    : explode(',', $filter['page_ids']);
+
+                $query->whereIn('pages.id', $pageIds);
+            })
+            ->when(! empty($filter['shop_ids']), function (Builder $query) use ($filter) {
+                $shopIds = is_array($filter['shop_ids'])
+                    ? $filter['shop_ids']
+                    : explode(',', $filter['shop_ids']);
+
+                $query->whereIn('pages.shop_id', $shopIds);
+            })
+            ->groupBy('pancake_orders.customer_id')
+            ->selectRaw('pancake_orders.customer_id as customer_key');
     }
 
-    private function parseFilters(array $filter): array
-    {
-        $pageIds = ! empty($filter['page_ids'])
-            ? (is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids']))
-            : null;
-        $shopIds = ! empty($filter['shop_ids'])
-            ? (is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']))
-            : null;
+    private function buildCohortCustomerIdsQuery(
+        int $workspaceId,
+        array $filter,
+        string $startAt,
+        string $endExclusive
+    ): Builder {
+        return DB::table('pancake_orders')
+            ->when($this->needsPagesJoin($filter), function (Builder $query) {
+                $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id');
+            })
+            ->where('pancake_orders.workspace_id', $workspaceId)
+            ->where('pancake_orders.confirmed_at', '>=', $startAt)
+            ->where('pancake_orders.confirmed_at', '<', $endExclusive)
+            ->whereNotNull('pancake_orders.customer_id')
+            ->whereNotIn('pancake_orders.status', [6, 7])
+            ->when(! empty($filter['page_ids']), function (Builder $query) use ($filter) {
+                $pageIds = is_array($filter['page_ids'])
+                    ? $filter['page_ids']
+                    : explode(',', $filter['page_ids']);
 
-        return [$pageIds, $shopIds];
+                $query->whereIn('pages.id', $pageIds);
+            })
+            ->when(! empty($filter['shop_ids']), function (Builder $query) use ($filter) {
+                $shopIds = is_array($filter['shop_ids'])
+                    ? $filter['shop_ids']
+                    : explode(',', $filter['shop_ids']);
+
+                $query->whereIn('pages.shop_id', $shopIds);
+            })
+            ->groupBy('pancake_orders.customer_id')
+            ->select('pancake_orders.customer_id');
     }
 
     private function generatePeriods(array $dateRange, string $group): array
     {
         $start = Carbon::parse($dateRange['start_date'])->startOfDay();
         $end = Carbon::parse($dateRange['end_date'])->startOfDay();
+
         $periods = [];
 
         if ($group === 'monthly') {
             $cursor = $start->copy()->startOfMonth();
-            while ($cursor <= $end) {
-                $pStart = $cursor->copy()->startOfMonth();
-                $pEnd = $cursor->copy()->endOfMonth();
+            $last = $end->copy()->startOfMonth();
+
+            while ($cursor <= $last) {
+                $periodStart = $cursor->copy()->startOfMonth();
+                $periodEndExclusive = $cursor->copy()->addMonth()->startOfMonth();
+
                 $periods[] = [
-                    'label' => $pStart->format('Y-m'),
-                    'start_date' => $pStart->toDateString(),
-                    'end_date' => $pEnd->toDateString(),
+                    'label' => $periodStart->format('Y-m'),
+                    'start' => $periodStart->toDateTimeString(),
+                    'end_exclusive' => $periodEndExclusive->toDateTimeString(),
                 ];
+
                 $cursor->addMonth();
             }
 
@@ -185,14 +350,18 @@ final class RepeatCustomerRatio
 
         if ($group === 'weekly') {
             $cursor = $start->copy()->startOfWeek(Carbon::MONDAY);
-            while ($cursor <= $end) {
-                $pStart = $cursor->copy();
-                $pEnd = $cursor->copy()->endOfWeek(Carbon::SUNDAY);
+            $last = $end->copy()->startOfWeek(Carbon::MONDAY);
+
+            while ($cursor <= $last) {
+                $periodStart = $cursor->copy()->startOfWeek(Carbon::MONDAY);
+                $periodEndExclusive = $cursor->copy()->addWeek()->startOfWeek(Carbon::MONDAY);
+
                 $periods[] = [
-                    'label' => $pStart->format('o-\WW'),
-                    'start_date' => $pStart->toDateString(),
-                    'end_date' => $pEnd->toDateString(),
+                    'label' => $periodStart->format('o-\WW'),
+                    'start' => $periodStart->toDateTimeString(),
+                    'end_exclusive' => $periodEndExclusive->toDateTimeString(),
                 ];
+
                 $cursor->addWeek();
             }
 
@@ -200,15 +369,34 @@ final class RepeatCustomerRatio
         }
 
         $cursor = $start->copy();
+
         while ($cursor <= $end) {
+            $periodStart = $cursor->copy()->startOfDay();
+            $periodEndExclusive = $cursor->copy()->addDay()->startOfDay();
+
             $periods[] = [
-                'label' => $cursor->format('Y-m-d'),
-                'start_date' => $cursor->toDateString(),
-                'end_date' => $cursor->toDateString(),
+                'label' => $periodStart->format('Y-m-d'),
+                'start' => $periodStart->toDateTimeString(),
+                'end_exclusive' => $periodEndExclusive->toDateTimeString(),
             ];
+
             $cursor->addDay();
         }
 
         return $periods;
+    }
+
+    private function needsPagesJoin(array $filter): bool
+    {
+        return ! empty($filter['page_ids']) || ! empty($filter['shop_ids']);
+    }
+
+    private function resolveIds(mixed $ids): array
+    {
+        if (empty($ids)) {
+            return [];
+        }
+
+        return array_map('intval', is_array($ids) ? $ids : explode(',', $ids));
     }
 }
