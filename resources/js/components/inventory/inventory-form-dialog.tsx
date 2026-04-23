@@ -1,8 +1,12 @@
 import { Workspace } from '@/types/models/Workspace';
 import { InventoryTransaction } from '@/types/models/InventoryTransaction';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useForm } from '@inertiajs/react';
-import React, { useEffect, useMemo } from 'react';
+import { format, isValid, parseISO } from 'date-fns';
+import { CalendarIcon } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 interface InventoryItem {
     id: number;
@@ -37,6 +41,14 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
     });
 
     const isEditing = useMemo(() => !!inventory, [inventory]);
+    const [datePickerOpen, setDatePickerOpen] = useState(false);
+
+    const selectedDate = useMemo(() => {
+        if (!data.date) return undefined;
+
+        const parsedDate = parseISO(data.date);
+        return isValid(parsedDate) ? parsedDate : undefined;
+    }, [data.date]);
 
     useEffect(() => {
         if (inventory) {
@@ -55,6 +67,7 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
         } else {
             reset();
         }
+        setDatePickerOpen(false);
     }, [inventory, open]);
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -87,6 +100,8 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
 
     const inputClass = "h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400";
     const labelClass = "block font-mono! text-[10px]! font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500";
+    const dateTriggerClass = `${inputClass} flex items-center justify-between gap-2 pr-2 text-left`;
+    const formattedDate = selectedDate ? format(selectedDate, 'dd MMM yyyy') : 'Select transaction date';
 
     // Helper to ensure values are non-negative integers
     const handleNumericChange = (key: keyof typeof data, value: string) => {
@@ -137,12 +152,28 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
                                 <label className={labelClass}>
                                     Transaction Date <span className="text-red-400">*</span>
                                 </label>
-                                <input
-                                    type="date"
-                                    value={data.date}
-                                    onChange={(e) => setData('date', e.target.value)}
-                                    className={inputClass}
-                                />
+                                <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                                    <PopoverTrigger asChild>
+                                        <button type="button" className={dateTriggerClass}>
+                                            <span className={`truncate ${data.date ? 'text-gray-800 dark:text-gray-100' : 'text-gray-300 dark:text-gray-600'}`}>
+                                                {formattedDate}
+                                            </span>
+                                            <CalendarIcon className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
+                                        </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="start" className="w-auto p-0" sideOffset={8}>
+                                        <Calendar
+                                            mode="single"
+                                            selected={selectedDate}
+                                            onSelect={(value) => {
+                                                if (!value) return;
+                                                setData('date', format(value, 'yyyy-MM-dd'));
+                                                setDatePickerOpen(false);
+                                            }}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
                                 {errors.date && <p className="text-[11px] text-red-500">{errors.date}</p>}
                             </div>
                             <div className="space-y-1.5">
