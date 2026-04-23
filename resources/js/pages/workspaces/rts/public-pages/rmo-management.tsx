@@ -141,7 +141,6 @@ function CallLogModal({
     onOpenChange,
     phoneNumber,
     label,
-    assigneeName,
     workspaceSlug,
     date,
 }: {
@@ -149,12 +148,12 @@ function CallLogModal({
     onOpenChange: (open: boolean) => void;
     phoneNumber: string;
     label: string;
-    assigneeName: string;
     workspaceSlug: string;
     date: string;
 }) {
     const [logs, setLogs] = useState<CallLog[]>([]);
     const [loading, setLoading] = useState(false);
+    const csrName = localStorage.getItem('user_name') ?? 'CSR';
 
     useEffect(() => {
         if (!open || !phoneNumber) return;
@@ -209,7 +208,7 @@ function CallLogModal({
                                             </span>
                                         </td>
                                         <td className="py-2 pr-3 text-[11px] text-gray-600 dark:text-gray-300">
-                                            {log.type === 'outgoing' ? assigneeName : label}
+                                            {csrName}
                                         </td>
                                         <td className="py-2 pr-3 text-right font-mono text-gray-600 dark:text-gray-300">
                                             {formatDuration(log.duration)}
@@ -273,7 +272,7 @@ export default function RmoManagement({
     const [showStats, setShowStats] = useState(() => localStorage.getItem('rmo_show_stats') === 'true');
     const [showMyOnly, setShowMyOnly] = useState(() => localStorage.getItem('rmo_show_my_only') === 'true');
     const [pendingAssign, setPendingAssign] = useState<{ id: number; currentStatus: string } | null>(null);
-    const [callLogModal, setCallLogModal] = useState<{ phone: string; label: string; assigneeName: string } | null>(null);
+    const [callLogModal, setCallLogModal] = useState<{ phone: string; label: string } | null>(null);
     const [exportModalOpen, setExportModalOpen] = useState(false);
     const [exportColumns, setExportColumns] = useState<string[]>(() => {
         const saved = localStorage.getItem('rmo_export_columns');
@@ -602,7 +601,7 @@ export default function RmoManagement({
                             <CallLogBadge
                                 attempts={attempts}
                                 duration={duration}
-                                onClick={() => phone && setCallLogModal({ phone, label: row.original.rider_name || 'Rider', assigneeName: row.original.assignee?.name || 'Assignee' })}
+                                onClick={() => phone && setCallLogModal({ phone, label: row.original.rider_name || 'Rider' })}
                             />
                         </div>
                     );
@@ -630,7 +629,7 @@ export default function RmoManagement({
                             <CallLogBadge
                                 attempts={attempts}
                                 duration={duration}
-                                onClick={() => phone && setCallLogModal({ phone, label: addr?.full_name || 'Customer', assigneeName: row.original.assignee?.name || 'Assignee' })}
+                                onClick={() => phone && setCallLogModal({ phone, label: addr?.full_name || 'Customer' })}
                             />
                             {addr?.full_address && (
                                 <Tooltip>
@@ -826,7 +825,6 @@ export default function RmoManagement({
                 onOpenChange={(open) => { if (!open) setCallLogModal(null); }}
                 phoneNumber={callLogModal?.phone ?? ''}
                 label={callLogModal?.label ?? ''}
-                assigneeName={callLogModal?.assigneeName ?? ''}
                 workspaceSlug={workspace.slug}
                 date={deliveryDate}
             />
