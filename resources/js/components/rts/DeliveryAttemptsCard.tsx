@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import RtsBreakdownChart from '@/components/charts/RtsBreakdownChart';
-import { buildBaseParams, DeliveryAttemptRow, RtsCell, RtsQueryParams, ViewMode, ViewToggle } from './rts-shared';
+import { buildBaseParams, DeliveryAttemptRow, RefreshButton, RtsCell, RtsQueryParams, ViewMode, ViewToggle } from './rts-shared';
 
 interface Props {
     workspaceSlug: string;
@@ -11,6 +11,7 @@ export default function DeliveryAttemptsCard({ workspaceSlug, queryParams }: Pro
     const [rows, setRows] = useState<DeliveryAttemptRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState<ViewMode>('chart');
+    const [refreshKey, setRefreshKey] = useState(0);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
@@ -22,7 +23,7 @@ export default function DeliveryAttemptsCard({ workspaceSlug, queryParams }: Pro
             .then((data) => { if (!cancelled) { setRows(data); setLoading(false); } })
             .catch(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [workspaceSlug, JSON.stringify(queryParams)]);
+    }, [workspaceSlug, JSON.stringify(queryParams), refreshKey]);
 
     return (
         <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
@@ -31,7 +32,10 @@ export default function DeliveryAttemptsCard({ workspaceSlug, queryParams }: Pro
                     <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">By Delivery Attempts</h2>
                     <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">RTS rate by number of delivery attempts</p>
                 </div>
-                <ViewToggle value={view} onChange={setView} />
+                <div className="flex items-center gap-2">
+                        <RefreshButton onClick={() => setRefreshKey((k) => k + 1)} loading={loading} />
+                        <ViewToggle value={view} onChange={setView} />
+                    </div>
             </div>
             <div className="p-4">
                 {loading ? (
