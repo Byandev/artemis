@@ -2,31 +2,30 @@
 
 namespace App\Metrics\Orders;
 
-use App\Support\AnalyticsRollup\ReadsRollup;
+use Illuminate\Support\Facades\DB;
 
 final class ReturnedAvgDeliveryAttempts
 {
-    use ReadsRollup;
-
-    private const SUM = 'sum_delivery_attempts_returned';
-
-    private const COUNT = 'entered_returning_count';
-
     public function compute(int $workspaceId, array $date_range, array $filter): float
     {
-        $row = $this->rollupBaseQuery($workspaceId, $date_range, $filter)
-            ->selectRaw($this->rollupAvgSql(self::SUM, self::COUNT).' as value')
-            ->first();
-
-        return (float) ($row->value ?? 0);
+        return round(
+            (float) ($this->baseQuery($workspaceId, $date_range, $filter)
+                ->avg('pancake_orders.delivery_attempts') ?? 0),
+            2
+        );
     }
 
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
-        $periodSql = $this->rollupPeriodSql($group);
+        $periodSql = match ($group) {
+            'daily' => 'DATE(pancake_orders.returning_at)',
+            'weekly' => "DATE_FORMAT(pancake_orders.returning_at, '%x-W%v')",
+            'monthly' => "DATE_FORMAT(pancake_orders.returning_at, '%Y-%m')",
+            default => 'DATE(pancake_orders.returning_at)',
+        };
 
-        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
-            ->selectRaw("$periodSql as period, ".$this->rollupAvgSql(self::SUM, self::COUNT).' as value')
+        return $this->baseQuery($workspaceId, $date_range, $filter)
+            ->selectRaw("$periodSql as period, AVG(pancake_orders.delivery_attempts) as value")
             ->groupByRaw($periodSql)
             ->orderByRaw($periodSql)
             ->get();
@@ -34,9 +33,12 @@ final class ReturnedAvgDeliveryAttempts
 
     public function perPage(int $workspaceId, array $date_range, array $filter)
     {
-        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
-            ->join('pages', 'pages.id', '=', 'workspace_daily_metrics.page_id')
-            ->selectRaw('pages.id as page_id, pages.name as page_name, '.$this->rollupAvgSql(self::SUM, self::COUNT).' as value')
+        return $this->baseQuery($workspaceId, $date_range, $filter, true)
+            ->selectRaw('
+                pages.id as page_id,
+                pages.name as page_name,
+                AVG(pancake_orders.delivery_attempts) as value
+            ')
             ->groupBy('pages.id', 'pages.name')
             ->orderByDesc('value')
             ->get();
@@ -44,11 +46,14 @@ final class ReturnedAvgDeliveryAttempts
 
     public function perShop(int $workspaceId, array $date_range, array $filter)
     {
-        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
-            ->join('pages', 'pages.id', '=', 'workspace_daily_metrics.page_id')
+        return $this->baseQuery($workspaceId, $date_range, $filter, true)
             ->join('shops', 'shops.id', '=', 'pages.shop_id')
+            ->selectRaw('
+                shops.id as shop_id,
+                shops.name as shop_name,
+                AVG(pancake_orders.delivery_attempts) as value
+            ')
             ->whereNotNull('pages.shop_id')
-            ->selectRaw('shops.id as shop_id, shops.name as shop_name, '.$this->rollupAvgSql(self::SUM, self::COUNT).' as value')
             ->groupBy('shops.id', 'shops.name')
             ->orderByDesc('value')
             ->get();
@@ -56,13 +61,45 @@ final class ReturnedAvgDeliveryAttempts
 
     public function perUser(int $workspaceId, array $date_range, array $filter)
     {
-        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
-            ->join('pages', 'pages.id', '=', 'workspace_daily_metrics.page_id')
+        return $this->baseQuery($workspaceId, $date_range, $filter, true)
             ->join('users', 'users.id', '=', 'pages.owner_id')
+            ->selectRaw('
+                users.id as user_id,
+                users.name as user_name,
+                AVG(pancake_orders.delivery_attempts) as value
+            ')
             ->whereNotNull('pages.owner_id')
-            ->selectRaw('users.id as user_id, users.name as user_name, '.$this->rollupAvgSql(self::SUM, self::COUNT).' as value')
             ->groupBy('users.id', 'users.name')
             ->orderByDesc('value')
             ->get();
+    }
+
+    private function baseQuery(int $workspaceId, array $date_range, array $filter, bool $forceJoinPages = false)
+    {
+        return DB::table('pancake_orders')
+            ->when(
+                $forceJoinPages || ! empty($filter['page_ids']) || ! empty($filter['shop_ids']),
+                function ($query) use ($filter) {
+                    $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
+                        ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
+                            $query->whereIn(
+                                'pages.id',
+                                is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids'])
+                            );
+                        })
+                        ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
+                            $query->whereIn(
+                                'pages.shop_id',
+                                is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids'])
+                            );
+                        });
+                }
+            )
+            ->where('pancake_orders.workspace_id', $workspaceId)
+            ->whereNotNull('pancake_orders.returning_at')
+            ->whereBetween('pancake_orders.returning_at', [
+                $date_range['start_date'].' 00:00:00',
+                $date_range['end_date'].' 23:59:59',
+            ]);
     }
 }
