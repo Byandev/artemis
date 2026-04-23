@@ -33,7 +33,28 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FormModal from './formModal';
+import { Checkbox } from '@/components/ui/checkbox';
 import { CallLog } from '@/types/models/CallLog';
+
+const EXPORT_COLUMNS = [
+    { key: 'order_id', label: 'Order ID' },
+    { key: 'tracking_number', label: 'Tracking Number' },
+    { key: 'jnt_status', label: 'J&T Status' },
+    { key: 'rider_name', label: "Rider's Name" },
+    { key: 'rider_number', label: "Rider's Number" },
+    { key: 'cx_name', label: 'CX Name' },
+    { key: 'cx_number', label: 'CX Number' },
+    { key: 'address', label: 'Address' },
+    { key: 'srp', label: 'SRP' },
+    { key: 'attempts', label: '# of Attempts' },
+    { key: 'confirmed_by', label: 'Confirmed By' },
+    { key: 'cx_rts', label: 'CX RTS' },
+    { key: 'location_rts', label: 'Location RTS' },
+    { key: 'updated_status', label: 'Updated Status' },
+    { key: 'csr', label: 'CSR' },
+] as const;
+
+const ALL_COLUMN_KEYS = EXPORT_COLUMNS.map((c) => c.key);
 
 interface Props {
     orders: PaginatedData<OrderForDelivery>;
@@ -253,6 +274,11 @@ export default function RmoManagement({
     const [showMyOnly, setShowMyOnly] = useState(() => localStorage.getItem('rmo_show_my_only') === 'true');
     const [pendingAssign, setPendingAssign] = useState<{ id: number; currentStatus: string } | null>(null);
     const [callLogModal, setCallLogModal] = useState<{ phone: string; label: string; assigneeName: string } | null>(null);
+    const [exportModalOpen, setExportModalOpen] = useState(false);
+    const [exportColumns, setExportColumns] = useState<string[]>(() => {
+        const saved = localStorage.getItem('rmo_export_columns');
+        return saved ? JSON.parse(saved) : [...ALL_COLUMN_KEYS];
+    });
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
@@ -401,7 +427,8 @@ export default function RmoManagement({
     }, [showMyOnly]);
 
 
-    const handleExport = useCallback(() => {
+    const doExport = useCallback((columns: string[]) => {
+        localStorage.setItem('rmo_export_columns', JSON.stringify(columns));
         const params = new URLSearchParams();
         if (searchValue) params.set('filter[search]', searchValue);
         if (currentStatus) params.set('filter[status]', currentStatus);
@@ -412,6 +439,9 @@ export default function RmoManagement({
         params.set('delivery_date', deliveryDate);
         if (showMyOnly && localStorage.getItem('user_id')) {
             params.set('assignee_id', localStorage.getItem('user_id') ?? '');
+        }
+        if (columns.length > 0 && columns.length < ALL_COLUMN_KEYS.length) {
+            params.set('columns', columns.join(','));
         }
 
         const qs = params.toString();
@@ -801,6 +831,72 @@ export default function RmoManagement({
                 date={deliveryDate}
             />
 
+            {/* Export column picker modal */}
+            <Dialog open={exportModalOpen} onOpenChange={setExportModalOpen}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle className="text-sm font-semibold">Export Columns</DialogTitle>
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                            Select which columns to include in the export.
+                        </p>
+                    </DialogHeader>
+                    <div className="space-y-1.5 max-h-72 overflow-y-auto py-2">
+                        {EXPORT_COLUMNS.map((col) => (
+                            <label key={col.key} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-stone-50 dark:hover:bg-zinc-800">
+                                <Checkbox
+                                    checked={exportColumns.includes(col.key)}
+                                    onCheckedChange={(checked) => {
+                                        setExportColumns((prev) =>
+                                            checked
+                                                ? [...prev, col.key]
+                                                : prev.filter((k) => k !== col.key),
+                                        );
+                                    }}
+                                />
+                                <span className="text-[12px] text-gray-700 dark:text-gray-300">{col.label}</span>
+                            </label>
+                        ))}
+                    </div>
+                    <div className="flex items-center justify-between border-t pt-3 dark:border-white/6">
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setExportColumns([...ALL_COLUMN_KEYS])}
+                                className="text-[11px] font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                            >
+                                Select all
+                            </button>
+                            <span className="text-gray-300 dark:text-gray-600">|</span>
+                            <button
+                                onClick={() => setExportColumns([])}
+                                className="text-[11px] font-medium text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setExportModalOpen(false)}
+                                className="rounded-lg border border-black/10 px-3 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 dark:border-white/10 dark:text-gray-400 dark:hover:bg-zinc-800"
+                            >
+                                Cancel
+                            </button>
+                            <Button
+                                size="sm"
+                                disabled={exportColumns.length === 0}
+                                onClick={() => {
+                                    doExport(exportColumns);
+                                    setExportModalOpen(false);
+                                }}
+                                className="rounded-lg bg-emerald-600 px-4 text-[12px] font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                                <Download className="mr-1.5 h-3.5 w-3.5" />
+                                Download
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             {/* Top bar */}
             <div className="border-b border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                 <div className="mx-auto flex w-full items-center justify-between px-4 py-3 md:px-6">
@@ -901,7 +997,7 @@ export default function RmoManagement({
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={handleExport}
+                            onClick={() => setExportModalOpen(true)}
                             className="flex items-center gap-1.5 rounded-lg text-[12px]"
                         >
                             <Download className="h-3.5 w-3.5" />
