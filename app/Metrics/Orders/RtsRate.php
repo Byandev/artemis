@@ -2,12 +2,17 @@
 
 namespace App\Metrics\Orders;
 
+use App\Support\Analytics\RollupReader;
 use Illuminate\Support\Facades\DB;
 
 final class RtsRate
 {
     public function compute(int $workspaceId, array $date_range, array $filter): float
     {
+        if (RollupReader::canUse($filter)) {
+            return $this->computeFromRollup($workspaceId, $date_range, $filter);
+        }
+
         $start = $date_range['start_date'].' 00:00:00';
         $end = $date_range['end_date'].' 23:59:59';
 
@@ -71,6 +76,10 @@ final class RtsRate
 
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
+        if (RollupReader::canUse($filter)) {
+            return $this->breakdownFromRollup($workspaceId, $date_range, $filter, $group);
+        }
+
         $start = $date_range['start_date'].' 00:00:00';
         $end = $date_range['end_date'].' 23:59:59';
 
@@ -160,6 +169,10 @@ final class RtsRate
 
     public function perPage(int $workspaceId, array $date_range, array $filter)
     {
+        if (RollupReader::canUse($filter)) {
+            return $this->perPageFromRollup($workspaceId, $date_range, $filter);
+        }
+
         $start = $date_range['start_date'].' 00:00:00';
         $end = $date_range['end_date'].' 23:59:59';
 
@@ -232,6 +245,10 @@ final class RtsRate
 
     public function perShop(int $workspaceId, array $date_range, array $filter)
     {
+        if (RollupReader::canUse($filter)) {
+            return $this->perShopFromRollup($workspaceId, $date_range, $filter);
+        }
+
         $start = $date_range['start_date'].' 00:00:00';
         $end = $date_range['end_date'].' 23:59:59';
 
@@ -380,6 +397,126 @@ final class RtsRate
             ->groupBy('x.user_id', 'x.user_name')
             ->orderByDesc('value')
             ->get();
+    }
+
+    private function computeFromRollup(int $workspaceId, array $date_range, array $filter): float
+    {
+        $row = $this->rollupBaseQuery($workspaceId, $date_range, $filter)
+            ->selectRaw('
+                COALESCE(
+                    SUM(entered_returning_amount) /
+                    NULLIF(SUM(entered_returning_amount + delivered_amount), 0),
+                    0
+                ) AS rts_rate
+            ')
+            ->first();
+
+        return (float) ($row->rts_rate ?? 0);
+    }
+
+    private function breakdownFromRollup(int $workspaceId, array $date_range, array $filter, string $group)
+    {
+        $periodSql = match ($group) {
+            'weekly' => "DATE_FORMAT(date, '%x-W%v')",
+            'monthly' => "DATE_FORMAT(date, '%Y-%m')",
+            default => 'DATE(date)',
+        };
+
+        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
+            ->selectRaw("
+                $periodSql AS period,
+                ROUND(
+                    COALESCE(
+                        SUM(entered_returning_amount) /
+                        NULLIF(SUM(entered_returning_amount + delivered_amount), 0),
+                        0
+                    ),
+                    4
+                ) AS value
+            ")
+            ->groupByRaw($periodSql)
+            ->orderByRaw($periodSql)
+            ->get();
+    }
+
+    private function perPageFromRollup(int $workspaceId, array $date_range, array $filter)
+    {
+        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
+            ->join('pages', 'pages.id', '=', 'workspace_page_daily_metrics.page_id')
+            ->selectRaw('
+                pages.id AS page_id,
+                pages.name AS page_name,
+                ROUND(
+                    COALESCE(
+                        SUM(workspace_page_daily_metrics.entered_returning_amount) /
+                        NULLIF(SUM(workspace_page_daily_metrics.entered_returning_amount + workspace_page_daily_metrics.delivered_amount), 0),
+                        0
+                    ),
+                    4
+                ) AS value
+            ')
+            ->groupBy('pages.id', 'pages.name')
+            ->orderByDesc('value')
+            ->get();
+    }
+
+    private function perShopFromRollup(int $workspaceId, array $date_range, array $filter)
+    {
+        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
+            ->join('pages', 'pages.id', '=', 'workspace_page_daily_metrics.page_id')
+            ->join('shops', 'shops.id', '=', 'pages.shop_id')
+            ->selectRaw('
+                shops.id AS shop_id,
+                shops.name AS shop_name,
+                ROUND(
+                    COALESCE(
+                        SUM(workspace_page_daily_metrics.entered_returning_amount) /
+                        NULLIF(SUM(workspace_page_daily_metrics.entered_returning_amount + workspace_page_daily_metrics.delivered_amount), 0),
+                        0
+                    ),
+                    4
+                ) AS value
+            ')
+            ->whereNotNull('pages.shop_id')
+            ->groupBy('shops.id', 'shops.name')
+            ->orderByDesc('value')
+            ->get();
+    }
+
+    private function rollupBaseQuery(int $workspaceId, array $date_range, array $filter)
+    {
+        $query = DB::table('workspace_page_daily_metrics')
+            ->where('workspace_page_daily_metrics.workspace_id', $workspaceId);
+
+        if (! empty($date_range['start_date']) && ! empty($date_range['end_date'])) {
+            $query->whereBetween('workspace_page_daily_metrics.date', [
+                $date_range['start_date'],
+                $date_range['end_date'],
+            ]);
+        }
+
+        $pageIds = ! empty($filter['page_ids'])
+            ? (is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids']))
+            : null;
+
+        $shopIds = ! empty($filter['shop_ids'])
+            ? (is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']))
+            : null;
+
+        if ($pageIds) {
+            $query->whereIn('workspace_page_daily_metrics.page_id', $pageIds);
+        }
+
+        if ($shopIds) {
+            $query->whereIn('workspace_page_daily_metrics.page_id', function ($sub) use ($workspaceId, $shopIds) {
+                $sub->from('pages')
+                    ->select('id')
+                    ->where('workspace_id', $workspaceId)
+                    ->whereIn('shop_id', $shopIds);
+            });
+        }
+
+        return $query;
     }
 
     private function baseQuery(int $workspaceId, array $date_range, array $filter)

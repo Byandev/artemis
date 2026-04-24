@@ -2,17 +2,26 @@
 
 namespace App\Metrics\Orders;
 
+use App\Support\Analytics\RollupReader;
 use Illuminate\Support\Facades\DB;
 
 final class TotalOrders
 {
     public function compute(int $workspaceId, array $date_range, array $filter): int
     {
+        if (RollupReader::canUse($filter)) {
+            return (int) RollupReader::sum('confirmed_count', $workspaceId, $date_range, $filter);
+        }
+
         return (int) $this->baseQuery($workspaceId, $date_range, $filter)->count();
     }
 
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
+        if (RollupReader::canUse($filter)) {
+            return RollupReader::breakdown('confirmed_count', $workspaceId, $date_range, $filter, $group);
+        }
+
         $periodSql = match ($group) {
             'daily' => 'DATE(pancake_orders.confirmed_at)',
             'weekly' => "DATE_FORMAT(pancake_orders.confirmed_at, '%x-W%v')",
@@ -29,6 +38,10 @@ final class TotalOrders
 
     public function perPage(int $workspaceId, array $date_range, array $filter)
     {
+        if (RollupReader::canUse($filter)) {
+            return RollupReader::perPage('confirmed_count', $workspaceId, $date_range, $filter);
+        }
+
         return $this->baseQuery($workspaceId, $date_range, $filter, true)
             ->selectRaw('
                 pages.id as page_id,
@@ -57,6 +70,10 @@ final class TotalOrders
 
     public function perShop(int $workspaceId, array $date_range, array $filter)
     {
+        if (RollupReader::canUse($filter)) {
+            return RollupReader::perShop('confirmed_count', $workspaceId, $date_range, $filter);
+        }
+
         return $this->baseQuery($workspaceId, $date_range, $filter, true)
             ->join('shops', 'shops.id', '=', 'pages.shop_id')
             ->selectRaw('

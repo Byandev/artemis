@@ -2,12 +2,17 @@
 
 namespace App\Metrics\Orders;
 
+use App\Support\Analytics\RollupReader;
 use Illuminate\Support\Facades\DB;
 
 final class TotalSales
 {
     public function compute(int $workspaceId, array $date_range, array $filter): float
     {
+        if (RollupReader::canUse($filter)) {
+            return round(RollupReader::sum('confirmed_amount', $workspaceId, $date_range, $filter), 2);
+        }
+
         return round(
             (float) $this->baseQuery($workspaceId, $date_range, $filter)
                 ->sum('pancake_orders.final_amount'),
@@ -17,6 +22,10 @@ final class TotalSales
 
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
+        if (RollupReader::canUse($filter)) {
+            return RollupReader::breakdown('confirmed_amount', $workspaceId, $date_range, $filter, $group);
+        }
+
         $periodSql = match ($group) {
             'daily' => 'DATE(pancake_orders.confirmed_at)',
             'weekly' => "DATE_FORMAT(pancake_orders.confirmed_at, '%x-W%v')",
@@ -33,6 +42,10 @@ final class TotalSales
 
     public function perPage(int $workspaceId, array $date_range, array $filter)
     {
+        if (RollupReader::canUse($filter)) {
+            return RollupReader::perPage('confirmed_amount', $workspaceId, $date_range, $filter);
+        }
+
         return $this->baseQuery($workspaceId, $date_range, $filter, true)
             ->selectRaw('
                 pages.id as page_id,
@@ -46,6 +59,10 @@ final class TotalSales
 
     public function perShop(int $workspaceId, array $date_range, array $filter)
     {
+        if (RollupReader::canUse($filter)) {
+            return RollupReader::perShop('confirmed_amount', $workspaceId, $date_range, $filter);
+        }
+
         return $this->baseQuery($workspaceId, $date_range, $filter, true)
             ->join('shops', 'shops.id', '=', 'pages.shop_id')
             ->selectRaw('

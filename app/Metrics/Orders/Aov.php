@@ -2,12 +2,17 @@
 
 namespace App\Metrics\Orders;
 
+use App\Support\Analytics\RollupReader;
 use Illuminate\Support\Facades\DB;
 
 final class Aov
 {
     public function compute(int $workspaceId, array $date_range, array $filter): float
     {
+        if (RollupReader::canUse($filter)) {
+            return RollupReader::divide('confirmed_amount', 'confirmed_count', $workspaceId, $date_range, $filter);
+        }
+
         $row = $this->baseQuery($workspaceId, $date_range, $filter)
             ->selectRaw('
                 COALESCE(SUM(pancake_orders.final_amount) / NULLIF(COUNT(*), 0), 0) as value
@@ -19,6 +24,10 @@ final class Aov
 
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
+        if (RollupReader::canUse($filter)) {
+            return RollupReader::ratioBreakdown('confirmed_amount', 'confirmed_count', $workspaceId, $date_range, $filter, $group);
+        }
+
         $periodSql = match ($group) {
             'daily' => 'DATE(pancake_orders.confirmed_at)',
             'weekly' => "DATE_FORMAT(pancake_orders.confirmed_at, '%x-W%v')",
@@ -41,6 +50,10 @@ final class Aov
 
     public function perPage(int $workspaceId, array $date_range, array $filter)
     {
+        if (RollupReader::canUse($filter)) {
+            return RollupReader::ratioPerPage('confirmed_amount', 'confirmed_count', $workspaceId, $date_range, $filter);
+        }
+
         return $this->baseQuery($workspaceId, $date_range, $filter, true)
             ->selectRaw('
                 pages.id as page_id,
@@ -57,6 +70,10 @@ final class Aov
 
     public function perShop(int $workspaceId, array $date_range, array $filter)
     {
+        if (RollupReader::canUse($filter)) {
+            return RollupReader::ratioPerShop('confirmed_amount', 'confirmed_count', $workspaceId, $date_range, $filter);
+        }
+
         return $this->baseQuery($workspaceId, $date_range, $filter, true)
             ->join('shops', 'shops.id', '=', 'pages.shop_id')
             ->selectRaw('
