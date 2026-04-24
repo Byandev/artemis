@@ -16,6 +16,7 @@ import { useMemo, useState } from 'react';
 import { Workspace } from '@/types/models/Workspace';
 import { omit } from 'lodash';
 import { DeleteOrderDialog } from '@/components/inventory/delete-order-dialog';
+import { PaginatedData } from '@/types';
 
 interface PurchasedOrderItem {
     id: number;
@@ -53,16 +54,7 @@ interface PurchasedOrder {
 
 interface Props {
     workspace: Workspace;
-    orders: {
-        data: PurchasedOrder[];
-        total: number;
-        from: number;
-        to: number;
-        links: any[];
-        last_page: number;
-        current_page: number;
-        per_page: number;
-    };
+    orders: PaginatedData<PurchasedOrder>;
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -71,7 +63,7 @@ interface Props {
 }
 
 export default function PurchasedOrderIndex({ workspace, orders, query }: Props) {
-    const [deletingId, setDeletingId] = useState<number | null>(null);
+    const [deletingOrder, setDeletingOrder] = useState<PurchasedOrder | null>(null);
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
 
    const baseUrl = `/workspaces/${workspace.slug}/inventory/purchased-orders`;
@@ -230,10 +222,10 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
                         }}
                     />
                 </div>
-                <DeleteOrderDialog 
-                    order={deletingOrder} 
-                    workspace={workspace} 
-                    onClose={() => setDeletingOrder(null)} 
+                <DeleteOrderDialog
+                    order={deletingOrder}
+                    workspace={workspace}
+                    onClose={() => setDeletingOrder(null)}
                 />
             </div>
         </AppLayout>
