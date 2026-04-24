@@ -34,6 +34,7 @@ class AnalyticController extends Controller
     public function groupByOrderItem(Request $request, Workspace $workspace)
     {
         $key = $this->cacheKey($workspace, 'order-item', $request);
+
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsOrderItemQuery($workspace, $request))
                 ->sort($request->input('sort', '-total_orders'))
@@ -164,6 +165,7 @@ class AnalyticController extends Controller
      */
     private function ttl(Request $request): int
     {
+        return 1;
         $endDate = $request->input('end_date');
 
         if ($endDate && Carbon::parse($endDate)->startOfDay()->lt(Carbon::today())) {
