@@ -116,80 +116,80 @@ export function AppSidebar() {
         },
         ...(currentWorkspace.show_inventory
             ? [
-                  {
-                      title: 'Inventory',
-                      icon: Box,
-                      items: [
-                          {
-                              title: 'Inventory Items',
-                              href: `/workspaces/${currentWorkspace.slug}/inventory/items`,
-                              icon: Layers,
-                          },
-                          {
-                              title: 'Transaction Logs',
-                              href: `/workspaces/${currentWorkspace.slug}/inventory/transactions`,
-                              icon: ClipboardList,
-                          },
-                          {
-                              title: 'Purchased Orders',
-                              href: `/workspaces/${currentWorkspace.slug}/inventory/purchased-orders`,
-                              icon: ShoppingCart,
-                          },
-                      ],
-                  },
-              ]
+                {
+                    title: 'Inventory',
+                    icon: Box,
+                    items: [
+                        {
+                            title: 'Inventory Items',
+                            href: `/workspaces/${currentWorkspace.slug}/inventory/items`,
+                            icon: Layers,
+                        },
+                        {
+                            title: 'Transaction Logs',
+                            href: `/workspaces/${currentWorkspace.slug}/inventory/transactions`,
+                            icon: ClipboardList,
+                        },
+                        {
+                            title: 'Purchased Orders',
+                            href: `/workspaces/${currentWorkspace.slug}/inventory/purchased-orders`,
+                            icon: ShoppingCart,
+                        },
+                    ],
+                },
+            ]
             : []),
         ...(currentWorkspace.show_finance
             ? [
-                  {
-                      title: 'Finance',
-                      icon: Wallet,
-                      items: [
-                          {
-                              title: 'Live Cashflow',
-                              href: `/workspaces/${currentWorkspace.slug}/finance/dashboard`,
-                              icon: LayoutDashboard,
-                          },
-                          {
-                              title: 'Dashboard',
-                              href: `/workspaces/${currentWorkspace.slug}/finance/expenses`,
-                              icon: PieChart,
-                          },
-                          {
-                              title: 'Accounts',
-                              href: `/workspaces/${currentWorkspace.slug}/finance/accounts`,
-                              icon: Landmark,
-                          },
-                          {
-                              title: 'Transactions',
-                              href: `/workspaces/${currentWorkspace.slug}/finance/transactions`,
-                              icon: ArrowLeftRight,
-                          },
-                          {
-                              title: 'Remittances',
-                              href: `/workspaces/${currentWorkspace.slug}/finance/remittances`,
-                              icon: Send,
-                          },
-                      ],
-                  },
-              ]
+                {
+                    title: 'Finance',
+                    icon: Wallet,
+                    items: [
+                        {
+                            title: 'Live Cashflow',
+                            href: `/workspaces/${currentWorkspace.slug}/finance/dashboard`,
+                            icon: LayoutDashboard,
+                        },
+                        {
+                            title: 'Dashboard',
+                            href: `/workspaces/${currentWorkspace.slug}/finance/expenses`,
+                            icon: PieChart,
+                        },
+                        {
+                            title: 'Accounts',
+                            href: `/workspaces/${currentWorkspace.slug}/finance/accounts`,
+                            icon: Landmark,
+                        },
+                        {
+                            title: 'Transactions',
+                            href: `/workspaces/${currentWorkspace.slug}/finance/transactions`,
+                            icon: ArrowLeftRight,
+                        },
+                        {
+                            title: 'Remittances',
+                            href: `/workspaces/${currentWorkspace.slug}/finance/remittances`,
+                            icon: Send,
+                        },
+                    ],
+                },
+            ]
             : []),
-        {
-            title: 'RTS',
-            icon: RotateCcw,
-            items: [
-                {
-                    title: 'Analytics',
-                    href: `/workspaces/${currentWorkspace.slug}/rts/analytics`,
-                    icon: BarChart2,
-                },
-                {
-                    title: 'Parcel Journey',
-                    href: `/workspaces/${currentWorkspace.slug}/rts/parcel-journeys`,
-                    icon: MapPin,
-                },
-            ],
-        },
+        // {
+        //     title: 'RTS',
+        //     icon: RotateCcw,
+        //     items: [
+        //         {
+        //             title: 'Analytics',
+        //             href: `/workspaces/${currentWorkspace.slug}/rts/analytics`,
+        //             icon: BarChart2,
+        //         },
+        //         {
+        //             title: 'Parcel Journey',
+        //             href: `/workspaces/${currentWorkspace.slug}/rts/parcel-journeys`,
+        //             icon: MapPin,
+        //         },
+        //     ],
+        // },
 
         {
             title: 'Settings',
