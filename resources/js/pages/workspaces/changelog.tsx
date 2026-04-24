@@ -12,6 +12,38 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v2.7.1',
+        date: '2026-04-24',
+        sections: [
+            {
+                title: 'RMO Management',
+                items: [
+                    'Copy rider and customer phone numbers for the first 10 pending orders directly from the RMO Management view (currently enabled on efb.on-forge.com)',
+                    'Parcel Update Notification template form now validates empty text areas before saving',
+                ],
+            },
+            {
+                title: 'Sidebar',
+                items: [
+                    'Removed duplicate RTS entry from the workspace sidebar',
+                ],
+            },
+            {
+                title: 'Forms',
+                items: [
+                    'Polish pass across Inventory Items, Purchased Orders, Products, Teams, and Employees dialogs — tightened validation and layout consistency',
+                ],
+            },
+            {
+                title: 'Internal',
+                items: [
+                    'Subscriptions foundation — new subscription_plans catalog and workspace_subscriptions tables, plan tier constants, idempotent plan seeder, and a subscription relation on Workspace (no user-facing UI yet)',
+                    'Build config fix in vite.config.ts',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v2.7.0',
         date: '2026-04-22',
         sections: [
@@ -525,6 +557,8 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v2.7.1':
+        'bg-lime-500/10 text-lime-600 dark:text-lime-400 ring-lime-500/20',
     'v2.7.0':
         'bg-purple-500/10 text-purple-600 dark:text-purple-400 ring-purple-500/20',
     'v2.6.0':
