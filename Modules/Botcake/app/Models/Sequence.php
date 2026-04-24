@@ -5,6 +5,8 @@ namespace Modules\Botcake\Models;
 use App\Models\Page;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Sequence extends Model
 {
@@ -12,12 +14,12 @@ class Sequence extends Model
 
     protected $table = 'botcake_sequences';
 
-    public function page(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function page(): BelongsTo
     {
         return $this->belongsTo(Page::class);
     }
 
-    public function messages(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function messages(): HasMany
     {
         return $this->hasMany(SequenceMessage::class);
     }

@@ -116,7 +116,7 @@ class WorkspaceMemberController extends Controller
     {
 
         if (! $request->user()->isAdminOf($workspace)) {
-            abort(403, 'You do not have permission to update member roles.');
+            return back()->withErrors(['error' => 'You do not have permission to update member roles.']);
         }
 
         if ($workspace->isOwner($user)) {

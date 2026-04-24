@@ -10,6 +10,7 @@ use Inertia\Inertia;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class InventoryItemController extends Controller
@@ -27,10 +28,7 @@ class InventoryItemController extends Controller
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
             ->select('inventory_items.*')
             ->with(['product'])
-            // unfulfilled_count is a stored column updated manually
-            // waiting for delivery = purchased order items where order status = 6 (Waiting For Delivery)
             ->withSum('waitingForDeliveryItems as waiting_for_delivery_stocks', 'count')
-            // current stocks = latest remaining_qty from transactions
             ->addSelect([
                 'current_stocks' => InventoryTransaction::select('remaining_qty')
                     ->whereColumn('inventory_item_id', 'inventory_items.id')
@@ -73,7 +71,7 @@ class InventoryItemController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        // Compute derived metrics on each item
+        // 4. Formatting loop for frontend display
         $items->through(function (InventoryItem $item) {
             $current = (float) ($item->current_stocks ?? 0);
             $waiting = (float) ($item->waiting_for_delivery_stocks ?? 0);
@@ -97,6 +95,7 @@ class InventoryItemController extends Controller
             'workspace' => $workspace,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
+                'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
         ]);

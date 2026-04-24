@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Workspaces;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use App\Models\WorkspaceApiKey;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class WorkspaceApiKeyController extends Controller
 {
-    public function index(Request $request, Workspace $workspace): \Inertia\Response
+    public function index(Request $request, Workspace $workspace): Response
     {
         if (! $request->user()->isAdminOf($workspace)) {
             abort(403);
@@ -26,7 +29,7 @@ class WorkspaceApiKeyController extends Controller
         ]);
     }
 
-    public function store(Request $request, Workspace $workspace): \Illuminate\Http\RedirectResponse
+    public function store(Request $request, Workspace $workspace): RedirectResponse
     {
         if (! $request->user()->isAdminOf($workspace)) {
             abort(403);
@@ -48,7 +51,7 @@ class WorkspaceApiKeyController extends Controller
         return back()->with('newApiKey', $generated['raw']);
     }
 
-    public function reveal(Request $request, Workspace $workspace, WorkspaceApiKey $apiKey): \Illuminate\Http\JsonResponse
+    public function reveal(Request $request, Workspace $workspace, WorkspaceApiKey $apiKey): JsonResponse
     {
         if (! $request->user()->isAdminOf($workspace)) {
             abort(403);
@@ -63,7 +66,7 @@ class WorkspaceApiKeyController extends Controller
         return response()->json(['key' => $apiKey->reveal()]);
     }
 
-    public function destroy(Request $request, Workspace $workspace, WorkspaceApiKey $apiKey): \Illuminate\Http\RedirectResponse
+    public function destroy(Request $request, Workspace $workspace, WorkspaceApiKey $apiKey): RedirectResponse
     {
         if (! $request->user()->isAdminOf($workspace)) {
             abort(403);

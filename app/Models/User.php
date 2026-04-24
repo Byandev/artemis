@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     /**
@@ -18,7 +20,7 @@ class User extends Authenticatable implements MustVerifyEmail
      *
      * @var list<string>
      */
-    protected $fillable = ['name', 'email', 'password', 'role'];
+    protected $fillable = ['name', 'email', 'password', 'role', 'is_super_admin'];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -42,6 +44,7 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_super_admin' => 'boolean',
         ];
     }
 
@@ -103,7 +106,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isAdminOf(Workspace $workspace): bool
     {
         // If they are a global superadmin, they are an admin of everything
-        if ($this->isSuperAdmin()) {
+        if ($this->is_super_admin()) {
             return true;
         }
 
@@ -132,27 +135,27 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Check if the user is a global Super Admin.
      */
-    public function isSuperAdmin(): bool
-    {
-        // This checks the 'role' column on the 'users' table
-        return $this->role === 'superadmin';
-    }
+    // public function isSuperAdmin(): bool
+    // {
+    //     // This checks the 'role' column on the 'users' table
+    //     return $this->role === 'superadmin';
+    // }
 
-    public function hasReach(string $requiredRole): bool
-    {
-        if ($this->isSuperAdmin()) {
-            return true;
-        }
+    // public function hasReach(string $requiredRole): bool
+    // {
+    //     if ($this->isSuperAdmin()) {
+    //         return true;
+    //     }
 
-        return $this->role === $requiredRole;
-    }
+    //     return $this->role === $requiredRole;
+    // }
 
-    public function pages(): User|\Illuminate\Database\Eloquent\Relations\HasMany
+    public function pages(): User|HasMany
     {
         return $this->hasMany(Page::class, 'owner_id');
     }
 
-    public function pancakeAccounts(): User|\Illuminate\Database\Eloquent\Relations\HasMany
+    public function pancakeAccounts(): User|HasMany
     {
         return $this->hasMany(\Modules\Pancake\Models\User::class);
     }

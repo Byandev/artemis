@@ -30,22 +30,30 @@ abstract class BaseNotificationHandler implements NotifiesParcelJourney
         string $activity,
         array $data,
     ): void {
-        ParcelJourneyNotification::create([
-            'order_id' => $order->id,
-            'parcel_journey_id' => $parcelJourney->id,
-            'type' => 'sms',
-            'receiver_name' => $order->shippingAddress->full_name,
-            'receiver_identity' => $order->shippingAddress->phone_number,
-            'message' => $this->renderer->render($this->workspace, 'sms', $activity, 'customer', $data),
-        ]);
+        $smsMessage = $this->renderer->render($this->workspace, 'sms', $activity, 'customer', $data);
 
-        ParcelJourneyNotification::create([
-            'order_id' => $order->id,
-            'parcel_journey_id' => $parcelJourney->id,
-            'type' => 'chat',
-            'receiver_name' => $order->shippingAddress->full_name,
-            'receiver_identity' => $psid,
-            'message' => $this->renderer->render($this->workspace, 'chat', $activity, 'customer', $data),
-        ]);
+        if ($smsMessage !== null) {
+            ParcelJourneyNotification::create([
+                'order_id' => $order->id,
+                'parcel_journey_id' => $parcelJourney->id,
+                'type' => 'sms',
+                'receiver_name' => $order->shippingAddress->full_name,
+                'receiver_identity' => $order->shippingAddress->phone_number,
+                'message' => $smsMessage,
+            ]);
+        }
+
+        $chatMessage = $this->renderer->render($this->workspace, 'chat', $activity, 'customer', $data);
+
+        if ($chatMessage !== null) {
+            ParcelJourneyNotification::create([
+                'order_id' => $order->id,
+                'parcel_journey_id' => $parcelJourney->id,
+                'type' => 'chat',
+                'receiver_name' => $order->shippingAddress->full_name,
+                'receiver_identity' => $psid,
+                'message' => $chatMessage,
+            ]);
+        }
     }
 }
