@@ -10,11 +10,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { currencyFormatter, percentageFormatter } from '@/lib/utils';
 import { toFrontendSort } from '@/lib/sort';
 import publicPage from '@/routes/public-page';
-import { PaginatedData } from '@/types';
+import { PaginatedData, SharedData } from '@/types';
 import { OrderForDelivery, OrderStatus } from '@/types/models/Pancake/OrderForDelivery';
 import { User } from '@/types/models/Pancake/User';
 import { Workspace } from '@/types/models/Workspace';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import {
@@ -66,7 +66,7 @@ function formatDuration(seconds: number): string {
     return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
-function EditablePhone({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+function EditablePhone({ value, onSave, disabled = false }: { value: string; onSave: (v: string) => void; disabled?: boolean }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(value);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -86,7 +86,7 @@ function EditablePhone({ value, onSave }: { value: string; onSave: (v: string) =
         }
     };
 
-    if (editing) {
+    if (editing && !disabled) {
         return (
             <input
                 ref={inputRef}
@@ -100,6 +100,15 @@ function EditablePhone({ value, onSave }: { value: string; onSave: (v: string) =
                 }}
                 className="h-6 w-28 rounded border border-emerald-300 px-1.5 text-[11px] outline-none focus:ring-1 focus:ring-emerald-400 dark:border-emerald-600 dark:bg-zinc-800 dark:text-gray-300"
             />
+        );
+    }
+
+    if (disabled) {
+        return (
+            <span className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
+                <Phone className="h-3 w-3 shrink-0" />
+                {value || '—'}
+            </span>
         );
     }
 
@@ -247,6 +256,9 @@ export default function RmoManagement({
     returning_count,
     problematic_count,
 }: Props) {
+    const { appEnv } = usePage<SharedData>().props;
+    const canEditPhone = appEnv !== 'production';
+
     const [userName, setUserName] = useState<string | false>(false);
     const [isOpen, setIsOpen] = useState(false);
     const [showStats, setShowStats] = useState(() => localStorage.getItem('rmo_show_stats') === 'true');
@@ -568,6 +580,7 @@ export default function RmoManagement({
                             <EditablePhone
                                 value={phone}
                                 onSave={(v) => handleUpdatePhone(row.original.id, 'rider_phone', v)}
+                                disabled={!canEditPhone}
                             />
                             <CallLogBadge
                                 attempts={attempts}
@@ -596,6 +609,7 @@ export default function RmoManagement({
                             <EditablePhone
                                 value={phone}
                                 onSave={(v) => handleUpdatePhone(row.original.id, 'customer_phone', v)}
+                                disabled={!canEditPhone}
                             />
                             <CallLogBadge
                                 attempts={attempts}
@@ -776,7 +790,7 @@ export default function RmoManagement({
                 ),
             },
         ],
-        [handleAssignToMe, handleRemoveAssignee, handleChangeStatus, handleUpdatePhone, isToday],
+        [handleAssignToMe, handleRemoveAssignee, handleChangeStatus, handleUpdatePhone, isToday, canEditPhone],
     );
 
     return (

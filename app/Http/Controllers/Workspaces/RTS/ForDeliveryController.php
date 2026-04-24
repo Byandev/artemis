@@ -70,6 +70,10 @@ class ForDeliveryController extends Controller
 
     public function publicUpdatePhones(Workspace $workspace, $id, Request $request)
     {
+        if (app()->environment('production')) {
+            return redirect()->back()->with('error', 'Editing phone numbers is disabled in production.');
+        }
+
         $orderForDelivery = OrderForDelivery::find($id);
 
         if (! $orderForDelivery) {
