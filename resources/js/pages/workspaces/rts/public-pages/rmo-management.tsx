@@ -903,14 +903,14 @@ export default function RmoManagement({
                             <span className="text-[11px] font-bold text-white">R</span>
                         </div>
                         <div className="h-4 w-px bg-black/8 dark:bg-white/8" />
-                        <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                        {/* <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
                             {new Date().toLocaleDateString('en-US', {
                                 weekday: 'short',
                                 month: 'short',
                                 day: 'numeric',
                                 year: 'numeric',
                             })}
-                        </span>
+                        </span> */}
                     </div>
 
                     {userName ? (
