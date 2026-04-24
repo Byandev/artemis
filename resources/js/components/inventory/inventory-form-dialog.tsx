@@ -3,6 +3,7 @@ import { InventoryTransaction } from '@/types/models/InventoryTransaction';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useForm } from '@inertiajs/react';
 import React, { useEffect, useMemo } from 'react';
+import { toast } from 'sonner';
 
 interface InventoryItem {
     id: number;
@@ -22,7 +23,7 @@ interface Props {
     onSuccess?: () => void;
 }
 
-const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items = [] }: Props) => {
+const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items = [], onSuccess }: Props) => {
     const { data, setData, post, processing, errors, reset, patch } = useForm({
         inventory_item_id: '',
         date: '',
@@ -58,32 +59,25 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
     }, [inventory, open]);
 
     const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+    e.preventDefault();
 
-        const url = isEditing
-            ? `/workspaces/${workspace.slug}/inventory/transactions/${inventory?.id}`
-            : `/workspaces/${workspace.slug}/inventory/transactions`;
+    const url = isEditing
+        ? `/workspaces/${workspace.slug}/inventory/transactions/${inventory?.id}`
+        : `/workspaces/${workspace.slug}/inventory/transactions`;
 
-        const options = {
-            preserveScroll: true,
-            preserveState: true,
-            onSuccess: () => {
-                onOpenChange(false);
-            },
-        };
+    const request = isEditing ? patch : post;
 
-        if (isEditing) {
-            patch(url, options);
-        } else {
-            post(url, {
-                ...options,
-                onSuccess: () => {
-                    reset();
-                    onOpenChange(false);
-                }
-            });
-        }
-    }
+    request(url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            toast.success(isEditing ? 'Transaction updated successfully' : 'New transaction logged successfully');
+            if (!isEditing) reset();
+            onOpenChange(false);
+            onSuccess?.();
+        },
+        onError: () => toast.error('Failed to save transaction. Please check the form.')
+    });
+};
 
     const inputClass = "h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400";
     const labelClass = "block font-mono! text-[10px]! font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500";

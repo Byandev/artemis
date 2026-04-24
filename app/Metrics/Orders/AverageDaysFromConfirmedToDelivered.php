@@ -2,31 +2,53 @@
 
 namespace App\Metrics\Orders;
 
-use App\Support\AnalyticsRollup\ReadsRollup;
+use Illuminate\Support\Facades\DB;
 
 final class AverageDaysFromConfirmedToDelivered
 {
-    use ReadsRollup;
-
-    private const SUM = 'sum_days_confirmed_to_delivered';
-
-    private const COUNT = 'count_confirmed_to_delivered';
-
+    /**
+     * Compute average days from confirmed -> shipped
+     */
     public function compute(int $workspaceId, array $date_range, array $filter): float
     {
-        $row = $this->rollupBaseQuery($workspaceId, $date_range, $filter)
-            ->selectRaw($this->rollupAvgSql(self::SUM, self::COUNT).' as value')
+        $row = $this->baseQuery($workspaceId, $date_range, $filter)
+            ->selectRaw('
+                ROUND(
+                    COALESCE(
+                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.confirmed_at, pancake_orders.delivered_at)),
+                        0
+                    ),
+                    2
+                ) as value
+            ')
             ->first();
 
         return (float) ($row->value ?? 0);
     }
 
+    /**
+     * Breakdown average shipped out days by period
+     */
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
-        $periodSql = $this->rollupPeriodSql($group);
+        $periodSql = match ($group) {
+            'daily' => 'DATE(pancake_orders.delivered_at)',
+            'weekly' => "DATE_FORMAT(pancake_orders.delivered_at, '%x-W%v')",
+            'monthly' => "DATE_FORMAT(pancake_orders.delivered_at, '%Y-%m')",
+            default => 'DATE(pancake_orders.delivered_at)',
+        };
 
-        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
-            ->selectRaw("$periodSql as period, ".$this->rollupAvgSql(self::SUM, self::COUNT).' as value')
+        return $this->baseQuery($workspaceId, $date_range, $filter)
+            ->selectRaw("
+                $periodSql as period,
+                ROUND(
+                    COALESCE(
+                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.confirmed_at, pancake_orders.delivered_at)),
+                        0
+                    ),
+                    2
+                ) as value
+            ")
             ->groupByRaw($periodSql)
             ->orderByRaw($periodSql)
             ->get();
@@ -34,9 +56,18 @@ final class AverageDaysFromConfirmedToDelivered
 
     public function perPage(int $workspaceId, array $date_range, array $filter)
     {
-        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
-            ->join('pages', 'pages.id', '=', 'workspace_daily_metrics.page_id')
-            ->selectRaw('pages.id as page_id, pages.name as page_name, '.$this->rollupAvgSql(self::SUM, self::COUNT).' as value')
+        return $this->baseQuery($workspaceId, $date_range, $filter, true)
+            ->selectRaw('
+                pages.id as page_id,
+                pages.name as page_name,
+                ROUND(
+                    COALESCE(
+                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.confirmed_at, pancake_orders.delivered_at)),
+                        0
+                    ),
+                    2
+                ) as value
+            ')
             ->groupBy('pages.id', 'pages.name')
             ->orderByDesc('value')
             ->get();
@@ -44,11 +75,20 @@ final class AverageDaysFromConfirmedToDelivered
 
     public function perShop(int $workspaceId, array $date_range, array $filter)
     {
-        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
-            ->join('pages', 'pages.id', '=', 'workspace_daily_metrics.page_id')
+        return $this->baseQuery($workspaceId, $date_range, $filter, true)
             ->join('shops', 'shops.id', '=', 'pages.shop_id')
+            ->selectRaw('
+                shops.id as shop_id,
+                shops.name as shop_name,
+                ROUND(
+                    COALESCE(
+                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.confirmed_at, pancake_orders.delivered_at)),
+                        0
+                    ),
+                    2
+                ) as value
+            ')
             ->whereNotNull('pages.shop_id')
-            ->selectRaw('shops.id as shop_id, shops.name as shop_name, '.$this->rollupAvgSql(self::SUM, self::COUNT).' as value')
             ->groupBy('shops.id', 'shops.name')
             ->orderByDesc('value')
             ->get();
@@ -56,13 +96,95 @@ final class AverageDaysFromConfirmedToDelivered
 
     public function perUser(int $workspaceId, array $date_range, array $filter)
     {
-        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
-            ->join('pages', 'pages.id', '=', 'workspace_daily_metrics.page_id')
-            ->join('users', 'users.id', '=', 'pages.owner_id')
-            ->whereNotNull('pages.owner_id')
-            ->selectRaw('users.id as user_id, users.name as user_name, '.$this->rollupAvgSql(self::SUM, self::COUNT).' as value')
-            ->groupBy('users.id', 'users.name')
-            ->orderByDesc('value')
-            ->get();
+        $shopIds = ! empty($filter['shop_ids'])
+            ? (is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']))
+            : null;
+        $pageIds = ! empty($filter['page_ids'])
+            ? (is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids']))
+            : null;
+
+        $userNames = DB::table('users')
+            ->join('pages', 'pages.owner_id', '=', 'users.id')
+            ->where('pages.workspace_id', $workspaceId)
+            ->when($shopIds, fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->when($pageIds, fn ($q) => $q->whereIn('pages.id', $pageIds))
+            ->select('users.id', 'users.name')
+            ->distinct()
+            ->pluck('name', 'id');
+
+        if ($userNames->isEmpty()) {
+            return collect();
+        }
+
+        $averages = DB::table('pancake_orders')
+            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
+            ->where('pages.workspace_id', $workspaceId)
+            ->when($shopIds, fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->when($pageIds, fn ($q) => $q->whereIn('pages.id', $pageIds))
+            ->whereIn('pages.owner_id', $userNames->keys())
+            ->where('pancake_orders.workspace_id', $workspaceId)
+            ->whereNotIn('pancake_orders.status', [6, 7])
+            ->whereNotNull('pancake_orders.confirmed_at')
+            ->whereNotNull('pancake_orders.delivered_at')
+            ->whereBetween('pancake_orders.delivered_at', [
+                $date_range['start_date'].' 00:00:00',
+                $date_range['end_date'].' 23:59:59',
+            ])
+            ->selectRaw('
+                pages.owner_id as user_id,
+                ROUND(
+                    COALESCE(
+                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.confirmed_at, pancake_orders.delivered_at)),
+                        0
+                    ),
+                    2
+                ) as value
+            ')
+            ->groupBy('pages.owner_id')
+            ->pluck('value', 'user_id');
+
+        return $userNames->map(fn ($name, $id) => (object) [
+            'user_id' => $id,
+            'user_name' => $name,
+            'value' => (float) ($averages[$id] ?? 0),
+        ])->sortByDesc('value')->values();
+    }
+
+    /**
+     * Base query to avoid duplicating filters
+     */
+    private function baseQuery(
+        int $workspaceId,
+        array $date_range,
+        array $filter,
+        bool $forceJoinPages = false
+    ) {
+        return DB::table('pancake_orders')
+            ->when(
+                $forceJoinPages || ! empty($filter['page_ids']) || ! empty($filter['shop_ids']),
+                function ($query) use ($filter) {
+                    $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
+                        ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
+                            $query->whereIn(
+                                'pages.id',
+                                is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids'])
+                            );
+                        })
+                        ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
+                            $query->whereIn(
+                                'pages.shop_id',
+                                is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids'])
+                            );
+                        });
+                }
+            )
+            ->where('pancake_orders.workspace_id', $workspaceId)
+            ->whereNotIn('pancake_orders.status', [6, 7])
+            ->whereNotNull('pancake_orders.confirmed_at')
+            ->whereNotNull('pancake_orders.delivered_at')
+            ->whereBetween('pancake_orders.delivered_at', [
+                $date_range['start_date'].' 00:00:00',
+                $date_range['end_date'].' 23:59:59',
+            ]);
     }
 }

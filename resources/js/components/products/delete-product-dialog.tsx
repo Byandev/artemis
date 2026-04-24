@@ -12,6 +12,7 @@ import {
 import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
 import workspaces from '@/routes/workspaces';
+import { toast } from 'sonner';
 
 interface DeleteProductDialogProps {
     product: Product | null;
@@ -31,11 +32,12 @@ export function DeleteProductDialog({
 
         destroy(workspaces.products.destroy.url({ workspace, product }), {
             onSuccess: () => {
+                toast.success(`Product deleted successfully`);
                 onClose();
             },
         });
     };
-
+    
     return (
         <AlertDialog open={!!product} onOpenChange={(open) => !open && onClose()}>
             <AlertDialogContent>

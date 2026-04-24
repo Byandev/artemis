@@ -2,7 +2,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { ParcelJourneyNotificationTemplate } from '@/types/models/ParcelJourneyNotificationTemplate';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { ChangeEvent, useCallback, useEffect, useMemo, useRef } from 'react';
+import { ChangeEvent, useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { useForm } from '@inertiajs/react';
 import workspaces from '@/routes/workspaces';
 import { startCase } from 'lodash';
@@ -12,6 +12,10 @@ interface Props {
     onOpenChange: (open: boolean) => void;
     workspace: Workspace;
     initialValue?: ParcelJourneyNotificationTemplate;
+}
+
+interface FormErrors {
+    message?: string;
 }
 
 const TemplateForm = ({ initialValue, open, onOpenChange, workspace }: Props) => {
@@ -29,15 +33,43 @@ const TemplateForm = ({ initialValue, open, onOpenChange, workspace }: Props) =>
         });
     }, [initialValue?.id, initialValue?.message, initialValue?.is_enabled, setData]);
 
+    const [errors, setErrors] = useState<FormErrors>({});
+
+    const validate = () => {
+        let tempErrors: FormErrors = {};
+
+        if (!data.message.trim()) {
+            tempErrors.message = "Message is required.";
+        } else if (data.message.length < 10) {
+            tempErrors.message = "Message must be at least 10 characters.";
+        }
+
+        setErrors(tempErrors);
+        return Object.keys(tempErrors).length === 0;
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(workspaces.rts.parcelJourneyNotificationTemplates.update.url({ workspace, template: initialValue as ParcelJourneyNotificationTemplate }), {
-            onSuccess: () => onOpenChange(false),
-        });
+
+
+        if (validate()) {
+            put(workspaces.rts.parcelJourneyNotificationTemplates.update.url({
+                workspace,
+                template: initialValue as ParcelJourneyNotificationTemplate
+            }), {
+                onSuccess: () => {
+                    setErrors({});
+                    onOpenChange(false);
+                },
+            });
+        }
     };
 
     const handleChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
         setData('message', e.target.value);
+        if (Object.keys(errors).length > 0) {
+            setErrors({});
+        }
     };
 
     const insertAtCursor = useCallback((placeholder: string) => {
@@ -72,6 +104,7 @@ const TemplateForm = ({ initialValue, open, onOpenChange, workspace }: Props) =>
         { display: 'Rider Name', code: '{{rider_name}}', isVisible: initialValue?.activity === 'for-delivery' },
         { display: 'Rider Mobile', code: '{{rider_mobile}}', isVisible: initialValue?.activity === 'for-delivery' },
     ], [initialValue?.activity]);
+
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -126,11 +159,24 @@ const TemplateForm = ({ initialValue, open, onOpenChange, workspace }: Props) =>
                                 value={data.message}
                                 onChange={handleChange}
                                 placeholder="Type your message here..."
-                                className="w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 py-2.5 font-mono! text-[12px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400 resize-none"
+                                /* Added dynamic border color logic here */
+                                className={`w-full rounded-[10px] border px-3 py-2.5 font-mono! text-[12px]! outline-none transition-all resize-none
+                                ${errors.message
+                                        ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/15 text-red-900 dark:text-red-200"
+                                        : "border-black/8 bg-stone-50 text-gray-800 placeholder:text-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                                    }`}
                             />
-                            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                                For SMS, keep the message as short as possible.
-                            </p>
+
+                            {/* Display error message if it exists, otherwise show the hint */}
+                            {errors.message ? (
+                                <p className="font-mono text-[10px] font-medium text-red-500 animate-in fade-in slide-in-from-top-1">
+                                    {errors.message}
+                                </p>
+                            ) : (
+                                <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                    For SMS, keep the message as short as possible.
+                                </p>
+                            )}
                         </div>
 
                         <div className="space-y-1.5">

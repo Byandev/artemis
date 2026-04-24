@@ -18,13 +18,11 @@ class InventoryItemController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
 
-        $currentStocksSql = '(SELECT remaining_qty FROM inventory_transactions WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)';
-
-        $waitingStocksSql = '(SELECT SUM(count) FROM inventory_purchased_order_items
-                              WHERE inventory_item_id = inventory_items.id
-                              AND EXISTS (SELECT 1 FROM inventory_purchased_orders
-                                          WHERE inventory_purchased_orders.id = inventory_purchased_order_items.inventory_purchased_order_id
-                                          AND status = 6))';
+        $currentStocksSql = "(SELECT remaining_qty FROM inventory_transactions WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)";
+        $waitingStocksSql = "(SELECT SUM(count) FROM inventory_purchased_order_items WHERE inventory_item_id = inventory_items.id AND EXISTS (SELECT * FROM inventory_purchased_orders WHERE inventory_purchased_order_items.inventory_purchased_order_id = inventory_purchased_orders.id AND status = 6))";
+        $remainingAfterFulfillmentSql = "(COALESCE($currentStocksSql, 0) + COALESCE($waitingStocksSql, 0) - COALESCE(inventory_items.unfulfilled_count, 0))";
+        $poNeededSql = "GREATEST(0, (COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0)) - COALESCE($waitingStocksSql, 0))";
+        $daysItCanLastSql = "(CASE WHEN inventory_items.three_days_average > 0 THEN $remainingAfterFulfillmentSql / inventory_items.three_days_average ELSE 0 END)";
 
         $items = QueryBuilder::for(InventoryItem::where('inventory_items.workspace_id', $workspace->id))
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
@@ -39,17 +37,10 @@ class InventoryItemController extends Controller
                     ->limit(1),
             ])
 
-            ->selectRaw("
-                (COALESCE($currentStocksSql, 0) + COALESCE($waitingStocksSql, 0) - inventory_items.unfulfilled_count) as remaining_after_fulfillment,
-
-                CASE
-                    WHEN three_days_average > 0
-                    THEN (COALESCE($currentStocksSql, 0) + COALESCE($waitingStocksSql, 0) - inventory_items.unfulfilled_count) / three_days_average
-                    ELSE NULL
-                END as days_it_can_last,
-
-                GREATEST(0, (lead_time * three_days_average) - COALESCE($waitingStocksSql, 0)) as po_needed
-            ")
+            ->selectRaw("$remainingAfterFulfillmentSql as remaining_after_fulfillment")
+            ->selectRaw("$poNeededSql as po_needed")
+            ->selectRaw("$daysItCanLastSql as days_it_can_last")
+            // three_days_average is a stored column updated hourly by inventory:update-averages
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where('sku', 'like', "%{$value}%");
@@ -60,7 +51,21 @@ class InventoryItemController extends Controller
                 'id',
                 'product_id',
                 'sku',
-                AllowedSort::field('product_name', 'products.name'),
+                \Spatie\QueryBuilder\AllowedSort::field('product_name', 'products.name'),
+                'lead_time',
+                'unfulfilled_count',
+                'three_days_average',
+                'current_stocks',
+                'waiting_for_delivery_stocks',
+                \Spatie\QueryBuilder\AllowedSort::callback('remaining_after_fulfillment', function ($query, $descending) use ($remainingAfterFulfillmentSql) {
+                    $query->orderByRaw("$remainingAfterFulfillmentSql " . ($descending ? 'DESC' : 'ASC'));
+                }),
+                \Spatie\QueryBuilder\AllowedSort::callback('days_it_can_last', function ($query, $descending) use ($daysItCanLastSql) {
+                    $query->orderByRaw("$daysItCanLastSql " . ($descending ? 'DESC' : 'ASC'));
+                }),
+                \Spatie\QueryBuilder\AllowedSort::callback('po_needed', function ($query, $descending) use ($poNeededSql) {
+                    $query->orderByRaw("$poNeededSql " . ($descending ? 'DESC' : 'ASC'));
+                }),
             ])
             ->defaultSort('-created_at')
             ->paginate(10)
@@ -98,9 +103,9 @@ class InventoryItemController extends Controller
 
     public function store(Request $request, Workspace $workspace)
     {
-        $validated = $request->validate([
+        $request->validate([
             'product_id' => 'required|exists:products,id',
-            'sku' => 'required|string|max:255|unique:inventory_items,sku,NULL,id,workspace_id,'.$workspace->id,
+            'sku' => 'required|string|max:255|unique:inventory_items,sku,NULL,id,workspace_id,' . $workspace->id,
             'sales_keywords' => 'nullable|string',
             'transaction_keywords' => 'nullable|string',
             'lead_time' => 'nullable|integer|min:0',
@@ -110,13 +115,13 @@ class InventoryItemController extends Controller
 
         InventoryItem::create([
             'workspace_id' => $workspace->id,
-            'product_id' => $validated['product_id'],
-            'sku' => $validated['sku'],
-            'sales_keywords' => $validated['sales_keywords'],
-            'transaction_keywords' => $validated['transaction_keywords'],
-            'lead_time' => $validated['lead_time'] ?? 0,
-            'unfulfilled_count' => $validated['unfulfilled_count'] ?? 0,
-            'three_days_average' => $validated['three_days_average'] ?? 0,
+            'product_id' => $request->product_id,
+            'sku' => $request->sku,
+            'sales_keywords' => $request->sales_keywords,
+            'transaction_keywords' => $request->transaction_keywords,
+            'lead_time' => $request->lead_time ?? 0,
+            'unfulfilled_count' => $request->unfulfilled_count ?? 0,
+            'three_days_average' => $request->three_days_average ?? 0,
         ]);
 
         return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
@@ -125,7 +130,7 @@ class InventoryItemController extends Controller
 
     public function update(Request $request, Workspace $workspace, InventoryItem $item)
     {
-        $validated = $request->validate([
+        $request->validate([
             'product_id' => 'required|exists:products,id',
             'sku' => 'required|string|max:255',
             'sales_keywords' => 'nullable|string',
@@ -135,7 +140,15 @@ class InventoryItemController extends Controller
             'three_days_average' => 'nullable|numeric|min:0',
         ]);
 
-        $item->update($validated);
+        $item->update([
+            'product_id' => $request->product_id,
+            'sku' => $request->sku,
+            'sales_keywords' => $request->sales_keywords,
+            'transaction_keywords' => $request->transaction_keywords,
+            'lead_time' => $request->lead_time ?? 0,
+            'unfulfilled_count' => $request->unfulfilled_count ?? 0,
+            'three_days_average' => $request->three_days_average ?? 0,
+        ]);
 
         return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
             ->with('success', 'Inventory Items record updated.');

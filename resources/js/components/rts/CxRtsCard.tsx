@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import RtsBreakdownChart from '@/components/charts/RtsBreakdownChart';
-import { buildBaseParams, CX_RTS_LABELS, CxRtsRow, RtsCell, RtsQueryParams, ViewMode, ViewToggle } from './rts-shared';
+import { buildBaseParams, CX_RTS_LABELS, CxRtsRow, RefreshButton, RtsCell, RtsQueryParams, ViewMode, ViewToggle } from './rts-shared';
 
 interface Props {
     workspaceSlug: string;
@@ -13,6 +13,7 @@ export default function CxRtsCard({ workspaceSlug, queryParams, onDataLoaded }: 
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState<ViewMode>('chart');
     const [type, setType] = useState<'latest' | 'initial'>('latest');
+    const [refreshKey, setRefreshKey] = useState(0);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
@@ -25,7 +26,7 @@ export default function CxRtsCard({ workspaceSlug, queryParams, onDataLoaded }: 
             .then((data) => { if (!cancelled) { setRows(data); setLoading(false); onDataLoaded?.(data); } })
             .catch(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [workspaceSlug, type, JSON.stringify(queryParams)]);
+    }, [workspaceSlug, type, JSON.stringify(queryParams), refreshKey]);
 
     return (
         <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
@@ -53,6 +54,7 @@ export default function CxRtsCard({ workspaceSlug, queryParams, onDataLoaded }: 
                             Initial
                         </button>
                     </div>
+                    <RefreshButton onClick={() => setRefreshKey((k) => k + 1)} loading={loading} />
                     <ViewToggle value={view} onChange={setView} />
                 </div>
             </div>
