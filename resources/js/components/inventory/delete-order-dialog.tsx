@@ -35,7 +35,7 @@ export function DeleteOrderDialog({ order, workspace, onClose }: Props) {
             preserveScroll: true,
             onStart: () => setProcessing(true),
             onSuccess: () => {
-                toast.success(`Order deleted successfully`);
+                toast.success(`Purchased Order deleted successfully`);
                 onClose();
             },
             onFinish: () => setProcessing(false),

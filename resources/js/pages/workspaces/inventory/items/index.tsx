@@ -27,8 +27,7 @@ interface Item {
     sales_keywords: string;
     transaction_keywords: string;
     lead_time: number;
-    unfulfilled_count: number;
-    three_days_average: number;
+    unfulfilled_count: number
     product?: { id: number; name: string };
     // aggregated (unfulfilled is mapped from unfulfilled_count by the server)
     unfulfilled: number | null;
@@ -56,7 +55,15 @@ interface Props {
 const num = (v: number | null | undefined, decimals = 0) =>
     v == null ? '—' : Number(v).toLocaleString('en-PH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
-const MetricCell = ({ value, color }: { value: number | null | undefined; color?: string }) => (
+const MetricCell = ({ 
+    value, 
+    color, 
+    decimals = 0 
+}: { 
+    value: number | null | undefined; 
+    color?: string; 
+    decimals?: number 
+}) => (
     <span className={`font-mono text-[12px] font-medium ${color ?? 'text-gray-700 dark:text-gray-300'}`}>
         {num(value)}
     </span>
@@ -104,7 +111,7 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
         },
         {
             accessorKey: 'lead_time',
-            enableSorting: false,
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Lead Time (days)" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center">
@@ -115,40 +122,40 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             ),
         },
         {
-            id: 'unfulfilled',
-            enableSorting: false,
+            accessorKey: 'unfulfilled_count',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Unfulfilled" className="justify-center" />,
             cell: ({ row }) => (
-                <div className="text-center"><MetricCell value={row.original.unfulfilled} color="text-red-500 dark:text-red-400" /></div>
+                <div className="text-center"><MetricCell value={row.original.unfulfilled_count} color="text-red-500 dark:text-red-400" /></div>
             ),
         },
         {
-            id: 'current_stocks',
-            enableSorting: false,
+            accessorKey: 'current_stocks',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Current Stocks" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center"><MetricCell value={row.original.current_stocks} color="text-emerald-600 dark:text-emerald-400" /></div>
             ),
         },
         {
-            id: 'waiting_for_delivery_stocks',
-            enableSorting: false,
+            accessorKey: 'waiting_for_delivery_stocks',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Waiting for Delivery" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center"><MetricCell value={row.original.waiting_for_delivery_stocks} color="text-blue-500 dark:text-blue-400" /></div>
             ),
         },
         {
-            id: 'three_days_average',
-            enableSorting: false,
+            accessorKey: 'three_days_average',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="3-Day Avg" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center"><MetricCell value={row.original.three_days_average} decimals={1} /></div>
             ),
         },
         {
-            id: 'remaining_after_fulfillment',
-            enableSorting: false,
+            accessorKey: 'remaining_after_fulfillment',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Remaining After Fulfillment" className="justify-center" />,
             cell: ({ row }) => {
                 const v = row.original.remaining_after_fulfillment;
@@ -157,8 +164,8 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             },
         },
         {
-            id: 'days_it_can_last',
-            enableSorting: false,
+            accessorKey: 'days_it_can_last',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Days It Can Last" className="justify-center" />,
             cell: ({ row }) => {
                 const v = row.original.days_it_can_last;
@@ -173,8 +180,8 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             },
         },
         {
-            id: 'po_needed',
-            enableSorting: false,
+            accessorKey: 'po_needed',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="PO Needed" className="justify-center" />,
             cell: ({ row }) => {
                 const v = row.original.po_needed;
@@ -183,7 +190,7 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             },
         },
         {
-            id: 'actions',
+            accessorKey: 'actions',
             header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Actions</div>,
             cell: ({ row }) => {
                 const item = row.original;

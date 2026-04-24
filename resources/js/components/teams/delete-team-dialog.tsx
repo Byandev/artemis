@@ -1,8 +1,17 @@
-import { router } from '@inertiajs/react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { useForm } from '@inertiajs/react';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Workspace } from '@/types/models/Workspace';
-import { Trash2 } from 'lucide-react';
 import workspaces from '@/routes/workspaces';
+import { toast } from 'sonner';
 
 interface Team {
     id: number;
@@ -15,46 +24,55 @@ interface DeleteTeamDialogProps {
     onClose: () => void;
 }
 
-export function DeleteTeamDialog({ workspace, team, onClose }: DeleteTeamDialogProps) {
+export function DeleteTeamDialog({
+    team,
+    workspace,
+    onClose,
+}: DeleteTeamDialogProps) {
+    const { delete: destroy, processing } = useForm({});
+
     const handleDelete = () => {
         if (!team) return;
-        router.delete(workspaces.teams.destroy.url({ workspace, team: team.id }), {
-            preserveScroll: true,
-            onSuccess: () => onClose(),
+
+        destroy(workspaces.teams.destroy.url({ workspace, team }), {
+            onSuccess: () => {
+                toast.success(`Team deleted successfully`);
+                onClose();
+            },
         });
     };
 
     return (
-        <Dialog open={!!team} onOpenChange={() => onClose()}>
-            <DialogContent className="sm:max-w-sm p-0 gap-0 overflow-hidden">
-                <div className="flex flex-col items-center px-6 pt-6 pb-5 text-center">
-                    <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 dark:bg-red-500/10">
-                        <Trash2 className="h-5 w-5 text-red-500 dark:text-red-400" />
-                    </div>
-                    <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">Delete Team</h3>
-                    <p className="mt-1.5 text-[12px] text-gray-400 dark:text-gray-500">
-                        Are you sure you want to delete{' '}
-                        <span className="font-semibold text-gray-700 dark:text-gray-300">"{team?.name}"</span>?
-                        This action cannot be undone.
-                    </p>
-                </div>
-                <div className="flex items-center justify-end gap-2 border-t border-black/6 dark:border-white/6 px-5 py-3">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="flex h-9 items-center rounded-lg border border-black/8 bg-stone-100 px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+        <AlertDialog open={!!team} onOpenChange={(open) => !open && onClose()}>
+            <AlertDialogContent className="max-w-[400px] border-none shadow-2xl dark:bg-zinc-900">
+                <AlertDialogHeader>
+                    <AlertDialogTitle className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
+                        Delete Team?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                        Are you sure you want to delete the team <strong>{team?.name}</strong>? 
+                        This action cannot be undone and may affect associated members.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-4 gap-2">
+                    <AlertDialogCancel 
+                        disabled={processing}
+                        className="h-9 rounded-lg border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
                     >
                         Cancel
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleDelete}
-                        className="flex h-9 items-center rounded-lg bg-red-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-red-700"
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={(e) => {
+                            e.preventDefault();
+                            handleDelete();
+                        }}
+                        disabled={processing}
+                        className="h-9 rounded-lg bg-red-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-red-700 disabled:opacity-50"
                     >
-                        Delete Team
-                    </button>
-                </div>
-            </DialogContent>
-        </Dialog>
+                        {processing ? 'Deleting...' : 'Confirm Delete'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     );
 }
