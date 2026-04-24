@@ -70,24 +70,6 @@ class InventoryItemController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        // 4. Formatting loop for frontend display
-        $items->through(function (InventoryItem $item) {
-            $current = (float) ($item->current_stocks ?? 0);
-            $waiting = (float) ($item->waiting_for_delivery_stocks ?? 0);
-            $unfulfilled = (float) ($item->unfulfilled_count ?? 0);
-            $item->unfulfilled = $unfulfilled;
-            $avg = (float) ($item->three_days_average ?? 0);
-            $leadTime = (int) ($item->lead_time ?? 0);
-
-            $remaining = $current + $waiting - $unfulfilled;
-
-            $item->remaining_after_fulfillment = round($remaining, 2);
-            $item->days_it_can_last = $avg > 0 ? round($remaining / $avg, 1) : null;
-            $item->po_needed = round(max(0, ($leadTime * $avg) - $waiting), 2);
-
-            return $item;
-        });
-
         return Inertia::render('workspaces/inventory/items/index', [
             'items' => $items,
             'products' => Product::where('workspace_id', $workspace->id)->get(),
