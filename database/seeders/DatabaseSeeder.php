@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             AdminUserSeeder::class,
+            SubscriptionPlanSeeder::class,
         ]);
 
         // Seed RTS analytics sample data

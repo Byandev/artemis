@@ -3,6 +3,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
 import { useEffect } from 'react';
 import { User } from '@/types/models/Pancake/User';
+import { toast } from 'sonner';
 
 interface EmployeeFormDialogProps {
     workspace: Workspace;
@@ -10,10 +11,11 @@ interface EmployeeFormDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     employee?: User | null;
+    onSuccess?: () => void;
 }
 
-export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenChange, employee }: EmployeeFormDialogProps) {
-    const { data, setData, put, processing, errors, reset, clearErrors } = useForm({
+export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenChange, employee, onSuccess}: EmployeeFormDialogProps) {
+    const { data, setData, put, post, processing, errors, reset, clearErrors } = useForm({
         status: 'ACTIVE',
         user_id: '',
     });
@@ -31,15 +33,30 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
     }, [employee, open]);
 
     const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+    e.preventDefault();
 
-        put(`/workspaces/${workspace.slug}/employees/${employee?.id}`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                onOpenChange(false);
-            },
-        });
-    };
+    const isEditing = !!employee; 
+
+    const url = isEditing
+        ? `/workspaces/${workspace.slug}/employees/${employee.id}`
+        : `/workspaces/${workspace.slug}/employees`;
+
+    const request = isEditing ? put : post;
+
+    request(url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            toast.success(isEditing ? 'Employee updated successfully' : 'Employee created successfully');
+            
+            if (!isEditing) reset();
+            onOpenChange(false);     
+            onSuccess?.();           
+        },
+        onError: () => {
+            toast.error('Failed to save employee. Please check the form.');
+        }
+    });
+};
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

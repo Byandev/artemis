@@ -9,7 +9,32 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class RmoManagementExport implements FromQuery, WithHeadings, WithMapping
 {
-    public function __construct(private QueryBuilder $query) {}
+    public const AVAILABLE_COLUMNS = [
+        'order_id' => 'Order ID',
+        'tracking_number' => 'Tracking Number',
+        'jnt_status' => 'J&T Status',
+        'rider_name' => "Rider's Name",
+        'rider_number' => "Rider's Number",
+        'cx_name' => 'CX Name',
+        'cx_number' => 'CX Number',
+        'address' => 'Address',
+        'srp' => 'SRP',
+        'attempts' => '# of Attempts',
+        'confirmed_by' => 'Confirmed By',
+        'cx_rts' => 'CX RTS',
+        'location_rts' => 'Location RTS',
+        'updated_status' => 'Updated Status',
+        'csr' => 'CSR',
+    ];
+
+    private array $columns;
+
+    public function __construct(private QueryBuilder $query, array $columns = [])
+    {
+        $this->columns = ! empty($columns)
+            ? array_intersect($columns, array_keys(self::AVAILABLE_COLUMNS))
+            : array_keys(self::AVAILABLE_COLUMNS);
+    }
 
     public function query()
     {
@@ -18,23 +43,7 @@ class RmoManagementExport implements FromQuery, WithHeadings, WithMapping
 
     public function headings(): array
     {
-        return [
-            'Order ID',
-            'Tracking Number',
-            'J&T Status',
-            "Rider's Name",
-            "Rider's Number",
-            'CX Name',
-            'CX Number',
-            'Address',
-            'SRP',
-            '# of Attempts',
-            'Confirmed By',
-            'CX RTS',
-            'Location RTS',
-            'Updated Status',
-            'CSR',
-        ];
+        return array_map(fn ($key) => self::AVAILABLE_COLUMNS[$key], $this->columns);
     }
 
     public function map($row): array
@@ -42,22 +51,24 @@ class RmoManagementExport implements FromQuery, WithHeadings, WithMapping
         $order = $row->order;
         $address = $order?->shippingAddress;
 
-        return [
-            $order?->id,
-            $order?->tracking_code,
-            $order?->parcel_status,
-            $row->rider_name,
-            $row->rider_phone,
-            $address?->full_name,
-            $address?->phone_number,
-            $address?->full_address,
-            $order?->final_amount,
-            $order?->delivery_attempts,
-            $row->conferrer?->name,
-            $order?->cx_rts_rate,
-            $address?->cityOrderSummary?->rts_rate,
-            $row->status,
-            $row->assignee?->name,
+        $allValues = [
+            'order_id' => $order?->id,
+            'tracking_number' => $order?->tracking_code,
+            'jnt_status' => $order?->parcel_status,
+            'rider_name' => $row->rider_name,
+            'rider_number' => $row->rider_phone,
+            'cx_name' => $address?->full_name,
+            'cx_number' => $row->customer_phone ?: $address?->phone_number,
+            'address' => $address?->full_address,
+            'srp' => $order?->final_amount,
+            'attempts' => $order?->delivery_attempts,
+            'confirmed_by' => $row->conferrer?->name,
+            'cx_rts' => $order?->cx_rts_rate,
+            'location_rts' => $address?->cityOrderSummary?->rts_rate,
+            'updated_status' => $row->status,
+            'csr' => $row->assignee?->name,
         ];
+
+        return array_map(fn ($key) => $allValues[$key] ?? null, $this->columns);
     }
 }

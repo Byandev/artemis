@@ -5,7 +5,7 @@ import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import RtsBreakdownChart from '@/components/charts/RtsBreakdownChart';
 import { PaginatedData } from '@/types';
 import { toFrontendSort } from '@/lib/sort';
-import { AdRow, buildBaseParams, RtsCell, RtsQueryParams, ViewMode, ViewToggle } from './rts-shared';
+import { AdRow, buildBaseParams, RefreshButton, RtsCell, RtsQueryParams, ViewMode, ViewToggle } from './rts-shared';
 
 interface Props {
     workspaceSlug: string;
@@ -67,7 +67,10 @@ export default function AdCard({ workspaceSlug, queryParams }: Props) {
                     <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">By Ad</h2>
                     <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">RTS rate broken down by ad</p>
                 </div>
-                <ViewToggle value={view} onChange={setView} />
+                <div className="flex items-center gap-2">
+                        <RefreshButton onClick={() => fetchPage(1, sort)} loading={loading} />
+                        <ViewToggle value={view} onChange={setView} />
+                    </div>
             </div>
             <div className="p-4">
                 {loading ? (

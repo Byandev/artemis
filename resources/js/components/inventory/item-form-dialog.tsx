@@ -4,6 +4,7 @@ import { Product } from '@/types/models/Product';
 import { useForm } from '@inertiajs/react';
 import React, { useState } from 'react';
 import { useEffect } from 'react';
+import { toast } from 'sonner';
 
 
 interface InventoryItem {
@@ -27,14 +28,15 @@ interface ItemFormDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     item?: InventoryItem | null;
+    onSuccess?: () => void;
 }
 
-export function ItemFormDialog({ workspace, products, open, onOpenChange, item }: ItemFormDialogProps) {
+export function ItemFormDialog({ workspace, products, open, onOpenChange, item, onSuccess }: ItemFormDialogProps) {
     const isEditing = !!item;
 
     const [showAdditional, setShowAdditional] = useState(false);
 
-    const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm({
+    const { data, setData, post, put, processing, errors, reset, clearErrors} = useForm({
         id: '',
         product_id: '',
         sku: '',
@@ -66,27 +68,26 @@ export function ItemFormDialog({ workspace, products, open, onOpenChange, item }
         }
     }, [open, item]);
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+   const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
 
-        const url = isEditing
-            ? `/workspaces/${workspace.slug}/inventory/items/${item.id}`
-            : `/workspaces/${workspace.slug}/inventory/items`;
+    const url = isEditing
+        ? `/workspaces/${workspace.slug}/inventory/items/${item.id}`
+        : `/workspaces/${workspace.slug}/inventory/items`;
 
-        const options = {
-            preserveScroll: true,
-            onSuccess: () => {
-                reset();
-                onOpenChange(false);
-            },
-        };
+    const request = isEditing ? put : post;
 
-        if (isEditing) {
-            put(url, options);
-        } else {
-            post(url, options);
-        }
-    };
+    request(url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            toast.success(isEditing ? 'Item updated successfully' : 'Item created successfully');
+            if (!isEditing) reset();
+            onOpenChange(false);
+            onSuccess?.();
+        },
+        onError: () => toast.error('Failed to save item. Please check the form.')
+    });
+};
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

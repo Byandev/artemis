@@ -126,19 +126,21 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Unfulfilled" className="justify-center" />,
             cell: ({ row }) => (
-                <div className="text-center"><MetricCell value={row.original.unfulfilled} color="text-red-500 dark:text-red-400" /></div>
+                <div className="text-center"><MetricCell value={row.original.unfulfilled_count} color="text-red-500 dark:text-red-400" /></div>
             ),
         },
         {
-            id: 'current_stocks',
+            accessorKey: 'current_stocks',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Current Stocks" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center"><MetricCell value={row.original.current_stocks} color="text-emerald-600 dark:text-emerald-400" /></div>
             ),
         },
         {
-            id: 'waiting_for_delivery_stocks',
-            header: ({ column }) => <SortableHeader column={column} title="Waiting" className="justify-center" />,
+            accessorKey: 'waiting_for_delivery_stocks',
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Waiting for Delivery" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center"><MetricCell value={row.original.waiting_for_delivery_stocks} color="text-blue-500 dark:text-blue-400" /></div>
             ),
@@ -152,8 +154,9 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             ),
         },
         {
-            id: 'remaining_after_fulfillment',
-            header: ({ column }) => <SortableHeader column={column} title="Remaining" className="justify-center" />,
+            accessorKey: 'remaining_after_fulfillment',
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Remaining After Fulfillment" className="justify-center" />,
             cell: ({ row }) => {
                 const v = row.original.remaining_after_fulfillment;
                 const color = v != null && v < 0 ? 'text-red-500 dark:text-red-400' : 'text-gray-700 dark:text-gray-300';
@@ -161,8 +164,9 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             },
         },
         {
-            id: 'days_it_can_last',
-            header: ({ column }) => <SortableHeader column={column} title="Days Left" className="justify-center" />,
+            accessorKey: 'days_it_can_last',
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Days It Can Last" className="justify-center" />,
             cell: ({ row }) => {
                 const v = row.original.days_it_can_last;
                 const color = v == null ? '' : v < 3 ? 'text-red-500 dark:text-red-400' : v < 7 ? 'text-amber-500 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400';
@@ -176,7 +180,8 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             },
         },
         {
-            id: 'po_needed',
+            accessorKey: 'po_needed',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="PO Needed" className="justify-center" />,
             cell: ({ row }) => {
                 const v = row.original.po_needed;
@@ -185,7 +190,7 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             },
         },
         {
-            id: 'actions',
+            accessorKey: 'actions',
             header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Actions</div>,
             cell: ({ row }) => {
                 const item = row.original;
