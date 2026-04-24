@@ -21,6 +21,7 @@ import {
     BarChart3,
     ChevronDown,
     ChevronUp,
+    ClipboardCopy,
     Download,
     MapPin,
     Pencil,
@@ -536,6 +537,37 @@ export default function RmoManagement({
             }
         },
         [pendingAssign, handleAssignUser],
+    );
+
+    const [copiedRider, setCopiedRider] = useState(false);
+    const [copiedCustomer, setCopiedCustomer] = useState(false);
+
+    const pendingOrders = useMemo(
+        () => (orders.data ?? []).filter((o) => o.status === 'PENDING').slice(0, 10),
+        [orders.data],
+    );
+
+    const copyPendingPhones = useCallback(
+        (type: 'rider' | 'customer') => {
+            const phones = pendingOrders
+                .map((o) =>
+                    type === 'rider'
+                        ? o.rider_phone
+                        : o.customer_phone ?? o.order.shipping_address?.phone_number ?? '',
+                )
+                .filter(Boolean);
+            if (phones.length === 0) return;
+            navigator.clipboard.writeText(phones.join('\n')).then(() => {
+                if (type === 'rider') {
+                    setCopiedRider(true);
+                    setTimeout(() => setCopiedRider(false), 2000);
+                } else {
+                    setCopiedCustomer(true);
+                    setTimeout(() => setCopiedCustomer(false), 2000);
+                }
+            });
+        },
+        [pendingOrders],
     );
 
     const columns = useMemo<ColumnDef<OrderForDelivery>[]>(
@@ -1081,6 +1113,44 @@ export default function RmoManagement({
                                 </option>
                             ))}
                         </select>
+
+                        {window.location.hostname === 'efb.on-forge.com' && <div className="ml-auto flex items-center gap-2">
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={pendingOrders.length === 0}
+                                        onClick={() => copyPendingPhones('rider')}
+                                        className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                                    >
+                                        <ClipboardCopy className="h-3.5 w-3.5" />
+                                        {copiedRider ? 'Copied!' : 'Copy Rider Phones'}
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                    <p className="text-xs">Copy rider phone numbers from top 10 pending orders</p>
+                                </TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={pendingOrders.length === 0}
+                                        onClick={() => copyPendingPhones('customer')}
+                                        className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                                    >
+                                        <ClipboardCopy className="h-3.5 w-3.5" />
+                                        {copiedCustomer ? 'Copied!' : 'Copy CX Phones'}
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                    <p className="text-xs">Copy customer phone numbers from top 10 pending orders</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </div>}
                     </div>
                 </div>
 
