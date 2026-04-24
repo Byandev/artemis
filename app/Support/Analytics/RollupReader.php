@@ -10,8 +10,7 @@ class RollupReader
 
     public static function canUse(array $filter): bool
     {
-        return self::isEmpty($filter, 'user_ids')
-            && self::isEmpty($filter, 'product_ids')
+        return self::isEmpty($filter, 'product_ids')
             && self::isEmpty($filter, 'team_ids');
     }
 
@@ -117,6 +116,22 @@ class RollupReader
             ->get();
     }
 
+    public static function perUser(string $column, int $workspaceId, array $dateRange, array $filter)
+    {
+        return self::baseQuery($workspaceId, $dateRange, $filter)
+            ->join('pages', 'pages.id', '=', self::TABLE.'.page_id')
+            ->join('users', 'users.id', '=', 'pages.owner_id')
+            ->selectRaw('
+                users.id AS user_id,
+                users.name AS user_name,
+                SUM('.self::TABLE.'.'.$column.') AS value
+            ')
+            ->whereNotNull('pages.owner_id')
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc('value')
+            ->get();
+    }
+
     public static function ratioPerPage(string $numeratorExpr, string $denominatorExpr, int $workspaceId, array $dateRange, array $filter)
     {
         return self::baseQuery($workspaceId, $dateRange, $filter)
@@ -155,6 +170,26 @@ class RollupReader
             ->get();
     }
 
+    public static function ratioPerUser(string $numeratorExpr, string $denominatorExpr, int $workspaceId, array $dateRange, array $filter)
+    {
+        return self::baseQuery($workspaceId, $dateRange, $filter)
+            ->join('pages', 'pages.id', '=', self::TABLE.'.page_id')
+            ->join('users', 'users.id', '=', 'pages.owner_id')
+            ->selectRaw("
+                users.id AS user_id,
+                users.name AS user_name,
+                ROUND(
+                    (SUM($numeratorExpr) * 100.0) /
+                    NULLIF(SUM($denominatorExpr), 0),
+                    2
+                ) AS value
+            ")
+            ->whereNotNull('pages.owner_id')
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc('value')
+            ->get();
+    }
+
     private static function baseQuery(int $workspaceId, array $dateRange, array $filter)
     {
         $query = DB::table(self::TABLE)
@@ -169,6 +204,7 @@ class RollupReader
 
         $pageIds = self::normalizeIds($filter['page_ids'] ?? null);
         $shopIds = self::normalizeIds($filter['shop_ids'] ?? null);
+        $userIds = self::normalizeIds($filter['user_ids'] ?? null);
 
         if ($pageIds) {
             $query->whereIn(self::TABLE.'.page_id', $pageIds);
@@ -180,6 +216,15 @@ class RollupReader
                     ->select('id')
                     ->where('workspace_id', $workspaceId)
                     ->whereIn('shop_id', $shopIds);
+            });
+        }
+
+        if ($userIds) {
+            $query->whereIn(self::TABLE.'.page_id', function ($sub) use ($workspaceId, $userIds) {
+                $sub->from('pages')
+                    ->select('id')
+                    ->where('workspace_id', $workspaceId)
+                    ->whereIn('owner_id', $userIds);
             });
         }
 

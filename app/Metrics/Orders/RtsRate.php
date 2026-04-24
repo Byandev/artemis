@@ -325,6 +325,10 @@ final class RtsRate
 
     public function perUser(int $workspaceId, array $date_range, array $filter)
     {
+        if (RollupReader::canUse($filter)) {
+            return $this->perUserFromRollup($workspaceId, $date_range, $filter);
+        }
+
         $start = $date_range['start_date'].' 00:00:00';
         $end = $date_range['end_date'].' 23:59:59';
 
@@ -483,6 +487,29 @@ final class RtsRate
             ->get();
     }
 
+    private function perUserFromRollup(int $workspaceId, array $date_range, array $filter)
+    {
+        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
+            ->join('pages', 'pages.id', '=', 'workspace_page_daily_metrics.page_id')
+            ->join('users', 'users.id', '=', 'pages.owner_id')
+            ->selectRaw('
+                users.id AS user_id,
+                users.name AS user_name,
+                ROUND(
+                    COALESCE(
+                        SUM(workspace_page_daily_metrics.entered_returning_amount) /
+                        NULLIF(SUM(workspace_page_daily_metrics.entered_returning_amount + workspace_page_daily_metrics.delivered_amount), 0),
+                        0
+                    ),
+                    4
+                ) AS value
+            ')
+            ->whereNotNull('pages.owner_id')
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc('value')
+            ->get();
+    }
+
     private function rollupBaseQuery(int $workspaceId, array $date_range, array $filter)
     {
         $query = DB::table('workspace_page_daily_metrics')
@@ -503,6 +530,10 @@ final class RtsRate
             ? (is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']))
             : null;
 
+        $userIds = ! empty($filter['user_ids'])
+            ? (is_array($filter['user_ids']) ? $filter['user_ids'] : explode(',', $filter['user_ids']))
+            : null;
+
         if ($pageIds) {
             $query->whereIn('workspace_page_daily_metrics.page_id', $pageIds);
         }
@@ -513,6 +544,15 @@ final class RtsRate
                     ->select('id')
                     ->where('workspace_id', $workspaceId)
                     ->whereIn('shop_id', $shopIds);
+            });
+        }
+
+        if ($userIds) {
+            $query->whereIn('workspace_page_daily_metrics.page_id', function ($sub) use ($workspaceId, $userIds) {
+                $sub->from('pages')
+                    ->select('id')
+                    ->where('workspace_id', $workspaceId)
+                    ->whereIn('owner_id', $userIds);
             });
         }
 

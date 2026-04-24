@@ -78,6 +78,10 @@ final class ReturnedAmount
 
     public function perUser(int $workspaceId, array $date_range, array $filter)
     {
+        if (RollupReader::canUse($filter)) {
+            return RollupReader::perUser('returned_amount', $workspaceId, $date_range, $filter);
+        }
+
         return $this->baseQuery($workspaceId, $date_range, $filter, true)
             ->join('users', 'users.id', '=', 'pages.owner_id')
             ->selectRaw('

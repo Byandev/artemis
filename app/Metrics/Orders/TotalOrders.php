@@ -55,6 +55,10 @@ final class TotalOrders
 
     public function perUser(int $workspaceId, array $date_range, array $filter)
     {
+        if (RollupReader::canUse($filter)) {
+            return RollupReader::perUser('confirmed_count', $workspaceId, $date_range, $filter);
+        }
+
         return $this->baseQuery($workspaceId, $date_range, $filter, true)
             ->join('users', 'users.id', '=', 'pages.owner_id')
             ->selectRaw('
