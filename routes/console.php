@@ -23,7 +23,3 @@ Schedule::command('trigger-fetch-csr-erp-dail-records')->dailyAt('15:00');
 
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
-
-Schedule::command('analytics:rollup --date=today')->hourly()->withoutOverlapping(30);
-Schedule::command('analytics:rollup --date=yesterday')->dailyAt('01:00')->withoutOverlapping(30);
-Schedule::command('analytics:rollup')->dailyAt('02:00')->withoutOverlapping(60);
