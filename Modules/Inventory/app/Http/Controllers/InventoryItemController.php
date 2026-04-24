@@ -17,11 +17,10 @@ class InventoryItemController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
-
         $currentStocksSql = "(SELECT remaining_qty FROM inventory_transactions WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)";
         $waitingStocksSql = "(SELECT SUM(count) FROM inventory_purchased_order_items WHERE inventory_item_id = inventory_items.id AND EXISTS (SELECT * FROM inventory_purchased_orders WHERE inventory_purchased_order_items.inventory_purchased_order_id = inventory_purchased_orders.id AND status = 6))";
         $remainingAfterFulfillmentSql = "(COALESCE($currentStocksSql, 0) + COALESCE($waitingStocksSql, 0) - COALESCE(inventory_items.unfulfilled_count, 0))";
-        $poNeededSql = "GREATEST(0, (COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0)) - COALESCE($waitingStocksSql, 0))";
+        $poNeededSql = "GREATEST(0, (COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0)) - COALESCE($waitingStocksSql, 0) - $remainingAfterFulfillmentSql)";
         $daysItCanLastSql = "(CASE WHEN inventory_items.three_days_average > 0 THEN $remainingAfterFulfillmentSql / inventory_items.three_days_average ELSE 0 END)";
 
         $items = QueryBuilder::for(InventoryItem::where('inventory_items.workspace_id', $workspace->id))
@@ -70,24 +69,6 @@ class InventoryItemController extends Controller
             ->defaultSort('-created_at')
             ->paginate(10)
             ->withQueryString();
-
-        // 4. Formatting loop for frontend display
-        $items->through(function (InventoryItem $item) {
-            $current = (float) ($item->current_stocks ?? 0);
-            $waiting = (float) ($item->waiting_for_delivery_stocks ?? 0);
-            $unfulfilled = (float) ($item->unfulfilled_count ?? 0);
-            $item->unfulfilled = $unfulfilled;
-            $avg = (float) ($item->three_days_average ?? 0);
-            $leadTime = (int) ($item->lead_time ?? 0);
-
-            $remaining = $current + $waiting - $unfulfilled;
-
-            $item->remaining_after_fulfillment = round($remaining, 2);
-            $item->days_it_can_last = $avg > 0 ? round($remaining / $avg, 1) : null;
-            $item->po_needed = round(max(0, ($leadTime * $avg) - $waiting), 2);
-
-            return $item;
-        });
 
         return Inertia::render('workspaces/inventory/items/index', [
             'items' => $items,
