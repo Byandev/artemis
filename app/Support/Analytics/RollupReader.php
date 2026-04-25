@@ -80,6 +80,28 @@ class RollupReader
             ->get();
     }
 
+    public static function divideBreakdown(string $numeratorCol, string $denominatorCol, int $workspaceId, array $dateRange, array $filter, string $group = 'daily')
+    {
+        $periodSql = match ($group) {
+            'weekly' => "DATE_FORMAT(date, '%x-W%v')",
+            'monthly' => "DATE_FORMAT(date, '%Y-%m')",
+            default => 'DATE(date)',
+        };
+
+        return self::baseQuery($workspaceId, $dateRange, $filter)
+            ->selectRaw("
+                $periodSql AS period,
+                ROUND(
+                    SUM($numeratorCol) /
+                    NULLIF(SUM($denominatorCol), 0),
+                    2
+                ) AS value
+            ")
+            ->groupByRaw($periodSql)
+            ->orderByRaw($periodSql)
+            ->get();
+    }
+
     public static function perPage(string $column, int $workspaceId, array $dateRange, array $filter)
     {
         return self::baseQuery($workspaceId, $dateRange, $filter)
@@ -144,6 +166,27 @@ class RollupReader
             ->get();
     }
 
+    public static function dividePerPage(string $numeratorCol, string $denominatorCol, int $workspaceId, array $dateRange, array $filter)
+    {
+        $num = self::TABLE.'.'.$numeratorCol;
+        $den = self::TABLE.'.'.$denominatorCol;
+
+        return self::baseQuery($workspaceId, $dateRange, $filter)
+            ->join('pages', 'pages.id', '=', self::TABLE.'.page_id')
+            ->selectRaw("
+                pages.id AS page_id,
+                pages.name AS page_name,
+                ROUND(
+                    SUM($num) /
+                    NULLIF(SUM($den), 0),
+                    2
+                ) AS value
+            ")
+            ->groupBy('pages.id', 'pages.name')
+            ->orderByDesc('value')
+            ->get();
+    }
+
     public static function ratioPerShop(string $numeratorExpr, string $denominatorExpr, int $workspaceId, array $dateRange, array $filter)
     {
         return self::baseQuery($workspaceId, $dateRange, $filter)
@@ -164,6 +207,29 @@ class RollupReader
             ->get();
     }
 
+    public static function dividePerShop(string $numeratorCol, string $denominatorCol, int $workspaceId, array $dateRange, array $filter)
+    {
+        $num = self::TABLE.'.'.$numeratorCol;
+        $den = self::TABLE.'.'.$denominatorCol;
+
+        return self::baseQuery($workspaceId, $dateRange, $filter)
+            ->join('pages', 'pages.id', '=', self::TABLE.'.page_id')
+            ->join('shops', 'shops.id', '=', 'pages.shop_id')
+            ->selectRaw("
+                shops.id AS shop_id,
+                shops.name AS shop_name,
+                ROUND(
+                    SUM($num) /
+                    NULLIF(SUM($den), 0),
+                    2
+                ) AS value
+            ")
+            ->whereNotNull('pages.shop_id')
+            ->groupBy('shops.id', 'shops.name')
+            ->orderByDesc('value')
+            ->get();
+    }
+
     public static function ratioPerUser(string $numeratorExpr, string $denominatorExpr, int $workspaceId, array $dateRange, array $filter)
     {
         return self::baseQuery($workspaceId, $dateRange, $filter)
@@ -175,6 +241,29 @@ class RollupReader
                 ROUND(
                     (SUM($numeratorExpr) * 100.0) /
                     NULLIF(SUM($denominatorExpr), 0),
+                    2
+                ) AS value
+            ")
+            ->whereNotNull('pages.owner_id')
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc('value')
+            ->get();
+    }
+
+    public static function dividePerUser(string $numeratorCol, string $denominatorCol, int $workspaceId, array $dateRange, array $filter)
+    {
+        $num = self::TABLE.'.'.$numeratorCol;
+        $den = self::TABLE.'.'.$denominatorCol;
+
+        return self::baseQuery($workspaceId, $dateRange, $filter)
+            ->join('pages', 'pages.id', '=', self::TABLE.'.page_id')
+            ->join('users', 'users.id', '=', 'pages.owner_id')
+            ->selectRaw("
+                users.id AS user_id,
+                users.name AS user_name,
+                ROUND(
+                    SUM($num) /
+                    NULLIF(SUM($den), 0),
                     2
                 ) AS value
             ")

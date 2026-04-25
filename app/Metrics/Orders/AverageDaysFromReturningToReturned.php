@@ -2,157 +2,32 @@
 
 namespace App\Metrics\Orders;
 
-use App\Support\Metrics\OrdersFilter;
-use Illuminate\Support\Facades\DB;
+use App\Support\Analytics\RollupReader;
 
 final class AverageDaysFromReturningToReturned
 {
-    /**
-     * Compute average days from confirmed -> shipped
-     */
     public function compute(int $workspaceId, array $date_range, array $filter): float
     {
-        $row = $this->baseQuery($workspaceId, $date_range, $filter)
-            ->selectRaw('
-                ROUND(
-                    COALESCE(
-                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.returning_at, pancake_orders.returned_at)),
-                        0
-                    ),
-                    2
-                ) as value
-            ')
-            ->first();
-
-        return (float) ($row->value ?? 0);
+        return RollupReader::divide('sum_days_returning_to_returned', 'count_returning_to_returned', $workspaceId, $date_range, $filter);
     }
 
-    /**
-     * Breakdown average shipped out days by period
-     */
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
-        $periodSql = match ($group) {
-            'daily' => 'DATE(pancake_orders.returned_at)',
-            'weekly' => "DATE_FORMAT(pancake_orders.returned_at, '%x-W%v')",
-            'monthly' => "DATE_FORMAT(pancake_orders.returned_at, '%Y-%m')",
-            default => 'DATE(pancake_orders.returned_at)',
-        };
-
-        return $this->baseQuery($workspaceId, $date_range, $filter)
-            ->selectRaw("
-                $periodSql as period,
-                ROUND(
-                    COALESCE(
-                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.returning_at, pancake_orders.returned_at)),
-                        0
-                    ),
-                    2
-                ) as value
-            ")
-            ->groupByRaw($periodSql)
-            ->orderByRaw($periodSql)
-            ->get();
+        return RollupReader::divideBreakdown('sum_days_returning_to_returned', 'count_returning_to_returned', $workspaceId, $date_range, $filter, $group);
     }
 
     public function perPage(int $workspaceId, array $date_range, array $filter)
     {
-        return $this->baseQuery($workspaceId, $date_range, $filter, true)
-            ->selectRaw('
-                pages.id as page_id,
-                pages.name as page_name,
-                ROUND(
-                    COALESCE(
-                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.returning_at, pancake_orders.returned_at)),
-                        0
-                    ),
-                    2
-                ) as value
-            ')
-            ->groupBy('pages.id', 'pages.name')
-            ->orderByDesc('value')
-            ->get();
+        return RollupReader::dividePerPage('sum_days_returning_to_returned', 'count_returning_to_returned', $workspaceId, $date_range, $filter);
     }
 
     public function perShop(int $workspaceId, array $date_range, array $filter)
     {
-        return $this->baseQuery($workspaceId, $date_range, $filter, true)
-            ->join('shops', 'shops.id', '=', 'pages.shop_id')
-            ->selectRaw('
-                shops.id as shop_id,
-                shops.name as shop_name,
-                ROUND(
-                    COALESCE(
-                        AVG(TIMESTAMPDIFF(DAY, pancake_orders.returning_at, pancake_orders.returned_at)),
-                        0
-                    ),
-                    2
-                ) as value
-            ')
-            ->whereNotNull('pages.shop_id')
-            ->groupBy('shops.id', 'shops.name')
-            ->orderByDesc('value')
-            ->get();
+        return RollupReader::dividePerShop('sum_days_returning_to_returned', 'count_returning_to_returned', $workspaceId, $date_range, $filter);
     }
 
     public function perUser(int $workspaceId, array $date_range, array $filter)
     {
-        $users = DB::table('users')
-            ->join('pages', 'pages.owner_id', '=', 'users.id')
-            ->where('pages.workspace_id', $workspaceId)
-            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
-            })
-            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
-            })
-            ->select('users.id', 'users.name')
-            ->distinct()
-            ->get();
-
-        return $users->map(function ($user) use ($workspaceId, $date_range, $filter) {
-            $userFilter = $filter;
-            $userFilter['page_ids'] = DB::table('pages')
-                ->where('workspace_id', $workspaceId)
-                ->where('owner_id', $user->id)
-                ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                    $query->whereIn('shop_id', $this->parseIds($filter['shop_ids']));
-                })
-                ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                    $query->whereIn('id', $this->parseIds($filter['page_ids']));
-                })
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
-
-            return (object) [
-                'user_id' => $user->id,
-                'user_name' => $user->name,
-                'value' => ! empty($userFilter['page_ids'])
-                    ? $this->compute($workspaceId, $date_range, $userFilter)
-                    : 0,
-            ];
-        })->sortByDesc('value')->values();
-    }
-
-    /**
-     * Base query to avoid duplicating filters
-     */
-    private function baseQuery(
-        int $workspaceId,
-        array $date_range,
-        array $filter,
-        bool $forceJoinPages = false
-    ) {
-        return DB::table('pancake_orders')
-            ->tap(fn ($q) => OrdersFilter::joinAndApply($q, $filter, $forceJoinPages))
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->whereNotNull('pancake_orders.returning_at')
-            ->whereNotNull('pancake_orders.returned_at')
-            ->whereBetween('pancake_orders.returned_at', [
-                $date_range['start_date'].' 00:00:00',
-                $date_range['end_date'].' 23:59:59',
-            ]);
+        return RollupReader::dividePerUser('sum_days_returning_to_returned', 'count_returning_to_returned', $workspaceId, $date_range, $filter);
     }
 }

@@ -13,21 +13,21 @@ final class Aov
 
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
-        return RollupReader::ratioBreakdown('confirmed_amount', 'confirmed_count', $workspaceId, $date_range, $filter, $group);
+        return RollupReader::divideBreakdown('confirmed_amount', 'confirmed_count', $workspaceId, $date_range, $filter, $group);
     }
 
     public function perPage(int $workspaceId, array $date_range, array $filter)
     {
-        return RollupReader::ratioPerPage('confirmed_amount', 'confirmed_count', $workspaceId, $date_range, $filter);
+        return RollupReader::dividePerPage('confirmed_amount', 'confirmed_count', $workspaceId, $date_range, $filter);
     }
 
     public function perShop(int $workspaceId, array $date_range, array $filter)
     {
-        return RollupReader::ratioPerShop('confirmed_amount', 'confirmed_count', $workspaceId, $date_range, $filter);
+        return RollupReader::dividePerShop('confirmed_amount', 'confirmed_count', $workspaceId, $date_range, $filter);
     }
 
     public function perUser(int $workspaceId, array $date_range, array $filter)
     {
-        return RollupReader::ratioPerUser('confirmed_amount', 'confirmed_count', $workspaceId, $date_range, $filter);
+        return RollupReader::dividePerUser('confirmed_amount', 'confirmed_count', $workspaceId, $date_range, $filter);
     }
 }

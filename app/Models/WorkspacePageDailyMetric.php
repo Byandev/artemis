@@ -22,6 +22,22 @@ class WorkspacePageDailyMetric extends Model
         'delivered_amount',
         'entered_returning_amount',
         'returned_amount',
+        'sum_days_confirmed_to_shipped',
+        'count_confirmed_to_shipped',
+        'sum_days_confirmed_to_first_attempt',
+        'count_confirmed_to_first_attempt',
+        'sum_days_confirmed_to_delivered',
+        'count_confirmed_to_delivered',
+        'sum_days_shipped_to_first_attempt',
+        'count_shipped_to_first_attempt',
+        'sum_days_shipped_to_delivered',
+        'count_shipped_to_delivered',
+        'sum_days_returning_to_returned',
+        'count_returning_to_returned',
+        'sum_delivery_attempts_delivered',
+        'count_delivery_attempts_delivered',
+        'sum_delivery_attempts_returned',
+        'count_delivery_attempts_returned',
     ];
 
     protected $casts = [

@@ -8,6 +8,8 @@ All metrics dispatched from `WorkspaceMetrics` (`app/Support/WorkspaceMetrics.ph
 
 All metrics support filters: `page_ids`, `shop_ids`, `user_ids` (→ `pages.owner_id`), `product_ids` (→ `pages.product_id`), `team_ids` (→ `team_user.team_id` → `pages.owner_id`).
 
+**Status snapshot:** 14 of 28 metrics are now on the rollup (all 4 Revenue & Volume except `uniqueCustomerCount`, 3 of 5 Delivery Outcomes, all 6 Fulfillment Lead Time, 2 of 4 Delivery Quality Signals).
+
 ---
 
 ## Revenue & Volume
@@ -27,20 +29,20 @@ All metrics support filters: `page_ids`, `shop_ids`, `user_ids` (→ `pages.owne
 | `returningAmount` | Sales of orders currently in transit back (snapshot) | `SUM(final_amount)` where `returning_at` in range AND `returned_at IS NULL` *as-of-now* | Live | **Semantic shift required.** Snapshots don't aggregate (would double-count). Options: (a) store end-of-day snapshot, read latest date in range only — start date becomes decorative. (b) Replace metric with event-based "Returning Started" using existing `entered_returning_amount` column (different meaning). |
 | `returnedAmount` | Sales of orders fully returned in the period | `SUM(returned_amount)` | **Rollup** | — |
 | `rtsRate` | Return-to-sender rate (decimal 0–1) | `SUM(entered_returning_amount) / SUM(entered_returning_amount + delivered_amount)` | **Rollup** | — |
-| `totalForDeliveryCount` | Parcel journeys "On Delivery" in the period | `COUNT(*) FROM parcel_journeys WHERE status='On Delivery'` | Live | **Easy but different grain.** Add `for_delivery_count` column populated from `parcel_journeys` (parcel-journey events, not orders). Worth doing if it's slow. |
+| `totalForDeliveryCount` | Parcel journeys "On Delivery" in the period | `COUNT(*) FROM parcel_journeys WHERE status='On Delivery'` | Live | **Easy but different table.** Add `for_delivery_count` column to the rollup, populate from `parcel_journeys` joined to `pancake_orders` for the page. Builder needs a second query against `parcel_journeys`. |
 
 ## Fulfillment Lead Time
 
-All averages of `TIMESTAMPDIFF(DAY, …)` for orders that completed the indicated transition in the period.
+All weighted averages computed as `SUM(sum_days_X_to_Y) / SUM(count_X_to_Y)` from the rollup. Columns populated by the builder using `TIMESTAMPDIFF(DAY, …)` for orders where the later timestamp falls on the rollup date and the earlier timestamp is non-null.
 
 | Key | Description | Formula | Source | Path to rollup |
 |---|---|---|---|---|
-| `averageDaysFromConfirmedToShipped` | Avg days confirmed → shipped | `AVG(DATEDIFF(shipped_at, confirmed_at))` over orders shipped in range | Live | **Easy.** Add `sum_days_confirmed_to_shipped` + `count_confirmed_to_shipped` columns. Read = SUM/SUM weighted avg. |
-| `averageDaysFromConfirmedToFirstAttempt` | Avg days confirmed → first delivery attempt | `AVG(DATEDIFF(first_delivery_attempt, confirmed_at))` | Live | **Easy.** Add `sum_days_confirmed_to_first_attempt` + `count_confirmed_to_first_attempt` columns. |
-| `averageDaysFromConfirmedToDelivered` | Avg days confirmed → delivered | `AVG(DATEDIFF(delivered_at, confirmed_at))` over orders delivered in range | Live | **Easy.** Add `sum_days_confirmed_to_delivered` + `count_confirmed_to_delivered` columns. |
-| `averageDaysFromShippedToFirstAttempt` | Avg days shipped → first delivery attempt | `AVG(DATEDIFF(first_delivery_attempt, shipped_at))` | Live | **Easy.** Add `sum_days_shipped_to_first_attempt` + `count_shipped_to_first_attempt` columns. |
-| `averageDaysFromShippedToDelivered` | Avg days shipped → delivered | `AVG(DATEDIFF(delivered_at, shipped_at))` over orders delivered in range | Live | **Easy.** Add `sum_days_shipped_to_delivered` + `count_shipped_to_delivered` columns. |
-| `averageDaysFromReturningToReturned` | Avg days returning → returned | `AVG(DATEDIFF(returned_at, returning_at))` over orders returned in range | Live | **Easy.** Add `sum_days_returning_to_returned` + `count_returning_to_returned` columns. |
+| `averageDaysFromConfirmedToShipped` | Avg days confirmed → shipped | `SUM(sum_days_confirmed_to_shipped) / SUM(count_confirmed_to_shipped)` | **Rollup** | — |
+| `averageDaysFromConfirmedToFirstAttempt` | Avg days confirmed → first delivery attempt | `SUM(sum_days_confirmed_to_first_attempt) / SUM(count_confirmed_to_first_attempt)` | **Rollup** | — |
+| `averageDaysFromConfirmedToDelivered` | Avg days confirmed → delivered | `SUM(sum_days_confirmed_to_delivered) / SUM(count_confirmed_to_delivered)` | **Rollup** | — |
+| `averageDaysFromShippedToFirstAttempt` | Avg days shipped → first delivery attempt | `SUM(sum_days_shipped_to_first_attempt) / SUM(count_shipped_to_first_attempt)` | **Rollup** | — |
+| `averageDaysFromShippedToDelivered` | Avg days shipped → delivered | `SUM(sum_days_shipped_to_delivered) / SUM(count_shipped_to_delivered)` | **Rollup** | — |
+| `averageDaysFromReturningToReturned` | Avg days returning → returned | `SUM(sum_days_returning_to_returned) / SUM(count_returning_to_returned)` | **Rollup** | — |
 
 ## Delivery Quality Signals
 
@@ -48,8 +50,8 @@ All averages of `TIMESTAMPDIFF(DAY, …)` for orders that completed the indicate
 |---|---|---|---|---|
 | `deliveredAvgCustomerRts` | Avg historical RTS rate of customers whose orders were delivered in the period | `AVG(customer_rts_rate)` from `pancake_order_phone_number_reports` joined to delivered orders | Live | **Medium.** Add `sum_customer_rts_delivered` + `count_customer_rts_delivered`. Builder needs a `pancake_order_phone_number_reports` join. |
 | `returnedAvgCustomerRts` | Avg historical RTS rate of customers whose orders were returned | Same join, for returned orders | Live | **Medium.** Add `sum_customer_rts_returned` + `count_customer_rts_returned` (same join). |
-| `deliveredAvgDeliveryAttempts` | Avg `delivery_attempts` for delivered orders | `AVG(pancake_orders.delivery_attempts)` where status=3 in range | Live | **Easy.** Add `sum_delivery_attempts_delivered` + reuse `delivered_count`. |
-| `returnedAvgDeliveryAttempts` | Avg `delivery_attempts` for returned orders | `AVG(pancake_orders.delivery_attempts)` where status IN (4,5) in range | Live | **Easy.** Add `sum_delivery_attempts_returned` + reuse `returned_count`. |
+| `deliveredAvgDeliveryAttempts` | Avg `delivery_attempts` for delivered orders | `SUM(sum_delivery_attempts_delivered) / SUM(count_delivery_attempts_delivered)` | **Rollup** | — |
+| `returnedAvgDeliveryAttempts` | Avg `delivery_attempts` for orders that entered returning | `SUM(sum_delivery_attempts_returned) / SUM(count_delivery_attempts_returned)` | **Rollup** | — |
 
 ## Customer Quality & Retention
 
@@ -70,21 +72,26 @@ All cohort/repeat metrics require full customer history — fundamentally not ro
 
 | Key | Description | Formula | Source | Path to rollup |
 |---|---|---|---|---|
-| `trackedOrdersCount` | Unique orders with sent parcel notifications in period | `SUM(tracked_orders)` from monthly log + count of new sent notifications in range | Live (hybrid) | **Easy.** Already half-rolled-up via the monthly log. Add daily `tracked_orders_count` to the rollup table; populate from `parcel_journey_notifications`. |
-| `smsSentCount` | SMS sent via parcel notifications in period | `SUM(sms_sent)` from monthly log + count of new sent SMS in range | Live (hybrid) | **Easy.** Same pattern: add daily `sms_sent_count` column. |
+| `trackedOrdersCount` | Unique orders with sent parcel notifications in period | `SUM(tracked_orders)` from monthly log + count of new sent notifications in range | Live (hybrid) | **Easy but different table + DISTINCT.** Already half-rolled-up via `parcel_journey_notification_log` (monthly grain, per page). Add daily `tracked_orders_count` column to the rollup, populate from `parcel_journey_notifications`. Caveat: the metric is DISTINCT on order_id — sums across days overcount any order with notifications spanning multiple days. |
+| `smsSentCount` | SMS sent via parcel notifications in period | `SUM(sms_sent)` from monthly log + count of new sent SMS in range | Live (hybrid) | **Easy but different table.** Add daily `sms_sent_count` column. Pure event count — additive, no DISTINCT issue. |
 
 ---
 
 ## Rollup grain & rebuild
 
-Rollup table: `workspace_page_daily_metrics` keyed on `(workspace_id, page_id, date)`. Columns: `confirmed_count/amount`, `shipped_count/amount`, `delivered_count/amount`, `entered_returning_count/amount`, `returned_count/amount`.
+Rollup table: `workspace_page_daily_metrics` keyed on `(workspace_id, page_id, date)`. Columns:
+
+- **Event count/amount** — `confirmed_count/amount`, `shipped_count/amount`, `delivered_count/amount`, `entered_returning_count/amount`, `returned_count/amount`
+- **Latency sum/count** — `sum_days_confirmed_to_shipped` + `count_confirmed_to_shipped` (and 5 more pairs for the other latency transitions)
+- **Delivery attempts sum/count** — `sum_delivery_attempts_delivered` + `count_delivery_attempts_delivered`, same for `_returned`
 
 Rebuild via `analytics:rollup [--date=Y-m-d]` (dispatches one queue job per `(workspace, page, date)`). Schedules: hourly for today, daily 01:00 for yesterday.
 
 ## Rollup expansion difficulty — quick reference
 
-- **Easy (one builder query, additive columns)** — all 6 latency metrics, 2 delivery-attempts metrics, 2 parcel notification metrics, `totalForDeliveryCount` (different grain).
-- **Medium (extra joins or different grain)** — 2 customer-RTS metrics, `timeToFirstOrder`.
+- **Done** — 6 latency metrics + 2 delivery-attempts metrics (16 columns added in `2026_04_25_000000_add_latency_and_attempts_*.php`).
+- **Easy but different table** — `totalForDeliveryCount` (parcel_journeys), `smsSentCount` and `trackedOrdersCount` (parcel_journey_notifications). Builder needs separate queries against those tables.
+- **Medium (extra joins)** — 2 customer-RTS metrics (`pancake_order_phone_number_reports` join), `timeToFirstOrder` (`pancake_customers.created_at` join).
 - **Hard (need separate `workspace_customer_facts` grain)** — `avgLifetimeValue`, all 3 repeat-* metrics, `uniqueCustomerCount` (DISTINCT problem).
 - **Skip rollup, use cache** — 3 retention cohort metrics (window is fixed, cache for 1h).
 - **Semantic shift required** — `returningAmount` (snapshot vs event).
