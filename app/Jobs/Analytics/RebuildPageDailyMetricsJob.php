@@ -10,6 +10,8 @@ class RebuildPageDailyMetricsJob implements ShouldQueue
 {
     use Queueable;
 
+    public $queue = 'analytics';
+
     public function __construct(
         public int $workspaceId,
         public int $pageId,
