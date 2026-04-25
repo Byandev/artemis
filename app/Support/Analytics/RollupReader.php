@@ -8,12 +8,6 @@ class RollupReader
 {
     public const TABLE = 'workspace_page_daily_metrics';
 
-    public static function canUse(array $filter): bool
-    {
-        return self::isEmpty($filter, 'product_ids')
-            && self::isEmpty($filter, 'team_ids');
-    }
-
     public static function sum(string $column, int $workspaceId, array $dateRange, array $filter): float
     {
         return (float) self::baseQuery($workspaceId, $dateRange, $filter)->sum($column);
@@ -205,6 +199,8 @@ class RollupReader
         $pageIds = self::normalizeIds($filter['page_ids'] ?? null);
         $shopIds = self::normalizeIds($filter['shop_ids'] ?? null);
         $userIds = self::normalizeIds($filter['user_ids'] ?? null);
+        $productIds = self::normalizeIds($filter['product_ids'] ?? null);
+        $teamIds = self::normalizeIds($filter['team_ids'] ?? null);
 
         if ($pageIds) {
             $query->whereIn(self::TABLE.'.page_id', $pageIds);
@@ -228,22 +224,29 @@ class RollupReader
             });
         }
 
+        if ($productIds) {
+            $query->whereIn(self::TABLE.'.page_id', function ($sub) use ($workspaceId, $productIds) {
+                $sub->from('pages')
+                    ->select('id')
+                    ->where('workspace_id', $workspaceId)
+                    ->whereIn('product_id', $productIds);
+            });
+        }
+
+        if ($teamIds) {
+            $query->whereIn(self::TABLE.'.page_id', function ($sub) use ($workspaceId, $teamIds) {
+                $sub->from('pages')
+                    ->select('id')
+                    ->where('workspace_id', $workspaceId)
+                    ->whereIn('owner_id', function ($sub2) use ($teamIds) {
+                        $sub2->from('team_user')
+                            ->select('user_id')
+                            ->whereIn('team_id', $teamIds);
+                    });
+            });
+        }
+
         return $query;
-    }
-
-    private static function isEmpty(array $filter, string $key): bool
-    {
-        $value = $filter[$key] ?? null;
-
-        if ($value === null || $value === '') {
-            return true;
-        }
-
-        if (is_array($value)) {
-            return count($value) === 0;
-        }
-
-        return false;
     }
 
     private static function normalizeIds(mixed $value): ?array
