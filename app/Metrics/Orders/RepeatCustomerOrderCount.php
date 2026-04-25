@@ -2,6 +2,7 @@
 
 namespace App\Metrics\Orders;
 
+use App\Support\Metrics\OrdersFilter;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -38,10 +39,6 @@ final class RepeatCustomerOrderCount
         $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
-        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
-        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
-
-        // Customers with 2+ total orders up to end date (workspace-wide)
         $repeatCustomers = $this->buildRepeatCustomersSubquery($workspaceId, $endExclusive);
 
         return DB::table('pancake_orders as po')
@@ -52,8 +49,7 @@ final class RepeatCustomerOrderCount
             ->where('po.confirmed_at', '<', $endExclusive)
             ->whereNotNull('po.customer_id')
             ->whereNotIn('po.status', [6, 7])
-            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-            ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->groupBy('pages.id', 'pages.name')
             ->selectRaw('pages.id as page_id, pages.name as page_name, COUNT(DISTINCT po.customer_id) as value')
             ->orderByDesc('value')
@@ -64,9 +60,6 @@ final class RepeatCustomerOrderCount
     {
         $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
-
-        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
-        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
 
         $repeatCustomers = $this->buildRepeatCustomersSubquery($workspaceId, $endExclusive);
 
@@ -80,8 +73,7 @@ final class RepeatCustomerOrderCount
             ->whereNotNull('po.customer_id')
             ->whereNotIn('po.status', [6, 7])
             ->whereNotNull('pages.shop_id')
-            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-            ->when(! empty($shopIds), fn ($q) => $q->whereIn('shops.id', $shopIds))
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->groupBy('shops.id', 'shops.name')
             ->selectRaw('shops.id as shop_id, shops.name as shop_name, COUNT(DISTINCT po.customer_id) as value')
             ->orderByDesc('value')
@@ -92,9 +84,6 @@ final class RepeatCustomerOrderCount
     {
         $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
-
-        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
-        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
 
         $repeatCustomers = $this->buildRepeatCustomersSubquery($workspaceId, $endExclusive);
 
@@ -107,8 +96,7 @@ final class RepeatCustomerOrderCount
             ->where('po.confirmed_at', '<', $endExclusive)
             ->whereNotNull('po.customer_id')
             ->whereNotIn('po.status', [6, 7])
-            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-            ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->groupBy('users.id', 'users.name')
             ->selectRaw('users.id as user_id, users.name as user_name, COUNT(DISTINCT po.customer_id) as value')
             ->orderByDesc('value')
@@ -119,25 +107,16 @@ final class RepeatCustomerOrderCount
     {
         $repeatCustomers = $this->buildRepeatCustomersSubquery($workspaceId, $endExclusive);
 
-        $query = DB::table('pancake_orders as po')
+        return (int) DB::table('pancake_orders as po')
+            ->tap(fn ($q) => OrdersFilter::joinAndApply($q, $filter, false, 'po'))
             ->joinSub($repeatCustomers, 'rc', fn ($j) => $j->on('rc.customer_id', '=', 'po.customer_id'))
             ->where('po.workspace_id', $workspaceId)
             ->where('po.confirmed_at', '>=', $startAt)
             ->where('po.confirmed_at', '<', $endExclusive)
             ->whereNotNull('po.customer_id')
-            ->whereNotIn('po.status', [6, 7]);
-
-        if ($this->needsPagesJoin($filter)) {
-            $query->join('pages', 'pages.id', '=', 'po.page_id')
-                ->when(! empty($filter['page_ids']), fn ($q) => $q->whereIn('pages.id',
-                    $this->resolveIds($filter['page_ids'])
-                ))
-                ->when(! empty($filter['shop_ids']), fn ($q) => $q->whereIn('pages.shop_id',
-                    $this->resolveIds($filter['shop_ids'])
-                ));
-        }
-
-        return (int) $query->selectRaw('COUNT(DISTINCT po.customer_id) as total')->value('total');
+            ->whereNotIn('po.status', [6, 7])
+            ->selectRaw('COUNT(DISTINCT po.customer_id) as total')
+            ->value('total');
     }
 
     /**

@@ -26,33 +26,22 @@ class RtsRiderQuery extends RtsBaseQuery
 
     public function get(int $perPage = 15): LengthAwarePaginator
     {
-        $start = $this->request->input('start_date');
-        $end = $this->request->input('end_date');
-        $pageIds = $this->request->filled('page_ids') ? (array) $this->request->input('page_ids') : null;
-        $shopIds = $this->request->filled('shop_ids') ? (array) $this->request->input('shop_ids') : null;
+        $latestRider = DB::table('parcel_journeys as pj')
+            ->select('pj.order_id', 'pj.rider_name')
+            ->whereNotNull('pj.rider_name')
+            ->whereIn('pj.id', function ($q) {
+                $q->from('parcel_journeys')
+                    ->selectRaw('MAX(id)')
+                    ->where('status', 'On Delivery')
+                    ->groupBy('order_id');
+            });
 
-        return DB::table('workspace_daily_metrics_by_rider')
-            ->where('workspace_id', $this->workspace->id)
-            ->when($start && $end, fn ($q) => $q->whereBetween('date', [$start, $end]))
-            ->when($pageIds, fn ($q) => $q->whereIn('page_id', $pageIds))
-            ->when($shopIds, function ($q) use ($shopIds) {
-                $q->whereIn('page_id', function ($sub) use ($shopIds) {
-                    $sub->from('pages')->whereIn('shop_id', $shopIds)->select('id');
-                });
-            })
+        return $this->query
             ->selectRaw('
-                rider_name,
-                SUM(delivered_count + returning_count + returned_count) AS total_orders,
-                SUM(delivered_count) AS delivered_count,
-                SUM(returning_count + returned_count) AS returned_count,
-                ROUND(
-                    (SUM(returning_count + returned_count) * 100.0) /
-                    NULLIF(SUM(delivered_count + returning_count + returned_count), 0),
-                    2
-                ) AS rts_rate_percentage
-            ')
-            ->groupBy('rider_name')
-            ->havingRaw('SUM(delivered_count + returning_count + returned_count) > 0')
+                lr.rider_name,'.self::METRICS_SQL)
+            ->joinSub($latestRider, 'lr', 'lr.order_id', '=', 'pancake_orders.id')
+            ->groupBy('lr.rider_name')
+            ->havingRaw(self::HAVING_SQL)
             ->orderBy($this->sortColumn, $this->sortDirection)
             ->paginate($perPage);
     }
