@@ -245,7 +245,9 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/remittances', [FinanceRemittanceController::class, 'index'])->name('remittances.index');
         Route::post('/remittances', [FinanceRemittanceController::class, 'store'])->name('remittances.store');
+        Route::post('/remittances/import', [FinanceRemittanceController::class, 'import'])->name('remittances.import');
         Route::get('/remittances/{remittance}', [FinanceRemittanceController::class, 'show'])->name('remittances.show');
+        Route::post('/remittances/{remittance}/import-items', [FinanceRemittanceController::class, 'importItems'])->name('remittances.import-items');
         Route::put('/remittances/{remittance}', [FinanceRemittanceController::class, 'update'])->name('remittances.update');
         Route::delete('/remittances/{remittance}', [FinanceRemittanceController::class, 'destroy'])->name('remittances.destroy');
     });
