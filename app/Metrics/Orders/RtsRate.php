@@ -24,12 +24,16 @@ final class RtsRate
             ? (is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']))
             : [];
 
+        $userIds = ! empty($filter['user_ids'])
+            ? (is_array($filter['user_ids']) ? $filter['user_ids'] : explode(',', $filter['user_ids']))
+            : [];
+
         $returnedQuery = DB::table('pancake_orders')
             ->selectRaw('SUM(pancake_orders.final_amount) as amount, "returned" as type')
             ->where('pancake_orders.workspace_id', $workspaceId)
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->whereBetween('pancake_orders.returning_at', [$start, $end])
-            ->when(! empty($pageIds) || ! empty($shopIds), function ($query) use ($pageIds, $shopIds) {
+            ->when(! empty($pageIds) || ! empty($shopIds) || ! empty($userIds), function ($query) use ($pageIds, $shopIds, $userIds) {
                 $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id');
 
                 if (! empty($pageIds)) {
@@ -38,6 +42,10 @@ final class RtsRate
 
                 if (! empty($shopIds)) {
                     $query->whereIn('pages.shop_id', $shopIds);
+                }
+
+                if (! empty($userIds)) {
+                    $query->whereIn('pages.owner_id', $userIds);
                 }
             });
 
@@ -46,7 +54,7 @@ final class RtsRate
             ->where('pancake_orders.workspace_id', $workspaceId)
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->whereBetween('pancake_orders.delivered_at', [$start, $end])
-            ->when(! empty($pageIds) || ! empty($shopIds), function ($query) use ($pageIds, $shopIds) {
+            ->when(! empty($pageIds) || ! empty($shopIds) || ! empty($userIds), function ($query) use ($pageIds, $shopIds, $userIds) {
                 $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id');
 
                 if (! empty($pageIds)) {
@@ -55,6 +63,10 @@ final class RtsRate
 
                 if (! empty($shopIds)) {
                     $query->whereIn('pages.shop_id', $shopIds);
+                }
+
+                if (! empty($userIds)) {
+                    $query->whereIn('pages.owner_id', $userIds);
                 }
             });
 
@@ -91,6 +103,10 @@ final class RtsRate
             ? (is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']))
             : [];
 
+        $userIds = ! empty($filter['user_ids'])
+            ? (is_array($filter['user_ids']) ? $filter['user_ids'] : explode(',', $filter['user_ids']))
+            : [];
+
         $returnedPeriodSql = match ($group) {
             'weekly' => "DATE_FORMAT(pancake_orders.returning_at, '%x-W%v')",
             'monthly' => "DATE_FORMAT(pancake_orders.returning_at, '%Y-%m')",
@@ -112,7 +128,7 @@ final class RtsRate
             ->where('pancake_orders.workspace_id', $workspaceId)
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->whereBetween('pancake_orders.returning_at', [$start, $end])
-            ->when(! empty($pageIds) || ! empty($shopIds), function ($query) use ($pageIds, $shopIds) {
+            ->when(! empty($pageIds) || ! empty($shopIds) || ! empty($userIds), function ($query) use ($pageIds, $shopIds, $userIds) {
                 $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id');
 
                 if (! empty($pageIds)) {
@@ -121,6 +137,10 @@ final class RtsRate
 
                 if (! empty($shopIds)) {
                     $query->whereIn('pages.shop_id', $shopIds);
+                }
+
+                if (! empty($userIds)) {
+                    $query->whereIn('pages.owner_id', $userIds);
                 }
             })
             ->groupByRaw($returnedPeriodSql);
@@ -134,7 +154,7 @@ final class RtsRate
             ->where('pancake_orders.workspace_id', $workspaceId)
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->whereBetween('pancake_orders.delivered_at', [$start, $end])
-            ->when(! empty($pageIds) || ! empty($shopIds), function ($query) use ($pageIds, $shopIds) {
+            ->when(! empty($pageIds) || ! empty($shopIds) || ! empty($userIds), function ($query) use ($pageIds, $shopIds, $userIds) {
                 $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id');
 
                 if (! empty($pageIds)) {
@@ -143,6 +163,10 @@ final class RtsRate
 
                 if (! empty($shopIds)) {
                     $query->whereIn('pages.shop_id', $shopIds);
+                }
+
+                if (! empty($userIds)) {
+                    $query->whereIn('pages.owner_id', $userIds);
                 }
             })
             ->groupByRaw($deliveredPeriodSql);
@@ -184,6 +208,10 @@ final class RtsRate
             ? (is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']))
             : [];
 
+        $userIds = ! empty($filter['user_ids'])
+            ? (is_array($filter['user_ids']) ? $filter['user_ids'] : explode(',', $filter['user_ids']))
+            : [];
+
         $returnedQuery = DB::table('pancake_orders')
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
             ->selectRaw('
@@ -200,6 +228,9 @@ final class RtsRate
             })
             ->when(! empty($shopIds), function ($query) use ($shopIds) {
                 $query->whereIn('pages.shop_id', $shopIds);
+            })
+            ->when(! empty($userIds), function ($query) use ($userIds) {
+                $query->whereIn('pages.owner_id', $userIds);
             })
             ->groupBy('pages.id', 'pages.name');
 
@@ -219,6 +250,9 @@ final class RtsRate
             })
             ->when(! empty($shopIds), function ($query) use ($shopIds) {
                 $query->whereIn('pages.shop_id', $shopIds);
+            })
+            ->when(! empty($userIds), function ($query) use ($userIds) {
+                $query->whereIn('pages.owner_id', $userIds);
             })
             ->groupBy('pages.id', 'pages.name');
 
@@ -260,6 +294,10 @@ final class RtsRate
             ? (is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']))
             : [];
 
+        $userIds = ! empty($filter['user_ids'])
+            ? (is_array($filter['user_ids']) ? $filter['user_ids'] : explode(',', $filter['user_ids']))
+            : [];
+
         $returnedQuery = DB::table('pancake_orders')
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
             ->join('shops', 'shops.id', '=', 'pages.shop_id')
@@ -277,6 +315,9 @@ final class RtsRate
             })
             ->when(! empty($shopIds), function ($query) use ($shopIds) {
                 $query->whereIn('pages.shop_id', $shopIds);
+            })
+            ->when(! empty($userIds), function ($query) use ($userIds) {
+                $query->whereIn('pages.owner_id', $userIds);
             })
             ->whereNotNull('pages.shop_id')
             ->groupBy('shops.id', 'shops.name');
@@ -298,6 +339,9 @@ final class RtsRate
             })
             ->when(! empty($shopIds), function ($query) use ($shopIds) {
                 $query->whereIn('pages.shop_id', $shopIds);
+            })
+            ->when(! empty($userIds), function ($query) use ($userIds) {
+                $query->whereIn('pages.owner_id', $userIds);
             })
             ->whereNotNull('pages.shop_id')
             ->groupBy('shops.id', 'shops.name');
@@ -340,6 +384,10 @@ final class RtsRate
             ? (is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']))
             : [];
 
+        $userIds = ! empty($filter['user_ids'])
+            ? (is_array($filter['user_ids']) ? $filter['user_ids'] : explode(',', $filter['user_ids']))
+            : [];
+
         $returnedQuery = DB::table('pancake_orders')
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
             ->join('users', 'users.id', '=', 'pages.owner_id')
@@ -357,6 +405,9 @@ final class RtsRate
             })
             ->when(! empty($shopIds), function ($query) use ($shopIds) {
                 $query->whereIn('pages.shop_id', $shopIds);
+            })
+            ->when(! empty($userIds), function ($query) use ($userIds) {
+                $query->whereIn('pages.owner_id', $userIds);
             })
             ->whereNotNull('pages.owner_id')
             ->groupBy('users.id', 'users.name');
@@ -378,6 +429,9 @@ final class RtsRate
             })
             ->when(! empty($shopIds), function ($query) use ($shopIds) {
                 $query->whereIn('pages.shop_id', $shopIds);
+            })
+            ->when(! empty($userIds), function ($query) use ($userIds) {
+                $query->whereIn('pages.owner_id', $userIds);
             })
             ->whereNotNull('pages.owner_id')
             ->groupBy('users.id', 'users.name');

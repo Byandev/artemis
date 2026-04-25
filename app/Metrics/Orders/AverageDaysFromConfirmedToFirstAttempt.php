@@ -2,6 +2,7 @@
 
 namespace App\Metrics\Orders;
 
+use App\Support\Metrics\OrdersFilter;
 use Illuminate\Support\Facades\DB;
 
 final class AverageDaysFromConfirmedToFirstAttempt
@@ -144,24 +145,7 @@ final class AverageDaysFromConfirmedToFirstAttempt
         bool $forceJoinPages = false
     ) {
         return DB::table('pancake_orders')
-            ->when(
-                $forceJoinPages || ! empty($filter['page_ids']) || ! empty($filter['shop_ids']),
-                function ($query) use ($filter) {
-                    $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-                        ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                            $query->whereIn(
-                                'pages.id',
-                                is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids'])
-                            );
-                        })
-                        ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                            $query->whereIn(
-                                'pages.shop_id',
-                                is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids'])
-                            );
-                        });
-                }
-            )
+            ->tap(fn ($q) => OrdersFilter::joinAndApply($q, $filter, $forceJoinPages))
             ->where('pancake_orders.workspace_id', $workspaceId)
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->whereNotNull('pancake_orders.confirmed_at')
