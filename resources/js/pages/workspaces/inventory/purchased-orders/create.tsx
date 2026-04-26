@@ -1,9 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
 import PageHeader from '@/components/common/PageHeader';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Head, useForm, router } from '@inertiajs/react';
 import { Workspace } from '@/types/models/Workspace';
-import { Plus, Trash2 } from 'lucide-react';
-import { useEffect } from 'react';
+import { format, isValid, parseISO } from 'date-fns';
+import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 
 
@@ -27,7 +30,7 @@ interface OrderItem {
 
 const emptyItem = (): OrderItem => ({
     inventory_item_id: '',
-    count: '',
+    count: '1',
     amount: '',
     total_amount: '',
 });
@@ -54,6 +57,14 @@ export default function Create({ workspace, items }: Props) {
         status: '1',
         items: [emptyItem()],
     });
+    const [issueDateOpen, setIssueDateOpen] = useState(false);
+
+    const selectedIssueDate = useMemo(() => {
+        if (!data.issue_date) return undefined;
+
+        const parsedDate = parseISO(data.issue_date);
+        return isValid(parsedDate) ? parsedDate : undefined;
+    }, [data.issue_date]);
 
     useEffect(() => {
         const itemsTotal = data.items.reduce((sum, item) => {
@@ -72,7 +83,8 @@ export default function Create({ workspace, items }: Props) {
    
     const inputClass = "h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600";
     const labelClass = "block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1.5";
-    const dateFormatRegex = /^\d{4}-\d{2}-\d{2}$/;
+    const dateTriggerClass = `${inputClass} flex items-center justify-between gap-2 pr-2 text-left`;
+    const formattedIssueDate = selectedIssueDate ? format(selectedIssueDate, 'dd MMM yyyy') : 'Select issue date';
 
     const updateItem = (index: number, field: keyof OrderItem, value: string) => {
         const updated = data.items.map((item, i) => {
@@ -105,9 +117,8 @@ export default function Create({ workspace, items }: Props) {
         );
     });
 
-    const isIssueDateValid = dateFormatRegex.test(data.issue_date);
     const isSubmitDisabled = processing
-        || !isIssueDateValid
+        || data.issue_date === ''
         || data.status === ''
         || data.delivery_fee === ''
         || Number(data.delivery_fee) < 0
@@ -128,7 +139,13 @@ export default function Create({ workspace, items }: Props) {
                     title="Create Purchased Order"
                     description="Add a new purchased order record."
                 >
-
+                    <button
+                        type="button"
+                        onClick={() => router.get(`/workspaces/${workspace.slug}/inventory/purchased-orders`)}
+                        className="flex h-8 items-center rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300"
+                    >
+                        Cancel
+                    </button>
                 </PageHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -146,10 +163,28 @@ export default function Create({ workspace, items }: Props) {
                             </div>
                             <div>
                                 <label className={labelClass}>Issue Date <span className="text-red-400">*</span></label>
-                                <input type="date" value={data.issue_date} onChange={(e) => setData('issue_date', e.target.value)} className={inputClass} />
-                                {data.issue_date !== '' && !isIssueDateValid && (
-                                    <p className="mt-1 font-mono text-[11px] text-red-500">Please enter a valid date in YYYY-MM-DD format.</p>
-                                )}
+                                <Popover open={issueDateOpen} onOpenChange={setIssueDateOpen}>
+                                    <PopoverTrigger asChild>
+                                        <button type="button" className={dateTriggerClass}>
+                                            <span className={`truncate ${data.issue_date ? 'text-gray-800 dark:text-gray-100' : 'text-gray-300 dark:text-gray-600'}`}>
+                                                {formattedIssueDate}
+                                            </span>
+                                            <CalendarIcon className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
+                                        </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="start" sideOffset={8} className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={selectedIssueDate}
+                                            onSelect={(date) => {
+                                                if (!date) return;
+                                                setData('issue_date', format(date, 'yyyy-MM-dd'));
+                                                setIssueDateOpen(false);
+                                            }}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
                                 {errors.issue_date && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.issue_date}</p>}
                             </div>
                             <div>
@@ -208,7 +243,7 @@ export default function Create({ workspace, items }: Props) {
                                             </option>
                                         ))}
                                     </select>
-                                    <input type="number" min="1" placeholder="0" value={item.count} onChange={(e) => updateItem(i, 'count', e.target.value)} className={inputClass} />
+                                    <input type="number" min="1" step="1" placeholder="1" value={item.count} onChange={(e) => updateItem(i, 'count', e.target.value)} className={inputClass} />
                                     <input type="number" step="0.01" min="0" placeholder="0.00" value={item.amount} onChange={(e) => updateItem(i, 'amount', e.target.value)} className={inputClass} />
                                     <input type="text" readOnly value={item.total_amount} className={`${inputClass} bg-black/5 opacity-50 cursor-not-allowed`} />
                                     <button
@@ -227,39 +262,14 @@ export default function Create({ workspace, items }: Props) {
                             
                             <div>
                                 <label className={labelClass}>Total Amount <span className="text-red-400">*</span></label>
-                                <input 
-                                    type="number" 
-                                    step="0.01" 
-                                    min="0" 
-                                    value={data.total_amount} 
-                                    onChange={(e) => setData('total_amount', e.target.value)} 
-                                    placeholder="0.00" 
-                                    className={inputClass} 
+                                <input
+                                    type="text"
+                                    readOnly
+                                    value={data.total_amount}
+                                    className={`${inputClass} bg-black/5 opacity-75 cursor-not-allowed`}
                                 />
                                 {errors.total_amount && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.total_amount}</p>}
                             </div>
-                            
-                            <div />
-                        </div>
-
-                        {/* TOTAL AMOUNT SECTION - NASA RIGHT SIDE (Aligned with totals) */}
-                       <div className="mt-4 grid grid-cols-[1fr_100px_120px_120px_36px] gap-3">
-                            <div className="col-span-3" /> 
-                            
-                            <div>
-                                <label className={labelClass}>Total Amount <span className="text-red-400">*</span></label>
-                                <input 
-                                    type="number" 
-                                    step="0.01" 
-                                    min="0" 
-                                    value={data.total_amount} 
-                                    onChange={(e) => setData('total_amount', e.target.value)} 
-                                    placeholder="0.00" 
-                                    className={inputClass} 
-                                />
-                                {errors.total_amount && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.total_amount}</p>}
-                            </div>
-                            
                             <div />
                         </div>
 
@@ -269,17 +279,9 @@ export default function Create({ workspace, items }: Props) {
                     {/* Footer Actions */}
                     <div className="flex justify-end gap-2">
                         <button
-                            type="button"
-                            onClick={() => router.get(`/workspaces/${workspace.slug}/inventory/purchased-orders`)}
-                            className="flex h-10 items-center rounded-lg border border-black/8 bg-white px-5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300"
-                        >
-                            Cancel
-                        </button>
-                        <button
                             type="submit"
                             className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                             disabled={isSubmitDisabled}
-                            className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                         >
                             {processing ? 'Creating…' : 'Create Order'}
                         </button>
