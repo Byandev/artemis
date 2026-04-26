@@ -44,7 +44,7 @@ class RollupAnalytics extends Command
         $query->orderBy('id')->chunkById(200, function ($pages) use ($dates, &$count) {
             foreach ($pages as $page) {
                 foreach ($dates as $date) {
-                    RebuildPageDailyMetricsJob::dispatch($page->workspace_id, $page->id, $date);
+                    RebuildPageDailyMetricsJob::dispatch($page->workspace_id, $page->id, $date)->onQueue('analytics');
                     $count++;
                 }
             }
