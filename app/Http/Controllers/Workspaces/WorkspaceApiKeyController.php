@@ -15,7 +15,8 @@ class WorkspaceApiKeyController extends Controller
 {
     public function index(Request $request, Workspace $workspace): Response
     {
-        if (! $request->user()->isAdminOf($workspace)) {
+
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403);
         }
 
@@ -31,7 +32,7 @@ class WorkspaceApiKeyController extends Controller
 
     public function store(Request $request, Workspace $workspace): RedirectResponse
     {
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403);
         }
 
@@ -53,7 +54,7 @@ class WorkspaceApiKeyController extends Controller
 
     public function reveal(Request $request, Workspace $workspace, WorkspaceApiKey $apiKey): JsonResponse
     {
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403);
         }
 
@@ -68,7 +69,7 @@ class WorkspaceApiKeyController extends Controller
 
     public function destroy(Request $request, Workspace $workspace, WorkspaceApiKey $apiKey): RedirectResponse
     {
-        if (! $request->user()->isAdminOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403);
         }
 
