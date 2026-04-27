@@ -12,6 +12,18 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.0.2',
+        date: '2026-04-27',
+        sections: [
+            {
+                title: 'Fixes',
+                items: [
+                    'Analytics Rollup — page daily metrics with no activity (all-zero counts and amounts) are no longer written to the rollup table, keeping the metrics dataset compact and avoiding empty rows for inactive pages',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.0.1',
         date: '2026-04-27',
         sections: [
@@ -634,6 +646,8 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v3.0.2':
+        'bg-teal-500/10 text-teal-600 dark:text-teal-400 ring-teal-500/20',
     'v3.0.1':
         'bg-green-500/10 text-green-600 dark:text-green-400 ring-green-500/20',
     'v3.0.0':
