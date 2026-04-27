@@ -12,6 +12,18 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.0.1',
+        date: '2026-04-27',
+        sections: [
+            {
+                title: 'Fixes',
+                items: [
+                    'Purchased Orders — fixed a missing AuthorizesRequests import that caused authorization checks to fail on the Purchased Orders controller',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.0.0',
         date: '2026-04-27',
         sections: [
@@ -622,6 +634,8 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v3.0.1':
+        'bg-green-500/10 text-green-600 dark:text-green-400 ring-green-500/20',
     'v3.0.0':
         'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20',
     'v2.7.1':
