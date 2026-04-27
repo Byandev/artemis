@@ -11,7 +11,6 @@ use App\Http\Sorts\Page\ShopNameSort;
 use App\Http\Sorts\PendingRequiredChecklistsSort;
 use App\Models\Page;
 use App\Models\Shop;
-use App\Models\User;
 use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -78,7 +77,7 @@ class PageController extends Controller
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
-            'users' => User::get(['id', 'name']),
+            'users' => $workspace->users()->get(['users.id', 'users.name']),
         ]);
     }
 
@@ -88,7 +87,7 @@ class PageController extends Controller
 
         return Inertia::render('workspaces/pages/create', [
             'workspace' => $workspace,
-            'users' => User::get(['id', 'name']),
+            'users' => $workspace->users()->get(['users.id', 'users.name']),
         ]);
     }
 
@@ -99,7 +98,7 @@ class PageController extends Controller
         return Inertia::render('workspaces/pages/edit', [
             'workspace' => $workspace,
             'page' => $page,
-            'users' => User::get(['id', 'name']),
+            'users' => $workspace->users()->get(['users.id', 'users.name']),
         ]);
     }
 
@@ -138,13 +137,19 @@ class PageController extends Controller
             'shop_id' => $validated['shop_id'],
             'name' => $validated['name'],
             'pos_token' => $validated['pos_token'] ?? null,
+            'botcake_token' => $validated['botcake_token'] ?? null,
+            'pancake_token' => $validated['pancake_token'] ?? null,
+            'infotxt_token' => $validated['infotxt_token'] ?? null,
+            'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
+            'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
+            'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
+            'parcel_journey_enabled' => $validated['parcel_journey_enabled'] ?? false,
             'status' => $validated['status'] ?? 'active',
-            // ... (rest of your field assignments)
         ]);
-        //
-        //        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonth()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
-        //        dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subMonth()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
-        //        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
+
+        dispatch(new FetchPageOrders($page, 1, Carbon::now()->subMonth()->unix(), Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopCustomers($shop, 1, Carbon::now()->subMonth()->unix(), Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
 
         return redirect()->route('workspaces.pages.index', $workspace)
             ->with('success', 'Page created successfully.');
