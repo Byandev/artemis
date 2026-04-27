@@ -38,7 +38,7 @@ class AnalyticController extends Controller
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsOrderItemQuery($workspace, $request))
                 ->sort($request->input('sort', '-total_orders'))
-                ->get($request->input('per_page', 10));
+                ->get($request->integer('per_page', 10));
         });
 
         return response()->json($data);
@@ -82,7 +82,7 @@ class AnalyticController extends Controller
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsAdQuery($workspace, $request))
                 ->sort($request->input('sort', '-total_orders'))
-                ->get($request->input('per_page', 10));
+                ->get($request->integer('per_page', 10));
         });
 
         return response()->json($data);
@@ -94,7 +94,7 @@ class AnalyticController extends Controller
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsConfirmedByQuery($workspace, $request))
                 ->sort($request->input('sort', '-total_orders'))
-                ->get($request->input('per_page', 10));
+                ->get($request->integer('per_page', 10));
         });
 
         return response()->json($data);
@@ -116,7 +116,7 @@ class AnalyticController extends Controller
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsRiderQuery($workspace, $request))
                 ->sort($request->input('sort', '-total_orders'))
-                ->get($request->input('per_page', 10));
+                ->get($request->integer('per_page', 10));
         });
 
         return response()->json($data);
@@ -130,7 +130,7 @@ class AnalyticController extends Controller
                 ->byProvince()
                 ->search($request->input('search', ''))
                 ->sort($request->input('sort', '-total_orders'))
-                ->paginate($request->input('per_page', 10));
+                ->paginate($request->integer('per_page', 10));
         });
 
         return response()->json($data);
@@ -144,7 +144,7 @@ class AnalyticController extends Controller
                 ->byCity()
                 ->search($request->input('search', ''))
                 ->sort($request->input('sort', '-total_orders'))
-                ->paginate($request->input('per_page', 10));
+                ->paginate($request->integer('per_page', 10));
         });
 
         return response()->json($data);
