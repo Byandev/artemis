@@ -8,7 +8,7 @@ All metrics dispatched from `WorkspaceMetrics` (`app/Support/WorkspaceMetrics.ph
 
 All metrics support filters: `page_ids`, `shop_ids`, `user_ids` (→ `pages.owner_id`), `product_ids` (→ `pages.product_id`), `team_ids` (→ `team_user.team_id` → `pages.owner_id`).
 
-**Status snapshot:** 14 of 28 metrics are now on the rollup (all 4 Revenue & Volume except `uniqueCustomerCount`, 3 of 5 Delivery Outcomes, all 6 Fulfillment Lead Time, 2 of 4 Delivery Quality Signals).
+**Status snapshot:** 15 of 28 metrics are now on the rollup (all 4 Revenue & Volume except `uniqueCustomerCount`, 4 of 5 Delivery Outcomes, all 6 Fulfillment Lead Time, 2 of 4 Delivery Quality Signals).
 
 ---
 
@@ -26,7 +26,7 @@ All metrics support filters: `page_ids`, `shop_ids`, `user_ids` (→ `pages.owne
 | Key | Description | Formula | Source | Path to rollup |
 |---|---|---|---|---|
 | `deliveredAmount` | Sales of orders delivered in the period | `SUM(delivered_amount)` | **Rollup** | — |
-| `returningAmount` | Sales of orders currently in transit back (snapshot) | `SUM(final_amount)` where `returning_at` in range AND `returned_at IS NULL` *as-of-now* | Live | **Semantic shift required.** Snapshots don't aggregate (would double-count). Options: (a) store end-of-day snapshot, read latest date in range only — start date becomes decorative. (b) Replace metric with event-based "Returning Started" using existing `entered_returning_amount` column (different meaning). |
+| `returningAmount` | Sales of orders that entered the returning state in the period (display name: "Entered Returning Amount") | `SUM(entered_returning_amount)` | **Rollup** | — |
 | `returnedAmount` | Sales of orders fully returned in the period | `SUM(returned_amount)` | **Rollup** | — |
 | `rtsRate` | Return-to-sender rate (decimal 0–1) | `SUM(entered_returning_amount) / SUM(entered_returning_amount + delivered_amount)` | **Rollup** | — |
 | `totalForDeliveryCount` | Parcel journeys "On Delivery" in the period | `COUNT(*) FROM parcel_journeys WHERE status='On Delivery'` | Live | **Easy but different table.** Add `for_delivery_count` column to the rollup, populate from `parcel_journeys` joined to `pancake_orders` for the page. Builder needs a second query against `parcel_journeys`. |
@@ -85,13 +85,32 @@ Rollup table: `workspace_page_daily_metrics` keyed on `(workspace_id, page_id, d
 - **Latency sum/count** — `sum_days_confirmed_to_shipped` + `count_confirmed_to_shipped` (and 5 more pairs for the other latency transitions)
 - **Delivery attempts sum/count** — `sum_delivery_attempts_delivered` + `count_delivery_attempts_delivered`, same for `_returned`
 
-Rebuild via `analytics:rollup [--date=Y-m-d]` (dispatches one queue job per `(workspace, page, date)`). Schedules: hourly for today, daily 01:00 for yesterday.
+### Command
+
+```bash
+analytics:rollup [--date=Y-m-d]                          # single date (defaults to yesterday)
+analytics:rollup --from=Y-m-d --to=Y-m-d                 # date range, inclusive
+analytics:rollup --workspace=N                           # filter to one workspace
+analytics:rollup --workspace=N --page=M                  # filter to one page
+```
+
+Each `(workspace, page, date)` tuple dispatches a `RebuildPageDailyMetricsJob` onto the dedicated **`analytics`** Horizon queue (max 3 concurrent workers, configured in `config/horizon.php`).
+
+### Schedules
+
+- `analytics:rollup --date=today` — hourly (keeps today fresh within the hour)
+- `analytics:rollup --date=yesterday` — daily at 01:00 (final pass for yesterday after late updates)
+
+### Backfill
+
+```bash
+php artisan analytics:rollup --from=2026-01-01 --to=2026-04-25
+```
 
 ## Rollup expansion difficulty — quick reference
 
-- **Done** — 6 latency metrics + 2 delivery-attempts metrics (16 columns added in `2026_04_25_000000_add_latency_and_attempts_*.php`).
-- **Easy but different table** — `totalForDeliveryCount` (parcel_journeys), `smsSentCount` and `trackedOrdersCount` (parcel_journey_notifications). Builder needs separate queries against those tables.
+- **Done** — 15 of 28 metrics. Includes 4 Revenue & Volume, 4 Delivery Outcomes, all 6 Fulfillment Lead Time, 2 Delivery Quality Signals.
+- **Easy but different table** — `totalForDeliveryCount` (parcel_journeys), `smsSentCount` and `trackedOrdersCount` (parcel_journey_notifications). Builder needs separate queries against those tables. `trackedOrdersCount` also has a DISTINCT-on-order_id wrinkle that makes cross-day sums overcount.
 - **Medium (extra joins)** — 2 customer-RTS metrics (`pancake_order_phone_number_reports` join), `timeToFirstOrder` (`pancake_customers.created_at` join).
 - **Hard (need separate `workspace_customer_facts` grain)** — `avgLifetimeValue`, all 3 repeat-* metrics, `uniqueCustomerCount` (DISTINCT problem).
 - **Skip rollup, use cache** — 3 retention cohort metrics (window is fixed, cache for 1h).
-- **Semantic shift required** — `returningAmount` (snapshot vs event).
