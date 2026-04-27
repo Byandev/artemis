@@ -12,6 +12,71 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.0.0',
+        date: '2026-04-27',
+        sections: [
+            {
+                title: 'Artemis — Public Launch',
+                items: [
+                    'Rebranded from ecomm-control-hub to Artemis — the analytics & automation platform for Philippine COD e-commerce',
+                    'New public marketing site with Hunt down RTS positioning — hero, problem, features, free trial, how it works, real seller results, and FAQ sections',
+                    'New /rts-calculator page — sellers can quantify their monthly RTS bleed in pesos before signing up',
+                    'New about, blog, contact, privacy, terms, data-policy, and security pages',
+                    'New Artemis logo, emerald brand palette, and dark/light theme toggle on all marketing pages',
+                ],
+            },
+            {
+                title: 'Subscriptions',
+                items: [
+                    'Subscription management UI — workspaces can now view their plan, current period, and billing status',
+                    'Plan selection and upgrade flow built on top of the v2.7.1 subscriptions foundation',
+                    '14-day free trial flow — new workspaces start on a trial subscription with no credit card required',
+                    'Plan tier gating across feature surfaces (gracefully shown rather than hidden when out of plan)',
+                ],
+            },
+            {
+                title: 'Roles & Permissions',
+                items: [
+                    'Reworked permissions engine — roles now resolve through a single source of truth across workspace, module, and action layers',
+                    'Per-action permission checks across Members, Roles, Orders, Products, Teams, Inventory, Reports, Shops, and API Keys',
+                    'Workspace members with the manage-api-keys permission can now generate and revoke API keys without owner intervention',
+                    'Bypass mode for owner-level accounts to keep workspace recovery flows working when permissions are misconfigured',
+                ],
+            },
+            {
+                title: 'Finance — Remittances',
+                items: [
+                    'Detailed remittance management view with per-account balance, transaction history, and date-range filters',
+                    'Bulk import from Excel — paste or upload remittance entries in batches with validation and preview before commit',
+                    'Inline edit and delete of individual remittance entries from the management view',
+                ],
+            },
+            {
+                title: 'Shops',
+                items: [
+                    'Shops management view aligned with the Pages experience — search, sort, filter, and per-shop checklist progress',
+                    'Per-shop status badge and last-sync indicator',
+                ],
+            },
+            {
+                title: 'Performance & Polish',
+                items: [
+                    'Optimization pass on dashboard and analytics queries — faster initial loads with smaller payloads',
+                    'New skeleton loading states across dashboard, RTS analytics, and inventory pages',
+                    'Sidebar scrollbar fix — no longer overlaps content on narrow viewports',
+                    'Metrics pipeline tightened — fewer redundant recalculations across workspace metrics',
+                ],
+            },
+            {
+                title: 'Internal',
+                items: [
+                    'Marketing plan, content playbook, and post calendar documents added to the repository for the launch',
+                    'Project documentation refreshed to reflect the Artemis brand and RTS-first positioning',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v2.7.1',
         date: '2026-04-24',
         sections: [
@@ -557,6 +622,8 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v3.0.0':
+        'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20',
     'v2.7.1':
         'bg-lime-500/10 text-lime-600 dark:text-lime-400 ring-lime-500/20',
     'v2.7.0':
