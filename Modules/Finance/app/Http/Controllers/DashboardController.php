@@ -2,8 +2,10 @@
 
 namespace Modules\Finance\Http\Controllers;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Finance\Models\Account;
@@ -12,11 +14,15 @@ use Modules\Finance\Models\Transaction;
 
 class DashboardController extends Controller
 {
+    use AuthorizesRequests;
+
     public function __invoke(Request $request, Workspace $workspace)
     {
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
+
+        $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
 
         $accounts = Account::where('workspace_id', $workspace->id)
             ->orderBy('name')->get();

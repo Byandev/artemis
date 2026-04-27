@@ -16,18 +16,8 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { AlertTriangle, ExternalLink, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-
-interface TxnOpt {
-    id: number;
-    account_id: number;
-    date: string;
-    description: string;
-    amount: number | string;
-    type: 'in' | 'out';
-    account?: { id: number; name: string } | null;
-}
+import { AlertTriangle, ExternalLink, MoreHorizontal, Search, Trash2, Upload } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface Row extends FinanceRemittance {
     is_reconciled: boolean;
@@ -38,7 +28,7 @@ interface Props {
     workspace: Workspace;
     remittances: PaginatedData<Row>;
     unreconciledCount: number;
-    transactions: TxnOpt[];
+    transactions: { id: number; account_id: number; date: string; description: string; amount: number | string; type: 'in' | 'out'; account?: { id: number; name: string } | null }[];
     query?: { sort?: string | null; filter?: { search?: string; status?: string; unreconciled?: string } };
 }
 
@@ -47,9 +37,10 @@ const fmt = (v: number | string) => Number(v).toLocaleString('en-PH', { minimumF
 export default function RemittancesIndex({ workspace, remittances, unreconciledCount, transactions, query }: Props) {
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
     const [createOpen, setCreateOpen] = useState(false);
-    const [editing, setEditing] = useState<FinanceRemittance | null>(null);
     const [toDelete, setToDelete] = useState<Row | null>(null);
     const [search, setSearch] = useState(query?.filter?.search ?? '');
+    const [importing, setImporting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const unreconciled = query?.filter?.unreconciled === '1' || query?.filter?.unreconciled === 'true';
 
     const baseUrl = `/workspaces/${workspace.slug}/finance/remittances`;
@@ -150,9 +141,6 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
                                     <ExternalLink className="mr-2 h-3.5 w-3.5" /> View
                                 </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setEditing(row.original)}>
-                                <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
-                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => setToDelete(row.original)}>
                                 <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
@@ -175,12 +163,40 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
             <Head title={`${workspace.name} - Finance Remittances`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader title="Remittances" description="Courier SOA (Statement of Account) records.">
-                    <button
-                        onClick={() => setCreateOpen(true)}
-                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white hover:bg-emerald-700"
-                    >
-                        Add Remittance
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            className="hidden"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setImporting(true);
+                                router.post(`${baseUrl}/import`, { file }, {
+                                    forceFormData: true,
+                                    onFinish: () => {
+                                        setImporting(false);
+                                        if (fileInputRef.current) fileInputRef.current.value = '';
+                                    },
+                                });
+                            }}
+                        />
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={importing}
+                            className="flex h-8 items-center gap-1.5 rounded-lg border border-black/6 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-600 hover:bg-stone-50 disabled:opacity-50 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
+                        >
+                            <Upload className="h-3.5 w-3.5" />
+                            {importing ? 'Importing...' : 'Import CSV'}
+                        </button>
+                        <button
+                            onClick={() => setCreateOpen(true)}
+                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white hover:bg-emerald-700"
+                        >
+                            Add Remittance
+                        </button>
+                    </div>
                 </PageHeader>
 
                 {unreconciledCount > 0 && (
@@ -224,9 +240,9 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
                 </div>
 
                 <RemittanceFormDialog
-                    open={createOpen || editing !== null}
-                    onOpenChange={(o) => { if (!o) { setCreateOpen(false); setEditing(null); } }}
-                    remittance={editing}
+                    open={createOpen}
+                    onOpenChange={setCreateOpen}
+                    remittance={null}
                     workspaceSlug={workspace.slug}
                     transactions={transactions}
                 />

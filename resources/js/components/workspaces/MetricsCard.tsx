@@ -1,4 +1,4 @@
-import { CircleHelp, Info } from 'lucide-react';
+import { CircleHelp } from 'lucide-react';
 import React from 'react';
 import {
     Tooltip,

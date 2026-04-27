@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\PendingRequiredChecklistsSort;
 use App\Models\Shop;
 use App\Models\Workspace;
 use Carbon\Carbon;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -18,12 +20,16 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class ShopController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
+
+        $this->authorize(Permission::ViewShops->value, $workspace);
 
         $pendingChecklistsSub = DB::table('workspace_checklists as wc')
             ->selectRaw('COUNT(*)')
@@ -73,6 +79,8 @@ class ShopController extends Controller
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
+
+        $this->authorize(Permission::RefreshShops->value, $workspace);
 
         // Ensure the page belongs to the workspace
         if ($shop->workspace_id !== $workspace->id) {

@@ -12,8 +12,11 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class PurchasedOrderController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
+        $this->authorize('View Purchased Orders', $workspace);
         $orders = QueryBuilder::for(PurchasedOrder::where('workspace_id', $workspace->id))
             ->with(['items.inventoryItem.product'])
             ->allowedSorts([
@@ -42,6 +45,8 @@ class PurchasedOrderController extends Controller
 
     public function create(Workspace $workspace)
     {
+        $this->authorize('Create Purchased Orders', $workspace);
+
         return Inertia::render('workspaces/inventory/purchased-orders/create', [
             'workspace' => $workspace,
             'items' => InventoryItem::where('workspace_id', $workspace->id)->with('product')->get(),
@@ -50,6 +55,8 @@ class PurchasedOrderController extends Controller
 
     public function store(Request $request, Workspace $workspace)
     {
+        $this->authorize('Create Purchased Orders', $workspace);
+
         $request->validate([
             'issue_date' => 'required|date_format:Y-m-d|date',
             'delivery_no' => 'nullable|string|max:255',
@@ -86,6 +93,8 @@ class PurchasedOrderController extends Controller
 
     public function edit(Workspace $workspace, PurchasedOrder $purchasedOrder)
     {
+        $this->authorize('Edit Purchased Orders', $workspace);
+
         return Inertia::render('workspaces/inventory/purchased-orders/edit', [
             'workspace' => $workspace,
             'order' => $purchasedOrder->load('items.inventoryItem.product'),
@@ -95,6 +104,8 @@ class PurchasedOrderController extends Controller
 
     public function update(Request $request, Workspace $workspace, PurchasedOrder $purchasedOrder)
     {
+        $this->authorize('Edit Purchased Orders', $workspace);
+
         $request->validate([
             'issue_date' => 'required|date_format:Y-m-d|date',
             'delivery_no' => 'nullable|string|max:255',
@@ -131,6 +142,8 @@ class PurchasedOrderController extends Controller
 
     public function destroy(Workspace $workspace, PurchasedOrder $purchasedOrder)
     {
+        $this->authorize('Delete Purchased Orders', $workspace);
+
         $purchasedOrder->delete();
 
         return redirect()->route('workspaces.inventory.purchased-orders.index', $workspace->slug)

@@ -2,10 +2,12 @@
 
 namespace Modules\Finance\Http\Controllers;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -14,6 +16,8 @@ use Modules\Finance\Models\Transaction;
 
 class ExpensesController extends Controller
 {
+    use AuthorizesRequests;
+
     private const SUB_CATEGORIES = [
         'ad_spent', 'cogs', 'subscription', 'shipping_fee',
         'operation_expense', 'salary', 'transfer_fee', 'seminar_fee', 'others',
@@ -24,6 +28,8 @@ class ExpensesController extends Controller
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
+
+        $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
 
         $from = $this->parseDate($request->query('from')) ?? Carbon::now()->startOfMonth()->toDateString();
         $to = $this->parseDate($request->query('to')) ?? Carbon::now()->endOfMonth()->toDateString();
