@@ -10,6 +10,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Models\User as PancakeUser;
+use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -102,6 +103,11 @@ class CSRController extends Controller
             ');
 
         $records = QueryBuilder::for($query)
+            ->allowedFilters([
+                AllowedFilter::callback('search', function ($q, $value) {
+                    $q->where('pu.name', 'like', "%{$value}%");
+                }),
+            ])
             ->allowedSorts(array_map(fn ($s) => AllowedSort::field($s), self::ALLOWED_SORTS))
             ->defaultSort('-total_sales')
             ->paginate($request->integer('per_page', 10))

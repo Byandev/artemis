@@ -5,7 +5,7 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { format, subDays } from 'date-fns';
@@ -96,15 +96,18 @@ function StatCard({ title, value, loading, format: fmt }: StatCardProps) {
 
 export default function Analytics({ workspace }: Props) {
     const today = new Date();
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialType = urlParams.get('type') === 'erp' ? 'erp' : 'pos';
     const [range, setRange] = useState<{ from: Date; to: Date }>({
         from: subDays(today, 6),
         to: today,
     });
     const [paginatedRecords, setPaginatedRecords] = useState<PaginatedData<CsrRecord> | null>(null);
-    const [currentType, setCurrentType] = useState('pos');
+    const [currentType, setCurrentType] = useState(initialType);
     const [sort, setSort] = useState('-total_sales');
     const [page, setPage] = useState(1);
     const [perPage, setPerPage] = useState(10);
+    const [search, setSearch] = useState(urlParams.get('search') ?? '');
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
     const toStr = format(range.to, 'yyyy-MM-dd');
@@ -118,13 +121,13 @@ export default function Analytics({ workspace }: Props) {
 
     useEffect(() => {
         setPage(1);
-    }, [range?.from, range?.to, currentType]);
+    }, [range?.from, range?.to, currentType, search]);
 
     useEffect(() => {
         const controller = new AbortController();
         axios
             .get(`/api/workspaces/${workspace.slug}/csrs/daily-records`, {
-                params: { from: fromStr, to: toStr, type: currentType, sort, page, per_page: perPage },
+                params: { from: fromStr, to: toStr, type: currentType, sort, page, per_page: perPage, 'filter[search]': search || undefined },
                 signal: controller.signal,
             })
             .then((res) => setPaginatedRecords(res.data))
@@ -132,7 +135,7 @@ export default function Analytics({ workspace }: Props) {
                 if (!axios.isCancel(err)) console.error(err);
             });
         return () => controller.abort();
-    }, [workspace.slug, fromStr, toStr, currentType, sort, page, perPage]);
+    }, [workspace.slug, fromStr, toStr, currentType, sort, page, perPage, search]);
 
     const initialSorting = useMemo(() => toFrontendSort(sort), [sort]);
 
@@ -191,6 +194,22 @@ export default function Analytics({ workspace }: Props) {
                     title="CSR Analytics"
                     description="Aggregated CSR performance from daily records"
                 >
+                    <input
+                        type="text"
+                        placeholder="Search CSR..."
+                        value={search}
+                        onChange={(e) => {
+                            setSearch(e.target.value);
+                            const url = new URL(window.location.href);
+                            if (e.target.value) {
+                                url.searchParams.set('search', e.target.value);
+                            } else {
+                                url.searchParams.delete('search');
+                            }
+                            window.history.replaceState({}, '', url.toString());
+                        }}
+                        className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500 dark:focus:border-zinc-500"
+                    />
                     <div className="flex items-center p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
                         {['erp', 'pos'].map((value) => {
                             const label = value === 'erp' ? 'ERP' : 'POS';
@@ -198,7 +217,12 @@ export default function Analytics({ workspace }: Props) {
                             return (
                                 <button
                                     key={value}
-                                    onClick={() => setCurrentType(value)}
+                                    onClick={() => {
+                                        setCurrentType(value);
+                                        const url = new URL(window.location.href);
+                                        url.searchParams.set('type', value);
+                                        window.history.replaceState({}, '', url.toString());
+                                    }}
                                     className={`rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors ${
                                         isActive
                                             ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-600 dark:text-white'
