@@ -2,6 +2,7 @@
 
 namespace App\Metrics\Orders;
 
+use App\Support\Metrics\OrdersFilter;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Database\Query\Builder;
@@ -174,12 +175,7 @@ final class AverageLifetimeValue
             ->where('pancake_orders.confirmed_at', '<', $endExclusive)
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
-            })
-            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
-            })
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->selectRaw('
                 pages.id as page_id,
                 pages.name as page_name,
@@ -210,12 +206,7 @@ final class AverageLifetimeValue
             ->where('pancake_orders.confirmed_at', '<', $endExclusive)
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
-            })
-            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
-            })
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->selectRaw('
                 shops.id as shop_id,
                 shops.name as shop_name,
@@ -237,12 +228,7 @@ final class AverageLifetimeValue
         $users = DB::table('users')
             ->join('pages', 'pages.owner_id', '=', 'users.id')
             ->where('pages.workspace_id', $workspaceId)
-            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
-            })
-            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
-            })
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->select('users.id', 'users.name')
             ->distinct()
             ->get();
@@ -286,19 +272,11 @@ final class AverageLifetimeValue
         }
 
         return DB::table(DB::raw($table))
-            ->when($this->needsPagesJoin($filter), function (Builder $query) {
-                $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id');
-            })
+            ->tap(fn ($q) => OrdersFilter::joinAndApply($q, $filter))
             ->where('pancake_orders.workspace_id', $workspaceId)
             ->where('pancake_orders.confirmed_at', '<', $endExclusive)
             ->whereNotNull('pancake_orders.customer_id')
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(! empty($filter['page_ids']), function (Builder $query) use ($filter) {
-                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
-            })
-            ->when(! empty($filter['shop_ids']), function (Builder $query) use ($filter) {
-                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
-            });
+            ->whereNotIn('pancake_orders.status', [6, 7]);
     }
 
     private function baseOrdersBetweenQuery(
@@ -359,11 +337,6 @@ final class AverageLifetimeValue
             '1 day',
             $end->copy()->startOfDay()
         ))->map(fn (Carbon $date) => $date->format('Y-m-d'))->all();
-    }
-
-    private function needsPagesJoin(array $filter): bool
-    {
-        return ! empty($filter['page_ids']) || ! empty($filter['shop_ids']);
     }
 
     private function parseIds(array|string $value): array

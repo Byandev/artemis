@@ -10,7 +10,6 @@ use Modules\Pancake\Jobs\FetchPageOrders;
 class TriggerFetchPageOrders extends Command
 {
     /**
-     * 
      * The name and signature of the console command.
      *
      * @var string

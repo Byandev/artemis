@@ -11,9 +11,13 @@ class Subscription extends Model
     use HasFactory;
 
     public const STATUS_TRIALING = 'trialing';
+
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_PAST_DUE = 'past_due';
+
     public const STATUS_CANCELED = 'canceled';
+
     public const STATUS_EXPIRED = 'expired';
 
     protected $fillable = [
