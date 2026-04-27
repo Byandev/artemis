@@ -18,7 +18,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { MoreHorizontal, Pencil, Search, Trash2, Upload, X } from 'lucide-react';
+import { Download, MoreHorizontal, Pencil, Search, Trash2, Upload, X } from 'lucide-react';
 import { SUB_CATEGORIES, SUB_CATEGORY_LABEL, SubCategory } from '@/components/finance/sub-category';
 import { TRANSACTION_TYPES, TRANSACTION_TYPE_LABEL, TRANSACTION_TYPE_STYLE, TransactionType } from '@/components/finance/transaction-type';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -73,6 +73,19 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
     const [bulkProcessing, setBulkProcessing] = useState(false);
 
     const baseUrl = `/workspaces/${workspace.slug}/finance/transactions`;
+
+    const handleExport = () => {
+        const params = new URLSearchParams();
+        if (search) params.set('filter[search]', search);
+        if (typeFilter) params.set('filter[type]', typeFilter);
+        if (accountFilter) params.set('filter[account_id]', accountFilter);
+        if (txnTypeFilter) params.set('filter[transaction_type]', txnTypeFilter);
+        if (subCategoryFilter) params.set('filter[sub_category]', subCategoryFilter);
+        if (missingType) params.set('filter[missing_type]', '1');
+        if (expensesMissingSub) params.set('filter[expenses_missing_sub]', '1');
+        const qs = params.toString();
+        window.location.href = `${baseUrl}/export${qs ? `?${qs}` : ''}`;
+    };
 
     const selectedIds = useMemo(() => Object.keys(rowSelection).filter((id) => rowSelection[id]), [rowSelection]);
     const selectedCount = selectedIds.length;
@@ -276,6 +289,12 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
             <Head title={`${workspace.name} - Finance Transactions`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader title="Transactions" description="Ledger entries across all accounts.">
+                    <button
+                        onClick={handleExport}
+                        className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
+                    >
+                        <Download className="h-3.5 w-3.5" /> Export CSV
+                    </button>
                     <button
                         onClick={() => setImportOpen(true)}
                         className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
