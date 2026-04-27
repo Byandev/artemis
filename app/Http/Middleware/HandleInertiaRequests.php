@@ -117,10 +117,17 @@ class HandleInertiaRequests extends Middleware
             return [];
         }
 
-        return Role::with('permissions:id,name')
+        $disabled = array_values(array_filter([
+            $workspace->show_finance ? null : 'Finance',
+            $workspace->show_inventory ? null : 'Inventory',
+        ]));
+
+        return Role::with('permissions:id,name,category')
             ->find($roleId)
             ?->permissions
+            ->reject(fn ($permission) => in_array($permission->category, $disabled, true))
             ->pluck('name')
+            ->values()
             ->all() ?? [];
     }
 }

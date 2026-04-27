@@ -95,6 +95,7 @@ export function AppSidebar() {
             title: 'Checklist',
             href: `/workspaces/${slug}/checklist`,
             icon: ListChecks,
+            permission: PERMISSIONS.ViewChecklist,
         },
         {
             title: 'CSR',
@@ -168,31 +169,42 @@ export function AppSidebar() {
                 {
                     title: 'Finance',
                     icon: Wallet,
+                    anyOf: [
+                        PERMISSIONS.ViewFinanceDashboard,
+                        PERMISSIONS.ViewFinanceAccounts,
+                        PERMISSIONS.ViewFinanceTransactions,
+                        PERMISSIONS.ViewFinanceRemittances,
+                    ],
                     items: [
                         {
                             title: 'Live Cashflow',
                             href: `/workspaces/${currentWorkspace.slug}/finance/dashboard`,
                             icon: LayoutDashboard,
+                            permission: PERMISSIONS.ViewFinanceDashboard,
                         },
                         {
                             title: 'Dashboard',
                             href: `/workspaces/${currentWorkspace.slug}/finance/expenses`,
                             icon: PieChart,
+                            permission: PERMISSIONS.ViewFinanceDashboard,
                         },
                         {
                             title: 'Accounts',
                             href: `/workspaces/${currentWorkspace.slug}/finance/accounts`,
                             icon: Landmark,
+                            permission: PERMISSIONS.ViewFinanceAccounts,
                         },
                         {
                             title: 'Transactions',
                             href: `/workspaces/${currentWorkspace.slug}/finance/transactions`,
                             icon: ArrowLeftRight,
+                            permission: PERMISSIONS.ViewFinanceTransactions,
                         },
                         {
                             title: 'Remittances',
                             href: `/workspaces/${currentWorkspace.slug}/finance/remittances`,
                             icon: Send,
+                            permission: PERMISSIONS.ViewFinanceRemittances,
                         },
                     ],
                 },

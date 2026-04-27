@@ -64,6 +64,27 @@ enum Permission: string
     case EditPurchasedOrders = 'Edit Purchased Orders';
     case DeletePurchasedOrders = 'Delete Purchased Orders';
 
+    // Checklist
+    case ViewChecklist = 'View Checklist';
+    case CreateChecklist = 'Create Checklist';
+    case EditChecklist = 'Edit Checklist';
+    case DeleteChecklist = 'Delete Checklist';
+
+    // Finance
+    case ViewFinanceDashboard = 'View Finance Dashboard';
+    case ViewFinanceAccounts = 'View Finance Accounts';
+    case CreateFinanceAccounts = 'Create Finance Accounts';
+    case EditFinanceAccounts = 'Edit Finance Accounts';
+    case DeleteFinanceAccounts = 'Delete Finance Accounts';
+    case ViewFinanceTransactions = 'View Finance Transactions';
+    case CreateFinanceTransactions = 'Create Finance Transactions';
+    case EditFinanceTransactions = 'Edit Finance Transactions';
+    case DeleteFinanceTransactions = 'Delete Finance Transactions';
+    case ViewFinanceRemittances = 'View Finance Remittances';
+    case CreateFinanceRemittances = 'Create Finance Remittances';
+    case EditFinanceRemittances = 'Edit Finance Remittances';
+    case DeleteFinanceRemittances = 'Delete Finance Remittances';
+
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
@@ -121,6 +142,25 @@ enum Permission: string
             self::CreatePurchasedOrders,
             self::EditPurchasedOrders,
             self::DeletePurchasedOrders => 'Inventory',
+
+            self::ViewChecklist,
+            self::CreateChecklist,
+            self::EditChecklist,
+            self::DeleteChecklist => 'Checklist',
+
+            self::ViewFinanceDashboard,
+            self::ViewFinanceAccounts,
+            self::CreateFinanceAccounts,
+            self::EditFinanceAccounts,
+            self::DeleteFinanceAccounts,
+            self::ViewFinanceTransactions,
+            self::CreateFinanceTransactions,
+            self::EditFinanceTransactions,
+            self::DeleteFinanceTransactions,
+            self::ViewFinanceRemittances,
+            self::CreateFinanceRemittances,
+            self::EditFinanceRemittances,
+            self::DeleteFinanceRemittances => 'Finance',
 
             self::EditWorkspaceSettings,
             self::ManageApiKeys => 'Settings',

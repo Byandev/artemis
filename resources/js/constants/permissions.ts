@@ -59,6 +59,27 @@ export const PERMISSIONS = {
     EditPurchasedOrders: 'Edit Purchased Orders',
     DeletePurchasedOrders: 'Delete Purchased Orders',
 
+    // Checklist
+    ViewChecklist: 'View Checklist',
+    CreateChecklist: 'Create Checklist',
+    EditChecklist: 'Edit Checklist',
+    DeleteChecklist: 'Delete Checklist',
+
+    // Finance
+    ViewFinanceDashboard: 'View Finance Dashboard',
+    ViewFinanceAccounts: 'View Finance Accounts',
+    CreateFinanceAccounts: 'Create Finance Accounts',
+    EditFinanceAccounts: 'Edit Finance Accounts',
+    DeleteFinanceAccounts: 'Delete Finance Accounts',
+    ViewFinanceTransactions: 'View Finance Transactions',
+    CreateFinanceTransactions: 'Create Finance Transactions',
+    EditFinanceTransactions: 'Edit Finance Transactions',
+    DeleteFinanceTransactions: 'Delete Finance Transactions',
+    ViewFinanceRemittances: 'View Finance Remittances',
+    CreateFinanceRemittances: 'Create Finance Remittances',
+    EditFinanceRemittances: 'Edit Finance Remittances',
+    DeleteFinanceRemittances: 'Delete Finance Remittances',
+
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',
     ManageApiKeys: 'Manage API Keys',

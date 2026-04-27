@@ -19,7 +19,11 @@ class RolePermissionController extends Controller
     {
         $this->authorize(PermissionEnum::ManageRolePermissions->value, $workspace);
 
-        $permissions = Permission::orderBy('category')->orderBy('name')->get();
+        $disabled = $this->disabledCategoriesFor($workspace);
+
+        $permissions = Permission::orderBy('category')->orderBy('name')
+            ->when($disabled, fn ($q) => $q->whereNotIn('category', $disabled))
+            ->get();
 
         $grouped = $permissions->groupBy('category')->map(function ($items, $category) use ($role) {
             return [
@@ -48,8 +52,29 @@ class RolePermissionController extends Controller
             'permission_ids.*' => 'integer|exists:permissions,id',
         ]);
 
-        $role->permissions()->sync($request->permission_ids);
+        $disabled = $this->disabledCategoriesFor($workspace);
+
+        // Preserve any already-granted permissions that belong to disabled categories
+        // (the form doesn't show them, so they'd otherwise be wiped on sync).
+        $preservedIds = $disabled
+            ? $role->permissions()->whereIn('category', $disabled)->pluck('permissions.id')->all()
+            : [];
+
+        $role->permissions()->sync(array_values(array_unique(
+            array_merge($request->input('permission_ids', []), $preservedIds)
+        )));
 
         return back()->with('success', 'Permissions updated.');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function disabledCategoriesFor(Workspace $workspace): array
+    {
+        return array_values(array_filter([
+            $workspace->show_finance ? null : 'Finance',
+            $workspace->show_inventory ? null : 'Inventory',
+        ]));
     }
 }
