@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Workspaces\StorePageRequest;
 use App\Http\Requests\Workspaces\UpdatePageRequest;
@@ -32,7 +33,7 @@ class PageController extends Controller
 
     public function index(Request $request, Workspace $workspace)
     {
-        $this->authorize('View Pages', $workspace);
+        $this->authorize(Permission::ViewPages->value, $workspace);
 
         $pendingChecklistsSub = DB::table('workspace_checklists as wc')
             ->selectRaw('COUNT(*)')
@@ -83,7 +84,7 @@ class PageController extends Controller
 
     public function create(Request $request, Workspace $workspace)
     {
-        $this->authorize('Edit Pages', $workspace);
+        $this->authorize(Permission::EditPages->value, $workspace);
 
         return Inertia::render('workspaces/pages/create', [
             'workspace' => $workspace,
@@ -93,7 +94,7 @@ class PageController extends Controller
 
     public function edit(Request $request, Workspace $workspace, Page $page)
     {
-        $this->authorize('Edit Pages', $workspace);
+        $this->authorize(Permission::EditPages->value, $workspace);
 
         return Inertia::render('workspaces/pages/edit', [
             'workspace' => $workspace,
@@ -104,7 +105,7 @@ class PageController extends Controller
 
     public function store(StorePageRequest $request, Workspace $workspace)
     {
-        $this->authorize('Edit Pages', $workspace);
+        $this->authorize(Permission::EditPages->value, $workspace);
 
         $validated = $request->validated();
         $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
@@ -151,7 +152,7 @@ class PageController extends Controller
 
     public function update(UpdatePageRequest $request, Workspace $workspace, Page $page)
     {
-        $this->authorize('Edit Pages', $workspace);
+        $this->authorize(Permission::EditPages->value, $workspace);
 
         $page->update($request->validated());
 
@@ -160,7 +161,7 @@ class PageController extends Controller
 
     public function refresh(Request $request, Workspace $workspace, Page $page)
     {
-        $this->authorize('Refresh Pages', $workspace);
+        $this->authorize(Permission::RefreshPages->value, $workspace);
 
         if ($page->workspace_id !== $workspace->id) {
             abort(403);
@@ -178,7 +179,7 @@ class PageController extends Controller
 
     public function archive(Request $request, Workspace $workspace, Page $page)
     {
-        $this->authorize('Archive Pages', $workspace);
+        $this->authorize(Permission::ArchivePages->value, $workspace);
 
         if ($page->workspace_id !== $workspace->id) {
             abort(403);
@@ -191,7 +192,7 @@ class PageController extends Controller
 
     public function restore(Request $request, Workspace $workspace, Page $page)
     {
-        $this->authorize('Archive Pages', $workspace);
+        $this->authorize(Permission::ArchivePages->value, $workspace);
 
         if ($page->workspace_id !== $workspace->id) {
             abort(403);

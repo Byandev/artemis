@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces\RTS;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Page;
 use App\Models\ParcelJourneyNotification;
@@ -21,7 +22,7 @@ class ParcelUpdateNotificationTemplateController extends Controller
 
     public function index(Workspace $workspace, Request $request)
     {
-        $this->authorize('Manage Parcel Journey Templates', $workspace);
+        $this->authorize(Permission::ManageParcelJourneyTemplates->value, $workspace);
 
         if ($workspace->parcelJourneyNotificationTemplates()->count() === 0) {
             ParcelJourneyNotificationTemplate::upsert([
@@ -192,7 +193,7 @@ class ParcelUpdateNotificationTemplateController extends Controller
 
     public function update(Request $request, Workspace $workspace, ParcelJourneyNotificationTemplate $template)
     {
-        $this->authorize('Manage Parcel Journey Templates', $workspace);
+        $this->authorize(Permission::ManageParcelJourneyTemplates->value, $workspace);
 
         $data = $request->validate([
             'message' => 'required|string',

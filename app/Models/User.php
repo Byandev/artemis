@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use BackedEnum;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -164,11 +165,13 @@ class User extends Authenticatable implements MustVerifyEmail
      * FIXED: This method now uses DB::table to avoid triggering the
      * Gate::before infinite loop which caused the 502/Timeout.
      */
-    public function hasPermission(string $permissionName, Workspace $workspace): bool
+    public function hasPermission(string|BackedEnum $permission, Workspace $workspace): bool
     {
         if ($this->isSuperAdmin() || $this->ownsWorkspace($workspace)) {
             return true;
         }
+
+        $permissionName = $permission instanceof BackedEnum ? $permission->value : $permission;
 
         // Direct DB query to bypass Eloquent relations and events
         $roleId = DB::table('workspace_user')

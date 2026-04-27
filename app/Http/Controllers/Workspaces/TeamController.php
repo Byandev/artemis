@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\Workspace;
@@ -18,7 +19,7 @@ class TeamController extends Controller
 
     public function index(Request $request, Workspace $workspace)
     {
-        $this->authorize('View Teams', $workspace);
+        $this->authorize(Permission::ViewTeams->value, $workspace);
 
         $teams = QueryBuilder::for(Team::ofWorkspace($workspace)->withCount('members')->with(['members:id,name,email']))
             ->allowedFilters([
@@ -49,7 +50,7 @@ class TeamController extends Controller
 
     public function store(Request $request, Workspace $workspace)
     {
-        $this->authorize('Create Teams', $workspace);
+        $this->authorize(Permission::CreateTeams->value, $workspace);
 
         $validated = $request->validate([
             'name' => [
@@ -82,7 +83,7 @@ class TeamController extends Controller
 
     public function update(Request $request, Workspace $workspace, Team $team)
     {
-        $this->authorize('Edit Teams', $workspace);
+        $this->authorize(Permission::EditTeams->value, $workspace);
 
         if ($team->workspace_id !== $workspace->id) {
             abort(403, 'This team does not belong to the current workspace.');
@@ -109,7 +110,7 @@ class TeamController extends Controller
 
     public function destroy(Request $request, Workspace $workspace, Team $team)
     {
-        $this->authorize('Delete Teams', $workspace);
+        $this->authorize(Permission::DeleteTeams->value, $workspace);
 
         if ($team->workspace_id !== $workspace->id) {
             abort(403, 'This team does not belong to the current workspace.');

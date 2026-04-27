@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\AdRecord;
 use App\Models\Order;
@@ -63,7 +64,7 @@ class WorkspaceController extends Controller
 
     public function edit(Request $request, Workspace $workspace)
     {
-        $this->authorize('Edit Workspace Settings', $workspace);
+        $this->authorize(Permission::EditWorkspaceSettings->value, $workspace);
 
         return Inertia::render('workspaces/edit', [
             'workspace' => $workspace,
@@ -72,7 +73,7 @@ class WorkspaceController extends Controller
 
     public function update(Request $request, Workspace $workspace)
     {
-        $this->authorize('Edit Workspace Settings', $workspace);
+        $this->authorize(Permission::EditWorkspaceSettings->value, $workspace);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -130,7 +131,7 @@ class WorkspaceController extends Controller
 
     public function getChartData(Request $request, Workspace $workspace)
     {
-        $this->authorize('View RTS Analytics', $workspace);
+        $this->authorize(Permission::ViewRtsAnalytics->value, $workspace);
 
         $days = $request->query('days', 30);
         $startDate = $request->query('start_date');

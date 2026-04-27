@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission as PermissionEnum;
 use App\Http\Controllers\Controller;
 use App\Models\Permission;
 use App\Models\Role;
@@ -16,7 +17,7 @@ class RolePermissionController extends Controller
 
     public function edit(Workspace $workspace, Role $role)
     {
-        $this->authorize('Manage Role Permissions', $workspace);
+        $this->authorize(PermissionEnum::ManageRolePermissions->value, $workspace);
 
         $permissions = Permission::orderBy('category')->orderBy('name')->get();
 
@@ -40,7 +41,7 @@ class RolePermissionController extends Controller
 
     public function update(Request $request, Workspace $workspace, Role $role)
     {
-        $this->authorize('Manage Role Permissions', $workspace);
+        $this->authorize(PermissionEnum::ManageRolePermissions->value, $workspace);
 
         $request->validate([
             'permission_ids' => 'present|array',

@@ -40,9 +40,11 @@ import {
     ArrowLeftRight,
     Send,
     PieChart,
+    Shield,
 } from 'lucide-react';
 import { useState } from 'react';
 import AppLogo from './app-logo';
+import { PERMISSIONS } from '@/constants/permissions';
 
 export function AppSidebar() {
     const { currentWorkspace } = usePage().props as unknown as { currentWorkspace: { slug: string; show_inventory: boolean; show_finance: boolean } };
@@ -50,6 +52,8 @@ export function AppSidebar() {
     const dashboardUrl = currentWorkspace
         ? workspace.dashboard.url((currentWorkspace as { slug: string }).slug)
         : dashboard().url;
+
+    const slug = (currentWorkspace as { slug: string }).slug;
 
     const mainNavItems: NavItem[] = [
         {
@@ -59,58 +63,73 @@ export function AppSidebar() {
         },
         {
             title: 'Shops',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/shops`,
+            href: `/workspaces/${slug}/shops`,
             icon: Store,
         },
         {
             title: 'Pages',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/pages`,
+            href: `/workspaces/${slug}/pages`,
             icon: BookOpenIcon,
+            permission: PERMISSIONS.ViewPages,
         },
         {
             title: 'Products',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/products/list`,
+            href: `/workspaces/${slug}/products/list`,
             icon: Package,
+            permission: PERMISSIONS.ViewProducts,
         },
         {
             title: 'Teams',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/teams`,
+            href: `/workspaces/${slug}/teams`,
             icon: Users,
+            permission: PERMISSIONS.ViewTeams,
+        },
+        {
+            title: 'Roles',
+            href: `/workspaces/${slug}/roles`,
+            icon: Shield,
+            permission: PERMISSIONS.ViewRoles,
         },
         {
             title: 'Checklist',
-            href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/checklist`,
+            href: `/workspaces/${slug}/checklist`,
             icon: ListChecks,
         },
         {
             title: 'CSR',
             icon: User,
+            anyOf: [PERMISSIONS.ViewCsrManagement, PERMISSIONS.ViewCsrAnalytics],
             items: [
                 {
                     title: 'Management',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/csr/management`,
+                    href: `/workspaces/${slug}/csr/management`,
                     icon: User,
+                    permission: PERMISSIONS.ViewCsrManagement,
                 },
                 {
                     title: 'Analytics',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/csr/analytics`,
+                    href: `/workspaces/${slug}/csr/analytics`,
                     icon: BarChart2,
+                    permission: PERMISSIONS.ViewCsrAnalytics,
                 },
             ],
         },
         {
             title: 'RTS',
             icon: RotateCcw,
+            anyOf: [PERMISSIONS.ViewRtsAnalytics, PERMISSIONS.ManageParcelJourneyTemplates],
             items: [
                 {
                     title: 'Analytics',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/analytics`,
+                    href: `/workspaces/${slug}/rts/analytics`,
                     icon: BarChart2,
+                    permission: PERMISSIONS.ViewRtsAnalytics,
                 },
                 {
                     title: 'Parcel Journey',
-                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/rts/parcel-journeys`,
+                    href: `/workspaces/${slug}/rts/parcel-journeys`,
                     icon: MapPin,
+                    permission: PERMISSIONS.ManageParcelJourneyTemplates,
                 },
             ],
         },
@@ -119,21 +138,25 @@ export function AppSidebar() {
                 {
                     title: 'Inventory',
                     icon: Box,
+                    anyOf: [PERMISSIONS.ViewInventoryItems, PERMISSIONS.ViewTransactionLogs, PERMISSIONS.ViewPurchasedOrders],
                     items: [
                         {
                             title: 'Inventory Items',
-                            href: `/workspaces/${currentWorkspace.slug}/inventory/items`,
+                            href: `/workspaces/${slug}/inventory/items`,
                             icon: Layers,
+                            permission: PERMISSIONS.ViewInventoryItems,
                         },
                         {
                             title: 'Transaction Logs',
-                            href: `/workspaces/${currentWorkspace.slug}/inventory/transactions`,
+                            href: `/workspaces/${slug}/inventory/transactions`,
                             icon: ClipboardList,
+                            permission: PERMISSIONS.ViewTransactionLogs,
                         },
                         {
                             title: 'Purchased Orders',
-                            href: `/workspaces/${currentWorkspace.slug}/inventory/purchased-orders`,
+                            href: `/workspaces/${slug}/inventory/purchased-orders`,
                             icon: ShoppingCart,
+                            permission: PERMISSIONS.ViewPurchasedOrders,
                         },
                     ],
                 },

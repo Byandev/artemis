@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
@@ -23,7 +24,7 @@ class CSRController extends Controller
 
     public function index(Request $request, Workspace $workspace)
     {
-        $this->authorize('View CSR Management', $workspace);
+        $this->authorize(Permission::ViewCsrManagement->value, $workspace);
 
         $employees = QueryBuilder::for(PancakeUser::class)
             ->with('systemUser')
@@ -65,7 +66,7 @@ class CSRController extends Controller
 
     public function analytics(Request $request, Workspace $workspace)
     {
-        $this->authorize('View CSR Analytics', $workspace);
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
 
         $from = $request->input('from')
             ? CarbonImmutable::parse($request->input('from'))->toDateString()
@@ -132,7 +133,7 @@ class CSRController extends Controller
 
     public function update(Request $request, Workspace $workspace, PancakeUser $employee)
     {
-        $this->authorize('Edit CSR Employees', $workspace);
+        $this->authorize(Permission::EditCsrEmployees->value, $workspace);
 
         $validated = $request->validate([
             'status' => 'required|string|in:ACTIVE,INACTIVE',

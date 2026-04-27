@@ -5,6 +5,8 @@ import { Workspace } from '@/types/models/Workspace';
 import { Role } from '@/types/models/Role';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
+import { usePermission } from '@/hooks/use-permission';
+import { PERMISSIONS } from '@/constants/permissions';
 
 interface Permission {
     id: number;
@@ -32,6 +34,8 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
     const { data, setData, put, processing } = useForm<{ permission_ids: number[] }>({
         permission_ids: initialIds,
     });
+
+    const canManage = usePermission(PERMISSIONS.ManageRolePermissions);
 
     const toggle = (id: number) => {
         setData('permission_ids',
@@ -102,13 +106,15 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
                                             {group.category}
                                         </span>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => toggleAll(group.permissions)}
-                                        className="font-mono text-[11px] text-emerald-600 hover:underline dark:text-emerald-400"
-                                    >
-                                        {allChecked ? 'Deselect all' : 'Select all'}
-                                    </button>
+                                    {canManage && (
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleAll(group.permissions)}
+                                            className="font-mono! text-[11px]! text-emerald-600 hover:underline dark:text-emerald-400"
+                                        >
+                                            {allChecked ? 'Deselect all' : 'Select all'}
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Permissions grid */}
@@ -123,8 +129,9 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
                                                 <input
                                                     type="checkbox"
                                                     checked={checked}
+                                                    disabled={!canManage}
                                                     onChange={() => toggle(permission.id)}
-                                                    className="h-4 w-4 rounded border-gray-300 accent-emerald-600"
+                                                    className="h-4 w-4 rounded border-gray-300 accent-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
                                                 />
                                                 <span className="font-mono text-[12px] text-gray-700 dark:text-gray-300">
                                                     {permission.name}
@@ -137,15 +144,17 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
                         );
                     })}
 
-                    <div className="flex justify-end pt-2">
-                        <button
-                            type="submit"
-                            disabled={processing}
-                            className="flex h-9 items-center rounded-lg bg-emerald-600 px-5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
-                        >
-                            {processing ? 'Saving…' : 'Save Permissions'}
-                        </button>
-                    </div>
+                    {canManage && (
+                        <div className="flex justify-end pt-2">
+                            <button
+                                type="submit"
+                                disabled={processing}
+                                className="flex h-9 items-center rounded-lg bg-emerald-600 px-5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                                {processing ? 'Saving…' : 'Save Permissions'}
+                            </button>
+                        </div>
+                    )}
                 </form>
             </div>
         </AppLayout>

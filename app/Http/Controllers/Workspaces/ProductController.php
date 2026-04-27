@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Page;
 use App\Models\Product;
@@ -18,7 +19,7 @@ class ProductController extends Controller
 
     public function index(Request $request, Workspace $workspace)
     {
-        $this->authorize('View Products', $workspace);
+        $this->authorize(Permission::ViewProducts->value, $workspace);
 
         $products = QueryBuilder::for(Product::ofWorkspace($workspace))
             ->with('owner')
@@ -65,7 +66,7 @@ class ProductController extends Controller
 
     public function create(Workspace $workspace)
     {
-        $this->authorize('Create Products', $workspace);
+        $this->authorize(Permission::CreateProducts->value, $workspace);
         $pages = Page::ofWorkspace($workspace)
             ->select('id', 'name')
             ->orderBy('name')
@@ -79,7 +80,7 @@ class ProductController extends Controller
 
     public function store(Request $request, Workspace $workspace)
     {
-        $this->authorize('Create Products', $workspace);
+        $this->authorize(Permission::CreateProducts->value, $workspace);
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -119,7 +120,7 @@ class ProductController extends Controller
 
     public function edit(Workspace $workspace, Product $product)
     {
-        $this->authorize('Edit Products', $workspace);
+        $this->authorize(Permission::EditProducts->value, $workspace);
         $pages = Page::ofWorkspace($workspace)
             ->select('id', 'name')
             ->orderBy('name')
@@ -138,7 +139,7 @@ class ProductController extends Controller
 
     public function update(Request $request, Workspace $workspace, Product $product)
     {
-        $this->authorize('Edit Products', $workspace);
+        $this->authorize(Permission::EditProducts->value, $workspace);
 
         if ($product->workspace_id !== $workspace->id) {
             abort(403, 'Unauthorized action.');
@@ -186,7 +187,7 @@ class ProductController extends Controller
 
     public function destroy(Workspace $workspace, Product $product)
     {
-        $this->authorize('Delete Products', $workspace);
+        $this->authorize(Permission::DeleteProducts->value, $workspace);
 
         if ($product->workspace_id !== $workspace->id) {
             abort(403, 'Unauthorized action.');

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use App\Models\WorkspaceApiKey;
@@ -18,7 +19,7 @@ class WorkspaceApiKeyController extends Controller
 
     public function index(Request $request, Workspace $workspace): Response
     {
-        $this->authorize('Manage API Keys', $workspace);
+        $this->authorize(Permission::ManageApiKeys->value, $workspace);
 
         $keys = $workspace->apiKeys()
             ->latest()
@@ -32,7 +33,7 @@ class WorkspaceApiKeyController extends Controller
 
     public function store(Request $request, Workspace $workspace): RedirectResponse
     {
-        $this->authorize('Manage API Keys', $workspace);
+        $this->authorize(Permission::ManageApiKeys->value, $workspace);
 
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -52,7 +53,7 @@ class WorkspaceApiKeyController extends Controller
 
     public function reveal(Request $request, Workspace $workspace, WorkspaceApiKey $apiKey): JsonResponse
     {
-        $this->authorize('Manage API Keys', $workspace);
+        $this->authorize(Permission::ManageApiKeys->value, $workspace);
 
         abort_if($apiKey->workspace_id !== $workspace->id, 404);
 
@@ -67,7 +68,7 @@ class WorkspaceApiKeyController extends Controller
 
     public function destroy(Request $request, Workspace $workspace, WorkspaceApiKey $apiKey): RedirectResponse
     {
-        $this->authorize('Manage API Keys', $workspace);
+        $this->authorize(Permission::ManageApiKeys->value, $workspace);
 
         abort_if($apiKey->workspace_id !== $workspace->id, 404);
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\WorkspaceInvitation\InviterNameSort;
 use App\Models\Role;
@@ -25,7 +26,7 @@ class WorkspaceMemberController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
-        $this->authorize('View Members', $workspace);
+        $this->authorize(Permission::ViewMembers->value, $workspace);
 
         $members = QueryBuilder::for(User::class)
             ->join('workspace_user', 'users.id', '=', 'workspace_user.user_id')
@@ -103,7 +104,7 @@ class WorkspaceMemberController extends Controller
 
     public function store(Request $request, Workspace $workspace)
     {
-        $this->authorize('Invite Members', $workspace);
+        $this->authorize(Permission::InviteMembers->value, $workspace);
 
         $request->validate([
             'email' => 'required|email',
@@ -121,7 +122,7 @@ class WorkspaceMemberController extends Controller
     public function updateMember(Request $request, Workspace $workspace, User $user)
     {
         // NEW: Check granular permission
-        $this->authorize('Edit Members', $workspace);
+        $this->authorize(Permission::EditMembers->value, $workspace);
 
         if ($workspace->isOwner($user)) {
             return back()->withErrors(['error' => 'Cannot change the workspace owner\'s role.']);
@@ -139,7 +140,7 @@ class WorkspaceMemberController extends Controller
     public function destroy(Request $request, Workspace $workspace, User $user)
     {
         if ($request->user()->id !== $user->id) {
-            $this->authorize('Remove Members', $workspace);
+            $this->authorize(Permission::RemoveMembers->value, $workspace);
         }
 
         if ($workspace->isOwner($user)) {
@@ -157,7 +158,7 @@ class WorkspaceMemberController extends Controller
 
     public function generatePasswordReset(Request $request, Workspace $workspace, User $user)
     {
-        $this->authorize('Reset Member Password', $workspace);
+        $this->authorize(Permission::ResetMemberPassword->value, $workspace);
 
         $token = Password::createToken($user);
         $url = route('password.reset', ['token' => $token]).'?'.http_build_query(['email' => $user->email]);
