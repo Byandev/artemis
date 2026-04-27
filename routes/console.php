@@ -26,3 +26,7 @@ Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
 
 Schedule::command('analytics:rollup --date=today')->hourly()->withoutOverlapping();
 Schedule::command('analytics:rollup --date=yesterday')->dailyAt('01:00')->withoutOverlapping();
+Schedule::command('analytics:rollup --date="2 days ago"')->dailyAt('02:00')->withoutOverlapping();
+Schedule::command('analytics:rollup --date="3 days ago"')->dailyAt('03:00')->withoutOverlapping();
+Schedule::command('analytics:rollup --date="4 days ago"')->dailyAt('04:00')->withoutOverlapping();
+Schedule::command('analytics:rollup --date="5 days ago"')->dailyAt('05:00')->withoutOverlapping();
