@@ -106,7 +106,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isAdminOf(Workspace $workspace): bool
     {
         // If they are a global superadmin, they are an admin of everything
-        if ($this->is_super_admin()) {
+        if ($this->is_super_admin) {
             return true;
         }
 
