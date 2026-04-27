@@ -138,8 +138,8 @@ export const metricConfigs: MetricConfig[] = [
     {
         key: 'returningAmount',
         groupKey: 'deliveryOutcomes',
-        name: 'Returning Amount',
-        description: 'Total value of orders that are currently on their way back to the seller.',
+        name: 'Entered Returning Amount',
+        description: 'Total value of orders that entered the returning state in the selected period.',
         formatter: currencyFormatter,
     },
     {
