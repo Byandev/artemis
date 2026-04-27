@@ -9,7 +9,7 @@ use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Order>
+ * @extends Factory<Order>
  */
 class OrderFactory extends Factory
 {
@@ -32,6 +32,7 @@ class OrderFactory extends Factory
             'total_amount' => fake()->randomFloat(2, 10, 1000),
             'final_amount' => fake()->randomFloat(2, 10, 1000),
             'discount' => fake()->randomFloat(2, 0, 100),
+            'customer_id' => fake()->uuid(),
             'ad_id' => fake()->optional()->numberBetween(1, 100),
             'fb_id' => fake()->unique()->numerify('####################'),
             'delivery_attempts' => fake()->optional()->numberBetween(1, 3),

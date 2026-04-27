@@ -41,10 +41,11 @@ class AnalyticController extends Controller
         $this->authorize('View RTS Analytics', $workspace);
 
         $key = $this->cacheKey($workspace, 'order-item', $request);
+
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsOrderItemQuery($workspace, $request))
                 ->sort($request->input('sort', '-total_orders'))
-                ->get($request->input('per_page', 15));
+                ->get($request->integer('per_page', 10));
         });
 
         return response()->json($data);
@@ -96,7 +97,7 @@ class AnalyticController extends Controller
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsAdQuery($workspace, $request))
                 ->sort($request->input('sort', '-total_orders'))
-                ->get($request->input('per_page', 15));
+                ->get($request->integer('per_page', 10));
         });
 
         return response()->json($data);
@@ -110,7 +111,7 @@ class AnalyticController extends Controller
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsConfirmedByQuery($workspace, $request))
                 ->sort($request->input('sort', '-total_orders'))
-                ->get($request->input('per_page', 15));
+                ->get($request->integer('per_page', 10));
         });
 
         return response()->json($data);
@@ -136,7 +137,7 @@ class AnalyticController extends Controller
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsRiderQuery($workspace, $request))
                 ->sort($request->input('sort', '-total_orders'))
-                ->get($request->input('per_page', 15));
+                ->get($request->integer('per_page', 10));
         });
 
         return response()->json($data);
@@ -152,7 +153,7 @@ class AnalyticController extends Controller
                 ->byProvince()
                 ->search($request->input('search', ''))
                 ->sort($request->input('sort', '-total_orders'))
-                ->paginate($request->input('per_page', 10));
+                ->paginate($request->integer('per_page', 10));
         });
 
         return response()->json($data);
@@ -168,7 +169,7 @@ class AnalyticController extends Controller
                 ->byCity()
                 ->search($request->input('search', ''))
                 ->sort($request->input('sort', '-total_orders'))
-                ->paginate($request->input('per_page', 10));
+                ->paginate($request->integer('per_page', 10));
         });
 
         return response()->json($data);
@@ -186,6 +187,7 @@ class AnalyticController extends Controller
 
     private function ttl(Request $request): int
     {
+        return 1;
         $endDate = $request->input('end_date');
 
         if ($endDate && Carbon::parse($endDate)->startOfDay()->lt(Carbon::today())) {

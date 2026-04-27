@@ -6,7 +6,7 @@ use App\Models\ParcelJourney;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\ParcelJourney>
+ * @extends Factory<ParcelJourney>
  */
 class ParcelJourneyFactory extends Factory
 {

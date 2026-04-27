@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use App\Models\Workspace;
+use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -12,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     /**
@@ -20,7 +22,7 @@ class User extends Authenticatable implements MustVerifyEmail
      *
      * @var list<string>
      */
-    protected $fillable = ['name', 'email', 'password', 'role'];
+    protected $fillable = ['name', 'email', 'password', 'role', 'is_super_admin'];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -44,6 +46,7 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_super_admin' => 'boolean',
         ];
     }
 
@@ -107,15 +110,9 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isAdminOf(Workspace $workspace): bool
     {
-        if ($this->isSuperAdmin() || $this->ownsWorkspace($workspace)) {
-            return true;
-        }
-
-        return DB::table('workspace_user')
-            ->join('roles', 'workspace_user.role_id', '=', 'roles.id')
-            ->where('workspace_user.user_id', $this->id)
-            ->where('workspace_user.workspace_id', $workspace->id)
-            ->whereIn('roles.name', ['Owner', 'Admin'])
+        return $this->workspaces()
+            ->where('workspace_id', $workspace->id)
+            ->whereIn('workspace_user.role', ['owner', 'admin'])
             ->exists();
     }
 
@@ -145,21 +142,21 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->role === 'superadmin';
     }
 
-    public function hasReach(string $requiredRole): bool
-    {
-        if ($this->isSuperAdmin()) {
-            return true;
-        }
+    // public function hasReach(string $requiredRole): bool
+    // {
+    //     if ($this->isSuperAdmin()) {
+    //         return true;
+    //     }
 
-        return $this->role === $requiredRole;
-    }
+    //     return $this->role === $requiredRole;
+    // }
 
-    public function pages(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function pages(): User|HasMany
     {
         return $this->hasMany(Page::class, 'owner_id');
     }
 
-    public function pancakeAccounts(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function pancakeAccounts(): User|HasMany
     {
         return $this->hasMany(\Modules\Pancake\Models\User::class);
     }

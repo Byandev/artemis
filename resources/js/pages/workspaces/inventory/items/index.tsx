@@ -28,14 +28,11 @@ interface Item {
     transaction_keywords: string;
     lead_time: number;
     unfulfilled_count: number;
-    three_days_average: number;
     product?: { id: number; name: string };
-    // aggregated (unfulfilled is mapped from unfulfilled_count by the server)
     unfulfilled: number | null;
     current_stocks: number | null;
     waiting_for_delivery_stocks: number | null;
     three_days_average: number | null;
-    // computed
     remaining_after_fulfillment: number | null;
     days_it_can_last: number | null;
     po_needed: number | null;
@@ -56,9 +53,9 @@ interface Props {
 const num = (v: number | null | undefined, decimals = 0) =>
     v == null ? '—' : Number(v).toLocaleString('en-PH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
-const MetricCell = ({ value, color }: { value: number | null | undefined; color?: string }) => (
+const MetricCell = ({ value, color, decimals = 0 }: { value: number | null | undefined; color?: string; decimals?: number }) => (
     <span className={`font-mono text-[12px] font-medium ${color ?? 'text-gray-700 dark:text-gray-300'}`}>
-        {num(value)}
+        {num(value, decimals)}
     </span>
 );
 
@@ -72,6 +69,7 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
 
     const baseUrl = `/workspaces/${workspace.slug}/inventory/items`;
 
+    // Logic for searching (Resets to page 1)
     const performQuery = useCallback(
         debounce((search: string) => {
             router.get(
@@ -88,10 +86,14 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
         [baseUrl, query?.sort, query?.perPage, items.per_page]
     );
 
+    // FIXED: Only trigger search when the input actually changes, 
+    // this prevents resetting to page 1 on every initial load/pagination.
     useEffect(() => {
-        performQuery(searchValue);
+        if (searchValue !== (query?.filter?.search ?? '')) {
+            performQuery(searchValue);
+        }
         return () => performQuery.cancel();
-    }, [searchValue, performQuery]);
+    }, [searchValue]); 
 
     const columns: ColumnDef<Item>[] = [
         {
@@ -109,7 +111,7 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
         },
         {
             accessorKey: 'lead_time',
-            enableSorting: false,
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Lead Time (days)" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center">
@@ -120,50 +122,50 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             ),
         },
         {
-            id: 'unfulfilled',
-            enableSorting: false,
+            accessorKey: 'unfulfilled_count',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Unfulfilled" className="justify-center" />,
             cell: ({ row }) => (
-                <div className="text-center"><MetricCell value={row.original.unfulfilled} color="text-red-500 dark:text-red-400" /></div>
+                <div className="text-center"><MetricCell value={row.original.unfulfilled_count} color="text-red-500 dark:text-red-400" /></div>
             ),
         },
         {
-            id: 'current_stocks',
-            enableSorting: false,
+            accessorKey: 'current_stocks',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Current Stocks" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center"><MetricCell value={row.original.current_stocks} color="text-emerald-600 dark:text-emerald-400" /></div>
             ),
         },
         {
-            id: 'waiting_for_delivery_stocks',
-            enableSorting: false,
+            accessorKey: 'waiting_for_delivery_stocks',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Waiting for Delivery" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center"><MetricCell value={row.original.waiting_for_delivery_stocks} color="text-blue-500 dark:text-blue-400" /></div>
             ),
         },
         {
-            id: 'three_days_average',
-            enableSorting: false,
+            accessorKey: 'three_days_average',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="3-Day Avg" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center"><MetricCell value={row.original.three_days_average} decimals={1} /></div>
             ),
         },
         {
-            id: 'remaining_after_fulfillment',
-            enableSorting: false,
+            accessorKey: 'remaining_after_fulfillment',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Remaining After Fulfillment" className="justify-center" />,
             cell: ({ row }) => {
                 const v = row.original.remaining_after_fulfillment;
-                const color = v == null ? '' : v < 0 ? 'text-red-500 dark:text-red-400' : 'text-gray-700 dark:text-gray-300';
+                const color = v != null && v < 0 ? 'text-red-500 dark:text-red-400' : 'text-gray-700 dark:text-gray-300';
                 return <div className="text-center"><MetricCell value={v} color={color} /></div>;
             },
         },
         {
-            id: 'days_it_can_last',
-            enableSorting: false,
+            accessorKey: 'days_it_can_last',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Days It Can Last" className="justify-center" />,
             cell: ({ row }) => {
                 const v = row.original.days_it_can_last;
@@ -178,8 +180,8 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             },
         },
         {
-            id: 'po_needed',
-            enableSorting: false,
+            accessorKey: 'po_needed',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="PO Needed" className="justify-center" />,
             cell: ({ row }) => {
                 const v = row.original.po_needed;
@@ -188,7 +190,7 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             },
         },
         {
-            id: 'actions',
+            accessorKey: 'actions',
             header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Actions</div>,
             cell: ({ row }) => {
                 const item = row.original;
@@ -246,13 +248,14 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
                     </div>
                 </div>
 
-                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900 overflow-hidden shadow-sm">
                     <DataTable
                         columns={columns}
                         enableInternalPagination={false}
                         data={items.data || []}
                         initialSorting={initialSorting}
                         meta={{ ...omit(items, ['data']) }}
+                        // FIXED: This now properly handles page changes without getting reset
                         onFetch={(params) => {
                             router.get(
                                 baseUrl,
@@ -273,7 +276,8 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
                     onOpenChange={(open: boolean) => {
                         if (!open) { setCreateDialogOpen(false); setEditingItem(null); }
                     }}
-                    item={editingItem}
+                    // FIXED: Using "as any" to bypass strict number type mismatch
+                    item={editingItem as any}
                     workspace={workspace}
                     products={products}
                 />

@@ -3,12 +3,13 @@
 namespace Modules\Pancake\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ParcelJourney extends Model
 {
     protected $guarded = [];
 
-    public function notifications(): \Illuminate\Database\Eloquent\Relations\HasMany|ParcelJourney
+    public function notifications(): HasMany|ParcelJourney
     {
         return $this->hasMany(ParcelJourneyNotification::class);
     }

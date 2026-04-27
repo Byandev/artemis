@@ -2,6 +2,7 @@
 
 namespace App\Metrics\Orders;
 
+use App\Support\Metrics\OrdersFilter;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -43,9 +44,6 @@ final class RepeatOrderRatio
         $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
-        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
-        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
-
         $repeatCustomers = $this->buildRepeatSubquery($workspaceId, $endExclusive);
 
         return DB::table('pancake_orders as po')
@@ -56,8 +54,7 @@ final class RepeatOrderRatio
             ->where('po.confirmed_at', '<', $endExclusive)
             ->whereNotNull('po.customer_id')
             ->whereNotIn('po.status', [6, 7])
-            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-            ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->groupBy('pages.id', 'pages.name')
             ->selectRaw('
                 pages.id   AS page_id,
@@ -76,9 +73,6 @@ final class RepeatOrderRatio
         $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
-        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
-        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
-
         $repeatCustomers = $this->buildRepeatSubquery($workspaceId, $endExclusive);
 
         return DB::table('pancake_orders as po')
@@ -91,8 +85,7 @@ final class RepeatOrderRatio
             ->whereNotNull('po.customer_id')
             ->whereNotIn('po.status', [6, 7])
             ->whereNotNull('pages.shop_id')
-            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-            ->when(! empty($shopIds), fn ($q) => $q->whereIn('shops.id', $shopIds))
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->groupBy('shops.id', 'shops.name')
             ->selectRaw('
                 shops.id   AS shop_id,
@@ -111,9 +104,6 @@ final class RepeatOrderRatio
         $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
-        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
-        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
-
         $repeatCustomers = $this->buildRepeatSubquery($workspaceId, $endExclusive);
 
         return DB::table('pancake_orders as po')
@@ -126,8 +116,7 @@ final class RepeatOrderRatio
             ->whereNotNull('po.customer_id')
             ->whereNotNull('pages.owner_id')
             ->whereNotIn('po.status', [6, 7])
-            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-            ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->groupBy('users.id', 'users.name')
             ->selectRaw('
                 users.id   AS user_id,
@@ -143,16 +132,10 @@ final class RepeatOrderRatio
 
     private function computeForWindow(int $workspaceId, array $filter, string $startAt, string $endExclusive): float
     {
-        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
-        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
-
         $repeatCustomers = $this->buildRepeatSubquery($workspaceId, $endExclusive);
 
         $row = DB::table('pancake_orders as po')
-            ->when(! empty($pageIds) || ! empty($shopIds), fn ($q) => $q->join('pages', 'pages.id', '=', 'po.page_id')
-                ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-                ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
-            )
+            ->tap(fn ($q) => OrdersFilter::joinAndApply($q, $filter, false, 'po'))
             ->leftJoinSub($repeatCustomers, 'rc', fn ($j) => $j->on('rc.customer_id', '=', 'po.customer_id'))
             ->where('po.workspace_id', $workspaceId)
             ->where('po.confirmed_at', '>=', $startAt)

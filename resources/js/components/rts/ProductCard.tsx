@@ -4,7 +4,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { PaginatedData } from '@/types';
 import { toFrontendSort } from '@/lib/sort';
-import { buildBaseParams, OrderItemRow, RtsCell, RtsQueryParams } from './rts-shared';
+import { buildBaseParams, OrderItemRow, RefreshButton, RtsCell, RtsQueryParams } from './rts-shared';
 
 interface Props {
     workspaceSlug: string;
@@ -66,6 +66,7 @@ export default function ProductCard({ workspaceSlug, queryParams, onDataLoaded }
                     <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">By Product</h2>
                     <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">RTS rate broken down by product/item name</p>
                 </div>
+                <RefreshButton onClick={() => fetchPage(1, sort, 15, true)} loading={loading} />
             </div>
             <div className="p-4">
                 {loading ? (
@@ -80,7 +81,7 @@ export default function ProductCard({ workspaceSlug, queryParams, onDataLoaded }
                         onFetch={(params) => {
                             const s = params?.sort as string ?? '-total_orders';
                             setSort(s);
-                            fetchPage(Number(params?.page ?? 1), s, Number(params?.per_page ?? data?.per_page ?? 15));
+                            fetchPage(Number(params?.page ?? 1), s, Number(params?.per_page ?? data?.per_page ?? 10));
                         }}
                     />
                 )}

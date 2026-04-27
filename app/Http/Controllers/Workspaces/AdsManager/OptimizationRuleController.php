@@ -45,7 +45,7 @@ class OptimizationRuleController extends Controller
     {
         $rules = $this->buildQuery($workspace, $request)
             ->with('conditions')
-            ->paginate($request->get('perPage', 20))
+            ->paginate($request->get('perPage', 10))
             ->withQueryString();
 
         return Inertia::render('workspaces/ads-manager/optimization-rules', [
@@ -53,7 +53,7 @@ class OptimizationRuleController extends Controller
             'rules' => $rules,
             'query' => [
                 'sort' => $request->get('sort'),
-                'perPage' => $request->get('perPage', 20),
+                'perPage' => $request->get('perPage', 10),
                 'page' => $request->get('page', 1),
                 'filter' => [
                     'search' => $request->get('filter.search'),

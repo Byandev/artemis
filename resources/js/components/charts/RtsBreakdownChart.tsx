@@ -37,6 +37,8 @@ export default function RtsBreakdownChart({ rows }: Props) {
             axisBorder: { show: false },
             axisTicks: { show: false },
             labels: {
+                rotate: -45,
+                rotateAlways: categories.length > 5,
                 style: { fontSize: '11px', fontFamily: 'DM Mono, monospace', colors: '#9CA3AF' },
             },
         },

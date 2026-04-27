@@ -78,7 +78,7 @@ class RmoOrderController extends Controller
                         ]);
                 },
             ])
-            ->paginate($request->input('per_page', 15));
+            ->paginate($request->input('per_page', 10));
 
         $orders->getCollection()->transform(function ($item) {
             return [
@@ -138,6 +138,7 @@ class RmoOrderController extends Controller
 
             if (! $order) {
                 $notFound[] = $item['order_id'];
+
                 continue;
             }
 

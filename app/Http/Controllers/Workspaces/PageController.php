@@ -7,11 +7,14 @@ use App\Http\Requests\Workspaces\StorePageRequest;
 use App\Http\Requests\Workspaces\UpdatePageRequest;
 use App\Http\Sorts\Page\OwnerNameSort;
 use App\Http\Sorts\Page\ShopNameSort;
+use App\Http\Sorts\PendingRequiredChecklistsSort;
 use App\Models\Page;
 use App\Models\Shop;
 use App\Models\User;
 use App\Models\Workspace;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -31,8 +34,28 @@ class PageController extends Controller
     {
         $this->authorize('View Pages', $workspace);
 
-        $pages = QueryBuilder::for(Page::where('pages.workspace_id', $workspace->id))
-            ->allowedFilters([AllowedFilter::partial('search', 'name')])
+        $pendingChecklistsSub = DB::table('workspace_checklists as wc')
+            ->selectRaw('COUNT(*)')
+            ->where('wc.workspace_id', $workspace->id)
+            ->where('wc.target', 'Page')
+            ->where('wc.required', true)
+            ->whereNotExists(function ($sub) use ($workspace) {
+                $sub->select(DB::raw(1))
+                    ->from('workspace_checklist_completions as wcc')
+                    ->whereColumn('wcc.workspace_checklist_id', 'wc.id')
+                    ->whereColumn('wcc.target_id', 'pages.id')
+                    ->where('wcc.workspace_id', $workspace->id)
+                    ->where('wcc.target_type', Page::class);
+            });
+
+        $baseQuery = Page::where('pages.workspace_id', $workspace->id)
+            ->select('pages.*')
+            ->selectSub($pendingChecklistsSub, 'pending_required_checklists_count');
+
+        $pages = QueryBuilder::for($baseQuery)
+            ->allowedFilters([
+                AllowedFilter::partial('search', 'name'),
+            ])
             ->allowedSorts([
                 'name',
                 'created_at',
@@ -41,6 +64,7 @@ class PageController extends Controller
                 AllowedSort::custom('shop_name', new ShopNameSort),
                 AllowedSort::custom('owner_name', new OwnerNameSort),
                 'parcel_journey_enabled',
+                AllowedSort::custom('pending_required_checklists_count', new PendingRequiredChecklistsSort),
             ])
             ->with(['shop', 'owner'])
             ->paginate($request->integer('per_page', 10))
@@ -116,10 +140,13 @@ class PageController extends Controller
             'status' => $validated['status'] ?? 'active',
             // ... (rest of your field assignments)
         ]);
+        //
+        //        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonth()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
+        //        dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subMonth()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
+        //        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
 
-        dispatch(new FetchPageOrders($page, 1, now()->subMonth()->unix(), now()->unix()))->onQueue('pancake');
-
-        return redirect()->route('workspaces.pages.index', $workspace)->with('success', 'Page created.');
+        return redirect()->route('workspaces.pages.index', $workspace)
+            ->with('success', 'Page created successfully.');
     }
 
     public function update(UpdatePageRequest $request, Workspace $workspace, Page $page)
@@ -140,6 +167,10 @@ class PageController extends Controller
 
         $page->update(['orders_last_synced_at' => null, 'is_sync_logic_updated' => true]);
         dispatch(new FetchPageOrders($page, 1, now()->subMonth()->unix(), now()->unix()))->onQueue('pancake');
+
+        dispatch(new FetchPageOrders($page, 1, Carbon::now()->subMonth()->unix(), Carbon::now()->unix()))->onQueue('pancake');
+
+        //        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
 
         return redirect()->route('workspaces.pages.index', $workspace);
     }
@@ -164,5 +195,69 @@ class PageController extends Controller
 
         $page->activate();
         return redirect()->route('workspaces.pages.index', $workspace);
+    }
+
+    public function validatePancakeToken(Request $request, Workspace $workspace)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $validated = $request->validate([
+            'shop_id' => 'required|string',
+            'token' => 'required|string',
+        ]);
+
+        try {
+            $response = Http::timeout(10)->get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
+                'api_key' => $validated['token'],
+            ]);
+
+            if ($response->successful()) {
+                return response()->json(['valid' => true, 'message' => 'Pancake token is valid.']);
+            }
+
+            return response()->json([
+                'valid' => false,
+                'message' => 'Invalid Pancake token or shop ID.',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'valid' => false,
+                'message' => 'Could not reach Pancake API.',
+            ]);
+        }
+    }
+
+    public function validateBotcakeToken(Request $request, Workspace $workspace)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $validated = $request->validate([
+            'page_id' => 'required|string',
+            'token' => 'required|string',
+        ]);
+
+        try {
+            $response = Http::timeout(10)
+                ->withHeader('access-token', $validated['token'])
+                ->get('https://botcake.io/api/public_api/v1/pages/'.$validated['page_id'].'/flows/');
+
+            if ($response->successful()) {
+                return response()->json(['valid' => true, 'message' => 'Botcake token is valid.']);
+            }
+
+            return response()->json([
+                'valid' => false,
+                'message' => 'Invalid Botcake token or page ID.',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'valid' => false,
+                'message' => 'Could not reach Botcake API.',
+            ]);
+        }
     }
 }

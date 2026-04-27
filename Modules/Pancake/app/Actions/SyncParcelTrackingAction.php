@@ -69,22 +69,31 @@ readonly class SyncParcelTrackingAction
             );
 
             if ($update['status'] === 'On Delivery' && $update['rider_name'] && $update['rider_mobile'] && Carbon::parse($update['updated_at'])->isToday()) {
-                OrderForDelivery::firstOrCreate(
+                $shippingAddress = $savedOrder->shippingAddress;
+
+                $order_for_delivery = OrderForDelivery::firstOrCreate(
                     [
-                        'order_id'      => $savedOrder->id,
-                        'page_id'       => $savedOrder->page_id,
-                        'shop_id'       => $savedOrder->shop_id,
-                        'workspace_id'  => $savedOrder->workspace_id,
-                        'rider_name'    => $update['rider_name'],
-                        'rider_phone'   => $update['rider_mobile'],
+                        'order_id' => $savedOrder->id,
+                        'page_id' => $savedOrder->page_id,
+                        'shop_id' => $savedOrder->shop_id,
+                        'workspace_id' => $savedOrder->workspace_id,
+                        'rider_name' => $update['rider_name'],
+                        'rider_phone' => $update['rider_mobile'],
                         'delivery_date' => Carbon::parse($update['updated_at'])->format('Y-m-d'),
                     ],
                     [
                         'conferrer_id' => $savedOrder->confirmed_by,
-                        'status'       => 'PENDING',
-                        'created_at'   => $update['updated_at'],
+                        'status' => 'PENDING',
+                        'customer_name' => $shippingAddress?->full_name,
+                        'customer_phone' => $shippingAddress?->phone_number,
+                        'created_at' => $update['updated_at'],
                     ]
                 );
+
+                $order_for_delivery->update([
+                    'parcel_status' => $savedOrder->parcel_status,
+                ]);
+
             }
 
             if ($this->isNotifiable($savedOrder, $journey)) {

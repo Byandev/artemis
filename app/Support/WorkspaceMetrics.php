@@ -28,6 +28,7 @@ use App\Metrics\Orders\TimeToFirstOrder;
 use App\Metrics\Orders\TotalOrders;
 use App\Metrics\Orders\TotalSales;
 use App\Metrics\Orders\UniqueCustomerCount;
+use App\Metrics\ParcelJourney\TotalForDeliveryAmount;
 use App\Metrics\ParcelJourney\TotalForDeliveryCount;
 use App\Metrics\ParcelJourney\TrackedOrdersCount;
 use App\Models\Workspace;
@@ -69,6 +70,7 @@ final class WorkspaceMetrics
         'returningAmount' => ReturningAmount::class,
         'trackedOrdersCount' => TrackedOrdersCount::class,
         'totalForDeliveryCount' => TotalForDeliveryCount::class,
+        'totalForDeliveryAmount' => TotalForDeliveryAmount::class,
         'deliveredAvgCustomerRts' => DeliveredAvgCustomerRts::class,
         'returnedAvgCustomerRts' => ReturnedAvgCustomerRts::class,
         'deliveredAvgDeliveryAttempts' => DeliveredAvgDeliveryAttempts::class,

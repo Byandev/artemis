@@ -8,12 +8,15 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { toFrontendSort } from '@/lib/sort';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Workspace } from '@/types/models/Workspace';
 import { omit } from 'lodash';
+import { DeleteOrderDialog } from '@/components/inventory/delete-order-dialog';
+import { PaginatedData } from '@/types';
 
 interface PurchasedOrderItem {
     id: number;
@@ -51,36 +54,24 @@ interface PurchasedOrder {
 
 interface Props {
     workspace: Workspace;
-    orders: {
-        data: PurchasedOrder[];
-        total: number;
-        from: number;
-        to: number;
-        links: any[];
-        last_page: number;
-        current_page: number;
-        per_page: number;
-    };
+    orders: PaginatedData<PurchasedOrder>;
     query?: {
+        sort?: string | null;
         perPage?: number | string;
         page?: number | string;
     };
 }
 
 export default function PurchasedOrderIndex({ workspace, orders, query }: Props) {
-    const [deletingId, setDeletingId] = useState<number | null>(null);
+    const [deletingOrder, setDeletingOrder] = useState<PurchasedOrder | null>(null);
+    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
 
-    const baseUrl = `/workspaces/${workspace.slug}/inventory/purchased-orders`;
-
-    const handleDelete = (id: number) => {
-        if (!confirm('Are you sure you want to delete this order?')) return;
-        router.delete(`${baseUrl}/${id}`, { preserveScroll: true });
-    };
+   const baseUrl = `/workspaces/${workspace.slug}/inventory/purchased-orders`;
 
     const columns: ColumnDef<PurchasedOrder>[] = [
         {
             accessorKey: 'issue_date',
-            enableSorting: false,
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Issue Date" />,
             cell: ({ row }) => (
                 <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
@@ -90,7 +81,7 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
         },
         {
             accessorKey: 'delivery_no',
-            enableSorting: false,
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Delivery No." />,
             cell: ({ row }) => (
                 <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
@@ -100,7 +91,7 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
         },
         {
             accessorKey: 'cust_po_no',
-            enableSorting: false,
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Cust PO No." />,
             cell: ({ row }) => (
                 <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
@@ -110,7 +101,7 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
         },
         {
             accessorKey: 'control_no',
-            enableSorting: false,
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Control No." />,
             cell: ({ row }) => (
                 <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
@@ -120,7 +111,7 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
         },
         {
             accessorKey: 'delivery_fee',
-            enableSorting: false,
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Delivery Fee" />,
             cell: ({ row }) => (
                 <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
@@ -130,7 +121,7 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
         },
         {
             accessorKey: 'total_amount',
-            enableSorting: false,
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Total Amount" />,
             cell: ({ row }) => (
                 <span className="font-mono text-[12px] font-semibold text-gray-800 dark:text-gray-200">
@@ -140,7 +131,7 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
         },
         {
             accessorKey: 'status',
-            enableSorting: false,
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Status" />,
             cell: ({ row }) => {
                 const s = STATUSES[row.original.status] ?? STATUSES[1];
@@ -182,7 +173,7 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                     className="text-red-600 focus:text-red-600 dark:text-red-400"
-                                    onClick={() => handleDelete(order.id)}
+                                   onClick={() => setDeletingOrder(order)}
                                 >
                                     <Trash2 className="mr-2 h-3.5 w-3.5" />
                                     Delete
@@ -216,11 +207,13 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
                         columns={columns}
                         enableInternalPagination={false}
                         data={orders.data || []}
+                        initialSorting={initialSorting}
                         meta={{ ...omit(orders, ['data']) }}
                         onFetch={(params) => {
                             router.get(
                                 baseUrl,
                                 {
+                                    sort: params?.sort,
                                     page: params?.page ?? 1,
                                     per_page: params?.per_page ?? query?.perPage ?? orders.per_page,
                                 },
@@ -229,6 +222,11 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
                         }}
                     />
                 </div>
+                <DeleteOrderDialog
+                    order={deletingOrder}
+                    workspace={workspace}
+                    onClose={() => setDeletingOrder(null)}
+                />
             </div>
         </AppLayout>
     );

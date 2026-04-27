@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
+use App\Models\Page;
 use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
@@ -65,8 +66,7 @@ class ProductController extends Controller
     public function create(Workspace $workspace)
     {
         $this->authorize('Create Products', $workspace);
-
-        $pages = \App\Models\Page::ofWorkspace($workspace)
+        $pages = Page::ofWorkspace($workspace)
             ->select('id', 'name')
             ->orderBy('name')
             ->get();
@@ -109,7 +109,7 @@ class ProductController extends Controller
         }
 
         if ($request->filled('page_ids') && is_array($request->page_ids) && count($request->page_ids) > 0) {
-            \App\Models\Page::whereIn('id', $request->page_ids)
+            Page::whereIn('id', $request->page_ids)
                 ->where('workspace_id', $workspace->id)
                 ->update(['product_id' => $product->id]);
         }
@@ -120,12 +120,7 @@ class ProductController extends Controller
     public function edit(Workspace $workspace, Product $product)
     {
         $this->authorize('Edit Products', $workspace);
-
-        if ($product->workspace_id !== $workspace->id) {
-            abort(403, 'Unauthorized action.');
-        }
-
-        $pages = \App\Models\Page::ofWorkspace($workspace)
+        $pages = Page::ofWorkspace($workspace)
             ->select('id', 'name')
             ->orderBy('name')
             ->get();
@@ -175,12 +170,13 @@ class ProductController extends Controller
                 ->toMediaCollection('PRODUCT_IMAGE');
         }
 
-        \App\Models\Page::where('product_id', $product->id)
+        // Remove all existing page connections for this product
+        Page::where('product_id', $product->id)
             ->where('workspace_id', $workspace->id)
             ->update(['product_id' => null]);
 
         if ($request->filled('page_ids') && is_array($request->page_ids) && count($request->page_ids) > 0) {
-            \App\Models\Page::whereIn('id', $request->page_ids)
+            Page::whereIn('id', $request->page_ids)
                 ->where('workspace_id', $workspace->id)
                 ->update(['product_id' => $product->id]);
         }

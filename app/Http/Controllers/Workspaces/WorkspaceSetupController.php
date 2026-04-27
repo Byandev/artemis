@@ -44,12 +44,14 @@ class WorkspaceSetupController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'min:3'],
             'description' => ['nullable', 'string', 'max:1000'],
+            'monthly_order_volume' => ['nullable', 'string', 'in:below-500,500-1000,1000-5000,5000-10000,above-10000'],
         ]);
 
         // Create the workspace
         $workspace = Workspace::create([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
+            'monthly_order_volume' => $validated['monthly_order_volume'] ?? null,
             'owner_id' => $request->user()->id,
         ]);
 

@@ -3,12 +3,17 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 class ParcelJourneyNotificationTemplate extends Model
 {
     protected $guarded = [];
 
-    public static function defaults(): \Illuminate\Support\Collection
+    protected $casts = [
+        'is_enabled' => 'boolean',
+    ];
+
+    public static function defaults(): Collection
     {
         return collect([
             [

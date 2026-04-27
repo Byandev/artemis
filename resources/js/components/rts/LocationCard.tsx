@@ -4,7 +4,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { PaginatedData } from '@/types';
 import { toFrontendSort } from '@/lib/sort';
-import { buildBaseParams, CityRow, ProvinceRow, RtsCell, RtsQueryParams } from './rts-shared';
+import { buildBaseParams, CityRow, ProvinceRow, RefreshButton, RtsCell, RtsQueryParams } from './rts-shared';
 
 type GroupBy = 'province' | 'city';
 
@@ -167,6 +167,13 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <RefreshButton
+                        onClick={() => {
+                            if (groupBy === 'province') fetchProvinces(1, provinceSearch, provinceSort, provincePerPage);
+                            else fetchCities(1, citySearch, citySort, cityPerPage);
+                        }}
+                        loading={groupBy === 'province' ? provincesLoading : citiesLoading}
+                    />
                     <div className="relative">
                         <svg className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />

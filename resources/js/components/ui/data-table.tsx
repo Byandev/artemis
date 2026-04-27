@@ -4,6 +4,7 @@ import {
     Column,
     ColumnDef,
     PaginationState,
+    RowSelectionState,
     SortingState,
     flexRender,
     getCoreRowModel,
@@ -40,6 +41,9 @@ interface DataTableProps<TData, TValue> {
     enableInternalPagination?: boolean
     onFetch?: (params?: { [key: string]: string | number | null }) => void,
     meta?: Omit<PaginatedData<TData>, 'data'>
+    rowSelection?: RowSelectionState
+    onRowSelectionChange?: (selection: RowSelectionState) => void
+    getRowId?: (row: TData, index: number) => string
 }
 
 export function DataTable<TData, TValue>({
@@ -48,6 +52,9 @@ export function DataTable<TData, TValue>({
     onFetch,
     initialSorting,
     meta,
+    rowSelection,
+    onRowSelectionChange,
+    getRowId,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
 
@@ -73,12 +80,21 @@ export function DataTable<TData, TValue>({
             const next = typeof updater === "function" ? updater(sorting) : updater
             setSorting(next)
 
-            if (onFetch) onFetch({ sort: toBackendSort(next), page: 1 })
+            if (onFetch) onFetch({ sort: toBackendSort(next), page: 1, per_page: meta?.per_page ?? null })
         },
         getSortedRowModel: getSortedRowModel(),
+        getRowId,
+        enableRowSelection: !!onRowSelectionChange,
+        onRowSelectionChange: onRowSelectionChange
+            ? (updater) => {
+                const next = typeof updater === 'function' ? updater(rowSelection ?? {}) : updater
+                onRowSelectionChange(next)
+            }
+            : undefined,
         state: {
             sorting,
-            pagination
+            pagination,
+            ...(rowSelection !== undefined ? { rowSelection } : {}),
         },
         manualSorting: true,
     })
@@ -93,7 +109,7 @@ export function DataTable<TData, TValue>({
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
                                     return (
-                                        <TableHead key={header.id} className="px-4 py-2.5 text-[10px] font-mono font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600 border-b border-black/6 dark:border-white/6">
+                                        <TableHead key={header.id} className="px-4 py-2.5 text-[10px] font-mono font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600 border-b border-black/6 dark:border-white/6 [&:has([role=checkbox])]:pr-0">
                                             {header.isPlaceholder
                                                 ? null
                                                 : flexRender(
@@ -112,7 +128,7 @@ export function DataTable<TData, TValue>({
                                 <TableRow
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
-                                    className="hover:bg-emerald-500/[0.03] transition-colors"
+                                    className="hover:bg-emerald-500/3 transition-colors"
                                 >
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id} className='px-4 py-3  text-[12px] text-black dark:text-gray-400 border-b border-black/6 dark:border-white/6 align-top'>
@@ -150,16 +166,16 @@ export function DataTable<TData, TValue>({
                                     Rows
                                 </span>
                                 <Select
-                                    value={String(footerMeta?.per_page ?? 15)}
+                                    value={String(footerMeta?.per_page ?? 10)}
                                     onValueChange={(val) => {
                                         if (onFetch) onFetch({ per_page: Number(val), page: 1, sort: toBackendSort(sorting) })
                                     }}
                                 >
-                                    <SelectTrigger className="h-7 w-[72px] rounded-[8px] border border-black/6 bg-stone-50 px-2.5 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
+                                    <SelectTrigger className="h-7 w-[72px] rounded-lg border border-black/6 bg-stone-50 px-2.5 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent className="min-w-[72px]">
-                                        {[10, 25, 50, 100].map((n) => (
+                                        {[10, 25, 50, 100, 500].map((n) => (
                                             <SelectItem key={n} value={String(n)} className="font-mono! text-[11px]!">
                                                 {n}
                                             </SelectItem>
@@ -169,12 +185,12 @@ export function DataTable<TData, TValue>({
                             </div>
                             <div className="h-4 w-px bg-black/6 dark:bg-white/6" />
                             <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
-                                Showing {footerMeta?.from} to {footerMeta?.to} of {footerMeta?.total?.toLocaleString()} entries
+                                Showing {footerMeta?.from ?? 0} to {footerMeta?.to ?? 0} of {(footerMeta?.total ?? 0).toLocaleString()} entries
                             </p>
                         </div>
 
                         <Pagination currentPage={footerMeta?.current_page ?? 1} totalPages={footerMeta?.last_page ?? 1} onPageChange={(page) => {
-                            if (onFetch) onFetch({ page, sort: toBackendSort(sorting) })
+                            if (onFetch) onFetch({ page, sort: toBackendSort(sorting), per_page: footerMeta?.per_page ?? null })
                         }} />
                     </div>
                 </div>
