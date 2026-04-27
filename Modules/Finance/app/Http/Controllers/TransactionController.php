@@ -215,7 +215,7 @@ class TransactionController extends Controller
 
         $transactions = QueryBuilder::for(
             Transaction::where('workspace_id', $workspace->id)
-                ->with(['account', 'remittance'])
+                ->with(['account'])
         )
             ->allowedFilters([
                 AllowedFilter::callback('search', fn ($q, $v) => $q->where(function ($q2) use ($v) {
@@ -240,7 +240,7 @@ class TransactionController extends Controller
 
         return response()->streamDownload(function () use ($transactions) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Date', 'Account', 'Description', 'Type', 'Transaction Type', 'Sub Category', 'Amount', 'Running Balance', 'Position', 'Notes', 'SOA Number', 'Courier']);
+            fputcsv($out, ['Date', 'Account', 'Description', 'Type', 'Transaction Type', 'Sub Category', 'Amount', 'Running Balance', 'Notes']);
 
             foreach ($transactions as $txn) {
                 fputcsv($out, [
@@ -252,10 +252,7 @@ class TransactionController extends Controller
                     $txn->sub_category ?? '',
                     $txn->amount,
                     $txn->running_balance ?? '',
-                    $txn->position ?? '',
                     $txn->notes ?? '',
-                    $txn->remittance?->soa_number ?? '',
-                    $txn->remittance?->courier ?? '',
                 ]);
             }
 
