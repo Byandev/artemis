@@ -28,6 +28,7 @@ export type MetricKey =
     | 'deliveredAvgDeliveryAttempts'
     | 'returnedAvgDeliveryAttempts'
     | 'totalForDeliveryCount'
+    | 'totalForDeliveryAmount'
     | 'repeatCustomerOrderCount'
     | 'repeatCustomerRatio'
     | 'retention30dRateCohort'
@@ -254,6 +255,13 @@ export const metricConfigs: MetricConfig[] = [
         name: 'For Delivery Count',
         description: 'How many orders are currently out for delivery in the selected period.',
         formatter: numberFormatter,
+    },
+    {
+        key: 'totalForDeliveryAmount',
+        groupKey: 'deliveryOutcomes',
+        name: 'For Delivery Amount',
+        description: 'Total value of orders currently out for delivery in the selected period.',
+        formatter: currencyFormatter,
     },
 ];
 

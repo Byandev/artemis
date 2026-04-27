@@ -30,6 +30,7 @@ All metrics support filters: `page_ids`, `shop_ids`, `user_ids` (→ `pages.owne
 | `returnedAmount` | Sales of orders fully returned in the period | `SUM(returned_amount)` | **Rollup** | — |
 | `rtsRate` | Return-to-sender rate (decimal 0–1) | `SUM(entered_returning_amount) / SUM(entered_returning_amount + delivered_amount)` | **Rollup** | — |
 | `totalForDeliveryCount` | Distinct orders whose "out for delivery" window overlaps the period. Window = `[first_delivery_attempt, COALESCE(delivered_at, returning_at, NOW())]` | `COUNT(*) FROM pancake_orders WHERE first_delivery_attempt <= range_end AND COALESCE(delivered_at, returning_at, NOW()) >= range_start` | Live | **Hard.** The "for-delivery" window spans multiple days and the open end (`NOW()`) shifts daily. A daily rollup column would either miss in-flight orders or double-count across days. Best path: keep live + index `(workspace_id, first_delivery_attempt, delivered_at, returning_at)`. |
+| `totalForDeliveryAmount` | Total value of orders whose "out for delivery" window overlaps the period (same window as `totalForDeliveryCount`) | `SUM(final_amount) FROM pancake_orders WHERE first_delivery_attempt <= range_end AND COALESCE(delivered_at, returning_at, NOW()) >= range_start` | Live | **Hard — same as `totalForDeliveryCount`.** |
 
 ## Fulfillment Lead Time
 
