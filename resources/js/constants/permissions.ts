@@ -20,6 +20,10 @@ export const PERMISSIONS = {
     ArchivePages: 'Archive Pages',
     RefreshPages: 'Refresh Pages',
 
+    // Shops
+    ViewShops: 'View Shops',
+    RefreshShops: 'Refresh Shops',
+
     // Products
     ViewProducts: 'View Products',
     CreateProducts: 'Create Products',

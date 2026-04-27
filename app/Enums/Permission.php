@@ -25,6 +25,10 @@ enum Permission: string
     case ArchivePages = 'Archive Pages';
     case RefreshPages = 'Refresh Pages';
 
+    // Shops
+    case ViewShops = 'View Shops';
+    case RefreshShops = 'Refresh Shops';
+
     // Products
     case ViewProducts = 'View Products';
     case CreateProducts = 'Create Products';
@@ -84,6 +88,9 @@ enum Permission: string
             self::EditPages,
             self::ArchivePages,
             self::RefreshPages => 'Pages',
+
+            self::ViewShops,
+            self::RefreshShops => 'Shops',
 
             self::ViewProducts,
             self::CreateProducts,

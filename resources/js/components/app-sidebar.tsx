@@ -65,6 +65,7 @@ export function AppSidebar() {
             title: 'Shops',
             href: `/workspaces/${slug}/shops`,
             icon: Store,
+            permission: PERMISSIONS.ViewShops,
         },
         {
             title: 'Pages',
