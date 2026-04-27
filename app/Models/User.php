@@ -2,15 +2,14 @@
 
 namespace App\Models;
 
-use App\Models\Workspace;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Fortify\TwoFactorAuthenticatable;
 use Illuminate\Support\Facades\DB;
+use Laravel\Fortify\TwoFactorAuthenticatable;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -177,7 +176,7 @@ class User extends Authenticatable implements MustVerifyEmail
             ->where('workspace_id', $workspace->id)
             ->value('role_id');
 
-        if (!$roleId) {
+        if (! $roleId) {
             return false;
         }
 

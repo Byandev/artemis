@@ -9,13 +9,13 @@ use App\Models\PancakeUserRmoDailyReport;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Pancake\Models\User as PancakeUser;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class CSRController extends Controller
 {

@@ -13,6 +13,7 @@ use App\Models\Shop;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\Carbon;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -24,12 +25,11 @@ use Modules\Pancake\Jobs\FetchShopUsers;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class PageController extends Controller
 {
-    
     use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
         $this->authorize('View Pages', $workspace);
@@ -107,7 +107,7 @@ class PageController extends Controller
         $this->authorize('Edit Pages', $workspace);
 
         $validated = $request->validated();
-        $response = Http::get('https://pos.pages.fm/api/v1/shops/' . $validated['shop_id'], [
+        $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
             'api_key' => $validated['pos_token'],
         ]);
 
@@ -118,7 +118,7 @@ class PageController extends Controller
         $resJson = $response->json();
         $pageData = collect($resJson['shop']['pages'])->firstWhere('id', $validated['id']);
 
-        if (!$pageData) {
+        if (! $pageData) {
             throw ValidationException::withMessages(['id' => 'Page not found']);
         }
 
@@ -162,8 +162,9 @@ class PageController extends Controller
     {
         $this->authorize('Refresh Pages', $workspace);
 
-        if ($page->workspace_id !== $workspace->id)
+        if ($page->workspace_id !== $workspace->id) {
             abort(403);
+        }
 
         $page->update(['orders_last_synced_at' => null, 'is_sync_logic_updated' => true]);
         dispatch(new FetchPageOrders($page, 1, now()->subMonth()->unix(), now()->unix()))->onQueue('pancake');
@@ -179,10 +180,12 @@ class PageController extends Controller
     {
         $this->authorize('Archive Pages', $workspace);
 
-        if ($page->workspace_id !== $workspace->id)
+        if ($page->workspace_id !== $workspace->id) {
             abort(403);
+        }
 
         $page->deactivate();
+
         return redirect()->route('workspaces.pages.index', $workspace);
     }
 
@@ -190,10 +193,12 @@ class PageController extends Controller
     {
         $this->authorize('Archive Pages', $workspace);
 
-        if ($page->workspace_id !== $workspace->id)
+        if ($page->workspace_id !== $workspace->id) {
             abort(403);
+        }
 
         $page->activate();
+
         return redirect()->route('workspaces.pages.index', $workspace);
     }
 

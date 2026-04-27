@@ -33,7 +33,7 @@ class AppServiceProvider extends ServiceProvider
             $workspaceKey = is_object($workspace) ? ($workspace->slug ?? $workspace->id ?? 'unknown') : ($workspace ?? 'unknown');
 
             return [
-                Limit::perMinute(20)->by($request->ip() . '|' . $workspaceKey),
+                Limit::perMinute(20)->by($request->ip().'|'.$workspaceKey),
             ];
         });
 
@@ -42,7 +42,7 @@ class AppServiceProvider extends ServiceProvider
             $workspaceKey = is_object($workspace) ? ($workspace->slug ?? $workspace->id ?? 'unknown') : ($workspace ?? 'unknown');
 
             return [
-                Limit::perMinute(30)->by($request->ip() . '|' . $workspaceKey),
+                Limit::perMinute(30)->by($request->ip().'|'.$workspaceKey),
             ];
         });
 

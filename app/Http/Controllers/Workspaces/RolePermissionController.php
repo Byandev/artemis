@@ -6,15 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class RolePermissionController extends Controller
 {
-
     use AuthorizesRequests;
-    
+
     public function edit(Workspace $workspace, Role $role)
     {
         $this->authorize('Manage Role Permissions', $workspace);
@@ -24,7 +23,7 @@ class RolePermissionController extends Controller
         $grouped = $permissions->groupBy('category')->map(function ($items, $category) use ($role) {
             return [
                 'category' => $category,
-                'permissions' => $items->map(fn($p) => [
+                'permissions' => $items->map(fn ($p) => [
                     'id' => $p->id,
                     'name' => $p->name,
                     'granted' => $role->permissions->contains($p->id),

@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\AdRecord;
 use App\Models\Order;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class WorkspaceController extends Controller
 {

@@ -7,22 +7,21 @@ use App\Http\Sorts\WorkspaceInvitation\InviterNameSort;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class WorkspaceMemberController extends Controller
 {
-
     use AuthorizesRequests;
 
     public function index(Request $request, Workspace $workspace)
     {
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -63,6 +62,7 @@ class WorkspaceMemberController extends Controller
                     'created_at' => $user->pivot_created_at,
                 ];
                 unset($user->pivot_role_id, $user->pivot_role_name, $user->pivot_created_at);
+
                 return $user;
             });
 
@@ -160,7 +160,7 @@ class WorkspaceMemberController extends Controller
         $this->authorize('Reset Member Password', $workspace);
 
         $token = Password::createToken($user);
-        $url = route('password.reset', ['token' => $token]) . '?' . http_build_query(['email' => $user->email]);
+        $url = route('password.reset', ['token' => $token]).'?'.http_build_query(['email' => $user->email]);
 
         return response()->json(['url' => $url]);
     }

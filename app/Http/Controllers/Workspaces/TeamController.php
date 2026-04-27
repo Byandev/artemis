@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Workspaces;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class TeamController extends Controller
 {

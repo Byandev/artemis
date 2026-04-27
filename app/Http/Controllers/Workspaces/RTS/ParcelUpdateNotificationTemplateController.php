@@ -8,12 +8,12 @@ use App\Models\ParcelJourneyNotification;
 use App\Models\ParcelJourneyNotificationLog;
 use App\Models\ParcelJourneyNotificationTemplate;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class ParcelUpdateNotificationTemplateController extends Controller
 {
