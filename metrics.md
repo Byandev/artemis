@@ -29,7 +29,8 @@ All metrics support filters: `page_ids`, `shop_ids`, `user_ids` (→ `pages.owne
 | `returningAmount` | Sales of orders that entered the returning state in the period (display name: "Entered Returning Amount") | `SUM(entered_returning_amount)` | **Rollup** | — |
 | `returnedAmount` | Sales of orders fully returned in the period | `SUM(returned_amount)` | **Rollup** | — |
 | `rtsRate` | Return-to-sender rate (decimal 0–1) | `SUM(entered_returning_amount) / SUM(entered_returning_amount + delivered_amount)` | **Rollup** | — |
-| `totalForDeliveryCount` | Parcel journeys "On Delivery" in the period | `COUNT(*) FROM parcel_journeys WHERE status='On Delivery'` | Live | **Easy but different table.** Add `for_delivery_count` column to the rollup, populate from `parcel_journeys` joined to `pancake_orders` for the page. Builder needs a second query against `parcel_journeys`. |
+| `totalForDeliveryCount` | Distinct orders whose "out for delivery" window overlaps the period. Window = `[first_delivery_attempt, COALESCE(delivered_at, returning_at, NOW())]` | `COUNT(*) FROM pancake_orders WHERE first_delivery_attempt <= range_end AND COALESCE(delivered_at, returning_at, NOW()) >= range_start` | Live | **Hard.** The "for-delivery" window spans multiple days and the open end (`NOW()`) shifts daily. A daily rollup column would either miss in-flight orders or double-count across days. Best path: keep live + index `(workspace_id, first_delivery_attempt, delivered_at, returning_at)`. |
+| `totalForDeliveryAmount` | Total value of orders whose "out for delivery" window overlaps the period (same window as `totalForDeliveryCount`) | `SUM(final_amount) FROM pancake_orders WHERE first_delivery_attempt <= range_end AND COALESCE(delivered_at, returning_at, NOW()) >= range_start` | Live | **Hard — same as `totalForDeliveryCount`.** |
 
 ## Fulfillment Lead Time
 
@@ -110,7 +111,8 @@ php artisan analytics:rollup --from=2026-01-01 --to=2026-04-25
 ## Rollup expansion difficulty — quick reference
 
 - **Done** — 15 of 28 metrics. Includes 4 Revenue & Volume, 4 Delivery Outcomes, all 6 Fulfillment Lead Time, 2 Delivery Quality Signals.
-- **Easy but different table** — `totalForDeliveryCount` (parcel_journeys), `smsSentCount` and `trackedOrdersCount` (parcel_journey_notifications). Builder needs separate queries against those tables. `trackedOrdersCount` also has a DISTINCT-on-order_id wrinkle that makes cross-day sums overcount.
+- **Easy but different table** — `smsSentCount` and `trackedOrdersCount` (parcel_journey_notifications). Builder needs separate queries against those tables. `trackedOrdersCount` also has a DISTINCT-on-order_id wrinkle that makes cross-day sums overcount.
+- **Window-overlap (hard for rollup)** — `totalForDeliveryCount`. Each order is "for delivery" for a multi-day window; rollup naturally aggregates daily events, not multi-day intervals. Keep live, add index.
 - **Medium (extra joins)** — 2 customer-RTS metrics (`pancake_order_phone_number_reports` join), `timeToFirstOrder` (`pancake_customers.created_at` join).
 - **Hard (need separate `workspace_customer_facts` grain)** — `avgLifetimeValue`, all 3 repeat-* metrics, `uniqueCustomerCount` (DISTINCT problem).
 - **Skip rollup, use cache** — 3 retention cohort metrics (window is fixed, cache for 1h).

@@ -7,21 +7,20 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Distinct count of pancake_orders whose "out for delivery" window overlaps the date range.
+ * Sum of final_amount for distinct pancake_orders whose "out for delivery" window overlaps the date range.
+ * Window = [first_delivery_attempt, COALESCE(delivered_at, returning_at, NOW())].
  *
- * The window starts at `first_delivery_attempt` and ends at the first of:
- *   - `delivered_at` (delivered)
- *   - `returning_at` (started returning)
- *   - NOW() (still in transit)
- *
- * An order overlaps the range [start, end] when:
- *   first_delivery_attempt <= end  AND  COALESCE(delivered_at, returning_at, NOW()) >= start
+ * @see TotalForDeliveryCount for the matching count metric and overlap rationale.
  */
-final class TotalForDeliveryCount
+final class TotalForDeliveryAmount
 {
     public function compute(int $workspaceId, array $date_range, array $filter): float
     {
-        return (float) $this->baseQuery($workspaceId, $date_range, $filter)->count();
+        return round(
+            (float) $this->baseQuery($workspaceId, $date_range, $filter)
+                ->sum('pancake_orders.final_amount'),
+            2
+        );
     }
 
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
@@ -31,10 +30,13 @@ final class TotalForDeliveryCount
         return collect($periods)->map(function (array $period) use ($workspaceId, $filter) {
             return (object) [
                 'period' => $period['label'],
-                'value' => (int) $this->baseQuery($workspaceId, [
-                    'start_date' => $period['start'],
-                    'end_date' => $period['end'],
-                ], $filter)->count(),
+                'value' => round(
+                    (float) $this->baseQuery($workspaceId, [
+                        'start_date' => $period['start'],
+                        'end_date' => $period['end'],
+                    ], $filter)->sum('pancake_orders.final_amount'),
+                    2
+                ),
             ];
         })->values();
     }
@@ -42,7 +44,7 @@ final class TotalForDeliveryCount
     public function perPage(int $workspaceId, array $date_range, array $filter)
     {
         return $this->baseQuery($workspaceId, $date_range, $filter, true)
-            ->selectRaw('pages.id as page_id, pages.name as page_name, COUNT(*) as value')
+            ->selectRaw('pages.id as page_id, pages.name as page_name, SUM(pancake_orders.final_amount) as value')
             ->groupBy('pages.id', 'pages.name')
             ->orderByDesc('value')
             ->get();
@@ -52,7 +54,7 @@ final class TotalForDeliveryCount
     {
         return $this->baseQuery($workspaceId, $date_range, $filter, true)
             ->join('shops', 'shops.id', '=', 'pages.shop_id')
-            ->selectRaw('shops.id as shop_id, shops.name as shop_name, COUNT(*) as value')
+            ->selectRaw('shops.id as shop_id, shops.name as shop_name, SUM(pancake_orders.final_amount) as value')
             ->whereNotNull('pages.shop_id')
             ->groupBy('shops.id', 'shops.name')
             ->orderByDesc('value')
@@ -63,7 +65,7 @@ final class TotalForDeliveryCount
     {
         return $this->baseQuery($workspaceId, $date_range, $filter, true)
             ->join('users', 'users.id', '=', 'pages.owner_id')
-            ->selectRaw('users.id as user_id, users.name as user_name, COUNT(*) as value')
+            ->selectRaw('users.id as user_id, users.name as user_name, SUM(pancake_orders.final_amount) as value')
             ->whereNotNull('pages.owner_id')
             ->groupBy('users.id', 'users.name')
             ->orderByDesc('value')
