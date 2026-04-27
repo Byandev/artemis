@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
@@ -9,6 +10,7 @@ use App\Models\PancakeUserRmoDailyReport;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Pancake\Models\User as PancakeUser;
@@ -18,11 +20,11 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class CSRController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
+        $this->authorize(Permission::ViewCsrManagement->value, $workspace);
 
         $employees = QueryBuilder::for(PancakeUser::class)
             ->with('systemUser')
@@ -64,9 +66,7 @@ class CSRController extends Controller
 
     public function analytics(Request $request, Workspace $workspace)
     {
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
 
         $from = $request->input('from')
             ? CarbonImmutable::parse($request->input('from'))->toDateString()
@@ -133,6 +133,8 @@ class CSRController extends Controller
 
     public function update(Request $request, Workspace $workspace, PancakeUser $employee)
     {
+        $this->authorize(Permission::EditCsrEmployees->value, $workspace);
+
         $validated = $request->validate([
             'status' => 'required|string|in:ACTIVE,INACTIVE',
             'user_id' => 'nullable|exists:users,id',
