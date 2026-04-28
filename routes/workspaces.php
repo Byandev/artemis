@@ -13,6 +13,7 @@ use App\Http\Controllers\Workspaces\ChecklistController;
 use App\Http\Controllers\Workspaces\ChecklistProgressController;
 use App\Http\Controllers\Workspaces\CSRController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
+use App\Http\Controllers\Workspaces\OnboardingController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\Product\AnalyticsController;
 use App\Http\Controllers\Workspaces\ProductController;
@@ -63,6 +64,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/setup', [WorkspaceSetupController::class, 'store'])->name('workspaces.setup.store');
 
     Route::prefix('workspaces/{workspace:slug}')->group(function () {
+        // Onboarding (after workspace creation)
+        Route::get('/onboarding', [OnboardingController::class, 'create'])->name('workspace.onboarding');
+        Route::post('/onboarding', [OnboardingController::class, 'store'])->name('workspace.onboarding.store');
+        Route::get('/onboarding/status', [OnboardingController::class, 'status'])->name('workspace.onboarding.status');
+        Route::post('/onboarding/skip', [OnboardingController::class, 'skip'])->name('workspace.onboarding.skip');
+
         Route::get('/inventory/transactions', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
         Route::post('/inventory/transactions', [InventoryTransactionController::class, 'store'])->name('inventory.transactions.store');
         Route::patch('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'update'])->name('inventory.transactions.update');

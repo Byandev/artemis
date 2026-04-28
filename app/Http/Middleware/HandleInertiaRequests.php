@@ -58,6 +58,18 @@ class HandleInertiaRequests extends Middleware
             ? $user->ownsWorkspace($currentWorkspace)
             : false;
 
+        // Show syncing modal when any page has no orders_last_synced_at
+        $syncingData = null;
+        if ($currentWorkspace instanceof Workspace && $currentWorkspace->pages()->exists()) {
+            $hasSyncingPages = $currentWorkspace->pages()
+                ->whereNull('orders_last_synced_at')
+                ->exists();
+
+            if ($hasSyncingPages) {
+                $syncingData = ['workspaceSlug' => $currentWorkspace->slug];
+            }
+        }
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
@@ -80,6 +92,7 @@ class HandleInertiaRequests extends Middleware
                 'newApiKey' => $request->session()->get('newApiKey'),
             ],
             'appEnv' => config('app.env'),
+            'syncingData' => $syncingData,
         ];
     }
 
