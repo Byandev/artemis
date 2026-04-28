@@ -174,9 +174,6 @@ class PageController extends Controller
 
         $page->update(['orders_last_synced_at' => null, 'is_sync_logic_updated' => true]);
         dispatch(new FetchPageOrders($page, 1, now()->subMonth()->unix(), now()->unix()))->onQueue('pancake');
-
-//        dispatch(new FetchPageOrders($page, 1, Carbon::now()->subMonth()->unix(), Carbon::now()->unix()))->onQueue('pancake');
-
         //        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
 
         return redirect()->route('workspaces.pages.index', $workspace);

@@ -63,6 +63,8 @@ class RemittanceController extends Controller
                         $q->whereNull('transaction_id');
                     }
                 }),
+                AllowedFilter::callback('date_from', fn ($q, $v) => $q->whereDate('billing_date_from', '>=', $v)),
+                AllowedFilter::callback('date_to', fn ($q, $v) => $q->whereDate('billing_date_to', '<=', $v)),
             ])
             ->allowedSorts(['id', 'billing_date_from', 'billing_date_to', 'courier', 'soa_number', 'gross_cod', 'net_amount', 'status', 'created_at'])
             ->defaultSort('-billing_date_to', '-created_at')
@@ -83,6 +85,7 @@ class RemittanceController extends Controller
             'remittances' => $remittances,
             'unreconciledCount' => $unreconciledCount,
             'transactions' => Transaction::where('workspace_id', $workspace->id)
+                ->where('transaction_type', 'remittance')
                 ->with('account')
                 ->orderByDesc('date')
                 ->limit(200)
@@ -145,6 +148,12 @@ class RemittanceController extends Controller
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
+            'transactions' => Transaction::where('workspace_id', $workspace->id)
+                ->where('transaction_type', 'remittance')
+                ->with('account')
+                ->orderByDesc('date')
+                ->limit(200)
+                ->get(['id', 'account_id', 'date', 'description', 'amount', 'type']),
         ]);
     }
 
