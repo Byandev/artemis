@@ -25,7 +25,27 @@ interface Props {
 }
 
 export default function ChecklistPage({ workspace, checklists, query }: Props) {
-    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
+    const invertSortParam = useCallback((sort?: string | null) => {
+        if (!sort) {
+            return sort;
+        }
+
+        return sort
+            .split(',')
+            .map((part) => {
+                const trimmed = part.trim();
+
+                if (!trimmed) {
+                    return '';
+                }
+
+                return trimmed.startsWith('-') ? trimmed.slice(1) : `-${trimmed}`;
+            })
+            .filter(Boolean)
+            .join(',');
+    }, []);
+
+    const initialSorting = useMemo(() => toFrontendSort(invertSortParam(query?.sort ?? null)), [invertSortParam, query?.sort]);
     const [addTaskOpen, setAddTaskOpen] = useState(false);
     const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
     const [editingItemId, setEditingItemId] = useState<number | null>(null);
@@ -181,8 +201,9 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                             router.get(
                                 `/workspaces/${workspace.slug}/checklist`,
                                 {
-                                    sort: params?.sort,
+                                    sort: invertSortParam(params?.sort ?? null) ?? undefined,
                                     page: params?.page ?? 1,
+                                    per_page: params?.per_page ?? query?.perPage ?? checklists.per_page,
                                 },
                                 {
                                     preserveState: true,
