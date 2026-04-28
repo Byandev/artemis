@@ -66,6 +66,8 @@ class TransactionController extends Controller
                 AllowedFilter::callback('expenses_missing_sub', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN)
                     ? $q->where('transaction_type', 'expenses')->whereNull('sub_category')
                     : $q),
+                AllowedFilter::callback('date_from', fn ($q, $v) => $q->whereDate('date', '>=', $v)),
+                AllowedFilter::callback('date_to', fn ($q, $v) => $q->whereDate('date', '<=', $v)),
             ])
             ->orderBy('date', 'desc')
             ->orderBy('position', 'desc')

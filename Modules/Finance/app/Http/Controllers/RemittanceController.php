@@ -63,6 +63,8 @@ class RemittanceController extends Controller
                         $q->whereNull('transaction_id');
                     }
                 }),
+                AllowedFilter::callback('date_from', fn ($q, $v) => $q->whereDate('billing_date_from', '>=', $v)),
+                AllowedFilter::callback('date_to', fn ($q, $v) => $q->whereDate('billing_date_to', '<=', $v)),
             ])
             ->allowedSorts(['id', 'billing_date_from', 'billing_date_to', 'courier', 'soa_number', 'gross_cod', 'net_amount', 'status', 'created_at'])
             ->defaultSort('-billing_date_to', '-created_at')
