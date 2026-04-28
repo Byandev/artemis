@@ -85,6 +85,7 @@ class RemittanceController extends Controller
             'transactions' => Transaction::where('workspace_id', $workspace->id)
                 ->with('account')
                 ->orderByDesc('date')
+                ->where('transaction_type', 'remittance')
                 ->limit(200)
                 ->get(['id', 'account_id', 'date', 'description', 'amount', 'type']),
             'query' => [
