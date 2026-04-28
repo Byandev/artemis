@@ -18,10 +18,14 @@ class AdminSubscriptionPlanController extends Controller
                     $query->where('name', 'like', "%{$search}%")
                         ->orWhere('code', 'like', "%{$search}%");
                 })
-                ->orderBy('sort_order')
-                ->get(),
+                ->orderBy(
+                    in_array($request->sort, ['name', 'price_php', 'sort_order', 'is_active', 'subscriptions_count']) ? $request->sort : 'sort_order',
+                    $request->direction === 'desc' ? 'desc' : 'asc'
+                )
+                ->paginate((int) $request->input('per_page', 15))
+                ->withQueryString(),
 
-            'filters' => $request->only(['search']),
+            'filters' => $request->only(['search', 'sort', 'direction']),
         ]);
     }
 

@@ -22,8 +22,11 @@ class AdminWorkspaceController extends Controller
                     $query->where('name', 'like', "%{$search}%")
                         ->orWhere('slug', 'like', "%{$search}%");
                 })
-                ->orderBy($request->sort ?? 'created_at', $request->direction ?? 'desc')
-                ->paginate(15)
+                ->orderBy(
+                    in_array($request->sort, ['name', 'slug', 'created_at', 'pages_count']) ? $request->sort : 'created_at',
+                    $request->direction === 'asc' ? 'asc' : 'desc'
+                )
+                ->paginate((int) $request->input('per_page', 15))
                 ->withQueryString(),
 
             'plans' => SubscriptionPlan::where('is_active', true)->orderBy('sort_order')->get(),

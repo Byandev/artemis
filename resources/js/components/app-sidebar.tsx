@@ -10,7 +10,6 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import workspace from '@/routes/workspace';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
@@ -45,15 +44,16 @@ import {
 import { useState } from 'react';
 import AppLogo from './app-logo';
 import { PERMISSIONS } from '@/constants/permissions';
+import { dashboard as workspaceDashboard } from '@/actions/App/Http/Controllers/Workspaces/WorkspaceController';
 
 export function AppSidebar() {
     const { currentWorkspace } = usePage().props as unknown as { currentWorkspace: { slug: string; show_inventory: boolean; show_finance: boolean } };
 
     const dashboardUrl = currentWorkspace
-        ? workspace.dashboard.url((currentWorkspace as { slug: string }).slug)
+        ? workspaceDashboard(currentWorkspace.slug).url
         : dashboard().url;
 
-    const slug = (currentWorkspace as { slug: string }).slug;
+    const slug = currentWorkspace?.slug ?? '';
 
     const mainNavItems: NavItem[] = [
         {

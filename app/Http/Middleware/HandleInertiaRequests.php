@@ -64,7 +64,13 @@ class HandleInertiaRequests extends Middleware
         $subscriptionExpired = null;
         if ($currentWorkspace instanceof Workspace) {
             $subscription = $currentWorkspace->subscription;
-            if (! $subscription || $subscription->status === Subscription::STATUS_EXPIRED || $subscription->status === Subscription::STATUS_CANCELED) {
+            $isExpired = ! $subscription
+                || $subscription->status === Subscription::STATUS_EXPIRED
+                || $subscription->status === Subscription::STATUS_CANCELED
+                || ($subscription->status === Subscription::STATUS_TRIALING && $subscription->trial_ends_at && $subscription->trial_ends_at->isPast())
+                || ($subscription->status === Subscription::STATUS_ACTIVE && $subscription->current_period_end && $subscription->current_period_end->isPast());
+
+            if ($isExpired) {
                 $subscriptionExpired = [
                     'workspace' => $currentWorkspace->only('id', 'name', 'slug'),
                     'plans' => SubscriptionPlan::where('is_active', true)

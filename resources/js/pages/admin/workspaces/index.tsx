@@ -1,9 +1,13 @@
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { Head, router, useForm } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Search, Files, LayoutGrid, CreditCard, X } from 'lucide-react';
 import PageHeader from '@/components/common/PageHeader';
-import ComponentCard from '@/components/common/ComponentCard';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import { ColumnDef } from '@tanstack/react-table';
+import { PaginatedData } from '@/types';
+import { toFrontendSort } from '@/lib/sort';
+import { debounce, omit } from 'lodash';
 
 interface SubscriptionPlan {
     id: number;
@@ -31,13 +35,14 @@ interface Workspace {
 }
 
 interface Props {
-    workspaces: {
-        data: Workspace[];
-    };
+    workspaces: PaginatedData<Workspace>;
     plans: SubscriptionPlan[];
     filters: {
         search: string;
+        sort?: string;
+        direction?: string;
     };
+    query?: { sort?: string | null };
 }
 
 const statusColors: Record<string, string> = {
@@ -52,18 +57,117 @@ export default function Index({ workspaces, plans, filters }: Props) {
     const [search, setSearch] = useState(filters.search || '');
     const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
 
+    const initialSorting = useMemo(() => {
+        if (filters.sort) {
+            return [{ id: filters.sort, desc: filters.direction === 'desc' }];
+        }
+        return [];
+    }, [filters.sort, filters.direction]);
+
+    const performQuery = useCallback(
+        debounce((s: string) => {
+            router.get('/admin/workspaces', {
+                search: s || undefined,
+                page: 1,
+            }, { preserveState: true, replace: true, preserveScroll: true });
+        }, 400),
+        []
+    );
+
     useEffect(() => {
-        const delayDebounceFn = setTimeout(() => {
-            if (search !== (filters.search || '')) {
-                router.get(
-                    '/admin/workspaces',
-                    { search },
-                    { preserveState: true, replace: true },
-                );
-            }
-        }, 300);
-        return () => clearTimeout(delayDebounceFn);
+        if (search !== (filters.search || '')) {
+            performQuery(search);
+        }
+        return () => performQuery.cancel();
     }, [search]);
+
+    const columns: ColumnDef<Workspace>[] = [
+        {
+            accessorKey: 'name', enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Workspace" />,
+            cell: ({ row }) => (
+                <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                        <LayoutGrid className="h-4 w-4" />
+                    </div>
+                    <div>
+                        <div className="font-semibold text-zinc-900 dark:text-zinc-100">{row.original.name}</div>
+                        <div className="text-xs text-zinc-500 font-mono tracking-tighter">/{row.original.slug}</div>
+                    </div>
+                </div>
+            ),
+        },
+        {
+            id: 'owner', enableSorting: false,
+            header: () => <div className="text-zinc-500 uppercase text-[11px] font-bold tracking-wider">Primary Owner</div>,
+            cell: ({ row }) => (
+                <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
+                    <div className="h-2 w-2 rounded-full bg-brand-500" />
+                    {row.original.owner?.name || 'Platform Admin'}
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'pages_count', enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Resources" className="justify-center" />,
+            cell: ({ row }) => (
+                <div className="text-center">
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-brand-50/50 dark:bg-brand-500/10 px-3 py-1 text-xs font-bold text-brand-600 dark:text-brand-400 border border-brand-100 dark:border-brand-500/20">
+                        <Files className="h-3 w-3" />
+                        {row.original.pages_count} Pages
+                    </div>
+                </div>
+            ),
+        },
+        {
+            id: 'subscription', enableSorting: false,
+            header: () => <div className="text-center text-zinc-500 uppercase text-[11px] font-bold tracking-wider">Subscription</div>,
+            cell: ({ row }) => (
+                <div className="text-center">
+                    {row.original.subscription ? (
+                        <div className="inline-flex flex-col items-center gap-1">
+                            <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                                {row.original.subscription.plan.name}
+                            </span>
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusColors[row.original.subscription.status] || statusColors.canceled}`}>
+                                {row.original.subscription.status}
+                            </span>
+                        </div>
+                    ) : (
+                        <span className="text-xs text-zinc-400 italic">No plan</span>
+                    )}
+                </div>
+            ),
+        },
+        {
+            id: 'days_left', enableSorting: false,
+            header: () => <div className="text-center text-zinc-500 uppercase text-[11px] font-bold tracking-wider">Days Left</div>,
+            cell: ({ row }) => (
+                <div className="text-center">
+                    {row.original.subscription ? (
+                        <DaysLeft subscription={row.original.subscription} />
+                    ) : (
+                        <span className="text-xs text-zinc-400">—</span>
+                    )}
+                </div>
+            ),
+        },
+        {
+            id: 'actions', enableSorting: false,
+            header: () => <div className="text-right text-zinc-500 uppercase text-[11px] font-bold tracking-wider">Actions</div>,
+            cell: ({ row }) => (
+                <div className="text-right">
+                    <button
+                        onClick={() => setEditingWorkspace(row.original)}
+                        className="rounded-md p-1.5 text-zinc-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:text-brand-400 dark:hover:bg-brand-500/10 transition-colors"
+                        title="Change subscription"
+                    >
+                        <CreditCard className="h-4 w-4" />
+                    </button>
+                </div>
+            ),
+        },
+    ];
 
     return (
         <AdminSidebarLayout>
@@ -86,91 +190,25 @@ export default function Index({ workspaces, plans, filters }: Props) {
                     </div>
                 </PageHeader>
 
-                <ComponentCard className="mt-6">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="border-b border-zinc-100 bg-zinc-50/30 dark:border-zinc-800 dark:bg-zinc-900/50">
-                                <tr className="text-zinc-500 uppercase text-[11px] font-bold tracking-wider">
-                                    <th className="px-6 py-4">Workspace Info</th>
-                                    <th className="px-6 py-4">Primary Owner</th>
-                                    <th className="px-6 py-4 text-center">Resources</th>
-                                    <th className="px-6 py-4 text-center">Subscription</th>
-                                    <th className="px-6 py-4 text-center">Days Left</th>
-                                    <th className="px-6 py-4 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                                {workspaces.data.length > 0 ? (
-                                    workspaces.data.map((ws) => (
-                                        <tr key={ws.id} className="group hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-                                                        <LayoutGrid className="h-4 w-4" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-semibold text-zinc-900 dark:text-zinc-100">{ws.name}</div>
-                                                        <div className="text-xs text-zinc-500 font-mono tracking-tighter">/{ws.slug}</div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
-                                                    <div className="h-2 w-2 rounded-full bg-brand-500" />
-                                                    {ws.owner?.name || 'Platform Admin'}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="inline-flex items-center gap-1.5 rounded-full bg-brand-50/50 dark:bg-brand-500/10 px-3 py-1 text-xs font-bold text-brand-600 dark:text-brand-400 border border-brand-100 dark:border-brand-500/20">
-                                                    <Files className="h-3 w-3" />
-                                                    {ws.pages_count} Pages
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                {ws.subscription ? (
-                                                    <div className="inline-flex flex-col items-center gap-1">
-                                                        <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                                                            {ws.subscription.plan.name}
-                                                        </span>
-                                                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusColors[ws.subscription.status] || statusColors.canceled}`}>
-                                                            {ws.subscription.status}
-                                                        </span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-xs text-zinc-400 italic">No plan</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                {ws.subscription ? (
-                                                    <DaysLeft subscription={ws.subscription} />
-                                                ) : (
-                                                    <span className="text-xs text-zinc-400">—</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <button
-                                                    onClick={() => setEditingWorkspace(ws)}
-                                                    className="rounded-md p-1.5 text-zinc-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:text-brand-400 dark:hover:bg-brand-500/10 transition-colors"
-                                                    title="Change subscription"
-                                                >
-                                                    <CreditCard className="h-4 w-4" />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-20 text-center">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <p className="text-zinc-500 italic">No workspaces found matching "{search}"</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </ComponentCard>
+                <div className="mt-6 rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+                    <DataTable
+                        columns={columns}
+                        data={workspaces.data || []}
+                        enableInternalPagination={false}
+                        initialSorting={initialSorting}
+                        meta={{ ...omit(workspaces, ['data']) }}
+                        onFetch={(params) => {
+                            const sortStr = params?.sort && params.sort !== null ? String(params.sort) : null;
+                            router.get('/admin/workspaces', {
+                                search: search || undefined,
+                                sort: sortStr ? sortStr.replace(/^-/, '') : undefined,
+                                direction: sortStr ? (sortStr.startsWith('-') ? 'desc' : 'asc') : undefined,
+                                page: params?.page ?? 1,
+                                per_page: params?.per_page ?? undefined,
+                            }, { preserveState: true, replace: true, preserveScroll: true });
+                        }}
+                    />
+                </div>
             </div>
 
             {editingWorkspace && (
