@@ -12,6 +12,34 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.1.0',
+        date: '2026-04-28',
+        sections: [
+            {
+                title: 'Finance — Transactions',
+                items: [
+                    'Export CSV — download the current transactions view as a CSV file with date, account, description, type, transaction type, sub-category, amount, running balance, and notes',
+                    'Date range filter — filter transactions by date directly from the toolbar, with the selection preserved across pagination and other filters',
+                ],
+            },
+            {
+                title: 'Finance — Remittances',
+                items: [
+                    'Edit remittances in place — new Edit action in the row dropdown on the remittances list and a dedicated Edit button on the remittance detail page',
+                    'Date range filter on the remittances list, matching against the billing period',
+                    'Linked Transaction picker now only lists remittance-type transactions and shows amounts formatted in pesos (₱) for easier scanning',
+                ],
+            },
+            {
+                title: 'Fixes',
+                items: [
+                    'Pages — removed a dead duplicate dispatch in the manual refresh path',
+                    'SuperAdmin — fixed a casing mismatch on the workspaces index that prevented the page from resolving on case-sensitive filesystems',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.0.2',
         date: '2026-04-27',
         sections: [
@@ -646,6 +674,8 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v3.1.0':
+        'bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20',
     'v3.0.2':
         'bg-teal-500/10 text-teal-600 dark:text-teal-400 ring-teal-500/20',
     'v3.0.1':
