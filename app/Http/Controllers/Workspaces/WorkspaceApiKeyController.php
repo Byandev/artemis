@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use App\Models\WorkspaceApiKey;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,11 +15,11 @@ use Inertia\Response;
 
 class WorkspaceApiKeyController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace): Response
     {
-        if (! $request->user()->isAdminOf($workspace)) {
-            abort(403);
-        }
+        $this->authorize(Permission::ManageApiKeys->value, $workspace);
 
         $keys = $workspace->apiKeys()
             ->latest()
@@ -31,9 +33,7 @@ class WorkspaceApiKeyController extends Controller
 
     public function store(Request $request, Workspace $workspace): RedirectResponse
     {
-        if (! $request->user()->isAdminOf($workspace)) {
-            abort(403);
-        }
+        $this->authorize(Permission::ManageApiKeys->value, $workspace);
 
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -53,14 +53,14 @@ class WorkspaceApiKeyController extends Controller
 
     public function reveal(Request $request, Workspace $workspace, WorkspaceApiKey $apiKey): JsonResponse
     {
-        if (! $request->user()->isAdminOf($workspace)) {
-            abort(403);
-        }
+        $this->authorize(Permission::ManageApiKeys->value, $workspace);
 
         abort_if($apiKey->workspace_id !== $workspace->id, 404);
 
         if (! $apiKey->key_encrypted) {
-            return response()->json(['error' => 'This key was created before reveal support was added. Please revoke it and create a new one.'], 422);
+            return response()->json([
+                'error' => 'This key was created before reveal support was added. Please revoke it and create a new one.',
+            ], 422);
         }
 
         return response()->json(['key' => $apiKey->reveal()]);
@@ -68,9 +68,7 @@ class WorkspaceApiKeyController extends Controller
 
     public function destroy(Request $request, Workspace $workspace, WorkspaceApiKey $apiKey): RedirectResponse
     {
-        if (! $request->user()->isAdminOf($workspace)) {
-            abort(403);
-        }
+        $this->authorize(Permission::ManageApiKeys->value, $workspace);
 
         abort_if($apiKey->workspace_id !== $workspace->id, 404);
 

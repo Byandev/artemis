@@ -2,8 +2,10 @@
 
 namespace Modules\Finance\Http\Controllers;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -15,6 +17,8 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class TransactionController extends Controller
 {
+    use AuthorizesRequests;
+
     protected function guard(Request $request, Workspace $workspace): void
     {
         if (! $request->user()->isMemberOf($workspace)) {
@@ -41,6 +45,7 @@ class TransactionController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewFinanceTransactions->value, $workspace);
 
         $transactions = QueryBuilder::for(
             Transaction::where('workspace_id', $workspace->id)
@@ -61,6 +66,8 @@ class TransactionController extends Controller
                 AllowedFilter::callback('expenses_missing_sub', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN)
                     ? $q->where('transaction_type', 'expenses')->whereNull('sub_category')
                     : $q),
+                AllowedFilter::callback('date_from', fn ($q, $v) => $q->whereDate('date', '>=', $v)),
+                AllowedFilter::callback('date_to', fn ($q, $v) => $q->whereDate('date', '<=', $v)),
             ])
             ->orderBy('date', 'desc')
             ->orderBy('position', 'desc')
@@ -82,6 +89,7 @@ class TransactionController extends Controller
     public function store(TransactionRequest $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::CreateFinanceTransactions->value, $workspace);
         $this->validateWorkspaceFor($workspace, $request->validated());
 
         $data = $request->validated();
@@ -111,6 +119,7 @@ class TransactionController extends Controller
     public function update(TransactionRequest $request, Workspace $workspace, Transaction $transaction)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::EditFinanceTransactions->value, $workspace);
         $this->ensureOwns($workspace, $transaction);
         $this->validateWorkspaceFor($workspace, $request->validated());
 
@@ -122,6 +131,7 @@ class TransactionController extends Controller
     public function import(Request $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::CreateFinanceTransactions->value, $workspace);
 
         $validated = $request->validate([
             'rows' => ['required', 'array', 'min:1'],
@@ -178,6 +188,7 @@ class TransactionController extends Controller
     public function bulkUpdateType(Request $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::EditFinanceTransactions->value, $workspace);
 
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
@@ -195,6 +206,7 @@ class TransactionController extends Controller
     public function bulkUpdateSubCategory(Request $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::EditFinanceTransactions->value, $workspace);
 
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
@@ -265,6 +277,7 @@ class TransactionController extends Controller
     public function destroy(Request $request, Workspace $workspace, Transaction $transaction)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::DeleteFinanceTransactions->value, $workspace);
         $this->ensureOwns($workspace, $transaction);
 
         $transaction->delete();

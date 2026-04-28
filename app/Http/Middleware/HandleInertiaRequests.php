@@ -2,6 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Role;
+use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -49,12 +52,22 @@ class HandleInertiaRequests extends Middleware
             ? $request->user()->workspaces()->limit(3)->get()
             : collect();
 
+        $user = $request->user();
+        $permissions = $this->resolvePermissions($user, $currentWorkspace);
+        $isOwner = $user && $currentWorkspace instanceof Workspace
+            ? $user->ownsWorkspace($currentWorkspace)
+            : false;
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user() ?? null,
+                'user' => $user ? array_merge($user->toArray(), [
+                    'is_super_admin' => $user->isSuperAdmin(),
+                    'is_workspace_owner' => $isOwner,
+                    'permissions' => $permissions,
+                ]) : null,
             ],
             'workspaces' => $workspaces,
             'currentWorkspace' => $currentWorkspace,
@@ -68,5 +81,53 @@ class HandleInertiaRequests extends Middleware
             ],
             'appEnv' => config('app.env'),
         ];
+    }
+
+    /**
+     * Resolve the permission names available to the user in the current workspace.
+     * Owners and super admins receive ['*'] which the frontend treats as full access.
+     *
+     * @return array<int, string>
+     */
+    private function resolvePermissions(?User $user, ?Workspace $workspace): array
+    {
+        if (! $user) {
+            return [];
+        }
+
+        if ($user->isSuperAdmin()) {
+            return ['*'];
+        }
+
+        if (! $workspace instanceof Workspace) {
+            return [];
+        }
+
+        if ($user->ownsWorkspace($workspace)) {
+            return ['*'];
+        }
+
+        $roleId = $user->workspaces()
+            ->where('workspaces.id', $workspace->id)
+            ->first()
+            ?->pivot
+            ?->role_id;
+
+        if (! $roleId) {
+            return [];
+        }
+
+        $disabled = array_values(array_filter([
+            $workspace->show_finance ? null : 'Finance',
+            $workspace->show_inventory ? null : 'Inventory',
+        ]));
+
+        return Role::with('permissions:id,name,category')
+            ->find($roleId)
+            ?->permissions
+            ->reject(fn ($permission) => in_array($permission->category, $disabled, true))
+            ->pluck('name')
+            ->values()
+            ->all() ?? [];
     }
 }

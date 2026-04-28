@@ -2,8 +2,10 @@
 
 namespace Modules\Finance\Http\Controllers;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -17,6 +19,8 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class RemittanceController extends Controller
 {
+    use AuthorizesRequests;
+
     protected function guard(Request $request, Workspace $workspace): void
     {
         if (! $request->user()->isMemberOf($workspace)) {
@@ -46,6 +50,7 @@ class RemittanceController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewFinanceRemittances->value, $workspace);
 
         $remittances = QueryBuilder::for(
             Remittance::where('workspace_id', $workspace->id)->with('transaction.account')
@@ -58,6 +63,8 @@ class RemittanceController extends Controller
                         $q->whereNull('transaction_id');
                     }
                 }),
+                AllowedFilter::callback('date_from', fn ($q, $v) => $q->whereDate('billing_date_from', '>=', $v)),
+                AllowedFilter::callback('date_to', fn ($q, $v) => $q->whereDate('billing_date_to', '<=', $v)),
             ])
             ->allowedSorts(['id', 'billing_date_from', 'billing_date_to', 'courier', 'soa_number', 'gross_cod', 'net_amount', 'status', 'created_at'])
             ->defaultSort('-billing_date_to', '-created_at')
@@ -78,6 +85,7 @@ class RemittanceController extends Controller
             'remittances' => $remittances,
             'unreconciledCount' => $unreconciledCount,
             'transactions' => Transaction::where('workspace_id', $workspace->id)
+                ->where('transaction_type', 'remittance')
                 ->with('account')
                 ->orderByDesc('date')
                 ->limit(200)
@@ -92,6 +100,7 @@ class RemittanceController extends Controller
     public function store(RemittanceRequest $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::CreateFinanceRemittances->value, $workspace);
         $data = $request->validated();
         $this->validateTransactionFor($workspace, $data['transaction_id'] ?? null);
 
@@ -104,6 +113,7 @@ class RemittanceController extends Controller
     public function show(Request $request, Workspace $workspace, Remittance $remittance)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewFinanceRemittances->value, $workspace);
         $this->ensureOwns($workspace, $remittance);
 
         $remittance->load('transaction.account');
@@ -138,12 +148,19 @@ class RemittanceController extends Controller
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
+            'transactions' => Transaction::where('workspace_id', $workspace->id)
+                ->where('transaction_type', 'remittance')
+                ->with('account')
+                ->orderByDesc('date')
+                ->limit(200)
+                ->get(['id', 'account_id', 'date', 'description', 'amount', 'type']),
         ]);
     }
 
     public function update(RemittanceRequest $request, Workspace $workspace, Remittance $remittance)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::EditFinanceRemittances->value, $workspace);
         $this->ensureOwns($workspace, $remittance);
         $data = $request->validated();
         $this->validateTransactionFor($workspace, $data['transaction_id'] ?? null);
@@ -156,6 +173,7 @@ class RemittanceController extends Controller
     public function destroy(Request $request, Workspace $workspace, Remittance $remittance)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::DeleteFinanceRemittances->value, $workspace);
         $this->ensureOwns($workspace, $remittance);
 
         $remittance->delete();
@@ -167,6 +185,7 @@ class RemittanceController extends Controller
     public function import(Request $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::CreateFinanceRemittances->value, $workspace);
 
         $request->validate([
             'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
@@ -299,6 +318,7 @@ class RemittanceController extends Controller
     public function importItems(Request $request, Workspace $workspace, Remittance $remittance)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::EditFinanceRemittances->value, $workspace);
         $this->ensureOwns($workspace, $remittance);
 
         $request->validate([

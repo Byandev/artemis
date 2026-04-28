@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Workspaces\RTS;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Page;
 use App\Models\ParcelJourneyNotification;
 use App\Models\ParcelJourneyNotificationLog;
 use App\Models\ParcelJourneyNotificationTemplate;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -16,8 +18,12 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class ParcelUpdateNotificationTemplateController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Workspace $workspace, Request $request)
     {
+        $this->authorize(Permission::ManageParcelJourneyTemplates->value, $workspace);
+
         if ($workspace->parcelJourneyNotificationTemplates()->count() === 0) {
             ParcelJourneyNotificationTemplate::upsert([
                 [
@@ -187,6 +193,8 @@ class ParcelUpdateNotificationTemplateController extends Controller
 
     public function update(Request $request, Workspace $workspace, ParcelJourneyNotificationTemplate $template)
     {
+        $this->authorize(Permission::ManageParcelJourneyTemplates->value, $workspace);
+
         $data = $request->validate([
             'message' => 'required|string',
             'is_enabled' => 'required|boolean',

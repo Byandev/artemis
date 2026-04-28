@@ -11,7 +11,7 @@ class AdminWorkspaceController extends Controller
 {
     public function index(Request $request)
     {
-        return Inertia::render('Admin/Workspaces/Index', [
+        return Inertia::render('admin/workspaces/index', [
             'workspaces' => Workspace::query()
                 ->with('owner:id,name')
                 ->withCount('pages')

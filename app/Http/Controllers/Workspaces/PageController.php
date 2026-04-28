@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Workspaces\StorePageRequest;
 use App\Http\Requests\Workspaces\UpdatePageRequest;
@@ -10,9 +11,9 @@ use App\Http\Sorts\Page\ShopNameSort;
 use App\Http\Sorts\PendingRequiredChecklistsSort;
 use App\Models\Page;
 use App\Models\Shop;
-use App\Models\User;
 use App\Models\Workspace;
 use Carbon\Carbon;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -27,12 +28,11 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class PageController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
-        // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
+        $this->authorize(Permission::ViewPages->value, $workspace);
 
         $pendingChecklistsSub = DB::table('workspace_checklists as wc')
             ->selectRaw('COUNT(*)')
@@ -70,8 +70,6 @@ class PageController extends Controller
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
-        $users = User::get(['id', 'name']);
-
         return Inertia::render('workspaces/pages/index', [
             'pages' => $pages,
             'workspace' => $workspace,
@@ -79,77 +77,57 @@ class PageController extends Controller
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
-            'users' => $users,
+            'users' => $workspace->users()->get(['users.id', 'users.name']),
         ]);
     }
 
     public function create(Request $request, Workspace $workspace)
     {
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
-
-        $users = User::get(['id', 'name']);
+        $this->authorize(Permission::EditPages->value, $workspace);
 
         return Inertia::render('workspaces/pages/create', [
             'workspace' => $workspace,
-            'users' => $users,
+            'users' => $workspace->users()->get(['users.id', 'users.name']),
         ]);
     }
 
     public function edit(Request $request, Workspace $workspace, Page $page)
     {
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
-
-        $users = User::get(['id', 'name']);
+        $this->authorize(Permission::EditPages->value, $workspace);
 
         return Inertia::render('workspaces/pages/edit', [
             'workspace' => $workspace,
             'page' => $page,
-            'users' => $users,
+            'users' => $workspace->users()->get(['users.id', 'users.name']),
         ]);
     }
 
     public function store(StorePageRequest $request, Workspace $workspace)
     {
-
-        // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
+        $this->authorize(Permission::EditPages->value, $workspace);
 
         $validated = $request->validated();
-
         $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
             'api_key' => $validated['pos_token'],
         ]);
 
         if ($response->failed()) {
-            throw ValidationException::withMessages([
-                'pos_token' => 'Invalid API Key. Please double-check and try again.',
-            ]);
+            throw ValidationException::withMessages(['pos_token' => 'Invalid API Key.']);
         }
 
-        $response = $response->json();
+        $resJson = $response->json();
+        $pageData = collect($resJson['shop']['pages'])->firstWhere('id', $validated['id']);
 
-        $pages = collect($response['shop']['pages']);
-
-        $page = $pages->firstWhere('id', $validated['id']);
-
-        if (! $page) {
-            throw ValidationException::withMessages([
-                'id' => 'Page not found',
-            ]);
+        if (! $pageData) {
+            throw ValidationException::withMessages(['id' => 'Page not found']);
         }
 
         $shop = Shop::firstOrCreate([
             'id' => $validated['shop_id'],
             'workspace_id' => $workspace->id,
         ], [
-            'name' => $response['shop']['name'],
-            'avatar_url' => isset($response['shop']['avatar_url']) ? $response['shop']['avatar_url'] : null,
+            'name' => $resJson['shop']['name'],
+            'avatar_url' => $resJson['shop']['avatar_url'] ?? null,
         ]);
 
         $page = Page::create([
@@ -160,18 +138,18 @@ class PageController extends Controller
             'name' => $validated['name'],
             'pos_token' => $validated['pos_token'] ?? null,
             'botcake_token' => $validated['botcake_token'] ?? null,
+            'pancake_token' => $validated['pancake_token'] ?? null,
             'infotxt_token' => $validated['infotxt_token'] ?? null,
             'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
-            'pancake_token' => $validated['pancake_token'] ?? null,
-            'parcel_journey_enabled' => $validated['parcel_journey_enabled'] ?? null,
             'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
             'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
+            'parcel_journey_enabled' => $validated['parcel_journey_enabled'] ?? false,
             'status' => $validated['status'] ?? 'active',
         ]);
-        //
-        //        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subMonth()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
-        //        dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subMonth()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
-        //        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
+
+        dispatch(new FetchPageOrders($page, 1, Carbon::now()->subMonth()->unix(), Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopCustomers($shop, 1, Carbon::now()->subMonth()->unix(), Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
 
         return redirect()->route('workspaces.pages.index', $workspace)
             ->with('success', 'Page created successfully.');
@@ -179,47 +157,23 @@ class PageController extends Controller
 
     public function update(UpdatePageRequest $request, Workspace $workspace, Page $page)
     {
-        $validated = $request->validated();
+        $this->authorize(Permission::EditPages->value, $workspace);
 
-        $page->update([
-            'shop_id' => $validated['shop_id'],
-            'name' => $validated['name'],
-            'facebook_url' => $validated['facebook_url'] ?? null,
-            'pos_token' => $validated['pos_token'] ?? null,
-            'botcake_token' => $validated['botcake_token'] ?? null,
-            'infotxt_token' => $validated['infotxt_token'] ?? null,
-            'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
-            'pancake_token' => $validated['pancake_token'] ?? null,
-            'parcel_journey_enabled' => $validated['parcel_journey_enabled'] ?? null,
-            'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
-            'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
-            'owner_id' => $validated['owner_id'],
-            'status' => $validated['status'],
-        ]);
+        $page->update($request->validated());
 
-        return redirect()->route('workspaces.pages.index', $workspace)
-            ->with('success', 'Page updated successfully.');
+        return redirect()->route('workspaces.pages.index', $workspace)->with('success', 'Page updated.');
     }
 
     public function refresh(Request $request, Workspace $workspace, Page $page)
     {
-        // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
+        $this->authorize(Permission::RefreshPages->value, $workspace);
 
-        // Ensure the page belongs to the workspace
         if ($page->workspace_id !== $workspace->id) {
             abort(403);
         }
 
-        $page->update([
-            'orders_last_synced_at' => null,
-            'is_sync_logic_updated' => true,
-        ]);
-
-        dispatch(new FetchPageOrders($page, 1, Carbon::now()->subMonth()->unix(), Carbon::now()->unix()))->onQueue('pancake');
-
+        $page->update(['orders_last_synced_at' => null, 'is_sync_logic_updated' => true]);
+        dispatch(new FetchPageOrders($page, 1, now()->subMonth()->unix(), now()->unix()))->onQueue('pancake');
         //        dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::now()->subYear()->startOfYear()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
 
         return redirect()->route('workspaces.pages.index', $workspace);
@@ -227,9 +181,7 @@ class PageController extends Controller
 
     public function archive(Request $request, Workspace $workspace, Page $page)
     {
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
+        $this->authorize(Permission::ArchivePages->value, $workspace);
 
         if ($page->workspace_id !== $workspace->id) {
             abort(403);
@@ -242,9 +194,7 @@ class PageController extends Controller
 
     public function restore(Request $request, Workspace $workspace, Page $page)
     {
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
+        $this->authorize(Permission::ArchivePages->value, $workspace);
 
         if ($page->workspace_id !== $workspace->id) {
             abort(403);

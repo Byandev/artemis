@@ -18,7 +18,11 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { Download, MoreHorizontal, Pencil, Search, Trash2, Upload, X } from 'lucide-react';
+import { MoreHorizontal, Pencil, Search, Trash2, Upload, X } from 'lucide-react';
+import DatePicker from '@/components/ui/date-picker';
+import moment from 'moment';
+import flatpickr from 'flatpickr';
+import DateOption = flatpickr.Options.DateOption;
 import { SUB_CATEGORIES, SUB_CATEGORY_LABEL, SubCategory } from '@/components/finance/sub-category';
 import { TRANSACTION_TYPES, TRANSACTION_TYPE_LABEL, TRANSACTION_TYPE_STYLE, TransactionType } from '@/components/finance/transaction-type';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -46,6 +50,8 @@ interface Props {
             sub_category?: string;
             missing_type?: string | boolean;
             expenses_missing_sub?: string | boolean;
+            date_from?: string;
+            date_to?: string;
         };
     };
 }
@@ -67,6 +73,17 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
     const boolish = (v: string | boolean | undefined) => v === true || v === '1' || v === 'true';
     const [missingType, setMissingType] = useState<boolean>(boolish(query?.filter?.missing_type));
     const [expensesMissingSub, setExpensesMissingSub] = useState<boolean>(boolish(query?.filter?.expenses_missing_sub));
+    const [dateFrom, setDateFrom] = useState<string | undefined>(query?.filter?.date_from);
+    const [dateTo, setDateTo] = useState<string | undefined>(query?.filter?.date_to);
+    const defaultDate = useMemo(() => dateFrom && dateTo ? [dateFrom, dateTo] : undefined, []);
+    const handleDateChange = (dates: Date[]) => {
+        if (dates.length !== 2) return;
+        const from = moment(dates[0]).format('YYYY-MM-DD');
+        const to = moment(dates[1]).format('YYYY-MM-DD');
+        if (from === dateFrom && to === dateTo) return;
+        setDateFrom(from);
+        setDateTo(to);
+    };
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [bulkType, setBulkType] = useState<TransactionType | ''>('');
     const [bulkSubCategory, setBulkSubCategory] = useState<SubCategory | ''>('');
@@ -123,7 +140,7 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
     };
 
     const performQuery = useCallback(
-        debounce((s: string, t: '' | 'in' | 'out', a: string, tt: string, sc: string, mt: boolean, ems: boolean) => {
+        debounce((s: string, t: '' | 'in' | 'out', a: string, tt: string, sc: string, mt: boolean, ems: boolean, df: string | undefined, dt: string | undefined) => {
             router.get(baseUrl, {
                 sort: query?.sort,
                 'filter[search]': s || undefined,
@@ -133,13 +150,15 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                 'filter[sub_category]': sc || undefined,
                 'filter[missing_type]': mt ? 1 : undefined,
                 'filter[expenses_missing_sub]': ems ? 1 : undefined,
+                'filter[date_from]': df || undefined,
+                'filter[date_to]': dt || undefined,
                 page: 1,
             }, { preserveState: true, replace: true, preserveScroll: true, only: ['transactions'] });
         }, 400),
         [baseUrl, query?.sort]
     );
 
-    useEffect(() => { performQuery(search, typeFilter, accountFilter, txnTypeFilter, subCategoryFilter, missingType, expensesMissingSub); return () => performQuery.cancel(); }, [search, typeFilter, accountFilter, txnTypeFilter, subCategoryFilter, missingType, expensesMissingSub, performQuery]);
+    useEffect(() => { performQuery(search, typeFilter, accountFilter, txnTypeFilter, subCategoryFilter, missingType, expensesMissingSub, dateFrom, dateTo); return () => performQuery.cancel(); }, [search, typeFilter, accountFilter, txnTypeFilter, subCategoryFilter, missingType, expensesMissingSub, dateFrom, dateTo, performQuery]);
 
     const columns: ColumnDef<Row>[] = [
         {
@@ -319,6 +338,12 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
+                    <DatePicker
+                        id="finance-transactions-date-range"
+                        mode="range"
+                        onChange={handleDateChange}
+                        defaultDate={defaultDate as never as DateOption}
+                    />
                     <select
                         value={accountFilter}
                         onChange={(e) => setAccountFilter(e.target.value)}
@@ -467,6 +492,8 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                                     'filter[sub_category]': subCategoryFilter || undefined,
                                     'filter[missing_type]': missingType ? 1 : undefined,
                                     'filter[expenses_missing_sub]': expensesMissingSub ? 1 : undefined,
+                                    'filter[date_from]': dateFrom || undefined,
+                                    'filter[date_to]': dateTo || undefined,
                                     page: params?.page ?? 1,
                                     per_page: params?.per_page ?? undefined,
                                 },
