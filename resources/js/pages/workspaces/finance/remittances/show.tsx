@@ -1,5 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
-import { FinanceRemittance } from '@/components/finance/remittance-form-dialog';
+import { FinanceRemittance, RemittanceFormDialog } from '@/components/finance/remittance-form-dialog';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
@@ -9,7 +9,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { AlertTriangle, ArrowLeft, ChevronDown, Search, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronDown, Pencil, Search, Upload } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface RemittanceItem {
@@ -43,16 +43,28 @@ interface Remittance extends FinanceRemittance {
     } | null;
 }
 
+interface TransactionOpt {
+    id: number;
+    account_id: number;
+    date: string;
+    description: string;
+    amount: number | string;
+    type: 'in' | 'out';
+    account?: { id: number; name: string } | null;
+}
+
 interface Props {
     workspace: Workspace;
     remittance: Remittance;
     items: PaginatedData<RemittanceItem>;
     itemsQuery?: { sort?: string | null; perPage?: string | null; filter?: { search?: string } };
+    transactions: TransactionOpt[];
 }
 
 const peso = (v: number | string) => `₱${Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export default function RemittanceShow({ workspace, remittance, items, itemsQuery }: Props) {
+export default function RemittanceShow({ workspace, remittance, items, itemsQuery, transactions }: Props) {
+    const [editOpen, setEditOpen] = useState(false);
     const [importing, setImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const base = `/workspaces/${workspace.slug}/finance`;
@@ -167,6 +179,12 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
                             }}
                         />
                         <button
+                            onClick={() => setEditOpen(true)}
+                            className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
+                        >
+                            <Pencil className="h-3.5 w-3.5" /> Edit
+                        </button>
+                        <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={importing}
                             className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 hover:bg-stone-50 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
@@ -261,6 +279,13 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
                     </div>
                 </div>
 
+                <RemittanceFormDialog
+                    open={editOpen}
+                    onOpenChange={setEditOpen}
+                    remittance={remittance}
+                    workspaceSlug={workspace.slug}
+                    transactions={transactions}
+                />
             </div>
         </AppLayout>
     );
