@@ -3,6 +3,8 @@ import { InventoryTransaction } from '@/types/models/InventoryTransaction';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useForm } from '@inertiajs/react';
 import React, { useEffect, useMemo } from 'react';
+import DatePicker from '@/components/ui/date-picker';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 interface InventoryItem {
@@ -131,11 +133,17 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
                                 <label className={labelClass}>
                                     Transaction Date <span className="text-red-400">*</span>
                                 </label>
-                                <input
-                                    type="date"
-                                    value={data.date}
-                                    onChange={(e) => setData('date', e.target.value)}
-                                    className={inputClass}
+                                <DatePicker
+                                    id="inventory-transaction-date"
+                                    mode="single"
+                                    defaultDate={data.date || undefined}
+                                    onChange={(dates) => {
+                                        if (dates.length) {
+                                            setData('date', format(dates[0], 'yyyy-MM-dd'))
+                                        } else {
+                                            setData('date', '')
+                                        }
+                                    }}
                                 />
                                 {errors.date && <p className="text-[11px] text-red-500">{errors.date}</p>}
                             </div>
