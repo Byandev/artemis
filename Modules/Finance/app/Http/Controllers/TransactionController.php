@@ -221,6 +221,59 @@ class TransactionController extends Controller
         return redirect()->back()->with('success', "{$updated} transactions updated.");
     }
 
+    public function export(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+
+        $transactions = QueryBuilder::for(
+            Transaction::where('workspace_id', $workspace->id)
+                ->with(['account'])
+        )
+            ->allowedFilters([
+                AllowedFilter::callback('search', fn ($q, $v) => $q->where(function ($q2) use ($v) {
+                    $q2->where('description', 'like', "%{$v}%")
+                        ->orWhere('running_balance', $v)
+                        ->orWhere('amount', $v);
+                })),
+                AllowedFilter::exact('account_id'),
+                AllowedFilter::exact('type'),
+                AllowedFilter::exact('transaction_type'),
+                AllowedFilter::exact('sub_category'),
+                AllowedFilter::callback('missing_type', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN) ? $q->whereNull('transaction_type') : $q),
+                AllowedFilter::callback('expenses_missing_sub', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN)
+                    ? $q->where('transaction_type', 'expenses')->whereNull('sub_category')
+                    : $q),
+            ])
+            ->orderBy('date', 'desc')
+            ->orderBy('position', 'desc')
+            ->get();
+
+        $fileName = 'transactions-'.now()->format('Y-m-d-His').'.csv';
+
+        return response()->streamDownload(function () use ($transactions) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Date', 'Account', 'Description', 'Type', 'Transaction Type', 'Sub Category', 'Amount', 'Running Balance', 'Notes']);
+
+            foreach ($transactions as $txn) {
+                fputcsv($out, [
+                    $txn->date,
+                    $txn->account?->name ?? '',
+                    $txn->description,
+                    $txn->type,
+                    $txn->transaction_type ?? '',
+                    $txn->sub_category ?? '',
+                    $txn->amount,
+                    $txn->running_balance ?? '',
+                    $txn->notes ?? '',
+                ]);
+            }
+
+            fclose($out);
+        }, $fileName, [
+            'Content-Type' => 'text/csv',
+        ]);
+    }
+
     public function destroy(Request $request, Workspace $workspace, Transaction $transaction)
     {
         $this->guard($request, $workspace);
