@@ -72,40 +72,46 @@ class PageDailyMetricsBuilder
             ))
             ->first();
 
+        $metrics = [
+            'confirmed_count' => (int) ($row->confirmed_count ?? 0),
+            'confirmed_amount' => (float) ($row->confirmed_amount ?? 0),
+            'shipped_count' => (int) ($row->shipped_count ?? 0),
+            'shipped_amount' => (float) ($row->shipped_amount ?? 0),
+            'delivered_count' => (int) ($row->delivered_count ?? 0),
+            'delivered_amount' => (float) ($row->delivered_amount ?? 0),
+            'entered_returning_count' => (int) ($row->entered_returning_count ?? 0),
+            'entered_returning_amount' => (float) ($row->entered_returning_amount ?? 0),
+            'returned_count' => (int) ($row->returned_count ?? 0),
+            'returned_amount' => (float) ($row->returned_amount ?? 0),
+            'sum_days_confirmed_to_shipped' => (int) ($row->sum_days_confirmed_to_shipped ?? 0),
+            'count_confirmed_to_shipped' => (int) ($row->count_confirmed_to_shipped ?? 0),
+            'sum_days_confirmed_to_first_attempt' => (int) ($row->sum_days_confirmed_to_first_attempt ?? 0),
+            'count_confirmed_to_first_attempt' => (int) ($row->count_confirmed_to_first_attempt ?? 0),
+            'sum_days_confirmed_to_delivered' => (int) ($row->sum_days_confirmed_to_delivered ?? 0),
+            'count_confirmed_to_delivered' => (int) ($row->count_confirmed_to_delivered ?? 0),
+            'sum_days_shipped_to_first_attempt' => (int) ($row->sum_days_shipped_to_first_attempt ?? 0),
+            'count_shipped_to_first_attempt' => (int) ($row->count_shipped_to_first_attempt ?? 0),
+            'sum_days_shipped_to_delivered' => (int) ($row->sum_days_shipped_to_delivered ?? 0),
+            'count_shipped_to_delivered' => (int) ($row->count_shipped_to_delivered ?? 0),
+            'sum_days_returning_to_returned' => (int) ($row->sum_days_returning_to_returned ?? 0),
+            'count_returning_to_returned' => (int) ($row->count_returning_to_returned ?? 0),
+            'sum_delivery_attempts_delivered' => (int) ($row->sum_delivery_attempts_delivered ?? 0),
+            'count_delivery_attempts_delivered' => (int) ($row->count_delivery_attempts_delivered ?? 0),
+            'sum_delivery_attempts_returned' => (int) ($row->sum_delivery_attempts_returned ?? 0),
+            'count_delivery_attempts_returned' => (int) ($row->count_delivery_attempts_returned ?? 0),
+        ];
+
+        if (! array_filter($metrics)) {
+            return;
+        }
+
         WorkspacePageDailyMetric::updateOrCreate(
             [
                 'workspace_id' => $workspaceId,
                 'page_id' => $pageId,
                 'date' => $date,
             ],
-            [
-                'confirmed_count' => (int) ($row->confirmed_count ?? 0),
-                'confirmed_amount' => (float) ($row->confirmed_amount ?? 0),
-                'shipped_count' => (int) ($row->shipped_count ?? 0),
-                'shipped_amount' => (float) ($row->shipped_amount ?? 0),
-                'delivered_count' => (int) ($row->delivered_count ?? 0),
-                'delivered_amount' => (float) ($row->delivered_amount ?? 0),
-                'entered_returning_count' => (int) ($row->entered_returning_count ?? 0),
-                'entered_returning_amount' => (float) ($row->entered_returning_amount ?? 0),
-                'returned_count' => (int) ($row->returned_count ?? 0),
-                'returned_amount' => (float) ($row->returned_amount ?? 0),
-                'sum_days_confirmed_to_shipped' => (int) ($row->sum_days_confirmed_to_shipped ?? 0),
-                'count_confirmed_to_shipped' => (int) ($row->count_confirmed_to_shipped ?? 0),
-                'sum_days_confirmed_to_first_attempt' => (int) ($row->sum_days_confirmed_to_first_attempt ?? 0),
-                'count_confirmed_to_first_attempt' => (int) ($row->count_confirmed_to_first_attempt ?? 0),
-                'sum_days_confirmed_to_delivered' => (int) ($row->sum_days_confirmed_to_delivered ?? 0),
-                'count_confirmed_to_delivered' => (int) ($row->count_confirmed_to_delivered ?? 0),
-                'sum_days_shipped_to_first_attempt' => (int) ($row->sum_days_shipped_to_first_attempt ?? 0),
-                'count_shipped_to_first_attempt' => (int) ($row->count_shipped_to_first_attempt ?? 0),
-                'sum_days_shipped_to_delivered' => (int) ($row->sum_days_shipped_to_delivered ?? 0),
-                'count_shipped_to_delivered' => (int) ($row->count_shipped_to_delivered ?? 0),
-                'sum_days_returning_to_returned' => (int) ($row->sum_days_returning_to_returned ?? 0),
-                'count_returning_to_returned' => (int) ($row->count_returning_to_returned ?? 0),
-                'sum_delivery_attempts_delivered' => (int) ($row->sum_delivery_attempts_delivered ?? 0),
-                'count_delivery_attempts_delivered' => (int) ($row->count_delivery_attempts_delivered ?? 0),
-                'sum_delivery_attempts_returned' => (int) ($row->sum_delivery_attempts_returned ?? 0),
-                'count_delivery_attempts_returned' => (int) ($row->count_delivery_attempts_returned ?? 0),
-            ]
+            $metrics
         );
     }
 }
