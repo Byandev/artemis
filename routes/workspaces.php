@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
 use App\Http\Controllers\Workspaces\AdAccountController;
 use App\Http\Controllers\Workspaces\AdsManager\AdController;
@@ -62,7 +63,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/setup', [WorkspaceSetupController::class, 'create'])->name('workspaces.setup');
     Route::post('/workspaces/setup', [WorkspaceSetupController::class, 'store'])->name('workspaces.setup.store');
 
-    Route::prefix('workspaces/{workspace:slug}')->group(function () {
+    Route::prefix('workspaces/{workspace:slug}')->middleware('subscription')->group(function () {
         Route::get('/inventory/transactions', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
         Route::post('/inventory/transactions', [InventoryTransactionController::class, 'store'])->name('inventory.transactions.store');
         Route::patch('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'update'])->name('inventory.transactions.update');
@@ -281,4 +282,19 @@ Route::middleware(['auth', 'verified', 'admin'])
     ->group(function () {
         Route::get('/workspaces', [AdminWorkspaceController::class, 'index'])
             ->name('workspaces.index');
+        Route::put('/workspaces/{workspace}/subscription', [AdminWorkspaceController::class, 'updateSubscription'])
+            ->name('workspaces.update-subscription');
+
+        Route::get('/subscription-plans', [AdminSubscriptionPlanController::class, 'index'])
+            ->name('subscription-plans.index');
+        Route::get('/subscription-plans/create', [AdminSubscriptionPlanController::class, 'create'])
+            ->name('subscription-plans.create');
+        Route::post('/subscription-plans', [AdminSubscriptionPlanController::class, 'store'])
+            ->name('subscription-plans.store');
+        Route::get('/subscription-plans/{subscriptionPlan}/edit', [AdminSubscriptionPlanController::class, 'edit'])
+            ->name('subscription-plans.edit');
+        Route::put('/subscription-plans/{subscriptionPlan}', [AdminSubscriptionPlanController::class, 'update'])
+            ->name('subscription-plans.update');
+        Route::delete('/subscription-plans/{subscriptionPlan}', [AdminSubscriptionPlanController::class, 'destroy'])
+            ->name('subscription-plans.destroy');
     });
