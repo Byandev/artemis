@@ -85,6 +85,7 @@ class RemittanceController extends Controller
             'remittances' => $remittances,
             'unreconciledCount' => $unreconciledCount,
             'transactions' => Transaction::where('workspace_id', $workspace->id)
+                ->where('transaction_type', 'remittance')
                 ->with('account')
                 ->orderByDesc('date')
                 ->limit(200)
@@ -147,6 +148,12 @@ class RemittanceController extends Controller
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
+            'transactions' => Transaction::where('workspace_id', $workspace->id)
+                ->where('transaction_type', 'remittance')
+                ->with('account')
+                ->orderByDesc('date')
+                ->limit(200)
+                ->get(['id', 'account_id', 'date', 'description', 'amount', 'type']),
         ]);
     }
 

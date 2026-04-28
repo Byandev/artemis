@@ -41,6 +41,7 @@ const fmt = (v: number | string) => Number(v).toLocaleString('en-PH', { minimumF
 export default function RemittancesIndex({ workspace, remittances, unreconciledCount, transactions, query }: Props) {
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
     const [createOpen, setCreateOpen] = useState(false);
+    const [editing, setEditing] = useState<Row | null>(null);
     const [toDelete, setToDelete] = useState<Row | null>(null);
     const [search, setSearch] = useState(query?.filter?.search ?? '');
     const [importing, setImporting] = useState(false);
@@ -163,6 +164,9 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
                                     <ExternalLink className="mr-2 h-3.5 w-3.5" /> View
                                 </Link>
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setEditing(row.original)}>
+                                <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => setToDelete(row.original)}>
                                 <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
@@ -281,9 +285,9 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
                 </div>
 
                 <RemittanceFormDialog
-                    open={createOpen}
-                    onOpenChange={setCreateOpen}
-                    remittance={null}
+                    open={createOpen || editing !== null}
+                    onOpenChange={(o) => { if (!o) { setCreateOpen(false); setEditing(null); } }}
+                    remittance={editing}
                     workspaceSlug={workspace.slug}
                     transactions={transactions}
                 />
