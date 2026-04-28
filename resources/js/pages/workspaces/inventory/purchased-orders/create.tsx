@@ -4,6 +4,8 @@ import { Head, useForm, router } from '@inertiajs/react';
 import { Workspace } from '@/types/models/Workspace';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect } from 'react';
+import DatePicker from '@/components/ui/date-picker';
+import { format } from 'date-fns';
 
 
 
@@ -146,7 +148,18 @@ export default function Create({ workspace, items }: Props) {
                             </div>
                             <div>
                                 <label className={labelClass}>Issue Date <span className="text-red-400">*</span></label>
-                                <input type="date" value={data.issue_date} onChange={(e) => setData('issue_date', e.target.value)} className={inputClass} />
+                                <DatePicker
+                                    id="purchased-order-issue-date"
+                                    mode="single"
+                                    defaultDate={data.issue_date || undefined}
+                                    onChange={(dates) => {
+                                        if (dates.length) {
+                                            setData('issue_date', format(dates[0], 'yyyy-MM-dd'))
+                                        } else {
+                                            setData('issue_date', '')
+                                        }
+                                    }}
+                                />
                                 {data.issue_date !== '' && !isIssueDateValid && (
                                     <p className="mt-1 font-mono text-[11px] text-red-500">Please enter a valid date in YYYY-MM-DD format.</p>
                                 )}
