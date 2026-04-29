@@ -1,6 +1,16 @@
 import PageHeader from '@/components/common/PageHeader';
+import { FinanceDeleteDialog } from '@/components/finance/delete-dialog';
 import { FinanceRemittance, RemittanceFormDialog } from '@/components/finance/remittance-form-dialog';
+import { RemittanceItemFormDialog } from '@/components/finance/remittance-item-form-dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -8,8 +18,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { AlertTriangle, ArrowLeft, ChevronDown, Pencil, Search, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronDown, MoreHorizontal, Pencil, Search, Trash2, Upload } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface RemittanceItem {
@@ -69,6 +78,8 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
     const fileInputRef = useRef<HTMLInputElement>(null);
     const base = `/workspaces/${workspace.slug}/finance`;
     const showUrl = `${base}/remittances/${remittance.id}`;
+    const [editingItem, setEditingItem] = useState<RemittanceItem | null>(null);
+    const [toDelete, setToDelete] = useState<RemittanceItem | null>(null);
 
     const initialSorting = useMemo(() => toFrontendSort(itemsQuery?.sort ?? null), [itemsQuery?.sort]);
     const [search, setSearch] = useState(itemsQuery?.filter?.search ?? '');
@@ -144,6 +155,30 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
             accessorKey: 'signing_time', enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Signed" />,
             cell: ({ row }) => <span className="text-gray-500">{row.original.signing_time ? String(row.original.signing_time).slice(0, 10) : '—'}</span>,
+        },
+        {
+            id: 'actions',
+            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-300">Actions</div>,
+            cell: ({ row }) => (
+                <div className="flex justify-center">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800">
+                                <MoreHorizontal className="h-3.5 w-3.5" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-36">
+                            <DropdownMenuItem onClick={() => setEditingItem(row.original)}>
+                                <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => setToDelete(row.original)}>
+                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            ),
         },
     ];
 
@@ -285,6 +320,23 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
                     remittance={remittance}
                     workspaceSlug={workspace.slug}
                     transactions={transactions}
+                />
+
+                <RemittanceItemFormDialog
+                    open={editingItem !== null}
+                    onOpenChange={(o) => { if (!o) setEditingItem(null); }}
+                    item={editingItem}
+                    workspaceSlug={workspace.slug}
+                    remittanceId={remittance.id}
+                />
+
+                <FinanceDeleteDialog
+                    open={!!toDelete}
+                    onClose={() => setToDelete(null)}
+                    title="Delete Item?"
+                    description={`Delete waybill ${toDelete?.waybill_number ?? ''}?`}
+                    url={toDelete ? `${showUrl}/items/${toDelete.id}` : ''}
+                    successMessage="Item deleted"
                 />
             </div>
         </AppLayout>
