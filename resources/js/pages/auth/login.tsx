@@ -1,6 +1,6 @@
-import AuthenticatedSessionController from '@/actions/App/Http/Controllers/Auth/AuthenticatedSessionController';
 import TextLink from '@/components/text-link';
 import AuthLayout from '@/layouts/auth-layout';
+import login from '@/routes/login';
 import { register } from '@/routes';
 import { request } from '@/routes/password';
 import { Form, Head, usePage } from '@inertiajs/react';
@@ -41,7 +41,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
             )}
 
             <Form
-                {...AuthenticatedSessionController.store()}
+                {...login.store.form()}
                 resetOnSuccess={['password']}
                 className="flex flex-col gap-5"
             >
