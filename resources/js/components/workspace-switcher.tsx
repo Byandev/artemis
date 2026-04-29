@@ -33,7 +33,7 @@ const WorkspaceSwitcher = () => {
                     <span className="flex items-center justify-center h-5 w-5 rounded-[5px] bg-emerald-600 dark:bg-emerald-500 text-white text-[10px] font-semibold shrink-0 select-none">
                         {initials}
                     </span>
-                    <span className="min-w-0 truncate text-[13px] font-medium text-gray-700 dark:text-gray-200">
+                    <span className="hidden min-w-0 truncate text-[13px] font-medium text-gray-700 dark:text-gray-200 sm:inline">
                         {currentWorkspace.name}
                     </span>
                     <ChevronsUpDown className="hidden h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0 sm:block" />

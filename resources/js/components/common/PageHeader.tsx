@@ -20,7 +20,7 @@ export default function PageHeader({ title, description, children }: Props) {
                 )}
             </div>
             {children && (
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex max-w-full flex-nowrap items-center gap-2 overflow-x-auto">
                     {children}
                 </div>
             )}

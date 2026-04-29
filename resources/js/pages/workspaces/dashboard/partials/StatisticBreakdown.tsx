@@ -164,14 +164,30 @@ export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Pr
     return (
         <div className="space-y-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0">
+                <div className="flex min-w-0 items-center justify-between gap-2">
                     <h2 className="truncate text-[14px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
                         {metricOne?.name} <span className="text-gray-300 dark:text-gray-600">vs</span> {metricTwo?.name}
                     </h2>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 shrink-0 rounded-[10px] border border-black/6 bg-stone-100 p-0 text-gray-400 hover:bg-stone-200 hover:text-gray-700 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:bg-zinc-700 dark:hover:text-gray-300"
+                                onClick={() =>
+                                    setReload((prevState) => !prevState)
+                                }
+                            >
+                                <RefreshCcw className="h-3.5 w-3.5" />
+                            </Button>
+                        </TooltipTrigger>
+
+                        <TooltipContent>Refresh</TooltipContent>
+                    </Tooltip>
                 </div>
 
-                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-                    <div className="flex h-8 w-fit max-w-full items-center gap-0.5 rounded-[10px] border border-black/6 bg-stone-100 p-0.5 dark:border-white/6 dark:bg-zinc-800">
+                <div className="flex max-w-full flex-nowrap items-center gap-2 overflow-x-auto">
+                    <div className="flex h-8 shrink-0 items-center gap-0.5 rounded-[10px] border border-black/6 bg-stone-100 p-0.5 dark:border-white/6 dark:bg-zinc-800">
                         {availableGroups.map((g) => (
                             <button
                                 key={g}
@@ -187,45 +203,29 @@ export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Pr
                         ))}
                     </div>
 
-                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                        <div className="w-full sm:w-auto">
+                    <div className="flex shrink-0 items-center gap-2">
+                        <div className="shrink-0">
                             <DropdownSelect
                                 value={option}
                                 onChange={(val) => setOption(val as MetricKey)}
                                 options={metricConfigs.filter((m) => metrics.includes(m.key) && m.key !== secondOption).map((m) => ({ key: m.key, label: m.name }))}
                                 label="Metric"
                                 align="start"
-                                width="w-52"
+                                width="w-44"
                             />
                         </div>
 
-                        <div className="w-full sm:w-auto">
+                        <div className="shrink-0">
                             <DropdownSelect
                                 value={secondOption}
                                 onChange={(val) => setSecondOption(val as MetricKey)}
                                 options={metricConfigs.filter((m) => metrics.includes(m.key) && m.key !== option).map((m) => ({ key: m.key, label: m.name }))}
                                 label="Metric"
                                 align="start"
-                                width="w-52"
+                                width="w-44"
                             />
                         </div>
 
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 self-end rounded-[10px] border border-black/6 bg-stone-100 p-0 text-gray-400 hover:bg-stone-200 hover:text-gray-700 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:bg-zinc-700 dark:hover:text-gray-300 sm:self-auto"
-                                    onClick={() =>
-                                        setReload((prevState) => !prevState)
-                                    }
-                                >
-                                    <RefreshCcw className="h-3.5 w-3.5" />
-                                </Button>
-                            </TooltipTrigger>
-
-                            <TooltipContent>Refresh</TooltipContent>
-                        </Tooltip>
                     </div>
                 </div>
             </div>

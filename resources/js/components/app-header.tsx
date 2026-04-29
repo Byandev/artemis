@@ -159,7 +159,7 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                     <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 font-mono text-[11px] font-bold text-white">
                                         {getInitials(auth.user.name)}
                                     </div>
-                                    <span className="min-w-0 truncate font-mono! text-[12px]! font-medium text-gray-700 dark:text-gray-300">
+                                    <span className="hidden min-w-0 truncate font-mono! text-[12px]! font-medium text-gray-700 dark:text-gray-300 sm:inline">
                                         {auth.user.name}
                                     </span>
                                 </button>
