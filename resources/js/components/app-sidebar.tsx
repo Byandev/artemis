@@ -227,11 +227,11 @@ export function AppSidebar() {
         //     ],
         // },
 
-        {
-            title: 'Settings',
-            href: `/settings`,
-            icon: Settings,
-        },
+        // {
+        //     title: 'Settings',
+        //     href: `/settings`,
+        //     icon: Settings,
+        // },
     ];
 
     return (
