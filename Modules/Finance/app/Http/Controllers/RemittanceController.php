@@ -315,51 +315,15 @@ class RemittanceController extends Controller
             ->with('success', $message);
     }
 
-    public function updateItem(Request $request, Workspace $workspace, Remittance $remittance, RemittanceItem $item)
+    public function clearItems(Request $request, Workspace $workspace, Remittance $remittance)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::EditFinanceRemittances->value, $workspace);
         $this->ensureOwns($workspace, $remittance);
-        if ($item->remittance_id !== $remittance->id) {
-            abort(404);
-        }
 
-        $data = $request->validate([
-            'waybill_number' => ['required', 'string', 'max:255'],
-            'order_number' => ['nullable', 'string', 'max:255'],
-            'shipping_date' => ['nullable', 'date'],
-            'sender_city' => ['nullable', 'string', 'max:255'],
-            'destination_city' => ['nullable', 'string', 'max:255'],
-            'package_billing_weight' => ['nullable', 'numeric'],
-            'item_value' => ['nullable', 'numeric'],
-            'value_added_fee' => ['nullable', 'numeric'],
-            'receivable_freight' => ['nullable', 'numeric'],
-            'total_shipping_cost' => ['nullable', 'numeric'],
-            'cod' => ['nullable', 'numeric'],
-            'cod_commission_rate' => ['nullable', 'numeric'],
-            'cod_commission' => ['nullable', 'numeric'],
-            'cod_commission_vat_fee' => ['nullable', 'numeric'],
-            'shipping_customer_code' => ['nullable', 'string', 'max:255'],
-            'signing_time' => ['nullable', 'date'],
-        ]);
+        $deleted = $remittance->items()->delete();
 
-        $item->update($data);
-
-        return redirect()->back()->with('success', 'Item updated.');
-    }
-
-    public function destroyItem(Request $request, Workspace $workspace, Remittance $remittance, RemittanceItem $item)
-    {
-        $this->guard($request, $workspace);
-        $this->authorize(Permission::EditFinanceRemittances->value, $workspace);
-        $this->ensureOwns($workspace, $remittance);
-        if ($item->remittance_id !== $remittance->id) {
-            abort(404);
-        }
-
-        $item->delete();
-
-        return redirect()->back()->with('success', 'Item deleted.');
+        return redirect()->back()->with('success', "{$deleted} item(s) deleted.");
     }
 
     public function importItems(Request $request, Workspace $workspace, Remittance $remittance)

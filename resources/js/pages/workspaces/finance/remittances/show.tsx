@@ -1,16 +1,17 @@
 import PageHeader from '@/components/common/PageHeader';
-import { FinanceDeleteDialog } from '@/components/finance/delete-dialog';
 import { FinanceRemittance, RemittanceFormDialog } from '@/components/finance/remittance-form-dialog';
-import { RemittanceItemFormDialog } from '@/components/finance/remittance-item-form-dialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -18,7 +19,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { AlertTriangle, ArrowLeft, ChevronDown, MoreHorizontal, Pencil, Search, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronDown, Pencil, Search, Trash2, Upload } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface RemittanceItem {
@@ -78,8 +79,18 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
     const fileInputRef = useRef<HTMLInputElement>(null);
     const base = `/workspaces/${workspace.slug}/finance`;
     const showUrl = `${base}/remittances/${remittance.id}`;
-    const [editingItem, setEditingItem] = useState<RemittanceItem | null>(null);
-    const [toDelete, setToDelete] = useState<RemittanceItem | null>(null);
+    const [clearOpen, setClearOpen] = useState(false);
+    const [clearing, setClearing] = useState(false);
+
+    const performClearAll = () => {
+        setClearing(true);
+        router.delete(`${showUrl}/items`, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => setClearOpen(false),
+            onFinish: () => setClearing(false),
+        });
+    };
 
     const initialSorting = useMemo(() => toFrontendSort(itemsQuery?.sort ?? null), [itemsQuery?.sort]);
     const [search, setSearch] = useState(itemsQuery?.filter?.search ?? '');
@@ -156,30 +167,6 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
             header: ({ column }) => <SortableHeader column={column} title="Signed" />,
             cell: ({ row }) => <span className="text-gray-500">{row.original.signing_time ? String(row.original.signing_time).slice(0, 10) : '—'}</span>,
         },
-        {
-            id: 'actions',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-300">Actions</div>,
-            cell: ({ row }) => (
-                <div className="flex justify-center">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800">
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-36">
-                            <DropdownMenuItem onClick={() => setEditingItem(row.original)}>
-                                <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => setToDelete(row.original)}>
-                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            ),
-        },
     ];
 
     return (
@@ -227,6 +214,15 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
                             <Upload className="h-3.5 w-3.5" />
                             {importing ? 'Importing...' : 'Import CSV'}
                         </button>
+                        {items.total > 0 && (
+                            <button
+                                onClick={() => setClearOpen(true)}
+                                className="flex h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3.5 font-mono! text-[12px]! font-medium text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:bg-zinc-800 dark:text-red-400 dark:hover:bg-red-500/10"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete all items
+                            </button>
+                        )}
                     </div>
                 </PageHeader>
 
@@ -322,22 +318,33 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
                     transactions={transactions}
                 />
 
-                <RemittanceItemFormDialog
-                    open={editingItem !== null}
-                    onOpenChange={(o) => { if (!o) setEditingItem(null); }}
-                    item={editingItem}
-                    workspaceSlug={workspace.slug}
-                    remittanceId={remittance.id}
-                />
-
-                <FinanceDeleteDialog
-                    open={!!toDelete}
-                    onClose={() => setToDelete(null)}
-                    title="Delete Item?"
-                    description={`Delete waybill ${toDelete?.waybill_number ?? ''}?`}
-                    url={toDelete ? `${showUrl}/items/${toDelete.id}` : ''}
-                    successMessage="Item deleted"
-                />
+                <AlertDialog open={clearOpen} onOpenChange={setClearOpen}>
+                    <AlertDialogContent className="max-w-[400px] border-none shadow-2xl dark:bg-zinc-900">
+                        <AlertDialogHeader>
+                            <AlertDialogTitle className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
+                                Delete all {items.total} items?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                                This will permanently delete every item attached to this remittance. This action cannot be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="mt-4 gap-2">
+                            <AlertDialogCancel
+                                disabled={clearing}
+                                className="h-9 rounded-lg border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+                            >
+                                Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={(e) => { e.preventDefault(); performClearAll(); }}
+                                disabled={clearing}
+                                className="h-9 rounded-lg bg-red-600 px-4 font-mono! text-[12px]! font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                            >
+                                {clearing ? 'Deleting...' : 'Confirm Delete All'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
         </AppLayout>
     );
