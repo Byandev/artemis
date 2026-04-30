@@ -34,4 +34,21 @@ class Pancake
             ->throw()
             ->json();
     }
+
+    /**
+     * Public API: GET /pages/{page_id}/page_customers
+     *
+     * @throws RequestException
+     * @throws ConnectionException
+     */
+    public static function listPageCustomers(string $pageId, string $pageAccessToken, int $since, int $until, int $pageNumber = 1, int $pageSize = 1): array
+    {
+        return Http::get("https://pages.fm/api/public_api/v1/pages/{$pageId}/page_customers", [
+            'page_access_token' => $pageAccessToken,
+            'page_number' => $pageNumber,
+            'page_size' => $pageSize,
+            'since' => $since,
+            'until' => $until,
+        ])->throw()->json();
+    }
 }
