@@ -127,7 +127,11 @@ class CSRController extends Controller
         return Inertia::render('workspaces/csr/analytics', [
             'workspace' => $workspace,
             'records' => $records,
-            'query' => $request->only(['sort', 'from', 'to', 'page', 'type']),
+            'query' => [
+                ...$request->only(['sort', 'from', 'to', 'page']),
+                'type' => $type,
+                'search' => (string) $request->input('search', ''),
+            ],
         ]);
     }
 

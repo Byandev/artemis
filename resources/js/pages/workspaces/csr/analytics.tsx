@@ -5,7 +5,7 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { format, subDays } from 'date-fns';
@@ -32,6 +32,8 @@ interface Props {
         from?: string | null;
         to?: string | null;
         page?: number | string;
+        type?: 'erp' | 'pos' | null;
+        search?: string | null;
     };
 }
 
@@ -94,10 +96,9 @@ function StatCard({ title, value, loading, format: fmt }: StatCardProps) {
     );
 }
 
-export default function Analytics({ workspace }: Props) {
+export default function Analytics({ workspace, query }: Props) {
     const today = new Date();
-    const urlParams = new URLSearchParams(window.location.search);
-    const initialType = urlParams.get('type') === 'erp' ? 'erp' : 'pos';
+    const initialType = query?.type === 'erp' ? 'erp' : 'pos';
     const [range, setRange] = useState<{ from: Date; to: Date }>({
         from: subDays(today, 6),
         to: today,
@@ -107,7 +108,7 @@ export default function Analytics({ workspace }: Props) {
     const [sort, setSort] = useState('-total_sales');
     const [page, setPage] = useState(1);
     const [perPage, setPerPage] = useState(10);
-    const [search, setSearch] = useState(urlParams.get('search') ?? '');
+    const [search, setSearch] = useState(query?.search ?? '');
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
     const toStr = format(range.to, 'yyyy-MM-dd');
