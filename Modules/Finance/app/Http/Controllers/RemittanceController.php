@@ -315,6 +315,17 @@ class RemittanceController extends Controller
             ->with('success', $message);
     }
 
+    public function clearItems(Request $request, Workspace $workspace, Remittance $remittance)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::EditFinanceRemittances->value, $workspace);
+        $this->ensureOwns($workspace, $remittance);
+
+        $deleted = $remittance->items()->delete();
+
+        return redirect()->back()->with('success', "{$deleted} item(s) deleted.");
+    }
+
     public function importItems(Request $request, Workspace $workspace, Remittance $remittance)
     {
         $this->guard($request, $workspace);
