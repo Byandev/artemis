@@ -16,10 +16,30 @@ if (import.meta.env.VITE_SENTRY_DSN) {
     });
 }
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = 'Artemis';
+
+const formatTitle = (rawTitle?: string | null) => {
+    if (!rawTitle) {
+        return appName;
+    }
+
+    let title = rawTitle.trim();
+    const prefixPattern = new RegExp(`^${appName}\s*[\-|—|\|]\s*`, 'i');
+    const suffixPattern = new RegExp(`\s*[\-|—|\|]\s*${appName}$`, 'i');
+
+    title = title.replace(prefixPattern, '').replace(suffixPattern, '').trim();
+    title = title
+        .replace(/\s+—\s+/g, ' | ')
+        .replace(/\s+-\s+/g, ' | ')
+        .replace(/\s+\|\s+/g, ' | ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+    return title ? `${appName} | ${title}` : appName;
+};
 
 createInertiaApp({
-    title: (title) => (title ? `${title} - ${appName}` : appName),
+    title: (title) => formatTitle(title),
     resolve: (name) =>
         resolvePageComponent(
             `./pages/${name}.tsx`,
