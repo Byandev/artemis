@@ -3,6 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Models\Role;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Inspiring;
@@ -58,6 +60,29 @@ class HandleInertiaRequests extends Middleware
             ? $user->ownsWorkspace($currentWorkspace)
             : false;
 
+        // Check subscription status for current workspace
+        $subscriptionExpired = null;
+        if ($currentWorkspace instanceof Workspace) {
+            $subscription = $currentWorkspace->subscription;
+            $isExpired = ! $subscription
+                || $subscription->status === Subscription::STATUS_EXPIRED
+                || $subscription->status === Subscription::STATUS_CANCELED
+                || ($subscription->status === Subscription::STATUS_TRIALING && $subscription->trial_ends_at && $subscription->trial_ends_at->isPast())
+                || ($subscription->status === Subscription::STATUS_ACTIVE && $subscription->current_period_end && $subscription->current_period_end->isPast());
+
+            if ($isExpired) {
+                $subscriptionExpired = [
+                    'workspace' => $currentWorkspace->only('id', 'name', 'slug'),
+                    'plans' => SubscriptionPlan::where('is_active', true)
+                        ->where('code', '!=', SubscriptionPlan::CODE_FREE_TRIAL)
+                        ->orderBy('sort_order')
+                        ->get(),
+                    'current_period_end' => $subscription?->current_period_end?->toIso8601String()
+                        ?? $subscription?->trial_ends_at?->toIso8601String(),
+                ];
+            }
+        }
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
@@ -80,6 +105,7 @@ class HandleInertiaRequests extends Middleware
                 'newApiKey' => $request->session()->get('newApiKey'),
             ],
             'appEnv' => config('app.env'),
+            'subscriptionExpired' => $subscriptionExpired,
         ];
     }
 

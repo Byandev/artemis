@@ -15,18 +15,22 @@ import {
     Layers,
     Users,
     Settings,
+    CreditCard,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
 export function AdminSidebar() {
     const adminNavItems: NavItem[] = [
-
         {
             title: 'Workspaces',
             href: '/admin/workspaces',
             icon: Layers,
-        }
-
+        },
+        {
+            title: 'Subscription Plans',
+            href: '/admin/subscription-plans',
+            icon: CreditCard,
+        },
     ];
 
     return (
