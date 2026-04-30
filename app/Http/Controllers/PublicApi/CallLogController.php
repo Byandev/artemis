@@ -87,4 +87,86 @@ class CallLogController extends Controller
             'total_talk_time' => (int) $totalTalkTime,
         ]);
     }
+
+    public function list(Request $request): JsonResponse
+    {
+        $request->validate([
+            'user_id' => ['required', 'uuid'],
+            'since' => ['nullable'],
+            'until' => ['nullable'],
+        ]);
+
+        $workspace = $request->attributes->get('workspace');
+
+        $query = CallLog::where('workspace_id', $workspace->id)
+            ->where('user_id', $request->input('user_id'));
+
+        if ($since = $request->input('since')) {
+            $sinceCarbon = is_numeric($since)
+                ? Carbon::createFromTimestampMs((int) $since)
+                : Carbon::parse($since);
+            $query->whereRaw("CONCAT(call_date, ' ', call_time) >= ?", [$sinceCarbon->format('Y-m-d H:i:s')]);
+        }
+
+        if ($until = $request->input('until')) {
+            $untilCarbon = is_numeric($until)
+                ? Carbon::createFromTimestampMs((int) $until)
+                : Carbon::parse($until);
+            $query->whereRaw("CONCAT(call_date, ' ', call_time) <= ?", [$untilCarbon->format('Y-m-d H:i:s')]);
+        }
+
+        $rows = $query->orderByDesc('call_date')
+            ->orderByDesc('call_time')
+            ->limit(2000)
+            ->get(['phone_number', 'type', 'duration', 'call_date', 'call_time'])
+            ->map(fn ($r) => [
+                'phone_number' => $r->phone_number,
+                'type' => $r->type,
+                'duration' => (int) $r->duration,
+                'call_date' => $r->call_date instanceof \Carbon\CarbonInterface ? $r->call_date->toDateString() : (string) $r->call_date,
+                'call_time' => (string) $r->call_time,
+            ]);
+
+        return response()->json([
+            'data' => $rows,
+            'total' => $rows->count(),
+        ]);
+    }
+
+    public function summary(Request $request): JsonResponse
+    {
+        $request->validate([
+            'user_id' => ['required', 'uuid'],
+            'since' => ['nullable'],
+        ]);
+
+        $workspace = $request->attributes->get('workspace');
+
+        $query = CallLog::where('workspace_id', $workspace->id)
+            ->where('user_id', $request->input('user_id'));
+
+        if ($since = $request->input('since')) {
+            $sinceCarbon = is_numeric($since)
+                ? Carbon::createFromTimestampMs((int) $since)
+                : Carbon::parse($since);
+            $query->whereRaw("CONCAT(call_date, ' ', call_time) >= ?", [$sinceCarbon->format('Y-m-d H:i:s')]);
+        }
+
+        $numbers = $query->selectRaw('phone_number, COUNT(*) as count, SUM(duration) as total_duration, MAX(CONCAT(call_date, " ", call_time)) as last_called_at')
+            ->groupBy('phone_number')
+            ->orderByDesc('count')
+            ->get()
+            ->map(fn ($r) => [
+                'phone_number' => $r->phone_number,
+                'count' => (int) $r->count,
+                'total_duration' => (int) $r->total_duration,
+                'last_called_at' => $r->last_called_at,
+            ]);
+
+        return response()->json([
+            'numbers' => $numbers,
+            'total_calls' => $numbers->sum('count'),
+            'total_duration' => $numbers->sum('total_duration'),
+        ]);
+    }
 }
