@@ -23,14 +23,25 @@ class FetchPageCustomersDaily implements ShouldQueue
         $since = $day->getTimestamp();
         $until = $day->endOfDay()->getTimestamp();
 
-        $response = Pancake::listPageCustomers(
+        $newResponse = Pancake::listPageCustomers(
             pageId: (string) $this->page->id,
             pageAccessToken: $this->page->pancake_token,
             since: $since,
             until: $until,
+            orderBy: 'inserted_at',
         );
 
-        $total = (int) ($response['total'] ?? 0);
+        $allResponse = Pancake::listPageCustomers(
+            pageId: (string) $this->page->id,
+            pageAccessToken: $this->page->pancake_token,
+            since: $since,
+            until: $until,
+            orderBy: 'updated_at',
+        );
+
+        $newCount = (int) ($newResponse['total'] ?? 0);
+        $allCount = (int) ($allResponse['total'] ?? 0);
+        $oldCount = max(0, $allCount - $newCount);
 
         WorkspacePageDailyMetric::updateOrCreate(
             [
@@ -39,7 +50,9 @@ class FetchPageCustomersDaily implements ShouldQueue
                 'date' => $day->toDateString(),
             ],
             [
-                'new_customer_count' => $total,
+                'new_customer_count' => $newCount,
+                'all_customer_count' => $allCount,
+                'old_customer_count' => $oldCount,
             ]
         );
     }

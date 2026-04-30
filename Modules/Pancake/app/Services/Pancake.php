@@ -41,7 +41,7 @@ class Pancake
      * @throws RequestException
      * @throws ConnectionException
      */
-    public static function listPageCustomers(string $pageId, string $pageAccessToken, int $since, int $until, int $pageNumber = 1, int $pageSize = 1): array
+    public static function listPageCustomers(string $pageId, string $pageAccessToken, int $since, int $until, string $orderBy = 'inserted_at', int $pageNumber = 1, int $pageSize = 1): array
     {
         return Http::get("https://pages.fm/api/public_api/v1/pages/{$pageId}/page_customers", [
             'page_access_token' => $pageAccessToken,
@@ -49,6 +49,7 @@ class Pancake
             'page_size' => $pageSize,
             'since' => $since,
             'until' => $until,
+            'order_by' => $orderBy,
         ])->throw()->json();
     }
 }

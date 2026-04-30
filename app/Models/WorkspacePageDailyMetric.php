@@ -18,6 +18,8 @@ class WorkspacePageDailyMetric extends Model
         'entered_returning_count',
         'returned_count',
         'new_customer_count',
+        'all_customer_count',
+        'old_customer_count',
         'confirmed_amount',
         'shipped_amount',
         'delivered_amount',
