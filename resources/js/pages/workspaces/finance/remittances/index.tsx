@@ -16,7 +16,15 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { AlertTriangle, ExternalLink, MoreHorizontal, Search, Trash2, Upload } from 'lucide-react';
+import {
+    AlertTriangle,
+    ExternalLink,
+    MoreHorizontal,
+    Pencil,
+    Search,
+    Trash2,
+    Upload,
+} from 'lucide-react';
 import DatePicker from '@/components/ui/date-picker';
 import moment from 'moment';
 import flatpickr from 'flatpickr';

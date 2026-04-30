@@ -38,7 +38,7 @@ class TriggerFetchPageOrders extends Command
             ->orderBy('created_at', 'asc')
             ->get()
             ->each(function (Page $page) {
-                dispatch(new FetchPageOrders($page, 1, Carbon::parse($page->orders_last_synced_at)->unix(), Carbon::now()->unix()))->onQueue('pancake');
+                dispatch(new FetchPageOrders($page, 1, Carbon::parse($page->orders_last_synced_at)->subDay()->unix(), Carbon::now()->unix()))->onQueue('pancake');
             });
     }
 }

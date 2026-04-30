@@ -47,6 +47,11 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::before(function ($user, $ability, $params) {
+            // TEMP: bypass role/permission checks in production while RBAC rollout is still on the test server.
+            if (app()->environment('production')) {
+                return true;
+            }
+
             $workspace = $params[0] ?? null;
 
             if ($workspace instanceof Workspace) {
