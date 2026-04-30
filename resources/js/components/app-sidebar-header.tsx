@@ -2,6 +2,9 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { NavUser } from '@/components/nav-user';
 import WorkspaceSwitcher from './workspace-switcher';
 import AppearanceToggleDropdown from '@/components/appearance-dropdown';
+import { ContactSupportModal } from '@/components/contact-support-modal';
+import { Button } from '@/components/ui/button';
+import { LifeBuoy } from 'lucide-react';
 
 export function AppSidebarHeader() {
     return (
@@ -13,6 +16,18 @@ export function AppSidebarHeader() {
                 </div>
 
                 <div className="flex items-center gap-2 ml-auto">
+                    <ContactSupportModal
+                        trigger={
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 rounded-full"
+                                aria-label="Contact support"
+                            >
+                                <LifeBuoy className="h-4 w-4" />
+                            </Button>
+                        }
+                    />
                     <AppearanceToggleDropdown />
                     <NavUser />
                 </div>
