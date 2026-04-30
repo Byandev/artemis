@@ -57,6 +57,13 @@ class HandleInertiaRequests extends Middleware
         $isOwner = $user && $currentWorkspace instanceof Workspace
             ? $user->ownsWorkspace($currentWorkspace)
             : false;
+        $can = [
+            'viewAnySupportTickets' => $user && $currentWorkspace instanceof Workspace
+                ? $user->ownsWorkspace($currentWorkspace)
+                    || $user->isAdminOf($currentWorkspace)
+                    || $user->hasWorkspaceRole($currentWorkspace, 'admin')
+                : false,
+        ];
 
         return [
             ...parent::share($request),
@@ -67,6 +74,7 @@ class HandleInertiaRequests extends Middleware
                     'is_super_admin' => $user->isSuperAdmin(),
                     'is_workspace_owner' => $isOwner,
                     'permissions' => $permissions,
+                    'can' => $can,
                 ]) : null,
             ],
             'workspaces' => $workspaces,
