@@ -12,6 +12,20 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.2.0',
+        date: '2026-04-30',
+        sections: [
+            {
+                title: 'Analytics — Live by default',
+                items: [
+                    'Dashboard cards and breakdowns now compute directly from pancake_orders instead of the hourly rollup table, so numbers reflect activity in near real time rather than waiting for the next rollup pass',
+                    'Opt back into the rollup by passing ?source=rollup on the analytics endpoints — useful when you want a faster (but slightly stale) read or to compare values against the rollup baseline',
+                    'Per-metric source toggle — each metric class can be flipped between live and rollup independently via setSource(); RtsRate, the avg-days metrics, and the count/amount metrics all support both modes',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.1.0',
         date: '2026-04-28',
         sections: [
