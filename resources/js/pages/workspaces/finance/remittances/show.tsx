@@ -1,5 +1,16 @@
 import PageHeader from '@/components/common/PageHeader';
 import { FinanceRemittance, RemittanceFormDialog } from '@/components/finance/remittance-form-dialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
@@ -8,8 +19,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { AlertTriangle, ArrowLeft, ChevronDown, Pencil, Search, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronDown, Pencil, Search, Trash2, Upload } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface RemittanceItem {
@@ -69,6 +79,18 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
     const fileInputRef = useRef<HTMLInputElement>(null);
     const base = `/workspaces/${workspace.slug}/finance`;
     const showUrl = `${base}/remittances/${remittance.id}`;
+    const [clearOpen, setClearOpen] = useState(false);
+    const [clearing, setClearing] = useState(false);
+
+    const performClearAll = () => {
+        setClearing(true);
+        router.delete(`${showUrl}/items`, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => setClearOpen(false),
+            onFinish: () => setClearing(false),
+        });
+    };
 
     const initialSorting = useMemo(() => toFrontendSort(itemsQuery?.sort ?? null), [itemsQuery?.sort]);
     const [search, setSearch] = useState(itemsQuery?.filter?.search ?? '');
@@ -192,6 +214,15 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
                             <Upload className="h-3.5 w-3.5" />
                             {importing ? 'Importing...' : 'Import CSV'}
                         </button>
+                        {items.total > 0 && (
+                            <button
+                                onClick={() => setClearOpen(true)}
+                                className="flex h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3.5 font-mono! text-[12px]! font-medium text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:bg-zinc-800 dark:text-red-400 dark:hover:bg-red-500/10"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete all items
+                            </button>
+                        )}
                     </div>
                 </PageHeader>
 
@@ -286,6 +317,34 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
                     workspaceSlug={workspace.slug}
                     transactions={transactions}
                 />
+
+                <AlertDialog open={clearOpen} onOpenChange={setClearOpen}>
+                    <AlertDialogContent className="max-w-[400px] border-none shadow-2xl dark:bg-zinc-900">
+                        <AlertDialogHeader>
+                            <AlertDialogTitle className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
+                                Delete all {items.total} items?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                                This will permanently delete every item attached to this remittance. This action cannot be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="mt-4 gap-2">
+                            <AlertDialogCancel
+                                disabled={clearing}
+                                className="h-9 rounded-lg border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+                            >
+                                Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={(e) => { e.preventDefault(); performClearAll(); }}
+                                disabled={clearing}
+                                className="h-9 rounded-lg bg-red-600 px-4 font-mono! text-[12px]! font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                            >
+                                {clearing ? 'Deleting...' : 'Confirm Delete All'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
         </AppLayout>
     );
