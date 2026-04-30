@@ -29,7 +29,8 @@ class WorkspaceMemberController extends Controller
         $this->authorize(Permission::ViewMembers->value, $workspace);
 
         $members = QueryBuilder::for(User::class)
-            ->join('workspace_user', 'users.id', '=', 'workspace_user.user_id')
+            // --- CHANGED: Using leftJoin instead of join to ensure Owners (who might not be in the pivot) still show up and sort correctly ---
+            ->leftJoin('workspace_user', 'users.id', '=', 'workspace_user.user_id')
             ->leftJoin('roles', 'workspace_user.role_id', '=', 'roles.id')
             ->where('workspace_user.workspace_id', $workspace->id)
             ->select(
@@ -47,10 +48,10 @@ class WorkspaceMemberController extends Controller
                 }),
             ])
             ->allowedSorts([
-                'id',
-                'name',
-                'email',
-                AllowedSort::field('role', 'roles.name'),
+                AllowedSort::field('id', 'users.id'),
+                AllowedSort::field('name', 'users.name'),
+                AllowedSort::field('email', 'users.email'),
+                AllowedSort::field('role', 'roles.name'), 
                 'pivot_created_at',
             ])
             ->defaultSort('-pivot_created_at')
@@ -66,7 +67,7 @@ class WorkspaceMemberController extends Controller
 
                 return $user;
             });
-
+        // Get pending invitations with pagination — uses invitation_sort / invitation_page params
         $invitationRequest = $request->duplicate(
             query: array_merge($request->query(), $request->has('invitation_sort') ? ['sort' => $request->input('invitation_sort')] : [])
         );
