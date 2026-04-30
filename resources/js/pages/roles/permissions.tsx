@@ -89,9 +89,6 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
                         const allChecked = group.permissions.every((p) =>
                             data.permission_ids.includes(p.id)
                         );
-                        const someChecked = group.permissions.some((p) =>
-                            data.permission_ids.includes(p.id)
-                        );
 
                         return (
                             <div
@@ -121,6 +118,12 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
                                 <div className="grid grid-cols-1 gap-px bg-black/4 dark:bg-white/4 sm:grid-cols-2 lg:grid-cols-3">
                                     {group.permissions.map((permission) => {
                                         const checked = data.permission_ids.includes(permission.id);
+                                        
+                                        // Logic to swap display name specifically for "Delete Roles"
+                                        const displayName = permission.name === 'Delete Roles' 
+                                            ? 'Archive Roles' 
+                                            : permission.name;
+
                                         return (
                                             <label
                                                 key={permission.id}
@@ -134,7 +137,7 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
                                                     className="h-4 w-4 rounded border-gray-300 accent-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
                                                 />
                                                 <span className="font-mono text-[12px] text-gray-700 dark:text-gray-300">
-                                                    {permission.name}
+                                                    {displayName}
                                                 </span>
                                             </label>
                                         );
