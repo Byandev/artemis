@@ -43,27 +43,27 @@ export function ProductFormDialog({
 
     const isEditing = !!product;
 
-    const { data, setData, post, patch, processing, errors, reset, clearErrors } =
+    const { data, setData, post, processing, errors, reset, clearErrors } =
         useForm({
             name: product?.name || '',
             code: product?.code || '',
             category: product?.category || '',
             status: product?.status || 'Testing',
             description: product?.description || '',
-            _method: 'POST',
+            _method: 'POST', // Default to POST
         });
 
     useEffect(() => {
-        if (open && product) { // Add 'open' check here
+        if (open && product) {
             setData({
                 name: product.name,
                 code: product.code,
                 category: product.category,
                 status: product.status,
                 description: product.description || '',
-                _method: 'PATCH',
+                _method: 'PATCH', // Set to PATCH for spoofing when editing
             });
-        } else {
+        } else if (open) {
             reset();
             setData('_method', 'POST');
         }
@@ -76,9 +76,7 @@ export function ProductFormDialog({
             ? `/workspaces/${workspace.slug}/products/${product?.id}`
             : `/workspaces/${workspace.slug}/products`;
 
-        const request = isEditing ? patch : post;
-
-        request(url, {
+        post(url, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success(isEditing ? 'Product updated successfully' : 'Product created successfully');
@@ -108,11 +106,13 @@ export function ProductFormDialog({
                         <DialogTitle>
                             {product ? 'Edit Product' : 'Add New Product'}
                         </DialogTitle>
-                        <DialogDescription>
-                            {product
-                                ? 'Update the product information below.'
-                                : 'Fill in the details to create a new product.'}
-                        </DialogDescription>
+                        <DialogHeader>
+                            <DialogDescription>
+                                {product
+                                    ? 'Update the product information below.'
+                                    : 'Fill in the details to create a new product.'}
+                            </DialogDescription>
+                        </DialogHeader>
                     </DialogHeader>
 
                     <div className="grid gap-4 py-4">

@@ -1,5 +1,6 @@
 import {
     Dialog,
+    DialogClose,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -16,6 +17,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { X } from 'lucide-react';
 import { AddTaskForm } from './types';
 
 type AddTaskDialogProps = {
@@ -42,16 +44,24 @@ export function AddTaskDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md gap-0 rounded-xl border border-black/8 p-0 dark:border-white/8">
+            <DialogContent className="max-w-md gap-0 rounded-xl border border-black/8 p-0 dark:border-white/8 [&_[data-default-close=true]]:hidden">
                 <DialogHeader className="space-y-0 border-b border-black/6 px-5 py-3 text-left dark:border-white/8">
-                    <DialogTitle className="font-mono text-[16px] leading-none uppercase tracking-wide text-gray-800 dark:text-gray-100">
-                        {isEdit ? 'Edit Checklist' : 'Create Checklist'}
-                    </DialogTitle>
-                    <DialogDescription className="-mt-0.5 text-[11px] leading-none text-gray-500 dark:text-gray-300">
-                        {isEdit
-                            ? 'Update the details below to edit checklist'
-                            : 'Fill in the details below to create checklist'}
-                    </DialogDescription>
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-0.5">
+                            <DialogTitle className="font-mono text-[16px] leading-none uppercase tracking-wide text-gray-800 dark:text-gray-100">
+                                {isEdit ? 'Edit Checklist' : 'Create Checklist'}
+                            </DialogTitle>
+                            <DialogDescription className="text-[11px] leading-none text-gray-500 dark:text-gray-300">
+                                {isEdit
+                                    ? 'Update the details below to edit checklist'
+                                    : 'Fill in the details below to create checklist'}
+                            </DialogDescription>
+                        </div>
+                        <DialogClose className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/6 dark:hover:text-gray-300 z-10">
+                            <X className="h-4 w-4" />
+                            <span className="sr-only">Close</span>
+                        </DialogClose>
+                    </div>
                 </DialogHeader>
 
                 <div className="space-y-3.5 px-5 py-3.5">
@@ -103,17 +113,17 @@ export function AddTaskDialog({
                     </div>
                 </div>
 
-                <DialogFooter className="border-t border-black/6 px-5 py-3 sm:justify-end dark:border-white/8">
+                <DialogFooter className="border-t border-black/6 px-5 py-3 flex-row items-center gap-2 dark:border-white/8">
                     <button
                         type="button"
-                        className="flex h-8 items-center rounded-lg border border-black/8 bg-stone-100 px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+                        className="flex h-8 flex-1 items-center justify-center rounded-lg border border-black/8 bg-stone-100 px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
                         onClick={onCancel}
                     >
                         Cancel
                     </button>
                     <button
                         type="button"
-                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
+                        className="flex h-8 flex-1 items-center justify-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                         onClick={onSubmit}
                         disabled={!isFormValid}
                     >

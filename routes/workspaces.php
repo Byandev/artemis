@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
 use App\Http\Controllers\Workspaces\AdAccountController;
 use App\Http\Controllers\Workspaces\AdsManager\AdController;
@@ -244,6 +245,7 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/accounts/{account}', [FinanceAccountController::class, 'destroy'])->name('accounts.destroy');
 
         Route::get('/transactions', [FinanceTransactionController::class, 'index'])->name('transactions.index');
+        Route::get('/transactions/export', [FinanceTransactionController::class, 'export'])->name('transactions.export');
         Route::post('/transactions', [FinanceTransactionController::class, 'store'])->name('transactions.store');
         Route::post('/transactions/import', [FinanceTransactionController::class, 'import'])->name('transactions.import');
         Route::put('/transactions/bulk-update-type', [FinanceTransactionController::class, 'bulkUpdateType'])->name('transactions.bulk-update-type');
@@ -256,6 +258,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/remittances/import', [FinanceRemittanceController::class, 'import'])->name('remittances.import');
         Route::get('/remittances/{remittance}', [FinanceRemittanceController::class, 'show'])->name('remittances.show');
         Route::post('/remittances/{remittance}/import-items', [FinanceRemittanceController::class, 'importItems'])->name('remittances.import-items');
+        Route::delete('/remittances/{remittance}/items', [FinanceRemittanceController::class, 'clearItems'])->name('remittances.items.clear');
         Route::put('/remittances/{remittance}', [FinanceRemittanceController::class, 'update'])->name('remittances.update');
         Route::delete('/remittances/{remittance}', [FinanceRemittanceController::class, 'destroy'])->name('remittances.destroy');
     });
@@ -288,4 +291,19 @@ Route::middleware(['auth', 'verified', 'admin'])
     ->group(function () {
         Route::get('/workspaces', [AdminWorkspaceController::class, 'index'])
             ->name('workspaces.index');
+        Route::put('/workspaces/{workspace}/subscription', [AdminWorkspaceController::class, 'updateSubscription'])
+            ->name('workspaces.update-subscription');
+
+        Route::get('/subscription-plans', [AdminSubscriptionPlanController::class, 'index'])
+            ->name('subscription-plans.index');
+        Route::get('/subscription-plans/create', [AdminSubscriptionPlanController::class, 'create'])
+            ->name('subscription-plans.create');
+        Route::post('/subscription-plans', [AdminSubscriptionPlanController::class, 'store'])
+            ->name('subscription-plans.store');
+        Route::get('/subscription-plans/{subscriptionPlan}/edit', [AdminSubscriptionPlanController::class, 'edit'])
+            ->name('subscription-plans.edit');
+        Route::put('/subscription-plans/{subscriptionPlan}', [AdminSubscriptionPlanController::class, 'update'])
+            ->name('subscription-plans.update');
+        Route::delete('/subscription-plans/{subscriptionPlan}', [AdminSubscriptionPlanController::class, 'destroy'])
+            ->name('subscription-plans.destroy');
     });
