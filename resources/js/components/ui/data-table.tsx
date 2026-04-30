@@ -44,6 +44,7 @@ interface DataTableProps<TData, TValue> {
     rowSelection?: RowSelectionState
     onRowSelectionChange?: (selection: RowSelectionState) => void
     getRowId?: (row: TData, index: number) => string
+    onRowClick?: (row: TData) => void
 }
 
 export function DataTable<TData, TValue>({
@@ -55,6 +56,7 @@ export function DataTable<TData, TValue>({
     rowSelection,
     onRowSelectionChange,
     getRowId,
+    onRowClick,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
 
@@ -128,7 +130,11 @@ export function DataTable<TData, TValue>({
                                 <TableRow
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
-                                    className="hover:bg-emerald-500/3 transition-colors"
+                                    className={[
+                                        'transition-colors hover:bg-emerald-500/3',
+                                        onRowClick ? 'cursor-pointer' : '',
+                                    ].join(' ')}
+                                    onClick={() => onRowClick?.(row.original)}
                                 >
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id} className='px-4 py-3  text-[12px] text-black dark:text-gray-400 border-b border-black/6 dark:border-white/6 align-top'>
