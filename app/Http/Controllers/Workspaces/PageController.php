@@ -205,7 +205,7 @@ class PageController extends Controller
         return redirect()->route('workspaces.pages.index', $workspace);
     }
 
-    public function validatePancakeToken(Request $request, Workspace $workspace)
+    public function validatePosToken(Request $request, Workspace $workspace)
     {
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
@@ -222,7 +222,39 @@ class PageController extends Controller
             ]);
 
             if ($response->successful()) {
-                return response()->json(['valid' => true, 'message' => 'Pancake token is valid.']);
+                return response()->json(['valid' => true, 'message' => 'POS token is valid.', 'data' => $response->json()], 200);
+            }
+
+            return response()->json([
+                'valid' => false,
+                'message' => 'Invalid POS token or shop ID.',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'valid' => false,
+                'message' => 'Could not reach Pancake API.',
+            ]);
+        }
+    }
+
+    public function validatePancakeToken(Request $request, Workspace $workspace)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $validated = $request->validate([
+            'page_id' => 'required|string',
+            'token' => 'required|string',
+        ]);
+
+        try {
+            $response = Http::timeout(10)->get('https://pages.fm/api/public_api/v1/pages/'.$validated['page_id'], [
+                'page_access_token' => $validated['token'],
+            ]);
+
+            if ($response->successful()) {
+                return response()->json(['valid' => true, 'message' => 'Pancake token is valid.', 'data' => $response->status()], 200);
             }
 
             return response()->json([

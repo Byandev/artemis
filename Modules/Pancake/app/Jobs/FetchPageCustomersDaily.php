@@ -27,8 +27,7 @@ class FetchPageCustomersDaily implements ShouldQueue
             pageId: (string) $this->page->id,
             pageAccessToken: $this->page->pancake_token,
             since: $since,
-            until: $until,
-            orderBy: 'inserted_at',
+            until: $until
         );
 
         $allResponse = Pancake::listPageCustomers(
