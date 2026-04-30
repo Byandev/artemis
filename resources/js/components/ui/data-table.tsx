@@ -32,7 +32,7 @@ import { Inbox } from 'lucide-react';
 import { toBackendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { TriangleDownIcon, TriangleUpIcon } from '@radix-ui/react-icons';
-import { useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
@@ -57,6 +57,25 @@ export function DataTable<TData, TValue>({
     getRowId,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+    const scrollLeftRef = useRef(0)
+    const scrollStorageKey = useMemo(() => {
+        if (typeof window === 'undefined') {
+            return 'datatable-scroll'
+        }
+        return `datatable-scroll:${window.location.pathname}`
+    }, [])
+
+    const rememberScrollLeft = () => {
+        if (!scrollContainerRef.current) {
+            return
+        }
+
+        scrollLeftRef.current = scrollContainerRef.current.scrollLeft
+        if (typeof window !== 'undefined') {
+            window.sessionStorage.setItem(scrollStorageKey, String(scrollLeftRef.current))
+        }
+    }
 
     const hasPaginationMeta = Boolean(
         meta
@@ -80,7 +99,10 @@ export function DataTable<TData, TValue>({
             const next = typeof updater === "function" ? updater(sorting) : updater
             setSorting(next)
 
-            if (onFetch) onFetch({ sort: toBackendSort(next), page: 1, per_page: meta?.per_page ?? null })
+            if (onFetch) {
+                rememberScrollLeft()
+                onFetch({ sort: toBackendSort(next), page: 1, per_page: meta?.per_page ?? null })
+            }
         },
         getSortedRowModel: getSortedRowModel(),
         getRowId,
@@ -99,10 +121,37 @@ export function DataTable<TData, TValue>({
         manualSorting: true,
     })
 
+    useLayoutEffect(() => {
+        if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollLeft = scrollLeftRef.current
+        }
+    }, [data])
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return
+        }
+
+        const stored = window.sessionStorage.getItem(scrollStorageKey)
+        if (!stored || !scrollContainerRef.current) {
+            return
+        }
+
+        const parsed = Number(stored)
+        if (!Number.isNaN(parsed)) {
+            scrollLeftRef.current = parsed
+            requestAnimationFrame(() => {
+                if (scrollContainerRef.current) {
+                    scrollContainerRef.current.scrollLeft = parsed
+                }
+            })
+        }
+    }, [scrollStorageKey])
+
 
     return (
         <>
-            <div className="max-w-full overflow-x-auto custom-scrollbar">
+            <div ref={scrollContainerRef} className="max-w-full overflow-x-auto custom-scrollbar">
                 <Table>
                     <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
@@ -168,7 +217,10 @@ export function DataTable<TData, TValue>({
                                 <Select
                                     value={String(footerMeta?.per_page ?? 10)}
                                     onValueChange={(val) => {
-                                        if (onFetch) onFetch({ per_page: Number(val), page: 1, sort: toBackendSort(sorting) })
+                                        if (onFetch) {
+                                            rememberScrollLeft()
+                                            onFetch({ per_page: Number(val), page: 1, sort: toBackendSort(sorting) })
+                                        }
                                     }}
                                 >
                                     <SelectTrigger className="h-7 w-[72px] rounded-lg border border-black/6 bg-stone-50 px-2.5 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
@@ -190,7 +242,10 @@ export function DataTable<TData, TValue>({
                         </div>
 
                         <Pagination currentPage={footerMeta?.current_page ?? 1} totalPages={footerMeta?.last_page ?? 1} onPageChange={(page) => {
-                            if (onFetch) onFetch({ page, sort: toBackendSort(sorting), per_page: footerMeta?.per_page ?? null })
+                            if (onFetch) {
+                                rememberScrollLeft()
+                                onFetch({ page, sort: toBackendSort(sorting), per_page: footerMeta?.per_page ?? null })
+                            }
                         }} />
                     </div>
                 </div>
