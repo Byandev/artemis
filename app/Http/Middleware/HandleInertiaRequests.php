@@ -60,6 +60,18 @@ class HandleInertiaRequests extends Middleware
             ? $user->ownsWorkspace($currentWorkspace)
             : false;
 
+        // Show syncing modal when any page has no orders_last_synced_at
+        $syncingData = null;
+        if ($currentWorkspace instanceof Workspace && $currentWorkspace->pages()->exists()) {
+            $hasSyncingPages = $currentWorkspace->pages()
+                ->whereNull('orders_last_synced_at')
+                ->exists();
+
+            if ($hasSyncingPages) {
+                $syncingData = ['workspaceSlug' => $currentWorkspace->slug];
+            }
+        }
+
         // Check subscription status for current workspace
         $subscriptionExpired = null;
         if ($currentWorkspace instanceof Workspace) {
@@ -106,6 +118,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'appEnv' => config('app.env'),
             'subscriptionExpired' => $subscriptionExpired,
+            'syncingData' => $syncingData,
         ];
     }
 

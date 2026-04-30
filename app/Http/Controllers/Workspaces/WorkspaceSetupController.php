@@ -78,7 +78,7 @@ class WorkspaceSetupController extends Controller
         // Set as current workspace
         session(['current_workspace_id' => $workspace->id]);
 
-        return redirect()->route('workspace.dashboard', $workspace->slug)
-            ->with('success', 'Welcome to your new workspace!');
+        return redirect()->route('workspace.onboarding', $workspace->slug)
+            ->with('success', 'Welcome! Let\'s connect your first page.');
     }
 }
