@@ -19,8 +19,9 @@ interface CsrRecord {
     total_sales: number;
     delivered: number;
     returning_count: number;
-    rmo_called: number;
     rts_rate: number;
+    total_called: number;
+    total_call_time: number;
 }
 
 interface Props {
@@ -36,6 +37,15 @@ interface Props {
 
 const peso = (n: number) =>
     new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(n) || 0);
+
+const formatCallTime = (seconds: number) => {
+    const s = Math.max(0, Math.floor(Number(seconds) || 0));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+};
 
 function useStatCard(workspace: Workspace, endpoint: string, from: string, to: string, type: string) {
     const [value, setValue] = useState<number | null>(null);
@@ -94,6 +104,7 @@ export default function Analytics({ workspace }: Props) {
     const [currentType, setCurrentType] = useState('pos');
     const [sort, setSort] = useState('-total_sales');
     const [page, setPage] = useState(1);
+    const [perPage, setPerPage] = useState(10);
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
     const toStr = format(range.to, 'yyyy-MM-dd');
@@ -113,7 +124,7 @@ export default function Analytics({ workspace }: Props) {
         const controller = new AbortController();
         axios
             .get(`/api/workspaces/${workspace.slug}/csrs/daily-records`, {
-                params: { from: fromStr, to: toStr, type: currentType, sort, page },
+                params: { from: fromStr, to: toStr, type: currentType, sort, page, per_page: perPage },
                 signal: controller.signal,
             })
             .then((res) => setPaginatedRecords(res.data))
@@ -121,7 +132,7 @@ export default function Analytics({ workspace }: Props) {
                 if (!axios.isCancel(err)) console.error(err);
             });
         return () => controller.abort();
-    }, [workspace.slug, fromStr, toStr, currentType, sort, page]);
+    }, [workspace.slug, fromStr, toStr, currentType, sort, page, perPage]);
 
     const initialSorting = useMemo(() => toFrontendSort(sort), [sort]);
 
@@ -159,9 +170,14 @@ export default function Analytics({ workspace }: Props) {
                 cell: ({ row }) => `${Number(row.original.rts_rate).toFixed(2)}%`,
             },
             {
-                accessorKey: 'rmo_called',
+                accessorKey: 'total_called',
                 header: ({ column }) => <SortableHeader column={column} title="RMO Called" />,
-                cell: ({ row }) => Number(row.original.rmo_called).toLocaleString(),
+                cell: ({ row }) => Number(row.original.total_called).toLocaleString(),
+            },
+            {
+                accessorKey: 'total_call_time',
+                header: ({ column }) => <SortableHeader column={column} title="Total Call Time" />,
+                cell: ({ row }) => formatCallTime(row.original.total_call_time),
             },
         ],
         [],
@@ -228,6 +244,10 @@ export default function Analytics({ workspace }: Props) {
                         onFetch={(params) => {
                             if (params?.sort !== undefined) {
                                 setSort(params.sort as string);
+                                setPage(1);
+                            }
+                            if (params?.per_page !== undefined) {
+                                setPerPage(params.per_page as number);
                                 setPage(1);
                             }
                             if (params?.page !== undefined) {

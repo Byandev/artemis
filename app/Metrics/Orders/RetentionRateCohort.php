@@ -58,6 +58,7 @@ abstract class RetentionRateCohort
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
         $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
+        $userIds = $this->resolveIds($filter['user_ids'] ?? []);
 
         $newCustomers = DB::table('pancake_orders as po')
             ->join('pages', 'pages.id', '=', 'po.page_id')
@@ -66,6 +67,7 @@ abstract class RetentionRateCohort
             ->whereNotIn('po.status', [6, 7])
             ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
             ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->when(! empty($userIds), fn ($q) => $q->whereIn('pages.owner_id', $userIds))
             ->groupBy('po.customer_id', 'pages.id', 'pages.name')
             ->havingRaw('MIN(po.confirmed_at) >= ? AND MIN(po.confirmed_at) < ?', [$cohortStart, $cohortEnd])
             ->selectRaw('po.customer_id, pages.id as page_id, pages.name as page_name, MIN(po.confirmed_at) as first_order_at');
@@ -80,6 +82,7 @@ abstract class RetentionRateCohort
             ->whereRaw("po2.confirmed_at <= DATE_ADD(nc.first_order_at, INTERVAL {$days} DAY)")
             ->when(! empty($pageIds), fn ($q) => $q->whereIn('p2.id', $pageIds))
             ->when(! empty($shopIds), fn ($q) => $q->whereIn('p2.shop_id', $shopIds))
+            ->when(! empty($userIds), fn ($q) => $q->whereIn('p2.owner_id', $userIds))
             ->groupBy('nc.customer_id', 'nc.page_id', 'nc.page_name')
             ->selectRaw('nc.customer_id, nc.page_id, nc.page_name');
 
@@ -102,6 +105,7 @@ abstract class RetentionRateCohort
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
         $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
+        $userIds = $this->resolveIds($filter['user_ids'] ?? []);
 
         $newCustomers = DB::table('pancake_orders as po')
             ->join('pages', 'pages.id', '=', 'po.page_id')
@@ -112,6 +116,7 @@ abstract class RetentionRateCohort
             ->whereNotIn('po.status', [6, 7])
             ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
             ->when(! empty($shopIds), fn ($q) => $q->whereIn('shops.id', $shopIds))
+            ->when(! empty($userIds), fn ($q) => $q->whereIn('pages.owner_id', $userIds))
             ->groupBy('po.customer_id', 'shops.id', 'shops.name')
             ->havingRaw('MIN(po.confirmed_at) >= ? AND MIN(po.confirmed_at) < ?', [$cohortStart, $cohortEnd])
             ->selectRaw('po.customer_id, shops.id as shop_id, shops.name as shop_name, MIN(po.confirmed_at) as first_order_at');
@@ -127,6 +132,7 @@ abstract class RetentionRateCohort
             ->whereRaw("po2.confirmed_at <= DATE_ADD(nc.first_order_at, INTERVAL {$days} DAY)")
             ->when(! empty($pageIds), fn ($q) => $q->whereIn('p2.id', $pageIds))
             ->when(! empty($shopIds), fn ($q) => $q->whereIn('s2.id', $shopIds))
+            ->when(! empty($userIds), fn ($q) => $q->whereIn('p2.owner_id', $userIds))
             ->groupBy('nc.customer_id', 'nc.shop_id', 'nc.shop_name')
             ->selectRaw('nc.customer_id, nc.shop_id, nc.shop_name');
 
@@ -149,6 +155,7 @@ abstract class RetentionRateCohort
 
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
         $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
+        $userIds = $this->resolveIds($filter['user_ids'] ?? []);
 
         $newCustomers = DB::table('pancake_orders as po')
             ->join('pages', 'pages.id', '=', 'po.page_id')
@@ -159,6 +166,7 @@ abstract class RetentionRateCohort
             ->whereNotIn('po.status', [6, 7])
             ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
             ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->when(! empty($userIds), fn ($q) => $q->whereIn('users.id', $userIds))
             ->groupBy('po.customer_id', 'users.id', 'users.name')
             ->havingRaw('MIN(po.confirmed_at) >= ? AND MIN(po.confirmed_at) < ?', [$cohortStart, $cohortEnd])
             ->selectRaw('po.customer_id, users.id as user_id, users.name as user_name, MIN(po.confirmed_at) as first_order_at');
@@ -173,6 +181,7 @@ abstract class RetentionRateCohort
             ->whereRaw("po2.confirmed_at <= DATE_ADD(nc.first_order_at, INTERVAL {$days} DAY)")
             ->when(! empty($pageIds), fn ($q) => $q->whereIn('p2.id', $pageIds))
             ->when(! empty($shopIds), fn ($q) => $q->whereIn('p2.shop_id', $shopIds))
+            ->when(! empty($userIds), fn ($q) => $q->whereIn('p2.owner_id', $userIds))
             ->groupBy('nc.customer_id', 'nc.user_id', 'nc.user_name')
             ->selectRaw('nc.customer_id, nc.user_id, nc.user_name');
 
@@ -189,11 +198,13 @@ abstract class RetentionRateCohort
         $days = $this->days();
         $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
         $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
+        $userIds = $this->resolveIds($filter['user_ids'] ?? []);
 
         $newCustomers = DB::table('pancake_orders as po')
-            ->when(! empty($pageIds) || ! empty($shopIds), fn ($q) => $q->join('pages', 'pages.id', '=', 'po.page_id')
+            ->when(! empty($pageIds) || ! empty($shopIds) || ! empty($userIds), fn ($q) => $q->join('pages', 'pages.id', '=', 'po.page_id')
                 ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
                 ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+                ->when(! empty($userIds), fn ($q) => $q->whereIn('pages.owner_id', $userIds))
             )
             ->where('po.workspace_id', $workspaceId)
             ->whereNotNull('po.customer_id')
@@ -214,9 +225,10 @@ abstract class RetentionRateCohort
         $retained = DB::query()
             ->fromSub($newCustomers, 'nc')
             ->join('pancake_orders as po2', 'po2.customer_id', '=', 'nc.customer_id')
-            ->when(! empty($pageIds) || ! empty($shopIds), fn ($q) => $q->join('pages as p2', 'p2.id', '=', 'po2.page_id')
+            ->when(! empty($pageIds) || ! empty($shopIds) || ! empty($userIds), fn ($q) => $q->join('pages as p2', 'p2.id', '=', 'po2.page_id')
                 ->when(! empty($pageIds), fn ($q) => $q->whereIn('p2.id', $pageIds))
                 ->when(! empty($shopIds), fn ($q) => $q->whereIn('p2.shop_id', $shopIds))
+                ->when(! empty($userIds), fn ($q) => $q->whereIn('p2.owner_id', $userIds))
             )
             ->where('po2.workspace_id', $workspaceId)
             ->whereNotIn('po2.status', [6, 7])

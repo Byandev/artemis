@@ -4,21 +4,19 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class PancakeUserDailyReport extends Model
+class PancakeUserErpDailyReport extends Model
 {
-    protected $table = 'pancake_user_daily_reports';
+    protected $table = 'pancake_user_erp_daily_reports';
 
     protected $fillable = [
         'workspace_id',
         'pancake_user_id',
         'date',
-        'type',
         'total_orders',
         'total_sales',
         'returning',
         'delivered',
         'rts_rate',
-        'rmo_called',
     ];
 
     protected $casts = [
@@ -27,4 +25,10 @@ class PancakeUserDailyReport extends Model
         'rts_rate' => 'decimal:2',
         'pancake_user_id' => 'string',
     ];
+
+    public function scopeForWorkspaceRange($query, $workspaceId, $from, $to)
+    {
+        return $query->where('workspace_id', $workspaceId)
+            ->whereBetween('date', [$from, $to]);
+    }
 }

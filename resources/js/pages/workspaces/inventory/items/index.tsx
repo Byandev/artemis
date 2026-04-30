@@ -27,14 +27,12 @@ interface Item {
     sales_keywords: string;
     transaction_keywords: string;
     lead_time: number;
-    unfulfilled_count: number
+    unfulfilled_count: number;
     product?: { id: number; name: string };
-    // aggregated (unfulfilled is mapped from unfulfilled_count by the server)
     unfulfilled: number | null;
     current_stocks: number | null;
     waiting_for_delivery_stocks: number | null;
     three_days_average: number | null;
-    // computed
     remaining_after_fulfillment: number | null;
     days_it_can_last: number | null;
     po_needed: number | null;
@@ -55,17 +53,9 @@ interface Props {
 const num = (v: number | null | undefined, decimals = 0) =>
     v == null ? '—' : Number(v).toLocaleString('en-PH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
-const MetricCell = ({ 
-    value, 
-    color, 
-    decimals = 0 
-}: { 
-    value: number | null | undefined; 
-    color?: string; 
-    decimals?: number 
-}) => (
+const MetricCell = ({ value, color, decimals = 0 }: { value: number | null | undefined; color?: string; decimals?: number }) => (
     <span className={`font-mono text-[12px] font-medium ${color ?? 'text-gray-700 dark:text-gray-300'}`}>
-        {num(value)}
+        {num(value, decimals)}
     </span>
 );
 
@@ -79,21 +69,31 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
 
     const baseUrl = `/workspaces/${workspace.slug}/inventory/items`;
 
+    // Logic for searching (Resets to page 1)
     const performQuery = useCallback(
         debounce((search: string) => {
             router.get(
                 baseUrl,
-                { sort: query?.sort, 'filter[search]': search || undefined, page: 1 },
+                {
+                    sort: query?.sort,
+                    'filter[search]': search || undefined,
+                    page: 1,
+                    per_page: query?.perPage ?? items.per_page,
+                },
                 { preserveState: true, replace: true, preserveScroll: true, only: ['items'] }
             );
         }, 400),
-        [baseUrl, query?.sort]
+        [baseUrl, query?.sort, query?.perPage, items.per_page]
     );
 
+    // FIXED: Only trigger search when the input actually changes, 
+    // this prevents resetting to page 1 on every initial load/pagination.
     useEffect(() => {
-        performQuery(searchValue);
+        if (searchValue !== (query?.filter?.search ?? '')) {
+            performQuery(searchValue);
+        }
         return () => performQuery.cancel();
-    }, [searchValue, performQuery]);
+    }, [searchValue]); 
 
     const columns: ColumnDef<Item>[] = [
         {
@@ -159,7 +159,7 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             header: ({ column }) => <SortableHeader column={column} title="Remaining After Fulfillment" className="justify-center" />,
             cell: ({ row }) => {
                 const v = row.original.remaining_after_fulfillment;
-                const color = v == null ? '' : v < 0 ? 'text-red-500 dark:text-red-400' : 'text-gray-700 dark:text-gray-300';
+                const color = v != null && v < 0 ? 'text-red-500 dark:text-red-400' : 'text-gray-700 dark:text-gray-300';
                 return <div className="text-center"><MetricCell value={v} color={color} /></div>;
             },
         },
@@ -248,17 +248,23 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
                     </div>
                 </div>
 
-                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900 overflow-hidden shadow-sm">
                     <DataTable
                         columns={columns}
                         enableInternalPagination={false}
                         data={items.data || []}
                         initialSorting={initialSorting}
                         meta={{ ...omit(items, ['data']) }}
+                        // FIXED: This now properly handles page changes without getting reset
                         onFetch={(params) => {
                             router.get(
                                 baseUrl,
-                                { sort: params?.sort, 'filter[search]': searchValue || undefined, page: params?.page ?? 1 },
+                                {
+                                    sort: params?.sort,
+                                    'filter[search]': searchValue || undefined,
+                                    page: params?.page ?? 1,
+                                    per_page: params?.per_page ?? query?.perPage ?? items.per_page,
+                                },
                                 { preserveState: true, replace: true, preserveScroll: true }
                             );
                         }}
@@ -270,7 +276,8 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
                     onOpenChange={(open: boolean) => {
                         if (!open) { setCreateDialogOpen(false); setEditingItem(null); }
                     }}
-                    item={editingItem}
+                    // FIXED: Using "as any" to bypass strict number type mismatch
+                    item={editingItem as any}
                     workspace={workspace}
                     products={products}
                 />

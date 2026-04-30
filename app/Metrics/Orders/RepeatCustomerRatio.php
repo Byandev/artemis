@@ -2,6 +2,7 @@
 
 namespace App\Metrics\Orders;
 
+use App\Support\Metrics\OrdersFilter;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
@@ -19,15 +20,8 @@ final class RepeatCustomerRatio
         $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
-        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
-        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
-
         $base = DB::table('pancake_orders')
-            ->when(! empty($pageIds) || ! empty($shopIds), function ($q) use ($pageIds, $shopIds) {
-                $q->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-                    ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-                    ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds));
-            })
+            ->tap(fn ($q) => OrdersFilter::joinAndApply($q, $filter))
             ->where('pancake_orders.workspace_id', $workspaceId)
             ->where('pancake_orders.confirmed_at', '>=', $startAt)
             ->where('pancake_orders.confirmed_at', '<', $endExclusive)
@@ -79,9 +73,6 @@ final class RepeatCustomerRatio
         $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
-        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
-        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
-
         $customerTotals = DB::table('pancake_orders')
             ->where('workspace_id', $workspaceId)
             ->where('confirmed_at', '>=', $startAt)
@@ -99,8 +90,7 @@ final class RepeatCustomerRatio
             ->where('po.confirmed_at', '<', $endExclusive)
             ->whereNotNull('po.customer_id')
             ->whereNotIn('po.status', [6, 7])
-            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-            ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->groupBy('pages.id', 'pages.name')
             ->selectRaw('
                 pages.id as page_id,
@@ -118,9 +108,6 @@ final class RepeatCustomerRatio
     {
         $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
-
-        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
-        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
 
         $customerTotals = DB::table('pancake_orders')
             ->where('workspace_id', $workspaceId)
@@ -141,8 +128,7 @@ final class RepeatCustomerRatio
             ->whereNotNull('po.customer_id')
             ->whereNotIn('po.status', [6, 7])
             ->whereNotNull('pages.shop_id')
-            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-            ->when(! empty($shopIds), fn ($q) => $q->whereIn('shops.id', $shopIds))
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->groupBy('shops.id', 'shops.name')
             ->selectRaw('
                 shops.id as shop_id,
@@ -165,9 +151,7 @@ final class RepeatCustomerRatio
         $cohort = $this->buildCohortQuery($workspaceId, $filter, $startAt, $endExclusive);
 
         $ordersUpToEnd = DB::table('pancake_orders as po')
-            ->when($this->needsPagesJoin($filter), function (Builder $query) {
-                $query->join('pages', 'pages.id', '=', 'po.page_id');
-            })
+            ->tap(fn ($q) => OrdersFilter::joinAndApply($q, $filter, false, 'po'))
             ->joinSub(
                 $this->buildCohortCustomerIdsQuery($workspaceId, $filter, $startAt, $endExclusive),
                 'c2',
@@ -180,20 +164,6 @@ final class RepeatCustomerRatio
             ->where('po.confirmed_at', '<', $endExclusive)
             ->whereNotNull('po.customer_id')
             ->whereNotIn('po.status', [6, 7])
-            ->when(! empty($filter['page_ids']), function (Builder $query) use ($filter) {
-                $pageIds = is_array($filter['page_ids'])
-                    ? $filter['page_ids']
-                    : explode(',', $filter['page_ids']);
-
-                $query->whereIn('pages.id', $pageIds);
-            })
-            ->when(! empty($filter['shop_ids']), function (Builder $query) use ($filter) {
-                $shopIds = is_array($filter['shop_ids'])
-                    ? $filter['shop_ids']
-                    : explode(',', $filter['shop_ids']);
-
-                $query->whereIn('pages.shop_id', $shopIds);
-            })
             ->groupBy('po.customer_id')
             ->selectRaw('po.customer_id as customer_key, COUNT(*) as orders_count');
 
@@ -219,9 +189,6 @@ final class RepeatCustomerRatio
         $startAt = Carbon::parse($dateRange['start_date'])->startOfDay()->toDateTimeString();
         $endExclusive = Carbon::parse($dateRange['end_date'])->addDay()->startOfDay()->toDateTimeString();
 
-        $pageIds = $this->resolveIds($filter['page_ids'] ?? []);
-        $shopIds = $this->resolveIds($filter['shop_ids'] ?? []);
-
         $customerTotals = DB::table('pancake_orders')
             ->where('workspace_id', $workspaceId)
             ->where('confirmed_at', '>=', $startAt)
@@ -240,8 +207,7 @@ final class RepeatCustomerRatio
             ->where('po.confirmed_at', '<', $endExclusive)
             ->whereNotNull('po.customer_id')
             ->whereNotIn('po.status', [6, 7])
-            ->when(! empty($pageIds), fn ($q) => $q->whereIn('pages.id', $pageIds))
-            ->when(! empty($shopIds), fn ($q) => $q->whereIn('pages.shop_id', $shopIds))
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->groupBy('users.id', 'users.name')
             ->selectRaw('
                 users.id as user_id,
@@ -262,28 +228,12 @@ final class RepeatCustomerRatio
         string $endExclusive
     ): Builder {
         return DB::table('pancake_orders')
-            ->when($this->needsPagesJoin($filter), function (Builder $query) {
-                $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id');
-            })
+            ->tap(fn ($q) => OrdersFilter::joinAndApply($q, $filter))
             ->where('pancake_orders.workspace_id', $workspaceId)
             ->where('pancake_orders.confirmed_at', '>=', $startAt)
             ->where('pancake_orders.confirmed_at', '<', $endExclusive)
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(! empty($filter['page_ids']), function (Builder $query) use ($filter) {
-                $pageIds = is_array($filter['page_ids'])
-                    ? $filter['page_ids']
-                    : explode(',', $filter['page_ids']);
-
-                $query->whereIn('pages.id', $pageIds);
-            })
-            ->when(! empty($filter['shop_ids']), function (Builder $query) use ($filter) {
-                $shopIds = is_array($filter['shop_ids'])
-                    ? $filter['shop_ids']
-                    : explode(',', $filter['shop_ids']);
-
-                $query->whereIn('pages.shop_id', $shopIds);
-            })
             ->groupBy('pancake_orders.customer_id')
             ->selectRaw('pancake_orders.customer_id as customer_key');
     }
@@ -295,28 +245,12 @@ final class RepeatCustomerRatio
         string $endExclusive
     ): Builder {
         return DB::table('pancake_orders')
-            ->when($this->needsPagesJoin($filter), function (Builder $query) {
-                $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id');
-            })
+            ->tap(fn ($q) => OrdersFilter::joinAndApply($q, $filter))
             ->where('pancake_orders.workspace_id', $workspaceId)
             ->where('pancake_orders.confirmed_at', '>=', $startAt)
             ->where('pancake_orders.confirmed_at', '<', $endExclusive)
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(! empty($filter['page_ids']), function (Builder $query) use ($filter) {
-                $pageIds = is_array($filter['page_ids'])
-                    ? $filter['page_ids']
-                    : explode(',', $filter['page_ids']);
-
-                $query->whereIn('pages.id', $pageIds);
-            })
-            ->when(! empty($filter['shop_ids']), function (Builder $query) use ($filter) {
-                $shopIds = is_array($filter['shop_ids'])
-                    ? $filter['shop_ids']
-                    : explode(',', $filter['shop_ids']);
-
-                $query->whereIn('pages.shop_id', $shopIds);
-            })
             ->groupBy('pancake_orders.customer_id')
             ->select('pancake_orders.customer_id');
     }

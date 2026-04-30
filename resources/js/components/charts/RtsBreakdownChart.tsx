@@ -34,9 +34,13 @@ export default function RtsBreakdownChart({ rows }: Props) {
         stroke: { show: true, width: 2, colors: ['transparent'] },
         xaxis: {
             categories,
+            tickPlacement: 'on',
             axisBorder: { show: false },
             axisTicks: { show: false },
             labels: {
+                rotate: -35,
+                rotateAlways: categories.length > 5,
+                offsetY: 6,
                 style: { fontSize: '11px', fontFamily: 'DM Mono, monospace', colors: '#9CA3AF' },
             },
         },
@@ -53,7 +57,7 @@ export default function RtsBreakdownChart({ rows }: Props) {
             strokeDashArray: 4,
             yaxis: { lines: { show: true } },
             xaxis: { lines: { show: false } },
-            padding: { top: 0, right: 8, bottom: 0, left: 8 },
+            padding: { top: 0, right: 8, bottom: 12, left: 8 },
         },
         tooltip: {
             custom: ({ dataPointIndex, w }) => {

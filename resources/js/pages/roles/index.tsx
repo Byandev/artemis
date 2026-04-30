@@ -17,6 +17,7 @@ import {
     AlertTriangle,
     ShieldCheck,
     MoreHorizontal,
+    KeyRound,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast, Toaster } from 'sonner';
@@ -30,6 +31,9 @@ import { toFrontendSort } from '@/lib/sort';
 import { omit } from 'lodash';
 import * as rolesRoute from '@/routes/roles';
 import clsx from 'clsx';
+import { Can } from '@/components/can';
+import { usePermission } from '@/hooks/use-permission';
+import { PERMISSIONS } from '@/constants/permissions';
 
 interface Props {
     roles: PaginatedData<Role>;
@@ -68,6 +72,11 @@ export default function Index({ roles, workspace, query }: Props) {
     const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
     const [openFormModal, setOpenFormModal] = useState(false);
 
+    const canEdit = usePermission(PERMISSIONS.EditRoles);
+    const canDelete = usePermission(PERMISSIONS.DeleteRoles);
+    const canManagePerms = usePermission(PERMISSIONS.ManageRolePermissions);
+    const showActions = canEdit || canDelete || canManagePerms;
+
     useEffect(() => {
         const timer = setTimeout(() => {
             router.get(
@@ -76,6 +85,7 @@ export default function Index({ roles, workspace, query }: Props) {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
                     page: searchValue ? 1 : query?.page ?? 1,
+                    per_page: query?.perPage ?? roles.per_page,
                 },
                 { preserveState: true, replace: true, preserveScroll: true, only: ['roles'] },
             );
@@ -134,40 +144,56 @@ export default function Index({ roles, workspace, query }: Props) {
             header: ({ column }) => <SortableHeader column={column} title="Status" />,
             cell: ({ row }) => <StatusBadge deletedAt={row.original.deleted_at} />,
         },
-        {
-            id: 'actions',
-            cell: ({ row }) => (
-                <div className="flex justify-end">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
-                            {!row.original.deleted_at ? (
-                                <>
-                                    <DropdownMenuItem onClick={() => { setSelectedRole(row.original); setOpenFormModal(true); }}>
-                                        <Pencil />
-                                        Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem variant="destructive" onClick={() => { setSelectedRole(row.original); setIsArchiveModalOpen(true); }}>
-                                        <Archive />
-                                        Archive
-                                    </DropdownMenuItem>
-                                </>
-                            ) : (
-                                <DropdownMenuItem onClick={() => { setSelectedRole(row.original); setIsRestoreModalOpen(true); }}>
-                                    <RefreshCcw />
-                                    Restore
-                                </DropdownMenuItem>
-                            )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            ),
-        },
+        ...(showActions
+            ? [{
+                id: 'actions',
+                cell: ({ row }) => (
+                    <div className="flex justify-end">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
+                                    <MoreHorizontal className="h-3.5 w-3.5" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                                {!row.original.deleted_at ? (
+                                    <>
+                                        {canEdit && (
+                                            <DropdownMenuItem onClick={() => { setSelectedRole(row.original); setOpenFormModal(true); }}>
+                                                <Pencil />
+                                                Edit
+                                            </DropdownMenuItem>
+                                        )}
+                                        {canManagePerms && (
+                                            <DropdownMenuItem onClick={() => router.get(`/workspaces/${workspace.slug}/roles/${row.original.id}/permissions`)}>
+                                                <KeyRound />
+                                                Manage Permissions
+                                            </DropdownMenuItem>
+                                        )}
+                                        {canDelete && (
+                                            <>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem variant="destructive" onClick={() => { setSelectedRole(row.original); setIsArchiveModalOpen(true); }}>
+                                                    <Archive />
+                                                    Archive
+                                                </DropdownMenuItem>
+                                            </>
+                                        )}
+                                    </>
+                                ) : (
+                                    canDelete && (
+                                        <DropdownMenuItem onClick={() => { setSelectedRole(row.original); setIsRestoreModalOpen(true); }}>
+                                            <RefreshCcw />
+                                            Restore
+                                        </DropdownMenuItem>
+                                    )
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                ),
+            } as ColumnDef<Role>]
+            : []),
     ];
 
     return (
@@ -190,12 +216,14 @@ export default function Index({ roles, workspace, query }: Props) {
                     title="Role Management"
                     description="Define and manage access levels for your workspace"
                 >
-                    <button
-                        onClick={() => { setSelectedRole(undefined); setOpenFormModal(true); }}
-                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
-                    >
-                        Add New Role
-                    </button>
+                    <Can permission={PERMISSIONS.CreateRoles}>
+                        <button
+                            onClick={() => { setSelectedRole(undefined); setOpenFormModal(true); }}
+                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
+                        >
+                            Add New Role
+                        </button>
+                    </Can>
                 </PageHeader>
 
                 <div className="mb-3 flex items-center gap-2">
@@ -225,6 +253,7 @@ export default function Index({ roles, workspace, query }: Props) {
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
                                     page: params?.page ?? 1,
+                                    per_page: params?.per_page ?? query?.perPage ?? roles.per_page,
                                 },
                                 { preserveState: true, replace: true, preserveScroll: true },
                             );

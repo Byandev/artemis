@@ -8,6 +8,7 @@ export interface Workspace {
     slug: string;
     owner_id: number;
     show_inventory: boolean;
+    show_finance: boolean;
     created_at: string;
     updated_at: string;
 

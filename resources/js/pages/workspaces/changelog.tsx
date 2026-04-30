@@ -12,6 +12,263 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.0.2',
+        date: '2026-04-27',
+        sections: [
+            {
+                title: 'Fixes',
+                items: [
+                    'Analytics Rollup — page daily metrics with no activity (all-zero counts and amounts) are no longer written to the rollup table, keeping the metrics dataset compact and avoiding empty rows for inactive pages',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.0.1',
+        date: '2026-04-27',
+        sections: [
+            {
+                title: 'Fixes',
+                items: [
+                    'Purchased Orders — fixed a missing AuthorizesRequests import that caused authorization checks to fail on the Purchased Orders controller',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.0.0',
+        date: '2026-04-27',
+        sections: [
+            {
+                title: 'Artemis — Public Launch',
+                items: [
+                    'Rebranded from ecomm-control-hub to Artemis — the analytics & automation platform for Philippine COD e-commerce',
+                    'New public marketing site with Hunt down RTS positioning — hero, problem, features, free trial, how it works, real seller results, and FAQ sections',
+                    'New /rts-calculator page — sellers can quantify their monthly RTS bleed in pesos before signing up',
+                    'New about, blog, contact, privacy, terms, data-policy, and security pages',
+                    'New Artemis logo, emerald brand palette, and dark/light theme toggle on all marketing pages',
+                ],
+            },
+            {
+                title: 'Subscriptions',
+                items: [
+                    'Subscription management UI — workspaces can now view their plan, current period, and billing status',
+                    'Plan selection and upgrade flow built on top of the v2.7.1 subscriptions foundation',
+                    '14-day free trial flow — new workspaces start on a trial subscription with no credit card required',
+                    'Plan tier gating across feature surfaces (gracefully shown rather than hidden when out of plan)',
+                ],
+            },
+            {
+                title: 'Roles & Permissions',
+                items: [
+                    'Reworked permissions engine — roles now resolve through a single source of truth across workspace, module, and action layers',
+                    'Per-action permission checks across Members, Roles, Orders, Products, Teams, Inventory, Reports, Shops, and API Keys',
+                    'Workspace members with the manage-api-keys permission can now generate and revoke API keys without owner intervention',
+                    'Bypass mode for owner-level accounts to keep workspace recovery flows working when permissions are misconfigured',
+                ],
+            },
+            {
+                title: 'Finance — Remittances',
+                items: [
+                    'Detailed remittance management view with per-account balance, transaction history, and date-range filters',
+                    'Bulk import from Excel — paste or upload remittance entries in batches with validation and preview before commit',
+                    'Inline edit and delete of individual remittance entries from the management view',
+                ],
+            },
+            {
+                title: 'Shops',
+                items: [
+                    'Shops management view aligned with the Pages experience — search, sort, filter, and per-shop checklist progress',
+                    'Per-shop status badge and last-sync indicator',
+                ],
+            },
+            {
+                title: 'Performance & Polish',
+                items: [
+                    'Optimization pass on dashboard and analytics queries — faster initial loads with smaller payloads',
+                    'New skeleton loading states across dashboard, RTS analytics, and inventory pages',
+                    'Sidebar scrollbar fix — no longer overlaps content on narrow viewports',
+                    'Metrics pipeline tightened — fewer redundant recalculations across workspace metrics',
+                ],
+            },
+            {
+                title: 'Internal',
+                items: [
+                    'Marketing plan, content playbook, and post calendar documents added to the repository for the launch',
+                    'Project documentation refreshed to reflect the Artemis brand and RTS-first positioning',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v2.7.1',
+        date: '2026-04-24',
+        sections: [
+            {
+                title: 'RMO Management',
+                items: [
+                    'Copy rider and customer phone numbers for the first 10 pending orders directly from the RMO Management view (currently enabled on efb.on-forge.com)',
+                    'Parcel Update Notification template form now validates empty text areas before saving',
+                ],
+            },
+            {
+                title: 'Sidebar',
+                items: [
+                    'Removed duplicate RTS entry from the workspace sidebar',
+                ],
+            },
+            {
+                title: 'Forms',
+                items: [
+                    'Polish pass across Inventory Items, Purchased Orders, Products, Teams, and Employees dialogs — tightened validation and layout consistency',
+                ],
+            },
+            {
+                title: 'Internal',
+                items: [
+                    'Subscriptions foundation — new subscription_plans catalog and workspace_subscriptions tables, plan tier constants, idempotent plan seeder, and a subscription relation on Workspace (no user-facing UI yet)',
+                    'Build config fix in vite.config.ts',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v2.7.0',
+        date: '2026-04-22',
+        sections: [
+            {
+                title: 'Analytics Optimization',
+                items: [
+                    'Analytics rollup — new scheduled command precomputes order metrics so dashboards load from aggregated data instead of recalculating per request',
+                    'Backfill command for populating analytics rollups across historical date ranges',
+                    'Order metrics (AOV, totals, lifetime value, repeat/retention, delivery timing, RTS averages) refactored to read from rollups — significantly faster queries',
+                    'Parcel journey metrics (SMS sent, tracked orders, total for delivery) now use the same optimized pipeline',
+                ],
+            },
+            {
+                title: 'Inventory Items',
+                items: [
+                    'Purchased Orders view per inventory item, with pagination',
+                    'Fixed inventory transaction bugs affecting stock calculations',
+                ],
+            },
+            {
+                title: 'RMO Management',
+                items: [
+                    'Call logs are now visible directly on the RMO management dashboard',
+                    'Phone numbers can be edited in place from the RMO management view',
+                    'Parcel status label updated and redundant update logic removed',
+                ],
+            },
+            {
+                title: 'CSR Mobile API',
+                items: [
+                    'New call log synchronization and KPI endpoints for the CSR mobile client',
+                    'Call logs moved to a dedicated table with separated KPI calculations for improved accuracy',
+                    'Call log sync batches database updates to reduce load during large imports',
+                ],
+            },
+            {
+                title: 'SuperAdmin Panel',
+                items: [
+                    'SuperAdmin panel added with cross-workspace oversight views',
+                    'Casing and styling adjustments for consistency with the rest of the app',
+                ],
+            },
+            {
+                title: 'Finance',
+                items: [
+                    'Initial rollout of finance features (feat/finance)',
+                ],
+            },
+            {
+                title: 'Parcel Journey',
+                items: [
+                    'Parcel journey template support added (feat/pj-template)',
+                    'parcel_status added to OrderForDelivery for faster filtering and is now nullable',
+                ],
+            },
+            {
+                title: 'Internal',
+                items: [
+                    'Sentry integration added for error monitoring',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v2.6.0',
+        date: '2026-04-16',
+        sections: [
+            {
+                title: 'Workspace Checklist',
+                items: [
+                    'New Checklist page in the workspace sidebar — define reusable tasks that apply to Shop or Page targets',
+                    'Each checklist item has a title, target type (Shop or Page), and a required flag shown as a yes/no badge',
+                    'Add, edit, and delete checklist items from a shared modal with validation',
+                    'Pages and Shops list rows now include a "View Checklist" action that opens a drawer showing per-target progress',
+                    'Optimistic toggle flow — checking or unchecking an item updates instantly and records who completed it',
+                    'Pages and Shops sort indicator now reflects how many required checklist items are still pending per target',
+                ],
+            },
+            {
+                title: 'Purchased Orders',
+                items: [
+                    'All columns are now sortable, with sort state persisted in the URL query string',
+                    'Create form enforces a strict YYYY-MM-DD issue date and disables submit until required fields are valid',
+                ],
+            },
+            {
+                title: 'Inventory Items',
+                items: [
+                    'Lead Time, Unfulfilled Count, 3-Day Average, and Created Date columns are now sortable',
+                ],
+            },
+            {
+                title: 'RMO Management',
+                items: [
+                    'Filter state is now preserved correctly after navigation — fixed a regression where assignee/status filters would reset',
+                ],
+            },
+            {
+                title: 'Tables',
+                items: [
+                    'Default page size is now 10 rows across CSR Management, CSR Analytics, RTS Analytics breakdowns (Ad, Confirmed By, Product, Rider), Parcel Templates, Roles, Inventory Purchased Orders, Ads Optimization Rules, and the public API endpoints (Users, RMO, CSR Daily Records)',
+                    'Row numbering now starts from the correct offset on every paginated table across the system',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v2.5.1',
+        date: '2026-04-16',
+        sections: [
+            {
+                title: 'CSR Analytics',
+                items: [
+                    'RMO Total For Delivery — new sortable column showing orders assigned to the CSR as conferrer within the selected date range',
+                    'RMO Productivity — new sortable column showing RMO called as a percentage of RMO Total For Delivery',
+                    'Assignee filter now counts total orders by confirmed_by, so the stat card matches the filtered CSR',
+                ],
+            },
+            {
+                title: 'RMO Management',
+                items: [
+                    'Status picker, Assign to me, and Remove assignee are disabled unless the order\'s delivery date is today — backend validation mirrors the UI',
+                    'Date picker moved to the right side of the toolbar, next to the Show/Hide Statistics button',
+                ],
+            },
+            {
+                title: 'CSR ERP Sync',
+                items: [
+                    'Schedule replaced: backfill runs at 2/3/4/5 AM for 2–5 days ago, plus 12 PM and 3 PM runs for yesterday (previously twice daily at 10 and 22)',
+                    'New --date option on trigger-fetch-csr-erp-dail-records accepts any Carbon-parseable value for ad-hoc backfills',
+                    'Sync now only targets ACTIVE Pancake users',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v2.5.0',
         date: '2026-04-14',
         sections: [
@@ -389,6 +646,20 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v3.0.2':
+        'bg-teal-500/10 text-teal-600 dark:text-teal-400 ring-teal-500/20',
+    'v3.0.1':
+        'bg-green-500/10 text-green-600 dark:text-green-400 ring-green-500/20',
+    'v3.0.0':
+        'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20',
+    'v2.7.1':
+        'bg-lime-500/10 text-lime-600 dark:text-lime-400 ring-lime-500/20',
+    'v2.7.0':
+        'bg-purple-500/10 text-purple-600 dark:text-purple-400 ring-purple-500/20',
+    'v2.6.0':
+        'bg-pink-500/10 text-pink-600 dark:text-pink-400 ring-pink-500/20',
+    'v2.5.1':
+        'bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 ring-fuchsia-500/20',
     'v2.5.0':
         'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 ring-indigo-500/20',
     'v2.4.4':

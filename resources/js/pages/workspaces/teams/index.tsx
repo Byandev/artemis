@@ -18,6 +18,9 @@ import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import { MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { Can } from '@/components/can';
+import { usePermission } from '@/hooks/use-permission';
+import { PERMISSIONS } from '@/constants/permissions';
 
 interface Team {
     id: number;
@@ -45,6 +48,10 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, query }
     const [editingTeam, setEditingTeam] = useState<Team | null>(null);
     const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+
+    const canEditTeams = usePermission(PERMISSIONS.EditTeams);
+    const canDeleteTeams = usePermission(PERMISSIONS.DeleteTeams);
+    const showActions = canEditTeams || canDeleteTeams;
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -90,34 +97,40 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, query }
                 );
             },
         },
-        {
-            id: 'actions',
-            cell: ({ row }) => {
-                const team = row.original;
-                return (
-                    <div className="flex justify-end">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
-                                    <MoreHorizontal className="h-3.5 w-3.5" />
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-36">
-                                <DropdownMenuItem onClick={() => setEditingTeam(team)}>
-                                    <Pencil />
-                                    Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem variant="destructive" onClick={() => setTeamToDelete(team)}>
-                                    <Trash2 />
-                                    Delete
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                );
-            },
-        },
+        ...(showActions
+            ? [{
+                id: 'actions',
+                cell: ({ row }) => {
+                    const team = row.original;
+                    return (
+                        <div className="flex justify-end">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
+                                        <MoreHorizontal className="h-3.5 w-3.5" />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-36">
+                                    {canEditTeams && (
+                                        <DropdownMenuItem onClick={() => setEditingTeam(team)}>
+                                            <Pencil />
+                                            Edit
+                                        </DropdownMenuItem>
+                                    )}
+                                    {canEditTeams && canDeleteTeams && <DropdownMenuSeparator />}
+                                    {canDeleteTeams && (
+                                        <DropdownMenuItem variant="destructive" onClick={() => setTeamToDelete(team)}>
+                                            <Trash2 />
+                                            Delete
+                                        </DropdownMenuItem>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    );
+                },
+            } as ColumnDef<Team>]
+            : []),
     ];
 
     return (
@@ -125,12 +138,14 @@ export default function TeamsIndex({ workspace, teams, workspaceMembers, query }
             <Head title={`${workspace.name} - Teams`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader title="Teams" description="Organize members into teams for better collaboration">
-                        <button
-                            onClick={() => setCreateDialogOpen(true)}
-                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
-                        >
-                            Create Team
-                        </button>
+                        <Can permission={PERMISSIONS.CreateTeams}>
+                            <button
+                                onClick={() => setCreateDialogOpen(true)}
+                                className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
+                            >
+                                Create Team
+                            </button>
+                        </Can>
                 </PageHeader>
 
                 <div className="mb-3 flex items-center gap-2">

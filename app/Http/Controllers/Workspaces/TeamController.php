@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -13,15 +15,11 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class TeamController extends Controller
 {
-    /**
-     * Display a listing of teams.
-     */
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
-        // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
+        $this->authorize(Permission::ViewTeams->value, $workspace);
 
         $teams = QueryBuilder::for(Team::ofWorkspace($workspace)->withCount('members')->with(['members:id,name,email']))
             ->allowedFilters([
@@ -50,15 +48,9 @@ class TeamController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created team in storage.
-     */
     public function store(Request $request, Workspace $workspace)
     {
-        // Check if user has admin access
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have permission to create teams.');
-        }
+        $this->authorize(Permission::CreateTeams->value, $workspace);
 
         $validated = $request->validate([
             'name' => [
@@ -79,7 +71,6 @@ class TeamController extends Controller
         ]);
 
         if (! empty($validated['members'])) {
-            // Validate that all selected members are part of the workspace
             $validMemberIds = $workspace->users()
                 ->whereIn('users.id', $validated['members'])
                 ->pluck('users.id');
@@ -90,19 +81,12 @@ class TeamController extends Controller
         return redirect()->back()->with('success', 'Team created successfully.');
     }
 
-    /**
-     * Update the specified team in storage.
-     */
     public function update(Request $request, Workspace $workspace, Team $team)
     {
-        // Check if user has admin access
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have permission to update teams.');
-        }
+        $this->authorize(Permission::EditTeams->value, $workspace);
 
-        // Ensure the team belongs to the workspace
         if ($team->workspace_id !== $workspace->id) {
-            abort(404);
+            abort(403, 'This team does not belong to the current workspace.');
         }
 
         $validated = $request->validate([
@@ -115,7 +99,6 @@ class TeamController extends Controller
             'name' => $validated['name'],
         ]);
 
-        // Validate that all selected members are part of the workspace
         $validMemberIds = $workspace->users()
             ->whereIn('users.id', $validated['members'] ?? [])
             ->pluck('users.id');
@@ -125,19 +108,12 @@ class TeamController extends Controller
         return redirect()->back()->with('success', 'Team updated successfully.');
     }
 
-    /**
-     * Remove the specified team from storage.
-     */
     public function destroy(Request $request, Workspace $workspace, Team $team)
     {
-        // Check if user has admin access
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have permission to delete teams.');
-        }
+        $this->authorize(Permission::DeleteTeams->value, $workspace);
 
-        // Ensure the team belongs to the workspace
         if ($team->workspace_id !== $workspace->id) {
-            abort(404);
+            abort(403, 'This team does not belong to the current workspace.');
         }
 
         $team->delete();

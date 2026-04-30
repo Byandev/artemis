@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Http\Controllers\Controller;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 
 class WorkspaceSetupController extends Controller
@@ -44,17 +47,33 @@ class WorkspaceSetupController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'min:3'],
             'description' => ['nullable', 'string', 'max:1000'],
+            'monthly_order_volume' => ['nullable', 'string', 'in:below-500,500-1000,1000-5000,5000-10000,above-10000'],
         ]);
 
         // Create the workspace
         $workspace = Workspace::create([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
+            'monthly_order_volume' => $validated['monthly_order_volume'] ?? null,
             'owner_id' => $request->user()->id,
         ]);
 
         // Add the user as owner in the pivot table
         $workspace->users()->attach($request->user()->id, ['role' => 'owner']);
+
+        // Start free trial subscription
+        $freeTrial = SubscriptionPlan::where('code', SubscriptionPlan::CODE_FREE_TRIAL)->first();
+        if ($freeTrial) {
+            $now = Carbon::now();
+            Subscription::create([
+                'workspace_id' => $workspace->id,
+                'subscription_plan_id' => $freeTrial->id,
+                'status' => Subscription::STATUS_TRIALING,
+                'trial_ends_at' => $now->copy()->addDays($freeTrial->trial_days ?? 14),
+                'current_period_start' => $now,
+                'current_period_end' => $now->copy()->addDays($freeTrial->trial_days ?? 14),
+            ]);
+        }
 
         // Set as current workspace
         session(['current_workspace_id' => $workspace->id]);

@@ -7,10 +7,20 @@ interface Props {
     userName: string;
 }
 
+const volumeOptions = [
+    { value: '', label: 'Select range' },
+    { value: 'below-500', label: 'Below 500' },
+    { value: '500-1000', label: '500 – 1,000' },
+    { value: '1000-5000', label: '1,000 – 5,000' },
+    { value: '5000-10000', label: '5,000 – 10,000' },
+    { value: 'above-10000', label: '10,000+' },
+];
+
 export default function WorkspaceSetup({ userName }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         name: `${userName}'s Workspace`,
         description: '',
+        monthly_order_volume: '',
     });
 
     const submit: FormEventHandler = (e) => {
@@ -43,6 +53,28 @@ export default function WorkspaceSetup({ userName }: Props) {
                         {errors.name
                             ? <p className="font-mono text-[11px] text-red-500">{errors.name}</p>
                             : <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">You can always change this later.</p>
+                        }
+                    </div>
+
+                    {/* Monthly order volume */}
+                    <div className="space-y-1.5">
+                        <label htmlFor="monthly_order_volume" className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                            Monthly order volume
+                        </label>
+                        <select
+                            id="monthly_order_volume"
+                            name="monthly_order_volume"
+                            value={data.monthly_order_volume}
+                            onChange={e => setData('monthly_order_volume', e.target.value)}
+                            className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:focus:border-emerald-400"
+                        >
+                            {volumeOptions.map((opt) => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                        </select>
+                        {errors.monthly_order_volume
+                            ? <p className="font-mono text-[11px] text-red-500">{errors.monthly_order_volume}</p>
+                            : <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">Approximate range — helps us tailor your experience.</p>
                         }
                     </div>
 

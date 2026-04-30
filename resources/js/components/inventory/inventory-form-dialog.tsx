@@ -82,15 +82,19 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
     const inputClass = "h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400";
     const labelClass = "block font-mono! text-[10px]! font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500";
 
+    // Helper to ensure values are non-negative integers
+    const handleNumericChange = (key: keyof typeof data, value: string) => {
+        const parsed = parseInt(value) || 0;
+        setData(key as any, Math.max(0, parsed));
+    };
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-xl">
                 <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
-                            {isEditing
-                                ? 'Edit Transaction'
-                                : 'Log New Transaction'}
+                            {isEditing ? 'Edit Transaction' : 'Log New Transaction'}
                         </DialogTitle>
                         <DialogDescription className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
                             {isEditing
@@ -125,34 +129,24 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
                         <div className="grid grid-cols-2 gap-4">
                             <div className="items-center justify-center space-y-1.5">
                                 <label className={labelClass}>
-                                    Transaction Date{' '}
-                                    <span className="text-red-400">*</span>
+                                    Transaction Date <span className="text-red-400">*</span>
                                 </label>
                                 <input
                                     type="date"
                                     value={data.date}
-                                    onChange={(e) =>
-                                        setData('date', e.target.value)
-                                    }
+                                    onChange={(e) => setData('date', e.target.value)}
                                     className={inputClass}
                                 />
-                                {errors.date && (
-                                    <p className="text-[11px] text-red-500">
-                                        {errors.date}
-                                    </p>
-                                )}
+                                {errors.date && <p className="text-[11px] text-red-500">{errors.date}</p>}
                             </div>
                             <div className="space-y-1.5">
                                 <label className={labelClass}>
-                                    Reference No.{' '}
-                                    <span className="text-red-400">*</span>
+                                    Reference No. <span className="text-red-400">*</span>
                                 </label>
                                 <input
                                     type="text"
                                     value={data.ref_no}
-                                    onChange={(e) =>
-                                        setData('ref_no', e.target.value)
-                                    }
+                                    onChange={(e) => setData('ref_no', e.target.value)}
                                     placeholder="PO-001"
                                     className={inputClass}
                                 />
@@ -163,36 +157,26 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <label className={labelClass}>
-                                    PO Quantity In{' '}
-                                    <span className="text-red-400">*</span>
+                                    PO Quantity In <span className="text-red-400">*</span>
                                 </label>
                                 <input
                                     type="number"
+                                    min="0"
                                     value={data.po_qty_in}
-                                    onChange={(e) =>
-                                        setData(
-                                            'po_qty_in',
-                                            parseInt(e.target.value) || 0,
-                                        )
-                                    }
+                                    onChange={(e) => handleNumericChange('po_qty_in', e.target.value)}
                                     className={inputClass}
                                 />
                                 {errors.po_qty_in && <p className="text-[11px] text-red-500">{errors.po_qty_in}</p>}
                             </div>
                             <div className="space-y-1.5">
                                 <label className={labelClass}>
-                                    PO Quantity Out{' '}
-                                    <span className="text-red-400">*</span>
+                                    PO Quantity Out <span className="text-red-400">*</span>
                                 </label>
                                 <input
                                     type="number"
+                                    min="0"
                                     value={data.po_qty_out}
-                                    onChange={(e) =>
-                                        setData(
-                                            'po_qty_out',
-                                            parseInt(e.target.value) || 0,
-                                        )
-                                    }
+                                    onChange={(e) => handleNumericChange('po_qty_out', e.target.value)}
                                     className={inputClass}
                                 />
                                 {errors.po_qty_out && <p className="text-[11px] text-red-500">{errors.po_qty_out}</p>}
@@ -202,36 +186,26 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <label className={labelClass}>
-                                    Rts Goods In{' '}
-                                    <span className="text-red-400">*</span>
+                                    Rts Goods In <span className="text-red-400">*</span>
                                 </label>
                                 <input
                                     type="number"
+                                    min="0"
                                     value={data.rts_goods_in}
-                                    onChange={(e) =>
-                                        setData(
-                                            'rts_goods_in',
-                                            parseInt(e.target.value) || 0,
-                                        )
-                                    }
+                                    onChange={(e) => handleNumericChange('rts_goods_in', e.target.value)}
                                     className={inputClass}
                                 />
                                 {errors.rts_goods_in && <p className="text-[11px] text-red-500">{errors.rts_goods_in}</p>}
                             </div>
                             <div className="space-y-1.5">
                                 <label className={labelClass}>
-                                    Rts Goods Out{' '}
-                                    <span className="text-red-400">*</span>
+                                    Rts Goods Out <span className="text-red-400">*</span>
                                 </label>
                                 <input
                                     type="number"
+                                    min="0"
                                     value={data.rts_goods_out}
-                                    onChange={(e) =>
-                                        setData(
-                                            'rts_goods_out',
-                                            parseInt(e.target.value) || 0,
-                                        )
-                                    }
+                                    onChange={(e) => handleNumericChange('rts_goods_out', e.target.value)}
                                     className={inputClass}
                                 />
                                 {errors.rts_goods_out && <p className="text-[11px] text-red-500">{errors.rts_goods_out}</p>}
@@ -241,36 +215,26 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <label className={labelClass}>
-                                    Rts Bad (Damaged){' '}
-                                    <span className="text-red-400">*</span>
+                                    Rts Bad (Damaged) <span className="text-red-400">*</span>
                                 </label>
                                 <input
                                     type="number"
+                                    min="0"
                                     value={data.rts_bad}
-                                    onChange={(e) =>
-                                        setData(
-                                            'rts_bad',
-                                            parseInt(e.target.value) || 0,
-                                        )
-                                    }
+                                    onChange={(e) => handleNumericChange('rts_bad', e.target.value)}
                                     className={inputClass}
                                 />
                                 {errors.rts_bad && <p className="text-[11px] text-red-500">{errors.rts_bad}</p>}
                             </div>
                             <div className="space-y-1.5">
                                 <label className={labelClass}>
-                                    Lost{' '}
-                                    <span className="text-red-400">*</span>
+                                    Lost <span className="text-red-400">*</span>
                                 </label>
                                 <input
                                     type="number"
+                                    min="0"
                                     value={data.lost}
-                                    onChange={(e) =>
-                                        setData(
-                                            'lost',
-                                            parseInt(e.target.value) || 0,
-                                        )
-                                    }
+                                    onChange={(e) => handleNumericChange('lost', e.target.value)}
                                     className={inputClass}
                                 />
                                 {errors.lost && <p className="text-[11px] text-red-500">{errors.lost}</p>}
@@ -280,18 +244,13 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <label className={labelClass}>
-                                    Remaining Quantity{' '}
-                                    <span className="text-red-400">*</span>
+                                    Remaining Quantity <span className="text-red-400">*</span>
                                 </label>
                                 <input
                                     type="number"
+                                    min="0"
                                     value={data.remaining_qty}
-                                    onChange={(e) =>
-                                        setData(
-                                            'remaining_qty',
-                                            parseInt(e.target.value) || 0,
-                                        )
-                                    }
+                                    onChange={(e) => handleNumericChange('remaining_qty', e.target.value)}
                                     className={inputClass}
                                 />
                                 {errors.remaining_qty && <p className="text-[11px] text-red-500">{errors.remaining_qty}</p>}
@@ -313,12 +272,8 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
                             className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                         >
                             {processing
-                                ? isEditing
-                                    ? 'Saving…'
-                                    : 'Creating…'
-                                : isEditing
-                                  ? 'Save Changes'
-                                  : 'Create Record'}
+                                ? (isEditing ? 'Saving…' : 'Creating…')
+                                : (isEditing ? 'Save Changes' : 'Create Record')}
                         </button>
                     </div>
                 </form>

@@ -17,10 +17,7 @@ class FetchPageOrders implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(public Page $page, public int $page_number, public int $startTime, public int $endTime)
-    {
-        $this->page->loadMissing('workspace');
-    }
+    public function __construct(public Page $page, public int $page_number, public int $startTime, public int $endTime) {}
 
     /**
      * Execute the job.

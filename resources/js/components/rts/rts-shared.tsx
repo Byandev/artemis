@@ -1,4 +1,4 @@
-import { BarChart2, Table } from 'lucide-react';
+import { BarChart2, RefreshCw, Table } from 'lucide-react';
 
 export type ViewMode = 'table' | 'chart';
 
@@ -126,6 +126,17 @@ export function rtsColor(value: number): string {
 
 export const RtsCell = ({ value }: { value: number }) => (
     <span className={rtsColor(value)}>{value}%</span>
+);
+
+export const RefreshButton = ({ onClick, loading }: { onClick: () => void; loading?: boolean }) => (
+    <button
+        onClick={onClick}
+        disabled={loading}
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-black/8 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600 disabled:opacity-50 dark:border-white/8 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-300"
+        title="Refresh"
+    >
+        <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+    </button>
 );
 
 export const ViewToggle = ({ value, onChange }: { value: ViewMode; onChange: (v: ViewMode) => void }) => (

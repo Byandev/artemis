@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ParcelJourney extends Model
 {
@@ -14,7 +15,7 @@ class ParcelJourney extends Model
 
     protected $appends = ['rider_name', 'rider_mobile'];
 
-    public function notifications(): ParcelJourney|\Illuminate\Database\Eloquent\Relations\HasMany
+    public function notifications(): ParcelJourney|HasMany
     {
         return $this->hasMany(ParcelJourneyNotification::class);
     }

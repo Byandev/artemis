@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Models\Page;
 use App\Models\Product;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -12,8 +15,12 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class ProductController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
+        $this->authorize(Permission::ViewProducts->value, $workspace);
+
         $products = QueryBuilder::for(Product::ofWorkspace($workspace))
             ->with('owner')
             ->allowedFilters([
@@ -38,7 +45,6 @@ class ProductController extends Controller
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
-        // Get unique categories for filter dropdown (exclude null/empty values)
         $categories = Product::ofWorkspace($workspace)
             ->select('category')
             ->whereNotNull('category')
@@ -51,6 +57,7 @@ class ProductController extends Controller
             'workspace' => $workspace,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
+                'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
             'categories' => $categories,
@@ -59,7 +66,8 @@ class ProductController extends Controller
 
     public function create(Workspace $workspace)
     {
-        $pages = \App\Models\Page::ofWorkspace($workspace)
+        $this->authorize(Permission::CreateProducts->value, $workspace);
+        $pages = Page::ofWorkspace($workspace)
             ->select('id', 'name')
             ->orderBy('name')
             ->get();
@@ -72,12 +80,7 @@ class ProductController extends Controller
 
     public function store(Request $request, Workspace $workspace)
     {
-        // Debug logging
-        \Log::info('Product Store Request', [
-            'all_data' => $request->all(),
-            'page_ids' => $request->page_ids,
-            'filled' => $request->filled('page_ids'),
-        ]);
+        $this->authorize(Permission::CreateProducts->value, $workspace);
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -106,10 +109,8 @@ class ProductController extends Controller
                 ->toMediaCollection('PRODUCT_IMAGE');
         }
 
-        // Assign pages to this product
         if ($request->filled('page_ids') && is_array($request->page_ids) && count($request->page_ids) > 0) {
-            \Log::info('Assigning pages to product', ['product_id' => $product->id, 'page_ids' => $request->page_ids]);
-            \App\Models\Page::whereIn('id', $request->page_ids)
+            Page::whereIn('id', $request->page_ids)
                 ->where('workspace_id', $workspace->id)
                 ->update(['product_id' => $product->id]);
         }
@@ -119,12 +120,12 @@ class ProductController extends Controller
 
     public function edit(Workspace $workspace, Product $product)
     {
-        $pages = \App\Models\Page::ofWorkspace($workspace)
+        $this->authorize(Permission::EditProducts->value, $workspace);
+        $pages = Page::ofWorkspace($workspace)
             ->select('id', 'name')
             ->orderBy('name')
             ->get();
 
-        // Load pages with the necessary columns (id, name, and product_id for the relationship)
         $product->load(['pages' => function ($query) {
             $query->select('id', 'name', 'product_id');
         }]);
@@ -138,6 +139,12 @@ class ProductController extends Controller
 
     public function update(Request $request, Workspace $workspace, Product $product)
     {
+        $this->authorize(Permission::EditProducts->value, $workspace);
+
+        if ($product->workspace_id !== $workspace->id) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:10|unique:products,code,'.$product->id.',id,workspace_id,'.$workspace->id,
@@ -165,13 +172,12 @@ class ProductController extends Controller
         }
 
         // Remove all existing page connections for this product
-        \App\Models\Page::where('product_id', $product->id)
+        Page::where('product_id', $product->id)
             ->where('workspace_id', $workspace->id)
             ->update(['product_id' => null]);
 
-        // Assign new page selections
         if ($request->filled('page_ids') && is_array($request->page_ids) && count($request->page_ids) > 0) {
-            \App\Models\Page::whereIn('id', $request->page_ids)
+            Page::whereIn('id', $request->page_ids)
                 ->where('workspace_id', $workspace->id)
                 ->update(['product_id' => $product->id]);
         }
@@ -181,6 +187,12 @@ class ProductController extends Controller
 
     public function destroy(Workspace $workspace, Product $product)
     {
+        $this->authorize(Permission::DeleteProducts->value, $workspace);
+
+        if ($product->workspace_id !== $workspace->id) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $product->delete();
 
         return redirect()->route('workspaces.products.index', $workspace->slug);

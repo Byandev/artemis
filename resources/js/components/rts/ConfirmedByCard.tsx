@@ -5,7 +5,7 @@ import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import RtsBreakdownChart from '@/components/charts/RtsBreakdownChart';
 import { PaginatedData } from '@/types';
 import { toFrontendSort } from '@/lib/sort';
-import { buildBaseParams, ConfirmedByRow, RtsCell, RtsQueryParams, ViewMode, ViewToggle } from './rts-shared';
+import { buildBaseParams, ConfirmedByRow, RefreshButton, RtsCell, RtsQueryParams, ViewMode, ViewToggle } from './rts-shared';
 
 interface Props {
     workspaceSlug: string;
@@ -18,11 +18,11 @@ export default function ConfirmedByCard({ workspaceSlug, queryParams }: Props) {
     const [sort, setSort] = useState('-total_orders');
     const [view, setView] = useState<ViewMode>('table');
 
-    const fetchPage = (page: number, currentSort: string) => {
+    const fetchPage = (page: number, currentSort: string, perPage = 15) => {
         setLoading(true);
         const p = buildBaseParams(queryParams);
         p.append('page', String(page));
-        p.append('per_page', '15');
+        p.append('per_page', String(perPage));
         p.append('sort', currentSort);
         fetch(`/workspaces/${workspaceSlug}/rts/analytics/group-by/confirmed-by?${p}`, { credentials: 'same-origin' })
             .then((res) => (res.ok ? res.json() : null))
@@ -67,7 +67,10 @@ export default function ConfirmedByCard({ workspaceSlug, queryParams }: Props) {
                     <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">By Confirmed By</h2>
                     <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">RTS rate broken down by confirming agent</p>
                 </div>
-                <ViewToggle value={view} onChange={setView} />
+                <div className="flex items-center gap-2">
+                        <RefreshButton onClick={() => fetchPage(1, sort)} loading={loading} />
+                        <ViewToggle value={view} onChange={setView} />
+                    </div>
             </div>
             <div className="p-4">
                 {loading ? (
@@ -89,7 +92,7 @@ export default function ConfirmedByCard({ workspaceSlug, queryParams }: Props) {
                         onFetch={(params) => {
                             const s = params?.sort as string ?? '-total_orders';
                             setSort(s);
-                            fetchPage(Number(params?.page ?? 1), s);
+                            fetchPage(Number(params?.page ?? 1), s, Number(params?.per_page ?? data?.per_page ?? 10));
                         }}
                     />
                 )}

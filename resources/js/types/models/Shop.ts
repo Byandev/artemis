@@ -6,4 +6,5 @@ export interface Shop {
     created_at: string;
     updated_at: string;
     customers_last_synced_at: string
+    pending_required_checklists_count?: number;
 }
