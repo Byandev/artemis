@@ -14,6 +14,8 @@ use App\Http\Controllers\Workspaces\ChecklistProgressController;
 use App\Http\Controllers\Workspaces\CSRController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\PageController;
+use App\Http\Controllers\Workspaces\SupportTicketController;
+use App\Http\Controllers\Workspaces\Admin\SupportTicketAdminController;
 use App\Http\Controllers\Workspaces\Product\AnalyticsController;
 use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\RoleController;
@@ -29,6 +31,7 @@ use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
+use App\Models\SupportTicket;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Modules\Finance\Http\Controllers\AccountController as FinanceAccountController;
@@ -253,6 +256,15 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/remittances/{remittance}', [FinanceRemittanceController::class, 'update'])->name('remittances.update');
         Route::delete('/remittances/{remittance}', [FinanceRemittanceController::class, 'destroy'])->name('remittances.destroy');
     });
+
+    Route::get('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'index'])->name('support.index');
+    Route::post('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'store'])->name('support.store');
+    Route::get('/workspaces/{workspace:slug}/admin/support-tickets', [SupportTicketAdminController::class, 'index'])
+        ->name('admin.support-tickets.index')
+        ->can('viewAny', [SupportTicket::class, 'workspace']);
+    Route::patch('/workspaces/{workspace:slug}/admin/support-tickets/{ticket}', [SupportTicketAdminController::class, 'update'])
+        ->name('admin.support-tickets.update')
+        ->can('viewAny', [SupportTicket::class, 'workspace']);
 
 });
 
