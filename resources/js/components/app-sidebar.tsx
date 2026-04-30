@@ -1,4 +1,5 @@
 import { NavMain } from '@/components/nav-main';
+import { ContactSupportModal } from '@/components/contact-support-modal';
 import {
     Sidebar,
     SidebarContent,
@@ -41,13 +42,17 @@ import {
     Send,
     PieChart,
     Shield,
+    LifeBuoy,
 } from 'lucide-react';
 import { useState } from 'react';
 import AppLogo from './app-logo';
 import { PERMISSIONS } from '@/constants/permissions';
 
 export function AppSidebar() {
-    const { currentWorkspace } = usePage().props as unknown as { currentWorkspace: { slug: string; show_inventory: boolean; show_finance: boolean } };
+    const { currentWorkspace, auth } = usePage().props as unknown as {
+        currentWorkspace: { slug: string; show_inventory: boolean; show_finance: boolean };
+        auth: { user: { can?: { viewAnySupportTickets?: boolean } } };
+    };
 
     const dashboardUrl = currentWorkspace
         ? workspace.dashboard.url((currentWorkspace as { slug: string }).slug)
@@ -234,6 +239,16 @@ export function AppSidebar() {
         },
     ];
 
+    const adminNavItems: NavItem[] = auth?.user?.can?.viewAnySupportTickets
+        ? [
+            {
+                title: 'Support Tickets',
+                href: `/workspaces/${slug}/admin/support-tickets`,
+                icon: LifeBuoy,
+            },
+        ]
+        : [];
+
     return (
         <Sidebar
             className="bg-white dark:bg-zinc-900"
@@ -254,14 +269,48 @@ export function AppSidebar() {
 
             <SidebarContent className="p-3">
                 <NavMain items={mainNavItems} group_label="Main" />
+                <NavMain items={adminNavItems} group_label="Admin" />
                 {/*<NavMain items={accountNavItems} group_label="Account" />*/}
                 <PublicLinks workspaceSlug={currentWorkspace.slug} />
+                <SupportLinks />
             </SidebarContent>
 
             {/*<SidebarFooter>*/}
             {/*    <NavFooter items={footerNavItems} className="mt-auto" />*/}
             {/*</SidebarFooter>*/}
         </Sidebar>
+    );
+}
+
+function SupportLinks() {
+    return (
+        <SidebarGroup className="mt-4">
+            <SidebarGroupLabel className="text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-300 dark:text-gray-600 px-3.5 mb-2">
+                Support
+            </SidebarGroupLabel>
+            <SidebarMenu className="mt-2">
+                <SidebarMenuItem>
+                    <ContactSupportModal
+                        trigger={
+                            <SidebarMenuButton
+                                tooltip={{ children: 'Contact Support' }}
+                                className={[
+                                    'relative h-9 justify-start rounded-[10px] text-[13px]! w-full',
+                                    'text-gray-400 dark:text-gray-500',
+                                    'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/2 dark:hover:bg-white/2',
+                                    'transition-colors',
+                                ].join(' ')}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <LifeBuoy className="h-4 w-4" />
+                                    <span>Contact Support</span>
+                                </div>
+                            </SidebarMenuButton>
+                        }
+                    />
+                </SidebarMenuItem>
+            </SidebarMenu>
+        </SidebarGroup>
     );
 }
 
