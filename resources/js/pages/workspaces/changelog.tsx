@@ -12,6 +12,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.4.0',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Pancake — Courier Shipments',
+                items: [
+                    'New Courier Shipments page under Pancake — import courier reports (xlsx) and reconcile them against your Pancake orders by waybill / tracking code',
+                    'J&T Express xlsx importer — uploads are parsed, upserted by (workspace, courier, waybill), and automatically linked to the matching pancake_orders row',
+                    'Totals strip surfaces overall and matched-only sums for total shipping cost, COD fee, COD collected, and receivable freight, so you can see exactly how much shipping fee is tied to confirmed Pancake orders',
+                    'List supports search by waybill / order # / receiver / phone, matched-only or unmatched-only filters, pickup-date range, and sortable shipping-cost columns',
+                    'Two new role permissions — View Courier Shipments and Import Courier Shipments — assignable from the Roles screen',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.3.2',
         date: '2026-05-01',
         sections: [
