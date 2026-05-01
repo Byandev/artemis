@@ -12,6 +12,20 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.3.1',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Inventory — Purchased Orders',
+                items: [
+                    'Search the list by delivery no., customer PO, or control no.',
+                    'Filter the list by issue-date range, with the selection preserved across pagination and sort',
+                    'Export CSV now respects the active search, date range, and sort',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.3.0',
         date: '2026-05-01',
         sections: [
