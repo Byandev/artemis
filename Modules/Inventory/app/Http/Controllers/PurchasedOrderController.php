@@ -46,7 +46,7 @@ class PurchasedOrderController extends Controller
                 'status',
                 'created_at',
             ])
-            ->defaultSort('-created_at');
+            ->defaultSort('-issue_date');
     }
 
     public function index(Request $request, Workspace $workspace)
