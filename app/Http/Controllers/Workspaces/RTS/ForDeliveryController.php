@@ -17,6 +17,7 @@ use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
 use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Models\CallLog;
 use App\Models\Page;
+use App\Models\User;
 use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -267,7 +268,7 @@ class ForDeliveryController extends Controller
         $totalReturning = (int) ($statusBreakdown->returning_count ?? 0);
         $totalProblematic = (int) ($statusBreakdown->problematic ?? 0);
 
-        $users = $workspace->users()->get(['users.id', 'users.name']);
+        $users = User::get();
 
         $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id', 'pageOwners:id,name']);
 
