@@ -1,7 +1,7 @@
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Search, Files, LayoutGrid, CreditCard, X } from 'lucide-react';
+import { Search, Files, LayoutGrid, CreditCard, X, Boxes } from 'lucide-react';
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
@@ -32,7 +32,29 @@ interface Workspace {
     owner?: { name: string };
     pages_count: number;
     subscription?: Subscription | null;
+    inventory_module_enabled: boolean;
+    finance_module_enabled: boolean;
+    products_module_enabled: boolean;
+    teams_module_enabled: boolean;
+    checklist_module_enabled: boolean;
+    csr_module_enabled: boolean;
+    rmo_module_enabled: boolean;
+    leaderboard_module_enabled: boolean;
 }
+
+const MODULE_FIELDS: Array<{ key: keyof Pick<Workspace,
+    'inventory_module_enabled' | 'finance_module_enabled' | 'products_module_enabled'
+    | 'teams_module_enabled' | 'checklist_module_enabled' | 'csr_module_enabled'
+    | 'rmo_module_enabled' | 'leaderboard_module_enabled'>; label: string; description: string }> = [
+    { key: 'products_module_enabled', label: 'Products', description: 'Product catalog and management' },
+    { key: 'teams_module_enabled', label: 'Teams', description: 'Team grouping and assignments' },
+    { key: 'checklist_module_enabled', label: 'Checklist', description: 'Per-shop and per-page checklist' },
+    { key: 'csr_module_enabled', label: 'CSR', description: 'CSR management and analytics' },
+    { key: 'inventory_module_enabled', label: 'Inventory', description: 'Inventory items, transactions, purchased orders' },
+    { key: 'finance_module_enabled', label: 'Finance', description: 'Accounts, transactions, remittances' },
+    { key: 'rmo_module_enabled', label: 'RMO Management', description: 'Public RMO management link' },
+    { key: 'leaderboard_module_enabled', label: 'Leaderboards', description: 'Public leaderboards link' },
+];
 
 interface Props {
     workspaces: PaginatedData<Workspace>;
@@ -56,6 +78,7 @@ const statusColors: Record<string, string> = {
 export default function Index({ workspaces, plans, filters }: Props) {
     const [search, setSearch] = useState(filters.search || '');
     const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
+    const [editingModules, setEditingModules] = useState<Workspace | null>(null);
 
     const initialSorting = useMemo(() => {
         if (filters.sort) {
@@ -156,7 +179,14 @@ export default function Index({ workspaces, plans, filters }: Props) {
             id: 'actions', enableSorting: false,
             header: () => <div className="text-right text-zinc-500 uppercase text-[11px] font-bold tracking-wider">Actions</div>,
             cell: ({ row }) => (
-                <div className="text-right">
+                <div className="text-right flex items-center justify-end gap-1">
+                    <button
+                        onClick={() => setEditingModules(row.original)}
+                        className="rounded-md p-1.5 text-zinc-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:text-brand-400 dark:hover:bg-brand-500/10 transition-colors"
+                        title="Toggle modules"
+                    >
+                        <Boxes className="h-4 w-4" />
+                    </button>
                     <button
                         onClick={() => setEditingWorkspace(row.original)}
                         className="rounded-md p-1.5 text-zinc-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:text-brand-400 dark:hover:bg-brand-500/10 transition-colors"
@@ -216,6 +246,13 @@ export default function Index({ workspaces, plans, filters }: Props) {
                     workspace={editingWorkspace}
                     plans={plans}
                     onClose={() => setEditingWorkspace(null)}
+                />
+            )}
+
+            {editingModules && (
+                <ModulesModal
+                    workspace={editingModules}
+                    onClose={() => setEditingModules(null)}
                 />
             )}
         </AdminSidebarLayout>
@@ -337,6 +374,111 @@ function SubscriptionModal({
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-md border border-zinc-200 dark:border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={processing}
+                            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+function ModulesModal({
+    workspace,
+    onClose,
+}: {
+    workspace: Workspace;
+    onClose: () => void;
+}) {
+    const { data, setData, put, processing } = useForm({
+        inventory_module_enabled: workspace.inventory_module_enabled,
+        finance_module_enabled: workspace.finance_module_enabled,
+        products_module_enabled: workspace.products_module_enabled,
+        teams_module_enabled: workspace.teams_module_enabled,
+        checklist_module_enabled: workspace.checklist_module_enabled,
+        csr_module_enabled: workspace.csr_module_enabled,
+        rmo_module_enabled: workspace.rmo_module_enabled,
+        leaderboard_module_enabled: workspace.leaderboard_module_enabled,
+    });
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        put(`/admin/workspaces/${workspace.slug}/modules`, {
+            onSuccess: () => onClose(),
+            preserveScroll: true,
+        });
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+            <div
+                className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between mb-5">
+                    <div>
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                            Toggle Modules
+                        </h3>
+                        <p className="text-sm text-zinc-500">{workspace.name}</p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="rounded-md p-1 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-1">
+                    <div className="divide-y divide-zinc-200 dark:divide-zinc-800 -mx-6 px-6">
+                        {MODULE_FIELDS.map((field) => (
+                            <label
+                                key={field.key}
+                                className="flex items-center justify-between gap-4 py-3 cursor-pointer"
+                            >
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        {field.label}
+                                    </div>
+                                    <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                                        {field.description}
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={data[field.key]}
+                                    onClick={() => setData(field.key, !data[field.key])}
+                                    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                                        data[field.key]
+                                            ? 'bg-brand-600'
+                                            : 'bg-zinc-200 dark:bg-zinc-700'
+                                    }`}
+                                >
+                                    <span
+                                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                                            data[field.key] ? 'translate-x-5' : 'translate-x-1'
+                                        }`}
+                                    />
+                                </button>
+                            </label>
+                        ))}
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4">
                         <button
                             type="button"
                             onClick={onClose}
