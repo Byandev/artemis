@@ -12,6 +12,18 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.3.2',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Inventory — Purchased Orders',
+                items: [
+                    'List now defaults to sorting by issue date (newest first) instead of created date, so the most recently issued POs surface at the top',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.3.1',
         date: '2026-05-01',
         sections: [
