@@ -75,7 +75,7 @@ const changelog: ChangelogEntry[] = [
             {
                 title: 'Subscriptions',
                 items: [
-                    'Core subscription management and 14-day trial flow — new workspaces start on a trial that auto-expires via a scheduled command',
+                    'Core subscription management and 30-day free trial — new workspaces start on a one-month trial that auto-expires via a scheduled command',
                     'Subscription Expired modal — gracefully blocks workspace access when an active plan lapses, with a clear path to upgrade',
                     'Syncing Data modal — friendlier first-run state while initial workspace data is being pulled in',
                     'Subscription gate is temporarily disabled in production while the billing flow is finalised — workspaces continue working as normal in the meantime',

@@ -301,6 +301,8 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('workspaces.index');
         Route::put('/workspaces/{workspace}/subscription', [AdminWorkspaceController::class, 'updateSubscription'])
             ->name('workspaces.update-subscription');
+        Route::put('/workspaces/{workspace}/modules', [AdminWorkspaceController::class, 'updateModules'])
+            ->name('workspaces.update-modules');
 
         Route::get('/subscription-plans', [AdminSubscriptionPlanController::class, 'index'])
             ->name('subscription-plans.index');

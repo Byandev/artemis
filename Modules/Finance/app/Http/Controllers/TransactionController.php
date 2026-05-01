@@ -42,16 +42,9 @@ class TransactionController extends Controller
         }
     }
 
-    public function index(Request $request, Workspace $workspace)
+    protected function buildQuery(Workspace $workspace): QueryBuilder
     {
-        $this->guard($request, $workspace);
-        $this->authorize(Permission::ViewFinanceTransactions->value, $workspace);
-
-        $transactions = QueryBuilder::for(
-            Transaction::where('workspace_id', $workspace->id)
-                ->with(['account', 'remittance'])
-        )
-
+        return QueryBuilder::for(Transaction::where('workspace_id', $workspace->id))
             ->allowedFilters([
                 AllowedFilter::callback('search', fn ($q, $v) => $q->where(function ($q2) use ($v) {
                     $q2->where('description', 'like', "%{$v}%")
@@ -68,17 +61,35 @@ class TransactionController extends Controller
                     : $q),
                 AllowedFilter::callback('date_from', fn ($q, $v) => $q->whereDate('date', '>=', $v)),
                 AllowedFilter::callback('date_to', fn ($q, $v) => $q->whereDate('date', '<=', $v)),
-            ])
+            ]);
+    }
+
+    public function index(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewFinanceTransactions->value, $workspace);
+
+        $transactions = $this->buildQuery($workspace)
+            ->with(['account', 'remittance'])
             ->orderBy('date', 'desc')
             ->orderBy('position', 'desc')
             ->paginate((int) $request->input('per_page', 100))
             ->withQueryString();
+
+        $totals = $this->buildQuery($workspace)
+            ->selectRaw("COALESCE(SUM(CASE WHEN type = 'in' THEN amount ELSE 0 END), 0) as total_credit")
+            ->selectRaw("COALESCE(SUM(CASE WHEN type = 'out' THEN amount ELSE 0 END), 0) as total_debit")
+            ->first();
 
         return Inertia::render('workspaces/finance/transactions/index', [
             'workspace' => $workspace,
             'transactions' => $transactions,
             'accounts' => Account::where('workspace_id', $workspace->id)
                 ->orderBy('name')->get(['id', 'name', 'currency']),
+            'totals' => [
+                'credit' => (float) $totals->total_credit,
+                'debit' => (float) $totals->total_debit,
+            ],
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),

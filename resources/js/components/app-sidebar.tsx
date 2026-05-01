@@ -47,7 +47,19 @@ import { PERMISSIONS } from '@/constants/permissions';
 import { dashboard as workspaceDashboard } from '@/actions/App/Http/Controllers/Workspaces/WorkspaceController';
 
 export function AppSidebar() {
-    const { currentWorkspace } = usePage().props as unknown as { currentWorkspace: { slug: string; show_inventory: boolean; show_finance: boolean } };
+    const { currentWorkspace } = usePage().props as unknown as {
+        currentWorkspace: {
+            slug: string;
+            inventory_module_enabled: boolean;
+            finance_module_enabled: boolean;
+            products_module_enabled: boolean;
+            teams_module_enabled: boolean;
+            checklist_module_enabled: boolean;
+            csr_module_enabled: boolean;
+            rmo_module_enabled: boolean;
+            leaderboard_module_enabled: boolean;
+        };
+    };
 
     const dashboardUrl = currentWorkspace
         ? workspaceDashboard(currentWorkspace.slug).url
@@ -73,49 +85,65 @@ export function AppSidebar() {
             icon: BookOpenIcon,
             permission: PERMISSIONS.ViewPages,
         },
-        {
-            title: 'Products',
-            href: `/workspaces/${slug}/products/list`,
-            icon: Package,
-            permission: PERMISSIONS.ViewProducts,
-        },
-        {
-            title: 'Teams',
-            href: `/workspaces/${slug}/teams`,
-            icon: Users,
-            permission: PERMISSIONS.ViewTeams,
-        },
+        ...(currentWorkspace.products_module_enabled
+            ? [
+                {
+                    title: 'Products',
+                    href: `/workspaces/${slug}/products/list`,
+                    icon: Package,
+                    permission: PERMISSIONS.ViewProducts,
+                },
+            ]
+            : []),
+        ...(currentWorkspace.teams_module_enabled
+            ? [
+                {
+                    title: 'Teams',
+                    href: `/workspaces/${slug}/teams`,
+                    icon: Users,
+                    permission: PERMISSIONS.ViewTeams,
+                },
+            ]
+            : []),
         {
             title: 'Roles',
             href: `/workspaces/${slug}/roles`,
             icon: Shield,
             permission: PERMISSIONS.ViewRoles,
         },
-        {
-            title: 'Checklist',
-            href: `/workspaces/${slug}/checklist`,
-            icon: ListChecks,
-            permission: PERMISSIONS.ViewChecklist,
-        },
-        {
-            title: 'CSR',
-            icon: User,
-            anyOf: [PERMISSIONS.ViewCsrManagement, PERMISSIONS.ViewCsrAnalytics],
-            items: [
+        ...(currentWorkspace.checklist_module_enabled
+            ? [
                 {
-                    title: 'Management',
-                    href: `/workspaces/${slug}/csr/management`,
+                    title: 'Checklist',
+                    href: `/workspaces/${slug}/checklist`,
+                    icon: ListChecks,
+                    permission: PERMISSIONS.ViewChecklist,
+                },
+            ]
+            : []),
+        ...(currentWorkspace.csr_module_enabled
+            ? [
+                {
+                    title: 'CSR',
                     icon: User,
-                    permission: PERMISSIONS.ViewCsrManagement,
+                    anyOf: [PERMISSIONS.ViewCsrManagement, PERMISSIONS.ViewCsrAnalytics],
+                    items: [
+                        {
+                            title: 'Management',
+                            href: `/workspaces/${slug}/csr/management`,
+                            icon: User,
+                            permission: PERMISSIONS.ViewCsrManagement,
+                        },
+                        {
+                            title: 'Analytics',
+                            href: `/workspaces/${slug}/csr/analytics`,
+                            icon: BarChart2,
+                            permission: PERMISSIONS.ViewCsrAnalytics,
+                        },
+                    ],
                 },
-                {
-                    title: 'Analytics',
-                    href: `/workspaces/${slug}/csr/analytics`,
-                    icon: BarChart2,
-                    permission: PERMISSIONS.ViewCsrAnalytics,
-                },
-            ],
-        },
+            ]
+            : []),
         {
             title: 'RTS',
             icon: RotateCcw,
@@ -135,7 +163,7 @@ export function AppSidebar() {
                 },
             ],
         },
-        ...(currentWorkspace.show_inventory
+        ...(currentWorkspace.inventory_module_enabled
             ? [
                 {
                     title: 'Inventory',
@@ -164,7 +192,7 @@ export function AppSidebar() {
                 },
             ]
             : []),
-        ...(currentWorkspace.show_finance
+        ...(currentWorkspace.finance_module_enabled
             ? [
                 {
                     title: 'Finance',
@@ -255,7 +283,11 @@ export function AppSidebar() {
             <SidebarContent className="p-3">
                 <NavMain items={mainNavItems} group_label="Main" />
                 {/*<NavMain items={accountNavItems} group_label="Account" />*/}
-                <PublicLinks workspaceSlug={currentWorkspace.slug} />
+                <PublicLinks
+                    workspaceSlug={currentWorkspace.slug}
+                    rmoEnabled={currentWorkspace.rmo_module_enabled}
+                    leaderboardEnabled={currentWorkspace.leaderboard_module_enabled}
+                />
             </SidebarContent>
 
             {/*<SidebarFooter>*/}
@@ -265,14 +297,28 @@ export function AppSidebar() {
     );
 }
 
-function PublicLinks({ workspaceSlug }: { workspaceSlug: string }) {
+function PublicLinks({
+    workspaceSlug,
+    rmoEnabled,
+    leaderboardEnabled,
+}: {
+    workspaceSlug: string;
+    rmoEnabled: boolean;
+    leaderboardEnabled: boolean;
+}) {
     const links = [
-        {
-            title: 'RMO Management',
-            href: `/public/workspaces/${workspaceSlug}/rts/rmo-management`,
-            icon: Truck,
-        },
-        { title: 'Leaderboards', href: '/leaderboards', icon: Trophy },
+        ...(rmoEnabled
+            ? [
+                {
+                    title: 'RMO Management',
+                    href: `/public/workspaces/${workspaceSlug}/rts/rmo-management`,
+                    icon: Truck,
+                },
+            ]
+            : []),
+        ...(leaderboardEnabled
+            ? [{ title: 'Leaderboards', href: '/leaderboards', icon: Trophy }]
+            : []),
         { title: 'Changelog', href: '/changelog', icon: FileText },
     ];
 

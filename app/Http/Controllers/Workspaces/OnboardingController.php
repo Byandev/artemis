@@ -79,7 +79,7 @@ class OnboardingController extends Controller
         // Create free trial subscription if none exists
         if (! $workspace->subscription) {
             $trialPlan = SubscriptionPlan::where('code', SubscriptionPlan::CODE_FREE_TRIAL)->first();
-            $trialDays = $trialPlan?->trial_days ?? 14;
+            $trialDays = $trialPlan?->trial_days ?? 30;
 
             Subscription::create([
                 'workspace_id' => $workspace->id,
@@ -121,7 +121,7 @@ class OnboardingController extends Controller
         // Create free trial subscription if none exists
         if (! $workspace->subscription) {
             $trialPlan = SubscriptionPlan::where('code', SubscriptionPlan::CODE_FREE_TRIAL)->first();
-            $trialDays = $trialPlan?->trial_days ?? 14;
+            $trialDays = $trialPlan?->trial_days ?? 30;
 
             Subscription::create([
                 'workspace_id' => $workspace->id,
