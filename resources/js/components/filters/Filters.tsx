@@ -101,7 +101,7 @@ const Filters = ({
             <PopoverTrigger asChild>
                 <button
                     className={[
-                        'inline-flex h-9 items-center overflow-hidden rounded-[10px] border transition-all duration-150',
+                        'inline-flex h-9 shrink-0 min-w-max items-center overflow-hidden rounded-[10px] border transition-all duration-150',
                         'bg-white dark:bg-zinc-900',
                         'shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none',
                         isOpen
