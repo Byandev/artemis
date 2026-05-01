@@ -12,6 +12,31 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.4.1',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Inventory — Purchased Orders',
+                items: [
+                    'List now shows subtotal and summary totals for the active filtered view, so you can see overall delivery fee and total amount without exporting',
+                    'Excel export includes the same summary rows at the bottom of the file',
+                ],
+            },
+            {
+                title: 'Finance — Transactions',
+                items: [
+                    'Index page now surfaces totals for credit (in) and debit (out) across the active filters, giving a quick read on cashflow without leaving the page',
+                ],
+            },
+            {
+                title: 'Inventory — Stock Transactions',
+                items: [
+                    'Date-range filter added to the stock transactions list, with the selection preserved across pagination and sort',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.4.0',
         date: '2026-05-01',
         sections: [
