@@ -72,7 +72,7 @@ class InventoryItemController extends Controller
                 }),
             ])
             ->defaultSort('-created_at')
-            ->paginate(10)
+             ->paginate((int) $request->input('per_page', 100))
             ->withQueryString();
 
         return Inertia::render('workspaces/inventory/items/index', [

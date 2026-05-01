@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Shop } from '@/types/models/Shop';
+import { toast } from 'sonner'; // Added toast import
 
 const ChecklistsBadge = ({ pending }: { pending: number }) => {
     const hasPending = pending > 0;
@@ -89,7 +90,9 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
 
     const refresh = (shop: Shop) => {
         post(workspaces.shops.refresh.url({ workspace, shop }), {
-            onSuccess: () => alert('Refresh Started'),
+            onStart: () => toast.info(`Starting refresh for ${shop.name}...`),
+            onSuccess: () => toast.success(`${shop.name} data refreshed successfully.`),
+            onError: () => toast.error(`Failed to refresh ${shop.name}. Please try again.`),
         });
     };
 

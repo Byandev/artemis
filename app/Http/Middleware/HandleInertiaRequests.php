@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Role;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Inspiring;
@@ -58,6 +59,11 @@ class HandleInertiaRequests extends Middleware
             ? $user->ownsWorkspace($currentWorkspace)
             : false;
 
+        // TEMP: subscription gate + "syncing data" modal disabled.
+        // Restore the original blocks (see git history) when re-enabling.
+        $syncingData = null;
+        $subscriptionExpired = null;
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
@@ -80,6 +86,8 @@ class HandleInertiaRequests extends Middleware
                 'newApiKey' => $request->session()->get('newApiKey'),
             ],
             'appEnv' => config('app.env'),
+            'subscriptionExpired' => $subscriptionExpired,
+            'syncingData' => $syncingData,
         ];
     }
 
