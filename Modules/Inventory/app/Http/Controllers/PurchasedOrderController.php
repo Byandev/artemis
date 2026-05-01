@@ -58,9 +58,20 @@ class PurchasedOrderController extends Controller
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
+        $totals = $this->buildQuery($workspace)
+            ->selectRaw('COALESCE(SUM(delivery_fee), 0) as total_delivery_fee')
+            ->selectRaw('COALESCE(SUM(total_amount), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(total_amount - delivery_fee), 0) as total_cogs')
+            ->first();
+
         return Inertia::render('workspaces/inventory/purchased-orders/index', [
             'workspace' => $workspace,
             'orders' => $orders,
+            'totals' => [
+                'delivery_fee' => (float) $totals->total_delivery_fee,
+                'cogs' => (float) $totals->total_cogs,
+                'total_amount' => (float) $totals->total_amount,
+            ],
             'query' => [
                 ...$request->only(['sort', 'page', 'perPage']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),

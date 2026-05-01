@@ -24,6 +24,7 @@ class PurchasedOrderExport implements FromGenerator, WithHeadings
             'Item Count',
             'Item Unit Amount',
             'Item Total Amount',
+            'Order Subtotal',
             'Order Delivery Fee',
             'Order Total Amount',
         ];
@@ -44,8 +45,10 @@ class PurchasedOrderExport implements FromGenerator, WithHeadings
                 PurchasedOrder::STATUSES[$order->status] ?? 'Unknown',
             ];
 
+            $subtotal = (float) $order->total_amount - (float) $order->delivery_fee;
+
             if ($order->items->isEmpty()) {
-                yield array_merge($base, [null, null, null, null, null, $order->delivery_fee, $order->total_amount]);
+                yield array_merge($base, [null, null, null, null, null, $subtotal, $order->delivery_fee, $order->total_amount]);
 
                 continue;
             }
@@ -57,6 +60,7 @@ class PurchasedOrderExport implements FromGenerator, WithHeadings
                     $item->count,
                     $item->amount,
                     $item->total_amount,
+                    $subtotal,
                     $order->delivery_fee,
                     $order->total_amount,
                 ]);

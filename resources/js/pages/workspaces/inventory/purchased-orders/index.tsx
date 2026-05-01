@@ -56,9 +56,16 @@ interface PurchasedOrder {
     items: PurchasedOrderItem[];
 }
 
+interface Totals {
+    delivery_fee: number;
+    cogs: number;
+    total_amount: number;
+}
+
 interface Props {
     workspace: Workspace;
     orders: PaginatedData<PurchasedOrder>;
+    totals: Totals;
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -67,7 +74,7 @@ interface Props {
     };
 }
 
-export default function PurchasedOrderIndex({ workspace, orders, query }: Props) {
+export default function PurchasedOrderIndex({ workspace, orders, totals, query }: Props) {
     const [deletingOrder, setDeletingOrder] = useState<PurchasedOrder | null>(null);
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
 
@@ -95,7 +102,7 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
                     page: 1,
                     per_page: query?.perPage ?? orders.per_page,
                 },
-                { preserveState: true, replace: true, preserveScroll: true, only: ['orders', 'query'] }
+                { preserveState: true, replace: true, preserveScroll: true, only: ['orders', 'totals', 'query'] }
             );
         }, 400),
         [baseUrl, query?.sort, query?.perPage, orders.per_page]
@@ -152,6 +159,19 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
                     {row.original.control_no || '—'}
                 </span>
             ),
+        },
+        {
+            id: 'subtotal',
+            enableSorting: false,
+            header: () => <span className="font-mono text-[10px] uppercase tracking-wider text-gray-400">Subtotal</span>,
+            cell: ({ row }) => {
+                const subtotal = Number(row.original.total_amount) - Number(row.original.delivery_fee);
+                return (
+                    <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                        ₱{subtotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </span>
+                );
+            },
         },
         {
             accessorKey: 'delivery_fee',
@@ -309,6 +329,19 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
                         }}
                     />
                 </div>
+
+                <ul className="mt-3 flex flex-col items-start gap-1 rounded-[10px] border border-black/6 bg-stone-50 px-4 py-3 dark:border-white/6 dark:bg-zinc-900/60">
+                    <li className="font-mono text-[12px] text-gray-700 dark:text-gray-300">
+                        Total COGS : ₱{Number(totals.cogs).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </li>
+                    <li className="font-mono text-[12px] text-gray-700 dark:text-gray-300">
+                        Total Delivery Fee : ₱{Number(totals.delivery_fee).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </li>
+                    <li className="font-mono text-[12px] font-semibold text-emerald-700 dark:text-emerald-400">
+                        Total Amount : ₱{Number(totals.total_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </li>
+                </ul>
+
                 <DeleteOrderDialog
                     order={deletingOrder}
                     workspace={workspace}
