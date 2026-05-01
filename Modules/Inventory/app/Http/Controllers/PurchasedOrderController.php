@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
+use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class PurchasedOrderController extends Controller
@@ -20,6 +21,21 @@ class PurchasedOrderController extends Controller
         $this->authorize('View Purchased Orders', $workspace);
         $orders = QueryBuilder::for(PurchasedOrder::where('workspace_id', $workspace->id))
             ->with(['items.inventoryItem.product'])
+            ->allowedFilters([
+                AllowedFilter::callback('search', function ($query, $value) {
+                    $query->where(function ($q) use ($value) {
+                        $q->where('delivery_no', 'like', "%{$value}%")
+                            ->orWhere('cust_po_no', 'like', "%{$value}%")
+                            ->orWhere('control_no', 'like', "%{$value}%");
+                    });
+                }),
+                AllowedFilter::callback('start_date', function ($query, $value) {
+                    $query->whereDate('issue_date', '>=', $value);
+                }),
+                AllowedFilter::callback('end_date', function ($query, $value) {
+                    $query->whereDate('issue_date', '<=', $value);
+                }),
+            ])
             ->allowedSorts([
                 'issue_date',
                 'delivery_no',
@@ -40,6 +56,7 @@ class PurchasedOrderController extends Controller
             'query' => [
                 ...$request->only(['sort', 'page', 'perPage']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),
+                'filter' => $request->input('filter', []),
             ],
         ]);
     }
