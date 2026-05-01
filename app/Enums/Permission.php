@@ -15,7 +15,7 @@ enum Permission: string
     case ViewRoles = 'View Roles';
     case CreateRoles = 'Create Roles';
     case EditRoles = 'Edit Roles';
-    case DeleteRoles = 'Delete Roles';
+    case DeleteRoles = 'Archive Roles';
     case ManageRolePermissions = 'Manage Role Permissions';
 
     // Pages
