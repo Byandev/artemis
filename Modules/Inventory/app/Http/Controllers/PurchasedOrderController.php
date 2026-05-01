@@ -7,19 +7,35 @@ use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
+use Modules\Inventory\Exports\PurchasedOrderExport;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
+use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class PurchasedOrderController extends Controller
 {
     use AuthorizesRequests;
 
-    public function index(Request $request, Workspace $workspace)
+    private function buildQuery(Workspace $workspace): QueryBuilder
     {
-        $this->authorize('View Purchased Orders', $workspace);
-        $orders = QueryBuilder::for(PurchasedOrder::where('workspace_id', $workspace->id))
-            ->with(['items.inventoryItem.product'])
+        return QueryBuilder::for(PurchasedOrder::where('workspace_id', $workspace->id))
+            ->allowedFilters([
+                AllowedFilter::callback('search', function ($query, $value) {
+                    $query->where(function ($q) use ($value) {
+                        $q->where('delivery_no', 'like', "%{$value}%")
+                            ->orWhere('cust_po_no', 'like', "%{$value}%")
+                            ->orWhere('control_no', 'like', "%{$value}%");
+                    });
+                }),
+                AllowedFilter::callback('start_date', function ($query, $value) {
+                    $query->whereDate('issue_date', '>=', $value);
+                }),
+                AllowedFilter::callback('end_date', function ($query, $value) {
+                    $query->whereDate('issue_date', '<=', $value);
+                }),
+            ])
             ->allowedSorts([
                 'issue_date',
                 'delivery_no',
@@ -30,7 +46,15 @@ class PurchasedOrderController extends Controller
                 'status',
                 'created_at',
             ])
-            ->defaultSort('-created_at')
+            ->defaultSort('-created_at');
+    }
+
+    public function index(Request $request, Workspace $workspace)
+    {
+        $this->authorize('View Purchased Orders', $workspace);
+
+        $orders = $this->buildQuery($workspace)
+            ->with(['items.inventoryItem.product'])
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
@@ -40,8 +64,18 @@ class PurchasedOrderController extends Controller
             'query' => [
                 ...$request->only(['sort', 'page', 'perPage']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),
+                'filter' => $request->input('filter', []),
             ],
         ]);
+    }
+
+    public function export(Request $request, Workspace $workspace)
+    {
+        $this->authorize('View Purchased Orders', $workspace);
+
+        $filename = 'purchased-orders-'.now()->format('Y-m-d-His').'.xlsx';
+
+        return Excel::download(new PurchasedOrderExport($this->buildQuery($workspace)), $filename);
     }
 
     public function create(Workspace $workspace)
