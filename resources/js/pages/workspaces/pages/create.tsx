@@ -208,6 +208,20 @@ export default function Create({ workspace, users }: Props) {
                                             setData('pos_token', e.target.value)
                                         }
                                     />
+                                    <ValidateTokenButton
+                                        url={`/workspaces/${workspace.slug}/pages/validate-pos-token`}
+                                        payload={{
+                                            shop_id: data.shop_id,
+                                            token: data.pos_token,
+                                        }}
+                                        disabledReason={
+                                            !data.shop_id
+                                                ? 'Enter Shop ID first'
+                                                : !data.pos_token
+                                                  ? 'Enter a token first'
+                                                  : undefined
+                                        }
+                                    />
                                     {errors.pos_token && (
                                         <p className={errorClass}>
                                             {errors.pos_token}
