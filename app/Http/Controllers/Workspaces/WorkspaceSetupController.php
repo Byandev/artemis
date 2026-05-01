@@ -69,9 +69,9 @@ class WorkspaceSetupController extends Controller
                 'workspace_id' => $workspace->id,
                 'subscription_plan_id' => $freeTrial->id,
                 'status' => Subscription::STATUS_TRIALING,
-                'trial_ends_at' => $now->copy()->addDays($freeTrial->trial_days ?? 14),
+                'trial_ends_at' => $now->copy()->addDays($freeTrial->trial_days ?? 30),
                 'current_period_start' => $now,
-                'current_period_end' => $now->copy()->addDays($freeTrial->trial_days ?? 14),
+                'current_period_end' => $now->copy()->addDays($freeTrial->trial_days ?? 30),
             ]);
         }
 

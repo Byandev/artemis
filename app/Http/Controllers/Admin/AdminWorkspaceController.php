@@ -55,9 +55,9 @@ class AdminWorkspaceController extends Controller
             ];
 
             if ($validated['status'] === 'trialing') {
-                $data['trial_ends_at'] = $now->copy()->addDays($plan->trial_days ?? 14);
+                $data['trial_ends_at'] = $now->copy()->addDays($plan->trial_days ?? 30);
                 $data['current_period_start'] = $now;
-                $data['current_period_end'] = $now->copy()->addDays($plan->trial_days ?? 14);
+                $data['current_period_end'] = $now->copy()->addDays($plan->trial_days ?? 30);
             } elseif ($validated['status'] === 'active') {
                 $data['trial_ends_at'] = null;
                 $data['current_period_start'] = $now;
@@ -70,10 +70,10 @@ class AdminWorkspaceController extends Controller
                 'workspace_id' => $workspace->id,
                 'subscription_plan_id' => $validated['subscription_plan_id'],
                 'status' => $validated['status'],
-                'trial_ends_at' => $validated['status'] === 'trialing' ? $now->copy()->addDays($plan->trial_days ?? 14) : null,
+                'trial_ends_at' => $validated['status'] === 'trialing' ? $now->copy()->addDays($plan->trial_days ?? 30) : null,
                 'current_period_start' => $now,
                 'current_period_end' => $validated['status'] === 'trialing'
-                    ? $now->copy()->addDays($plan->trial_days ?? 14)
+                    ? $now->copy()->addDays($plan->trial_days ?? 30)
                     : $now->copy()->addMonth(),
             ]);
         }

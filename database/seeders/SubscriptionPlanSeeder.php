@@ -28,7 +28,7 @@ class SubscriptionPlanSeeder extends Seeder
                 'parcel_journey_rate_php' => null,
                 'parcel_journey_sms_enabled' => false,
                 'support_tier' => SubscriptionPlan::SUPPORT_CHAT,
-                'trial_days' => 14,
+                'trial_days' => 30,
                 'is_active' => true,
                 'sort_order' => 1,
             ],
