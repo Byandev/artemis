@@ -12,6 +12,84 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.3.0',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Admin — Subscription Plans',
+                items: [
+                    'New Subscription Plans admin panel — create, edit, and manage plans with pricing, trial settings, and feature flags',
+                    'Plan list with quick row actions and a shared form between create and edit screens',
+                    'Subscription plan seeder updated to match the new schema, safe to re-run idempotently',
+                ],
+            },
+            {
+                title: 'Admin — Workspaces',
+                items: [
+                    'Workspace Management panel reworked — sidebar logo and workspace name added, plus richer per-workspace controls for plan, subscription, and trial state',
+                    'Inline plan assignment and subscription edits directly from the workspaces list',
+                ],
+            },
+            {
+                title: 'Subscriptions',
+                items: [
+                    'Core subscription management and 14-day trial flow — new workspaces start on a trial that auto-expires via a scheduled command',
+                    'Subscription Expired modal — gracefully blocks workspace access when an active plan lapses, with a clear path to upgrade',
+                    'Syncing Data modal — friendlier first-run state while initial workspace data is being pulled in',
+                    'Subscription gate is temporarily disabled in production while the billing flow is finalised — workspaces continue working as normal in the meantime',
+                ],
+            },
+            {
+                title: 'Workspaces — Onboarding',
+                items: [
+                    'New onboarding flow at /workspaces/onboarding — guided first-run setup that lands new workspaces in a ready-to-use state without manual configuration',
+                ],
+            },
+            {
+                title: 'Public API — Call Logs',
+                items: [
+                    'Two new Bearer-token endpoints under /api/v1/public for call log listing and KPI summary',
+                    'CSR mobile clients can now read call log data directly without going through the workspace UI',
+                ],
+            },
+            {
+                title: 'Dashboard',
+                items: [
+                    'Header and dashboard filter — alignment and reset behaviour fixed; selections now persist correctly across navigation',
+                    'Statistic breakdown — removed a duplicate total row that was double-counting in summary cards',
+                ],
+            },
+            {
+                title: 'RTS Analytics',
+                items: [
+                    'Breakdown chart x-axis labels now align cleanly with extra bottom padding, so dates no longer overlap on dense ranges',
+                ],
+            },
+            {
+                title: 'Inventory',
+                items: [
+                    'Inventory Items — row-level filtering fixed; filters now apply correctly on first load',
+                    'Purchased Orders — total computation fix on the create screen',
+                ],
+            },
+            {
+                title: 'Checklist',
+                items: [
+                    'Edit Checklist — fixed a mobile-only bug that prevented edits from saving',
+                    'Add Task dialog — sorting and notification handling tightened',
+                ],
+            },
+            {
+                title: 'Polish',
+                items: [
+                    'Tab titles normalised to "Artemis | <Page>" across both client and SSR for consistent browser tab labels everywhere',
+                    'Sidebar settings entry removed in favour of inline controls already available elsewhere',
+                    'Small visual cleanups across workspace switcher, app header, and sidebar',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.2.0',
         date: '2026-04-30',
         sections: [
@@ -688,6 +766,8 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v3.3.0':
+        'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 ring-yellow-500/20',
     'v3.1.0':
         'bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20',
     'v3.0.2':
