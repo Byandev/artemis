@@ -85,6 +85,10 @@ enum Permission: string
     case EditFinanceRemittances = 'Edit Finance Remittances';
     case DeleteFinanceRemittances = 'Delete Finance Remittances';
 
+    // Pancake
+    case ViewCourierShipments = 'View Courier Shipments';
+    case ImportCourierShipments = 'Import Courier Shipments';
+
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
@@ -161,6 +165,9 @@ enum Permission: string
             self::CreateFinanceRemittances,
             self::EditFinanceRemittances,
             self::DeleteFinanceRemittances => 'Finance',
+
+            self::ViewCourierShipments,
+            self::ImportCourierShipments => 'Pancake',
 
             self::EditWorkspaceSettings,
             self::ManageApiKeys => 'Settings',

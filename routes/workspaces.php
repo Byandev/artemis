@@ -41,6 +41,7 @@ use Modules\Finance\Http\Controllers\TransactionController as FinanceTransaction
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
+use Modules\Pancake\Http\Controllers\CourierShipmentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -219,6 +220,11 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
         Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
     });
+    Route::prefix('/workspaces/{workspace}/pancake/courier-shipments')->name('workspaces.pancake.courier-shipments.')->group(function () {
+        Route::get('/', [CourierShipmentController::class, 'index'])->name('index');
+        Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');
+    });
+
     Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {
         Route::get('/', [PurchasedOrderController::class, 'index'])->name('index');
         Route::get('/export', [PurchasedOrderController::class, 'export'])->name('export');
