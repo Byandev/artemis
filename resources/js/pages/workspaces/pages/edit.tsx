@@ -190,6 +190,20 @@ export default function Edit({ workspace, page, users }: Props) {
                                             setData('pos_token', e.target.value)
                                         }
                                     />
+                                    <ValidateTokenButton
+                                        url={`/workspaces/${workspace.slug}/pages/validate-pos-token`}
+                                        payload={{
+                                            shop_id: data.shop_id,
+                                            token: data.pos_token,
+                                        }}
+                                        disabledReason={
+                                            !data.shop_id
+                                                ? 'Enter Shop ID first'
+                                                : !data.pos_token
+                                                  ? 'Enter a token first'
+                                                  : undefined
+                                        }
+                                    />
                                     {errors.pos_token && (
                                         <p className={errorClass}>
                                             {errors.pos_token}
@@ -215,13 +229,10 @@ export default function Edit({ workspace, page, users }: Props) {
                                     <ValidateTokenButton
                                         url={`/workspaces/${workspace.slug}/pages/validate-pancake-token`}
                                         payload={{
-                                            shop_id: data.shop_id,
+                                            page_id: page.id.toString(),
                                             token: data.pancake_token,
                                         }}
-                                        disabledReason={
-                                            !data.shop_id
-                                                ? 'Enter Shop ID first'
-                                                : !data.pancake_token
+                                        disabledReason={!data.pancake_token
                                                   ? 'Enter a token first'
                                                   : undefined
                                         }
