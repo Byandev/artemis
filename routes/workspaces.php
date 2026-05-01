@@ -221,6 +221,7 @@ Route::middleware(['auth'])->group(function () {
     });
     Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {
         Route::get('/', [PurchasedOrderController::class, 'index'])->name('index');
+        Route::get('/export', [PurchasedOrderController::class, 'export'])->name('export');
         Route::get('/create', [PurchasedOrderController::class, 'create'])->name('create');
         Route::post('/', [PurchasedOrderController::class, 'store'])->name('store');
         Route::get('/{purchasedOrder}/edit', [PurchasedOrderController::class, 'edit'])->name('edit');
