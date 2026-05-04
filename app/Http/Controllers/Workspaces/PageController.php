@@ -12,6 +12,7 @@ use App\Http\Sorts\PendingRequiredChecklistsSort;
 use App\Models\Page;
 use App\Models\Shop;
 use App\Models\Workspace;
+use App\Services\PostHogService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -150,6 +151,13 @@ class PageController extends Controller
         dispatch(new FetchPageOrders($page, 1, Carbon::now()->subMonth()->unix(), Carbon::now()->unix()))->onQueue('pancake');
         dispatch(new FetchShopCustomers($shop, 1, Carbon::now()->subMonth()->unix(), Carbon::now()->unix()))->onQueue('pancake');
         dispatch(new FetchShopUsers($shop))->onQueue('pancake');
+
+        (new PostHogService)->capture((string) $request->user()->id, 'page_connected', [
+            'workspace_id' => $workspace->id,
+            'page_id' => $page->id,
+            'page_name' => $page->name,
+            'shop_id' => $shop->id,
+        ]);
 
         return redirect()->route('workspaces.pages.index', $workspace)
             ->with('success', 'Page created successfully.');
