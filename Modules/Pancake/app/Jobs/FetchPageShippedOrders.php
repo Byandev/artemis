@@ -22,7 +22,7 @@ class FetchPageShippedOrders implements ShouldQueue
 
         $pancake = new Pancake($this->page->shop_id, $this->page->pos_token);
 
-        $response = $pancake->listProducts("&page_size=100&page_number=$page_number&order_sources[]=-1&order_sources[]={$this->page->id}&status[]=2&updateStatus=updated_at&extra_fields[]=return_rate");
+        $response = $pancake->listProducts("&page_size=100&page_number=$page_number&order_sources[]=-1&order_sources[]={$this->page->id}&filter_status[]=2&updateStatus=updated_at&extra_fields[]=return_rate");
 
         $totalPages = $response['total_pages'];
 
