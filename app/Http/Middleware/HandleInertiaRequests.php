@@ -63,11 +63,11 @@ class HandleInertiaRequests extends Middleware
         // Show syncing modal when any page has no orders_last_synced_at
         $syncingData = null;
         if ($currentWorkspace instanceof Workspace && $currentWorkspace->pages()->exists()) {
-            $hasSyncingPages = $currentWorkspace->pages()
-                ->whereNull('orders_last_synced_at')
+            $hasAnySyncedPage = $currentWorkspace->pages()
+                ->whereNotNull('orders_last_synced_at')
                 ->exists();
 
-            if ($hasSyncingPages) {
+            if (! $hasAnySyncedPage) {
                 $syncingData = ['workspaceSlug' => $currentWorkspace->slug];
             }
         }
@@ -75,9 +75,7 @@ class HandleInertiaRequests extends Middleware
         // Check subscription status for current workspace
         // On localhost, skip the subscription gate entirely
         $subscriptionExpired = null;
-        $isLocalhost = in_array($request->getHost(), ['localhost', '127.0.0.1']);
-
-        if ($currentWorkspace instanceof Workspace && ! $isLocalhost) {
+        if ($currentWorkspace instanceof Workspace && ! app()->isLocal()) {
             $subscription = $currentWorkspace->subscription;
 
             $isExpired = ! $subscription
