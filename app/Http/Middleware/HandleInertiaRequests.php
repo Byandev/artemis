@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Role;
 use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Inspiring;
@@ -59,10 +60,44 @@ class HandleInertiaRequests extends Middleware
             ? $user->ownsWorkspace($currentWorkspace)
             : false;
 
-        // TEMP: subscription gate + "syncing data" modal disabled.
-        // Restore the original blocks (see git history) when re-enabling.
+        // Show syncing modal when any page has no orders_last_synced_at
         $syncingData = null;
+        if ($currentWorkspace instanceof Workspace && $currentWorkspace->pages()->exists()) {
+            $hasSyncingPages = $currentWorkspace->pages()
+                ->whereNull('orders_last_synced_at')
+                ->exists();
+
+            if ($hasSyncingPages) {
+                $syncingData = ['workspaceSlug' => $currentWorkspace->slug];
+            }
+        }
+
+        // Check subscription status for current workspace
+        // On localhost, skip the subscription gate entirely
         $subscriptionExpired = null;
+        $isLocalhost = in_array($request->getHost(), ['localhost', '127.0.0.1']);
+
+        if ($currentWorkspace instanceof Workspace && ! $isLocalhost) {
+            $subscription = $currentWorkspace->subscription;
+
+            $isExpired = ! $subscription
+                || $subscription->status === Subscription::STATUS_EXPIRED
+                || $subscription->status === Subscription::STATUS_CANCELED
+                || ($subscription->status === Subscription::STATUS_TRIALING && $subscription->trial_ends_at && $subscription->trial_ends_at->isPast())
+                || ($subscription->status === Subscription::STATUS_ACTIVE && $subscription->current_period_end && $subscription->current_period_end->isPast());
+
+            if ($isExpired) {
+                $subscriptionExpired = [
+                    'workspace' => $currentWorkspace->only('id', 'name', 'slug'),
+                    'plans' => SubscriptionPlan::where('is_active', true)
+                        ->where('code', '!=', SubscriptionPlan::CODE_FREE_TRIAL)
+                        ->orderBy('sort_order')
+                        ->get(),
+                    'current_period_end' => $subscription?->current_period_end?->toIso8601String()
+                        ?? $subscription?->trial_ends_at?->toIso8601String(),
+                ];
+            }
+        }
 
         return [
             ...parent::share($request),
