@@ -1,7 +1,7 @@
 import AuthLayout from '@/layouts/auth-layout';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Loader2 } from 'lucide-react';
-import { FormEventHandler } from 'react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
+import { FormEventHandler, useCallback, useEffect, useRef, useState } from 'react';
 
 interface Props {
     workspace: { id: number; name: string; slug: string };
@@ -11,6 +11,11 @@ const inputCls =
     'h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400';
 
 export default function Onboarding({ workspace }: Props) {
+    const { flash } = usePage().props as { flash?: { success?: string } };
+    const [syncing, setSyncing] = useState(false);
+    const [complete, setComplete] = useState(false);
+    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
     const { data, setData, post, processing, errors } = useForm({
         page_id: '',
         shop_id: '',
@@ -20,8 +25,94 @@ export default function Onboarding({ workspace }: Props) {
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        post(`/workspaces/${workspace.slug}/onboarding`);
+        post(`/workspaces/${workspace.slug}/onboarding`, {
+            onSuccess: () => {
+                setSyncing(true);
+            },
+        });
     };
+
+    const pollStatus = useCallback(() => {
+        fetch(`/workspaces/${workspace.slug}/onboarding/status`, {
+            headers: { Accept: 'application/json' },
+        })
+            .then((res) => res.json())
+            .then((data) => {
+                if (data.complete) {
+                    setComplete(true);
+                    setSyncing(false);
+                    if (pollRef.current) {
+                        clearInterval(pollRef.current);
+                        pollRef.current = null;
+                    }
+                }
+            })
+            .catch(() => {});
+    }, [workspace.slug]);
+
+    useEffect(() => {
+        if (syncing && !pollRef.current) {
+            pollRef.current = setInterval(pollStatus, 3000);
+        }
+        return () => {
+            if (pollRef.current) {
+                clearInterval(pollRef.current);
+                pollRef.current = null;
+            }
+        };
+    }, [syncing, pollStatus]);
+
+    useEffect(() => {
+        if (complete) {
+            const timer = setTimeout(() => {
+                router.visit(`/workspaces/${workspace.slug}/dashboard`);
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [complete, workspace.slug]);
+
+    // Show syncing overlay
+    if (syncing || complete) {
+        return (
+            <AuthLayout title="Syncing your data" description={`Setting up ${workspace.name}`}>
+                <Head title="Syncing Data..." />
+                <div className="flex flex-col items-center gap-6 py-8">
+                    {complete ? (
+                        <>
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20">
+                                <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+                            </div>
+                            <div className="text-center">
+                                <p className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
+                                    Sync complete!
+                                </p>
+                                <p className="mt-1 font-mono text-[12px] text-gray-500">
+                                    Redirecting to your dashboard...
+                                </p>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20">
+                                <RefreshCw className="h-8 w-8 animate-spin text-emerald-600 dark:text-emerald-400" />
+                            </div>
+                            <div className="text-center">
+                                <p className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
+                                    Fetching your orders...
+                                </p>
+                                <p className="mt-1 font-mono text-[12px] text-gray-500">
+                                    This may take a few minutes. Please don't close this page.
+                                </p>
+                            </div>
+                            <div className="w-full overflow-hidden rounded-full bg-gray-200 dark:bg-zinc-700">
+                                <div className="h-1.5 animate-pulse rounded-full bg-emerald-500" style={{ width: '60%' }} />
+                            </div>
+                        </>
+                    )}
+                </div>
+            </AuthLayout>
+        );
+    }
 
     return (
         <AuthLayout title="Connect your page" description="Link your Pancake page to start syncing orders">

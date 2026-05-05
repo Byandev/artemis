@@ -105,9 +105,7 @@ class OnboardingController extends Controller
             'shop_id' => $shop->id,
         ]);
 
-        return redirect()
-            ->route('workspace.dashboard', $workspace->slug)
-            ->with('success', 'Page connected! Syncing your data...');
+        return back()->with('success', 'Page connected! Syncing your data...');
     }
 
     public function status(Request $request, Workspace $workspace)
