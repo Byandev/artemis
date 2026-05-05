@@ -30,7 +30,6 @@ import {
     ShoppingCart,
     Truck,
     Trophy,
-    FileText,
     Copy,
     Check,
     ExternalLink,
@@ -319,7 +318,6 @@ function PublicLinks({
         ...(leaderboardEnabled
             ? [{ title: 'Leaderboards', href: '/leaderboards', icon: Trophy }]
             : []),
-        { title: 'Changelog', href: '/changelog', icon: FileText },
     ];
 
     return (
