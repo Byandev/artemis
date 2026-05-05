@@ -8,7 +8,7 @@ class PostHogService
 {
     public function capture(string $distinctId, string $event, array $properties = []): void
     {
-        if (config('posthog.disabled')) {
+        if (! $this->enabled()) {
             return;
         }
 
@@ -21,7 +21,7 @@ class PostHogService
 
     public function identify(string $distinctId, array $properties = []): void
     {
-        if (config('posthog.disabled')) {
+        if (! $this->enabled()) {
             return;
         }
 
@@ -29,5 +29,10 @@ class PostHogService
             'distinctId' => $distinctId,
             'properties' => $properties,
         ]);
+    }
+
+    private function enabled(): bool
+    {
+        return ! config('posthog.disabled') && (bool) config('posthog.api_key');
     }
 }

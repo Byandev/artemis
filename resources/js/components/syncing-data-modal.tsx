@@ -86,7 +86,7 @@ export default function SyncingDataModal() {
                 {/* Footer hint */}
                 <div className="px-12 pb-12 pt-5 text-center">
                     <p className="text-sm text-gray-400 dark:text-gray-500">
-                        Please be patient and don't close this page.
+                        Please be patient.
                         <br />
                         This will disappear automatically once everything is ready.
                     </p>
