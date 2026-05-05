@@ -11,6 +11,7 @@ use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
+use Illuminate\Validation\Rule;
 
 class InventoryItemController extends Controller
 {
@@ -133,14 +134,20 @@ class InventoryItemController extends Controller
     {
         $request->validate([
             'product_id' => 'required|exists:products,id',
-            'sku' => 'required|string|max:255',
+            'sku' => [
+                'required', 
+                'string', 
+                'max:255', 
+                Rule::unique('inventory_items')
+                    ->where('workspace_id', $workspace->id) 
+                    ->ignore($item->id)                     
+            ],
             'sales_keywords' => 'nullable|string',
             'transaction_keywords' => 'nullable|string',
             'lead_time' => 'nullable|integer|min:0',
             'unfulfilled_count' => 'nullable|integer|min:0',
             'three_days_average' => 'nullable|numeric|min:0',
         ]);
-
         $item->update([
             'product_id' => $request->product_id,
             'sku' => $request->sku,
@@ -154,6 +161,7 @@ class InventoryItemController extends Controller
         return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
             ->with('success', 'Inventory Items record updated.');
     }
+
 
     public function destroy(Workspace $workspace, InventoryItem $item)
     {
