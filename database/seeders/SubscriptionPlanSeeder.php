@@ -65,7 +65,7 @@ class SubscriptionPlanSeeder extends Seeder
             [
                 'code' => SubscriptionPlan::CODE_SCALE,
                 'name' => 'Scale',
-                'price_php' => 19999,
+                'price_php' => 14999,
                 'order_limit' => 30000,
                 'page_limit' => 100,
                 'data_retention_months' => 12,
@@ -76,6 +76,21 @@ class SubscriptionPlanSeeder extends Seeder
                 'trial_days' => null,
                 'is_active' => true,
                 'sort_order' => 4,
+            ],
+            [
+                'code' => SubscriptionPlan::CODE_ENTERPRISE,
+                'name' => 'Enterprise',
+                'price_php' => 0, // Custom — negotiated per customer; UI displays "Custom"
+                'order_limit' => null, // unlimited
+                'page_limit' => null,  // unlimited
+                'data_retention_months' => 24,
+                'analytics_tier' => SubscriptionPlan::ANALYTICS_FULL,
+                'parcel_journey_rate_php' => null,
+                'parcel_journey_sms_enabled' => true,
+                'support_tier' => SubscriptionPlan::SUPPORT_DEDICATED,
+                'trial_days' => null,
+                'is_active' => true,
+                'sort_order' => 5,
             ],
         ];
 
