@@ -12,6 +12,25 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.6.1',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'Pages — Plan Limits',
+                items: [
+                    "Pages list now enforces the workspace's plan page limit — the index shows an \"X/Y pages used\" indicator under the Add New Page button, the button disables once the limit is reached, and a tooltip points to upgrading the plan",
+                    'Backend now blocks the Add Page flow when the limit is hit (both the create page and the store endpoint) with a clear validation message instead of letting the request through silently',
+                ],
+            },
+            {
+                title: 'Free Trial Plan',
+                items: [
+                    'Bumped Free Trial defaults so new workspaces get a more useful evaluation: 10,000 order cap (was unlimited), 6 months of data retention (was 1), full analytics tier (was basic), Parcel Journey SMS enabled, and priority chat support',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.6.0',
         date: '2026-05-05',
         sections: [
