@@ -12,6 +12,94 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.5.0',
+        date: '2026-05-04',
+        sections: [
+            {
+                title: 'Analytics',
+                items: [
+                    'Page-view analytics via PostHog — tracks Inertia route changes, identifies the signed-in user, and groups events by workspace so funnels and retention can be sliced per workspace',
+                    'Toggleable per environment via the VITE_POSTHOG_DISABLED flag, so local development stays out of production analytics',
+                ],
+            },
+            {
+                title: 'Pancake — Order Sync',
+                items: [
+                    'Consolidated the separate shipped-orders sync into the main page-orders job — at 9 AM, 12 PM, 3 PM, 6 PM, and 9 PM the run pulls shipped orders (filter_status[]=2); other runs pull orders updated since the last sync',
+                    'Removed the standalone trigger-fetch-page-shipped-orders command and FetchPageShippedOrders job — same coverage with one scheduled command instead of two',
+                    'trigger-fetch-page-orders now runs hourly (was every 30 minutes), reducing duplicate fetch overhead now that shipped pulls are interleaved',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.4.1',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Inventory — Purchased Orders',
+                items: [
+                    'List now shows subtotal and summary totals for the active filtered view, so you can see overall delivery fee and total amount without exporting',
+                    'Excel export includes the same summary rows at the bottom of the file',
+                ],
+            },
+            {
+                title: 'Finance — Transactions',
+                items: [
+                    'Index page now surfaces totals for credit (in) and debit (out) across the active filters, giving a quick read on cashflow without leaving the page',
+                ],
+            },
+            {
+                title: 'Inventory — Stock Transactions',
+                items: [
+                    'Date-range filter added to the stock transactions list, with the selection preserved across pagination and sort',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.4.0',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Pancake — Courier Shipments',
+                items: [
+                    'New Courier Shipments page under Pancake — import courier reports (xlsx) and reconcile them against your Pancake orders by waybill / tracking code',
+                    'J&T Express xlsx importer — uploads are parsed, upserted by (workspace, courier, waybill), and automatically linked to the matching pancake_orders row',
+                    'Totals strip surfaces overall and matched-only sums for total shipping cost, COD fee, COD collected, and receivable freight, so you can see exactly how much shipping fee is tied to confirmed Pancake orders',
+                    'List supports search by waybill / order # / receiver / phone, matched-only or unmatched-only filters, pickup-date range, and sortable shipping-cost columns',
+                    'Two new role permissions — View Courier Shipments and Import Courier Shipments — assignable from the Roles screen',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.3.2',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Inventory — Purchased Orders',
+                items: [
+                    'List now defaults to sorting by issue date (newest first) instead of created date, so the most recently issued POs surface at the top',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.3.1',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Inventory — Purchased Orders',
+                items: [
+                    'Search the list by delivery no., customer PO, or control no.',
+                    'Filter the list by issue-date range, with the selection preserved across pagination and sort',
+                    'Export CSV now respects the active search, date range, and sort',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.3.0',
         date: '2026-05-01',
         sections: [

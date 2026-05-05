@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\FetchAdAccounts;
 use App\Models\FacebookAccount;
 use App\Models\Workspace;
+use App\Services\PostHogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
@@ -55,6 +56,12 @@ class FacebookController extends Controller
         $facebookAccount->workspaces()->sync($state->workspace_id);
 
         dispatch(new FetchAdAccounts($facebookAccount));
+
+        (new PostHogService)->capture((string) $state->auth_id, 'facebook_account_connected', [
+            'workspace_id' => $workspace?->id,
+            'facebook_account_id' => $facebookAccount->id,
+            'facebook_account_name' => $facebookAccount->name,
+        ]);
 
         return redirect("workspaces/$workspace->slug/facebook-accounts");
     }

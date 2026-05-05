@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\Workspace;
+use App\Services\PostHogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
@@ -77,6 +78,12 @@ class WorkspaceSetupController extends Controller
 
         // Set as current workspace
         session(['current_workspace_id' => $workspace->id]);
+
+        (new PostHogService)->capture((string) $request->user()->id, 'workspace_created', [
+            'workspace_id' => $workspace->id,
+            'workspace_name' => $workspace->name,
+            'monthly_order_volume' => $workspace->monthly_order_volume,
+        ]);
 
         return redirect()->route('workspace.onboarding', $workspace->slug)
             ->with('success', 'Welcome! Let\'s connect your first page.');
