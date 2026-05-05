@@ -19,6 +19,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import support from '@/routes/support';
 import { SharedData } from '@/types';
 import { useForm, usePage } from '@inertiajs/react';
 import { ReactNode, useEffect, useState } from 'react';
@@ -62,7 +63,7 @@ export function ContactSupportModal({ trigger }: ContactSupportModalProps) {
 
         if (!currentWorkspace?.slug) return;
 
-        form.post(`/workspaces/${currentWorkspace.slug}/support`, {
+        form.post(support.store.url({ workspace: currentWorkspace.slug }), {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Support request sent.');
