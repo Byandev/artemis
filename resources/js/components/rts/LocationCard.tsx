@@ -55,7 +55,7 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
             .catch(() => setCitiesLoading(false));
     };
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     useEffect(() => {
         setProvincesLoading(true);
         const p = buildBaseParams(queryParams);

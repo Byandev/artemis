@@ -14,21 +14,29 @@ class FetchPageOrders implements ShouldQueue
 
     public int $tries = 5;
 
-    /**
-     * Create a new job instance.
-     */
-    public function __construct(public Page $page, public int $page_number, public int $startTime, public int $endTime) {}
+    public function __construct(
+        public Page $page,
+        public int $page_number,
+        public int $startTime,
+        public int $endTime,
+        public bool $shipped = false,
+    ) {}
 
-    /**
-     * Execute the job.
-     */
     public function handle(): void
     {
         $page_number = $this->page_number;
 
         $pancake = new Pancake($this->page->shop_id, $this->page->pos_token);
 
-        $response = $pancake->listProducts("&page_size=100&page_number=$page_number&order_sources[]=-1&order_sources[]={$this->page->id}&startDateTime=$this->startTime&endDateTime=$this->endTime&updateStatus=updated_at&extra_fields[]=return_rate");
+        $params = "&page_size=100&page_number=$page_number&order_sources[]=-1&order_sources[]={$this->page->id}&updateStatus=updated_at&extra_fields[]=return_rate";
+
+        if ($this->shipped) {
+            $params .= '&filter_status[]=2';
+        } else {
+            $params .= "&startDateTime=$this->startTime&endDateTime=$this->endTime";
+        }
+
+        $response = $pancake->listProducts($params);
 
         $totalPages = $response['total_pages'];
 
@@ -39,8 +47,8 @@ class FetchPageOrders implements ShouldQueue
         }
 
         if ($totalPages > $this->page_number) {
-            dispatch(new FetchPageOrders($this->page, $page_number + 1, $this->startTime, $this->endTime))->delay(now()->addSecond(5))->onQueue('pancake');
-        } else {
+            dispatch(new FetchPageOrders($this->page, $page_number + 1, $this->startTime, $this->endTime, $this->shipped))->delay(now()->addSecond(5))->onQueue('pancake');
+        } elseif (! $this->shipped) {
             $this->page->update(['orders_last_synced_at' => Carbon::createFromTimestamp($this->endTime)->subMinute(15)]);
         }
     }
