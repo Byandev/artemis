@@ -12,6 +12,7 @@ use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Modules\Pancake\Models\User as PancakeUser;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -27,6 +28,13 @@ class CSRController extends Controller
         $this->authorize(Permission::ViewCsrManagement->value, $workspace);
 
         $employees = QueryBuilder::for(PancakeUser::class)
+            ->whereExists(function ($query) use ($workspace) {
+                $query->select(DB::raw(1))
+                    ->from('pancake_shop_users as psu')
+                    ->join('shops as s', 's.id', '=', 'psu.shop_id')
+                    ->whereColumn('psu.user_id', 'pancake_users.id')
+                    ->where('s.workspace_id', $workspace->id);
+            })
             ->with('systemUser')
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -92,6 +100,13 @@ class CSRController extends Controller
                 'pancake_users.id as pancake_user_id',
                 'pancake_users.name as csr_name',
             ])
+            ->whereExists(function ($query) use ($workspace) {
+                $query->select(DB::raw(1))
+                    ->from('pancake_shop_users as psu')
+                    ->join('shops as s', 's.id', '=', 'psu.shop_id')
+                    ->whereColumn('psu.user_id', 'pancake_users.id')
+                    ->where('s.workspace_id', $workspace->id);
+            })
             ->selectSub($drSub()->selectRaw('COALESCE(SUM(total_orders), 0)'), 'total_orders')
             ->selectSub($drSub()->selectRaw('COALESCE(SUM(total_sales), 0)'), 'total_sales')
             ->selectSub($drSub()->selectRaw('COALESCE(SUM(delivered), 0)'), 'delivered')
@@ -135,6 +150,10 @@ class CSRController extends Controller
     {
         $this->authorize(Permission::EditCsrEmployees->value, $workspace);
 
+        if (! $this->employeeBelongsToWorkspace($employee->id, $workspace)) {
+            abort(404);
+        }
+
         $validated = $request->validate([
             'status' => 'required|string|in:ACTIVE,INACTIVE',
             'user_id' => 'nullable|exists:users,id',
@@ -143,5 +162,14 @@ class CSRController extends Controller
         $employee->update($validated);
 
         return redirect()->back()->with('success', 'Employee updated successfully');
+    }
+
+    private function employeeBelongsToWorkspace(string $employeeId, Workspace $workspace): bool
+    {
+        return DB::table('pancake_shop_users as psu')
+            ->join('shops as s', 's.id', '=', 'psu.shop_id')
+            ->where('psu.user_id', $employeeId)
+            ->where('s.workspace_id', $workspace->id)
+            ->exists();
     }
 }
