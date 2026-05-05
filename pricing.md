@@ -5,12 +5,12 @@
 | | Free Trial | Starter | Growth | Scale | Enterprise |
 |---|---|---|---|---|---|
 | **Price** | ₱0 (30 days) | ₱2,999/mo | ₱7,999/mo | ₱19,999/mo | Custom |
-| **Orders** | 500 cap | Up to 3,000/mo | Up to 10,000/mo | Up to 30,000/mo | Unlimited |
+| **Orders** | Up to 10,000/mo | Up to 3,000/mo | Up to 10,000/mo | Up to 30,000/mo | Unlimited |
 | **Pages** | 1 page | Up to 5 | Up to 25 | Up to 100 | Unlimited |
-| **Data retention** | 1 month | 3 months | 6 months | 12 months | Custom |
-| **Analytics** | Basic | Basic | Advanced + AI | Advanced + AI | Advanced + AI |
+| **Data retention** | 6 months | 3 months | 6 months | 12 months | Custom |
+| **Analytics** | Advanced + AI | Basic | Advanced + AI | Advanced + AI | Advanced + AI |
 | **Parcel Journey + SMS** | ✅ Included | ✅ Included | ✅ Included | ✅ Included | ✅ Included |
-| **Support** | Chat | Chat | Priority chat | Dedicated | Dedicated + SLA |
+| **Support** | Priority chat | Chat | Priority chat | Dedicated | Dedicated + SLA |
 
 Billing is **monthly, manual**: bank transfer / GCash / Maya. No automatic subscriptions, no card on file, no payment processor fees.
 

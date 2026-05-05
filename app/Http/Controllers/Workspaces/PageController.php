@@ -31,6 +31,29 @@ class PageController extends Controller
 {
     use AuthorizesRequests;
 
+    private function getPageLimitInfo(Workspace $workspace): array
+    {
+        $limit = $workspace->subscription?->plan?->page_limit;
+        $count = $workspace->pages()->count();
+
+        return [
+            'limit' => $limit,
+            'count' => $count,
+            'reached' => $limit !== null && $count >= $limit,
+        ];
+    }
+
+    private function assertPageLimitNotReached(Workspace $workspace): void
+    {
+        $info = $this->getPageLimitInfo($workspace);
+
+        if ($info['reached']) {
+            throw ValidationException::withMessages([
+                'page_limit' => "You've reached your plan's page limit ({$info['limit']}). Upgrade your plan to add more pages.",
+            ]);
+        }
+    }
+
     public function index(Request $request, Workspace $workspace)
     {
         $this->authorize(Permission::ViewPages->value, $workspace);
@@ -71,6 +94,8 @@ class PageController extends Controller
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
+        $pageLimitInfo = $this->getPageLimitInfo($workspace);
+
         return Inertia::render('workspaces/pages/index', [
             'pages' => $pages,
             'workspace' => $workspace,
@@ -79,12 +104,22 @@ class PageController extends Controller
                 'filter' => $request->input('filter', []),
             ],
             'users' => $workspace->users()->get(['users.id', 'users.name']),
+            'pageLimit' => $pageLimitInfo['limit'],
+            'pageCount' => $pageLimitInfo['count'],
+            'pageLimitReached' => $pageLimitInfo['reached'],
         ]);
     }
 
     public function create(Request $request, Workspace $workspace)
     {
         $this->authorize(Permission::EditPages->value, $workspace);
+
+        $info = $this->getPageLimitInfo($workspace);
+        if ($info['reached']) {
+            return redirect()
+                ->route('workspaces.pages.index', $workspace)
+                ->with('error', "You've reached your plan's page limit ({$info['limit']}). Upgrade your plan to add more pages.");
+        }
 
         return Inertia::render('workspaces/pages/create', [
             'workspace' => $workspace,
@@ -106,6 +141,8 @@ class PageController extends Controller
     public function store(StorePageRequest $request, Workspace $workspace)
     {
         $this->authorize(Permission::EditPages->value, $workspace);
+
+        $this->assertPageLimitNotReached($workspace);
 
         $validated = $request->validated();
         $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
