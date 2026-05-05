@@ -73,9 +73,16 @@ class CallLogController extends Controller
         $totalCalled = $deliveries->filter(fn ($d) => $d->customer_call_logs_count > 0 || $d->rider_call_logs_count > 0)->count();
         $totalAttempts = $deliveries->sum('customer_call_logs_count') + $deliveries->sum('rider_call_logs_count');
 
+        $rmoPhoneNumbers = $deliveries
+            ->flatMap(fn ($d) => array_filter([$d->customer_phone, $d->rider_phone]))
+            ->unique()
+            ->values()
+            ->all();
+
         $totalTalkTime = CallLog::where('workspace_id', $workspace->id)
             ->where('user_id', $request->input('user_id'))
             ->whereDate('call_date', $date)
+            ->whereIn('phone_number', $rmoPhoneNumbers)
             ->sum('duration');
 
         return response()->json([
