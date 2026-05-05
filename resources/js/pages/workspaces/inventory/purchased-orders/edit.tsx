@@ -108,24 +108,23 @@ export default function Edit({ workspace, order, items }: Props) {
         setData('items', data.items.filter((_, i) => i !== index));
 
     const handleSubmit = (e: React.FormEvent) => {
-            e.preventDefault();
-    
-            const url = `/workspaces/${workspace.slug}/inventory/purchased-orders/${order.id}`;
-    
-            put(url, {
-            preserveScroll: true,
-            onSuccess: () => {
-                
-                toast.success('Purchased order updated successfully');
-                
-                router.visit(`/workspaces/${workspace.slug}/inventory/purchased-orders`);
-            },
-            onError: (errors) => {
-                console.error(errors);
-                toast.error('Failed to update order. Please check the form.');
-            }
-        });
-    };
+    e.preventDefault();
+
+    const url = `/workspaces/${workspace.slug}/inventory/purchased-orders/${order.id}`;
+
+    put(url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            toast.success('Purchased order updated successfully');
+
+            router.visit(`/workspaces/${workspace.slug}/inventory/purchased-orders`);
+        },
+        onError: (errors) => {
+            console.error(errors);
+            toast.error('Failed to update order. Please check the form.');
+        }
+    });
+};
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Edit Purchased Order`} />
