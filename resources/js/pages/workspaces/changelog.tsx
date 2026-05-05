@@ -12,6 +12,39 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.6.0',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'RTS — RMO Management',
+                items: [
+                    'Split the single "Only my data" toggle into two independent filters — "My Assignee Only" and "My Confirmee Only" — so reps can narrow the list to orders they confirmed separately from those assigned to them, and combine both when needed',
+                    'Public endpoint and CSV export now accept a confirmee_id filter (mirrors the existing assignee_id filter), and toggle state is persisted per browser via localStorage',
+                ],
+            },
+            {
+                title: 'Subscription Gate & Syncing Modal',
+                items: [
+                    'Restored the subscription-expired gate on every authenticated Inertia page — workspaces with an expired, cancelled, or lapsed trial/active subscription are surfaced the upgrade modal with active non-trial plans (skipped on local environments)',
+                    'Restored the "syncing data" modal that appears on first connect until at least one page finishes its initial order sync; copy softened to "Please be patient." now that the sync runs in the background',
+                ],
+            },
+            {
+                title: 'Onboarding — Initial Sync Window',
+                items: [
+                    'First-time Pancake page connect now backfills 3 months of orders and shop customers (was 1 month), so newly onboarded workspaces have deeper history available immediately',
+                ],
+            },
+            {
+                title: 'Mobile / Public API — Call Logs',
+                items: [
+                    'Synced call-log timestamps are now normalised to the workspace timezone before storage, eliminating the off-by-hours drift on the KPI screen',
+                    'Total talk time KPI now only counts calls whose phone number matches a delivery on that date (customer or rider phone on pancake_order_for_delivery), giving an accurate read of talk time tied to actual delivery work',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.5.0',
         date: '2026-05-04',
         sections: [
