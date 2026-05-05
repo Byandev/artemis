@@ -17,6 +17,7 @@ import MetricPicker from '@/components/metrics/MetricPicker';
 import { metricConfigs, MetricKey } from '@/types/metrics';
 import PageHeader from '@/components/common/PageHeader';
 import AskDataWidget, { DashboardData } from '@/components/ai/AskDataWidget';
+import SyncStatusAlert from '@/pages/workspaces/dashboard/partials/SyncStatusAlert';
 
 interface Props {
     workspace: Workspace;
@@ -81,6 +82,7 @@ const Dashboard = ({ workspace }: Props) => {
     return (
         <AppLayout>
             <div className="p-4 md:p-6">
+                <SyncStatusAlert workspaceSlug={workspace.slug} />
                 <PageHeader
                     title="Dashboard"
                     description={`Performance overview · ${formatDate(new Date(dateRange[0]), 'MMM d')} – ${formatDate(new Date(dateRange[1]), 'MMM d, yyyy')}`}
