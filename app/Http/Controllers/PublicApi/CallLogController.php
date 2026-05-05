@@ -26,7 +26,7 @@ class CallLogController extends Controller
         $now = now();
 
         $rows = array_map(function ($log) use ($workspace, $request, $now) {
-            $timestamp = Carbon::parse($log['timestamp']);
+            $timestamp = Carbon::parse($log['timestamp'])->setTimezone(config('app.timezone'));
 
             return [
                 'workspace_id' => $workspace->id,
