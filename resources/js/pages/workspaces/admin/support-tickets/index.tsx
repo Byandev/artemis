@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
+import supportTickets from '@/routes/admin/support-tickets';
 import { PaginatedData } from '@/types';
 import { SupportTicket } from '@/types/models/SupportTicket';
 import { Workspace } from '@/types/models/Workspace';
@@ -73,7 +74,7 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
 
     useEffect(() => {
         router.get(
-            `/workspaces/${workspace.slug}/admin/support-tickets`,
+            supportTickets.index.url({ workspace: workspace.slug }),
             {
                 sort: query?.sort,
                 page: 1,
@@ -89,7 +90,7 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
         if (!selectedTicket) return;
 
         statusForm.patch(
-            `/workspaces/${workspace.slug}/admin/support-tickets/${selectedTicket.id}`,
+            supportTickets.update.url({ workspace: workspace.slug, ticket: selectedTicket.id }),
             {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -196,7 +197,7 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
                         onRowClick={(row) => setSelectedTicket(row)}
                         onFetch={(params) => {
                             router.get(
-                                `/workspaces/${workspace.slug}/admin/support-tickets`,
+                                supportTickets.index.url({ workspace: workspace.slug }),
                                 {
                                     sort: params?.sort,
                                     page: params?.page ?? 1,
@@ -267,7 +268,9 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
                                 <p className="text-xs uppercase tracking-wide text-gray-400">Update status</p>
                                 <Select
                                     value={statusForm.data.status}
-                                    onValueChange={(value) => statusForm.setData('status', value)}
+                                    onValueChange={(value) =>
+                                        statusForm.setData('status', value as SupportTicket['status'])
+                                    }
                                 >
                                     <SelectTrigger className="h-9">
                                         <SelectValue placeholder="Select status" />
