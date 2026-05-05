@@ -72,6 +72,22 @@ The pool is carved only from Bryan's share. Everyone else stays undiluted.
 
 ---
 
+## Pricing Model (Summary)
+
+| Plan | Monthly | Orders/mo | Pages | Retention | Analytics | Parcel Journey + SMS | Support |
+|---|---|---|---|---|---|---|---|
+| Free Trial (30 days) | ₱0 | 500 cap | 1 | 1mo | Basic | ✅ Included | Chat |
+| **Starter** | **₱2,999** | 3,000 | 5 | 3mo | Basic | ✅ Included | Chat |
+| **Growth** | **₱7,999** | 10,000 | 25 | 6mo | Advanced + AI | ✅ Included | Priority |
+| **Scale** | **₱19,999** | 30,000 | 100 | 12mo | Advanced + AI | ✅ Included | Dedicated |
+| Enterprise | Custom | Unlimited | Unlimited | Custom | Advanced + AI | ✅ Included | Dedicated + SLA |
+
+Billing is **monthly, manual** (bank transfer / GCash / Maya). Parcel Journey + SMS bundled into every paid plan — no usage-based billing, no add-on fees.
+
+Average revenue per customer (weighted 65/25/10 mix): **₱5,949/mo**.
+
+---
+
 ## Operating Costs
 
 Artemis is self-funded by Bryan. Here are the ongoing costs to run the business:
@@ -80,23 +96,26 @@ Artemis is self-funded by Bryan. Here are the ongoing costs to run the business:
 
 | Cost | Amount | Notes |
 |---|---|---|
-| **Server / Infrastructure** | ₱3,000/mo (minimum) | Scales proportionally as the client base grows |
-| **Domain** | ₱1,500/yr (~₱125/mo) | Annual renewal |
-| **Full-time Developer** | ₱18,000/mo | Development and client support |
-| **Total (minimum)** | **~₱21,125/mo** | Before any variable costs |
+| **Server / Infrastructure** | ₱7,500/mo (current) | DigitalOcean droplet + managed MySQL. Scales with client base. |
+| **Domain** | ₱5,700/yr (~₱475/mo) | Annual renewal |
+| **Full-time Developer** | ₱17,000/mo | Development and client support |
+| **Tooling** | ₱3,500/mo | Laravel Forge, S3/Spaces, email, Sentry, PostHog |
+| **Total (current)** | **~₱28,500/mo** | Before significant scaling |
 
 ### How costs scale
 
-- **Server costs grow significantly with customers.** At minimum ₱3,000/mo for early stage, scaling fast — ~₱10k at 80 customers, ~₱30k at 250, ~₱60k at 500. More clients means more data, more API calls, more processing power.
-- **The developer hire is planned.** Bryan currently handles all engineering. The plan is to hire a full-time developer at ₱18,000/mo to handle ongoing development and client support, freeing Bryan to focus on product strategy and growth.
+- **Server costs grow with customers.** Currently ~₱7.5k/mo (4GB DB + 8GB app). Expect ~₱15k at 80 customers, ~₱30k at 250, ~₱60k at 500. More clients = more data, more API calls, more processing.
+- **Developer hire is in plan.** ~₱17k/mo to free Bryan for product strategy and growth.
 - **All operating costs are funded by Bryan** until the business generates enough revenue to cover them. Partners are not expected to contribute financially.
 
 ### Break-even context
 
 | Milestone | Customers needed | MRR | Covers |
 |---|---|---|---|
-| Cover operating costs | ~10 | ~₱23k | Server + domain + developer salary |
-| Profitable operation | ~30 | ~₱70k | All costs covered, healthy margin |
+| Cover operating costs | ~5 | ~₱30k | Server + domain + developer + tooling |
+| Profitable operation | ~10 | ~₱60k | All costs covered, healthy margin |
+
+The break-even is dramatically easier than it looks because parcel journey + SMS are bundled into the subscription. Average revenue per customer ₱5,949/mo means even 5 customers covers everything.
 
 ---
 
@@ -122,11 +141,13 @@ Equity value is based on **net profit after operating expenses** — not raw rev
 
 | Stage | Customers | MRR | Opex/mo | Net Profit/mo | Net Profit/yr | 10% Share |
 |---|---|---|---|---|---|---|
-| Month 6 | ~80 | ₱215k | ₱28k | ₱187k | ₱2.24M | ₱224,000/yr |
-| Month 12 | ~250 | ₱712k | ₱48k | ₱664k | ₱7.97M | ₱797,000/yr |
-| Year 2 | ~500 | ₱1.4M | ₱78k | ₱1.32M | ₱15.9M | ₱1,590,000/yr |
+| Month 6 | ~80 | ₱476k | ₱45k | ₱431k | ₱5.17M | ₱517,000/yr |
+| Month 12 | ~250 | ₱1.49M | ₱75k | ₱1.41M | ₱16.94M | ₱1,694,000/yr |
+| Year 2 | ~500 | ₱2.97M | ₱120k | ₱2.85M | ₱34.25M | ₱3,425,000/yr |
 
-**Opex assumptions:** Server starts at ₱3k/mo minimum, scaling significantly with client base — ~₱10k at 80 customers, ~₱30k at 250, ~₱60k at 500 (more data, API calls, processing). Developer at ₱18k/mo. Domain ₱125/mo. All funded by Bryan.
+**MRR assumptions:** weighted blend of 65% Starter (₱2,999), 25% Growth (₱7,999), 10% Scale (₱19,999) = avg ₱5,949/customer/mo.
+
+**Opex assumptions:** server scales with client base — ~₱15k at 80 customers, ~₱45k at 250, ~₱90k at 500 (more data, API calls, processing). Developer at ₱17k/mo. Domain ₱475/mo. Tooling ₱3.5k/mo. Bundled SMS cost factored into fixed margin (capped per parcel in code). All funded by Bryan.
 
 ---
 
