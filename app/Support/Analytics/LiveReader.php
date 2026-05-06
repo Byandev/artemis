@@ -158,7 +158,7 @@ class LiveReader
         $periodSql = self::periodSql($spec['date_col'], $group);
 
         return self::baseQuery($workspaceId, $dateRange, $filter, $spec)
-            ->selectRaw("$periodSql AS period, COALESCE(SUM(".$spec['expr']."), 0) AS value")
+            ->selectRaw("$periodSql AS period, COALESCE(SUM(".$spec['expr'].'), 0) AS value')
             ->groupByRaw($periodSql)
             ->orderByRaw($periodSql)
             ->get();

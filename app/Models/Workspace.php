@@ -30,6 +30,7 @@ class Workspace extends Model
         'csr_module_enabled',
         'rmo_module_enabled',
         'leaderboard_module_enabled',
+        'botcake_module_enabled',
         'inventory_sync',
     ];
 
@@ -44,6 +45,7 @@ class Workspace extends Model
         'csr_module_enabled' => 'boolean',
         'rmo_module_enabled' => 'boolean',
         'leaderboard_module_enabled' => 'boolean',
+        'botcake_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
     ];
 

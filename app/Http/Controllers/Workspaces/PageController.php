@@ -296,7 +296,6 @@ class PageController extends Controller
                 'page_access_token' => $validated['token'],
             ]);
 
-
             if ($response->successful() && $response->json()['success']) {
                 return response()->json(['valid' => true, 'message' => 'Pancake token is valid.', 'data' => $response->json()], 200);
             }
