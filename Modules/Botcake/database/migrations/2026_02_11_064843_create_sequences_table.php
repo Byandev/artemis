@@ -12,13 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('botcake_sequences', function (Blueprint $table) {
-            $table->id();
+            // `id` holds the external Botcake sequence id directly — not auto-incremented.
+            $table->unsignedBigInteger('id')->primary();
             $table->unsignedBigInteger('page_id');
-            $table->unsignedBigInteger('sequence_id');
             $table->string('name');
             $table->timestamps();
             $table->foreign('page_id')->references('id')->on('pages')->cascadeOnDelete();
-            $table->unique(['page_id', 'sequence_id']);
+            $table->unique(['page_id', 'id']);
         });
     }
 

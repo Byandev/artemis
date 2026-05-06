@@ -30,13 +30,13 @@ class FetchSequences implements ShouldQueue
         $items = collect($sequences)
             ->map(function ($item) {
                 return [
+                    'id' => $item['id'],
                     'page_id' => $this->page->id,
-                    'sequence_id' => $item['id'],
                     'name' => $item['name'] ?? $item['id'],
                 ];
             })
             ->toArray();
 
-        Sequence::upsert($items, ['page_id', 'sequence_id']);
+        Sequence::upsert($items, ['page_id', 'id']);
     }
 }

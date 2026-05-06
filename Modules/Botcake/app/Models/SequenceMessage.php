@@ -12,6 +12,10 @@ class SequenceMessage extends Model
 
     protected $table = 'botcake_sequence_messages';
 
+    public $incrementing = false;
+
+    protected $keyType = 'int';
+
     public function sequence(): BelongsTo
     {
         return $this->belongsTo(Sequence::class);

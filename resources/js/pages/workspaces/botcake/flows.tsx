@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import DatePicker from '@/components/ui/date-picker';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
@@ -9,8 +10,10 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { Search } from 'lucide-react';
+import { ExternalLink, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+
+type Mode = 'overall' | 'historical';
 
 interface Props {
     workspace: Workspace;
@@ -19,42 +22,97 @@ interface Props {
         sort?: string | null;
         perPage?: number | string;
         page?: number | string;
+        mode?: Mode;
+        from?: string;
+        to?: string;
         filter?: { search?: string };
     };
 }
+
+const toIsoDate = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+const defaultRange = (): [string, string] => {
+    const to = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - 6);
+    return [toIsoDate(from), toIsoDate(to)];
+};
 
 export default function Flows({ workspace, flows, query }: Props) {
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
+    const mode: Mode = query?.mode === 'historical' ? 'historical' : 'overall';
+    const [defaultFrom, defaultTo] = defaultRange();
+    const fromDate = query?.from ?? defaultFrom;
+    const toDate = query?.to ?? defaultTo;
+
+    const navigate = (overrides: Record<string, string | number | null | undefined> = {}) => {
+        router.get(
+            `/workspaces/${workspace.slug}/botcake/flows`,
+            {
+                sort: query?.sort ?? undefined,
+                'filter[search]': searchValue || undefined,
+                page: query?.page ?? 1,
+                mode: mode === 'historical' ? 'historical' : undefined,
+                from: mode === 'historical' ? fromDate : undefined,
+                to: mode === 'historical' ? toDate : undefined,
+                ...overrides,
+            },
+            { preserveState: true, replace: true, preserveScroll: true, only: ['flows', 'query'] },
+        );
+    };
+
     useEffect(() => {
         const timer = setTimeout(() => {
-            router.get(
-                `/workspaces/${workspace.slug}/botcake/flows`,
-                {
-                    sort: query?.sort,
-                    'filter[search]': searchValue || undefined,
-                    page: searchValue ? 1 : query?.page ?? 1,
-                },
-                { preserveState: true, replace: true, preserveScroll: true, only: ['flows'] },
-            );
+            navigate({ page: searchValue ? 1 : query?.page ?? 1 });
         }, 500);
         return () => clearTimeout(timer);
     }, [searchValue]);
+
+    const switchMode = (next: Mode) => {
+        if (next === mode) return;
+        if (next === 'historical') {
+            navigate({ mode: 'historical', from: defaultFrom, to: defaultTo, page: 1 });
+        } else {
+            navigate({ mode: undefined, from: undefined, to: undefined, page: 1 });
+        }
+    };
+
+    const onRangeChange = (dates: Date[]) => {
+        if (dates.length !== 2) return;
+        navigate({ mode: 'historical', from: toIsoDate(dates[0]), to: toIsoDate(dates[1]), page: 1 });
+    };
 
     const columns: ColumnDef<Flow>[] = [
         {
             accessorKey: 'name',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Name" />,
-            cell: ({ row }) => (
-                <div>
-                    <p className="font-medium text-gray-900 dark:text-gray-100">{row.original.name}</p>
-                    <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
-                        {row.original.page?.name ?? '-'}
-                    </p>
-                </div>
-            ),
+            cell: ({ row }) => {
+                const flow = row.original;
+                const previewUrl = `https://botcake.io/${flow.page_id}/flows/${flow.id}/flow_preview`;
+
+                return (
+                    <div>
+                        <a
+                            href={previewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group inline-flex items-center gap-1.5 font-medium text-gray-900 hover:text-emerald-600 dark:text-gray-100 dark:hover:text-emerald-400"
+                        >
+                            {flow.name}
+                            <ExternalLink className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+                        </a>
+                        <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                            {flow.page?.name ?? '-'}
+                        </p>
+                    </div>
+                );
+            },
         },
         {
             accessorKey: 'sent',
@@ -79,7 +137,7 @@ export default function Flows({ workspace, flows, query }: Props) {
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader title="Flows" description="Automate customer interactions with messenger flows" />
 
-                <div className="mb-3 flex items-center gap-2">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
                     <div className="relative w-full max-w-xs">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
@@ -88,6 +146,43 @@ export default function Flows({ workspace, flows, query }: Props) {
                             value={searchValue}
                             onChange={(e) => setSearchValue(e.target.value)}
                         />
+                    </div>
+
+                    <div className="ml-auto flex items-center gap-2">
+                        {mode === 'historical' && (
+                            <DatePicker
+                                id="flows-date-range"
+                                mode="range"
+                                defaultDate={[fromDate, toDate] as unknown as string}
+                                onChange={onRangeChange}
+                                placeholder="Select range"
+                            />
+                        )}
+
+                        <div className="inline-flex h-9 items-center rounded-[10px] border border-black/8 bg-white p-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] dark:border-white/8 dark:bg-zinc-900 dark:shadow-none">
+                            <button
+                                type="button"
+                                onClick={() => switchMode('overall')}
+                                className={`h-8 rounded-lg px-3 text-[12px]! font-medium transition-colors ${
+                                    mode === 'overall'
+                                        ? 'bg-emerald-500 text-white'
+                                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+                                }`}
+                            >
+                                Overall
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => switchMode('historical')}
+                                className={`h-8 rounded-lg px-3 text-[12px]! font-medium transition-colors ${
+                                    mode === 'historical'
+                                        ? 'bg-emerald-500 text-white'
+                                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+                                }`}
+                            >
+                                Historical
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -99,16 +194,11 @@ export default function Flows({ workspace, flows, query }: Props) {
                         initialSorting={initialSorting}
                         meta={{ ...omit(flows, ['data']) }}
                         onFetch={(params) => {
-                            router.get(
-                                `/workspaces/${workspace.slug}/botcake/flows`,
-                                {
-                                    sort: params?.sort,
-                                    'filter[search]': searchValue || undefined,
-                                    page: params?.page ?? 1,
-                                    per_page: params?.per_page,
-                                },
-                                { preserveState: true, replace: true, preserveScroll: true },
-                            );
+                            navigate({
+                                sort: params?.sort,
+                                page: params?.page ?? 1,
+                                per_page: params?.per_page,
+                            });
                         }}
                     />
                 </div>
