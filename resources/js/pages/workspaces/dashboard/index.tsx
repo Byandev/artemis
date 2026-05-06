@@ -20,18 +20,22 @@ import AskDataWidget, { DashboardData } from '@/components/ai/AskDataWidget';
 
 interface Props {
     workspace: Workspace;
+    metricSettings: {
+        allowed: MetricKey[];
+        defaults: MetricKey[];
+    };
 }
 
-const Dashboard = ({ workspace }: Props) => {
-    const STORAGE_KEY    = `dashboard_metrics_${workspace.id}`;
+const Dashboard = ({ workspace, metricSettings }: Props) => {
+    const STORAGE_KEY = `dashboard_metrics_${workspace.id}`;
     const DATE_RANGE_KEY = `dashboard_date_range_${workspace.id}`;
-    const FILTER_KEY     = `dashboard_filter_${workspace.id}`;
+    const FILTER_KEY = `dashboard_filter_${workspace.id}`;
 
     const [dateRange, setDateRange] = useState<string[]>(() => {
         try {
             const saved = localStorage.getItem(DATE_RANGE_KEY);
             if (saved) return JSON.parse(saved) as string[];
-        } catch {}
+        } catch { }
         return [
             moment().startOf('month').format('YYYY-MM-DD'),
             moment().endOf('month').format('YYYY-MM-DD'),
@@ -42,24 +46,39 @@ const Dashboard = ({ workspace }: Props) => {
         try {
             const saved = localStorage.getItem(FILTER_KEY);
             if (saved) return JSON.parse(saved) as FilterValue;
-        } catch {}
+        } catch { }
         return { teamIds: [], productIds: [], shopIds: [], pageIds: [], userIds: [] };
     });
 
     const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>(() => {
+        const allowedKeys = metricSettings.allowed;
+        const availableMetrics = metricConfigs
+            .filter(m => allowedKeys.includes(m.key))
+            .map(m => m.key);
+
         try {
             const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) return JSON.parse(saved) as MetricKey[];
-        } catch {}
-        return ['totalSales', 'totalOrders', 'aov', 'rtsRate'];
+            if (saved) {
+                const parsed = JSON.parse(saved) as MetricKey[];
+                const validSaved = parsed.filter(key => availableMetrics.includes(key));
+
+                if (validSaved.length !== parsed.length) {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(validSaved));
+                }
+
+                return validSaved.length > 0 ? validSaved : metricSettings.defaults;
+            }
+        } catch { }
+
+        return metricSettings.defaults.filter(key => availableMetrics.includes(key)); // Safety
     });
 
     // Collect loaded data from breakdown components for the AI widget
     const [dashboardData, setDashboardData] = useState<DashboardData>({
         metrics: {},
-        pages:   { data: [], metric: 'totalSales' },
-        shops:   { data: [], metric: 'totalSales' },
-        users:   { data: [], metric: 'totalSales' },
+        pages: { data: [], metric: 'totalSales' },
+        shops: { data: [], metric: 'totalSales' },
+        users: { data: [], metric: 'totalSales' },
     });
 
     const onMetricLoaded = useCallback((metric: string, value: number) => {
@@ -86,10 +105,11 @@ const Dashboard = ({ workspace }: Props) => {
                     description={`Performance overview · ${formatDate(new Date(dateRange[0]), 'MMM d')} – ${formatDate(new Date(dateRange[1]), 'MMM d, yyyy')}`}
                 >
                     <MetricPicker
+                        metrics={metricConfigs.filter(m => metricSettings.allowed.includes(m.key))}  // ← ADD FILTER
                         initialValue={selectedMetrics}
                         onChange={(value) => {
                             setSelectedMetrics(value);
-                            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(value)); } catch {}
+                            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(value)); } catch { }
                         }}
                     />
                     <Filters
@@ -97,7 +117,7 @@ const Dashboard = ({ workspace }: Props) => {
                         initialValue={filter}
                         onChange={(value) => {
                             setFilter(value);
-                            try { localStorage.setItem(FILTER_KEY, JSON.stringify(value)); } catch {}
+                            try { localStorage.setItem(FILTER_KEY, JSON.stringify(value)); } catch { }
                         }}
                     />
                     <DatePicker
@@ -110,7 +130,7 @@ const Dashboard = ({ workspace }: Props) => {
                                     moment(dates[1]).format('YYYY-MM-DD'),
                                 ];
                                 setDateRange(range);
-                                try { localStorage.setItem(DATE_RANGE_KEY, JSON.stringify(range)); } catch {}
+                                try { localStorage.setItem(DATE_RANGE_KEY, JSON.stringify(range)); } catch { }
                             }
                         }}
                         defaultDate={dateRange as never as DateOption}
@@ -134,7 +154,7 @@ const Dashboard = ({ workspace }: Props) => {
                                 reverseTrend={card.reverse}
                                 onValueLoaded={onMetricLoaded}
                             />
-                    ))}
+                        ))}
                 </div>
 
                 <ComponentCard className="mt-12">

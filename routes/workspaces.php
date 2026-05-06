@@ -41,6 +41,10 @@ use Modules\Finance\Http\Controllers\TransactionController as FinanceTransaction
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
+use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
+
+
+
 
 /*
 |--------------------------------------------------------------------------
@@ -289,11 +293,21 @@ Route::middleware(['auth', 'verified', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
+        // Workspace Management
         Route::get('/workspaces', [AdminWorkspaceController::class, 'index'])
             ->name('workspaces.index');
+
         Route::put('/workspaces/{workspace}/subscription', [AdminWorkspaceController::class, 'updateSubscription'])
             ->name('workspaces.update-subscription');
 
+        // Metric Setting Controller
+        Route::get('workspaces/{workspace}/metrics/edit', [MetricSettingController::class, 'edit'])
+            ->name('workspaces.metric-settings.edit');
+
+        Route::put('/workspaces/{workspace}/metrics', [MetricSettingController::class, 'update'])
+            ->name('workspaces.metric-settings.update');
+
+        // Subscription Plans Management
         Route::get('/subscription-plans', [AdminSubscriptionPlanController::class, 'index'])
             ->name('subscription-plans.index');
         Route::get('/subscription-plans/create', [AdminSubscriptionPlanController::class, 'create'])

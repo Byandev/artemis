@@ -44,16 +44,18 @@ import {
 import { useState } from 'react';
 import AppLogo from './app-logo';
 import { PERMISSIONS } from '@/constants/permissions';
-import { dashboard as workspaceDashboard } from '@/actions/App/Http/Controllers/Workspaces/WorkspaceController';
+
+
 
 export function AppSidebar() {
     const { currentWorkspace } = usePage().props as unknown as { currentWorkspace: { slug: string; show_inventory: boolean; show_finance: boolean } };
 
+    const slug = currentWorkspace?.slug ?? '';
+
     const dashboardUrl = currentWorkspace
-        ? workspaceDashboard(currentWorkspace.slug).url
+        ? `/workspaces/${slug}/dashboard`
         : dashboard().url;
 
-    const slug = currentWorkspace?.slug ?? '';
 
     const mainNavItems: NavItem[] = [
         {

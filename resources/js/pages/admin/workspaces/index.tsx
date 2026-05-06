@@ -1,13 +1,14 @@
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, Link } from '@inertiajs/react';
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Search, Files, LayoutGrid, CreditCard, X } from 'lucide-react';
+import { Search, Files, LayoutGrid, CreditCard, X, Settings2 } from 'lucide-react';
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { PaginatedData } from '@/types';
-import { toFrontendSort } from '@/lib/sort';
-import { debounce, omit } from 'lodash';
+import { omit } from 'lodash';
+import debounce from 'lodash/debounce';
+import { MetricSettingDialog } from '@/components/metrics/metricsetting-dialog-form';
 
 interface SubscriptionPlan {
     id: number;
@@ -32,6 +33,7 @@ interface Workspace {
     owner?: { name: string };
     pages_count: number;
     subscription?: Subscription | null;
+    metric_settings?: { metric_key: string }[];
 }
 
 interface Props {
@@ -42,7 +44,6 @@ interface Props {
         sort?: string;
         direction?: string;
     };
-    query?: { sort?: string | null };
 }
 
 const statusColors: Record<string, string> = {
@@ -54,6 +55,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function Index({ workspaces, plans, filters }: Props) {
+    const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
     const [search, setSearch] = useState(filters.search || '');
     const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
 
@@ -79,11 +81,12 @@ export default function Index({ workspaces, plans, filters }: Props) {
             performQuery(search);
         }
         return () => performQuery.cancel();
-    }, [search]);
+    }, [search, performQuery, filters.search]);
 
     const columns: ColumnDef<Workspace>[] = [
         {
-            accessorKey: 'name', enableSorting: true,
+            accessorKey: 'name',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Workspace" />,
             cell: ({ row }) => (
                 <div className="flex items-center gap-3">
@@ -98,7 +101,8 @@ export default function Index({ workspaces, plans, filters }: Props) {
             ),
         },
         {
-            id: 'owner', enableSorting: false,
+            id: 'owner',
+            enableSorting: false,
             header: () => <div className="text-zinc-500 uppercase text-[11px] font-bold tracking-wider">Primary Owner</div>,
             cell: ({ row }) => (
                 <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
@@ -108,7 +112,8 @@ export default function Index({ workspaces, plans, filters }: Props) {
             ),
         },
         {
-            accessorKey: 'pages_count', enableSorting: true,
+            accessorKey: 'pages_count',
+            enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Resources" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center">
@@ -120,7 +125,8 @@ export default function Index({ workspaces, plans, filters }: Props) {
             ),
         },
         {
-            id: 'subscription', enableSorting: false,
+            id: 'subscription',
+            enableSorting: false,
             header: () => <div className="text-center text-zinc-500 uppercase text-[11px] font-bold tracking-wider">Subscription</div>,
             cell: ({ row }) => (
                 <div className="text-center">
@@ -140,23 +146,23 @@ export default function Index({ workspaces, plans, filters }: Props) {
             ),
         },
         {
-            id: 'days_left', enableSorting: false,
-            header: () => <div className="text-center text-zinc-500 uppercase text-[11px] font-bold tracking-wider">Days Left</div>,
-            cell: ({ row }) => (
-                <div className="text-center">
-                    {row.original.subscription ? (
-                        <DaysLeft subscription={row.original.subscription} />
-                    ) : (
-                        <span className="text-xs text-zinc-400">—</span>
-                    )}
-                </div>
-            ),
-        },
-        {
-            id: 'actions', enableSorting: false,
+            id: 'actions',
+            enableSorting: false,
             header: () => <div className="text-right text-zinc-500 uppercase text-[11px] font-bold tracking-wider">Actions</div>,
             cell: ({ row }) => (
-                <div className="text-right">
+                <div className="flex items-center justify-end gap-2">
+
+                    {/* Metric Configuration Icon Button */}
+                    <button
+                        type="button"
+                        onClick={() => setSelectedWorkspace(row.original)}
+                        className="rounded-md p-1.5 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:text-emerald-400 dark:hover:bg-emerald-500/10 transition-colors"
+                        title="Configure Metrics"
+                    >
+                        <Settings2 className="h-4 w-4" />
+                    </button>
+
+                    {/* Subscription Adjust Button */}
                     <button
                         onClick={() => setEditingWorkspace(row.original)}
                         className="rounded-md p-1.5 text-zinc-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:text-brand-400 dark:hover:bg-brand-500/10 transition-colors"
@@ -211,6 +217,14 @@ export default function Index({ workspaces, plans, filters }: Props) {
                 </div>
             </div>
 
+            {/* Metric Configuration Modal */}
+            <MetricSettingDialog
+                open={!!selectedWorkspace}
+                onOpenChange={(open) => !open && setSelectedWorkspace(null)}
+                workspace={selectedWorkspace}
+            />
+
+            {/* Subscription Modal */}
             {editingWorkspace && (
                 <SubscriptionModal
                     workspace={editingWorkspace}
@@ -221,6 +235,7 @@ export default function Index({ workspaces, plans, filters }: Props) {
         </AdminSidebarLayout>
     );
 }
+
 
 function DaysLeft({ subscription }: { subscription: Subscription }) {
     const endDate = subscription.status === 'trialing'
@@ -241,8 +256,8 @@ function DaysLeft({ subscription }: { subscription: Subscription }) {
     const color = days <= 3
         ? 'text-red-600 dark:text-red-400'
         : days <= 7
-          ? 'text-yellow-600 dark:text-yellow-400'
-          : 'text-zinc-700 dark:text-zinc-300';
+            ? 'text-yellow-600 dark:text-yellow-400'
+            : 'text-zinc-700 dark:text-zinc-300';
 
     return (
         <div className="flex flex-col items-center">
