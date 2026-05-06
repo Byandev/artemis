@@ -12,6 +12,51 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.6.3',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'Sign-up — Terms & Privacy',
+                items: [
+                    'Registration form now requires checking an "I agree to the Terms & Conditions and Privacy Policy" box before submit, with links opening the legal pages in a new tab',
+                    'Backend validates the acceptance flag and returns a clear error ("You must accept the Terms & Conditions to create an account.") if it is missing',
+                ],
+            },
+            {
+                title: 'Plans — New Enterprise Tier',
+                items: [
+                    'Added a new Enterprise plan to the pricing line-up: custom pricing, unlimited orders and pages, 24-month data retention, full analytics, Parcel Journey SMS included, and dedicated support',
+                    'Re-balanced Scale to ₱14,999/mo (down from ₱19,999) to slot under the new Enterprise tier',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.2',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'Plans — Pricing & Page Limits',
+                items: [
+                    'Re-priced and capped page counts on paid tiers: Starter ₱1,499→₱2,999 with a 5-page cap, Growth ₱3,999→₱5,999 with 25 pages, Scale ₱9,999→₱19,999 with 100 pages',
+                    'Parcel Journey SMS is now bundled (free) on every paid tier — removed the per-message rates (₱0.50 / ₱0.35 / ₱0.20) and turned SMS on for Starter so every paid plan includes it',
+                ],
+            },
+            {
+                title: 'Marketing Site',
+                items: [
+                    'Landing page now consistently reads "30-day free trial" everywhere (hero subline, pricing card label, pricing card lede, final CTA, and FAQ) — matches the actual trial length',
+                ],
+            },
+            {
+                title: 'Navigation',
+                items: [
+                    'Removed the Changelog item from the public sidebar; it stays reachable directly at /changelog',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.6.1',
         date: '2026-05-05',
         sections: [

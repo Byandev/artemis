@@ -179,7 +179,6 @@ class PageController extends Controller
             'pancake_token' => $validated['pancake_token'] ?? null,
             'infotxt_token' => $validated['infotxt_token'] ?? null,
             'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
-            'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
             'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
             'parcel_journey_enabled' => $validated['parcel_journey_enabled'] ?? false,
             'status' => $validated['status'] ?? 'active',
@@ -293,17 +292,18 @@ class PageController extends Controller
         ]);
 
         try {
-            $response = Http::timeout(10)->get('https://pages.fm/api/public_api/v1/pages/'.$validated['page_id'], [
+            $response = Http::timeout(10)->get('https://pages.fm/api/public_api/v1/pages/'.$validated['page_id'].'/page_customers', [
                 'page_access_token' => $validated['token'],
             ]);
 
-            if ($response->successful()) {
-                return response()->json(['valid' => true, 'message' => 'Pancake token is valid.', 'data' => $response->status()], 200);
+
+            if ($response->successful() && $response->json()['success']) {
+                return response()->json(['valid' => true, 'message' => 'Pancake token is valid.', 'data' => $response->json()], 200);
             }
 
             return response()->json([
                 'valid' => false,
-                'message' => 'Invalid Pancake token or shop ID.',
+                'message' => 'Invalid Pancake token',
             ]);
         } catch (\Throwable $e) {
             return response()->json([
