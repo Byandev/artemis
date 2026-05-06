@@ -12,6 +12,46 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.6.5',
+        date: '2026-05-06',
+        sections: [
+            {
+                title: 'Botcake — Module Toggle',
+                items: [
+                    'Added a per-workspace botcake_module_enabled flag — the Botcake nav group (Sequences + Flows) is hidden from the sidebar when the module is off, and any permission with the Botcake category is filtered out of the user\'s effective permission set',
+                ],
+            },
+            {
+                title: 'Botcake — Overall vs Historical Stats',
+                items: [
+                    'Flows and Sequences index pages now have an Overall / Historical toggle; Historical reveals a date-range picker (defaulting to the last 7 days) and re-aggregates Sent / Phone Numbers / Success Rate from the new daily delta tables',
+                    'FetchFlowStatistics and FetchSequenceStatistics now compute per-day deltas against the prior cumulative snapshot (clamped at 0 to absorb counter resets) so historical sums add up to real activity within any window — the cumulative-as-of-now value is still saved on the Flow / SequenceMessage row for the Overall view',
+                    'Trigger commands renamed under the botcake: namespace (botcake:trigger-fetch-flows, botcake:trigger-fetch-sequences, botcake:trigger-fetch-flow-statistics, botcake:trigger-fetch-sequence-statistics); old names kept as aliases',
+                    'Stats triggers now chunk through Flows / Sequences in batches of 200 instead of fetching all at once, preventing memory spikes on workspaces with thousands of records',
+                ],
+            },
+            {
+                title: 'Botcake — Schema & Code Layout',
+                items: [
+                    'botcake_flows, botcake_sequences, and botcake_sequence_messages now use the Botcake-supplied id directly as the primary key — collapsing the previous (auto-increment id + flow_id / sequence_id / message_id) split into a single column. The migration drops and recreates the six related tables to apply the change',
+                    'Web controllers for Flows and Sequences moved from app/Http/Controllers/Workspaces/Botcake/ into Modules/Botcake/Http/Controllers/Web/, keeping module-owned code inside the module',
+                ],
+            },
+            {
+                title: 'Telescope & Horizon — Access Control',
+                items: [
+                    'Both /telescope and /horizon now require is_super_admin = true in non-local environments — non-super-admin users get a 403 instead of seeing the dashboards. Local development continues to bypass the gate via the framework default',
+                ],
+            },
+            {
+                title: 'Workspace Middleware — Lookup Fallbacks',
+                items: [
+                    'CheckWorkspace now falls back to the route-bound {workspace} parameter and the user\'s session current_workspace_id when the X-Workspace-Id header is absent, so URL-scoped routes don\'t need clients to set the header explicitly',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.6.4',
         date: '2026-05-06',
         sections: [
