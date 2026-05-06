@@ -21,6 +21,8 @@ class FetchFlowStatistics implements ShouldQueue
 
     public int $timeout = 60;
 
+    private const STAT_COLUMNS = ['delivery', 'is_clicked', 'seen', 'sent', 'total_phone_number'];
+
     /**
      * Create a new job instance.
      */
@@ -37,25 +39,43 @@ class FetchFlowStatistics implements ShouldQueue
             $payload = (new Botcake($flow->page->id, $flow->page->botcake_token))
                 ->fetchFlowStatistics($flow->id);
 
-            $stats = [
-                'delivery' => (int) ($payload['delivery'] ?? 0),
-                'is_clicked' => (int) ($payload['is_clicked'] ?? 0),
-                'seen' => (int) ($payload['seen'] ?? 0),
-                'sent' => (int) ($payload['sent'] ?? 0),
-                'total_phone_number' => (int) ($payload['total_phone_number'] ?? 0),
-            ];
+            $new = [];
+            $old = [];
+            foreach (self::STAT_COLUMNS as $col) {
+                $new[$col] = (int) ($payload[$col] ?? 0);
+                $old[$col] = (int) $flow->{$col};
+            }
 
-            $flow->update($stats);
+            // First-time stats fetch for this flow: just baseline the cumulative
+            // values on the flow row — nothing to attribute to today, since we
+            // don't know which day the historical totals accrued on.
+            $hasBaseline = array_sum($old) > 0
+                || FlowDailyStat::where('flow_id', $flow->id)->exists();
 
-            FlowDailyStat::upsert([
-                [
+            if ($hasBaseline) {
+                $delta = [];
+                foreach (self::STAT_COLUMNS as $col) {
+                    // Clamp negatives — Botcake counters can drop on flow reset/delete.
+                    $delta[$col] = max(0, $new[$col] - $old[$col]);
+                }
+
+                // Add the delta to today's row so multiple same-day runs accumulate
+                // correctly instead of overwriting earlier deltas.
+                $daily = FlowDailyStat::firstOrNew([
                     'flow_id' => $flow->id,
                     'date' => now()->toDateString(),
-                    ...$stats,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ],
-            ], ['flow_id', 'date'], ['delivery', 'is_clicked', 'seen', 'sent', 'total_phone_number', 'updated_at']);
+                ]);
+
+                foreach (self::STAT_COLUMNS as $col) {
+                    $daily->{$col} = (int) ($daily->{$col} ?? 0) + $delta[$col];
+                }
+
+                $daily->save();
+            }
+
+            // Always advance the flow's cumulative to the latest snapshot so the
+            // next run measures its delta against this baseline.
+            $flow->update($new);
         } catch (Throwable $e) {
             Log::warning('Botcake flow statistics fetch failed', [
                 'flow_id' => $flow->id,
