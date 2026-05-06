@@ -12,9 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('botcake_flows', function (Blueprint $table) {
-            // `id` holds the external Botcake flow id directly — not auto-incremented.
-            $table->unsignedBigInteger('id')->primary();
+            $table->id();
             $table->unsignedBigInteger('page_id');
+            $table->unsignedBigInteger('flow_id');
             $table->unsignedBigInteger('parent_id')->nullable();
             $table->boolean('is_removed')->default(false);
             $table->unsignedBigInteger('delivery')->default(0);
@@ -25,7 +25,7 @@ return new class extends Migration
             $table->timestamps();
             $table->foreign('page_id')->references('id')->on('pages')->cascadeOnDelete();
             $table->string('name');
-            $table->unique(['page_id', 'id']);
+            $table->unique(['page_id', 'flow_id']);
         });
     }
 
