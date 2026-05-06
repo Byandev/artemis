@@ -5,6 +5,7 @@ namespace App\Http\Controllers\PublicApi;
 use App\Http\Controllers\Controller;
 use App\Models\CallLog;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Pancake\Models\OrderForDelivery;
@@ -136,7 +137,7 @@ class CallLogController extends Controller
                 'phone_number' => $r->phone_number,
                 'type' => $r->type,
                 'duration' => (int) $r->duration,
-                'call_date' => $r->call_date instanceof \Carbon\CarbonInterface ? $r->call_date->toDateString() : (string) $r->call_date,
+                'call_date' => $r->call_date instanceof CarbonInterface ? $r->call_date->toDateString() : (string) $r->call_date,
                 'call_time' => (string) $r->call_time,
             ]);
 
