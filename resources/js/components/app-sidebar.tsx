@@ -57,6 +57,7 @@ export function AppSidebar() {
             csr_module_enabled: boolean;
             rmo_module_enabled: boolean;
             leaderboard_module_enabled: boolean;
+            botcake_module_enabled: boolean;
         };
     };
 
@@ -119,22 +120,26 @@ export function AppSidebar() {
                   },
               ]
             : []),
-        {
-            title: 'Botcake',
-            icon: MessageSquare,
-            items: [
-                {
-                    title: 'Sequences',
-                    href: `/workspaces/${currentWorkspace.slug}/botcake/sequences`,
-                    icon: MessageSquare,
-                },
-                {
-                    title: 'Flows',
-                    href: `/workspaces/${currentWorkspace.slug}/botcake/flows`,
-                    icon: ClipboardList,
-                },
-            ],
-        },
+        ...(currentWorkspace.botcake_module_enabled
+            ? [
+                  {
+                      title: 'Botcake',
+                      icon: MessageSquare,
+                      items: [
+                          {
+                              title: 'Sequences',
+                              href: `/workspaces/${currentWorkspace.slug}/botcake/sequences`,
+                              icon: MessageSquare,
+                          },
+                          {
+                              title: 'Flows',
+                              href: `/workspaces/${currentWorkspace.slug}/botcake/flows`,
+                              icon: ClipboardList,
+                          },
+                      ],
+                  },
+              ]
+            : []),
         ...(currentWorkspace.csr_module_enabled
             ? [
                   {
