@@ -2,9 +2,9 @@
 
 namespace Modules\Botcake\Providers;
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Console\Scheduling\Schedule;
 use Modules\Botcake\Console\TriggerFetchFlows;
 use Modules\Botcake\Console\TriggerFetchFlowStatistics;
 use Modules\Botcake\Console\TriggerFetchSequences;

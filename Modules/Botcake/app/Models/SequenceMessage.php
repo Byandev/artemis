@@ -3,6 +3,8 @@
 namespace Modules\Botcake\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SequenceMessage extends Model
 {
@@ -10,12 +12,12 @@ class SequenceMessage extends Model
 
     protected $table = 'botcake_sequence_messages';
 
-    public function sequence(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function sequence(): BelongsTo
     {
         return $this->belongsTo(Sequence::class);
     }
 
-    public function dailyStats(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function dailyStats(): HasMany
     {
         return $this->hasMany(SequenceMessageDailyStat::class);
     }

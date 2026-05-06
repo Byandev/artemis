@@ -6,6 +6,7 @@ use App\Models\Page;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Flow extends Model
 {
@@ -13,12 +14,12 @@ class Flow extends Model
 
     protected $table = 'botcake_flows';
 
-    public function dailyStats(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function dailyStats(): HasMany
     {
         return $this->hasMany(FlowDailyStat::class);
     }
 
-    public function page(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function page(): BelongsTo
     {
         return $this->belongsTo(Page::class);
     }

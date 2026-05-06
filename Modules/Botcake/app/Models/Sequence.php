@@ -14,12 +14,12 @@ class Sequence extends Model
 
     protected $table = 'botcake_sequences';
 
-    public function dailyStats(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function dailyStats(): HasMany
     {
         return $this->hasMany(SequenceDailyStat::class);
     }
 
-    public function page(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function page(): BelongsTo
     {
         return $this->belongsTo(Page::class);
     }

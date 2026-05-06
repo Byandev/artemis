@@ -1,8 +1,8 @@
 <?php
 
+use Illuminate\Support\Facades\Route;
 use Modules\Botcake\Http\Controllers\API\FlowController;
 use Modules\Botcake\Http\Controllers\API\SequenceController;
-use Illuminate\Support\Facades\Route;
 
 Route::prefix('api/v1/botcake')->name('api.v1.botcake.')->middleware(['auth', 'workspace'])->group(function () {
     Route::apiResource('/flows', FlowController::class)->names('flows.index')->only(['index']);

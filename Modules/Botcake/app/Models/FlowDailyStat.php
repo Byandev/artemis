@@ -3,6 +3,7 @@
 namespace Modules\Botcake\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FlowDailyStat extends Model
 {
@@ -22,7 +23,7 @@ class FlowDailyStat extends Model
         'date' => 'date',
     ];
 
-    public function flow(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function flow(): BelongsTo
     {
         return $this->belongsTo(Flow::class);
     }

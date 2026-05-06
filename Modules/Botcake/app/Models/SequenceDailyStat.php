@@ -3,6 +3,7 @@
 namespace Modules\Botcake\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SequenceDailyStat extends Model
 {
@@ -21,7 +22,7 @@ class SequenceDailyStat extends Model
         'date' => 'date',
     ];
 
-    public function sequence(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function sequence(): BelongsTo
     {
         return $this->belongsTo(Sequence::class);
     }
