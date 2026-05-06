@@ -23,27 +23,14 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
     /**
      * Register the Horizon gate.
      *
-     * This gate determines who can access Horizon in all environments.
+     * The parent's authorization() callback already bypasses this gate on
+     * local, so this only runs in non-local environments — only super
+     * admins can access Horizon in staging/production.
      */
     protected function gate(): void
     {
-        Gate::define('viewHorizon', function ($user) {
+        Gate::define('viewHorizon', function ($user = null) {
             return $user && $user->is_super_admin;
-        });
-    }
-
-    /**
-     * Configure the Horizon authorization services.
-     *
-     * Overrides the parent to remove the local-environment bypass —
-     * the gate is enforced in every environment, including local.
-     */
-    protected function authorization(): void
-    {
-        $this->gate();
-
-        Horizon::auth(function ($request) {
-            return Gate::check('viewHorizon', [$request->user()]);
         });
     }
 }

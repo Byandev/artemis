@@ -2,17 +2,18 @@
 
 namespace Modules\Botcake\Jobs;
 
+use App\Services\Botcake;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Modules\Botcake\Models\Sequence;
 use Modules\Botcake\Models\SequenceDailyStat;
 use Modules\Botcake\Models\SequenceMessage;
 use Modules\Botcake\Models\SequenceMessageDailyStat;
+use Throwable;
 
 class FetchSequenceStatistics implements ShouldQueue
 {
@@ -34,24 +35,21 @@ class FetchSequenceStatistics implements ShouldQueue
     {
         $sequence = $this->sequence->load('page');
 
-        $response = Http::withHeaders([
-            'access-token' => $sequence->page->botcake_token,
-        ])
-            ->get("https://botcake.io/api/public_api/v1/pages/{$sequence->page->id}/sequences/{$sequence->sequence_id}/statistics");
-
-        if (! $response->ok()) {
+        try {
+            $data = (new Botcake($sequence->page->id, $sequence->page->botcake_token))
+                ->fetchSequenceStatistics($sequence->sequence_id);
+        } catch (Throwable $e) {
             Log::warning('Botcake sequence statistics fetch failed', [
                 'sequence_id' => $sequence->id,
                 'botcake_sequence_id' => $sequence->sequence_id,
                 'page_id' => $sequence->page_id,
-                'status' => $response->status(),
-                'body' => $response->body(),
+                'error' => $e->getMessage(),
             ]);
 
             return;
         }
 
-        $payload = collect($response->json('data', []));
+        $payload = collect($data);
         $today = now()->toDateString();
         $now = now();
 
