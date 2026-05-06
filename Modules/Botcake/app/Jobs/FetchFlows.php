@@ -32,8 +32,8 @@ class FetchFlows implements ShouldQueue
         collect($flows)
             ->map(function ($item) use ($page) {
                 return [
+                    'id' => $item['id'],
                     'page_id' => $page->id,
-                    'flow_id' => $item['id'],
                     'parent_id' => $item['parent_id'],
                     'is_removed' => $item['is_removed'],
                     'name' => $item['name'] ?? $item['id'],
@@ -41,7 +41,7 @@ class FetchFlows implements ShouldQueue
             })
             ->chunk(100)
             ->each(function ($chunk) {
-                Flow::upsert($chunk->toArray(), ['page_id', 'flow_id']);
+                Flow::upsert($chunk->toArray(), ['page_id', 'id']);
             });
     }
 }

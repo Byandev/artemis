@@ -14,6 +14,10 @@ class Flow extends Model
 
     protected $table = 'botcake_flows';
 
+    public $incrementing = false;
+
+    protected $keyType = 'int';
+
     public function dailyStats(): HasMany
     {
         return $this->hasMany(FlowDailyStat::class);

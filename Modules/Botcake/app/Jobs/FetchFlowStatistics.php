@@ -35,7 +35,7 @@ class FetchFlowStatistics implements ShouldQueue
 
         try {
             $payload = (new Botcake($flow->page->id, $flow->page->botcake_token))
-                ->fetchFlowStatistics($flow->flow_id);
+                ->fetchFlowStatistics($flow->id);
 
             $stats = [
                 'delivery' => (int) ($payload['delivery'] ?? 0),
@@ -59,7 +59,6 @@ class FetchFlowStatistics implements ShouldQueue
         } catch (Throwable $e) {
             Log::warning('Botcake flow statistics fetch failed', [
                 'flow_id' => $flow->id,
-                'botcake_flow_id' => $flow->flow_id,
                 'page_id' => $flow->page_id,
                 'error' => $e->getMessage(),
             ]);
