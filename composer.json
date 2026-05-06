@@ -20,6 +20,8 @@
         "league/flysystem-aws-s3-v3": "^3.0",
         "maatwebsite/excel": "^3.1",
         "nwidart/laravel-modules": "^12.0",
+        "posthog/posthog-php": "*",
+        "sentry/sentry-laravel": "^4.25",
         "spatie/laravel-medialibrary": "^11.17",
         "spatie/laravel-query-builder": "^6.3"
     },

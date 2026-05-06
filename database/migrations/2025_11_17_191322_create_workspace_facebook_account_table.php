@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('workspace_facebook_account', function (Blueprint $table) {
             $table->foreignId('facebook_account_id')->constrained('facebook_accounts')->cascadeOnDelete();
             $table->foreignId('workspace_id')->constrained('workspaces')->cascadeOnDelete();
+            $table->primary(['facebook_account_id', 'workspace_id']);
         });
     }
 

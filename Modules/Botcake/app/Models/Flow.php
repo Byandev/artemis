@@ -5,6 +5,7 @@ namespace Modules\Botcake\Models;
 use App\Models\Page;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Flow extends Model
 {

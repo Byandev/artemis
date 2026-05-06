@@ -2,67 +2,46 @@
 
 namespace App\Metrics\Orders;
 
+use App\Metrics\Concerns\HasMetricSource;
+use App\Metrics\MetricSource;
+use App\Support\Metrics\OrdersFilter;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 final class RtsRate
 {
+    use HasMetricSource;
+
+    private const ROLLUP_TABLE = 'workspace_page_daily_metrics';
+
+    private const ROLLUP_RATIO_SQL = '
+        ROUND(
+            COALESCE(
+                SUM(workspace_page_daily_metrics.entered_returning_amount) /
+                NULLIF(SUM(workspace_page_daily_metrics.entered_returning_amount + workspace_page_daily_metrics.delivered_amount), 0),
+                0
+            ),
+            4
+        )
+    ';
+
     public function compute(int $workspaceId, array $date_range, array $filter): float
     {
-        $start = $date_range['start_date'].' 00:00:00';
-        $end = $date_range['end_date'].' 23:59:59';
+        if ($this->source === MetricSource::LIVE) {
+            $row = $this->liveBaseQuery($workspaceId, $date_range, $filter)
+                ->selectRaw($this->liveRatioSql().' AS rts_rate')
+                ->first();
 
-        $pageIds = ! empty($filter['page_ids'])
-            ? (is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids']))
-            : [];
+            return (float) ($row->rts_rate ?? 0);
+        }
 
-        $shopIds = ! empty($filter['shop_ids'])
-            ? (is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']))
-            : [];
-
-        $returnedQuery = DB::table('pancake_orders')
-            ->selectRaw('SUM(pancake_orders.final_amount) as amount, "returned" as type')
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->whereBetween('pancake_orders.returning_at', [$start, $end])
-            ->when(! empty($pageIds) || ! empty($shopIds), function ($query) use ($pageIds, $shopIds) {
-                $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id');
-
-                if (! empty($pageIds)) {
-                    $query->whereIn('pages.id', $pageIds);
-                }
-
-                if (! empty($shopIds)) {
-                    $query->whereIn('pages.shop_id', $shopIds);
-                }
-            });
-
-        $deliveredQuery = DB::table('pancake_orders')
-            ->selectRaw('SUM(pancake_orders.final_amount) as amount, "delivered" as type')
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->whereBetween('pancake_orders.delivered_at', [$start, $end])
-            ->when(! empty($pageIds) || ! empty($shopIds), function ($query) use ($pageIds, $shopIds) {
-                $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id');
-
-                if (! empty($pageIds)) {
-                    $query->whereIn('pages.id', $pageIds);
-                }
-
-                if (! empty($shopIds)) {
-                    $query->whereIn('pages.shop_id', $shopIds);
-                }
-            });
-
-        $union = $returnedQuery->unionAll($deliveredQuery);
-
-        $row = DB::query()
-            ->fromSub($union, 'x')
+        $row = $this->rollupBaseQuery($workspaceId, $date_range, $filter)
             ->selectRaw('
                 COALESCE(
-                    SUM(CASE WHEN x.type = "returned" THEN x.amount ELSE 0 END)
-                    / NULLIF(SUM(x.amount), 0),
+                    SUM(entered_returning_amount) /
+                    NULLIF(SUM(entered_returning_amount + delivered_amount), 0),
                     0
-                ) as rts_rate
+                ) AS rts_rate
             ')
             ->first();
 
@@ -71,340 +50,264 @@ final class RtsRate
 
     public function breakdown(int $workspaceId, array $date_range, array $filter, string $group = 'daily')
     {
-        $start = $date_range['start_date'].' 00:00:00';
-        $end = $date_range['end_date'].' 23:59:59';
+        if ($this->source === MetricSource::LIVE) {
+            return $this->liveBreakdown($workspaceId, $date_range, $filter, $group);
+        }
 
-        $pageIds = ! empty($filter['page_ids'])
-            ? (is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids']))
-            : [];
-
-        $shopIds = ! empty($filter['shop_ids'])
-            ? (is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']))
-            : [];
-
-        $returnedPeriodSql = match ($group) {
-            'weekly' => "DATE_FORMAT(pancake_orders.returning_at, '%x-W%v')",
-            'monthly' => "DATE_FORMAT(pancake_orders.returning_at, '%Y-%m')",
-            default => 'DATE(pancake_orders.returning_at)',
+        $periodSql = match ($group) {
+            'weekly' => "DATE_FORMAT(date, '%x-W%v')",
+            'monthly' => "DATE_FORMAT(date, '%Y-%m')",
+            default => 'DATE(date)',
         };
 
-        $deliveredPeriodSql = match ($group) {
-            'weekly' => "DATE_FORMAT(pancake_orders.delivered_at, '%x-W%v')",
-            'monthly' => "DATE_FORMAT(pancake_orders.delivered_at, '%Y-%m')",
-            default => 'DATE(pancake_orders.delivered_at)',
-        };
-
-        $returnedQuery = DB::table('pancake_orders')
-            ->selectRaw("
-                $returnedPeriodSql as period,
-                SUM(pancake_orders.final_amount) as amount,
-                'returned' as type
-            ")
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->whereBetween('pancake_orders.returning_at', [$start, $end])
-            ->when(! empty($pageIds) || ! empty($shopIds), function ($query) use ($pageIds, $shopIds) {
-                $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id');
-
-                if (! empty($pageIds)) {
-                    $query->whereIn('pages.id', $pageIds);
-                }
-
-                if (! empty($shopIds)) {
-                    $query->whereIn('pages.shop_id', $shopIds);
-                }
-            })
-            ->groupByRaw($returnedPeriodSql);
-
-        $deliveredQuery = DB::table('pancake_orders')
-            ->selectRaw("
-                $deliveredPeriodSql as period,
-                SUM(pancake_orders.final_amount) as amount,
-                'delivered' as type
-            ")
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->whereBetween('pancake_orders.delivered_at', [$start, $end])
-            ->when(! empty($pageIds) || ! empty($shopIds), function ($query) use ($pageIds, $shopIds) {
-                $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id');
-
-                if (! empty($pageIds)) {
-                    $query->whereIn('pages.id', $pageIds);
-                }
-
-                if (! empty($shopIds)) {
-                    $query->whereIn('pages.shop_id', $shopIds);
-                }
-            })
-            ->groupByRaw($deliveredPeriodSql);
-
-        $union = $returnedQuery->unionAll($deliveredQuery);
-
-        return DB::query()
-            ->fromSub($union, 'x')
-            ->selectRaw('
-                x.period,
-                ROUND(
-                    COALESCE(
-                        SUM(CASE WHEN x.type = "returned" THEN x.amount ELSE 0 END)
-                        / NULLIF(SUM(x.amount), 0),
-                        0
-                    ),
-                    4
-                ) as value
-            ')
-            ->groupBy('x.period')
-            ->orderBy('x.period')
+        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
+            ->selectRaw("$periodSql AS period, ".self::ROLLUP_RATIO_SQL.' AS value')
+            ->groupByRaw($periodSql)
+            ->orderByRaw($periodSql)
             ->get();
     }
 
     public function perPage(int $workspaceId, array $date_range, array $filter)
     {
-        $start = $date_range['start_date'].' 00:00:00';
-        $end = $date_range['end_date'].' 23:59:59';
+        if ($this->source === MetricSource::LIVE) {
+            return $this->liveBaseQuery($workspaceId, $date_range, $filter, forceJoinPages: true)
+                ->selectRaw('pages.id AS page_id, pages.name AS page_name, '.$this->liveRatioSql().' AS value')
+                ->groupBy('pages.id', 'pages.name')
+                ->orderByDesc('value')
+                ->get();
+        }
 
-        $pageIds = ! empty($filter['page_ids'])
-            ? (is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids']))
-            : [];
-
-        $shopIds = ! empty($filter['shop_ids'])
-            ? (is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']))
-            : [];
-
-        $returnedQuery = DB::table('pancake_orders')
-            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->selectRaw('
-                pages.id as page_id,
-                pages.name as page_name,
-                SUM(pancake_orders.final_amount) as amount,
-                "returned" as type
-            ')
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->whereBetween('pancake_orders.returning_at', [$start, $end])
-            ->when(! empty($pageIds), function ($query) use ($pageIds) {
-                $query->whereIn('pages.id', $pageIds);
-            })
-            ->when(! empty($shopIds), function ($query) use ($shopIds) {
-                $query->whereIn('pages.shop_id', $shopIds);
-            })
-            ->groupBy('pages.id', 'pages.name');
-
-        $deliveredQuery = DB::table('pancake_orders')
-            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->selectRaw('
-                pages.id as page_id,
-                pages.name as page_name,
-                SUM(pancake_orders.final_amount) as amount,
-                "delivered" as type
-            ')
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->whereBetween('pancake_orders.delivered_at', [$start, $end])
-            ->when(! empty($pageIds), function ($query) use ($pageIds) {
-                $query->whereIn('pages.id', $pageIds);
-            })
-            ->when(! empty($shopIds), function ($query) use ($shopIds) {
-                $query->whereIn('pages.shop_id', $shopIds);
-            })
-            ->groupBy('pages.id', 'pages.name');
-
-        $union = $returnedQuery->unionAll($deliveredQuery);
-
-        return DB::query()
-            ->fromSub($union, 'x')
-            ->selectRaw('
-                x.page_id,
-                x.page_name,
-                ROUND(
-                    COALESCE(
-                        SUM(CASE WHEN x.type = "returned" THEN x.amount ELSE 0 END)
-                        / NULLIF(SUM(x.amount), 0),
-                        0
-                    ),
-                    4
-                ) as value
-            ')
-            ->groupBy('x.page_id', 'x.page_name')
+        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
+            ->join('pages', 'pages.id', '=', self::ROLLUP_TABLE.'.page_id')
+            ->selectRaw('pages.id AS page_id, pages.name AS page_name, '.self::ROLLUP_RATIO_SQL.' AS value')
+            ->groupBy('pages.id', 'pages.name')
             ->orderByDesc('value')
             ->get();
     }
 
     public function perShop(int $workspaceId, array $date_range, array $filter)
     {
-        $start = $date_range['start_date'].' 00:00:00';
-        $end = $date_range['end_date'].' 23:59:59';
+        if ($this->source === MetricSource::LIVE) {
+            return $this->liveBaseQuery($workspaceId, $date_range, $filter, forceJoinPages: true)
+                ->join('shops', 'shops.id', '=', 'pages.shop_id')
+                ->selectRaw('shops.id AS shop_id, shops.name AS shop_name, '.$this->liveRatioSql().' AS value')
+                ->whereNotNull('pages.shop_id')
+                ->groupBy('shops.id', 'shops.name')
+                ->orderByDesc('value')
+                ->get();
+        }
 
-        $pageIds = ! empty($filter['page_ids'])
-            ? (is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids']))
-            : [];
-
-        $shopIds = ! empty($filter['shop_ids'])
-            ? (is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']))
-            : [];
-
-        $returnedQuery = DB::table('pancake_orders')
-            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
+        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
+            ->join('pages', 'pages.id', '=', self::ROLLUP_TABLE.'.page_id')
             ->join('shops', 'shops.id', '=', 'pages.shop_id')
-            ->selectRaw('
-                shops.id as shop_id,
-                shops.name as shop_name,
-                SUM(pancake_orders.final_amount) as amount,
-                "returned" as type
-            ')
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->whereBetween('pancake_orders.returning_at', [$start, $end])
-            ->when(! empty($pageIds), function ($query) use ($pageIds) {
-                $query->whereIn('pages.id', $pageIds);
-            })
-            ->when(! empty($shopIds), function ($query) use ($shopIds) {
-                $query->whereIn('pages.shop_id', $shopIds);
-            })
+            ->selectRaw('shops.id AS shop_id, shops.name AS shop_name, '.self::ROLLUP_RATIO_SQL.' AS value')
             ->whereNotNull('pages.shop_id')
-            ->groupBy('shops.id', 'shops.name');
-
-        $deliveredQuery = DB::table('pancake_orders')
-            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->join('shops', 'shops.id', '=', 'pages.shop_id')
-            ->selectRaw('
-                shops.id as shop_id,
-                shops.name as shop_name,
-                SUM(pancake_orders.final_amount) as amount,
-                "delivered" as type
-            ')
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->whereBetween('pancake_orders.delivered_at', [$start, $end])
-            ->when(! empty($pageIds), function ($query) use ($pageIds) {
-                $query->whereIn('pages.id', $pageIds);
-            })
-            ->when(! empty($shopIds), function ($query) use ($shopIds) {
-                $query->whereIn('pages.shop_id', $shopIds);
-            })
-            ->whereNotNull('pages.shop_id')
-            ->groupBy('shops.id', 'shops.name');
-
-        $union = $returnedQuery->unionAll($deliveredQuery);
-
-        return DB::query()
-            ->fromSub($union, 'x')
-            ->selectRaw('
-                x.shop_id,
-                x.shop_name,
-                ROUND(
-                    COALESCE(
-                        SUM(CASE WHEN x.type = "returned" THEN x.amount ELSE 0 END)
-                        / NULLIF(SUM(x.amount), 0),
-                        0
-                    ),
-                    4
-                ) as value
-            ')
-            ->groupBy('x.shop_id', 'x.shop_name')
+            ->groupBy('shops.id', 'shops.name')
             ->orderByDesc('value')
             ->get();
     }
 
     public function perUser(int $workspaceId, array $date_range, array $filter)
     {
-        $start = $date_range['start_date'].' 00:00:00';
-        $end = $date_range['end_date'].' 23:59:59';
+        if ($this->source === MetricSource::LIVE) {
+            return $this->liveBaseQuery($workspaceId, $date_range, $filter, forceJoinPages: true)
+                ->join('users', 'users.id', '=', 'pages.owner_id')
+                ->selectRaw('users.id AS user_id, users.name AS user_name, '.$this->liveRatioSql().' AS value')
+                ->whereNotNull('pages.owner_id')
+                ->groupBy('users.id', 'users.name')
+                ->orderByDesc('value')
+                ->get();
+        }
 
-        $pageIds = ! empty($filter['page_ids'])
-            ? (is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids']))
-            : [];
-
-        $shopIds = ! empty($filter['shop_ids'])
-            ? (is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']))
-            : [];
-
-        $returnedQuery = DB::table('pancake_orders')
-            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
+        return $this->rollupBaseQuery($workspaceId, $date_range, $filter)
+            ->join('pages', 'pages.id', '=', self::ROLLUP_TABLE.'.page_id')
             ->join('users', 'users.id', '=', 'pages.owner_id')
-            ->selectRaw('
-            users.id as user_id,
-            users.name as user_name,
-            SUM(pancake_orders.final_amount) as amount,
-            "returned" as type
-        ')
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->whereBetween('pancake_orders.returning_at', [$start, $end])
-            ->when(! empty($pageIds), function ($query) use ($pageIds) {
-                $query->whereIn('pages.id', $pageIds);
-            })
-            ->when(! empty($shopIds), function ($query) use ($shopIds) {
-                $query->whereIn('pages.shop_id', $shopIds);
-            })
+            ->selectRaw('users.id AS user_id, users.name AS user_name, '.self::ROLLUP_RATIO_SQL.' AS value')
             ->whereNotNull('pages.owner_id')
-            ->groupBy('users.id', 'users.name');
-
-        $deliveredQuery = DB::table('pancake_orders')
-            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->join('users', 'users.id', '=', 'pages.owner_id')
-            ->selectRaw('
-            users.id as user_id,
-            users.name as user_name,
-            SUM(pancake_orders.final_amount) as amount,
-            "delivered" as type
-        ')
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->whereBetween('pancake_orders.delivered_at', [$start, $end])
-            ->when(! empty($pageIds), function ($query) use ($pageIds) {
-                $query->whereIn('pages.id', $pageIds);
-            })
-            ->when(! empty($shopIds), function ($query) use ($shopIds) {
-                $query->whereIn('pages.shop_id', $shopIds);
-            })
-            ->whereNotNull('pages.owner_id')
-            ->groupBy('users.id', 'users.name');
-
-        $union = $returnedQuery->unionAll($deliveredQuery);
-
-        return DB::query()
-            ->fromSub($union, 'x')
-            ->selectRaw('
-            x.user_id,
-            x.user_name,
-            ROUND(
-                COALESCE(
-                    SUM(CASE WHEN x.type = "returned" THEN x.amount ELSE 0 END)
-                    / NULLIF(SUM(x.amount), 0),
-                    0
-                ),
-                4
-            ) as value
-        ')
-            ->groupBy('x.user_id', 'x.user_name')
+            ->groupBy('users.id', 'users.name')
             ->orderByDesc('value')
             ->get();
     }
 
-    private function baseQuery(int $workspaceId, array $date_range, array $filter)
+    private function rollupBaseQuery(int $workspaceId, array $date_range, array $filter): Builder
     {
-        return DB::table('pancake_orders')
-            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->where('pancake_orders.workspace_id', $workspaceId)
-            ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(isset($filter['page_ids']) && $filter['page_ids'], function ($query) use ($filter) {
-                $pageIds = is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids']);
-                $query->whereIn('pages.id', $pageIds);
-            })
-            ->when(isset($filter['shop_ids']) && $filter['shop_ids'], function ($query) use ($filter) {
-                $shopIds = is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids']);
-                $query->whereIn('pages.shop_id', $shopIds);
-            })
-            ->where(function ($query) use ($date_range) {
-                $query->orWhereBetween('pancake_orders.returning_at', [
-                    $date_range['start_date'].' 00:00:00',
-                    $date_range['end_date'].' 23:59:59',
-                ])
-                    ->orWhereBetween('pancake_orders.delivered_at', [
-                        $date_range['start_date'].' 00:00:00',
-                        $date_range['end_date'].' 23:59:59',
-                    ]);
+        $query = DB::table(self::ROLLUP_TABLE)
+            ->where(self::ROLLUP_TABLE.'.workspace_id', $workspaceId);
+
+        if (! empty($date_range['start_date']) && ! empty($date_range['end_date'])) {
+            $query->whereBetween(self::ROLLUP_TABLE.'.date', [
+                $date_range['start_date'],
+                $date_range['end_date'],
+            ]);
+        }
+
+        $pageIds = $this->ids($filter, 'page_ids');
+        $shopIds = $this->ids($filter, 'shop_ids');
+        $userIds = $this->ids($filter, 'user_ids');
+        $productIds = $this->ids($filter, 'product_ids');
+        $teamIds = $this->ids($filter, 'team_ids');
+
+        if ($pageIds) {
+            $query->whereIn(self::ROLLUP_TABLE.'.page_id', $pageIds);
+        }
+
+        if ($shopIds) {
+            $query->whereIn(self::ROLLUP_TABLE.'.page_id', function ($sub) use ($workspaceId, $shopIds) {
+                $sub->from('pages')->select('id')->where('workspace_id', $workspaceId)->whereIn('shop_id', $shopIds);
             });
+        }
+
+        if ($userIds) {
+            $query->whereIn(self::ROLLUP_TABLE.'.page_id', function ($sub) use ($workspaceId, $userIds) {
+                $sub->from('pages')->select('id')->where('workspace_id', $workspaceId)->whereIn('owner_id', $userIds);
+            });
+        }
+
+        if ($productIds) {
+            $query->whereIn(self::ROLLUP_TABLE.'.page_id', function ($sub) use ($workspaceId, $productIds) {
+                $sub->from('pages')->select('id')->where('workspace_id', $workspaceId)->whereIn('product_id', $productIds);
+            });
+        }
+
+        if ($teamIds) {
+            $query->whereIn(self::ROLLUP_TABLE.'.page_id', function ($sub) use ($workspaceId, $teamIds) {
+                $sub->from('pages')
+                    ->select('id')
+                    ->where('workspace_id', $workspaceId)
+                    ->whereIn('owner_id', function ($sub2) use ($teamIds) {
+                        $sub2->from('team_user')->select('user_id')->whereIn('team_id', $teamIds);
+                    });
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * Live base query: select rows where either the returning event or the delivered
+     * event falls within the date range. The CASE-WHEN ratio expression handles which
+     * column each row contributes to.
+     */
+    private function liveBaseQuery(int $workspaceId, array $date_range, array $filter, bool $forceJoinPages = false): Builder
+    {
+        $start = $date_range['start_date'].' 00:00:00';
+        $end = $date_range['end_date'].' 23:59:59';
+
+        $query = DB::table('pancake_orders')
+            ->where('pancake_orders.workspace_id', $workspaceId)
+            ->where(function ($q) use ($start, $end) {
+                $q->where(function ($q2) use ($start, $end) {
+                    $q2->whereBetween('pancake_orders.returning_at', [$start, $end])
+                        ->whereNotIn('pancake_orders.status', [6, 7]);
+                })->orWhereBetween('pancake_orders.delivered_at', [$start, $end]);
+            });
+
+        OrdersFilter::joinAndApply($query, $filter, $forceJoinPages);
+
+        return $query;
+    }
+
+    /**
+     * Live ratio: returning amount / (returning amount + delivered amount).
+     * Each row contributes to at most one of the two sums based on which timestamp
+     * falls inside the date range.
+     *
+     * Date-range bind values are expected to be already constrained on the surrounding
+     * WHERE (see liveBaseQuery), so this expression conservatively re-asserts the
+     * conditions inside CASE-WHEN to avoid counting a row's amount twice if both
+     * returning_at and delivered_at fall in range.
+     */
+    private function liveRatioSql(): string
+    {
+        return '
+            ROUND(
+                COALESCE(
+                    SUM(CASE
+                        WHEN pancake_orders.returning_at IS NOT NULL
+                            AND pancake_orders.status NOT IN (6, 7)
+                        THEN pancake_orders.final_amount
+                        ELSE 0
+                    END)
+                    /
+                    NULLIF(
+                        SUM(CASE
+                            WHEN pancake_orders.returning_at IS NOT NULL
+                                AND pancake_orders.status NOT IN (6, 7)
+                            THEN pancake_orders.final_amount
+                            ELSE 0
+                        END)
+                        +
+                        SUM(CASE
+                            WHEN pancake_orders.delivered_at IS NOT NULL
+                            THEN pancake_orders.final_amount
+                            ELSE 0
+                        END),
+                        0
+                    ),
+                    0
+                ),
+                4
+            )
+        ';
+    }
+
+    /**
+     * Breakdown by period for live mode. Uses a UNION ALL of the two events so the
+     * ratio can be computed per period — an order with returning_at on day X and
+     * delivered_at on day Y contributes to both days like the rollup does.
+     */
+    private function liveBreakdown(int $workspaceId, array $date_range, array $filter, string $group)
+    {
+        $start = $date_range['start_date'].' 00:00:00';
+        $end = $date_range['end_date'].' 23:59:59';
+
+        $periodSql = match ($group) {
+            'weekly' => "DATE_FORMAT(t.event_at, '%x-W%v')",
+            'monthly' => "DATE_FORMAT(t.event_at, '%Y-%m')",
+            default => 'DATE(t.event_at)',
+        };
+
+        $returningQuery = DB::table('pancake_orders')
+            ->where('pancake_orders.workspace_id', $workspaceId)
+            ->whereBetween('pancake_orders.returning_at', [$start, $end])
+            ->whereNotIn('pancake_orders.status', [6, 7])
+            ->selectRaw('pancake_orders.returning_at AS event_at, pancake_orders.final_amount AS returning_amount, 0 AS delivered_amount');
+
+        OrdersFilter::joinAndApply($returningQuery, $filter);
+
+        $deliveredQuery = DB::table('pancake_orders')
+            ->where('pancake_orders.workspace_id', $workspaceId)
+            ->whereBetween('pancake_orders.delivered_at', [$start, $end])
+            ->selectRaw('pancake_orders.delivered_at AS event_at, 0 AS returning_amount, pancake_orders.final_amount AS delivered_amount');
+
+        OrdersFilter::joinAndApply($deliveredQuery, $filter);
+
+        return DB::query()
+            ->fromSub($returningQuery->unionAll($deliveredQuery), 't')
+            ->selectRaw("
+                $periodSql AS period,
+                ROUND(
+                    COALESCE(
+                        SUM(t.returning_amount) /
+                        NULLIF(SUM(t.returning_amount) + SUM(t.delivered_amount), 0),
+                        0
+                    ),
+                    4
+                ) AS value
+            ")
+            ->groupByRaw($periodSql)
+            ->orderByRaw($periodSql)
+            ->get();
+    }
+
+    private function ids(array $filter, string $key): ?array
+    {
+        $value = $filter[$key] ?? null;
+
+        if (empty($value)) {
+            return null;
+        }
+
+        return is_array($value) ? $value : explode(',', $value);
     }
 }

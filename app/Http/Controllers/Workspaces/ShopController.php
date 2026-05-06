@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\PendingRequiredChecklistsSort;
 use App\Models\Shop;
 use App\Models\Workspace;
+use Carbon\Carbon;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -17,12 +20,16 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class ShopController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
         // Check if user has access to this workspace
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
+
+        $this->authorize(Permission::ViewShops->value, $workspace);
 
         $pendingChecklistsSub = DB::table('workspace_checklists as wc')
             ->selectRaw('COUNT(*)')
@@ -73,6 +80,8 @@ class ShopController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
+        $this->authorize(Permission::RefreshShops->value, $workspace);
+
         // Ensure the page belongs to the workspace
         if ($shop->workspace_id !== $workspace->id) {
             abort(403);
@@ -80,7 +89,7 @@ class ShopController extends Controller
 
         $shop->update(['customers_last_synced_at' => null]);
 
-        dispatch(new FetchShopCustomers($shop, 1, \Carbon\Carbon::now()->subMonth()->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopCustomers($shop, 1, Carbon::now()->subMonths(3)->unix(), Carbon::now()->unix()))->onQueue('pancake');
         dispatch(new FetchShopUsers($shop))->onQueue('pancake');
 
         return redirect()->route('workspaces.shops.index', $workspace);

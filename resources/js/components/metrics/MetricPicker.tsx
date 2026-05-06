@@ -1,8 +1,12 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ChartNoAxesColumn } from 'lucide-react';
-import { groupedMetrics, MetricKey } from '@/types/metrics';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import { groupedMetrics, metricConfigs, MetricKey } from '@/types/metrics';
+import { ChartNoAxesColumn } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 
 interface Props {
     initialValue: MetricKey[];
@@ -18,37 +22,55 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
         setIsOpen(false);
     }, [localValue, onChange]);
 
+    const allMetricKeys = useMemo<MetricKey[]>(
+        () => metricConfigs.map((m) => m.key),
+        [],
+    );
+
+    const handleSelectAll = useCallback(
+        () => setLocalValue(allMetricKeys),
+        [allMetricKeys],
+    );
+
+    const handleClear = useCallback(() => setLocalValue([]), []);
+
     const activeCount = useMemo(() => localValue.length, [localValue]);
+    const allSelected = activeCount === allMetricKeys.length;
+
+    const MIN_REQUIRED = 2;
+    const canApply = activeCount >= MIN_REQUIRED;
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
                 <button
                     className={[
-                        'inline-flex h-9 items-center overflow-hidden rounded-[10px] border transition-all duration-150',
-                        'bg-white dark:bg-zinc-900',
-                        'shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none',
+                        'group/picker inline-flex h-9 shrink-0 min-w-max items-center overflow-hidden rounded-[10px] border transition-all duration-200',
+                        'bg-gradient-to-b from-white to-stone-50 dark:from-zinc-900 dark:to-zinc-950',
+                        'shadow-[0_1px_2px_rgba(16,24,40,0.06),0_1px_3px_rgba(16,24,40,0.10),inset_0_1px_0_rgba(255,255,255,0.5)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.04)]',
+                        'hover:-translate-y-px hover:shadow-[0_2px_4px_rgba(16,24,40,0.08),0_4px_10px_rgba(16,24,40,0.10),inset_0_1px_0_rgba(255,255,255,0.5)]',
+                        'active:translate-y-0 active:shadow-[0_1px_2px_rgba(16,24,40,0.06),inset_0_1px_2px_rgba(16,24,40,0.08)]',
                         isOpen
-                            ? 'border-emerald-500/40 ring-2 ring-emerald-500/10 dark:border-emerald-500/30'
+                            ? 'border-emerald-500/50 ring-2 ring-emerald-500/15 dark:border-emerald-500/40'
                             : activeCount > 0
-                              ? 'border-emerald-500/30 hover:border-emerald-500/50 dark:border-emerald-500/20 dark:hover:border-emerald-500/30'
-                              : 'border-black/8 hover:border-black/14 dark:border-white/8 dark:hover:border-white/14',
+                              ? 'border-emerald-500/40 hover:border-emerald-500/60 dark:border-emerald-500/30 dark:hover:border-emerald-500/40'
+                              : 'border-black/[0.08] hover:border-black/[0.16] dark:border-white/[0.08] dark:hover:border-white/[0.16]',
                     ].join(' ')}
                 >
                     {/* Icon cell */}
                     <span
                         className={[
-                            'flex h-full w-9 shrink-0 items-center justify-center rounded-l-[10px] border-r transition-colors duration-150',
+                            'flex h-full w-9 shrink-0 items-center justify-center rounded-l-[10px] border-r transition-colors duration-200',
                             activeCount > 0
-                                ? 'border-emerald-500/20 bg-emerald-500/[0.07] dark:border-emerald-500/15 dark:bg-emerald-500/10'
-                                : 'border-black/6 bg-stone-50 dark:border-white/6 dark:bg-white/3',
+                                ? 'border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.12] to-emerald-500/[0.06] dark:border-emerald-500/15 dark:from-emerald-500/[0.18] dark:to-emerald-500/[0.08]'
+                                : 'border-black/[0.06] bg-gradient-to-br from-stone-50 to-stone-100 dark:border-white/[0.06] dark:from-zinc-800/60 dark:to-zinc-900/60',
                         ].join(' ')}
                     >
                         <ChartNoAxesColumn
                             className={[
-                                'h-3.5 w-3.5 transition-colors duration-150',
+                                'h-3.5 w-3.5 transition-all duration-200 group-hover/picker:scale-110',
                                 activeCount > 0
-                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    ? 'text-emerald-600 drop-shadow-[0_1px_1px_rgba(16,185,129,0.25)] dark:text-emerald-400'
                                     : 'text-gray-400 dark:text-gray-500',
                             ].join(' ')}
                         />
@@ -58,16 +80,16 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
                     <span className="flex items-center gap-2 px-3">
                         <span
                             className={[
-                                'text-xs font-medium transition-colors duration-150',
+                                'text-xs font-semibold tracking-tight transition-colors duration-200',
                                 activeCount > 0
-                                    ? 'text-gray-700 dark:text-gray-200'
+                                    ? 'text-gray-800 dark:text-gray-100'
                                     : 'text-gray-500 dark:text-gray-400',
                             ].join(' ')}
                         >
                             Metrics
                         </span>
                         {activeCount > 0 && (
-                            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500/[0.10] px-1 text-[10px] font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">
+                            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-gradient-to-b from-emerald-500 to-emerald-600 px-1 text-[10px] font-bold text-white tabular-nums shadow-[0_1px_2px_rgba(16,185,129,0.4),inset_0_1px_0_rgba(255,255,255,0.25)] dark:from-emerald-400 dark:to-emerald-500">
                                 {activeCount}
                             </span>
                         )}
@@ -81,12 +103,35 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
             >
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-black/6 px-4 py-3 dark:border-white/6">
-                    <span className="text-[13px] font-medium text-gray-900 dark:text-gray-100">
-                        Metrics
-                    </span>
-                    <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                        {activeCount} selected
-                    </span>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-[13px] font-medium text-gray-900 dark:text-gray-100">
+                            Metrics
+                        </span>
+                        <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                            {activeCount} selected
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleSelectAll}
+                            disabled={allSelected}
+                            className="text-[11px]! font-medium! text-gray-400 transition-colors hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-gray-400 dark:text-gray-500 dark:hover:text-emerald-400 dark:disabled:hover:text-gray-500"
+                        >
+                            Select all
+                        </button>
+                        <span className="text-gray-200 dark:text-gray-700">
+                            |
+                        </span>
+                        <button
+                            type="button"
+                            onClick={handleClear}
+                            disabled={activeCount === 0}
+                            className="text-[11px]! font-medium! text-gray-400 transition-colors hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-gray-400 dark:text-gray-500 dark:hover:text-red-400 dark:disabled:hover:text-gray-500"
+                        >
+                            Clear
+                        </button>
+                    </div>
                 </div>
 
                 {/* Metric groups */}
@@ -146,22 +191,30 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
                 </div>
 
                 {/* Footer */}
-                <div className="flex gap-2 border-t border-black/6 px-4 py-3 dark:border-white/6">
-                    <button
-                        onClick={handleApply}
-                        className="flex-1 rounded-lg bg-emerald-600 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
-                    >
-                        Apply
-                    </button>
-                    <button
-                        onClick={() => {
-                            setLocalValue(initialValue);
-                            setIsOpen(false);
-                        }}
-                        className="rounded-lg border border-black/6 bg-white px-4 py-2 text-xs font-medium text-gray-500 transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-400 dark:hover:border-white/10"
-                    >
-                        Cancel
-                    </button>
+                <div className="border-t border-black/6 px-4 py-3 dark:border-white/6">
+                    {!canApply && (
+                        <p className="mb-2 text-[11px] text-amber-600 dark:text-amber-400">
+                            Select at least {MIN_REQUIRED} metrics to continue.
+                        </p>
+                    )}
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleApply}
+                            disabled={!canApply}
+                            className="flex-1 rounded-lg bg-emerald-600 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:bg-emerald-500 dark:hover:bg-emerald-400 dark:disabled:bg-zinc-800 dark:disabled:text-gray-500"
+                        >
+                            Apply
+                        </button>
+                        <button
+                            onClick={() => {
+                                setLocalValue(initialValue);
+                                setIsOpen(false);
+                            }}
+                            className="rounded-lg border border-black/6 bg-white px-4 py-2 text-xs font-medium text-gray-500 transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-400 dark:hover:border-white/10"
+                        >
+                            Cancel
+                        </button>
+                    </div>
                 </div>
             </PopoverContent>
         </Popover>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\WorkspaceInvitation;
+use App\Services\PostHogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -58,6 +59,15 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        $posthog = new PostHogService;
+        $posthog->identify((string) $user->id, [
+            'email' => $user->email,
+            'name' => $user->name,
+        ]);
+        $posthog->capture((string) $user->id, 'user_logged_in', [
+            'email' => $user->email,
+        ]);
+
         // Check if there's an invitation to auto-accept
         if ($request->has('invitation')) {
             $invitation = WorkspaceInvitation::with('workspace')
@@ -76,6 +86,10 @@ class AuthenticatedSessionController extends Controller
                 return redirect()->to("/workspaces/invitations/{$invitation->token}")
                     ->with('success', 'You have successfully joined the workspace!');
             }
+        }
+
+        if ($user->is_super_admin) {
+            return redirect()->route('admin.workspaces.index');
         }
 
         return redirect()->intended(route('dashboard', absolute: false));

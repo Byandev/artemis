@@ -3,6 +3,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
 import { useEffect } from 'react';
 import { User } from '@/types/models/Pancake/User';
+import { toast } from 'sonner';
 
 interface EmployeeFormDialogProps {
     workspace: Workspace;
@@ -10,10 +11,11 @@ interface EmployeeFormDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     employee?: User | null;
+    onSuccess?: () => void;
 }
 
-export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenChange, employee }: EmployeeFormDialogProps) {
-    const { data, setData, put, processing, errors, reset, clearErrors } = useForm({
+export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenChange, employee, onSuccess}: EmployeeFormDialogProps) {
+    const { data, setData, put, post, processing, errors, reset, clearErrors } = useForm({
         status: 'ACTIVE',
         user_id: '',
     });
@@ -22,7 +24,7 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
         if (open && employee) {
             setData({
                 status: employee.status || 'ACTIVE',
-                user_id: employee.user?.id || '',
+                user_id: (employee as any).system_user?.id || (employee as any).user_id || '',
             });
         } else if (!open) {
             clearErrors();
@@ -31,15 +33,30 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
     }, [employee, open]);
 
     const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+    e.preventDefault();
 
-        put(`/workspaces/${workspace.slug}/employees/${employee?.id}`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                onOpenChange(false);
-            },
-        });
-    };
+    const isEditing = !!employee; 
+
+    const url = isEditing
+        ? `/workspaces/${workspace.slug}/employees/${employee.id}`
+        : `/workspaces/${workspace.slug}/employees`;
+
+    const request = isEditing ? put : post;
+
+    request(url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            toast.success(isEditing ? 'Employee updated successfully' : 'Employee created successfully');
+            
+            if (!isEditing) reset();
+            onOpenChange(false);     
+            onSuccess?.();           
+        },
+        onError: () => {
+            toast.error('Failed to save employee. Please check the form.');
+        }
+    });
+};
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -88,8 +105,8 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
                                 Employee Status
                             </label>
                             <select
-                                value={data.status}
-                                onChange={(e) => setData('status', e.target.value)}
+                                value={data.user_id ?? ''}
+                                onChange={(e) => setData('user_id', e.target.value)}
                                 className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 outline-none transition-all focus:border-emerald-500 dark:border-white/8 dark:bg-zinc-800 dark:text-white"
                             >
                                 <option value="ACTIVE">ACTIVE</option>

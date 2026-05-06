@@ -16,18 +16,20 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { AlertTriangle, ExternalLink, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-
-interface TxnOpt {
-    id: number;
-    account_id: number;
-    date: string;
-    description: string;
-    amount: number | string;
-    type: 'in' | 'out';
-    account?: { id: number; name: string } | null;
-}
+import {
+    AlertTriangle,
+    ExternalLink,
+    MoreHorizontal,
+    Pencil,
+    Search,
+    Trash2,
+    Upload,
+} from 'lucide-react';
+import DatePicker from '@/components/ui/date-picker';
+import moment from 'moment';
+import flatpickr from 'flatpickr';
+import DateOption = flatpickr.Options.DateOption;
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface Row extends FinanceRemittance {
     is_reconciled: boolean;
@@ -38,8 +40,8 @@ interface Props {
     workspace: Workspace;
     remittances: PaginatedData<Row>;
     unreconciledCount: number;
-    transactions: TxnOpt[];
-    query?: { sort?: string | null; filter?: { search?: string; status?: string; unreconciled?: string } };
+    transactions: { id: number; account_id: number; date: string; description: string; amount: number | string; type: 'in' | 'out'; account?: { id: number; name: string } | null }[];
+    query?: { sort?: string | null; filter?: { search?: string; status?: string; unreconciled?: string; date_from?: string; date_to?: string } };
 }
 
 const fmt = (v: number | string) => Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -47,23 +49,43 @@ const fmt = (v: number | string) => Number(v).toLocaleString('en-PH', { minimumF
 export default function RemittancesIndex({ workspace, remittances, unreconciledCount, transactions, query }: Props) {
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
     const [createOpen, setCreateOpen] = useState(false);
-    const [editing, setEditing] = useState<FinanceRemittance | null>(null);
+    const [editing, setEditing] = useState<Row | null>(null);
     const [toDelete, setToDelete] = useState<Row | null>(null);
     const [search, setSearch] = useState(query?.filter?.search ?? '');
+    const [importing, setImporting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const unreconciled = query?.filter?.unreconciled === '1' || query?.filter?.unreconciled === 'true';
+    const [dateFrom, setDateFrom] = useState<string | undefined>(query?.filter?.date_from);
+    const [dateTo, setDateTo] = useState<string | undefined>(query?.filter?.date_to);
+    const defaultDate = useMemo(() => dateFrom && dateTo ? [dateFrom, dateTo] : undefined, []);
+    const handleDateChange = (dates: Date[]) => {
+        if (dates.length !== 2) return;
+        const from = moment(dates[0]).format('YYYY-MM-DD');
+        const to = moment(dates[1]).format('YYYY-MM-DD');
+        if (from === dateFrom && to === dateTo) return;
+        setDateFrom(from);
+        setDateTo(to);
+    };
 
     const baseUrl = `/workspaces/${workspace.slug}/finance/remittances`;
 
     const performQuery = useCallback(
-        debounce((s: string) => {
+        debounce((s: string, df: string | undefined, dt: string | undefined) => {
             router.get(baseUrl,
-                { sort: query?.sort, 'filter[search]': s || undefined, 'filter[unreconciled]': unreconciled ? 1 : undefined, page: 1 },
+                {
+                    sort: query?.sort,
+                    'filter[search]': s || undefined,
+                    'filter[unreconciled]': unreconciled ? 1 : undefined,
+                    'filter[date_from]': df || undefined,
+                    'filter[date_to]': dt || undefined,
+                    page: 1,
+                },
                 { preserveState: true, replace: true, preserveScroll: true, only: ['remittances', 'unreconciledCount'] });
         }, 400),
         [baseUrl, query?.sort, unreconciled]
     );
 
-    useEffect(() => { performQuery(search); return () => performQuery.cancel(); }, [search, performQuery]);
+    useEffect(() => { performQuery(search, dateFrom, dateTo); return () => performQuery.cancel(); }, [search, dateFrom, dateTo, performQuery]);
 
     const columns: ColumnDef<Row>[] = [
         {
@@ -166,7 +188,13 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
 
     const toggleUnreconciled = () => {
         router.get(baseUrl,
-            { 'filter[search]': search || undefined, 'filter[unreconciled]': unreconciled ? undefined : 1, page: 1 },
+            {
+                'filter[search]': search || undefined,
+                'filter[unreconciled]': unreconciled ? undefined : 1,
+                'filter[date_from]': dateFrom || undefined,
+                'filter[date_to]': dateTo || undefined,
+                page: 1,
+            },
             { preserveState: true, replace: true, preserveScroll: true });
     };
 
@@ -175,12 +203,40 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
             <Head title={`${workspace.name} - Finance Remittances`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader title="Remittances" description="Courier SOA (Statement of Account) records.">
-                    <button
-                        onClick={() => setCreateOpen(true)}
-                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white hover:bg-emerald-700"
-                    >
-                        Add Remittance
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            className="hidden"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setImporting(true);
+                                router.post(`${baseUrl}/import`, { file }, {
+                                    forceFormData: true,
+                                    onFinish: () => {
+                                        setImporting(false);
+                                        if (fileInputRef.current) fileInputRef.current.value = '';
+                                    },
+                                });
+                            }}
+                        />
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={importing}
+                            className="flex h-8 items-center gap-1.5 rounded-lg border border-black/6 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-600 hover:bg-stone-50 disabled:opacity-50 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
+                        >
+                            <Upload className="h-3.5 w-3.5" />
+                            {importing ? 'Importing...' : 'Import CSV'}
+                        </button>
+                        <button
+                            onClick={() => setCreateOpen(true)}
+                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white hover:bg-emerald-700"
+                        >
+                            Add Remittance
+                        </button>
+                    </div>
                 </PageHeader>
 
                 {unreconciledCount > 0 && (
@@ -190,7 +246,7 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
                     </div>
                 )}
 
-                <div className="mb-3 flex items-center gap-2">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
                     <div className="relative w-full max-w-xs">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                         <input
@@ -200,6 +256,12 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
+                    <DatePicker
+                        id="finance-remittances-date-range"
+                        mode="range"
+                        onChange={handleDateChange}
+                        defaultDate={defaultDate as never as DateOption}
+                    />
                     <button
                         onClick={toggleUnreconciled}
                         className={`h-9 rounded-[10px] border px-3 font-mono! text-[12px]! font-medium transition-all ${unreconciled ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300' : 'border-black/6 bg-white text-gray-600 hover:bg-stone-50 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300'}`}
@@ -217,7 +279,14 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
                         meta={{ ...omit(remittances, ['data']) }}
                         onFetch={(params) => {
                             router.get(baseUrl,
-                                { sort: params?.sort, 'filter[search]': search || undefined, 'filter[unreconciled]': unreconciled ? 1 : undefined, page: params?.page ?? 1 },
+                                {
+                                    sort: params?.sort,
+                                    'filter[search]': search || undefined,
+                                    'filter[unreconciled]': unreconciled ? 1 : undefined,
+                                    'filter[date_from]': dateFrom || undefined,
+                                    'filter[date_to]': dateTo || undefined,
+                                    page: params?.page ?? 1,
+                                },
                                 { preserveState: true, replace: true, preserveScroll: true });
                         }}
                     />

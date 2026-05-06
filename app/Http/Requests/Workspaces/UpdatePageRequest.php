@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Workspaces;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdatePageRequest extends FormRequest
@@ -21,7 +22,7 @@ class UpdatePageRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -34,7 +35,6 @@ class UpdatePageRequest extends FormRequest
             'infotxt_token' => 'nullable|string|max:255',
             'infotxt_user_id' => 'nullable|string|max:255',
             'pancake_token' => 'nullable|string',
-            'parcel_journey_flow_id' => 'required|integer',
             'parcel_journey_custom_field_id' => 'nullable|integer',
             'parcel_journey_enabled' => 'required|boolean',
             'owner_id' => 'required|integer|exists:users,id',

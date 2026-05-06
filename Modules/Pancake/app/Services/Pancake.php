@@ -36,26 +36,20 @@ class Pancake
     }
 
     /**
-     * Fetch per-user customer engagement statistics for a page on the given day.
-     * Uses the pages.fm public_api endpoint which authenticates with the page's pancake_token.
+     * Public API: GET /pages/{page_id}/page_customers
      *
      * @throws RequestException
      * @throws ConnectionException
      */
-    public static function getCustomerEngagements(int $pageId, string $pageAccessToken, \Carbon\Carbon $date): array
+    public static function listPageCustomers(string $pageId, string $pageAccessToken, int $since, int $until, string $orderBy = 'inserted_at', int $pageNumber = 1, int $pageSize = 1): array
     {
-        $start = $date->copy()->startOfDay()->format('d/m/Y H:i:s');
-        $end = $date->copy()->addDay()->startOfDay()->format('d/m/Y H:i:s');
-
-        $pageId = 729182576936579;
-        $pageAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjcyOTE4MjU3NjkzNjU3OSIsInRpbWVzdGFtcCI6MTc3MTYzOTg3N30.du_UE9R5aThgIJ5Dqv_NmMopUprCSQIoMnG167Ucu50';
-
-        return Http::get("https://pages.fm/api/public_api/v1/pages/{$pageId}/statistics/customer_engagements", [
+        return Http::get("https://pages.fm/api/public_api/v1/pages/{$pageId}/page_customers", [
             'page_access_token' => $pageAccessToken,
-            'date_range' => "$start - $end",
-            'by_hour' => 'false',
-        ])
-            ->throw()
-            ->json();
+            'page_number' => $pageNumber,
+            'page_size' => $pageSize,
+            'since' => $since,
+            'until' => $until,
+            'order_by' => $orderBy,
+        ])->throw()->json();
     }
 }

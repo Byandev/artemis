@@ -5,8 +5,9 @@ use App\Models\Order;
 use App\Models\Page;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('workspace members can fetch csr performance ranked by sales', function () {
     $user = User::factory()->create();

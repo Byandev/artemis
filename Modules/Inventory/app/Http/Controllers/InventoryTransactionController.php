@@ -3,25 +3,23 @@
 namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class InventoryTransactionController extends Controller
 {
-    public function index(Request $request, Workspace $workspace)
-    {
-        if (!$request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
+    use AuthorizesRequests;
 
-        $inventory = QueryBuilder::for(InventoryTransaction::where('workspace_id', $workspace->id))
-            ->with(['inventoryItem.product'])
+    private function buildQuery(Workspace $workspace): QueryBuilder
+    {
+        return QueryBuilder::for(InventoryTransaction::where('inventory_transactions.workspace_id', $workspace->id))
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where('ref_no', 'like', "%{$value}%");
@@ -33,12 +31,34 @@ class InventoryTransactionController extends Controller
                     $query->whereDate('date', '<=', $value);
                 }),
             ])
-            ->allowedSorts(['date', 'ref_no', 'po_qty_in', 'po_qty_out', 'rts_goods_in', 'rts_goods_out', 'rts_bad', 'lost', 'remaining_qty', 'created_at'])
-            ->defaultSort('-date')
+            ->allowedSorts([
+                'date',
+                'ref_no',
+                'po_qty_in',
+                'po_qty_out',
+                'rts_goods_in',
+                'rts_goods_out',
+                'rts_bad',
+                'lost',
+                'remaining_qty',
+                'created_at',
+                AllowedSort::callback('inventory_item', function ($query, $descending) {
+                    $query->join('inventory_items', 'inventory_transactions.inventory_item_id', '=', 'inventory_items.id')
+                        ->orderBy('inventory_items.sku', $descending ? 'desc' : 'asc')
+                        ->select('inventory_transactions.*');
+                }),
+            ])
+            ->defaultSort('-date');
+    }
+
+    public function index(Request $request, Workspace $workspace)
+    {
+        $this->authorize('View Transaction Logs', $workspace);
+
+        $inventory = $this->buildQuery($workspace)
+            ->with(['inventoryItem.product'])
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
-
-        $users = User::get(['id', 'name']);
 
         return Inertia::render('workspaces/inventory/inventory_transaction/index', [
             'workspace' => $workspace,
@@ -49,21 +69,23 @@ class InventoryTransactionController extends Controller
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
-            'users' => $users,
+            'users' => $workspace->users()->get(['users.id', 'users.name']),
         ]);
     }
 
     public function store(Request $request, Workspace $workspace)
     {
+        $this->authorize('Create Transaction Logs', $workspace);
+
         $validated = $request->validate([
             'inventory_item_id' => 'required|exists:inventory_items,id',
             'date' => [
                 'required',
                 'date',
                 'before_or_equal:9999-12-31',
-                'regex:/^\d{4}-\d{2}-\d{2}$/', 
+                'regex:/^\d{4}-\d{2}-\d{2}$/',
             ],
-            'ref_no' => 'required|string|max:255|unique:inventory_transactions,ref_no,NULL,id,workspace_id,' . $workspace->id,
+            'ref_no' => 'required|string|max:255|unique:inventory_transactions,ref_no,NULL,id,workspace_id,'.$workspace->id,
             'po_qty_in' => 'required|integer|min:0',
             'po_qty_out' => 'required|integer|min:0',
             'rts_goods_in' => 'required|integer|min:0',
@@ -80,10 +102,12 @@ class InventoryTransactionController extends Controller
 
     public function update(Request $request, Workspace $workspace, InventoryTransaction $transaction)
     {
+        $this->authorize('Edit Transaction Logs', $workspace);
+
         $validated = $request->validate([
             'inventory_item_id' => 'required|exists:inventory_items,id',
             'date' => 'required|date',
-            'ref_no' => 'required|string|max:255|unique:inventory_transactions,ref_no,' . $transaction->id . ',id,workspace_id,' . $workspace->id,
+            'ref_no' => 'required|string|max:255|unique:inventory_transactions,ref_no,'.$transaction->id.',id,workspace_id,'.$workspace->id,
             'po_qty_in' => 'required|integer|min:0',
             'po_qty_out' => 'required|integer|min:0',
             'rts_goods_in' => 'required|integer|min:0',
@@ -100,6 +124,8 @@ class InventoryTransactionController extends Controller
 
     public function destroy(Workspace $workspace, InventoryTransaction $transaction)
     {
+        $this->authorize('Delete Transaction Logs', $workspace);
+
         $transaction->delete();
 
         return redirect()->back()->with('success', 'Entry permanently deleted.');

@@ -15,13 +15,15 @@ use App\Http\Sorts\Order\ForDelivery\OrderParcelStatusSort;
 use App\Http\Sorts\Order\ForDelivery\OrderTrackingCodeSort;
 use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
 use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
+use App\Models\CallLog;
 use App\Models\Page;
+use App\Models\User;
 use App\Models\Workspace;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Modules\Pancake\Models\OrderForDelivery;
-use Modules\Pancake\Models\User;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -36,7 +38,7 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
             return redirect()->back()->with('error', 'Status can only be updated for orders scheduled for delivery today.');
         }
 
@@ -53,7 +55,7 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
             return redirect()->back()->with('error', 'Assignee can only be updated for orders scheduled for delivery today.');
         }
 
@@ -63,7 +65,29 @@ class ForDeliveryController extends Controller
 
         $orderForDelivery->update(['assignee_id' => $request->userId]);
 
-        return redirect()->back()->with('success', 'Assignee updated successfully' . $request->userId);
+        return redirect()->back()->with('success', 'Assignee updated successfully'.$request->userId);
+    }
+
+    public function publicUpdatePhones(Workspace $workspace, $id, Request $request)
+    {
+        if (app()->environment('production')) {
+            return redirect()->back()->with('error', 'Editing phone numbers is disabled in production.');
+        }
+
+        $orderForDelivery = OrderForDelivery::find($id);
+
+        if (! $orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        $data = $request->validate([
+            'customer_phone' => ['nullable', 'string'],
+            'rider_phone' => ['nullable', 'string'],
+        ]);
+
+        $orderForDelivery->update($data);
+
+        return redirect()->back()->with('success', 'Phone numbers updated successfully');
     }
 
     public function publicRemoveAssignee(Workspace $workspace, $id)
@@ -74,7 +98,7 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! \Carbon\Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
             return redirect()->back()->with('error', 'Assignee can only be removed for orders scheduled for delivery today.');
         }
 
@@ -93,12 +117,19 @@ class ForDeliveryController extends Controller
             $baseQuery->where('assignee_id', $request->input('assignee_id'));
         }
 
+        if ($request->input('confirmee_id')) {
+            $baseQuery->where('conferrer_id', $request->input('confirmee_id'));
+        }
+
         $items = QueryBuilder::for($baseQuery)
             ->addSelect([
                 'pancake_order_for_delivery.*',
                 \DB::raw('(SELECT rts_rate FROM rider_delivery_summary WHERE rider_name = pancake_order_for_delivery.rider_name AND rider_phone = pancake_order_for_delivery.rider_phone LIMIT 1) as rider_rts_rate'),
                 \DB::raw('('.RiskScoreSort::sql().') as risk_score'),
             ])
+            ->withCount(['customerCallLogs', 'riderCallLogs'])
+            ->withSum('customerCallLogs as customer_call_duration', 'duration')
+            ->withSum('riderCallLogs as rider_call_duration', 'duration')
             ->with([
                 'order' => function ($query) {
                     $query
@@ -146,9 +177,7 @@ class ForDeliveryController extends Controller
                 AllowedFilter::callback('parcel_status', function ($query, $value) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $values = array_map('strtolower', $values);
-                    $query->whereHas('order', function ($orderQuery) use ($values) {
-                        $orderQuery->whereIn('parcel_status', $values);
-                    });
+                    $query->whereIn('parcel_status', $values);
                 }),
                 AllowedFilter::callback('user_id', function ($query, $value) use ($workspace) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
@@ -225,27 +254,30 @@ class ForDeliveryController extends Controller
             });
         }
 
-        // 1️⃣ Total orders
-        $totalOrdersForDeliveryToday = (clone $totalOrdersForDeliveryTodayQuery)->count();
+        if ($request->input('confirmee_id')) {
+            $statsBase->where('conferrer_id', $request->input('confirmee_id'));
+            $totalOrdersForDeliveryTodayQuery->where('conferrer_id', $request->input('confirmee_id'));
+        }
 
-        // 3️⃣ Called rate (not pending)
-        $totalCalled = (clone $statsBase)
-            ->where('status', '!=', 'PENDING')
-            ->count();
+        // Total uses its own base (optionally filtered via whereHas on confirmed_by)
+        $totalOrdersForDeliveryToday = $totalOrdersForDeliveryTodayQuery->count();
 
-        $totalDelivered = (clone $statsBase)
-            ->whereHas('order', fn ($q) => $q->where('parcel_status', 'delivered'))
-            ->count();
+        // The other 4 stats share $statsBase — roll them into a single aggregate query
+        $statusBreakdown = $statsBase
+            ->selectRaw("
+                SUM(CASE WHEN status != 'PENDING' THEN 1 ELSE 0 END) as called,
+                SUM(CASE WHEN parcel_status = 'delivered' THEN 1 ELSE 0 END) as delivered,
+                SUM(CASE WHEN parcel_status = 'returning' THEN 1 ELSE 0 END) as returning_count,
+                SUM(CASE WHEN parcel_status = 'undeliverable' THEN 1 ELSE 0 END) as problematic
+            ")
+            ->first();
 
-        $totalReturning = (clone $statsBase)
-            ->whereHas('order', fn ($q) => $q->where('parcel_status', 'returning'))
-            ->count();
+        $totalCalled = (int) ($statusBreakdown->called ?? 0);
+        $totalDelivered = (int) ($statusBreakdown->delivered ?? 0);
+        $totalReturning = (int) ($statusBreakdown->returning_count ?? 0);
+        $totalProblematic = (int) ($statusBreakdown->problematic ?? 0);
 
-        $totalProblematic = (clone $statsBase)
-            ->whereHas('order', fn ($q) => $q->whereIn('parcel_status', ['undeliverable']))
-            ->count();
-
-        $users = User::get(['id', 'name']);
+        $users = \Modules\Pancake\Models\User::get();
 
         $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id', 'pageOwners:id,name']);
 
@@ -274,6 +306,10 @@ class ForDeliveryController extends Controller
 
         if ($request->input('assignee_id')) {
             $baseQuery->where('assignee_id', $request->input('assignee_id'));
+        }
+
+        if ($request->input('confirmee_id')) {
+            $baseQuery->where('conferrer_id', $request->input('confirmee_id'));
         }
 
         $query = QueryBuilder::for($baseQuery)
@@ -318,9 +354,7 @@ class ForDeliveryController extends Controller
                 AllowedFilter::callback('parcel_status', function ($query, $value) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $values = array_map('strtolower', $values);
-                    $query->whereHas('order', function ($orderQuery) use ($values) {
-                        $orderQuery->whereIn('parcel_status', $values);
-                    });
+                    $query->whereIn('parcel_status', $values);
                 }),
                 AllowedFilter::callback('user_id', function ($query, $value) use ($workspace) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
@@ -347,9 +381,14 @@ class ForDeliveryController extends Controller
             ])
             ->whereDate('delivery_date', $deliveryDate);
 
+        $columns = $request->input('columns', []);
+        if (is_string($columns)) {
+            $columns = array_filter(explode(',', $columns));
+        }
+
         $filename = 'rmo-management-'.$deliveryDate.'-'.now()->format('His').'.xlsx';
 
-        return Excel::download(new RmoManagementExport($query), $filename);
+        return Excel::download(new RmoManagementExport($query, $columns), $filename);
     }
 
     public function myAssignedCount(Request $request, Workspace $workspace)
@@ -360,15 +399,38 @@ class ForDeliveryController extends Controller
             return response()->json(['total' => 0, 'called' => 0, 'delivered' => 0, 'returning' => 0]);
         }
 
-        $base = OrderForDelivery::where('workspace_id', $workspace->id)
+        $row = OrderForDelivery::where('workspace_id', $workspace->id)
             ->where('assignee_id', $userId)
-            ->whereDate('delivery_date', now());
+            ->whereDate('delivery_date', now())
+            ->selectRaw("
+                COUNT(*) as total,
+                SUM(CASE WHEN status != 'PENDING' THEN 1 ELSE 0 END) as called,
+                SUM(CASE WHEN parcel_status = 'delivered' THEN 1 ELSE 0 END) as delivered,
+                SUM(CASE WHEN parcel_status = 'returning' THEN 1 ELSE 0 END) as returning_count
+            ")
+            ->first();
 
         return response()->json([
-            'total' => (clone $base)->count(),
-            'called' => (clone $base)->where('status', '!=', 'PENDING')->count(),
-            'delivered' => (clone $base)->whereHas('order', fn ($q) => $q->where('parcel_status', 'delivered'))->count(),
-            'returning' => (clone $base)->whereHas('order', fn ($q) => $q->where('parcel_status', 'returning'))->count(),
+            'total' => (int) ($row->total ?? 0),
+            'called' => (int) ($row->called ?? 0),
+            'delivered' => (int) ($row->delivered ?? 0),
+            'returning' => (int) ($row->returning_count ?? 0),
         ]);
+    }
+
+    public function callLogs(Workspace $workspace, Request $request)
+    {
+        $request->validate([
+            'phone_number' => ['required', 'string'],
+            'date' => ['required', 'date'],
+        ]);
+
+        $logs = CallLog::where('workspace_id', $workspace->id)
+            ->where('phone_number', $request->input('phone_number'))
+            ->whereDate('call_date', $request->input('date'))
+            ->orderBy('call_time', 'desc')
+            ->get(['id', 'user_id', 'phone_number', 'type', 'duration', 'call_date', 'call_time']);
+
+        return response()->json($logs);
     }
 }

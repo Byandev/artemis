@@ -23,12 +23,14 @@ import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
 import workspaces from '@/routes/workspaces';
 import InputError from '@/components/input-error';
+import { toast } from 'sonner';
 
 interface ProductFormDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    product?: Product;
+    product?: Product | null;
     workspace: Workspace;
+    onSuccess?: () => void;
 }
 
 export function ProductFormDialog({
@@ -36,48 +38,56 @@ export function ProductFormDialog({
     onOpenChange,
     product,
     workspace,
+    onSuccess
 }: ProductFormDialogProps) {
-    const { data, setData, post, put, processing, errors, reset, clearErrors } =
+
+    const isEditing = !!product;
+
+    const { data, setData, post, processing, errors, reset, clearErrors } =
         useForm({
             name: product?.name || '',
             code: product?.code || '',
             category: product?.category || '',
             status: product?.status || 'Testing',
             description: product?.description || '',
+            _method: 'POST', // Default to POST
         });
 
     useEffect(() => {
-        if (product) {
+        if (open && product) {
             setData({
                 name: product.name,
                 code: product.code,
                 category: product.category,
                 status: product.status,
                 description: product.description || '',
+                _method: 'PATCH', // Set to PATCH for spoofing when editing
             });
-        } else {
+        } else if (open) {
             reset();
+            setData('_method', 'POST');
         }
-    }, [product]);
+    }, [product, open]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (product) {
-            put(workspaces.products.update.url({ workspace, product }), {
-                onSuccess: () => {
-                    onOpenChange(false);
-                    reset();
-                },
-            });
-        } else {
-            post(workspaces.products.store.url({ workspace }), {
-                onSuccess: () => {
-                    onOpenChange(false);
-                    reset();
-                },
-            });
-        }
+        const url = isEditing
+            ? `/workspaces/${workspace.slug}/products/${product?.id}`
+            : `/workspaces/${workspace.slug}/products`;
+
+        post(url, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success(isEditing ? 'Product updated successfully' : 'Product created successfully');
+                onOpenChange(false);
+                if (!isEditing) reset();
+                onSuccess?.();
+            },
+            onError: () => {
+                toast.error('Failed to save product. Please check the form.');
+            }
+        });
     };
 
     const handleOpenChange = (newOpen: boolean) => {
@@ -96,11 +106,13 @@ export function ProductFormDialog({
                         <DialogTitle>
                             {product ? 'Edit Product' : 'Add New Product'}
                         </DialogTitle>
-                        <DialogDescription>
-                            {product
-                                ? 'Update the product information below.'
-                                : 'Fill in the details to create a new product.'}
-                        </DialogDescription>
+                        <DialogHeader>
+                            <DialogDescription>
+                                {product
+                                    ? 'Update the product information below.'
+                                    : 'Fill in the details to create a new product.'}
+                            </DialogDescription>
+                        </DialogHeader>
                     </DialogHeader>
 
                     <div className="grid gap-4 py-4">
@@ -198,8 +210,8 @@ export function ProductFormDialog({
                             {processing
                                 ? 'Saving...'
                                 : product
-                                  ? 'Update Product'
-                                  : 'Create Product'}
+                                    ? 'Update Product'
+                                    : 'Create Product'}
                         </Button>
                     </DialogFooter>
                 </form>
