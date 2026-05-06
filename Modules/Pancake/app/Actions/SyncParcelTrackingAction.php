@@ -90,8 +90,16 @@ readonly class SyncParcelTrackingAction
                     ]
                 );
 
+                $parcel_status = $savedOrder->parcel_status;
+
+                if ($savedOrder->status == 3) {
+                    $parcel_status = 'delivered';
+                } elseif ($savedOrder->status == 4) {
+                    $parcel_status = 'returning';
+                }
+
                 $order_for_delivery->update([
-                    'parcel_status' => $savedOrder->parcel_status,
+                    'parcel_status' => $parcel_status,
                 ]);
 
             }
