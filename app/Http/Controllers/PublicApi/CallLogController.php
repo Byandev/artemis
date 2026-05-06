@@ -43,7 +43,11 @@ class CallLogController extends Controller
         }, $request->input('call_logs'));
 
         foreach (array_chunk($rows, 500) as $chunk) {
-            CallLog::insert($chunk);
+            CallLog::upsert(
+                $chunk,
+                ['workspace_id', 'user_id', 'phone_number', 'call_date', 'call_time'],
+                ['type', 'duration', 'updated_at']
+            );
         }
 
         return response()->json([
