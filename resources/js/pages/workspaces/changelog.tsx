@@ -12,6 +12,31 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.6.4',
+        date: '2026-05-06',
+        sections: [
+            {
+                title: 'Inventory — SKU Uniqueness',
+                items: [
+                    'Editing an inventory item now rejects a SKU that is already used by another item in the same workspace, returning a clear validation error instead of silently saving a duplicate',
+                ],
+            },
+            {
+                title: 'Call Logs API — Idempotent Sync',
+                items: [
+                    'Public /call-logs/sync endpoint now upserts on (workspace, user, phone number, call date, call time) so re-syncing the same logs from the mobile app no longer creates duplicate rows',
+                    'Response now returns a synced count alongside total, and incoming timestamps are preserved as-sent rather than re-anchored to the app timezone',
+                ],
+            },
+            {
+                title: 'Purchased Orders — Create Feedback',
+                items: [
+                    'Creating a purchased order now shows a success toast on save and an error toast (with console-logged validation details) when the form fails, matching the edit-flow behaviour',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.6.3',
         date: '2026-05-05',
         sections: [
