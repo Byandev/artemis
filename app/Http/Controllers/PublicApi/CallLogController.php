@@ -26,7 +26,7 @@ class CallLogController extends Controller
         $now = now();
 
         $rows = array_map(function ($log) use ($workspace, $request, $now) {
-            $timestamp = Carbon::parse($log['timestamp'])->setTimezone(config('app.timezone'));
+            $timestamp = Carbon::parse($log['timestamp']);
 
             return [
                 'workspace_id' => $workspace->id,
@@ -42,12 +42,19 @@ class CallLogController extends Controller
 
         }, $request->input('call_logs'));
 
+        $inserted = 0;
+
         foreach (array_chunk($rows, 500) as $chunk) {
-            CallLog::insert($chunk);
+            $inserted += CallLog::upsert(
+                $chunk,
+                ['workspace_id', 'user_id', 'phone_number', 'call_date', 'call_time'],
+                ['type', 'duration', 'updated_at']
+            );
         }
 
         return response()->json([
             'total' => count($rows),
+            'synced' => $inserted,
         ]);
     }
 
