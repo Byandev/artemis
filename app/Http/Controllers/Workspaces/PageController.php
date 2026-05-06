@@ -31,6 +31,29 @@ class PageController extends Controller
 {
     use AuthorizesRequests;
 
+    private function getPageLimitInfo(Workspace $workspace): array
+    {
+        $limit = $workspace->subscription?->plan?->page_limit;
+        $count = $workspace->pages()->count();
+
+        return [
+            'limit' => $limit,
+            'count' => $count,
+            'reached' => $limit !== null && $count >= $limit,
+        ];
+    }
+
+    private function assertPageLimitNotReached(Workspace $workspace): void
+    {
+        $info = $this->getPageLimitInfo($workspace);
+
+        if ($info['reached']) {
+            throw ValidationException::withMessages([
+                'page_limit' => "You've reached your plan's page limit ({$info['limit']}). Upgrade your plan to add more pages.",
+            ]);
+        }
+    }
+
     public function index(Request $request, Workspace $workspace)
     {
         $this->authorize(Permission::ViewPages->value, $workspace);
@@ -71,6 +94,8 @@ class PageController extends Controller
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
+        $pageLimitInfo = $this->getPageLimitInfo($workspace);
+
         return Inertia::render('workspaces/pages/index', [
             'pages' => $pages,
             'workspace' => $workspace,
@@ -79,12 +104,22 @@ class PageController extends Controller
                 'filter' => $request->input('filter', []),
             ],
             'users' => $workspace->users()->get(['users.id', 'users.name']),
+            'pageLimit' => $pageLimitInfo['limit'],
+            'pageCount' => $pageLimitInfo['count'],
+            'pageLimitReached' => $pageLimitInfo['reached'],
         ]);
     }
 
     public function create(Request $request, Workspace $workspace)
     {
         $this->authorize(Permission::EditPages->value, $workspace);
+
+        $info = $this->getPageLimitInfo($workspace);
+        if ($info['reached']) {
+            return redirect()
+                ->route('workspaces.pages.index', $workspace)
+                ->with('error', "You've reached your plan's page limit ({$info['limit']}). Upgrade your plan to add more pages.");
+        }
 
         return Inertia::render('workspaces/pages/create', [
             'workspace' => $workspace,
@@ -106,6 +141,8 @@ class PageController extends Controller
     public function store(StorePageRequest $request, Workspace $workspace)
     {
         $this->authorize(Permission::EditPages->value, $workspace);
+
+        $this->assertPageLimitNotReached($workspace);
 
         $validated = $request->validated();
         $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
@@ -142,7 +179,6 @@ class PageController extends Controller
             'pancake_token' => $validated['pancake_token'] ?? null,
             'infotxt_token' => $validated['infotxt_token'] ?? null,
             'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
-            'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
             'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
             'parcel_journey_enabled' => $validated['parcel_journey_enabled'] ?? false,
             'status' => $validated['status'] ?? 'active',
@@ -256,17 +292,18 @@ class PageController extends Controller
         ]);
 
         try {
-            $response = Http::timeout(10)->get('https://pages.fm/api/public_api/v1/pages/'.$validated['page_id'], [
+            $response = Http::timeout(10)->get('https://pages.fm/api/public_api/v1/pages/'.$validated['page_id'].'/page_customers', [
                 'page_access_token' => $validated['token'],
             ]);
 
-            if ($response->successful()) {
-                return response()->json(['valid' => true, 'message' => 'Pancake token is valid.', 'data' => $response->status()], 200);
+
+            if ($response->successful() && $response->json()['success']) {
+                return response()->json(['valid' => true, 'message' => 'Pancake token is valid.', 'data' => $response->json()], 200);
             }
 
             return response()->json([
                 'valid' => false,
-                'message' => 'Invalid Pancake token or shop ID.',
+                'message' => 'Invalid Pancake token',
             ]);
         } catch (\Throwable $e) {
             return response()->json([

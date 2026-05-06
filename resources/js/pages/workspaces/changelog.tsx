@@ -12,6 +12,103 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.6.3',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'Sign-up — Terms & Privacy',
+                items: [
+                    'Registration form now requires checking an "I agree to the Terms & Conditions and Privacy Policy" box before submit, with links opening the legal pages in a new tab',
+                    'Backend validates the acceptance flag and returns a clear error ("You must accept the Terms & Conditions to create an account.") if it is missing',
+                ],
+            },
+            {
+                title: 'Plans — New Enterprise Tier',
+                items: [
+                    'Added a new Enterprise plan to the pricing line-up: custom pricing, unlimited orders and pages, 24-month data retention, full analytics, Parcel Journey SMS included, and dedicated support',
+                    'Re-balanced Scale to ₱14,999/mo (down from ₱19,999) to slot under the new Enterprise tier',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.2',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'Plans — Pricing & Page Limits',
+                items: [
+                    'Re-priced and capped page counts on paid tiers: Starter ₱1,499→₱2,999 with a 5-page cap, Growth ₱3,999→₱5,999 with 25 pages, Scale ₱9,999→₱19,999 with 100 pages',
+                    'Parcel Journey SMS is now bundled (free) on every paid tier — removed the per-message rates (₱0.50 / ₱0.35 / ₱0.20) and turned SMS on for Starter so every paid plan includes it',
+                ],
+            },
+            {
+                title: 'Marketing Site',
+                items: [
+                    'Landing page now consistently reads "30-day free trial" everywhere (hero subline, pricing card label, pricing card lede, final CTA, and FAQ) — matches the actual trial length',
+                ],
+            },
+            {
+                title: 'Navigation',
+                items: [
+                    'Removed the Changelog item from the public sidebar; it stays reachable directly at /changelog',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.1',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'Pages — Plan Limits',
+                items: [
+                    "Pages list now enforces the workspace's plan page limit — the index shows an \"X/Y pages used\" indicator under the Add New Page button, the button disables once the limit is reached, and a tooltip points to upgrading the plan",
+                    'Backend now blocks the Add Page flow when the limit is hit (both the create page and the store endpoint) with a clear validation message instead of letting the request through silently',
+                ],
+            },
+            {
+                title: 'Free Trial Plan',
+                items: [
+                    'Bumped Free Trial defaults so new workspaces get a more useful evaluation: 10,000 order cap (was unlimited), 6 months of data retention (was 1), full analytics tier (was basic), Parcel Journey SMS enabled, and priority chat support',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.0',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'RTS — RMO Management',
+                items: [
+                    'Split the single "Only my data" toggle into two independent filters — "My Assignee Only" and "My Confirmee Only" — so reps can narrow the list to orders they confirmed separately from those assigned to them, and combine both when needed',
+                    'Public endpoint and CSV export now accept a confirmee_id filter (mirrors the existing assignee_id filter), and toggle state is persisted per browser via localStorage',
+                ],
+            },
+            {
+                title: 'Subscription Gate & Syncing Modal',
+                items: [
+                    'Restored the subscription-expired gate on every authenticated Inertia page — workspaces with an expired, cancelled, or lapsed trial/active subscription are surfaced the upgrade modal with active non-trial plans (skipped on local environments)',
+                    'Restored the "syncing data" modal that appears on first connect until at least one page finishes its initial order sync; copy softened to "Please be patient." now that the sync runs in the background',
+                ],
+            },
+            {
+                title: 'Onboarding — Initial Sync Window',
+                items: [
+                    'First-time Pancake page connect now backfills 3 months of orders and shop customers (was 1 month), so newly onboarded workspaces have deeper history available immediately',
+                ],
+            },
+            {
+                title: 'Mobile / Public API — Call Logs',
+                items: [
+                    'Synced call-log timestamps are now normalised to the workspace timezone before storage, eliminating the off-by-hours drift on the KPI screen',
+                    'Total talk time KPI now only counts calls whose phone number matches a delivery on that date (customer or rider phone on pancake_order_for_delivery), giving an accurate read of talk time tied to actual delivery work',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.5.0',
         date: '2026-05-04',
         sections: [

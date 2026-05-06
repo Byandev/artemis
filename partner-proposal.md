@@ -76,15 +76,15 @@ The pool is carved only from Bryan's share. Everyone else stays undiluted.
 
 | Plan | Monthly | Orders/mo | Pages | Retention | Analytics | Parcel Journey + SMS | Support |
 |---|---|---|---|---|---|---|---|
-| Free Trial (30 days) | ₱0 | 500 cap | 1 | 1mo | Basic | ✅ Included | Chat |
+| Free Trial (30 days) | ₱0 | 10,000 | 1 | 6mo | Advanced | ✅ Included | Priority |
 | **Starter** | **₱2,999** | 3,000 | 5 | 3mo | Basic | ✅ Included | Chat |
-| **Growth** | **₱7,999** | 10,000 | 25 | 6mo | Advanced + AI | ✅ Included | Priority |
-| **Scale** | **₱19,999** | 30,000 | 100 | 12mo | Advanced + AI | ✅ Included | Dedicated |
-| Enterprise | Custom | Unlimited | Unlimited | Custom | Advanced + AI | ✅ Included | Dedicated + SLA |
+| **Growth** | **₱5,999** | 10,000 | 25 | 6mo | Advanced | ✅ Included | Priority |
+| **Scale** | **₱14,999** | 30,000 | 100 | 12mo | Advanced | ✅ Included | Dedicated |
+| Enterprise | Custom | Unlimited | Unlimited | Custom | Advanced | ✅ Included | Dedicated + SLA |
 
 Billing is **monthly, manual** (bank transfer / GCash / Maya). Parcel Journey + SMS bundled into every paid plan — no usage-based billing, no add-on fees.
 
-Average revenue per customer (weighted 65/25/10 mix): **₱5,949/mo**.
+Average revenue per customer (weighted 65/25/10 mix): **₱4,949/mo**.
 
 ---
 
@@ -115,7 +115,7 @@ Artemis is self-funded by Bryan. Here are the ongoing costs to run the business:
 | Cover operating costs | ~5 | ~₱30k | Server + domain + developer + tooling |
 | Profitable operation | ~10 | ~₱60k | All costs covered, healthy margin |
 
-The break-even is dramatically easier than it looks because parcel journey + SMS are bundled into the subscription. Average revenue per customer ₱5,949/mo means even 5 customers covers everything.
+The break-even is dramatically easier than it looks because parcel journey + SMS are bundled into the subscription. Average revenue per customer ₱4,949/mo means even 6 customers covers everything.
 
 ---
 
@@ -126,6 +126,7 @@ The break-even is dramatically easier than it looks because parcel journey + SMS
 | **RMO Call Statistics** | In Development | Sync RMO call data directly into Artemis for unified analytics and reporting |
 | **FB Ads Analytics** | Feasible | Full Facebook Ads analytics built into Artemis — a Super Ads replacement. Beta company currently pays ₱10k/mo for a similar tool |
 | **Auto Scale / Descale Ads** | Feasible | Automated ad budget scaling and descaling based on performance rules and thresholds |
+| **MCP Server + AI Chat Assistant** | Feasible | Conversational AI assistant for your shop data — also accessible via MCP from Claude, Cursor, and other AI tools |
 | **AUTO RMO Call** | In Research | Automated RMO calls to customers — both standard scripted messages and AI-connected conversations |
 | **Auto Process** | In Research | End-to-end automation of order processing workflows to reduce manual work |
 
@@ -141,11 +142,11 @@ Equity value is based on **net profit after operating expenses** — not raw rev
 
 | Stage | Customers | MRR | Opex/mo | Net Profit/mo | Net Profit/yr | 10% Share |
 |---|---|---|---|---|---|---|
-| Month 6 | ~80 | ₱476k | ₱45k | ₱431k | ₱5.17M | ₱517,000/yr |
-| Month 12 | ~250 | ₱1.49M | ₱75k | ₱1.41M | ₱16.94M | ₱1,694,000/yr |
-| Year 2 | ~500 | ₱2.97M | ₱120k | ₱2.85M | ₱34.25M | ₱3,425,000/yr |
+| Month 6 | ~80 | ₱396k | ₱45k | ₱351k | ₱4.21M | ₱421,000/yr |
+| Month 12 | ~250 | ₱1.24M | ₱75k | ₱1.16M | ₱13.95M | ₱1,395,000/yr |
+| Year 2 | ~500 | ₱2.47M | ₱120k | ₱2.35M | ₱28.25M | ₱2,825,000/yr |
 
-**MRR assumptions:** weighted blend of 65% Starter (₱2,999), 25% Growth (₱7,999), 10% Scale (₱19,999) = avg ₱5,949/customer/mo.
+**MRR assumptions:** weighted blend of 65% Starter (₱2,999), 25% Growth (₱5,999), 10% Scale (₱14,999) = avg ₱4,949/customer/mo.
 
 **Opex assumptions:** server scales with client base — ~₱15k at 80 customers, ~₱45k at 250, ~₱90k at 500 (more data, API calls, processing). Developer at ₱17k/mo. Domain ₱475/mo. Tooling ₱3.5k/mo. Bundled SMS cost factored into fixed margin (capped per parcel in code). All funded by Bryan.
 

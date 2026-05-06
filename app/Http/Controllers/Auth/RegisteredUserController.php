@@ -52,6 +52,9 @@ class RegisteredUserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'terms_accepted' => ['accepted'],
+        ], [
+            'terms_accepted.accepted' => 'You must accept the Terms & Conditions to create an account.',
         ]);
 
         $user = User::create([

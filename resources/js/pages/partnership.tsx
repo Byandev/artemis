@@ -233,8 +233,8 @@ export default function Partnership() {
                                                     <div className="space-y-3 px-4 py-5 sm:px-6">
                                                         {[
                                                             { plan: 'Starter', price: '₱2,999/mo', orders: '3,000 orders' },
-                                                            { plan: 'Growth', price: '₱7,999/mo', orders: '10,000 orders' },
-                                                            { plan: 'Scale', price: '₱19,999/mo', orders: '30,000 orders' },
+                                                            { plan: 'Growth', price: '₱5,999/mo', orders: '10,000 orders' },
+                                                            { plan: 'Scale', price: '₱14,999/mo', orders: '30,000 orders' },
                                                             { plan: 'Enterprise', price: 'Custom', orders: 'Unlimited' },
                                                         ].map((p) => (
                                                             <div key={p.plan} className="flex items-center justify-between text-[13px]">
@@ -275,7 +275,7 @@ export default function Partnership() {
                                                     {[
                                                         { label: 'Customer mix', value: '65 / 25 / 10%', sub: 'Starter / Growth / Scale' },
                                                         { label: 'Trial conversion', value: '15–25%', sub: 'Industry avg for B2B SaaS' },
-                                                        { label: 'Avg revenue/cust.', value: '₱5,949', sub: 'Weighted by plan mix' },
+                                                        { label: 'Avg revenue/cust.', value: '₱4,949', sub: 'Weighted by plan mix' },
                                                         { label: 'Monthly churn', value: '8% → 5%', sub: 'Improving as product matures' },
                                                     ].map((item) => (
                                                         <div key={item.label} className="bg-white px-4 py-4 sm:px-5 dark:bg-zinc-900/80">
@@ -294,9 +294,9 @@ export default function Partnership() {
                                                     <p className="font-mono text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Growth trajectory (moderate scenario)</p>
                                                 </div>
                                                 {[
-                                                    { phase: 'Month 1–3', label: 'Launch', cust: '5 → 25', mrr: '₱37k → ₱156k', desc: 'Cold start. Free trials, early adopters, COD seller communities.' },
-                                                    { phase: 'Month 4–6', label: 'Traction', cust: '40 → 80', mrr: '₱238k → ₱476k', desc: 'Referrals kicking in, case studies published, word spreading.' },
-                                                    { phase: 'Month 7–12', label: 'Growth', cust: '100 → 250', mrr: '₱595k → ₱1.49M', desc: 'Product-market fit confirmed. Expanding outreach and integrations.' },
+                                                    { phase: 'Month 1–3', label: 'Launch', cust: '5 → 25', mrr: '₱30k → ₱129k', desc: 'Cold start. Free trials, early adopters, COD seller communities.' },
+                                                    { phase: 'Month 4–6', label: 'Traction', cust: '40 → 80', mrr: '₱198k → ₱396k', desc: 'Referrals kicking in, case studies published, word spreading.' },
+                                                    { phase: 'Month 7–12', label: 'Growth', cust: '100 → 250', mrr: '₱495k → ₱1.24M', desc: 'Product-market fit confirmed. Expanding outreach and integrations.' },
                                                 ].map((r) => (
                                                     <div key={r.phase} className="border-b border-gray-100 px-4 py-4 last:border-0 sm:px-7 dark:border-white/5">
                                                         <div className="mb-2 flex items-center gap-3">
@@ -318,9 +318,9 @@ export default function Partnership() {
                                                 <div className="bg-gradient-to-r from-brand-50/90 to-white px-4 py-5 sm:px-7 sm:py-6 dark:from-brand-500/[0.06] dark:to-zinc-900">
                                                     <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">Year 1 summary (moderate)</p>
                                                     <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 sm:gap-x-8 sm:gap-y-3">
-                                                        <div><span className="text-2xl font-bold tracking-tight text-brand-600 sm:text-3xl dark:text-brand-400">₱1.49M</span><span className="ml-1.5 text-xs text-gray-400 sm:text-sm">MRR at Month 12</span></div>
-                                                        <div><span className="text-xl font-bold tracking-tight sm:text-2xl">₱17.9M</span><span className="ml-1.5 text-xs text-gray-400 sm:text-sm">ARR run rate</span></div>
-                                                        <div><span className="text-xl font-bold tracking-tight sm:text-2xl">₱9.5M</span><span className="ml-1.5 text-xs text-gray-400 sm:text-sm">total Year 1 revenue</span></div>
+                                                        <div><span className="text-2xl font-bold tracking-tight text-brand-600 sm:text-3xl dark:text-brand-400">₱1.24M</span><span className="ml-1.5 text-xs text-gray-400 sm:text-sm">MRR at Month 12</span></div>
+                                                        <div><span className="text-xl font-bold tracking-tight sm:text-2xl">₱14.9M</span><span className="ml-1.5 text-xs text-gray-400 sm:text-sm">ARR run rate</span></div>
+                                                        <div><span className="text-xl font-bold tracking-tight sm:text-2xl">₱7.9M</span><span className="ml-1.5 text-xs text-gray-400 sm:text-sm">total Year 1 revenue</span></div>
                                                         <div><span className="text-xl font-bold tracking-tight sm:text-2xl">250</span><span className="ml-1.5 text-xs text-gray-400 sm:text-sm">paying customers</span></div>
                                                     </div>
                                                 </div>
@@ -495,6 +495,7 @@ export default function Partnership() {
                                                     { t: 'RMO Call Statistics', d: 'Sync RMO call data directly into Artemis for unified analytics and reporting.', status: 'In Development', color: 'brand' },
                                                     { t: 'FB Ads Analytics', d: 'Full Facebook Ads analytics built into Artemis — a Super Ads replacement. Beta company currently pays ₱10k/mo for a similar tool.', status: 'Feasible', color: 'blue' },
                                                     { t: 'Auto Scale / Descale Ads', d: 'Automated ad budget scaling and descaling based on performance rules and thresholds.', status: 'Feasible', color: 'blue' },
+                                                    { t: 'MCP Server + AI Chat Assistant', d: 'Conversational AI assistant for your shop data — also accessible via MCP from Claude, Cursor, and other AI tools.', status: 'Feasible', color: 'blue' },
                                                     { t: 'AUTO RMO Call', d: 'Automated RMO calls to customers — both standard scripted messages and AI-connected conversations.', status: 'In Research', color: 'amber' },
                                                     { t: 'Auto Process', d: 'End-to-end automation of order processing workflows to reduce manual work.', status: 'In Research', color: 'amber' },
                                                 ].map((f, fi) => (
@@ -539,9 +540,9 @@ export default function Partnership() {
                                                     <p className="font-mono text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Revenue vs. net profit — 10% equity value</p>
                                                 </div>
                                                 {[
-                                                    { stage: 'Month 6', cust: '~80', mrr: '₱476k', opex: '₱45k', net: '₱431k', annual: '₱5.17M', tenPct: '₱517,000/yr' },
-                                                    { stage: 'Month 12', cust: '~250', mrr: '₱1.49M', opex: '₱75k', net: '₱1.41M', annual: '₱16.94M', tenPct: '₱1,694,000/yr' },
-                                                    { stage: 'Year 2', cust: '~500', mrr: '₱2.97M', opex: '₱120k', net: '₱2.85M', annual: '₱34.25M', tenPct: '₱3,425,000/yr' },
+                                                    { stage: 'Month 6', cust: '~80', mrr: '₱396k', opex: '₱45k', net: '₱351k', annual: '₱4.21M', tenPct: '₱421,000/yr' },
+                                                    { stage: 'Month 12', cust: '~250', mrr: '₱1.24M', opex: '₱75k', net: '₱1.16M', annual: '₱13.95M', tenPct: '₱1,395,000/yr' },
+                                                    { stage: 'Year 2', cust: '~500', mrr: '₱2.47M', opex: '₱120k', net: '₱2.35M', annual: '₱28.25M', tenPct: '₱2,825,000/yr' },
                                                 ].map((r, ri) => (
                                                     <div key={r.stage} className="border-b border-gray-100 px-4 py-4 last:border-0 sm:px-7 dark:border-white/5">
                                                         <div className="mb-2 flex items-center gap-3">
