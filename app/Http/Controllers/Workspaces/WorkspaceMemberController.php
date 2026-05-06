@@ -51,7 +51,7 @@ class WorkspaceMemberController extends Controller
                 AllowedSort::field('id', 'users.id'),
                 AllowedSort::field('name', 'users.name'),
                 AllowedSort::field('email', 'users.email'),
-                AllowedSort::field('role', 'roles.name'), 
+                AllowedSort::field('role', 'roles.name'),
                 'pivot_created_at',
             ])
             ->defaultSort('-pivot_created_at')

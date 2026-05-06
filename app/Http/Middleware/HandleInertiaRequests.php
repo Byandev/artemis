@@ -135,7 +135,7 @@ class HandleInertiaRequests extends Middleware
         if (! $user) {
             return [];
         }
-        
+
         // TEMP: bypass role/permission checks in production while RBAC rollout is still on the test server.
         if (app()->environment('production')) {
             return ['*'];
@@ -170,6 +170,7 @@ class HandleInertiaRequests extends Middleware
             $workspace->teams_module_enabled ? null : 'Teams',
             $workspace->checklist_module_enabled ? null : 'Checklist',
             $workspace->csr_module_enabled ? null : 'CSR',
+            $workspace->botcake_module_enabled ? null : 'Botcake',
         ]));
 
         return Role::with('permissions:id,name,category')

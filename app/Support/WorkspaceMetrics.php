@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Metrics\MetricSource;
 use App\Metrics\Orders\Aov;
 use App\Metrics\Orders\AverageDaysFromConfirmedToDelivered;
 use App\Metrics\Orders\AverageDaysFromConfirmedToFirstAttempt;
@@ -33,7 +34,6 @@ use App\Metrics\PageDaily\NewCustomerCount;
 use App\Metrics\ParcelJourney\TotalForDeliveryAmount;
 use App\Metrics\ParcelJourney\TotalForDeliveryCount;
 use App\Metrics\ParcelJourney\TrackedOrdersCount;
-use App\Metrics\MetricSource;
 use App\Models\Workspace;
 use InvalidArgumentException;
 

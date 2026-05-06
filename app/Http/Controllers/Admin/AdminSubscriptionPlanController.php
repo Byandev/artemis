@@ -68,7 +68,7 @@ class AdminSubscriptionPlanController extends Controller
     public function update(Request $request, SubscriptionPlan $subscriptionPlan)
     {
         $validated = $request->validate([
-            'code' => 'required|string|unique:subscription_plans,code,' . $subscriptionPlan->id,
+            'code' => 'required|string|unique:subscription_plans,code,'.$subscriptionPlan->id,
             'name' => 'required|string|max:255',
             'price_php' => 'required|numeric|min:0',
             'order_limit' => 'nullable|integer|min:0',

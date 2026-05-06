@@ -51,27 +51,14 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
     /**
      * Register the Telescope gate.
      *
-     * This gate determines who can access Telescope in all environments.
+     * The parent's authorization() callback already bypasses this gate on
+     * local, so this only runs in non-local environments — only super
+     * admins can access Telescope in staging/production.
      */
     protected function gate(): void
     {
-        Gate::define('viewTelescope', function ($user) {
+        Gate::define('viewTelescope', function ($user = null) {
             return $user && $user->is_super_admin;
-        });
-    }
-
-    /**
-     * Configure the Telescope authorization services.
-     *
-     * Overrides the parent to remove the local-environment bypass —
-     * the gate is enforced in every environment, including local.
-     */
-    protected function authorization(): void
-    {
-        $this->gate();
-
-        Telescope::auth(function ($request) {
-            return Gate::check('viewTelescope', [$request->user()]);
         });
     }
 }
