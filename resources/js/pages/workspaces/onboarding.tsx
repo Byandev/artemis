@@ -1,6 +1,6 @@
 import AuthLayout from '@/layouts/auth-layout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
+import { CheckCircle2, HelpCircle, Loader2, Mail, MessageCircle, PlayCircle, RefreshCw } from 'lucide-react';
 import { FormEventHandler, useCallback, useEffect, useRef, useState } from 'react';
 
 interface Props {
@@ -212,6 +212,51 @@ export default function Onboarding({ workspace }: Props) {
                     </button>
                 </div>
             </form>
+
+            {/* Need help? */}
+            <div className="mt-6 rounded-[12px] border border-black/6 bg-stone-50 p-4 dark:border-white/8 dark:bg-zinc-800/50">
+                <div className="mb-3 flex items-center gap-2">
+                    <HelpCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <p className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                        Need help getting started?
+                    </p>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                    <a
+                        href="https://drive.google.com/file/d/17uzVBqY4N3VIu8lL2WRzTQXE6cUQjPBg/view?usp=sharing"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-center gap-2.5 rounded-[8px] px-2 py-1.5 text-[12px] text-gray-700 transition-colors hover:bg-white dark:text-gray-300 dark:hover:bg-zinc-900"
+                    >
+                        <PlayCircle className="h-3.5 w-3.5 shrink-0 text-gray-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400" />
+                        <span>Watch the setup tutorial</span>
+                    </a>
+
+                    <a
+                        href="mailto:hello@artemis.ph"
+                        className="group flex items-center gap-2.5 rounded-[8px] px-2 py-1.5 text-[12px] text-gray-700 transition-colors hover:bg-white dark:text-gray-300 dark:hover:bg-zinc-900"
+                    >
+                        <Mail className="h-3.5 w-3.5 shrink-0 text-gray-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400" />
+                        <span>
+                            Email us at{' '}
+                            <span className="font-mono text-[11px] text-gray-900 dark:text-gray-100">
+                                hello@artemis.ph
+                            </span>
+                        </span>
+                    </a>
+
+                    <a
+                        href="https://web.facebook.com/profile.php?id=61589399962772"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-center gap-2.5 rounded-[8px] px-2 py-1.5 text-[12px] text-gray-700 transition-colors hover:bg-white dark:text-gray-300 dark:hover:bg-zinc-900"
+                    >
+                        <MessageCircle className="h-3.5 w-3.5 shrink-0 text-gray-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400" />
+                        <span>Message us on Facebook</span>
+                    </a>
+                </div>
+            </div>
         </AuthLayout>
     );
 }
