@@ -59,6 +59,7 @@ export default function Analytics({ workspace }: Props) {
                 <PageHeader
                     title="RTS Analytics"
                     description={`${formatDate(new Date(dateRange[0]), 'MMM d')} – ${formatDate(new Date(dateRange[1]), 'MMM d, yyyy')}`}
+                    stackActionsOnMobile
                 >
                     <Filters workspace={workspace} onChange={setFilter} />
                     <DatePicker

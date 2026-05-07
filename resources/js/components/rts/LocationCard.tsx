@@ -157,16 +157,16 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
 
     return (
         <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
-            <div className="flex items-center justify-between border-b border-black/6 dark:border-white/6 px-5 py-4">
-                <div>
-                    <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">
-                        {groupBy === 'province' ? 'By Province' : 'By City'}
-                    </h2>
-                    <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
-                        {groupBy === 'province' ? 'RTS rate grouped by province' : 'RTS rate grouped by city'}
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 border-b border-black/6 px-5 py-4 dark:border-white/6">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">
+                            {groupBy === 'province' ? 'By Province' : 'By City'}
+                        </h2>
+                        <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
+                            {groupBy === 'province' ? 'RTS rate grouped by province' : 'RTS rate grouped by city'}
+                        </p>
+                    </div>
                     <RefreshButton
                         onClick={() => {
                             if (groupBy === 'province') fetchProvinces(1, provinceSearch, provinceSort, provincePerPage);
@@ -174,6 +174,8 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
                         }}
                         loading={groupBy === 'province' ? provincesLoading : citiesLoading}
                     />
+                </div>
+                <div className="flex w-full flex-wrap items-center gap-3">
                     <div className="relative">
                         <svg className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
@@ -184,7 +186,7 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
                                 value={provinceSearch}
                                 onChange={(e) => setProvinceSearch(e.target.value)}
                                 placeholder="Search province…"
-                                className="h-8 w-48 rounded-lg border border-black/8 bg-stone-50 pl-8 pr-3 text-[12px]! text-gray-700 placeholder-gray-300 outline-none transition-colors focus:border-black/20 dark:border-white/8 dark:bg-white/3 dark:text-gray-300 dark:placeholder-gray-600 dark:focus:border-white/20"
+                                className="h-8 w-full min-w-[11rem] rounded-lg border border-black/8 bg-stone-50 pl-8 pr-3 text-[12px]! text-gray-700 placeholder-gray-300 outline-none transition-colors focus:border-black/20 dark:border-white/8 dark:bg-white/3 dark:text-gray-300 dark:placeholder-gray-600 dark:focus:border-white/20 sm:w-48"
                             />
                         ) : (
                             <input
@@ -192,7 +194,7 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
                                 value={citySearch}
                                 onChange={(e) => setCitySearch(e.target.value)}
                                 placeholder="Search city or province…"
-                                className="h-8 w-52 rounded-lg border border-black/8 bg-stone-50 pl-8 pr-3 text-[12px]! text-gray-700 placeholder-gray-300 outline-none transition-colors focus:border-black/20 dark:border-white/8 dark:bg-white/3 dark:text-gray-300 dark:placeholder-gray-600 dark:focus:border-white/20"
+                                className="h-8 w-full min-w-[12rem] rounded-lg border border-black/8 bg-stone-50 pl-8 pr-3 text-[12px]! text-gray-700 placeholder-gray-300 outline-none transition-colors focus:border-black/20 dark:border-white/8 dark:bg-white/3 dark:text-gray-300 dark:placeholder-gray-600 dark:focus:border-white/20 sm:w-52"
                             />
                         )}
                     </div>
