@@ -15,7 +15,7 @@ export const ORDER_STATUSES = [
     'CX RINGING',
     'RIDER RINGING',
     'IN TRANSIT',
-    'INCORRECT NUMBER'
+    'INCORRECT NUMBER',
     'AUTO DROP CX',
     'AUTO DROP RIDER'
 ] as const;
@@ -87,6 +87,10 @@ export const STATUS_COLORS: Record<
         border: 'border-cyan-200',
     },
     'INCORRECT NUMBER': {
+        bg: 'bg-gray-100',
+        text: 'text-gray-800',
+        border: 'border-gray-200',
+    },
     'AUTO DROP CX': {
         bg: 'bg-pink-100',
         text: 'text-pink-800',
