@@ -24,6 +24,8 @@ export const orderStatusConfig: Record<string, OrderStatusEntry> = {
     'CX RINGING':         { dot: 'bg-amber-400',   text: 'text-amber-700 dark:text-amber-400',     pill: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' },
     'RIDER RINGING':      { dot: 'bg-amber-400',   text: 'text-amber-700 dark:text-amber-400',     pill: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' },
     'IN TRANSIT':         { dot: 'bg-cyan-500',    text: 'text-cyan-700 dark:text-cyan-400',       pill: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-400' },
+    'AUTO DROP CX':       { dot: 'bg-pink-500',    text: 'text-pink-700 dark:text-pink-400',       pill: 'bg-pink-50 text-pink-700 dark:bg-pink-500/10 dark:text-pink-400' },
+    'AUTO DROP RIDER':    { dot: 'bg-indigo-500',  text: 'text-indigo-700 dark:text-indigo-400',   pill: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400' },
 };
 
 /**
