@@ -12,6 +12,31 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.6.9',
+        date: '2026-05-07',
+        sections: [
+            {
+                title: 'Shops — Refresh Users',
+                items: [
+                    'Added a "Refresh users" action to the shop row menu that re-dispatches the FetchShopUsers job for that shop — newly added Pancake operator accounts now show up in the workspace without having to wait for the next nightly sync or refresh the whole shop',
+                ],
+            },
+            {
+                title: 'CSR Daily Records — Aligned & More Detail',
+                items: [
+                    'sync:csr-daily-records (RMO) now defines total_called the same way the POS rollup does: pancake_order_for_delivery rows where status != PENDING. Previously the RMO and POS sides counted "called" differently, which made cross-tab comparisons drift',
+                    'Added a separate total_rmo_call_attempts column to pancake_user_rmo_daily_reports — counts every matching call log per delivery row instead of collapsing to 0/1, so you can now see how many call attempts a CSR actually made versus how many deliveries they reached',
+                ],
+            },
+            {
+                title: 'CSR Performance API — Faster Reads',
+                items: [
+                    'GET /api/.../csr/daily-records now reads from the pre-aggregated daily rollup tables (csr_daily_records, pancake_user_erp_daily_reports, pancake_user_rmo_daily_reports) instead of recomputing from raw orders / deliveries on every request — same numbers, dramatically less work per page load on workspaces with large order volumes',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.6.8',
         date: '2026-05-07',
         sections: [
