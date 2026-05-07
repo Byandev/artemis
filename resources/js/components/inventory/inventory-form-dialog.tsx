@@ -53,8 +53,20 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
                 lost: inventory.lost || 0,
                 remaining_qty: inventory.remaining_qty || 0,
             });
-        } else {
-            reset();
+        } else if (open) {
+            // Explicitly clear form fields when opening in create mode
+            setData({
+                inventory_item_id: '',
+                date: '',
+                ref_no: '',
+                po_qty_in: 0,
+                po_qty_out: 0,
+                rts_goods_in: 0,
+                rts_goods_out: 0,
+                rts_bad: 0,
+                lost: 0,
+                remaining_qty: 0,
+            });
         }
     }, [inventory, open]);
 
