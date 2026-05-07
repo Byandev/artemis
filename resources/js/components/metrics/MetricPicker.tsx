@@ -45,7 +45,7 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
             <PopoverTrigger asChild>
                 <button
                     className={[
-                        'group/picker inline-flex h-9 items-center overflow-hidden rounded-[10px] border transition-all duration-200',
+                        'group/picker inline-flex h-9 shrink-0 min-w-max items-center overflow-hidden rounded-[10px] border transition-all duration-200',
                         'bg-gradient-to-b from-white to-stone-50 dark:from-zinc-900 dark:to-zinc-950',
                         'shadow-[0_1px_2px_rgba(16,24,40,0.06),0_1px_3px_rgba(16,24,40,0.10),inset_0_1px_0_rgba(255,255,255,0.5)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.04)]',
                         'hover:-translate-y-px hover:shadow-[0_2px_4px_rgba(16,24,40,0.08),0_4px_10px_rgba(16,24,40,0.10),inset_0_1px_0_rgba(255,255,255,0.5)]',

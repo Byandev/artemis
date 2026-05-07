@@ -11,7 +11,14 @@ class TriggerFetchSequenceStatistics extends Command
     /**
      * The name and signature of the console command.
      */
-    protected $signature = 'trigger-fetch-sequence-statistics';
+    protected $signature = 'botcake:trigger-fetch-sequence-statistics';
+
+    /**
+     * The console command aliases.
+     *
+     * @var array<int, string>
+     */
+    protected $aliases = ['trigger-fetch-sequence-statistics'];
 
     /**
      * The console command description.
@@ -31,9 +38,11 @@ class TriggerFetchSequenceStatistics extends Command
      */
     public function handle()
     {
-        Sequence::get()
-            ->each(function (Sequence $sequence) {
-                dispatch(new FetchSequenceStatistics($sequence))->onQueue('botcake');
+        Sequence::query()
+            ->chunkById(200, function ($sequences) {
+                foreach ($sequences as $sequence) {
+                    dispatch(new FetchSequenceStatistics($sequence))->onQueue('botcake');
+                }
             });
     }
 

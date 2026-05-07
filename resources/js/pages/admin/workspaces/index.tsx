@@ -1,9 +1,29 @@
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
-import { Head, router } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
-import { Search, Globe, User, Files, LayoutGrid } from 'lucide-react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { Search, Files, LayoutGrid, CreditCard, X, Boxes } from 'lucide-react';
 import PageHeader from '@/components/common/PageHeader';
-import ComponentCard from '@/components/common/ComponentCard';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import { ColumnDef } from '@tanstack/react-table';
+import { PaginatedData } from '@/types';
+import { toFrontendSort } from '@/lib/sort';
+import { debounce, omit } from 'lodash';
+
+interface SubscriptionPlan {
+    id: number;
+    code: string;
+    name: string;
+    price_php: string;
+}
+
+interface Subscription {
+    id: number;
+    subscription_plan_id: number;
+    status: string;
+    current_period_end: string | null;
+    trial_ends_at: string | null;
+    plan: SubscriptionPlan;
+}
 
 interface Workspace {
     id: number;
@@ -11,44 +31,183 @@ interface Workspace {
     slug: string;
     owner?: { name: string };
     pages_count: number;
+    subscription?: Subscription | null;
+    inventory_module_enabled: boolean;
+    finance_module_enabled: boolean;
+    products_module_enabled: boolean;
+    teams_module_enabled: boolean;
+    checklist_module_enabled: boolean;
+    csr_module_enabled: boolean;
+    rmo_module_enabled: boolean;
+    leaderboard_module_enabled: boolean;
 }
+
+const MODULE_FIELDS: Array<{ key: keyof Pick<Workspace,
+    'inventory_module_enabled' | 'finance_module_enabled' | 'products_module_enabled'
+    | 'teams_module_enabled' | 'checklist_module_enabled' | 'csr_module_enabled'
+    | 'rmo_module_enabled' | 'leaderboard_module_enabled'>; label: string; description: string }> = [
+    { key: 'products_module_enabled', label: 'Products', description: 'Product catalog and management' },
+    { key: 'teams_module_enabled', label: 'Teams', description: 'Team grouping and assignments' },
+    { key: 'checklist_module_enabled', label: 'Checklist', description: 'Per-shop and per-page checklist' },
+    { key: 'csr_module_enabled', label: 'CSR', description: 'CSR management and analytics' },
+    { key: 'inventory_module_enabled', label: 'Inventory', description: 'Inventory items, transactions, purchased orders' },
+    { key: 'finance_module_enabled', label: 'Finance', description: 'Accounts, transactions, remittances' },
+    { key: 'rmo_module_enabled', label: 'RMO Management', description: 'Public RMO management link' },
+    { key: 'leaderboard_module_enabled', label: 'Leaderboards', description: 'Public leaderboards link' },
+];
 
 interface Props {
-    workspaces: {
-        data: Workspace[];
-    };
+    workspaces: PaginatedData<Workspace>;
+    plans: SubscriptionPlan[];
     filters: {
         search: string;
+        sort?: string;
+        direction?: string;
     };
+    query?: { sort?: string | null };
 }
 
-export default function Index({ workspaces, filters }: Props) {
+const statusColors: Record<string, string> = {
+    active: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20',
+    trialing: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20',
+    past_due: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-500/10 dark:text-yellow-400 dark:border-yellow-500/20',
+    canceled: 'bg-zinc-100 text-zinc-600 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700',
+    expired: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20',
+};
+
+export default function Index({ workspaces, plans, filters }: Props) {
     const [search, setSearch] = useState(filters.search || '');
+    const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
+    const [editingModules, setEditingModules] = useState<Workspace | null>(null);
+
+    const initialSorting = useMemo(() => {
+        if (filters.sort) {
+            return [{ id: filters.sort, desc: filters.direction === 'desc' }];
+        }
+        return [];
+    }, [filters.sort, filters.direction]);
+
+    const performQuery = useCallback(
+        debounce((s: string) => {
+            router.get('/admin/workspaces', {
+                search: s || undefined,
+                page: 1,
+            }, { preserveState: true, replace: true, preserveScroll: true });
+        }, 400),
+        []
+    );
 
     useEffect(() => {
-        const delayDebounceFn = setTimeout(() => {
-            if (search !== (filters.search || '')) {
-                router.get(
-                    '/admin/workspaces',
-                    { search },
-                    { preserveState: true, replace: true }
-                );
-            }
-        }, 300);
-        return () => clearTimeout(delayDebounceFn);
+        if (search !== (filters.search || '')) {
+            performQuery(search);
+        }
+        return () => performQuery.cancel();
     }, [search]);
+
+    const columns: ColumnDef<Workspace>[] = [
+        {
+            accessorKey: 'name', enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Workspace" />,
+            cell: ({ row }) => (
+                <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                        <LayoutGrid className="h-4 w-4" />
+                    </div>
+                    <div>
+                        <div className="font-semibold text-zinc-900 dark:text-zinc-100">{row.original.name}</div>
+                        <div className="text-xs text-zinc-500 font-mono tracking-tighter">/{row.original.slug}</div>
+                    </div>
+                </div>
+            ),
+        },
+        {
+            id: 'owner', enableSorting: false,
+            header: () => <div className="text-zinc-500 uppercase text-[11px] font-bold tracking-wider">Primary Owner</div>,
+            cell: ({ row }) => (
+                <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
+                    <div className="h-2 w-2 rounded-full bg-brand-500" />
+                    {row.original.owner?.name || 'Platform Admin'}
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'pages_count', enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Resources" className="justify-center" />,
+            cell: ({ row }) => (
+                <div className="text-center">
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-brand-50/50 dark:bg-brand-500/10 px-3 py-1 text-xs font-bold text-brand-600 dark:text-brand-400 border border-brand-100 dark:border-brand-500/20">
+                        <Files className="h-3 w-3" />
+                        {row.original.pages_count} Pages
+                    </div>
+                </div>
+            ),
+        },
+        {
+            id: 'subscription', enableSorting: false,
+            header: () => <div className="text-center text-zinc-500 uppercase text-[11px] font-bold tracking-wider">Subscription</div>,
+            cell: ({ row }) => (
+                <div className="text-center">
+                    {row.original.subscription ? (
+                        <div className="inline-flex flex-col items-center gap-1">
+                            <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                                {row.original.subscription.plan.name}
+                            </span>
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusColors[row.original.subscription.status] || statusColors.canceled}`}>
+                                {row.original.subscription.status}
+                            </span>
+                        </div>
+                    ) : (
+                        <span className="text-xs text-zinc-400 italic">No plan</span>
+                    )}
+                </div>
+            ),
+        },
+        {
+            id: 'days_left', enableSorting: false,
+            header: () => <div className="text-center text-zinc-500 uppercase text-[11px] font-bold tracking-wider">Days Left</div>,
+            cell: ({ row }) => (
+                <div className="text-center">
+                    {row.original.subscription ? (
+                        <DaysLeft subscription={row.original.subscription} />
+                    ) : (
+                        <span className="text-xs text-zinc-400">—</span>
+                    )}
+                </div>
+            ),
+        },
+        {
+            id: 'actions', enableSorting: false,
+            header: () => <div className="text-right text-zinc-500 uppercase text-[11px] font-bold tracking-wider">Actions</div>,
+            cell: ({ row }) => (
+                <div className="text-right flex items-center justify-end gap-1">
+                    <button
+                        onClick={() => setEditingModules(row.original)}
+                        className="rounded-md p-1.5 text-zinc-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:text-brand-400 dark:hover:bg-brand-500/10 transition-colors"
+                        title="Toggle modules"
+                    >
+                        <Boxes className="h-4 w-4" />
+                    </button>
+                    <button
+                        onClick={() => setEditingWorkspace(row.original)}
+                        className="rounded-md p-1.5 text-zinc-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:text-brand-400 dark:hover:bg-brand-500/10 transition-colors"
+                        title="Change subscription"
+                    >
+                        <CreditCard className="h-4 w-4" />
+                    </button>
+                </div>
+            ),
+        },
+    ];
 
     return (
         <AdminSidebarLayout>
             <Head title="Admin | Workspaces" />
 
             <div className="p-4 md:p-6">
-                {/* Aligned Page Header */}
                 <PageHeader
                     title="Workspace Management"
                     description="Platform-wide overview of all created workspaces and their owners."
                 >
-                    {/* Search Input aligned with your Header's action area */}
                     <div className="relative w-full sm:w-64">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
                         <input
@@ -61,60 +220,282 @@ export default function Index({ workspaces, filters }: Props) {
                     </div>
                 </PageHeader>
 
-                {/* Main Content wrapped in ComponentCard to match Dashboard style */}
-                <ComponentCard className="mt-6">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="border-b border-zinc-100 bg-zinc-50/30 dark:border-zinc-800 dark:bg-zinc-900/50">
-                                <tr className="text-zinc-500 uppercase text-[11px] font-bold tracking-wider">
-                                    <th className="px-6 py-4">Workspace Info</th>
-                                    <th className="px-6 py-4">Primary Owner</th>
-                                    <th className="px-6 py-4 text-center">Resources</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                                {workspaces.data.length > 0 ? (
-                                    workspaces.data.map((ws) => (
-                                        <tr key={ws.id} className="group hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-                                                        <LayoutGrid className="h-4 w-4" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-semibold text-zinc-900 dark:text-zinc-100">{ws.name}</div>
-                                                        <div className="text-xs text-zinc-500 font-mono tracking-tighter">/{ws.slug}</div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
-                                                    <div className="h-2 w-2 rounded-full bg-brand-500" />
-                                                    {ws.owner?.name || 'Platform Admin'}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="inline-flex items-center gap-1.5 rounded-full bg-brand-50/50 dark:bg-brand-500/10 px-3 py-1 text-xs font-bold text-brand-600 dark:text-brand-400 border border-brand-100 dark:border-brand-500/20">
-                                                    <Files className="h-3 w-3" />
-                                                    {ws.pages_count} Pages
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={3} className="px-6 py-20 text-center">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <p className="text-zinc-500 italic">No workspaces found matching "{search}"</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </ComponentCard>
+                <div className="mt-6 rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+                    <DataTable
+                        columns={columns}
+                        data={workspaces.data || []}
+                        enableInternalPagination={false}
+                        initialSorting={initialSorting}
+                        meta={{ ...omit(workspaces, ['data']) }}
+                        onFetch={(params) => {
+                            const sortStr = params?.sort && params.sort !== null ? String(params.sort) : null;
+                            router.get('/admin/workspaces', {
+                                search: search || undefined,
+                                sort: sortStr ? sortStr.replace(/^-/, '') : undefined,
+                                direction: sortStr ? (sortStr.startsWith('-') ? 'desc' : 'asc') : undefined,
+                                page: params?.page ?? 1,
+                                per_page: params?.per_page ?? undefined,
+                            }, { preserveState: true, replace: true, preserveScroll: true });
+                        }}
+                    />
+                </div>
             </div>
+
+            {editingWorkspace && (
+                <SubscriptionModal
+                    workspace={editingWorkspace}
+                    plans={plans}
+                    onClose={() => setEditingWorkspace(null)}
+                />
+            )}
+
+            {editingModules && (
+                <ModulesModal
+                    workspace={editingModules}
+                    onClose={() => setEditingModules(null)}
+                />
+            )}
         </AdminSidebarLayout>
+    );
+}
+
+function DaysLeft({ subscription }: { subscription: Subscription }) {
+    const endDate = subscription.status === 'trialing'
+        ? subscription.trial_ends_at
+        : subscription.current_period_end;
+
+    if (!endDate) return <span className="text-xs text-zinc-400">—</span>;
+
+    const now = new Date();
+    const end = new Date(endDate);
+    const diffMs = end.getTime() - now.getTime();
+    const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    if (days < 0) {
+        return <span className="text-xs font-medium text-red-500">Expired</span>;
+    }
+
+    const color = days <= 3
+        ? 'text-red-600 dark:text-red-400'
+        : days <= 7
+          ? 'text-yellow-600 dark:text-yellow-400'
+          : 'text-zinc-700 dark:text-zinc-300';
+
+    return (
+        <div className="flex flex-col items-center">
+            <span className={`text-sm font-bold ${color}`}>{days}</span>
+            <span className="text-[10px] text-zinc-500">days left</span>
+        </div>
+    );
+}
+
+function SubscriptionModal({
+    workspace,
+    plans,
+    onClose,
+}: {
+    workspace: Workspace;
+    plans: SubscriptionPlan[];
+    onClose: () => void;
+}) {
+    const { data, setData, put, processing } = useForm({
+        subscription_plan_id: workspace.subscription?.subscription_plan_id?.toString() || (plans[0]?.id?.toString() ?? ''),
+        status: workspace.subscription?.status || 'active',
+    });
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        put(`/admin/workspaces/${workspace.slug}/subscription`, {
+            onSuccess: () => onClose(),
+        });
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+            <div
+                className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between mb-5">
+                    <div>
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                            Adjust Subscription
+                        </h3>
+                        <p className="text-sm text-zinc-500">{workspace.name}</p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="rounded-md p-1 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                            Plan
+                        </label>
+                        <select
+                            value={data.subscription_plan_id}
+                            onChange={(e) => {
+                                const selectedPlan = plans.find((p) => p.id.toString() === e.target.value);
+                                setData((prev) => ({
+                                    ...prev,
+                                    subscription_plan_id: e.target.value,
+                                    status: selectedPlan?.code === 'free_trial' ? 'trialing' : 'active',
+                                }));
+                            }}
+                            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-zinc-700 dark:bg-zinc-800"
+                        >
+                            {plans.map((plan) => (
+                                <option key={plan.id} value={plan.id}>
+                                    {plan.name} — ₱{parseFloat(plan.price_php).toLocaleString()}/mo
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                            Status
+                        </label>
+                        <select
+                            value={data.status}
+                            onChange={(e) => setData('status', e.target.value)}
+                            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-zinc-700 dark:bg-zinc-800"
+                        >
+                            <option value="active">Active</option>
+                            <option value="trialing">Trialing</option>
+                            <option value="past_due">Past Due</option>
+                            <option value="canceled">Canceled</option>
+                            <option value="expired">Expired</option>
+                        </select>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-md border border-zinc-200 dark:border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={processing}
+                            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+function ModulesModal({
+    workspace,
+    onClose,
+}: {
+    workspace: Workspace;
+    onClose: () => void;
+}) {
+    const { data, setData, put, processing } = useForm({
+        inventory_module_enabled: workspace.inventory_module_enabled,
+        finance_module_enabled: workspace.finance_module_enabled,
+        products_module_enabled: workspace.products_module_enabled,
+        teams_module_enabled: workspace.teams_module_enabled,
+        checklist_module_enabled: workspace.checklist_module_enabled,
+        csr_module_enabled: workspace.csr_module_enabled,
+        rmo_module_enabled: workspace.rmo_module_enabled,
+        leaderboard_module_enabled: workspace.leaderboard_module_enabled,
+    });
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        put(`/admin/workspaces/${workspace.slug}/modules`, {
+            onSuccess: () => onClose(),
+            preserveScroll: true,
+        });
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+            <div
+                className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between mb-5">
+                    <div>
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                            Toggle Modules
+                        </h3>
+                        <p className="text-sm text-zinc-500">{workspace.name}</p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="rounded-md p-1 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-1">
+                    <div className="divide-y divide-zinc-200 dark:divide-zinc-800 -mx-6 px-6">
+                        {MODULE_FIELDS.map((field) => (
+                            <label
+                                key={field.key}
+                                className="flex items-center justify-between gap-4 py-3 cursor-pointer"
+                            >
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        {field.label}
+                                    </div>
+                                    <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                                        {field.description}
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={data[field.key]}
+                                    onClick={() => setData(field.key, !data[field.key])}
+                                    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                                        data[field.key]
+                                            ? 'bg-brand-600'
+                                            : 'bg-zinc-200 dark:bg-zinc-700'
+                                    }`}
+                                >
+                                    <span
+                                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                                            data[field.key] ? 'translate-x-5' : 'translate-x-1'
+                                        }`}
+                                    />
+                                </button>
+                            </label>
+                        ))}
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-md border border-zinc-200 dark:border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={processing}
+                            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     );
 }

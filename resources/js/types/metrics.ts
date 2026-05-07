@@ -33,7 +33,9 @@ export type MetricKey =
     | 'repeatCustomerRatio'
     | 'retention30dRateCohort'
     | 'retention60dRateCohort'
-    | 'retention90dRateCohort';
+    | 'retention90dRateCohort'
+    | 'newCustomerCount'
+    | 'allCustomerConversionRate';
 
 export type MetricGroupKey =
     | 'revenueVolume'
@@ -262,6 +264,20 @@ export const metricConfigs: MetricConfig[] = [
         name: 'For Delivery Amount',
         description: 'Total value of orders currently out for delivery in the selected period.',
         formatter: currencyFormatter,
+    },
+    {
+        key: 'newCustomerCount',
+        groupKey: 'revenueVolume',
+        name: 'New Customer Count',
+        description: 'How many new customers were added (first interaction with a page) in the selected period.',
+        formatter: numberFormatter,
+    },
+    {
+        key: 'allCustomerConversionRate',
+        groupKey: 'revenueVolume',
+        name: 'All Customer Conversion Rate',
+        description: 'Out of all customers active in the selected period, what percentage placed a confirmed order.',
+        formatter: percentageFormatter,
     },
 ];
 

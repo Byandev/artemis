@@ -1,6 +1,6 @@
 export type TransactionType =
     | 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance'
-    | 'loan' | 'loan_payment' | 'refund' | 'voided' | 'courier_damaged_settlement';
+    | 'loan' | 'loan_payment' | 'refund' | 'voided' | 'courier_damaged_settlement' | 'capex';
 
 export const TRANSACTION_TYPES: { value: TransactionType; label: string }[] = [
     { value: 'funds', label: 'Funds' },
@@ -13,6 +13,7 @@ export const TRANSACTION_TYPES: { value: TransactionType; label: string }[] = [
     { value: 'refund', label: 'Refund' },
     { value: 'voided', label: 'Voided' },
     { value: 'courier_damaged_settlement', label: 'Courier Damaged Settlement' },
+    { value: 'capex', label: 'CapEx' },
 ];
 
 export const TRANSACTION_TYPE_LABEL: Record<TransactionType, string> = Object.fromEntries(
@@ -30,4 +31,5 @@ export const TRANSACTION_TYPE_STYLE: Record<TransactionType, { cls: string }> = 
     refund: { cls: 'bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400' },
     voided: { cls: 'bg-gray-100 text-gray-500 line-through dark:bg-white/5 dark:text-gray-400' },
     courier_damaged_settlement: { cls: 'bg-fuchsia-50 text-fuchsia-600 dark:bg-fuchsia-500/10 dark:text-fuchsia-400' },
+    capex: { cls: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400' },
 };
