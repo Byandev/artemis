@@ -65,7 +65,7 @@ export default function Onboarding({ workspace }: Props) {
     useEffect(() => {
         if (complete) {
             const timer = setTimeout(() => {
-                router.visit(`/workspaces/${workspace.slug}/dashboard`);
+                window.location.reload();
             }, 2000);
             return () => clearTimeout(timer);
         }
