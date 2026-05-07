@@ -1,5 +1,5 @@
-import { Head, Link } from '@inertiajs/react';
 import { home } from '@/routes';
+import { Head, Link } from '@inertiajs/react';
 
 interface ChangelogEntry {
     version: string;
@@ -11,6 +11,37 @@ interface ChangelogEntry {
 }
 
 const changelog: ChangelogEntry[] = [
+    {
+        version: 'v3.6.7',
+        date: '2026-05-07',
+        sections: [
+            {
+                title: 'CSR Analytics — Live POS Data',
+                items: [
+                    'POS metrics (Total Sales, Orders, Delivered, Returning, RTS Rate, and the per-CSR table) now read directly from pancake_orders instead of the pancake_user_pos_daily_reports rollup — figures reflect live order activity within the selected range without waiting on the daily rollup job',
+                    'Per-CSR aggregation groups pancake_orders by confirmed_by; total_orders / total_sales use confirmed_at, delivered uses status=3 + delivered_at, returning uses status IN (4,5) + returning_at',
+                ],
+            },
+            {
+                title: 'CSR Analytics — Live RMO Called',
+                items: [
+                    'RMO Called and Total Call Time now derive directly from pancake_order_for_delivery (joined to call_logs via workspace + assignee + delivery date + rider/customer phone) instead of pancake_user_rmo_daily_reports — same aggregation logic the SyncCsrRmoDailyRecords command used, just evaluated at request time',
+                ],
+            },
+            {
+                title: 'CSR Analytics — ERP Toggle Disabled',
+                items: [
+                    'ERP option in the POS / ERP toggle is temporarily disabled (greyed out, unclickable) while the ERP data path is being reworked; POS remains the default and only selectable mode',
+                ],
+            },
+            {
+                title: 'Scheduler — Analytics Rollup Paused',
+                items: [
+                    'Hourly and back-fill analytics:rollup schedules in routes/console.php are commented out now that POS / RMO analytics no longer depend on the rollup tables — frees the queue from redundant work',
+                ],
+            },
+        ],
+    },
     {
         version: 'v3.6.6',
         date: '2026-05-07',
@@ -36,7 +67,7 @@ const changelog: ChangelogEntry[] = [
             {
                 title: 'Pancake Sync — Initial Backfill Window',
                 items: [
-                    'First-time Pancake page connect (and the Refresh button on Pages) now backfills 1 month of orders and shop customers instead of 3 months, cutting onboarding sync time and keeping queue load proportional to a typical seller\'s active window',
+                    "First-time Pancake page connect (and the Refresh button on Pages) now backfills 1 month of orders and shop customers instead of 3 months, cutting onboarding sync time and keeping queue load proportional to a typical seller's active window",
                 ],
             },
         ],
@@ -48,7 +79,7 @@ const changelog: ChangelogEntry[] = [
             {
                 title: 'Botcake — Module Toggle',
                 items: [
-                    'Added a per-workspace botcake_module_enabled flag — the Botcake nav group (Sequences + Flows) is hidden from the sidebar when the module is off, and any permission with the Botcake category is filtered out of the user\'s effective permission set',
+                    "Added a per-workspace botcake_module_enabled flag — the Botcake nav group (Sequences + Flows) is hidden from the sidebar when the module is off, and any permission with the Botcake category is filtered out of the user's effective permission set",
                 ],
             },
             {
@@ -76,7 +107,7 @@ const changelog: ChangelogEntry[] = [
             {
                 title: 'Workspace Middleware — Lookup Fallbacks',
                 items: [
-                    'CheckWorkspace now falls back to the route-bound {workspace} parameter and the user\'s session current_workspace_id when the X-Workspace-Id header is absent, so URL-scoped routes don\'t need clients to set the header explicitly',
+                    "CheckWorkspace now falls back to the route-bound {workspace} parameter and the user's session current_workspace_id when the X-Workspace-Id header is absent, so URL-scoped routes don't need clients to set the header explicitly",
                 ],
             },
         ],
@@ -158,7 +189,7 @@ const changelog: ChangelogEntry[] = [
             {
                 title: 'Pages — Plan Limits',
                 items: [
-                    "Pages list now enforces the workspace's plan page limit — the index shows an \"X/Y pages used\" indicator under the Add New Page button, the button disables once the limit is reached, and a tooltip points to upgrading the plan",
+                    'Pages list now enforces the workspace\'s plan page limit — the index shows an "X/Y pages used" indicator under the Add New Page button, the button disables once the limit is reached, and a tooltip points to upgrading the plan',
                     'Backend now blocks the Add Page flow when the limit is hit (both the create page and the store endpoint) with a clear validation message instead of letting the request through silently',
                 ],
             },
@@ -577,9 +608,7 @@ const changelog: ChangelogEntry[] = [
             },
             {
                 title: 'Finance',
-                items: [
-                    'Initial rollout of finance features (feat/finance)',
-                ],
+                items: ['Initial rollout of finance features (feat/finance)'],
             },
             {
                 title: 'Parcel Journey',
@@ -590,9 +619,7 @@ const changelog: ChangelogEntry[] = [
             },
             {
                 title: 'Internal',
-                items: [
-                    'Sentry integration added for error monitoring',
-                ],
+                items: ['Sentry integration added for error monitoring'],
             },
         ],
     },
@@ -654,7 +681,7 @@ const changelog: ChangelogEntry[] = [
             {
                 title: 'RMO Management',
                 items: [
-                    'Status picker, Assign to me, and Remove assignee are disabled unless the order\'s delivery date is today — backend validation mirrors the UI',
+                    "Status picker, Assign to me, and Remove assignee are disabled unless the order's delivery date is today — backend validation mirrors the UI",
                     'Date picker moved to the right side of the toolbar, next to the Show/Hide Statistics button',
                 ],
             },
@@ -754,9 +781,7 @@ const changelog: ChangelogEntry[] = [
         sections: [
             {
                 title: 'Fixes',
-                items: [
-                    'New CSR users now default to ACTIVE status',
-                ],
+                items: ['New CSR users now default to ACTIVE status'],
             },
         ],
     },
@@ -1048,8 +1073,7 @@ const changelog: ChangelogEntry[] = [
 const versionColors: Record<string, string> = {
     'v3.3.0':
         'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 ring-yellow-500/20',
-    'v3.1.0':
-        'bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20',
+    'v3.1.0': 'bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20',
     'v3.0.2':
         'bg-teal-500/10 text-teal-600 dark:text-teal-400 ring-teal-500/20',
     'v3.0.1':
@@ -1100,11 +1124,20 @@ export default function Changelog() {
                 {/* Header */}
                 <header className="border-b border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-                        <Link href={home().url} className="flex items-center gap-2.5">
-                            <img src="/img/logo/artemis.png" alt="Artemis" className="h-7 w-7 object-contain" />
-                            <span className="font-semibold tracking-tight text-gray-900 dark:text-white">Artemis</span>
+                        <Link
+                            href={home().url}
+                            className="flex items-center gap-2.5"
+                        >
+                            <img
+                                src="/img/logo/artemis.png"
+                                alt="Artemis"
+                                className="h-7 w-7 object-contain"
+                            />
+                            <span className="font-semibold tracking-tight text-gray-900 dark:text-white">
+                                Artemis
+                            </span>
                         </Link>
-                        <span className="font-mono text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                        <span className="font-mono text-[11px] font-semibold tracking-widest text-gray-400 uppercase dark:text-gray-500">
                             Changelog
                         </span>
                     </div>
@@ -1143,19 +1176,21 @@ export default function Changelog() {
                                 <div className="space-y-5">
                                     {entry.sections.map((section) => (
                                         <div key={section.title}>
-                                            <p className="mb-2.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                                            <p className="mb-2.5 font-mono text-[10px] font-semibold tracking-widest text-gray-400 uppercase dark:text-gray-500">
                                                 {section.title}
                                             </p>
                                             <ul className="space-y-1.5">
-                                                {section.items.map((item, i) => (
-                                                    <li
-                                                        key={i}
-                                                        className="flex items-start gap-2.5 font-mono text-[12px] text-gray-600 dark:text-gray-400"
-                                                    >
-                                                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300 dark:bg-zinc-600" />
-                                                        {item}
-                                                    </li>
-                                                ))}
+                                                {section.items.map(
+                                                    (item, i) => (
+                                                        <li
+                                                            key={i}
+                                                            className="flex items-start gap-2.5 font-mono text-[12px] text-gray-600 dark:text-gray-400"
+                                                        >
+                                                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300 dark:bg-zinc-600" />
+                                                            {item}
+                                                        </li>
+                                                    ),
+                                                )}
                                             </ul>
                                         </div>
                                     ))}
@@ -1165,7 +1200,8 @@ export default function Changelog() {
                     </div>
 
                     <p className="mt-8 text-center font-mono text-[11px] text-gray-400 dark:text-gray-600">
-                        © {new Date().getFullYear()} Artemis. All rights reserved.
+                        © {new Date().getFullYear()} Artemis. All rights
+                        reserved.
                     </p>
                 </main>
             </div>
