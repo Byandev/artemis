@@ -12,6 +12,36 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.6.6',
+        date: '2026-05-07',
+        sections: [
+            {
+                title: 'Onboarding — Help Panel',
+                items: [
+                    'Added a "Need help getting started?" panel under the onboarding form with three quick links: a setup-tutorial video, an email shortcut to hello@artemis.ph, and a Facebook message link — each with an icon and emerald hover accent that matches the brand palette',
+                ],
+            },
+            {
+                title: 'Onboarding — Sync Complete',
+                items: [
+                    'After the initial sync finishes, the onboarding page now does a full reload instead of an Inertia visit — server-side props (workspace flags, sync timestamps, sidebar visibility) refresh cleanly so the dashboard renders with up-to-date state on first paint',
+                ],
+            },
+            {
+                title: 'Dashboard — Default Date Range',
+                items: [
+                    'Dashboard date range now defaults to "start of month → yesterday" instead of "start of month → end of month" so the chart no longer extends into future days and dilutes today\'s metrics with empty buckets',
+                ],
+            },
+            {
+                title: 'Pancake Sync — Initial Backfill Window',
+                items: [
+                    'First-time Pancake page connect (and the Refresh button on Pages) now backfills 1 month of orders and shop customers instead of 3 months, cutting onboarding sync time and keeping queue load proportional to a typical seller\'s active window',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.6.5',
         date: '2026-05-06',
         sections: [
