@@ -12,6 +12,76 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.6.6',
+        date: '2026-05-07',
+        sections: [
+            {
+                title: 'Onboarding — Help Panel',
+                items: [
+                    'Added a "Need help getting started?" panel under the onboarding form with three quick links: a setup-tutorial video, an email shortcut to hello@artemis.ph, and a Facebook message link — each with an icon and emerald hover accent that matches the brand palette',
+                ],
+            },
+            {
+                title: 'Onboarding — Sync Complete',
+                items: [
+                    'After the initial sync finishes, the onboarding page now does a full reload instead of an Inertia visit — server-side props (workspace flags, sync timestamps, sidebar visibility) refresh cleanly so the dashboard renders with up-to-date state on first paint',
+                ],
+            },
+            {
+                title: 'Dashboard — Default Date Range',
+                items: [
+                    'Dashboard date range now defaults to "start of month → yesterday" instead of "start of month → end of month" so the chart no longer extends into future days and dilutes today\'s metrics with empty buckets',
+                ],
+            },
+            {
+                title: 'Pancake Sync — Initial Backfill Window',
+                items: [
+                    'First-time Pancake page connect (and the Refresh button on Pages) now backfills 1 month of orders and shop customers instead of 3 months, cutting onboarding sync time and keeping queue load proportional to a typical seller\'s active window',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.5',
+        date: '2026-05-06',
+        sections: [
+            {
+                title: 'Botcake — Module Toggle',
+                items: [
+                    'Added a per-workspace botcake_module_enabled flag — the Botcake nav group (Sequences + Flows) is hidden from the sidebar when the module is off, and any permission with the Botcake category is filtered out of the user\'s effective permission set',
+                ],
+            },
+            {
+                title: 'Botcake — Overall vs Historical Stats',
+                items: [
+                    'Flows and Sequences index pages now have an Overall / Historical toggle; Historical reveals a date-range picker (defaulting to the last 7 days) and re-aggregates Sent / Phone Numbers / Success Rate from the new daily delta tables',
+                    'FetchFlowStatistics and FetchSequenceStatistics now compute per-day deltas against the prior cumulative snapshot (clamped at 0 to absorb counter resets) so historical sums add up to real activity within any window — the cumulative-as-of-now value is still saved on the Flow / SequenceMessage row for the Overall view',
+                    'Trigger commands renamed under the botcake: namespace (botcake:trigger-fetch-flows, botcake:trigger-fetch-sequences, botcake:trigger-fetch-flow-statistics, botcake:trigger-fetch-sequence-statistics); old names kept as aliases',
+                    'Stats triggers now chunk through Flows / Sequences in batches of 200 instead of fetching all at once, preventing memory spikes on workspaces with thousands of records',
+                ],
+            },
+            {
+                title: 'Botcake — Schema & Code Layout',
+                items: [
+                    'botcake_flows, botcake_sequences, and botcake_sequence_messages now use the Botcake-supplied id directly as the primary key — collapsing the previous (auto-increment id + flow_id / sequence_id / message_id) split into a single column. The migration drops and recreates the six related tables to apply the change',
+                    'Web controllers for Flows and Sequences moved from app/Http/Controllers/Workspaces/Botcake/ into Modules/Botcake/Http/Controllers/Web/, keeping module-owned code inside the module',
+                ],
+            },
+            {
+                title: 'Telescope & Horizon — Access Control',
+                items: [
+                    'Both /telescope and /horizon now require is_super_admin = true in non-local environments — non-super-admin users get a 403 instead of seeing the dashboards. Local development continues to bypass the gate via the framework default',
+                ],
+            },
+            {
+                title: 'Workspace Middleware — Lookup Fallbacks',
+                items: [
+                    'CheckWorkspace now falls back to the route-bound {workspace} parameter and the user\'s session current_workspace_id when the X-Workspace-Id header is absent, so URL-scoped routes don\'t need clients to set the header explicitly',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.6.4',
         date: '2026-05-06',
         sections: [
