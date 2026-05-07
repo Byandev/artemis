@@ -6,6 +6,7 @@ use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\Workspace;
+use App\Services\PostHogService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -77,6 +78,13 @@ class TeamController extends Controller
 
             $team->members()->attach($validMemberIds);
         }
+
+        (new PostHogService)->capture((string) $request->user()->id, 'team_created', [
+            'workspace_id' => $workspace->id,
+            'team_id' => $team->id,
+            'team_name' => $team->name,
+            'members_count' => count($validated['members'] ?? []),
+        ]);
 
         return redirect()->back()->with('success', 'Team created successfully.');
     }

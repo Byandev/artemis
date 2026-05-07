@@ -12,6 +12,294 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.6.4',
+        date: '2026-05-06',
+        sections: [
+            {
+                title: 'Inventory — SKU Uniqueness',
+                items: [
+                    'Editing an inventory item now rejects a SKU that is already used by another item in the same workspace, returning a clear validation error instead of silently saving a duplicate',
+                ],
+            },
+            {
+                title: 'Call Logs API — Idempotent Sync',
+                items: [
+                    'Public /call-logs/sync endpoint now upserts on (workspace, user, phone number, call date, call time) so re-syncing the same logs from the mobile app no longer creates duplicate rows',
+                    'Response now returns a synced count alongside total, and incoming timestamps are preserved as-sent rather than re-anchored to the app timezone',
+                ],
+            },
+            {
+                title: 'Purchased Orders — Create Feedback',
+                items: [
+                    'Creating a purchased order now shows a success toast on save and an error toast (with console-logged validation details) when the form fails, matching the edit-flow behaviour',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.3',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'Sign-up — Terms & Privacy',
+                items: [
+                    'Registration form now requires checking an "I agree to the Terms & Conditions and Privacy Policy" box before submit, with links opening the legal pages in a new tab',
+                    'Backend validates the acceptance flag and returns a clear error ("You must accept the Terms & Conditions to create an account.") if it is missing',
+                ],
+            },
+            {
+                title: 'Plans — New Enterprise Tier',
+                items: [
+                    'Added a new Enterprise plan to the pricing line-up: custom pricing, unlimited orders and pages, 24-month data retention, full analytics, Parcel Journey SMS included, and dedicated support',
+                    'Re-balanced Scale to ₱14,999/mo (down from ₱19,999) to slot under the new Enterprise tier',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.2',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'Plans — Pricing & Page Limits',
+                items: [
+                    'Re-priced and capped page counts on paid tiers: Starter ₱1,499→₱2,999 with a 5-page cap, Growth ₱3,999→₱5,999 with 25 pages, Scale ₱9,999→₱19,999 with 100 pages',
+                    'Parcel Journey SMS is now bundled (free) on every paid tier — removed the per-message rates (₱0.50 / ₱0.35 / ₱0.20) and turned SMS on for Starter so every paid plan includes it',
+                ],
+            },
+            {
+                title: 'Marketing Site',
+                items: [
+                    'Landing page now consistently reads "30-day free trial" everywhere (hero subline, pricing card label, pricing card lede, final CTA, and FAQ) — matches the actual trial length',
+                ],
+            },
+            {
+                title: 'Navigation',
+                items: [
+                    'Removed the Changelog item from the public sidebar; it stays reachable directly at /changelog',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.1',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'Pages — Plan Limits',
+                items: [
+                    "Pages list now enforces the workspace's plan page limit — the index shows an \"X/Y pages used\" indicator under the Add New Page button, the button disables once the limit is reached, and a tooltip points to upgrading the plan",
+                    'Backend now blocks the Add Page flow when the limit is hit (both the create page and the store endpoint) with a clear validation message instead of letting the request through silently',
+                ],
+            },
+            {
+                title: 'Free Trial Plan',
+                items: [
+                    'Bumped Free Trial defaults so new workspaces get a more useful evaluation: 10,000 order cap (was unlimited), 6 months of data retention (was 1), full analytics tier (was basic), Parcel Journey SMS enabled, and priority chat support',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.0',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'RTS — RMO Management',
+                items: [
+                    'Split the single "Only my data" toggle into two independent filters — "My Assignee Only" and "My Confirmee Only" — so reps can narrow the list to orders they confirmed separately from those assigned to them, and combine both when needed',
+                    'Public endpoint and CSV export now accept a confirmee_id filter (mirrors the existing assignee_id filter), and toggle state is persisted per browser via localStorage',
+                ],
+            },
+            {
+                title: 'Subscription Gate & Syncing Modal',
+                items: [
+                    'Restored the subscription-expired gate on every authenticated Inertia page — workspaces with an expired, cancelled, or lapsed trial/active subscription are surfaced the upgrade modal with active non-trial plans (skipped on local environments)',
+                    'Restored the "syncing data" modal that appears on first connect until at least one page finishes its initial order sync; copy softened to "Please be patient." now that the sync runs in the background',
+                ],
+            },
+            {
+                title: 'Onboarding — Initial Sync Window',
+                items: [
+                    'First-time Pancake page connect now backfills 3 months of orders and shop customers (was 1 month), so newly onboarded workspaces have deeper history available immediately',
+                ],
+            },
+            {
+                title: 'Mobile / Public API — Call Logs',
+                items: [
+                    'Synced call-log timestamps are now normalised to the workspace timezone before storage, eliminating the off-by-hours drift on the KPI screen',
+                    'Total talk time KPI now only counts calls whose phone number matches a delivery on that date (customer or rider phone on pancake_order_for_delivery), giving an accurate read of talk time tied to actual delivery work',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.5.0',
+        date: '2026-05-04',
+        sections: [
+            {
+                title: 'Analytics',
+                items: [
+                    'Page-view analytics via PostHog — tracks Inertia route changes, identifies the signed-in user, and groups events by workspace so funnels and retention can be sliced per workspace',
+                    'Toggleable per environment via the VITE_POSTHOG_DISABLED flag, so local development stays out of production analytics',
+                ],
+            },
+            {
+                title: 'Pancake — Order Sync',
+                items: [
+                    'Consolidated the separate shipped-orders sync into the main page-orders job — at 9 AM, 12 PM, 3 PM, 6 PM, and 9 PM the run pulls shipped orders (filter_status[]=2); other runs pull orders updated since the last sync',
+                    'Removed the standalone trigger-fetch-page-shipped-orders command and FetchPageShippedOrders job — same coverage with one scheduled command instead of two',
+                    'trigger-fetch-page-orders now runs hourly (was every 30 minutes), reducing duplicate fetch overhead now that shipped pulls are interleaved',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.4.1',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Inventory — Purchased Orders',
+                items: [
+                    'List now shows subtotal and summary totals for the active filtered view, so you can see overall delivery fee and total amount without exporting',
+                    'Excel export includes the same summary rows at the bottom of the file',
+                ],
+            },
+            {
+                title: 'Finance — Transactions',
+                items: [
+                    'Index page now surfaces totals for credit (in) and debit (out) across the active filters, giving a quick read on cashflow without leaving the page',
+                ],
+            },
+            {
+                title: 'Inventory — Stock Transactions',
+                items: [
+                    'Date-range filter added to the stock transactions list, with the selection preserved across pagination and sort',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.4.0',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Pancake — Courier Shipments',
+                items: [
+                    'New Courier Shipments page under Pancake — import courier reports (xlsx) and reconcile them against your Pancake orders by waybill / tracking code',
+                    'J&T Express xlsx importer — uploads are parsed, upserted by (workspace, courier, waybill), and automatically linked to the matching pancake_orders row',
+                    'Totals strip surfaces overall and matched-only sums for total shipping cost, COD fee, COD collected, and receivable freight, so you can see exactly how much shipping fee is tied to confirmed Pancake orders',
+                    'List supports search by waybill / order # / receiver / phone, matched-only or unmatched-only filters, pickup-date range, and sortable shipping-cost columns',
+                    'Two new role permissions — View Courier Shipments and Import Courier Shipments — assignable from the Roles screen',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.3.2',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Inventory — Purchased Orders',
+                items: [
+                    'List now defaults to sorting by issue date (newest first) instead of created date, so the most recently issued POs surface at the top',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.3.1',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Inventory — Purchased Orders',
+                items: [
+                    'Search the list by delivery no., customer PO, or control no.',
+                    'Filter the list by issue-date range, with the selection preserved across pagination and sort',
+                    'Export CSV now respects the active search, date range, and sort',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.3.0',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Admin — Subscription Plans',
+                items: [
+                    'New Subscription Plans admin panel — create, edit, and manage plans with pricing, trial settings, and feature flags',
+                    'Plan list with quick row actions and a shared form between create and edit screens',
+                    'Subscription plan seeder updated to match the new schema, safe to re-run idempotently',
+                ],
+            },
+            {
+                title: 'Admin — Workspaces',
+                items: [
+                    'Workspace Management panel reworked — sidebar logo and workspace name added, plus richer per-workspace controls for plan, subscription, and trial state',
+                    'Inline plan assignment and subscription edits directly from the workspaces list',
+                ],
+            },
+            {
+                title: 'Subscriptions',
+                items: [
+                    'Core subscription management and 30-day free trial — new workspaces start on a one-month trial that auto-expires via a scheduled command',
+                    'Subscription Expired modal — gracefully blocks workspace access when an active plan lapses, with a clear path to upgrade',
+                    'Syncing Data modal — friendlier first-run state while initial workspace data is being pulled in',
+                    'Subscription gate is temporarily disabled in production while the billing flow is finalised — workspaces continue working as normal in the meantime',
+                ],
+            },
+            {
+                title: 'Workspaces — Onboarding',
+                items: [
+                    'New onboarding flow at /workspaces/onboarding — guided first-run setup that lands new workspaces in a ready-to-use state without manual configuration',
+                ],
+            },
+            {
+                title: 'Public API — Call Logs',
+                items: [
+                    'Two new Bearer-token endpoints under /api/v1/public for call log listing and KPI summary',
+                    'CSR mobile clients can now read call log data directly without going through the workspace UI',
+                ],
+            },
+            {
+                title: 'Dashboard',
+                items: [
+                    'Header and dashboard filter — alignment and reset behaviour fixed; selections now persist correctly across navigation',
+                    'Statistic breakdown — removed a duplicate total row that was double-counting in summary cards',
+                ],
+            },
+            {
+                title: 'RTS Analytics',
+                items: [
+                    'Breakdown chart x-axis labels now align cleanly with extra bottom padding, so dates no longer overlap on dense ranges',
+                ],
+            },
+            {
+                title: 'Inventory',
+                items: [
+                    'Inventory Items — row-level filtering fixed; filters now apply correctly on first load',
+                    'Purchased Orders — total computation fix on the create screen',
+                ],
+            },
+            {
+                title: 'Checklist',
+                items: [
+                    'Edit Checklist — fixed a mobile-only bug that prevented edits from saving',
+                    'Add Task dialog — sorting and notification handling tightened',
+                ],
+            },
+            {
+                title: 'Polish',
+                items: [
+                    'Tab titles normalised to "Artemis | <Page>" across both client and SSR for consistent browser tab labels everywhere',
+                    'Sidebar settings entry removed in favour of inline controls already available elsewhere',
+                    'Small visual cleanups across workspace switcher, app header, and sidebar',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.2.0',
         date: '2026-04-30',
         sections: [
@@ -688,6 +976,8 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v3.3.0':
+        'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 ring-yellow-500/20',
     'v3.1.0':
         'bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20',
     'v3.0.2':

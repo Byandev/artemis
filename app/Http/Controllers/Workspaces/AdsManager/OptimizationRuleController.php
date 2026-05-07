@@ -8,6 +8,7 @@ use App\Http\Requests\Workspaces\UpdateOptimizationRuleRequest;
 use App\Models\OptimizationRule;
 use App\Models\OptimizationRuleCondition;
 use App\Models\Workspace;
+use App\Services\PostHogService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -121,6 +122,15 @@ class OptimizationRuleController extends Controller
 
         // Reload with conditions
         $rule->load('conditions');
+
+        (new PostHogService)->capture((string) $request->user()->id, 'optimization_rule_created', [
+            'workspace_id' => $workspace->id,
+            'rule_id' => $rule->id,
+            'rule_name' => $rule->name,
+            'target' => $rule->target ?? null,
+            'action' => $rule->action ?? null,
+            'conditions_count' => count($conditions),
+        ]);
 
         return response()->json($rule, 201);
     }

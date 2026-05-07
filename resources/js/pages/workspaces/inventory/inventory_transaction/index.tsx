@@ -1,7 +1,10 @@
 import AppLayout from '@/layouts/app-layout';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import DatePicker from '@/components/ui/date-picker';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import flatpickr from 'flatpickr';
+import DateOption = flatpickr.Options.DateOption;
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -51,26 +54,40 @@ interface Props {
     query?: {
         sort?: string | null;
         page?: number | string;
-        search?: string;
+        perPage?: number | string;
+        filter?: { search?: string; start_date?: string; end_date?: string };
     };
 }
 
 export default function Index({ inventory, workspace, items = [], query }: Props) {
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
-    const [searchQuery, setSearchQuery] = useState(query?.search ?? '');
+    const [searchQuery, setSearchQuery] = useState(query?.filter?.search ?? '');
+    const [dateRange, setDateRange] = useState<string[]>(() => [
+        query?.filter?.start_date ?? '',
+        query?.filter?.end_date ?? '',
+    ]);
     const [openFormModal, setOpenFormModal] = useState(false);
     const [selectedInventory, setSelectedInventory] = useState<InventoryTransaction | undefined>(undefined);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
+    const buildFilter = (search: string, range: string[]) => ({
+        search: search || undefined,
+        start_date: range[0] || undefined,
+        end_date: range[1] || undefined,
+    });
+
     useEffect(() => {
+        const filterChanged =
+            searchQuery !== (query?.filter?.search ?? '') ||
+            (dateRange[0] || undefined) !== (query?.filter?.start_date ?? undefined) ||
+            (dateRange[1] || undefined) !== (query?.filter?.end_date ?? undefined);
+        if (!filterChanged) return;
         const timer = setTimeout(() => {
             router.get(
                 `/workspaces/${workspace.slug}/inventory/transactions`,
                 {
-                    filter: {
-                        search: searchQuery || undefined,
-                    },
-                    page: searchQuery ? 1 : query?.page ?? 1,
+                    filter: buildFilter(searchQuery, dateRange),
+                    page: 1,
                     sort: query?.sort,
                     per_page: query?.perPage ?? inventory.per_page,
                 },
@@ -83,7 +100,7 @@ export default function Index({ inventory, workspace, items = [], query }: Props
             );
         }, 500);
         return () => clearTimeout(timer);
-    }, [searchQuery]);
+    }, [searchQuery, dateRange]);
 
     const handleEdit = (item: InventoryTransaction) => {
         setSelectedInventory(item);
@@ -328,7 +345,7 @@ export default function Index({ inventory, workspace, items = [], query }: Props
                     </button>
                 </PageHeader>
 
-                <div className="mb-3 flex items-center gap-2">
+                <div className="mb-3 flex flex-col items-stretch gap-2 md:flex-row md:items-center">
                     <div className="relative w-full max-w-xs">
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                         <input
@@ -339,6 +356,22 @@ export default function Index({ inventory, workspace, items = [], query }: Props
                             className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pl-8 font-mono! text-[12px]! text-gray-800 outline-none focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                         />
                     </div>
+                    <DatePicker
+                        id="inventory-transactions-date-range"
+                        mode="range"
+                        placeholder="Filter by date"
+                        defaultDate={(dateRange[0] && dateRange[1] ? dateRange : undefined) as never as DateOption}
+                        onChange={(dates) => {
+                            if (dates.length === 2) {
+                                setDateRange([
+                                    moment(dates[0]).format('YYYY-MM-DD'),
+                                    moment(dates[1]).format('YYYY-MM-DD'),
+                                ]);
+                            } else if (dates.length === 0) {
+                                setDateRange(['', '']);
+                            }
+                        }}
+                    />
                 </div>
 
                 <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -353,9 +386,7 @@ export default function Index({ inventory, workspace, items = [], query }: Props
                                 `/workspaces/${workspace.slug}/inventory/transactions`,
                                 {
                                     sort: params?.sort,
-                                    filter: {
-                                        search: searchQuery || undefined,
-                                    },
+                                    filter: buildFilter(searchQuery, dateRange),
                                     page: params?.page ?? 1,
                                     per_page: params?.per_page ?? query?.perPage ?? inventory.per_page,
                                 },
@@ -363,7 +394,6 @@ export default function Index({ inventory, workspace, items = [], query }: Props
                                     preserveState: true,
                                     replace: true,
                                     preserveScroll: true,
-                                    only: ['inventory'],
                                 },
                             );
                         }}

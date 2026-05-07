@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Page;
 use App\Models\Product;
 use App\Models\Workspace;
+use App\Services\PostHogService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -114,6 +115,14 @@ class ProductController extends Controller
                 ->where('workspace_id', $workspace->id)
                 ->update(['product_id' => $product->id]);
         }
+
+        (new PostHogService)->capture((string) $request->user()->id, 'product_created', [
+            'workspace_id' => $workspace->id,
+            'product_id' => $product->id,
+            'product_name' => $product->name,
+            'category' => $product->category,
+            'status' => $product->status,
+        ]);
 
         return redirect()->route('workspaces.products.index', $workspace->slug);
     }

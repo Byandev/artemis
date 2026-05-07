@@ -3,7 +3,6 @@ import { Page } from '@/types/models/Page';
 export interface Flow {
     id: number;
     page_id: number;
-    flow_id: number;
     parent_id: number | null;
     is_removed: boolean;
     delivery: number;

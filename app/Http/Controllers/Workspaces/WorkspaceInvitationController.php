@@ -8,6 +8,7 @@ use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use App\Models\WorkspaceUser;
 use App\Notifications\WorkspaceInvitationNotification;
+use App\Services\PostHogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -63,6 +64,11 @@ class WorkspaceInvitationController extends Controller
         // Send the invitation email
         Notification::route('mail', $validated['email'])
             ->notify(new WorkspaceInvitationNotification($invitation));
+
+        (new PostHogService)->capture((string) $request->user()->id, 'workspace_invitation_sent', [
+            'workspace_id' => $workspace->id,
+            'invited_email' => $validated['email'],
+        ]);
 
         return back()->with('success', 'Invitation sent successfully.');
     }
@@ -187,6 +193,11 @@ class WorkspaceInvitationController extends Controller
             // Mark invitation as accepted
             $invitation->markAsAccepted();
         });
+
+        (new PostHogService)->capture((string) $request->user()->id, 'workspace_invitation_accepted', [
+            'workspace_id' => $invitation->workspace->id,
+            'workspace_name' => $invitation->workspace->name,
+        ]);
 
         return redirect()->to("/workspaces/invitations/{$token}")
             ->with('success', 'You have successfully joined the workspace!');

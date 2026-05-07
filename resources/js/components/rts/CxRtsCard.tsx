@@ -15,7 +15,7 @@ export default function CxRtsCard({ workspaceSlug, queryParams, onDataLoaded }: 
     const [type, setType] = useState<'latest' | 'initial'>('latest');
     const [refreshKey, setRefreshKey] = useState(0);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     useEffect(() => {
         let cancelled = false;
         setLoading(true);

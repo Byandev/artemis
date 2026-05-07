@@ -4,6 +4,7 @@ import { Head, useForm, router } from '@inertiajs/react';
 import { Workspace } from '@/types/models/Workspace';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect } from 'react';
+import { toast } from 'sonner';
 
 
 
@@ -116,9 +117,21 @@ export default function Create({ workspace, items }: Props) {
         || !hasValidItems;
 
     const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post(`/workspaces/${workspace.slug}/inventory/purchased-orders`);
-    };
+    e.preventDefault();
+    
+    post(`/workspaces/${workspace.slug}/inventory/purchased-orders`, {
+        preserveScroll: true,
+        onSuccess: () => {
+ 
+            toast.success('Purchased order created successfully');
+        },
+        onError: (errors) => {
+
+            console.error(errors);
+            toast.error('Failed to create order. Please check the form.');
+        }
+    });
+};
 
     return (
         <AppLayout>
