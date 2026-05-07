@@ -55,25 +55,20 @@ class CSRController extends Controller
 
     private function rmoDeliveryAggregateSub(Workspace $workspace, string $from, string $to)
     {
+        // total_called = pancake_order_for_delivery rows where status != 'PENDING'
+        // (matches the original SyncCsrDailyRecords definition).
+        // total_call_time still spans all rows in range — only the count is gated
+        // by status, since duration accumulates regardless of call disposition.
         return DB::table('pancake_order_for_delivery as pofd')
             ->whereNotNull('pofd.assignee_id')
             ->where('pofd.workspace_id', $workspace->id)
             ->whereBetween('pofd.delivery_date', [$from, $to])
             ->groupBy('pofd.assignee_id')
-            ->selectRaw('
+            ->selectRaw("
                 pofd.assignee_id as pancake_user_id,
-                SUM(
-                    CASE WHEN EXISTS (
-                        SELECT 1
-                        FROM call_logs cl
-                        WHERE cl.workspace_id = pofd.workspace_id
-                          AND cl.user_id = pofd.assignee_id
-                          AND cl.call_date = pofd.delivery_date
-                          AND cl.phone_number IN (pofd.rider_phone, pofd.customer_phone)
-                    ) THEN 1 ELSE 0 END
-                ) as total_called,
+                SUM(CASE WHEN pofd.status != 'PENDING' THEN 1 ELSE 0 END) as total_called,
                 COALESCE(SUM(pofd.customer_call_duration), 0) + COALESCE(SUM(pofd.rider_call_duration), 0) as total_call_time
-            ');
+            ");
     }
 
     private function posOrdersAggregateSub(Workspace $workspace, string $start, string $end)
@@ -260,18 +255,11 @@ class CSRController extends Controller
     {
         [$from, $to] = $this->range($request);
 
-        $value = DB::table('pancake_order_for_delivery as pofd')
-            ->whereNotNull('pofd.assignee_id')
-            ->where('pofd.workspace_id', $workspace->id)
-            ->whereBetween('pofd.delivery_date', [$from, $to])
-            ->whereExists(function ($q) {
-                $q->select(DB::raw(1))
-                    ->from('call_logs as cl')
-                    ->whereColumn('cl.workspace_id', 'pofd.workspace_id')
-                    ->whereColumn('cl.user_id', 'pofd.assignee_id')
-                    ->whereColumn('cl.call_date', 'pofd.delivery_date')
-                    ->whereRaw('cl.phone_number IN (pofd.rider_phone, pofd.customer_phone)');
-            })
+        $value = DB::table('pancake_order_for_delivery')
+            ->whereNotNull('assignee_id')
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('delivery_date', [$from, $to])
+            ->where('status', '!=', 'PENDING')
             ->count();
 
         return response()->json(['value' => $value]);
