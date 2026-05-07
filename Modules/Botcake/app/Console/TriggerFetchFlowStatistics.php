@@ -11,7 +11,14 @@ class TriggerFetchFlowStatistics extends Command
     /**
      * The name and signature of the console command.
      */
-    protected $signature = 'trigger-fetch-flow-statistics';
+    protected $signature = 'botcake:trigger-fetch-flow-statistics';
+
+    /**
+     * The console command aliases.
+     *
+     * @var array<int, string>
+     */
+    protected $aliases = ['trigger-fetch-flow-statistics'];
 
     /**
      * The console command description.
@@ -31,10 +38,17 @@ class TriggerFetchFlowStatistics extends Command
      */
     public function handle()
     {
-        Flow::limit(10)
-            ->get()
-            ->each(function (Flow $flow, $index) {
-                dispatch(new FetchFlowStatistics($flow))->delay(now()->addSeconds($index))->onQueue('botcake');
+        $delaySeconds = 0;
+
+        Flow::query()
+            ->chunkById(200, function ($flows) use (&$delaySeconds) {
+                foreach ($flows as $flow) {
+                    dispatch(new FetchFlowStatistics($flow))
+                        ->delay(now()->addSeconds($delaySeconds))
+                        ->onQueue('botcake');
+
+                    $delaySeconds++;
+                }
             });
     }
 

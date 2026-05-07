@@ -25,6 +25,7 @@ class BackfillPageCustomers extends Command
 
         if ($since->greaterThan($until)) {
             $this->error("--since ({$since->toDateString()}) is after --until ({$until->toDateString()}).");
+
             return self::FAILURE;
         }
 

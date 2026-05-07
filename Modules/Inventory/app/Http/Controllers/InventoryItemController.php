@@ -7,13 +7,13 @@ use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
-use Illuminate\Validation\Rule;
 
 class InventoryItemController extends Controller
 {
@@ -73,7 +73,7 @@ class InventoryItemController extends Controller
                 }),
             ])
             ->defaultSort('-created_at')
-             ->paginate((int) $request->input('per_page', 100))
+            ->paginate((int) $request->input('per_page', 100))
             ->withQueryString();
 
         return Inertia::render('workspaces/inventory/items/index', [
@@ -124,12 +124,12 @@ class InventoryItemController extends Controller
         $request->validate([
             'product_id' => 'required|exists:products,id',
             'sku' => [
-                'required', 
-                'string', 
-                'max:255', 
+                'required',
+                'string',
+                'max:255',
                 Rule::unique('inventory_items')
-                    ->where('workspace_id', $workspace->id) 
-                    ->ignore($item->id)                     
+                    ->where('workspace_id', $workspace->id)
+                    ->ignore($item->id),
             ],
             'sales_keywords' => 'nullable|string',
             'transaction_keywords' => 'nullable|string',
@@ -150,7 +150,6 @@ class InventoryItemController extends Controller
         return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
             ->with('success', 'Inventory Items record updated.');
     }
-
 
     public function destroy(Workspace $workspace, InventoryItem $item)
     {
