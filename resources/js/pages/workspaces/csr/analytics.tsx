@@ -190,6 +190,7 @@ export default function Analytics({ workspace }: Props) {
                 <PageHeader
                     title="CSR Analytics"
                     description="Aggregated CSR performance from daily records"
+                    stackActionsOnMobile
                 >
                     <div className="flex items-center p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
                         {['erp', 'pos'].map((value) => {
