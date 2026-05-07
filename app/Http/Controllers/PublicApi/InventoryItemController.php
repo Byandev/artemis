@@ -36,6 +36,7 @@ class InventoryItemController extends Controller
             'total_orders' => ['required', 'integer', 'min:0'],
             'unfulfilled_count' => ['required', 'integer', 'min:0'],
             'three_days_average' => ['required', 'numeric', 'min:0'],
+            'remaining_qty' => ['sometimes', 'integer', 'min:0'],
         ]);
 
         $item = InventoryItem::where('workspace_id', $workspace->id)
@@ -45,6 +46,7 @@ class InventoryItemController extends Controller
         $item->update([
             'unfulfilled_count' => $validated['unfulfilled_count'],
             'three_days_average' => $validated['three_days_average'],
+            'remaining_qty' => $validated['remaining_qty'] ?? $item->remaining_qty,
         ]);
 
         return response()->json([
