@@ -12,6 +12,19 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.6.8',
+        date: '2026-05-07',
+        sections: [
+            {
+                title: 'CSR Analytics — Index Coverage for Live Queries',
+                items: [
+                    'Added composite index (workspace_id, delivery_date, assignee_id) on pancake_order_for_delivery so the RMO outer query becomes a range scan and GROUP BY assignee_id has an ordered source — avoids the temp-table sort that was kicking in on workspaces with large delivery volume',
+                    'Added composite index (workspace_id, user_id, call_date, phone_number) on call_logs so the EXISTS subquery powering RMO Called resolves via a single index seek per delivery row instead of falling back to (workspace_id, user_id) plus a row-level date / phone match',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.6.7',
         date: '2026-05-07',
         sections: [
