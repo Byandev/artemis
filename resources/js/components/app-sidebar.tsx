@@ -1,4 +1,5 @@
 import { NavMain } from '@/components/nav-main';
+import { ContactSupportModal } from '@/components/contact-support-modal';
 import {
     Sidebar,
     SidebarContent,
@@ -271,6 +272,16 @@ export function AppSidebar() {
             : []),
     ];
 
+    const adminNavItems: NavItem[] = auth?.user?.can?.viewAnySupportTickets
+        ? [
+            {
+                title: 'Support Tickets',
+                href: `/workspaces/${slug}/admin/support-tickets`,
+                icon: LifeBuoy,
+            },
+        ]
+        : [];
+
     return (
         <Sidebar
             className="bg-white dark:bg-zinc-900"
@@ -291,6 +302,7 @@ export function AppSidebar() {
 
             <SidebarContent className="p-3">
                 <NavMain items={mainNavItems} group_label="Main" />
+                <NavMain items={adminNavItems} group_label="Admin" />
                 {/*<NavMain items={accountNavItems} group_label="Account" />*/}
                 <PublicLinks
                     workspaceSlug={currentWorkspace.slug}

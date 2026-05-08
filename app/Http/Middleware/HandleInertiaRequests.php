@@ -57,6 +57,13 @@ class HandleInertiaRequests extends Middleware
         $isOwner = $user && $workspaceModel
             ? $user->ownsWorkspace($workspaceModel)
             : false;
+        $can = [
+            'viewAnySupportTickets' => $user && $currentWorkspace instanceof Workspace
+                ? $user->ownsWorkspace($currentWorkspace)
+                    || $user->isAdminOf($currentWorkspace)
+                    || $user->hasWorkspaceRole($currentWorkspace, 'admin')
+                : false,
+        ];
 
         // Show syncing modal when any page has no orders_last_synced_at
         $syncingData = null;
@@ -104,6 +111,7 @@ class HandleInertiaRequests extends Middleware
                     'is_super_admin' => $user->isSuperAdmin(),
                     'is_workspace_owner' => $isOwner,
                     'permissions' => $permissions,
+                    'can' => $can,
                 ]) : null,
             ],
             'workspaces' => $workspaces,
