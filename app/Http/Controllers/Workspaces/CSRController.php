@@ -54,8 +54,7 @@ class CSRController extends Controller
             'workspace' => $workspace,
             'employees' => $employees,
             'query' => [
-                ...$request->only(['sort', 'perPage', 'page']),
-                'perPage' => $request->input('per_page', $request->input('perPage')),
+                ...$request->only(['sort', 'per_page', 'page']),
                 'filter' => $request->input('filter', []),
             ],
             'systemUsers' => User::whereHas('workspaces', fn ($query) => $query->where('workspace_id', $workspace->id))->get(),
@@ -128,9 +127,8 @@ class CSRController extends Controller
             'workspace' => $workspace,
             'records' => $records,
             'query' => [
-                ...$request->only(['sort', 'from', 'to', 'page']),
-                'type' => $type,
-                'search' => (string) $request->input('search', ''),
+                ...$request->only(['sort', 'per_page', 'page']),
+                'filter' => $request->input('filter', []),
             ],
         ]);
     }

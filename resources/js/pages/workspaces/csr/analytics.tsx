@@ -9,8 +9,8 @@ import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { format, subDays } from 'date-fns';
-import { omit } from 'lodash';
-import { useEffect, useMemo, useState } from 'react';
+import { debounce, omit } from 'lodash';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface CsrRecord {
     csr_id: number;
@@ -108,7 +108,18 @@ export default function Analytics({ workspace, query }: Props) {
     const [sort, setSort] = useState('-total_sales');
     const [page, setPage] = useState(1);
     const [perPage, setPerPage] = useState(10);
+    const [searchInput, setSearchInput] = useState(query?.search ?? '');
     const [search, setSearch] = useState(query?.search ?? '');
+
+    const debouncedSetSearch = useCallback(
+        debounce((value: string) => setSearch(value), 400),
+        [],
+    );
+
+    useEffect(() => {
+        debouncedSetSearch(searchInput);
+        return () => debouncedSetSearch.cancel();
+    }, [searchInput, debouncedSetSearch]);
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
     const toStr = format(range.to, 'yyyy-MM-dd');
@@ -198,17 +209,8 @@ export default function Analytics({ workspace, query }: Props) {
                     <input
                         type="text"
                         placeholder="Search CSR..."
-                        value={search}
-                        onChange={(e) => {
-                            setSearch(e.target.value);
-                            const url = new URL(window.location.href);
-                            if (e.target.value) {
-                                url.searchParams.set('search', e.target.value);
-                            } else {
-                                url.searchParams.delete('search');
-                            }
-                            window.history.replaceState({}, '', url.toString());
-                        }}
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
                         className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500 dark:focus:border-zinc-500"
                     />
                     <div className="flex items-center p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
