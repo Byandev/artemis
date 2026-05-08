@@ -20,4 +20,6 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
 
     Route::post('/call-logs/sync', [CallLogController::class, 'sync'])->name('call-logs.sync');
     Route::get('/call-logs/kpi', [CallLogController::class, 'kpi'])->name('call-logs.kpi');
+    Route::get('/call-logs/list', [CallLogController::class, 'list'])->name('call-logs.list');
+    Route::get('/call-logs/summary', [CallLogController::class, 'summary'])->name('call-logs.summary');
 });

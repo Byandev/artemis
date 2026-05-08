@@ -34,7 +34,7 @@ const Dashboard = ({ workspace }: Props) => {
         } catch {}
         return [
             moment().startOf('month').format('YYYY-MM-DD'),
-            moment().endOf('month').format('YYYY-MM-DD'),
+            moment().subtract(1, 'd').format('YYYY-MM-DD'),
         ];
     });
 

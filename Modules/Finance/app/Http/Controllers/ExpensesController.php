@@ -19,8 +19,8 @@ class ExpensesController extends Controller
     use AuthorizesRequests;
 
     private const SUB_CATEGORIES = [
-        'ad_spent', 'cogs', 'subscription', 'shipping_fee',
-        'operation_expense', 'salary', 'transfer_fee', 'seminar_fee', 'others',
+        'ad_spent', 'cogs', 'subscription', 'shipping_fee', 'delivery_fee',
+        'operation_expense', 'salary', 'transfer_fee', 'seminar_fee', 'rent', 'capex_payment', 'others',
     ];
 
     public function __invoke(Request $request, Workspace $workspace)

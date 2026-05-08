@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\WorkspaceInvitation;
 use App\Models\WorkspaceUser;
+use App\Services\PostHogService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -51,6 +52,9 @@ class RegisteredUserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'terms_accepted' => ['accepted'],
+        ], [
+            'terms_accepted.accepted' => 'You must accept the Terms & Conditions to create an account.',
         ]);
 
         $user = User::create([
@@ -64,6 +68,17 @@ class RegisteredUserController extends Controller
         Auth::login($user);
 
         $request->session()->regenerate();
+
+        $posthog = new PostHogService;
+        $posthog->identify((string) $user->id, [
+            'email' => $user->email,
+            'name' => $user->name,
+        ]);
+        $posthog->capture((string) $user->id, 'user_signed_up', [
+            'email' => $user->email,
+            'name' => $user->name,
+            'via_invitation' => $request->has('invitation'),
+        ]);
 
         // Check if there's an invitation to auto-accept
         if ($request->has('invitation')) {

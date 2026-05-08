@@ -3,6 +3,8 @@ import { InventoryTransaction } from '@/types/models/InventoryTransaction';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useForm } from '@inertiajs/react';
 import React, { useEffect, useMemo } from 'react';
+import DatePicker from '@/components/ui/date-picker';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 interface InventoryItem {
@@ -24,7 +26,7 @@ interface Props {
 }
 
 const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items = [], onSuccess }: Props) => {
-    const { data, setData, post, processing, errors, reset, patch } = useForm({
+    const { data, setData, post, processing, errors, reset, patch, clearErrors } = useForm({
         inventory_item_id: '',
         date: '',
         ref_no: '',
@@ -54,30 +56,34 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
                 remaining_qty: inventory.remaining_qty || 0,
             });
         } else {
+
             reset();
+            clearErrors();
         }
     }, [inventory, open]);
 
     const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+        e.preventDefault();
 
-    const url = isEditing
-        ? `/workspaces/${workspace.slug}/inventory/transactions/${inventory?.id}`
-        : `/workspaces/${workspace.slug}/inventory/transactions`;
+        const url = isEditing
+            ? `/workspaces/${workspace.slug}/inventory/transactions/${inventory?.id}`
+            : `/workspaces/${workspace.slug}/inventory/transactions`;
 
-    const request = isEditing ? patch : post;
+        const request = isEditing ? patch : post;
 
-    request(url, {
-        preserveScroll: true,
-        onSuccess: () => {
-            toast.success(isEditing ? 'Transaction updated successfully' : 'New transaction logged successfully');
-            if (!isEditing) reset();
-            onOpenChange(false);
-            onSuccess?.();
-        },
-        onError: () => toast.error('Failed to save transaction. Please check the form.')
-    });
-};
+        request(url, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success(isEditing ? 'Transaction updated successfully' : 'New transaction logged successfully');
+
+                reset();
+                clearErrors();
+                onOpenChange(false);
+            },
+
+            onError: () => toast.error('Failed to save transaction. Please check the form.')
+        });
+    };
 
     const inputClass = "h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400";
     const labelClass = "block font-mono! text-[10px]! font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500";
@@ -131,11 +137,17 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
                                 <label className={labelClass}>
                                     Transaction Date <span className="text-red-400">*</span>
                                 </label>
-                                <input
-                                    type="date"
-                                    value={data.date}
-                                    onChange={(e) => setData('date', e.target.value)}
-                                    className={inputClass}
+                                <DatePicker
+                                    id="inventory-transaction-date"
+                                    mode="single"
+                                    defaultDate={data.date || undefined}
+                                    onChange={(dates) => {
+                                        if (dates.length) {
+                                            setData('date', format(dates[0], 'yyyy-MM-dd'))
+                                        } else {
+                                            setData('date', '')
+                                        }
+                                    }}
                                 />
                                 {errors.date && <p className="text-[11px] text-red-500">{errors.date}</p>}
                             </div>
@@ -272,8 +284,12 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
                             className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                         >
                             {processing
-                                ? (isEditing ? 'Saving…' : 'Creating…')
-                                : (isEditing ? 'Save Changes' : 'Create Record')}
+                                ? isEditing
+                                    ? 'Saving…'
+                                    : 'Creating…'
+                                : isEditing
+                                    ? 'Save Changes'
+                                    : 'Create Record'}
                         </button>
                     </div>
                 </form>

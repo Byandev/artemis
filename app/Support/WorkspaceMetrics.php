@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Metrics\MetricSource;
 use App\Metrics\Orders\Aov;
 use App\Metrics\Orders\AverageDaysFromConfirmedToDelivered;
 use App\Metrics\Orders\AverageDaysFromConfirmedToFirstAttempt;
@@ -28,6 +29,8 @@ use App\Metrics\Orders\TimeToFirstOrder;
 use App\Metrics\Orders\TotalOrders;
 use App\Metrics\Orders\TotalSales;
 use App\Metrics\Orders\UniqueCustomerCount;
+use App\Metrics\PageDaily\AllCustomerConversionRate;
+use App\Metrics\PageDaily\NewCustomerCount;
 use App\Metrics\ParcelJourney\TotalForDeliveryAmount;
 use App\Metrics\ParcelJourney\TotalForDeliveryCount;
 use App\Metrics\ParcelJourney\TrackedOrdersCount;
@@ -39,7 +42,8 @@ final class WorkspaceMetrics
     public function __construct(
         private readonly Workspace $workspace,
         public array $dateRange,
-        public array $filter
+        public array $filter,
+        public string $source = MetricSource::LIVE,
     ) {}
 
     /**
@@ -75,6 +79,8 @@ final class WorkspaceMetrics
         'returnedAvgCustomerRts' => ReturnedAvgCustomerRts::class,
         'deliveredAvgDeliveryAttempts' => DeliveredAvgDeliveryAttempts::class,
         'returnedAvgDeliveryAttempts' => ReturnedAvgDeliveryAttempts::class,
+        'newCustomerCount' => NewCustomerCount::class,
+        'allCustomerConversionRate' => AllCustomerConversionRate::class,
     ];
 
     /**
@@ -86,13 +92,7 @@ final class WorkspaceMetrics
         $workspaceId = $this->workspace->id;
 
         foreach ($names as $name) {
-            $class = self::MAP[$name] ?? null;
-
-            if (! $class) {
-                throw new InvalidArgumentException("Unknown metric: {$name}");
-            }
-
-            $out[$name] = app($class)->compute(
+            $out[$name] = $this->resolve($name)->compute(
                 $workspaceId,
                 $this->dateRange,
                 $this->filter
@@ -104,20 +104,10 @@ final class WorkspaceMetrics
 
     public function breakdown(string $name, string $group = 'monthly')
     {
-        $class = self::MAP[$name] ?? null;
+        $metric = $this->resolve($name, 'breakdown');
 
-        if (! $class) {
-            throw new InvalidArgumentException("Unknown metric: {$name}");
-        }
-
-        $workspaceId = $this->workspace->id;
-
-        if (! method_exists($class, 'breakdown')) {
-            throw new InvalidArgumentException("Metric {$name} does not support breakdown.");
-        }
-
-        return app($class)->breakdown(
-            $workspaceId,
+        return $metric->breakdown(
+            $this->workspace->id,
             $this->dateRange,
             $this->filter,
             $group
@@ -126,20 +116,10 @@ final class WorkspaceMetrics
 
     public function perPage(string $name)
     {
-        $class = self::MAP[$name] ?? null;
+        $metric = $this->resolve($name, 'perPage');
 
-        if (! $class) {
-            throw new InvalidArgumentException("Unknown metric: {$name}");
-        }
-
-        $workspaceId = $this->workspace->id;
-
-        if (! method_exists($class, 'perPage')) {
-            throw new InvalidArgumentException("Metric {$name} does not support perPage.");
-        }
-
-        return app($class)->perPage(
-            $workspaceId,
+        return $metric->perPage(
+            $this->workspace->id,
             $this->dateRange,
             $this->filter
         );
@@ -147,20 +127,10 @@ final class WorkspaceMetrics
 
     public function perShop(string $name)
     {
-        $class = self::MAP[$name] ?? null;
+        $metric = $this->resolve($name, 'perShop');
 
-        if (! $class) {
-            throw new InvalidArgumentException("Unknown metric: {$name}");
-        }
-
-        $workspaceId = $this->workspace->id;
-
-        if (! method_exists($class, 'perShop')) {
-            throw new InvalidArgumentException("Metric {$name} does not support perShop.");
-        }
-
-        return app($class)->perShop(
-            $workspaceId,
+        return $metric->perShop(
+            $this->workspace->id,
             $this->dateRange,
             $this->filter
         );
@@ -168,23 +138,38 @@ final class WorkspaceMetrics
 
     public function perUser(string $name)
     {
+        $metric = $this->resolve($name, 'perUser');
+
+        return $metric->perUser(
+            $this->workspace->id,
+            $this->dateRange,
+            $this->filter
+        );
+    }
+
+    /**
+     * Resolve a metric instance, propagate the source toggle if supported, and
+     * verify the instance exposes the requested method.
+     */
+    private function resolve(string $name, ?string $requireMethod = null): object
+    {
         $class = self::MAP[$name] ?? null;
 
         if (! $class) {
             throw new InvalidArgumentException("Unknown metric: {$name}");
         }
 
-        $workspaceId = $this->workspace->id;
+        $metric = app($class);
 
-        if (! method_exists($class, 'perUser')) {
-            throw new InvalidArgumentException("Metric {$name} does not support perUser.");
+        if ($requireMethod && ! method_exists($metric, $requireMethod)) {
+            throw new InvalidArgumentException("Metric {$name} does not support {$requireMethod}.");
         }
 
-        return app($class)->perUser(
-            $workspaceId,
-            $this->dateRange,
-            $this->filter
-        );
+        if (method_exists($metric, 'setSource')) {
+            $metric->setSource($this->source);
+        }
+
+        return $metric;
     }
 
     public function keys(): array
