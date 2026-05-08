@@ -37,6 +37,8 @@ return [
 
     'n8n' => [
         'webhook_url' => env('N8N_WEBHOOK_URL'),
+        'inventory_webhook_url' => env('N8N_INVENTORY_WEBHOOK_URL'),
+        'inventory_transaction_webhook_url' => env('N8N_INVENTORY_TRANSACTION_WEBHOOK_URL'),
     ],
 
     'facebook' => [

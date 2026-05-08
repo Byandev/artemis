@@ -19,6 +19,7 @@ class InventoryTransaction extends Model
         'inventory_item_id',
         'date',
         'ref_no',
+        'key',
         'po_qty_in',
         'po_qty_out',
         'rts_goods_out',

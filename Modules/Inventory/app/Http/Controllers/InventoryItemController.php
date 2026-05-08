@@ -14,7 +14,6 @@ use Modules\Inventory\Models\InventoryTransaction;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
-use Illuminate\Validation\Rule;
 
 class InventoryItemController extends Controller
 {

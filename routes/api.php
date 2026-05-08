@@ -3,6 +3,8 @@
 use App\Http\Controllers\PublicApi\CallLogController;
 use App\Http\Controllers\PublicApi\CsrDailyRecordController;
 use App\Http\Controllers\PublicApi\HealthController;
+use App\Http\Controllers\PublicApi\InventoryItemController;
+use App\Http\Controllers\PublicApi\InventoryTransactionController;
 use App\Http\Controllers\PublicApi\PageController;
 use App\Http\Controllers\PublicApi\RmoOrderController;
 use App\Http\Controllers\PublicApi\ShopController;
@@ -22,4 +24,10 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
     Route::get('/call-logs/kpi', [CallLogController::class, 'kpi'])->name('call-logs.kpi');
     Route::get('/call-logs/list', [CallLogController::class, 'list'])->name('call-logs.list');
     Route::get('/call-logs/summary', [CallLogController::class, 'summary'])->name('call-logs.summary');
+
+    Route::get('/inventory-items/keywords', [InventoryItemController::class, 'keywords'])->name('inventory-items.keywords');
+    Route::post('/inventory-items/sync', [InventoryItemController::class, 'sync'])->name('inventory-items.sync');
+    Route::post('/inventory-items/sync-transactions', [InventoryItemController::class, 'syncTransactions'])->name('inventory-items.sync-transactions');
+
+    Route::post('/inventory-transactions/sync', [InventoryTransactionController::class, 'sync'])->name('inventory-transactions.sync');
 });
