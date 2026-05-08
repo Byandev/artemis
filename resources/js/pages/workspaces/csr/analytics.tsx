@@ -22,6 +22,7 @@ interface CsrRecord {
     rts_rate: number;
     total_called: number;
     total_call_time: number;
+    total_rmo_call_attempts:number;
 }
 
 interface Props {
@@ -251,7 +252,9 @@ export default function Analytics({ workspace }: Props) {
                     <SortableHeader column={column} title="RMO Attempts" />
                 ),
                 cell: ({ row }) =>
-                    Number(row.original.total_called).toLocaleString(),
+                    Number(
+                        row.original.total_rmo_call_attempts,
+                    ).toLocaleString(),
             },
             {
                 accessorKey: 'total_call_time',
