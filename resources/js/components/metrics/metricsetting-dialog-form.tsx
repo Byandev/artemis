@@ -20,10 +20,7 @@ interface Props {
 export function MetricSettingDialog({ open, onOpenChange, workspace: localWorkspace }: Props) {
     const { props } = usePage();
     const ziggy = (props as any).ziggy;
-
-    // Always prioritize the workspace from the shared page props to ensure we have fresh DB data
     const workspace = (props as any).currentWorkspace || localWorkspace;
-
     const route = useRoute(ziggy);
 
     const { data, setData, put, processing, errors } = useForm({
@@ -33,9 +30,7 @@ export function MetricSettingDialog({ open, onOpenChange, workspace: localWorksp
 
     useEffect(() => {
         if (open && workspace) {
-            // Check both snake_case and camelCase to match your Middleware/Model naming
             const setting = (workspace as any).metric_setting || (workspace as any).metricSetting;
-
             if (setting?.allowed_metrics) {
                 setData({
                     allowed_metrics: setting.allowed_metrics,
@@ -56,64 +51,64 @@ export function MetricSettingDialog({ open, onOpenChange, workspace: localWorksp
 
         put(`/admin/workspaces/${workspace.slug}/metrics`, {
             preserveScroll: true,
-            onSuccess: () => {
-                // The onOpenChange(false) will close the modal, 
-                // and the 'back()' redirect from Laravel will refresh the page props.
-                onOpenChange(false);
-            },
+            onSuccess: () => onOpenChange(false),
         });
     };
 
     const toggleMetric = (key: string) => {
         const current = [...data.allowed_metrics];
         const index = current.indexOf(key);
-
         if (index === -1) {
             current.push(key);
         } else {
             current.splice(index, 1);
         }
-
         setData('allowed_metrics', current);
     };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden border-none shadow-2xl dark:bg-zinc-900">
-                <div className="px-5 pt-5 pb-4 border-b border-black/6 dark:border-white/6">
+            {/* CHANGED: max-w-4xl to provide enough room for 3 columns */}
+            <DialogContent className="sm:max-w-4xl p-0 gap-0 overflow-hidden border-none shadow-2xl dark:bg-zinc-900">
+                <div className="px-6 pt-6 pb-4 border-b border-black/6 dark:border-white/6">
                     <DialogHeader>
-                        <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
+                        <DialogTitle className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
                             Workspace Metrics
                         </DialogTitle>
-                        <DialogDescription className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5">
+                        <DialogDescription className="text-[13px] text-gray-400 dark:text-gray-500 mt-0.5">
                             Select which metrics are enabled for <strong>{workspace?.name}</strong>.
                         </DialogDescription>
                     </DialogHeader>
                 </div>
 
                 <form onSubmit={handleSubmit}>
-                    <div className="max-h-[60vh] overflow-y-auto px-5 py-4 space-y-4">
+                    {/* REMOVED: max-h and overflow-y-auto so the modal expands to fit content */}
+                    <div className="px-6 py-6">
                         <Field label="Allowed Metrics" error={errors.allowed_metrics}>
-                            <div className="grid gap-2">
-                                {metricConfigs.map((metric) => (
-                                    <label
-                                        key={metric.key}
-                                        className="flex items-center gap-3 p-3 rounded-xl border border-black/5 bg-stone-50/50 hover:bg-stone-100/50 dark:border-white/5 dark:bg-white/2 cursor-pointer transition-colors"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            // Check against the current form state
-                                            checked={data.allowed_metrics.includes(metric.key)}
-                                            onChange={() => toggleMetric(metric.key)}
-                                            className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                                        />
-                                        <div className="flex flex-col">
-                                            <span className="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+                            {/* CHANGED: md:grid-cols-3 for a triple-column layout */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {metricConfigs.map((metric) => {
+                                    const isChecked = data.allowed_metrics.includes(metric.key);
+                                    return (
+                                        <label
+                                            key={metric.key}
+                                            className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${isChecked
+                                                ? 'border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-500/5'
+                                                : 'border-black/5 bg-stone-50/50 hover:bg-stone-100/50 dark:border-white/5 dark:bg-white/2'
+                                                }`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={() => toggleMetric(metric.key)}
+                                                className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                            />
+                                            <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200 truncate">
                                                 {metric.name}
                                             </span>
-                                        </div>
-                                    </label>
-                                ))}
+                                        </label>
+                                    );
+                                })}
                             </div>
                         </Field>
                     </div>
@@ -130,7 +125,7 @@ export function MetricSettingDialog({ open, onOpenChange, workspace: localWorksp
 
 function Field({ label, error, children }: { label: string; error?: any; children: React.ReactNode }) {
     return (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
             <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 {label}
             </label>
@@ -142,7 +137,7 @@ function Field({ label, error, children }: { label: string; error?: any; childre
 
 function Footer({ processing, onCancel }: { processing: boolean; onCancel: () => void }) {
     return (
-        <div className="flex items-center justify-end gap-2 border-t border-black/6 dark:border-white/6 px-5 py-3 bg-stone-50/50 dark:bg-white/2">
+        <div className="flex items-center justify-end gap-2 border-t border-black/6 dark:border-white/6 px-6 py-4 bg-stone-50/50 dark:bg-white/2">
             <button
                 type="button"
                 onClick={onCancel}
