@@ -8,8 +8,6 @@ use App\Http\Controllers\Workspaces\AdsManager\AdSetController;
 use App\Http\Controllers\Workspaces\AdsManager\CampaignController;
 use App\Http\Controllers\Workspaces\AdsManager\OptimizationRuleController;
 use App\Http\Controllers\Workspaces\AskDataController;
-use App\Http\Controllers\Workspaces\Botcake\FlowController;
-use App\Http\Controllers\Workspaces\Botcake\SequenceController;
 use App\Http\Controllers\Workspaces\ChecklistController;
 use App\Http\Controllers\Workspaces\ChecklistProgressController;
 use App\Http\Controllers\Workspaces\CSRController;
@@ -33,6 +31,8 @@ use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
+use Modules\Botcake\Http\Controllers\Web\FlowController;
+use Modules\Botcake\Http\Controllers\Web\SequenceController;
 use Modules\Finance\Http\Controllers\AccountController as FinanceAccountController;
 use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardController;
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
@@ -41,6 +41,7 @@ use Modules\Finance\Http\Controllers\TransactionController as FinanceTransaction
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
+use Modules\Pancake\Http\Controllers\CourierShipmentController;
 use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
 
 
@@ -125,6 +126,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/pages', [PageController::class, 'index'])->name('workspaces.pages.index');
     Route::get('/workspaces/{workspace}/pages/create', [PageController::class, 'create'])->name('workspaces.pages.create');
     Route::post('/workspaces/{workspace}/pages', [PageController::class, 'store'])->name('workspaces.pages.store');
+    Route::post('/workspaces/{workspace}/pages/validate-pos-token', [PageController::class, 'validatePosToken'])->name('workspaces.pages.validate-pos-token');
     Route::post('/workspaces/{workspace}/pages/validate-pancake-token', [PageController::class, 'validatePancakeToken'])->name('workspaces.pages.validate-pancake-token');
     Route::post('/workspaces/{workspace}/pages/validate-botcake-token', [PageController::class, 'validateBotcakeToken'])->name('workspaces.pages.validate-botcake-token');
     Route::get('/workspaces/{workspace}/pages/{page}/edit', [PageController::class, 'edit'])->name('workspaces.pages.edit');
@@ -222,8 +224,14 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
         Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
     });
+    Route::prefix('/workspaces/{workspace}/pancake/courier-shipments')->name('workspaces.pancake.courier-shipments.')->group(function () {
+        Route::get('/', [CourierShipmentController::class, 'index'])->name('index');
+        Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');
+    });
+
     Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {
         Route::get('/', [PurchasedOrderController::class, 'index'])->name('index');
+        Route::get('/export', [PurchasedOrderController::class, 'export'])->name('export');
         Route::get('/create', [PurchasedOrderController::class, 'create'])->name('create');
         Route::post('/', [PurchasedOrderController::class, 'store'])->name('store');
         Route::get('/{purchasedOrder}/edit', [PurchasedOrderController::class, 'edit'])->name('edit');
@@ -299,6 +307,8 @@ Route::middleware(['auth', 'verified', 'admin'])
 
         Route::put('/workspaces/{workspace}/subscription', [AdminWorkspaceController::class, 'updateSubscription'])
             ->name('workspaces.update-subscription');
+        Route::put('/workspaces/{workspace}/modules', [AdminWorkspaceController::class, 'updateModules'])
+            ->name('workspaces.update-modules');
 
         // Metric Setting Controller
         Route::get('workspaces/{workspace}/metrics/edit', [MetricSettingController::class, 'edit'])

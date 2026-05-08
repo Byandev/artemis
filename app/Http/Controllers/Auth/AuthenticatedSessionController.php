@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\WorkspaceInvitation;
+use App\Services\PostHogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -57,6 +58,15 @@ class AuthenticatedSessionController extends Controller
         Auth::login($user, $request->boolean('remember'));
 
         $request->session()->regenerate();
+
+        $posthog = new PostHogService;
+        $posthog->identify((string) $user->id, [
+            'email' => $user->email,
+            'name' => $user->name,
+        ]);
+        $posthog->capture((string) $user->id, 'user_logged_in', [
+            'email' => $user->email,
+        ]);
 
         // Check if there's an invitation to auto-accept
         if ($request->has('invitation')) {

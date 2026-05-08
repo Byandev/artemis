@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use PostHog\PostHog;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,6 +25,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (! config('posthog.disabled') && config('posthog.api_key')) {
+            PostHog::init(config('posthog.api_key'), [
+                'host' => config('posthog.host'),
+            ]);
+        }
+
         RateLimiter::for('parcel-notification', function ($job) {
             return Limit::perMinute(30);
         });

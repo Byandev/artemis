@@ -59,4 +59,68 @@ class Botcake
             throw new Exception('Failed to send flow: '.$response['message'] ?? '');
         }
     }
+
+    /**
+     * @throws ConnectionException
+     * @throws Exception
+     */
+    public function fetchFlows(): array
+    {
+        $response = Http::withHeader('access-token', $this->token)
+            ->get("https://botcake.io/api/public_api/v1/pages/$this->pageId/flows/");
+
+        if ($response->failed()) {
+            throw new Exception('Failed to fetch flows: '.$response->status());
+        }
+
+        return $response->json('data.flows', []);
+    }
+
+    /**
+     * @throws ConnectionException
+     * @throws Exception
+     */
+    public function fetchSequences(): array
+    {
+        $response = Http::withHeader('access-token', $this->token)
+            ->get("https://botcake.io/api/public_api/v1/pages/$this->pageId/sequences/");
+
+        if ($response->failed()) {
+            throw new Exception('Failed to fetch sequences: '.$response->status());
+        }
+
+        return $response->json('data', []);
+    }
+
+    /**
+     * @throws ConnectionException
+     * @throws Exception
+     */
+    public function fetchFlowStatistics(string $flowId): array
+    {
+        $response = Http::withHeader('access-token', $this->token)
+            ->get("https://botcake.io/api/public_api/v1/pages/$this->pageId/flows/$flowId/statistics");
+
+        if (! $response->ok()) {
+            throw new Exception('Failed to fetch flow statistics: '.$response->status().' '.$response->body());
+        }
+
+        return $response->json('data', []);
+    }
+
+    /**
+     * @throws ConnectionException
+     * @throws Exception
+     */
+    public function fetchSequenceStatistics(string $sequenceId): array
+    {
+        $response = Http::withHeader('access-token', $this->token)
+            ->get("https://botcake.io/api/public_api/v1/pages/$this->pageId/sequences/$sequenceId/statistics");
+
+        if (! $response->ok()) {
+            throw new Exception('Failed to fetch sequence statistics: '.$response->status().' '.$response->body());
+        }
+
+        return $response->json('data', []);
+    }
 }

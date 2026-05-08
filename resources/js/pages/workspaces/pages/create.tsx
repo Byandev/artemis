@@ -29,7 +29,6 @@ export default function Create({ workspace, users }: Props) {
         infotxt_token: '',
         infotxt_user_id: '',
         pancake_token: '',
-        parcel_journey_flow_id: '',
         parcel_journey_custom_field_id: '',
         parcel_journey_enabled: false as boolean,
         owner_id: '',
@@ -208,6 +207,20 @@ export default function Create({ workspace, users }: Props) {
                                             setData('pos_token', e.target.value)
                                         }
                                     />
+                                    <ValidateTokenButton
+                                        url={`/workspaces/${workspace.slug}/pages/validate-pos-token`}
+                                        payload={{
+                                            shop_id: data.shop_id,
+                                            token: data.pos_token,
+                                        }}
+                                        disabledReason={
+                                            !data.shop_id
+                                                ? 'Enter Shop ID first'
+                                                : !data.pos_token
+                                                  ? 'Enter a token first'
+                                                  : undefined
+                                        }
+                                    />
                                     {errors.pos_token && (
                                         <p className={errorClass}>
                                             {errors.pos_token}
@@ -286,50 +299,6 @@ export default function Create({ workspace, users }: Props) {
                                         </p>
                                     )}
                                 </div>
-                                <div className={fieldClass}>
-                                    <label className={labelClass}>
-                                        Infotxt Token
-                                    </label>
-                                    <input
-                                        type="text"
-                                        className={inputClass}
-                                        placeholder="Enter Infotxt token"
-                                        value={data.infotxt_token}
-                                        onChange={(e) =>
-                                            setData(
-                                                'infotxt_token',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    {errors.infotxt_token && (
-                                        <p className={errorClass}>
-                                            {errors.infotxt_token}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className={fieldClass}>
-                                    <label className={labelClass}>
-                                        Infotxt User ID
-                                    </label>
-                                    <input
-                                        type="text"
-                                        className={inputClass}
-                                        placeholder="Enter Infotxt user ID"
-                                        value={data.infotxt_user_id}
-                                        onChange={(e) =>
-                                            setData(
-                                                'infotxt_user_id',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    {errors.infotxt_user_id && (
-                                        <p className={errorClass}>
-                                            {errors.infotxt_user_id}
-                                        </p>
-                                    )}
-                                </div>
                             </div>
                         </div>
 
@@ -338,82 +307,140 @@ export default function Create({ workspace, users }: Props) {
                             <p className="mb-5 font-mono text-[10px] font-semibold tracking-widest text-gray-300 uppercase dark:text-gray-600">
                                 Parcel Journey
                             </p>
-                            <div className="grid gap-5 sm:grid-cols-2">
-                                <div className={fieldClass}>
-                                    <label className={labelClass}>
-                                        Flow ID
-                                    </label>
-                                    <input
-                                        type="text"
-                                        className={inputClass}
-                                        placeholder="Enter flow ID"
-                                        value={data.parcel_journey_flow_id}
-                                        onChange={(e) =>
-                                            setData(
-                                                'parcel_journey_flow_id',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    {errors.parcel_journey_flow_id && (
-                                        <p className={errorClass}>
-                                            {errors.parcel_journey_flow_id}
+                            <div className="space-y-5">
+                                <div className="flex items-center justify-between rounded-[10px] border border-black/8 bg-stone-50 px-4 py-3 dark:border-white/8 dark:bg-zinc-800">
+                                    <div>
+                                        <p className={labelClass}>
+                                            Enable Parcel Journey
                                         </p>
-                                    )}
-                                </div>
-                                <div className={fieldClass}>
-                                    <label className={labelClass}>
-                                        Custom Field ID
-                                    </label>
-                                    <input
-                                        type="text"
-                                        className={inputClass}
-                                        placeholder="Enter custom field ID"
-                                        value={
-                                            data.parcel_journey_custom_field_id
-                                        }
-                                        onChange={(e) =>
-                                            setData(
-                                                'parcel_journey_custom_field_id',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    {errors.parcel_journey_custom_field_id && (
-                                        <p className={errorClass}>
-                                            {
-                                                errors.parcel_journey_custom_field_id
-                                            }
+                                        <p className="mt-0.5 font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                                            Send parcel status updates via SMS
+                                            and chat
                                         </p>
-                                    )}
-                                </div>
-                                <div className={`${fieldClass} sm:col-span-2`}>
-                                    <div className="flex items-center justify-between rounded-[10px] border border-black/8 bg-stone-50 px-4 py-3 dark:border-white/8 dark:bg-zinc-800">
-                                        <div>
-                                            <p className={labelClass}>
-                                                Enable Parcel Journey
-                                            </p>
-                                            <p className="mt-0.5 font-mono text-[11px] text-gray-400 dark:text-gray-500">
-                                                Send parcel status updates via
-                                                flow
-                                            </p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setData(
-                                                    'parcel_journey_enabled',
-                                                    !data.parcel_journey_enabled,
-                                                )
-                                            }
-                                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${data.parcel_journey_enabled ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-zinc-600'}`}
-                                        >
-                                            <span
-                                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ${data.parcel_journey_enabled ? 'translate-x-5' : 'translate-x-0'}`}
-                                            />
-                                        </button>
                                     </div>
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setData(
+                                                'parcel_journey_enabled',
+                                                !data.parcel_journey_enabled,
+                                            )
+                                        }
+                                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${data.parcel_journey_enabled ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-zinc-600'}`}
+                                    >
+                                        <span
+                                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ${data.parcel_journey_enabled ? 'translate-x-5' : 'translate-x-0'}`}
+                                        />
+                                    </button>
                                 </div>
+
+                                {data.parcel_journey_enabled && (
+                                    <>
+                                        <div className="rounded-[10px] border border-black/8 bg-stone-50 p-4 dark:border-white/8 dark:bg-zinc-800">
+                                            <p className="mb-4 font-mono text-[10px] font-semibold tracking-widest text-gray-400 uppercase dark:text-gray-500">
+                                                Chat
+                                            </p>
+                                            <div className={fieldClass}>
+                                                <label className={labelClass}>
+                                                    Custom Field ID
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    className={inputClass}
+                                                    placeholder="Enter custom field ID"
+                                                    value={
+                                                        data.parcel_journey_custom_field_id
+                                                    }
+                                                    onChange={(e) =>
+                                                        setData(
+                                                            'parcel_journey_custom_field_id',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                                {errors.parcel_journey_custom_field_id && (
+                                                    <p className={errorClass}>
+                                                        {
+                                                            errors.parcel_journey_custom_field_id
+                                                        }
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="rounded-[10px] border border-black/8 bg-stone-50 p-4 dark:border-white/8 dark:bg-zinc-800">
+                                            <p className="mb-4 font-mono text-[10px] font-semibold tracking-widest text-gray-400 uppercase dark:text-gray-500">
+                                                SMS
+                                            </p>
+                                            <div className="grid gap-5 sm:grid-cols-2">
+                                                <div className={fieldClass}>
+                                                    <label
+                                                        className={labelClass}
+                                                    >
+                                                        Infotxt Token
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        className={inputClass}
+                                                        placeholder="Enter Infotxt token"
+                                                        value={
+                                                            data.infotxt_token
+                                                        }
+                                                        onChange={(e) =>
+                                                            setData(
+                                                                'infotxt_token',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                    {errors.infotxt_token && (
+                                                        <p
+                                                            className={
+                                                                errorClass
+                                                            }
+                                                        >
+                                                            {
+                                                                errors.infotxt_token
+                                                            }
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className={fieldClass}>
+                                                    <label
+                                                        className={labelClass}
+                                                    >
+                                                        Infotxt User ID
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        className={inputClass}
+                                                        placeholder="Enter Infotxt user ID"
+                                                        value={
+                                                            data.infotxt_user_id
+                                                        }
+                                                        onChange={(e) =>
+                                                            setData(
+                                                                'infotxt_user_id',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                    {errors.infotxt_user_id && (
+                                                        <p
+                                                            className={
+                                                                errorClass
+                                                            }
+                                                        >
+                                                            {
+                                                                errors.infotxt_user_id
+                                                            }
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
 

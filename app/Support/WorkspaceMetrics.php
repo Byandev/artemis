@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Metrics\MetricSource;
 use App\Metrics\Orders\Aov;
 use App\Metrics\Orders\AverageDaysFromConfirmedToDelivered;
 use App\Metrics\Orders\AverageDaysFromConfirmedToFirstAttempt;
@@ -28,10 +29,11 @@ use App\Metrics\Orders\TimeToFirstOrder;
 use App\Metrics\Orders\TotalOrders;
 use App\Metrics\Orders\TotalSales;
 use App\Metrics\Orders\UniqueCustomerCount;
+use App\Metrics\PageDaily\AllCustomerConversionRate;
+use App\Metrics\PageDaily\NewCustomerCount;
 use App\Metrics\ParcelJourney\TotalForDeliveryAmount;
 use App\Metrics\ParcelJourney\TotalForDeliveryCount;
 use App\Metrics\ParcelJourney\TrackedOrdersCount;
-use App\Metrics\MetricSource;
 use App\Models\Workspace;
 use InvalidArgumentException;
 
@@ -77,6 +79,8 @@ final class WorkspaceMetrics
         'returnedAvgCustomerRts' => ReturnedAvgCustomerRts::class,
         'deliveredAvgDeliveryAttempts' => DeliveredAvgDeliveryAttempts::class,
         'returnedAvgDeliveryAttempts' => ReturnedAvgDeliveryAttempts::class,
+        'newCustomerCount' => NewCustomerCount::class,
+        'allCustomerConversionRate' => AllCustomerConversionRate::class,
     ];
 
     /**

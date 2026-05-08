@@ -7,8 +7,15 @@ export interface Workspace {
     name: string;
     slug: string;
     owner_id: number;
-    show_inventory: boolean;
-    show_finance: boolean;
+    inventory_module_enabled: boolean;
+    finance_module_enabled: boolean;
+    products_module_enabled: boolean;
+    teams_module_enabled: boolean;
+    checklist_module_enabled: boolean;
+    csr_module_enabled: boolean;
+    rmo_module_enabled: boolean;
+    leaderboard_module_enabled: boolean;
+    botcake_module_enabled: boolean;
     created_at: string;
     updated_at: string;
 
