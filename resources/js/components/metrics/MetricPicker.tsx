@@ -4,13 +4,14 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { groupedMetrics, metricConfigs, MetricKey } from '@/types/metrics';
+import { groupedMetrics, MetricConfig, metricConfigs, MetricKey } from '@/types/metrics';
 import { ChartNoAxesColumn } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 interface Props {
     initialValue: MetricKey[];
     onChange: (value: MetricKey[]) => void;
+    metrics?: MetricConfig[];
 }
 
 const MetricPicker = ({ initialValue = [], onChange }: Props) => {
@@ -53,8 +54,8 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
                         isOpen
                             ? 'border-emerald-500/50 ring-2 ring-emerald-500/15 dark:border-emerald-500/40'
                             : activeCount > 0
-                              ? 'border-emerald-500/40 hover:border-emerald-500/60 dark:border-emerald-500/30 dark:hover:border-emerald-500/40'
-                              : 'border-black/[0.08] hover:border-black/[0.16] dark:border-white/[0.08] dark:hover:border-white/[0.16]',
+                                ? 'border-emerald-500/40 hover:border-emerald-500/60 dark:border-emerald-500/30 dark:hover:border-emerald-500/40'
+                                : 'border-black/[0.08] hover:border-black/[0.16] dark:border-white/[0.08] dark:hover:border-white/[0.16]',
                     ].join(' ')}
                 >
                     {/* Icon cell */}
@@ -163,10 +164,10 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
                                                     setLocalValue((prev) =>
                                                         prev.includes(m.key)
                                                             ? prev.filter(
-                                                                  (item) =>
-                                                                      item !==
-                                                                      m.key,
-                                                              )
+                                                                (item) =>
+                                                                    item !==
+                                                                    m.key,
+                                                            )
                                                             : [...prev, m.key],
                                                     )
                                                 }
