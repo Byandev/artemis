@@ -1,7 +1,7 @@
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { Head, router, useForm, Link } from '@inertiajs/react';
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Search, Files, LayoutGrid, CreditCard, X, Settings2 } from 'lucide-react';
+import { Search, Files, LayoutGrid, CreditCard, X, Settings2, Boxes } from 'lucide-react';
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
@@ -9,6 +9,7 @@ import { PaginatedData } from '@/types';
 import { omit } from 'lodash';
 import debounce from 'lodash/debounce';
 import { MetricSettingDialog } from '@/components/metrics/metricsetting-dialog-form';
+
 
 interface SubscriptionPlan {
     id: number;
@@ -44,19 +45,21 @@ interface Workspace {
     metric_settings?: { metric_key: string }[];
 }
 
-const MODULE_FIELDS: Array<{ key: keyof Pick<Workspace,
-    'inventory_module_enabled' | 'finance_module_enabled' | 'products_module_enabled'
-    | 'teams_module_enabled' | 'checklist_module_enabled' | 'csr_module_enabled'
-    | 'rmo_module_enabled' | 'leaderboard_module_enabled'>; label: string; description: string }> = [
-    { key: 'products_module_enabled', label: 'Products', description: 'Product catalog and management' },
-    { key: 'teams_module_enabled', label: 'Teams', description: 'Team grouping and assignments' },
-    { key: 'checklist_module_enabled', label: 'Checklist', description: 'Per-shop and per-page checklist' },
-    { key: 'csr_module_enabled', label: 'CSR', description: 'CSR management and analytics' },
-    { key: 'inventory_module_enabled', label: 'Inventory', description: 'Inventory items, transactions, purchased orders' },
-    { key: 'finance_module_enabled', label: 'Finance', description: 'Accounts, transactions, remittances' },
-    { key: 'rmo_module_enabled', label: 'RMO Management', description: 'Public RMO management link' },
-    { key: 'leaderboard_module_enabled', label: 'Leaderboards', description: 'Public leaderboards link' },
-];
+const MODULE_FIELDS: Array<{
+    key: keyof Pick<Workspace,
+        'inventory_module_enabled' | 'finance_module_enabled' | 'products_module_enabled'
+        | 'teams_module_enabled' | 'checklist_module_enabled' | 'csr_module_enabled'
+        | 'rmo_module_enabled' | 'leaderboard_module_enabled'>; label: string; description: string
+}> = [
+        { key: 'products_module_enabled', label: 'Products', description: 'Product catalog and management' },
+        { key: 'teams_module_enabled', label: 'Teams', description: 'Team grouping and assignments' },
+        { key: 'checklist_module_enabled', label: 'Checklist', description: 'Per-shop and per-page checklist' },
+        { key: 'csr_module_enabled', label: 'CSR', description: 'CSR management and analytics' },
+        { key: 'inventory_module_enabled', label: 'Inventory', description: 'Inventory items, transactions, purchased orders' },
+        { key: 'finance_module_enabled', label: 'Finance', description: 'Accounts, transactions, remittances' },
+        { key: 'rmo_module_enabled', label: 'RMO Management', description: 'Public RMO management link' },
+        { key: 'leaderboard_module_enabled', label: 'Leaderboards', description: 'Public leaderboards link' },
+    ];
 
 interface Props {
     workspaces: PaginatedData<Workspace>;
@@ -475,16 +478,14 @@ function ModulesModal({
                                     role="switch"
                                     aria-checked={data[field.key]}
                                     onClick={() => setData(field.key, !data[field.key])}
-                                    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                                        data[field.key]
+                                    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${data[field.key]
                                             ? 'bg-brand-600'
                                             : 'bg-zinc-200 dark:bg-zinc-700'
-                                    }`}
+                                        }`}
                                 >
                                     <span
-                                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                                            data[field.key] ? 'translate-x-5' : 'translate-x-1'
-                                        }`}
+                                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${data[field.key] ? 'translate-x-5' : 'translate-x-1'
+                                            }`}
                                     />
                                 </button>
                             </label>
