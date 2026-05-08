@@ -134,7 +134,14 @@ class TransactionController extends Controller
         $this->ensureOwns($workspace, $transaction);
         $this->validateWorkspaceFor($workspace, $request->validated());
 
-        $transaction->update($request->validated());
+        $data = $request->validated();
+
+        // Preserve existing position if not provided
+        if (empty($data['position'])) {
+            unset($data['position']);
+        }
+
+        $transaction->update($data);
 
         return redirect()->back()->with('success', 'Transaction updated.');
     }
