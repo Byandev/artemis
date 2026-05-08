@@ -5,11 +5,12 @@ namespace App\Http\Controllers\API\Workspace;
 use App\Http\Controllers\Controller;
 use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
+use App\Models\PancakeUserRmoDailyReport;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Modules\Pancake\Models\User as PancakeUser;
+use Modules\Pancake\Models\User;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -103,77 +104,65 @@ class CSRController extends Controller
 
         [$from, $to] = $this->range($request);
 
-        $rmoSub = $this->rmoCallTimeSub($workspace, $from, $to);
+        $posSummary = PancakeUserPosDailyReport::query()
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('date', [$from, $to])
+            ->groupBy('pancake_user_id')
+            ->selectRaw('
+                pancake_user_id,
+                SUM(total_orders)   as total_orders,
+                SUM(total_sales)    as total_sales,
+                SUM(`returning`)    as total_returning,
+                SUM(delivered)      as total_delivered
+            ');
 
-        if ($this->isPos($request)) {
-            // POS rollup is keyed by csr_id (= users.id), so the LEFT JOIN keys
-            // off pancake_users.user_id. total_called comes pre-aggregated from
-            // csr_daily_records.rmo_called; total_call_time comes from the rmo
-            // rollup (which is keyed on pancake_user_id).
-            $drSub = $this->posDailySummarySub($workspace, $from, $to);
+        $rmoSummary = PancakeUserRmoDailyReport::query()
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('date', [$from, $to])
+            ->groupBy('pancake_user_id')
+            ->selectRaw('
+                pancake_user_id,
+                SUM(total_called)             as total_called,
+                SUM(total_call_time)          as total_call_time,
+                SUM(total_rmo_call_attempts)  as total_rmo_call_attempts
+            ');
 
-            $query = PancakeUser::query()
-                ->from('pancake_users as pu')
-                ->whereExists(function ($q) use ($workspace) {
-                    $q->select(DB::raw(1))
-                        ->from('pancake_shop_users as psu')
-                        ->join('shops as s', 's.id', '=', 'psu.shop_id')
-                        ->whereColumn('psu.user_id', 'pu.id')
-                        ->where('s.workspace_id', $workspace->id);
-                })
-                ->leftJoinSub($drSub, 'dr', 'dr.csr_id', '=', 'pu.user_id')
-                ->leftJoinSub($rmoSub, 'rmo', 'rmo.pancake_user_id', '=', 'pu.id')
-                ->selectRaw('
-                    pu.id as pancake_user_id,
-                    pu.name as csr_name,
-                    COALESCE(dr.total_orders, 0) as total_orders,
-                    COALESCE(dr.total_sales, 0) as total_sales,
-                    COALESCE(dr.delivered, 0) as delivered,
-                    COALESCE(dr.returning_count, 0) as returning_count,
-                    COALESCE(dr.total_called, 0) as total_called,
-                    COALESCE(rmo.total_call_time, 0) as total_call_time,
-                    CASE
-                        WHEN (COALESCE(dr.delivered, 0) + COALESCE(dr.returning_count, 0)) > 0
-                        THEN ROUND((COALESCE(dr.returning_count, 0) / (dr.delivered + dr.returning_count)) * 100, 2)
-                        ELSE 0
-                    END as rts_rate
-                ');
-        } else {
-            // ERP rollup is keyed by pancake_user_id; total_called for ERP comes
-            // from the rmo rollup since pancake_user_erp_daily_reports doesn't
-            // store it.
-            $drSub = $this->erpDailySummarySub($workspace, $from, $to);
+        $base = User::query()
+            ->whereHas('shopUsers.shop', fn ($q) => $q->where('workspace_id', $workspace->id));
 
-            $query = PancakeUser::query()
-                ->from('pancake_users as pu')
-                ->whereExists(function ($q) use ($workspace) {
-                    $q->select(DB::raw(1))
-                        ->from('pancake_shop_users as psu')
-                        ->join('shops as s', 's.id', '=', 'psu.shop_id')
-                        ->whereColumn('psu.user_id', 'pu.id')
-                        ->where('s.workspace_id', $workspace->id);
-                })
-                ->leftJoinSub($drSub, 'dr', 'dr.pancake_user_id', '=', 'pu.id')
-                ->leftJoinSub($rmoSub, 'rmo', 'rmo.pancake_user_id', '=', 'pu.id')
-                ->selectRaw('
-                    pu.id as pancake_user_id,
-                    pu.name as csr_name,
-                    COALESCE(dr.total_orders, 0) as total_orders,
-                    COALESCE(dr.total_sales, 0) as total_sales,
-                    COALESCE(dr.delivered, 0) as delivered,
-                    COALESCE(dr.returning_count, 0) as returning_count,
-                    COALESCE(rmo.total_called, 0) as total_called,
-                    COALESCE(rmo.total_call_time, 0) as total_call_time,
-                    CASE
-                        WHEN (COALESCE(dr.delivered, 0) + COALESCE(dr.returning_count, 0)) > 0
-                        THEN ROUND((COALESCE(dr.returning_count, 0) / (dr.delivered + dr.returning_count)) * 100, 2)
-                        ELSE 0
-                    END as rts_rate
-                ');
-        }
-
-        $records = QueryBuilder::for($query)
-            ->allowedSorts(array_map(fn ($s) => AllowedSort::field($s), self::ALLOWED_SORTS))
+        $records = QueryBuilder::for($base)
+            ->leftJoinSub($posSummary, 'pos', 'pos.pancake_user_id', '=', 'pancake_users.id')
+            ->leftJoinSub($rmoSummary, 'rmo', 'rmo.pancake_user_id', '=', 'pancake_users.id')
+            ->select('pancake_users.*')
+            ->selectRaw('COALESCE(pos.total_orders, 0)             as total_orders')
+            ->selectRaw('COALESCE(pos.total_sales, 0)              as total_sales')
+            ->selectRaw('COALESCE(pos.total_returning, 0)          as total_returning')
+            ->selectRaw('COALESCE(pos.total_delivered, 0)          as total_delivered')
+            ->selectRaw('COALESCE(rmo.total_called, 0)             as total_called')
+            ->selectRaw('COALESCE(rmo.total_call_time, 0)          as total_call_time')
+            ->selectRaw('COALESCE(rmo.total_rmo_call_attempts, 0)  as total_rmo_call_attempts')
+            ->selectRaw('
+                CASE
+                    WHEN (COALESCE(pos.total_returning, 0) + COALESCE(pos.total_delivered, 0)) > 0
+                    THEN ROUND(
+                        COALESCE(pos.total_returning, 0)
+                        / (COALESCE(pos.total_returning, 0) + COALESCE(pos.total_delivered, 0))
+                        * 100, 2
+                    )
+                    ELSE 0
+                END as rts_rate
+            ')
+            ->allowedSorts([
+                AllowedSort::field('csr_name', 'pancake_users.name'),
+                'total_orders',
+                'total_sales',
+                'total_returning',
+                'total_delivered',
+                'total_called',
+                'total_call_time',
+                'total_rmo_call_attempts',
+                'rts_rate',
+            ])
             ->defaultSort('-total_sales')
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();

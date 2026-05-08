@@ -194,11 +194,10 @@ export default function Analytics({ workspace }: Props) {
     const columns = useMemo<ColumnDef<CsrRecord>[]>(
         () => [
             {
-                accessorKey: 'csr_name',
+                accessorKey: 'name',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="CSR" />
                 ),
-                cell: ({ row }) => row.original.csr_name || '-',
                 size: 220,
             },
             {
@@ -217,14 +216,14 @@ export default function Analytics({ workspace }: Props) {
                 cell: ({ row }) => peso(row.original.total_sales),
             },
             {
-                accessorKey: 'delivered',
+                accessorKey: 'total_delivered',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="Delivered" />
                 ),
                 cell: ({ row }) => peso(row.original.delivered),
             },
             {
-                accessorKey: 'returning_count',
+                accessorKey: 'total_returning',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="Returning" />
                 ),
@@ -242,6 +241,14 @@ export default function Analytics({ workspace }: Props) {
                 accessorKey: 'total_called',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="RMO Called" />
+                ),
+                cell: ({ row }) =>
+                    Number(row.original.total_called).toLocaleString(),
+            },
+            {
+                accessorKey: 'total_rmo_call_attempts',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RMO Attempts" />
                 ),
                 cell: ({ row }) =>
                     Number(row.original.total_called).toLocaleString(),

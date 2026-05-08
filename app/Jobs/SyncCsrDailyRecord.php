@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\CsrDailyRecord;
+use App\Models\PancakeUserPosDailyReport;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -30,7 +31,6 @@ class SyncCsrDailyRecord implements ShouldQueue
 
         $rows = DB::table('pancake_orders as po')
             ->join('pancake_users as pu', 'pu.id', '=', 'po.confirmed_by')
-            ->whereNotNull('pu.user_id')
             ->where(function ($q) use ($start, $end) {
                 $q->where(function ($q2) use ($start, $end) {
                     $q2->where('po.status', 3)
@@ -42,10 +42,10 @@ class SyncCsrDailyRecord implements ShouldQueue
                     })
                     ->orWhereBetween('po.confirmed_at', [$start, $end]);
             })
-            ->groupBy('po.workspace_id', 'pu.user_id')
+            ->groupBy('po.workspace_id', 'pu.id')
             ->selectRaw('
                 po.workspace_id as workspace_id,
-                pu.user_id as csr_id,
+                pu.id as pancake_user_id,
 
                 SUM(CASE WHEN po.confirmed_at BETWEEN ? AND ? THEN 1 ELSE 0 END) as total_orders,
                 SUM(CASE WHEN po.confirmed_at BETWEEN ? AND ? THEN po.final_amount ELSE 0 END) as total_sales,
@@ -65,41 +65,18 @@ class SyncCsrDailyRecord implements ShouldQueue
             ])
             ->get();
 
-        $rmoCalledRows = DB::table('pancake_order_for_delivery as pofd')
-            ->join('pancake_users as pu', 'pu.id', '=', 'pofd.assignee_id')
-            ->whereNotNull('pu.user_id')
-            ->where('pofd.delivery_date', $date)
-            ->where('pofd.status', '!=', 'PENDING')
-            ->groupBy('pofd.workspace_id', 'pu.user_id')
-            ->selectRaw('pofd.workspace_id, pu.user_id as csr_id, COUNT(*) as rmo_called')
-            ->get();
-
-        $rmoCalled = [];
-        foreach ($rmoCalledRows as $r) {
-            $rmoCalled[$r->workspace_id][$r->csr_id] = (int) $r->rmo_called;
-        }
-
         foreach ($rows as $row) {
-            $total = $row->delivered_count + $row->returning_count;
-
-            $rtsRate = $total > 0
-                ? round(($row->returning_count / $total) * 100, 2)
-                : 0;
-
-            CsrDailyRecord::updateOrCreate(
+            PancakeUserPosDailyReport::updateOrCreate(
                 [
                     'workspace_id' => $row->workspace_id,
-                    'csr_id' => $row->csr_id,
+                    'pancake_user_id' => $row->pancake_user_id,
                     'date' => $date,
-                    'type' => $type,
                 ],
                 [
                     'total_orders' => (int) $row->total_orders,
                     'total_sales' => (float) $row->total_sales,
                     'returning' => (float) $row->returning,
                     'delivered' => (float) $row->delivered,
-                    'rts_rate' => $rtsRate,
-                    'rmo_called' => (int) ($rmoCalled[$row->workspace_id][$row->csr_id] ?? 0),
                 ]
             );
         }
