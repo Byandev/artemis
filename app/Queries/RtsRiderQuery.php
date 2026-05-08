@@ -26,8 +26,6 @@ class RtsRiderQuery extends RtsBaseQuery
 
     public function get(int $perPage = 15): LengthAwarePaginator
     {
-        // The inner subquery already constrains to 'On Delivery' IDs,
-        // so the outer status check is redundant.
         $latestRider = DB::table('parcel_journeys as pj')
             ->select('pj.order_id', 'pj.rider_name')
             ->whereNotNull('pj.rider_name')

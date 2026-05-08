@@ -133,10 +133,32 @@ export default function Register() {
                                 {errors.password_confirmation && <p className="font-mono text-[11px] text-red-500">{errors.password_confirmation}</p>}
                             </div>
 
+                            {/* Terms & Conditions */}
+                            <div className="space-y-1.5 pt-1">
+                                <label htmlFor="terms_accepted" className="flex cursor-pointer items-start gap-2.5 text-[12px] leading-relaxed text-gray-600 dark:text-gray-400">
+                                    <input
+                                        id="terms_accepted"
+                                        type="checkbox"
+                                        name="terms_accepted"
+                                        value="1"
+                                        required
+                                        tabIndex={5}
+                                        className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer rounded border border-black/15 bg-stone-50 accent-emerald-600 outline-none transition-all focus:ring-2 focus:ring-emerald-500/15 dark:border-white/15 dark:bg-zinc-800"
+                                    />
+                                    <span>
+                                        I agree to the{' '}
+                                        <TextLink href="/terms" target="_blank" className="text-[12px]!">Terms &amp; Conditions</TextLink>
+                                        {' '}and{' '}
+                                        <TextLink href="/privacy" target="_blank" className="text-[12px]!">Privacy Policy</TextLink>.
+                                    </span>
+                                </label>
+                                {errors.terms_accepted && <p className="font-mono text-[11px] text-red-500">{errors.terms_accepted}</p>}
+                            </div>
+
                             {/* Submit */}
                             <button
                                 type="submit"
-                                tabIndex={5}
+                                tabIndex={6}
                                 disabled={processing}
                                 className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-emerald-600 font-mono! text-[13px]! font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                             >
@@ -150,7 +172,7 @@ export default function Register() {
                             <TextLink
                                 href={invitationToken ? login({ query: { invitation: invitationToken } }).url : login().url}
                                 className="font-mono! text-[11px]!"
-                                tabIndex={6}
+                                tabIndex={7}
                             >
                                 Log in
                             </TextLink>

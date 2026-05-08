@@ -398,7 +398,7 @@
 }
 @utility custom-scrollbar {
     &::-webkit-scrollbar {
-        @apply size-1.5;
+        @apply size-1;
     }
 
     &::-webkit-scrollbar-track {

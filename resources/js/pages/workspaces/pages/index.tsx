@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import { TargetChecklistDrawer } from '@/components/checklist/target-checklist-drawer';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -19,6 +20,7 @@ import clsx from 'clsx';
 import { omit } from 'lodash';
 import {
     Edit,
+    ListChecks,
     MoreHorizontal,
     RefreshCw,
     Search,
@@ -36,6 +38,9 @@ interface PagesProps {
             search?: string
         }
     }
+    pageLimit?: number | null
+    pageCount?: number
+    pageLimitReached?: boolean
 }
 
 const StatusBadge = ({ status }: { status: 'active' | 'inactive' }) => {
@@ -71,13 +76,32 @@ const EnableBadge = ({ isEnabled }: { isEnabled: boolean }) => {
     );
 };
 
-const Pages = ({ pages, workspace, query }: PagesProps) => {
+const ChecklistsBadge = ({ pending }: { pending: number }) => {
+    const hasPending = pending > 0;
+    return (
+        <span
+            className={clsx(
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
+                hasPending
+                    ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+                    : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+            )}
+        >
+            <span className={clsx('h-1.5 w-1.5 rounded-full', hasPending ? 'bg-amber-500' : 'bg-emerald-500')} />
+            {hasPending ? `${pending} Pending` : 'Complete'}
+        </span>
+    );
+};
+
+const Pages = ({ pages, workspace, query, pageLimit, pageCount, pageLimitReached }: PagesProps) => {
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
 
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [checklistDrawerOpen, setChecklistDrawerOpen] = useState(false);
+    const [selectedPage, setSelectedPage] = useState<Page | null>(null);
 
     const [processing, setProcessing] = useState(false);
 
@@ -118,6 +142,11 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
         });
     };
 
+    const openChecklist = (page: Page) => {
+        setSelectedPage(page);
+        setChecklistDrawerOpen(true);
+    };
+
 
     const columns: ColumnDef<Page>[] = [
         {
@@ -155,20 +184,7 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             ),
             cell: ({ row }) => {
                 const date = row.original.orders_last_synced_at;
-                const isUpdated = Boolean(row.original.is_sync_logic_updated);
-                return (
-                    <div className="flex items-center gap-2">
-                        <span>{date ? new Date(date).toLocaleString() : 'Never'}</span>
-                        <span className={clsx(
-                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
-                            isUpdated
-                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
-                                : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400',
-                        )}>
-                            {isUpdated ? 'Updated' : 'Legacy'}
-                        </span>
-                    </div>
-                );
+                return <span>{date ? new Date(date).toLocaleString() : 'Never'}</span>;
             },
         },
         {
@@ -190,6 +206,15 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             },
         },
         {
+            accessorKey: 'pending_required_checklists_count',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Checklists'} />
+            ),
+            cell: ({ row }) => (
+                <ChecklistsBadge pending={Number(row.original.pending_required_checklists_count ?? 0)} />
+            ),
+        },
+        {
             id: 'actions',
             cell: ({ row }) => {
                 const page = row.original;
@@ -202,6 +227,10 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
+                                <DropdownMenuItem onClick={() => openChecklist(page)}>
+                                    <ListChecks />
+                                    View Checklist
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleEdit(page)}>
                                     <Edit />
                                     Edit
@@ -222,9 +251,27 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             <Head title={`${workspace.name} - Pages`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader title="Pages" description="Manage your shop pages and their connected stores">
-                    <Button size="sm" onClick={handleCreate}>
-                        Add New Page
-                    </Button>
+                    <div className="flex flex-col items-end gap-1">
+                        <Button
+                            size="sm"
+                            onClick={handleCreate}
+                            disabled={pageLimitReached}
+                            title={pageLimitReached ? `Page limit reached (${pageCount}/${pageLimit}). Upgrade your plan to add more.` : undefined}
+                        >
+                            Add New Page
+                        </Button>
+                        {pageLimit != null && (
+                            <span className={clsx(
+                                'font-mono text-[10px] uppercase tracking-wider',
+                                pageLimitReached
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                    : 'text-gray-400 dark:text-gray-500',
+                            )}>
+                                {pageCount ?? 0}/{pageLimit} pages used
+                                {pageLimitReached && ' · upgrade to add more'}
+                            </span>
+                        )}
+                    </div>
                 </PageHeader>
 
                 <div className="mb-3 flex items-center gap-2">
@@ -265,6 +312,21 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
                         }}
                     />
                 </div>
+
+                <TargetChecklistDrawer
+                    open={checklistDrawerOpen}
+                    onOpenChange={(open) => {
+                        setChecklistDrawerOpen(open);
+                        if (!open) {
+                            setSelectedPage(null);
+                            router.reload({ only: ['pages'] });
+                        }
+                    }}
+                    workspace={workspace}
+                    target="page"
+                    targetId={selectedPage?.id ?? null}
+                    targetName={selectedPage?.name ?? ''}
+                />
 
             </div>
         </AppLayout>

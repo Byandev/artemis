@@ -2,6 +2,7 @@
 
 namespace App\Metrics\Orders;
 
+use App\Support\Metrics\OrdersFilter;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -132,20 +133,7 @@ final class TimeToFirstOrder
         $users = DB::table('users')
             ->join('pages', 'pages.owner_id', '=', 'users.id')
             ->where('pages.workspace_id', $workspaceId)
-            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                $shopIds = is_array($filter['shop_ids'])
-                    ? $filter['shop_ids']
-                    : explode(',', $filter['shop_ids']);
-
-                $query->whereIn('pages.shop_id', $shopIds);
-            })
-            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                $pageIds = is_array($filter['page_ids'])
-                    ? $filter['page_ids']
-                    : explode(',', $filter['page_ids']);
-
-                $query->whereIn('pages.id', $pageIds);
-            })
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->select('users.id', 'users.name')
             ->distinct()
             ->get();
@@ -193,18 +181,7 @@ final class TimeToFirstOrder
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(
-                ! empty($filter['page_ids']) || ! empty($filter['shop_ids']),
-                function ($query) use ($filter) {
-                    $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-                        ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                            $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
-                        })
-                        ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                            $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
-                        });
-                }
-            )
+            ->tap(fn ($q) => OrdersFilter::joinAndApply($q, $filter))
             ->groupBy('pancake_orders.customer_id')
             ->selectRaw('
                 pancake_orders.customer_id as customer_id,
@@ -223,12 +200,7 @@ final class TimeToFirstOrder
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
-            })
-            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
-            })
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->groupBy('pages.id', 'pages.name', 'pancake_orders.customer_id')
             ->selectRaw('
                 pages.id as page_id,
@@ -250,12 +222,7 @@ final class TimeToFirstOrder
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.id', $this->parseIds($filter['page_ids']));
-            })
-            ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                $query->whereIn('pages.shop_id', $this->parseIds($filter['shop_ids']));
-            })
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->whereNotNull('pages.shop_id')
             ->groupBy('shops.id', 'shops.name', 'pancake_orders.customer_id')
             ->selectRaw('

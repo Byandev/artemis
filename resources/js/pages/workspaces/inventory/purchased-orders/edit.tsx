@@ -6,6 +6,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 
+
 interface InventoryItem {
     id: number;
     sku: string;
@@ -108,24 +109,23 @@ export default function Edit({ workspace, order, items }: Props) {
         setData('items', data.items.filter((_, i) => i !== index));
 
     const handleSubmit = (e: React.FormEvent) => {
-            e.preventDefault();
-    
-            const url = `/workspaces/${workspace.slug}/inventory/purchased-orders/${order.id}`;
-    
-            put(url, {
-            preserveScroll: true,
-            onSuccess: () => {
-                
-                toast.success('Purchased order updated successfully');
-                
-                router.visit(`/workspaces/${workspace.slug}/inventory/purchased-orders`);
-            },
-            onError: (errors) => {
-                console.error(errors);
-                toast.error('Failed to update order. Please check the form.');
-            }
-        });
-    };
+    e.preventDefault();
+
+    const url = `/workspaces/${workspace.slug}/inventory/purchased-orders/${order.id}`;
+
+    put(url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            toast.success('Purchased order updated successfully');
+
+            router.visit(`/workspaces/${workspace.slug}/inventory/purchased-orders`);
+        },
+        onError: (errors) => {
+            console.error(errors);
+            toast.error('Failed to update order. Please check the form.');
+        }
+    });
+};
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Edit Purchased Order`} />
@@ -259,6 +259,26 @@ export default function Edit({ workspace, order, items }: Props) {
                                 </div>
                             ))}
                         </div>
+                        <div className="mt-4 grid grid-cols-[1fr_100px_120px_120px_36px] gap-3">
+                            <div className="col-span-3" /> 
+                            
+                            <div>
+                                <label className={labelClass}>Total Amount <span className="text-red-400">*</span></label>
+                                <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    min="0" 
+                                    value={data.total_amount} 
+                                    onChange={(e) => setData('total_amount', e.target.value)} 
+                                    placeholder="0.00" 
+                                    className={inputClass} 
+                                />
+                                {errors.total_amount && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.total_amount}</p>}
+                            </div>
+                            
+                            <div />
+                        </div>
+
                         <div className="mt-4 grid grid-cols-[1fr_100px_120px_120px_36px] gap-3">
                             <div className="col-span-3" /> 
                             

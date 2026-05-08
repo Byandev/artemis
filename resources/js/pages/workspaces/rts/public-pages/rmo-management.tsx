@@ -3,32 +3,59 @@ import { authParcelStatusConfig, orderStatusConfig, ParcelStatusEntry } from '@/
 import { RmoStatCards } from '@/components/rts/RmoStatCards';
 import { RmoStatusPicker } from '@/components/rts/RmoStatusPicker';
 import { Button } from '@/components/ui/button';
+import DatePicker from '@/components/ui/date-picker';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { currencyFormatter, percentageFormatter } from '@/lib/utils';
 import { toFrontendSort } from '@/lib/sort';
 import publicPage from '@/routes/public-page';
-import { PaginatedData } from '@/types';
+import { PaginatedData, SharedData } from '@/types';
 import { OrderForDelivery, OrderStatus } from '@/types/models/Pancake/OrderForDelivery';
 import { User } from '@/types/models/Pancake/User';
 import { Workspace } from '@/types/models/Workspace';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import {
     BarChart3,
     ChevronDown,
     ChevronUp,
+    ClipboardCopy,
+    Download,
     MapPin,
+    Pencil,
     Phone,
+    PhoneCall,
     Search,
     User as UserIcon,
     UserPlus,
     X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FormModal from './formModal';
-import workspaces from '@/routes/workspaces';
+import { Checkbox } from '@/components/ui/checkbox';
+import { CallLog } from '@/types/models/CallLog';
+
+const EXPORT_COLUMNS = [
+    { key: 'order_id', label: 'Order ID' },
+    { key: 'tracking_number', label: 'Tracking Number' },
+    { key: 'jnt_status', label: 'J&T Status' },
+    { key: 'rider_name', label: "Rider's Name" },
+    { key: 'rider_number', label: "Rider's Number" },
+    { key: 'cx_name', label: 'CX Name' },
+    { key: 'cx_number', label: 'CX Number' },
+    { key: 'address', label: 'Address' },
+    { key: 'srp', label: 'SRP' },
+    { key: 'attempts', label: '# of Attempts' },
+    { key: 'confirmed_by', label: 'Confirmed By' },
+    { key: 'cx_rts', label: 'CX RTS' },
+    { key: 'location_rts', label: 'Location RTS' },
+    { key: 'updated_status', label: 'Updated Status' },
+    { key: 'csr', label: 'CSR' },
+] as const;
+
+const ALL_COLUMN_KEYS = EXPORT_COLUMNS.map((c) => c.key);
 
 interface Props {
     orders: PaginatedData<OrderForDelivery>;
@@ -45,12 +72,198 @@ interface Props {
         };
         page?: number;
         perPage?: number;
+        delivery_date?: string;
     };
     users: User[];
     total_for_delivery_today: number;
-    called_rate: number;
-    successful_rate: number;
-    unsuccessful_rate: number;
+    called_count: number;
+    delivered_count: number;
+    returning_count: number;
+    problematic_count: number;
+}
+
+function formatDuration(seconds: number): string {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function EditablePhone({ value, onSave, disabled = false }: { value: string; onSave: (v: string) => void; disabled?: boolean }) {
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState(value);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (editing) inputRef.current?.focus();
+    }, [editing]);
+
+    useEffect(() => {
+        setDraft(value);
+    }, [value]);
+
+    const save = () => {
+        setEditing(false);
+        if (draft.trim() !== value) {
+            onSave(draft.trim());
+        }
+    };
+
+    if (editing && !disabled) {
+        return (
+            <input
+                ref={inputRef}
+                type="text"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={save}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') save();
+                    if (e.key === 'Escape') { setDraft(value); setEditing(false); }
+                }}
+                className="h-6 w-28 rounded border border-emerald-300 px-1.5 text-[11px] outline-none focus:ring-1 focus:ring-emerald-400 dark:border-emerald-600 dark:bg-zinc-800 dark:text-gray-300"
+            />
+        );
+    }
+
+    if (disabled) {
+        return (
+            <span className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
+                <Phone className="h-3 w-3 shrink-0" />
+                {value || '—'}
+            </span>
+        );
+    }
+
+    return (
+        <button
+            onClick={() => setEditing(true)}
+            className="group/phone flex items-center gap-1 text-[11px] text-gray-400 hover:text-emerald-600 dark:text-gray-500 dark:hover:text-emerald-400"
+        >
+            <Phone className="h-3 w-3 shrink-0" />
+            {value || '—'}
+            <Pencil className="h-2.5 w-2.5 shrink-0 opacity-0 group-hover/phone:opacity-100" />
+        </button>
+    );
+}
+
+function CallLogModal({
+    open,
+    onOpenChange,
+    phoneNumber,
+    label,
+    workspaceSlug,
+    date,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    phoneNumber: string;
+    label: string;
+    workspaceSlug: string;
+    date: string;
+}) {
+    const [logs, setLogs] = useState<CallLog[]>([]);
+    const [loading, setLoading] = useState(false);
+    const csrName = localStorage.getItem('user_name') ?? 'CSR';
+
+    useEffect(() => {
+        if (!open || !phoneNumber) return;
+        setLoading(true);
+        fetch(`/public/workspaces/${workspaceSlug}/rts/rmo-management/call-logs?phone_number=${encodeURIComponent(phoneNumber)}&date=${date}`)
+            .then((r) => r.json())
+            .then((data) => setLogs(data))
+            .finally(() => setLoading(false));
+    }, [open, phoneNumber, workspaceSlug, date]);
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="text-sm font-semibold">
+                        Call Logs — {label}
+                    </DialogTitle>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                        {phoneNumber} · {date}
+                    </p>
+                </DialogHeader>
+                {loading ? (
+                    <p className="py-6 text-center text-[12px] text-gray-400">Loading...</p>
+                ) : logs.length === 0 ? (
+                    <p className="py-6 text-center text-[12px] text-gray-400">No call logs found</p>
+                ) : (
+                    <div className="max-h-72 overflow-y-auto">
+                        <table className="w-full text-[12px]">
+                            <thead>
+                                <tr className="border-b text-left text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                    <th className="pb-2 pr-3">Time</th>
+                                    <th className="pb-2 pr-3">Type</th>
+                                    <th className="pb-2 pr-3">By</th>
+                                    <th className="pb-2 pr-3 text-right">Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {logs.map((log) => (
+                                    <tr key={log.id} className="border-b border-black/5 dark:border-white/5">
+                                        <td className="py-2 pr-3 font-mono text-gray-600 dark:text-gray-300">
+                                            {log.call_time}
+                                        </td>
+                                        <td className="py-2 pr-3">
+                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                                log.type === 'outgoing'
+                                                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
+                                                    : log.type === 'incoming'
+                                                    ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                                    : 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+                                            }`}>
+                                                {log.type}
+                                            </span>
+                                        </td>
+                                        <td className="py-2 pr-3 text-[11px] text-gray-600 dark:text-gray-300">
+                                            {csrName}
+                                        </td>
+                                        <td className="py-2 pr-3 text-right font-mono text-gray-600 dark:text-gray-300">
+                                            {formatDuration(log.duration)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        <div className="mt-3 flex justify-between border-t pt-2 text-[11px] text-gray-500 dark:text-gray-400">
+                            <span>{logs.length} call{logs.length !== 1 ? 's' : ''}</span>
+                            <span>Total: {formatDuration(logs.reduce((sum, l) => sum + l.duration, 0))}</span>
+                        </div>
+                    </div>
+                )}
+                <div className="flex justify-end">
+                    <button
+                        onClick={() => onOpenChange(false)}
+                        className="rounded-lg border border-black/10 px-4 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 dark:border-white/10 dark:text-gray-400 dark:hover:bg-zinc-800"
+                    >
+                        Close
+                    </button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function CallLogBadge({
+    attempts,
+    duration,
+    onClick,
+}: {
+    attempts: number;
+    duration: number;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            onClick={onClick}
+            className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-emerald-600 hover:underline dark:text-gray-500 dark:hover:text-emerald-400"
+        >
+            <PhoneCall className="h-2.5 w-2.5 shrink-0" />
+            {attempts} call{attempts !== 1 ? 's' : ''} · {formatDuration(duration)}
+        </button>
+    );
 }
 
 export default function RmoManagement({
@@ -59,14 +272,26 @@ export default function RmoManagement({
     query,
     users,
     total_for_delivery_today,
-    called_rate,
-    successful_rate,
-    unsuccessful_rate,
+    called_count,
+    delivered_count,
+    returning_count,
+    problematic_count,
 }: Props) {
+    const { appEnv } = usePage<SharedData>().props;
+    const canEditPhone = appEnv !== 'production';
+
     const [userName, setUserName] = useState<string | false>(false);
     const [isOpen, setIsOpen] = useState(false);
     const [showStats, setShowStats] = useState(() => localStorage.getItem('rmo_show_stats') === 'true');
+    const [showMyAssigneeOnly, setShowMyAssigneeOnly] = useState(() => localStorage.getItem('rmo_show_my_assignee_only') === 'true');
+    const [showMyConfirmeeOnly, setShowMyConfirmeeOnly] = useState(() => localStorage.getItem('rmo_show_my_confirmee_only') === 'true');
     const [pendingAssign, setPendingAssign] = useState<{ id: number; currentStatus: string } | null>(null);
+    const [callLogModal, setCallLogModal] = useState<{ phone: string; label: string } | null>(null);
+    const [exportModalOpen, setExportModalOpen] = useState(false);
+    const [exportColumns, setExportColumns] = useState<string[]>(() => {
+        const saved = localStorage.getItem('rmo_export_columns');
+        return saved ? JSON.parse(saved) : [...ALL_COLUMN_KEYS];
+    });
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
@@ -99,15 +324,22 @@ export default function RmoManagement({
             : (query?.filter?.parcel_status ?? ''), [query?.filter?.parcel_status]
     );
 
+    const todayLocal = (() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+    const deliveryDate = query?.delivery_date ?? todayLocal;
+    const isToday = deliveryDate === todayLocal;
+
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
 
     const initialFilterValue = useMemo<FilterValue>(
         () => ({
             teamIds: [],
             productIds: [],
-            shopIds: selectedShopIds.map(Number),
-            pageIds: selectedPageIds.map(Number),
-            userIds: selectedUserIds.map(Number),
+            shopIds: [...selectedShopIds],
+            pageIds: [...selectedPageIds],
+            userIds: [...selectedUserIds],
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [],
@@ -152,9 +384,12 @@ export default function RmoManagement({
             ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
             ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
             page: page ?? 1,
-            ...(perPage ? { per_page: perPage } : {}),
+            per_page: perPage ?? orders.per_page,
+            delivery_date: deliveryDate,
+            ...(showMyAssigneeOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
+            ...(showMyConfirmeeOnly && localStorage.getItem('user_id') ? { confirmee_id: localStorage.getItem('user_id') } : {}),
         }),
-        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds],
+        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyAssigneeOnly, showMyConfirmeeOnly, orders.per_page, deliveryDate],
     );
 
     const handleStatusChange = useCallback(
@@ -196,6 +431,63 @@ export default function RmoManagement({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchValue]);
 
+    useEffect(() => {
+        router.get(
+            publicPage.rmoManagement({ workspace }),
+            buildAllParams(query?.sort, 1),
+            { preserveState: true, replace: true, preserveScroll: true },
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showMyAssigneeOnly, showMyConfirmeeOnly]);
+
+
+    const doExport = useCallback((columns: string[]) => {
+        localStorage.setItem('rmo_export_columns', JSON.stringify(columns));
+        const params = new URLSearchParams();
+        if (searchValue) params.set('filter[search]', searchValue);
+        if (currentStatus) params.set('filter[status]', currentStatus);
+        if (currentParcelStatus) params.set('filter[parcel_status]', currentParcelStatus);
+        if (selectedPageIds.length) params.set('filter[page_id]', selectedPageIds.join(','));
+        if (selectedShopIds.length) params.set('filter[shop_id]', selectedShopIds.join(','));
+        if (selectedUserIds.length) params.set('filter[user_id]', selectedUserIds.join(','));
+        params.set('delivery_date', deliveryDate);
+        if (showMyAssigneeOnly && localStorage.getItem('user_id')) {
+            params.set('assignee_id', localStorage.getItem('user_id') ?? '');
+        }
+        if (showMyConfirmeeOnly && localStorage.getItem('user_id')) {
+            params.set('confirmee_id', localStorage.getItem('user_id') ?? '');
+        }
+        if (columns.length > 0 && columns.length < ALL_COLUMN_KEYS.length) {
+            params.set('columns', columns.join(','));
+        }
+
+        const qs = params.toString();
+        window.location.href = `/public/workspaces/${workspace.slug}/rts/rmo-management/export${qs ? `?${qs}` : ''}`;
+    }, [workspace.slug, searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyAssigneeOnly, showMyConfirmeeOnly, deliveryDate]);
+
+    const handleDateChange = useCallback(
+        (date: string) => {
+            router.get(
+                publicPage.rmoManagement({ workspace }),
+                {
+                    sort: query?.sort || undefined,
+                    'filter[search]': searchValue || undefined,
+                    ...(currentStatus ? { 'filter[status]': currentStatus } : {}),
+                    ...(currentParcelStatus ? { 'filter[parcel_status]': currentParcelStatus } : {}),
+                    ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
+                    ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
+                    ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
+                    ...(showMyAssigneeOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
+                    ...(showMyConfirmeeOnly && localStorage.getItem('user_id') ? { confirmee_id: localStorage.getItem('user_id') } : {}),
+                    delivery_date: date,
+                    page: 1,
+                    per_page: orders.per_page,
+                },
+                { preserveState: true, replace: true, preserveScroll: true },
+            );
+        },
+        [workspace, query?.sort, searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyAssigneeOnly, showMyConfirmeeOnly, orders.per_page],
+    );
 
     const handleAssignUser = useCallback(
         (id: number, userId: string) => {
@@ -224,7 +516,7 @@ export default function RmoManagement({
             router.post(
                 `/public/workspaces/${workspace.slug}/rts/rmo-management/${id}`,
                 { status },
-                { preserveScroll: true },
+                { preserveScroll: true, preserveState: false },
             );
         },
         [workspace.slug],
@@ -243,6 +535,17 @@ export default function RmoManagement({
         [handleAssignUser],
     );
 
+    const handleUpdatePhone = useCallback(
+        (id: number, field: 'customer_phone' | 'rider_phone', value: string) => {
+            router.post(
+                `/public/workspaces/${workspace.slug}/rts/rmo-management/${id}/update-phones`,
+                { [field]: value },
+                { preserveScroll: true },
+            );
+        },
+        [workspace.slug],
+    );
+
     const handleUserSelected = useCallback(
         (userId: string) => {
             setUserName(localStorage.getItem('user_name') ?? '');
@@ -252,6 +555,37 @@ export default function RmoManagement({
             }
         },
         [pendingAssign, handleAssignUser],
+    );
+
+    const [copiedRider, setCopiedRider] = useState(false);
+    const [copiedCustomer, setCopiedCustomer] = useState(false);
+
+    const pendingOrders = useMemo(
+        () => (orders.data ?? []).filter((o) => o.status === 'PENDING').slice(0, 10),
+        [orders.data],
+    );
+
+    const copyPendingPhones = useCallback(
+        (type: 'rider' | 'customer') => {
+            const phones = pendingOrders
+                .map((o) =>
+                    type === 'rider'
+                        ? o.rider_phone
+                        : o.customer_phone ?? o.order.shipping_address?.phone_number ?? '',
+                )
+                .filter(Boolean);
+            if (phones.length === 0) return;
+            navigator.clipboard.writeText(phones.join('\n')).then(() => {
+                if (type === 'rider') {
+                    setCopiedRider(true);
+                    setTimeout(() => setCopiedRider(false), 2000);
+                } else {
+                    setCopiedCustomer(true);
+                    setTimeout(() => setCopiedCustomer(false), 2000);
+                }
+            });
+        },
+        [pendingOrders],
     );
 
     const columns = useMemo<ColumnDef<OrderForDelivery>[]>(
@@ -264,7 +598,7 @@ export default function RmoManagement({
                 cell: ({ row }) => {
                     const items = row.original.order.items ?? [];
                     const trackingCode = row.original.order.tracking_code;
-                    const key = (row.original.order.parcel_status ?? '').toLowerCase();
+                    const key = (row.original.parcel_status ?? row.original.order.parcel_status ?? '').toLowerCase();
                     const cfg = authParcelStatusConfig[key] as ParcelStatusEntry | undefined;
                     return (
                         <div className="space-y-1.5">
@@ -301,19 +635,28 @@ export default function RmoManagement({
             {
                 accessorKey: 'rider_name',
                 header: ({ column }) => <SortableHeader column={column} title="Rider" />,
-                cell: ({ row }) => (
-                    <div className="space-y-1.5">
-                        <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
-                            {row.original.rider_name || '—'}
-                        </p>
-                        {row.original.rider_phone && (
-                            <p className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
-                                <Phone className="h-3 w-3 shrink-0" />
-                                {row.original.rider_phone}
+                cell: ({ row }) => {
+                    const attempts = row.original.rider_call_logs_count ?? 0;
+                    const duration = row.original.rider_call_duration ?? 0;
+                    const phone = row.original.rider_phone ?? '';
+                    return (
+                        <div className="space-y-1.5">
+                            <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
+                                {row.original.rider_name || '—'}
                             </p>
-                        )}
-                    </div>
-                ),
+                            <EditablePhone
+                                value={phone}
+                                onSave={(v) => handleUpdatePhone(row.original.id, 'rider_phone', v)}
+                                disabled={!canEditPhone}
+                            />
+                            <CallLogBadge
+                                attempts={attempts}
+                                duration={duration}
+                                onClick={() => phone && setCallLogModal({ phone, label: row.original.rider_name || 'Rider' })}
+                            />
+                        </div>
+                    );
+                },
             },
             {
                 id: 'order_shipping_address_full_name',
@@ -322,17 +665,24 @@ export default function RmoManagement({
                 header: ({ column }) => <SortableHeader column={column} title="Customer" />,
                 cell: ({ row }) => {
                     const addr = row.original.order.shipping_address;
+                    const attempts = row.original.customer_call_logs_count ?? 0;
+                    const duration = row.original.customer_call_duration ?? 0;
+                    const phone = row.original.customer_phone ?? addr?.phone_number ?? '';
                     return (
                         <div className="space-y-1.5">
                             <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
                                 {addr?.full_name || '—'}
                             </p>
-                            {addr?.phone_number && (
-                                <p className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
-                                    <Phone className="h-3 w-3 shrink-0" />
-                                    {addr.phone_number}
-                                </p>
-                            )}
+                            <EditablePhone
+                                value={phone}
+                                onSave={(v) => handleUpdatePhone(row.original.id, 'customer_phone', v)}
+                                disabled={!canEditPhone}
+                            />
+                            <CallLogBadge
+                                attempts={attempts}
+                                duration={duration}
+                                onClick={() => phone && setCallLogModal({ phone, label: addr?.full_name || 'Customer' })}
+                            />
                             {addr?.full_address && (
                                 <Tooltip>
                                     <TooltipTrigger asChild>
@@ -468,7 +818,8 @@ export default function RmoManagement({
                         return (
                             <button
                                 onClick={() => handleAssignToMe(id)}
-                                className="flex items-center gap-1.5 rounded-lg border border-dashed border-black/10 dark:border-white/10 px-2.5 py-1 text-[11px] font-medium text-gray-400 dark:text-gray-500 transition-all hover:border-emerald-300 dark:hover:border-emerald-500/40 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400"
+                                disabled={!isToday}
+                                className="flex items-center gap-1.5 rounded-lg border border-dashed border-black/10 dark:border-white/10 px-2.5 py-1 text-[11px] font-medium text-gray-400 dark:text-gray-500 transition-all hover:border-emerald-300 dark:hover:border-emerald-500/40 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-black/10 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:disabled:hover:border-white/10 dark:disabled:hover:bg-transparent dark:disabled:hover:text-gray-500"
                             >
                                 <UserPlus className="h-3 w-3" />
                                 Assign to me
@@ -481,12 +832,14 @@ export default function RmoManagement({
                             <span className="text-[12px] text-gray-700 dark:text-gray-300">
                                 {assignee.name}
                             </span>
-                            <button
-                                onClick={() => handleRemoveAssignee(id)}
-                                className="invisible flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-300 transition-colors hover:bg-red-50 hover:text-red-400 dark:text-gray-600 dark:hover:bg-red-500/10 dark:hover:text-red-400 group-hover:visible"
-                            >
-                                <X className="h-3 w-3" />
-                            </button>
+                            {isToday && (
+                                <button
+                                    onClick={() => handleRemoveAssignee(id)}
+                                    className="invisible flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-300 transition-colors hover:bg-red-50 hover:text-red-400 dark:text-gray-600 dark:hover:bg-red-500/10 dark:hover:text-red-400 group-hover:visible"
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
+                            )}
                         </div>
                     );
                 },
@@ -499,11 +852,12 @@ export default function RmoManagement({
                     <RmoStatusPicker
                         currentStatus={row.original.status as OrderStatus}
                         onChangeStatus={(status) => handleChangeStatus(status, row.original.id)}
+                        disabled={!isToday}
                     />
                 ),
             },
         ],
-        [handleAssignToMe, handleRemoveAssignee, handleChangeStatus],
+        [handleAssignToMe, handleRemoveAssignee, handleChangeStatus, handleUpdatePhone, isToday, canEditPhone],
     );
 
     return (
@@ -518,6 +872,81 @@ export default function RmoManagement({
                 onSubmit={handleUserSelected}
             />
 
+            <CallLogModal
+                open={!!callLogModal}
+                onOpenChange={(open) => { if (!open) setCallLogModal(null); }}
+                phoneNumber={callLogModal?.phone ?? ''}
+                label={callLogModal?.label ?? ''}
+                workspaceSlug={workspace.slug}
+                date={deliveryDate}
+            />
+
+            {/* Export column picker modal */}
+            <Dialog open={exportModalOpen} onOpenChange={setExportModalOpen}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle className="text-sm font-semibold">Export Columns</DialogTitle>
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                            Select which columns to include in the export.
+                        </p>
+                    </DialogHeader>
+                    <div className="space-y-1.5 max-h-72 overflow-y-auto py-2">
+                        {EXPORT_COLUMNS.map((col) => (
+                            <label key={col.key} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-stone-50 dark:hover:bg-zinc-800">
+                                <Checkbox
+                                    checked={exportColumns.includes(col.key)}
+                                    onCheckedChange={(checked) => {
+                                        setExportColumns((prev) =>
+                                            checked
+                                                ? [...prev, col.key]
+                                                : prev.filter((k) => k !== col.key),
+                                        );
+                                    }}
+                                />
+                                <span className="text-[12px] text-gray-700 dark:text-gray-300">{col.label}</span>
+                            </label>
+                        ))}
+                    </div>
+                    <div className="flex items-center justify-between border-t pt-3 dark:border-white/6">
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setExportColumns([...ALL_COLUMN_KEYS])}
+                                className="text-[11px] font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                            >
+                                Select all
+                            </button>
+                            <span className="text-gray-300 dark:text-gray-600">|</span>
+                            <button
+                                onClick={() => setExportColumns([])}
+                                className="text-[11px] font-medium text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setExportModalOpen(false)}
+                                className="rounded-lg border border-black/10 px-3 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 dark:border-white/10 dark:text-gray-400 dark:hover:bg-zinc-800"
+                            >
+                                Cancel
+                            </button>
+                            <Button
+                                size="sm"
+                                disabled={exportColumns.length === 0}
+                                onClick={() => {
+                                    doExport(exportColumns);
+                                    setExportModalOpen(false);
+                                }}
+                                className="rounded-lg bg-emerald-600 px-4 text-[12px] font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                                <Download className="mr-1.5 h-3.5 w-3.5" />
+                                Download
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             {/* Top bar */}
             <div className="border-b border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                 <div className="mx-auto flex w-full items-center justify-between px-4 py-3 md:px-6">
@@ -526,14 +955,14 @@ export default function RmoManagement({
                             <span className="text-[11px] font-bold text-white">R</span>
                         </div>
                         <div className="h-4 w-px bg-black/8 dark:bg-white/8" />
-                        <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                        {/* <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
                             {new Date().toLocaleDateString('en-US', {
                                 weekday: 'short',
                                 month: 'short',
                                 day: 'numeric',
                                 year: 'numeric',
                             })}
-                        </span>
+                        </span> */}
                     </div>
 
                     {userName ? (
@@ -570,13 +999,13 @@ export default function RmoManagement({
             </div>
 
             <div className="mx-auto w-full p-4 md:p-6">
-                <div className="mb-6 flex items-start justify-between">
+                <div className="mb-6 flex items-center justify-between">
                     <div>
                         <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">
                             RMO Management
                         </h1>
                         <p className="mt-0.5 text-[13px] text-gray-400 dark:text-gray-500">
-                            Delivery tracking for today's assigned orders
+                            Delivery tracking for assigned orders on {new Date(deliveryDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -585,6 +1014,17 @@ export default function RmoManagement({
                             onChange={handleFilterChange}
                             initialValue={initialFilterValue}
                         />
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setExportModalOpen(true)}
+                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                        >
+                            <Download className="h-3.5 w-3.5" />
+                            Export
+                        </Button>
+
                         <Button
                             variant="outline"
                             size="sm"
@@ -601,6 +1041,16 @@ export default function RmoManagement({
                             {showStats ? 'Hide' : 'Show'} Statistics
                             {showStats ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                         </Button>
+
+                        <DatePicker
+                            id="delivery-date"
+                            mode="single"
+                            defaultDate={deliveryDate}
+                            placeholder="Select date"
+                            onChange={(_, dateStr) => {
+                                if (dateStr && dateStr !== deliveryDate) handleDateChange(dateStr);
+                            }}
+                        />
                     </div>
                 </div>
 
@@ -608,9 +1058,10 @@ export default function RmoManagement({
                     <div className="mb-6">
                         <RmoStatCards
                             total_for_delivery_today={total_for_delivery_today}
-                            called_rate={called_rate}
-                            successful_rate={successful_rate}
-                            unsuccessful_rate={unsuccessful_rate}
+                            called_count={called_count}
+                            delivered_count={delivered_count}
+                            returning_count={returning_count}
+                            problematic_count={problematic_count}
                         />
                     </div>
                 )}
@@ -646,13 +1097,109 @@ export default function RmoManagement({
                             onChange={(e) => handleParcelStatusChange(e.target.value)}
                             className="h-8 rounded-lg border border-black/6 bg-stone-100 px-2 text-[12px]! text-gray-700 outline-none focus:border-emerald-500 dark:bg-zinc-800 dark:text-gray-300"
                         >
-                            <option value="">All J&amp;T Statuses</option>
+                            <option value="">All Parcel Statuses</option>
                             {Object.entries(authParcelStatusConfig).map(([key, config]) => (
                                 <option key={key} value={key}>
                                     {config.label}
                                 </option>
                             ))}
                         </select>
+
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setShowMyAssigneeOnly((prev) => {
+                                    const next = !prev;
+                                    localStorage.setItem('rmo_show_my_assignee_only', String(next));
+                                    return next;
+                                })
+                            }
+                            className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px] font-medium transition-all ${
+                                showMyAssigneeOnly
+                                    ? 'border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                    : 'border-black/6 bg-stone-100 text-gray-500 hover:border-black/12 hover:text-gray-700 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:text-gray-200'
+                            }`}
+                        >
+                            <span className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded border ${
+                                showMyAssigneeOnly
+                                    ? 'border-emerald-500 bg-emerald-500 dark:border-emerald-400 dark:bg-emerald-400'
+                                    : 'border-gray-300 dark:border-gray-600'
+                            }`}>
+                                {showMyAssigneeOnly && (
+                                    <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                )}
+                            </span>
+                            My Assignee Only
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setShowMyConfirmeeOnly((prev) => {
+                                    const next = !prev;
+                                    localStorage.setItem('rmo_show_my_confirmee_only', String(next));
+                                    return next;
+                                })
+                            }
+                            className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px] font-medium transition-all ${
+                                showMyConfirmeeOnly
+                                    ? 'border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                    : 'border-black/6 bg-stone-100 text-gray-500 hover:border-black/12 hover:text-gray-700 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:text-gray-200'
+                            }`}
+                        >
+                            <span className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded border ${
+                                showMyConfirmeeOnly
+                                    ? 'border-emerald-500 bg-emerald-500 dark:border-emerald-400 dark:bg-emerald-400'
+                                    : 'border-gray-300 dark:border-gray-600'
+                            }`}>
+                                {showMyConfirmeeOnly && (
+                                    <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                )}
+                            </span>
+                            My Confirmee Only
+                        </button>
+
+                        {window.location.hostname === 'efb.on-forge.com' && <div className="ml-auto flex items-center gap-2">
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={pendingOrders.length === 0}
+                                        onClick={() => copyPendingPhones('rider')}
+                                        className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                                    >
+                                        <ClipboardCopy className="h-3.5 w-3.5" />
+                                        {copiedRider ? 'Copied!' : 'Copy Rider Phones'}
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                    <p className="text-xs">Copy rider phone numbers from top 10 pending orders</p>
+                                </TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={pendingOrders.length === 0}
+                                        onClick={() => copyPendingPhones('customer')}
+                                        className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                                    >
+                                        <ClipboardCopy className="h-3.5 w-3.5" />
+                                        {copiedCustomer ? 'Copied!' : 'Copy CX Phones'}
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                    <p className="text-xs">Copy customer phone numbers from top 10 pending orders</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </div>}
                     </div>
                 </div>
 

@@ -11,14 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('pancake_users', function (Blueprint $table) {
-            $table->unsignedBigInteger('user_id')->nullable();
+        if (! Schema::hasColumn('pancake_users', 'user_id')) {
+            Schema::table('pancake_users', function (Blueprint $table) {
+                $table->unsignedBigInteger('user_id')->nullable();
 
-            $table->foreign('user_id')
-                ->references('id')
-                ->on('users')
-                ->cascadeOnDelete();
-        });
+                $table->foreign('user_id')
+                    ->references('id')
+                    ->on('users')
+                    ->cascadeOnDelete();
+            });
+        }
     }
 
     /**
@@ -26,10 +28,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('pancake_users', function (Blueprint $table) {
-            $table->dropColumn('user_id');
-
-            $table->dropColumn('user_id');
-        });
+        if (Schema::hasColumn('pancake_users', 'user_id')) {
+            Schema::table('pancake_users', function (Blueprint $table) {
+                $table->dropForeign(['user_id']);
+                $table->dropColumn('user_id');
+            });
+        }
     }
 };

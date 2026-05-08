@@ -4,29 +4,95 @@ namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
+use Modules\Inventory\Exports\PurchasedOrderExport;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class PurchasedOrderController extends Controller
 {
+    use AuthorizesRequests;
+
+    private function buildQuery(Workspace $workspace): QueryBuilder
+    {
+        return QueryBuilder::for(PurchasedOrder::where('workspace_id', $workspace->id))
+            ->allowedFilters([
+                AllowedFilter::callback('search', function ($query, $value) {
+                    $query->where(function ($q) use ($value) {
+                        $q->where('delivery_no', 'like', "%{$value}%")
+                            ->orWhere('cust_po_no', 'like', "%{$value}%")
+                            ->orWhere('control_no', 'like', "%{$value}%");
+                    });
+                }),
+                AllowedFilter::callback('start_date', function ($query, $value) {
+                    $query->whereDate('issue_date', '>=', $value);
+                }),
+                AllowedFilter::callback('end_date', function ($query, $value) {
+                    $query->whereDate('issue_date', '<=', $value);
+                }),
+            ])
+            ->allowedSorts([
+                'issue_date',
+                'delivery_no',
+                'cust_po_no',
+                'control_no',
+                'delivery_fee',
+                'total_amount',
+                'status',
+                'created_at',
+            ])
+            ->defaultSort('-issue_date');
+    }
+
     public function index(Request $request, Workspace $workspace)
     {
-        $orders = PurchasedOrder::where('workspace_id', $workspace->id)
+        $this->authorize('View Purchased Orders', $workspace);
+
+        $orders = $this->buildQuery($workspace)
             ->with(['items.inventoryItem.product'])
-            ->latest()
-            ->paginate(15)
+            ->paginate($request->integer('per_page', 10))
             ->withQueryString();
+
+        $totals = $this->buildQuery($workspace)
+            ->selectRaw('COALESCE(SUM(delivery_fee), 0) as total_delivery_fee')
+            ->selectRaw('COALESCE(SUM(total_amount), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(total_amount - delivery_fee), 0) as total_cogs')
+            ->first();
 
         return Inertia::render('workspaces/inventory/purchased-orders/index', [
             'workspace' => $workspace,
             'orders' => $orders,
+            'totals' => [
+                'delivery_fee' => (float) $totals->total_delivery_fee,
+                'cogs' => (float) $totals->total_cogs,
+                'total_amount' => (float) $totals->total_amount,
+            ],
+            'query' => [
+                ...$request->only(['sort', 'page', 'perPage']),
+                'perPage' => $request->input('per_page', $request->input('perPage')),
+                'filter' => $request->input('filter', []),
+            ],
         ]);
+    }
+
+    public function export(Request $request, Workspace $workspace)
+    {
+        $this->authorize('View Purchased Orders', $workspace);
+
+        $filename = 'purchased-orders-'.now()->format('Y-m-d-His').'.xlsx';
+
+        return Excel::download(new PurchasedOrderExport($this->buildQuery($workspace)), $filename);
     }
 
     public function create(Workspace $workspace)
     {
+        $this->authorize('Create Purchased Orders', $workspace);
+
         return Inertia::render('workspaces/inventory/purchased-orders/create', [
             'workspace' => $workspace,
             'items' => InventoryItem::where('workspace_id', $workspace->id)->with('product')->get(),
@@ -35,30 +101,32 @@ class PurchasedOrderController extends Controller
 
     public function store(Request $request, Workspace $workspace)
     {
+        $this->authorize('Create Purchased Orders', $workspace);
+
         $request->validate([
-            'issue_date'    => 'required|date',
-            'delivery_no'   => 'nullable|string|max:255',
-            'cust_po_no'    => 'nullable|string|max:255',
-            'control_no'    => 'nullable|string|max:255',
-            'delivery_fee'  => 'required|numeric|min:0',
-            'total_amount'  => 'required|numeric|min:0',
-            'status'        => 'required|integer|in:1,2,3,4,5,6,7,8',
-            'items'         => 'required|array|min:1',
+            'issue_date' => 'required|date_format:Y-m-d|date',
+            'delivery_no' => 'nullable|string|max:255',
+            'cust_po_no' => 'nullable|string|max:255',
+            'control_no' => 'nullable|string|max:255',
+            'delivery_fee' => 'required|numeric|min:0',
+            'total_amount' => 'required|numeric|min:0',
+            'status' => 'required|integer|in:1,2,3,4,5,6,7,8',
+            'items' => 'required|array|min:1',
             'items.*.inventory_item_id' => 'required|exists:inventory_items,id',
-            'items.*.count'             => 'required|integer|min:1',
-            'items.*.amount'            => 'required|numeric|min:0',
-            'items.*.total_amount'      => 'required|numeric|min:0',
+            'items.*.count' => 'required|integer|min:1',
+            'items.*.amount' => 'required|numeric|min:0',
+            'items.*.total_amount' => 'required|numeric|min:0',
         ]);
 
         $order = PurchasedOrder::create([
             'workspace_id' => $workspace->id,
-            'issue_date'   => $request->issue_date,
-            'delivery_no'  => $request->delivery_no,
-            'cust_po_no'   => $request->cust_po_no,
-            'control_no'   => $request->control_no,
+            'issue_date' => $request->issue_date,
+            'delivery_no' => $request->delivery_no,
+            'cust_po_no' => $request->cust_po_no,
+            'control_no' => $request->control_no,
             'delivery_fee' => $request->delivery_fee,
             'total_amount' => $request->total_amount,
-            'status'       => $request->status,
+            'status' => $request->status,
         ]);
 
         foreach ($request->items as $item) {
@@ -71,6 +139,8 @@ class PurchasedOrderController extends Controller
 
     public function edit(Workspace $workspace, PurchasedOrder $purchasedOrder)
     {
+        $this->authorize('Edit Purchased Orders', $workspace);
+
         return Inertia::render('workspaces/inventory/purchased-orders/edit', [
             'workspace' => $workspace,
             'order' => $purchasedOrder->load('items.inventoryItem.product'),
@@ -80,29 +150,31 @@ class PurchasedOrderController extends Controller
 
     public function update(Request $request, Workspace $workspace, PurchasedOrder $purchasedOrder)
     {
+        $this->authorize('Edit Purchased Orders', $workspace);
+
         $request->validate([
-            'issue_date'    => 'required|date',
-            'delivery_no'   => 'nullable|string|max:255',
-            'cust_po_no'    => 'nullable|string|max:255',
-            'control_no'    => 'nullable|string|max:255',
-            'delivery_fee'  => 'required|numeric|min:0',
-            'total_amount'  => 'required|numeric|min:0',
-            'status'        => 'required|integer|in:1,2,3,4,5,6,7,8',
-            'items'         => 'required|array|min:1',
+            'issue_date' => 'required|date_format:Y-m-d|date',
+            'delivery_no' => 'nullable|string|max:255',
+            'cust_po_no' => 'nullable|string|max:255',
+            'control_no' => 'nullable|string|max:255',
+            'delivery_fee' => 'required|numeric|min:0',
+            'total_amount' => 'required|numeric|min:0',
+            'status' => 'required|integer|in:1,2,3,4,5,6,7,8',
+            'items' => 'required|array|min:1',
             'items.*.inventory_item_id' => 'required|exists:inventory_items,id',
-            'items.*.count'             => 'required|integer|min:1',
-            'items.*.amount'            => 'required|numeric|min:0',
-            'items.*.total_amount'      => 'required|numeric|min:0',
+            'items.*.count' => 'required|integer|min:1',
+            'items.*.amount' => 'required|numeric|min:0',
+            'items.*.total_amount' => 'required|numeric|min:0',
         ]);
 
         $purchasedOrder->update([
-            'issue_date'   => $request->issue_date,
-            'delivery_no'  => $request->delivery_no,
-            'cust_po_no'   => $request->cust_po_no,
-            'control_no'   => $request->control_no,
+            'issue_date' => $request->issue_date,
+            'delivery_no' => $request->delivery_no,
+            'cust_po_no' => $request->cust_po_no,
+            'control_no' => $request->control_no,
             'delivery_fee' => $request->delivery_fee,
             'total_amount' => $request->total_amount,
-            'status'       => $request->status,
+            'status' => $request->status,
         ]);
 
         $purchasedOrder->items()->delete();
@@ -116,6 +188,8 @@ class PurchasedOrderController extends Controller
 
     public function destroy(Workspace $workspace, PurchasedOrder $purchasedOrder)
     {
+        $this->authorize('Delete Purchased Orders', $workspace);
+
         $purchasedOrder->delete();
 
         return redirect()->route('workspaces.inventory.purchased-orders.index', $workspace->slug)

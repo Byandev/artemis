@@ -3,32 +3,21 @@
 namespace App\Console\Commands;
 
 use App\Models\Page;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Modules\Pancake\Jobs\FetchPageOrders;
 
 class TriggerFetchPageOrders extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'trigger-fetch-page-orders';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Command description';
+    protected $description = 'Sync Pancake page orders. At 9/12/15/18/21 it pulls shipped orders (filter_status[]=2); otherwise it pulls orders updated since orders_last_synced_at.';
 
-    /**
-     * Execute the console command.
-     */
     public function handle()
     {
+        $shipped = in_array((int) now()->format('G'), [9, 12, 15, 18, 21], true);
+
         Page::whereNotNull('orders_last_synced_at')
-//            ->whereShopId(100173429)
             ->whereNotNull('pos_token')
             ->whereNotNull('shop_id')
             ->whereNotNull('botcake_token')
@@ -36,8 +25,14 @@ class TriggerFetchPageOrders extends Command
             ->whereNotNull('infotxt_user_id')
             ->orderBy('created_at', 'asc')
             ->get()
-            ->each(function (Page $page) {
-                dispatch(new FetchPageOrders($page, 1, \Carbon\Carbon::parse($page->orders_last_synced_at)->unix(), \Carbon\Carbon::now()->unix()))->onQueue('pancake');
+            ->each(function (Page $page) use ($shipped) {
+                dispatch(new FetchPageOrders(
+                    $page,
+                    1,
+                    Carbon::parse($page->orders_last_synced_at)->unix(),
+                    Carbon::now()->unix(),
+                    $shipped,
+                ))->onQueue('pancake');
             });
     }
 }

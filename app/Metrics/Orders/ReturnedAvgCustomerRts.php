@@ -2,6 +2,7 @@
 
 namespace App\Metrics\Orders;
 
+use App\Support\Metrics\OrdersFilter;
 use Illuminate\Support\Facades\DB;
 
 final class ReturnedAvgCustomerRts
@@ -94,24 +95,7 @@ final class ReturnedAvgCustomerRts
             ->leftJoinSub($phoneReportsSub, 'phone_reports', function ($join) {
                 $join->on('phone_reports.order_id', '=', 'pancake_orders.id');
             })
-            ->when(
-                $forceJoinPages || ! empty($filter['page_ids']) || ! empty($filter['shop_ids']),
-                function ($query) use ($filter) {
-                    $query->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-                        ->when(! empty($filter['page_ids']), function ($query) use ($filter) {
-                            $query->whereIn(
-                                'pages.id',
-                                is_array($filter['page_ids']) ? $filter['page_ids'] : explode(',', $filter['page_ids'])
-                            );
-                        })
-                        ->when(! empty($filter['shop_ids']), function ($query) use ($filter) {
-                            $query->whereIn(
-                                'pages.shop_id',
-                                is_array($filter['shop_ids']) ? $filter['shop_ids'] : explode(',', $filter['shop_ids'])
-                            );
-                        });
-                }
-            )
+            ->tap(fn ($q) => OrdersFilter::joinAndApply($q, $filter, $forceJoinPages))
             ->where('pancake_orders.workspace_id', $workspaceId)
             ->whereNotNull('pancake_orders.returning_at')
             ->whereBetween('pancake_orders.returning_at', [

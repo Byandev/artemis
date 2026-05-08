@@ -35,7 +35,7 @@ class UserController extends Controller
             ->allowedIncludes(['pancakeAccounts'])
             ->allowedSorts(['name', 'email', 'joined_at'])
             ->defaultSort('name')
-            ->paginate(min((int) $request->input('per_page', 15), 100));
+            ->paginate(min((int) $request->input('per_page', 10), 100));
 
         return response()->json($paginated);
     }

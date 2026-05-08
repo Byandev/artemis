@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Support\WorkspaceMetrics;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 use Modules\Inventory\Models\InventoryTransaction;
 
@@ -19,14 +21,31 @@ class Workspace extends Model
         'slug',
         'description',
         'owner_id',
-        'show_inventory',
+        'monthly_order_volume',
+        'inventory_module_enabled',
+        'finance_module_enabled',
+        'products_module_enabled',
+        'teams_module_enabled',
+        'checklist_module_enabled',
+        'csr_module_enabled',
+        'rmo_module_enabled',
+        'leaderboard_module_enabled',
+        'botcake_module_enabled',
         'inventory_sync',
     ];
 
     protected $casts = [
-        'created_at'     => 'datetime',
-        'updated_at'     => 'datetime',
-        'show_inventory' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'inventory_module_enabled' => 'boolean',
+        'finance_module_enabled' => 'boolean',
+        'products_module_enabled' => 'boolean',
+        'teams_module_enabled' => 'boolean',
+        'checklist_module_enabled' => 'boolean',
+        'csr_module_enabled' => 'boolean',
+        'rmo_module_enabled' => 'boolean',
+        'leaderboard_module_enabled' => 'boolean',
+        'botcake_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
     ];
 
@@ -167,9 +186,9 @@ class Workspace extends Model
         return $this->belongsToMany(FacebookAccount::class, 'workspace_facebook_account');
     }
 
-    public function metrics(array $dateRange, array $filter): \App\Support\WorkspaceMetrics
+    public function metrics(array $dateRange, array $filter, string $source = 'live'): WorkspaceMetrics
     {
-        return new \App\Support\WorkspaceMetrics($this, $dateRange, $filter);
+        return new WorkspaceMetrics($this, $dateRange, $filter, $source);
     }
 
     public function shops(): HasMany|Workspace
@@ -212,5 +231,15 @@ class Workspace extends Model
     public function apiKeys(): HasMany
     {
         return $this->hasMany(WorkspaceApiKey::class);
+    }
+
+    public function subscription(): HasOne
+    {
+        return $this->hasOne(Subscription::class);
+    }
+
+    public function checklists(): HasMany
+    {
+        return $this->hasMany(WorkspaceChecklist::class, 'workspace_id');
     }
 }

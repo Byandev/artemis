@@ -8,6 +8,7 @@ use App\Http\Requests\Workspaces\UpdateOptimizationRuleRequest;
 use App\Models\OptimizationRule;
 use App\Models\OptimizationRuleCondition;
 use App\Models\Workspace;
+use App\Services\PostHogService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -45,7 +46,7 @@ class OptimizationRuleController extends Controller
     {
         $rules = $this->buildQuery($workspace, $request)
             ->with('conditions')
-            ->paginate($request->get('perPage', 20))
+            ->paginate($request->get('perPage', 10))
             ->withQueryString();
 
         return Inertia::render('workspaces/ads-manager/optimization-rules', [
@@ -53,7 +54,7 @@ class OptimizationRuleController extends Controller
             'rules' => $rules,
             'query' => [
                 'sort' => $request->get('sort'),
-                'perPage' => $request->get('perPage', 20),
+                'perPage' => $request->get('perPage', 10),
                 'page' => $request->get('page', 1),
                 'filter' => [
                     'search' => $request->get('filter.search'),
@@ -121,6 +122,15 @@ class OptimizationRuleController extends Controller
 
         // Reload with conditions
         $rule->load('conditions');
+
+        (new PostHogService)->capture((string) $request->user()->id, 'optimization_rule_created', [
+            'workspace_id' => $workspace->id,
+            'rule_id' => $rule->id,
+            'rule_name' => $rule->name,
+            'target' => $rule->target ?? null,
+            'action' => $rule->action ?? null,
+            'conditions_count' => count($conditions),
+        ]);
 
         return response()->json($rule, 201);
     }
