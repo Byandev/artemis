@@ -317,40 +317,40 @@ export default function Analytics({ workspace }: Props) {
                     />
                 </PageHeader>
 
-                <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-                    <StatCard
-                        title="Total Sales"
-                        value={salesStat.value}
-                        loading={salesStat.loading}
-                        format={peso}
-                    />
-                    <StatCard
-                        title="Total Orders"
-                        value={ordersStat.value}
-                        loading={ordersStat.loading}
-                    />
-                    <StatCard
-                        title="Total Delivered"
-                        value={deliveredStat.value}
-                        loading={deliveredStat.loading}
-                    />
-                    <StatCard
-                        title="Total Returning"
-                        value={returningStat.value}
-                        loading={returningStat.loading}
-                    />
-                    <StatCard
-                        title="RTS Rate"
-                        value={rtsStat.value}
-                        loading={rtsStat.loading}
-                        format={(n) => `${n.toFixed(2)}%`}
-                    />
-                    <StatCard
-                        title="RMO Called"
-                        value={rmoCalledStat.value}
-                        loading={rmoCalledStat.loading}
-                    />
-                </div>
+                {/*<div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Sales"*/}
+                {/*        value={salesStat.value}*/}
+                {/*        loading={salesStat.loading}*/}
+                {/*        format={peso}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Orders"*/}
+                {/*        value={ordersStat.value}*/}
+                {/*        loading={ordersStat.loading}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Delivered"*/}
+                {/*        value={deliveredStat.value}*/}
+                {/*        loading={deliveredStat.loading}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Returning"*/}
+                {/*        value={returningStat.value}*/}
+                {/*        loading={returningStat.loading}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="RTS Rate"*/}
+                {/*        value={rtsStat.value}*/}
+                {/*        loading={rtsStat.loading}*/}
+                {/*        format={(n) => `${n.toFixed(2)}%`}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="RMO Called"*/}
+                {/*        value={rmoCalledStat.value}*/}
+                {/*        loading={rmoCalledStat.loading}*/}
+                {/*    />*/}
+                {/*</div>*/}
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
