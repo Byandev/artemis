@@ -25,29 +25,51 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
     {
         $date = $this->date;
 
-        // total_called: pancake_order_for_delivery rows where status != 'PENDING'
-        //   (matches the SyncCsrDailyRecord definition).
-        // total_rmo_call_attempts: count of matching call_logs entries — same
-        //   matching predicate as before, but counts every call instead of
-        //   collapsing to 0/1 per delivery row.
-        $rows = DB::table('pancake_order_for_delivery AS ofd')
-            ->whereNotNull('ofd.assignee_id')
-            ->where('ofd.delivery_date', $date)
-            ->groupBy('ofd.workspace_id', 'ofd.assignee_id')
+        // total_called: pancake_order_for_delivery rows assigned to the user where status != 'PENDING'.
+        $base = DB::table('pancake_order_for_delivery')
+            ->whereNotNull('assignee_id')
+            ->where('delivery_date', $date)
+            ->groupBy('workspace_id', 'assignee_id')
             ->selectRaw("
-                ofd.workspace_id,
-                ofd.assignee_id AS pancake_user_id,
-                SUM(CASE WHEN ofd.status != 'PENDING' THEN 1 ELSE 0 END) AS total_called,
-                COALESCE(SUM(
-                    (SELECT COUNT(*)
-                     FROM call_logs cl
-                     WHERE cl.workspace_id = ofd.workspace_id
-                       AND cl.user_id = ofd.assignee_id
-                       AND cl.call_date = ofd.delivery_date
-                       AND cl.phone_number IN (ofd.rider_phone, ofd.customer_phone))
-                ), 0) AS total_rmo_call_attempts,
-                COALESCE(SUM(ofd.customer_call_duration), 0) + COALESCE(SUM(ofd.rider_call_duration), 0) AS total_call_time
-            ")
+                workspace_id,
+                assignee_id AS pancake_user_id,
+                SUM(CASE WHEN status != 'PENDING' THEN 1 ELSE 0 END) AS total_called
+            ");
+
+        // total_rmo_call_attempts / total_call_time: per (workspace, user), count and sum call_logs
+        // whose phone_number matches any customer_phone or rider_phone from that user's deliveries
+        // on the date. Each call_log is counted once even if multiple deliveries share the same phone.
+        $callsAgg = DB::table('call_logs as cl')
+            ->where('cl.call_date', $date)
+            ->whereExists(function ($q) use ($date) {
+                $q->select(DB::raw(1))
+                    ->from('pancake_order_for_delivery as pod')
+                    ->whereColumn('pod.workspace_id', 'cl.workspace_id')
+                    ->whereColumn('pod.assignee_id', 'cl.user_id')
+                    ->where('pod.delivery_date', $date)
+                    ->whereRaw('cl.phone_number IN (pod.customer_phone, pod.rider_phone)');
+            })
+            ->groupBy('cl.workspace_id', 'cl.user_id')
+            ->selectRaw('
+                cl.workspace_id,
+                cl.user_id AS pancake_user_id,
+                COUNT(*) AS total_calls,
+                COALESCE(SUM(cl.duration), 0) AS total_duration
+            ');
+
+        $rows = DB::query()
+            ->fromSub($base, 'base')
+            ->leftJoinSub($callsAgg, 'calls', function ($join) {
+                $join->on('calls.workspace_id', '=', 'base.workspace_id')
+                    ->on('calls.pancake_user_id', '=', 'base.pancake_user_id');
+            })
+            ->selectRaw('
+                base.workspace_id,
+                base.pancake_user_id,
+                base.total_called,
+                COALESCE(calls.total_calls, 0)    AS total_rmo_call_attempts,
+                COALESCE(calls.total_duration, 0) AS total_call_time
+            ')
             ->get();
 
         foreach ($rows as $row) {
