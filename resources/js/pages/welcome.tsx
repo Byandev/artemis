@@ -100,7 +100,7 @@ const faqs = [
     },
     {
         q: 'What do I get with the free trial?',
-        a: '14-day free trial — connect 1 Pancake page and get 1 month of order and delivery data, plus Parcel Journey tracking via chat. No credit card required.',
+        a: '30-day free trial — connect 1 Pancake page and get 1 month of order and delivery data, plus Parcel Journey tracking via chat. No credit card required.',
     },
 ];
 
@@ -277,7 +277,7 @@ export default function Welcome() {
                             </a>
                         </div>
                         <span className="block font-mono text-[11px] tracking-[0.1em] text-gray-400 uppercase dark:text-gray-600">
-                            — No credit card · Connect 1 Pancake page · 14-day
+                            — No credit card · Connect 1 Pancake page · 30-day
                             free trial
                         </span>
 
@@ -458,7 +458,7 @@ export default function Welcome() {
                                 </span>
                             </h2>
                             <p className="mx-auto mb-12 max-w-lg text-lg leading-relaxed text-gray-500 dark:text-gray-400">
-                                14 days free. Connect one Pancake page and get 1
+                                30 days free. Connect one Pancake page and get 1
                                 month of data — enough to see your real numbers
                                 and start moving them.
                             </p>
@@ -469,7 +469,7 @@ export default function Welcome() {
                             <div className="relative px-8 py-10 text-center md:px-12">
                                 <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-300 bg-brand-50 px-4 py-1.5 dark:border-brand-500/30 dark:bg-brand-500/10">
                                     <span className="font-mono text-[10px] font-semibold tracking-[0.2em] text-brand-600 uppercase dark:text-brand-400">
-                                        14-day free trial
+                                        30-day free trial
                                     </span>
                                 </div>
 
@@ -733,7 +733,7 @@ export default function Welcome() {
                             </span>
                         </h2>
                         <p className="mx-auto mb-10 max-w-xl text-lg leading-relaxed text-gray-500 dark:text-gray-400">
-                            14 days free. Connect 1 Pancake page, get 1 month of
+                            30 days free. Connect 1 Pancake page, get 1 month of
                             data. Parcel Journey + chat support. Are you ready?
                         </p>
                         <div className="flex flex-col items-center justify-center gap-3.5 sm:flex-row">

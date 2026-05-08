@@ -15,18 +15,22 @@ import {
     Layers,
     Users,
     Settings,
+    CreditCard,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
 export function AdminSidebar() {
     const adminNavItems: NavItem[] = [
-
         {
             title: 'Workspaces',
             href: '/admin/workspaces',
             icon: Layers,
-        }
-
+        },
+        {
+            title: 'Subscription Plans',
+            href: '/admin/subscription-plans',
+            icon: CreditCard,
+        },
     ];
 
     return (
@@ -40,7 +44,7 @@ export function AdminSidebar() {
                     <SidebarMenuItem>
                         <div className="flex flex-col p-2">
                             <SidebarMenuButton size="lg" asChild>
-                                <Link href={dashboard().url}>
+                                <Link href="/admin/workspaces">
                                     <AppLogo />
                                 </Link>
                             </SidebarMenuButton>

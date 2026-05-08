@@ -22,16 +22,30 @@ class Workspace extends Model
         'description',
         'owner_id',
         'monthly_order_volume',
-        'show_inventory',
-        'show_finance',
+        'inventory_module_enabled',
+        'finance_module_enabled',
+        'products_module_enabled',
+        'teams_module_enabled',
+        'checklist_module_enabled',
+        'csr_module_enabled',
+        'rmo_module_enabled',
+        'leaderboard_module_enabled',
+        'botcake_module_enabled',
         'inventory_sync',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
-        'show_inventory' => 'boolean',
-        'show_finance' => 'boolean',
+        'inventory_module_enabled' => 'boolean',
+        'finance_module_enabled' => 'boolean',
+        'products_module_enabled' => 'boolean',
+        'teams_module_enabled' => 'boolean',
+        'checklist_module_enabled' => 'boolean',
+        'csr_module_enabled' => 'boolean',
+        'rmo_module_enabled' => 'boolean',
+        'leaderboard_module_enabled' => 'boolean',
+        'botcake_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
     ];
 
@@ -172,9 +186,9 @@ class Workspace extends Model
         return $this->belongsToMany(FacebookAccount::class, 'workspace_facebook_account');
     }
 
-    public function metrics(array $dateRange, array $filter): WorkspaceMetrics
+    public function metrics(array $dateRange, array $filter, string $source = 'live'): WorkspaceMetrics
     {
-        return new WorkspaceMetrics($this, $dateRange, $filter);
+        return new WorkspaceMetrics($this, $dateRange, $filter, $source);
     }
 
     public function shops(): HasMany|Workspace

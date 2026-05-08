@@ -13,7 +13,7 @@ export default function DeliveryAttemptsCard({ workspaceSlug, queryParams }: Pro
     const [view, setView] = useState<ViewMode>('chart');
     const [refreshKey, setRefreshKey] = useState(0);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     useEffect(() => {
         let cancelled = false;
         setLoading(true);

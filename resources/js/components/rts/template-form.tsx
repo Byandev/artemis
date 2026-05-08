@@ -36,7 +36,7 @@ const TemplateForm = ({ initialValue, open, onOpenChange, workspace }: Props) =>
     const [errors, setErrors] = useState<FormErrors>({});
 
     const validate = () => {
-        let tempErrors: FormErrors = {};
+        const tempErrors: FormErrors = {};
 
         if (!data.message.trim()) {
             tempErrors.message = "Message is required.";

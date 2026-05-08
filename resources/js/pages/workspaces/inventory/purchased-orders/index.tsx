@@ -8,13 +8,17 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import DatePicker from '@/components/ui/date-picker';
 import { toFrontendSort } from '@/lib/sort';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import flatpickr from 'flatpickr';
+import DateOption = flatpickr.Options.DateOption;
+import moment from 'moment';
+import { debounce, omit } from 'lodash';
+import { Download, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Workspace } from '@/types/models/Workspace';
-import { omit } from 'lodash';
 import { DeleteOrderDialog } from '@/components/inventory/delete-order-dialog';
 import { PaginatedData } from '@/types';
 
@@ -52,21 +56,68 @@ interface PurchasedOrder {
     items: PurchasedOrderItem[];
 }
 
+interface Totals {
+    delivery_fee: number;
+    cogs: number;
+    total_amount: number;
+}
+
 interface Props {
     workspace: Workspace;
     orders: PaginatedData<PurchasedOrder>;
+    totals: Totals;
     query?: {
         sort?: string | null;
         perPage?: number | string;
         page?: number | string;
+        filter?: { search?: string; start_date?: string; end_date?: string };
     };
 }
 
-export default function PurchasedOrderIndex({ workspace, orders, query }: Props) {
+export default function PurchasedOrderIndex({ workspace, orders, totals, query }: Props) {
     const [deletingOrder, setDeletingOrder] = useState<PurchasedOrder | null>(null);
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
 
-   const baseUrl = `/workspaces/${workspace.slug}/inventory/purchased-orders`;
+    const baseUrl = `/workspaces/${workspace.slug}/inventory/purchased-orders`;
+
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [dateRange, setDateRange] = useState<string[]>(() => [
+        query?.filter?.start_date ?? '',
+        query?.filter?.end_date ?? '',
+    ]);
+
+    const buildFilter = (search: string, range: string[]) => ({
+        search: search || undefined,
+        start_date: range[0] || undefined,
+        end_date: range[1] || undefined,
+    });
+
+    const performQuery = useCallback(
+        debounce((search: string, range: string[]) => {
+            router.get(
+                baseUrl,
+                {
+                    sort: query?.sort,
+                    filter: buildFilter(search, range),
+                    page: 1,
+                    per_page: query?.perPage ?? orders.per_page,
+                },
+                { preserveState: true, replace: true, preserveScroll: true, only: ['orders', 'totals', 'query'] }
+            );
+        }, 400),
+        [baseUrl, query?.sort, query?.perPage, orders.per_page]
+    );
+
+    useEffect(() => {
+        const filterChanged =
+            searchValue !== (query?.filter?.search ?? '') ||
+            (dateRange[0] || undefined) !== (query?.filter?.start_date ?? undefined) ||
+            (dateRange[1] || undefined) !== (query?.filter?.end_date ?? undefined);
+        if (filterChanged) {
+            performQuery(searchValue, dateRange);
+        }
+        return () => performQuery.cancel();
+    }, [searchValue, dateRange]);
 
     const columns: ColumnDef<PurchasedOrder>[] = [
         {
@@ -108,6 +159,19 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
                     {row.original.control_no || '—'}
                 </span>
             ),
+        },
+        {
+            id: 'subtotal',
+            enableSorting: false,
+            header: () => <span className="font-mono text-[10px] uppercase tracking-wider text-gray-400">Subtotal</span>,
+            cell: ({ row }) => {
+                const subtotal = Number(row.original.total_amount) - Number(row.original.delivery_fee);
+                return (
+                    <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                        ₱{subtotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </span>
+                );
+            },
         },
         {
             accessorKey: 'delivery_fee',
@@ -194,6 +258,20 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
                     title="Purchased Orders"
                     description="Manage your inventory purchased orders."
                 >
+                    <a
+                        href={`${baseUrl}/export?${new URLSearchParams(
+                            Object.entries({
+                                'filter[search]': searchValue || '',
+                                'filter[start_date]': dateRange[0] || '',
+                                'filter[end_date]': dateRange[1] || '',
+                                sort: query?.sort ?? '',
+                            }).filter(([, v]) => v !== '')
+                        ).toString()}`}
+                        className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-zinc-800"
+                    >
+                        <Download className="h-3.5 w-3.5" />
+                        Export
+                    </a>
                     <button
                         onClick={() => router.get(`${baseUrl}/create`)}
                         className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
@@ -201,6 +279,34 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
                         Add Order
                     </button>
                 </PageHeader>
+
+                <div className="mb-3 flex flex-col items-stretch gap-2 md:flex-row md:items-center">
+                    <div className="relative w-full max-w-xs">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <input
+                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pl-8 pr-3 font-mono! text-[12px]! text-gray-800 outline-none transition-all placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                            placeholder="Search Delivery No., Cust PO No., Control No.…"
+                            value={searchValue}
+                            onChange={(e) => setSearchValue(e.target.value)}
+                        />
+                    </div>
+                    <DatePicker
+                        id="purchased-orders-date-range"
+                        mode="range"
+                        placeholder="Filter by issue date"
+                        defaultDate={(dateRange[0] && dateRange[1] ? dateRange : undefined) as never as DateOption}
+                        onChange={(dates) => {
+                            if (dates.length === 2) {
+                                setDateRange([
+                                    moment(dates[0]).format('YYYY-MM-DD'),
+                                    moment(dates[1]).format('YYYY-MM-DD'),
+                                ]);
+                            } else if (dates.length === 0) {
+                                setDateRange(['', '']);
+                            }
+                        }}
+                    />
+                </div>
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
@@ -214,6 +320,7 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
                                 baseUrl,
                                 {
                                     sort: params?.sort,
+                                    filter: buildFilter(searchValue, dateRange),
                                     page: params?.page ?? 1,
                                     per_page: params?.per_page ?? query?.perPage ?? orders.per_page,
                                 },
@@ -222,6 +329,19 @@ export default function PurchasedOrderIndex({ workspace, orders, query }: Props)
                         }}
                     />
                 </div>
+
+                <ul className="mt-3 flex flex-col items-start gap-1 rounded-[10px] border border-black/6 bg-stone-50 px-4 py-3 dark:border-white/6 dark:bg-zinc-900/60">
+                    <li className="font-mono text-[12px] text-gray-700 dark:text-gray-300">
+                        Total COGS : ₱{Number(totals.cogs).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </li>
+                    <li className="font-mono text-[12px] text-gray-700 dark:text-gray-300">
+                        Total Delivery Fee : ₱{Number(totals.delivery_fee).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </li>
+                    <li className="font-mono text-[12px] font-semibold text-emerald-700 dark:text-emerald-400">
+                        Total Amount : ₱{Number(totals.total_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </li>
+                </ul>
+
                 <DeleteOrderDialog
                     order={deletingOrder}
                     workspace={workspace}

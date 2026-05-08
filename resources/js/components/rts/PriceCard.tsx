@@ -14,7 +14,7 @@ export default function PriceCard({ workspaceSlug, queryParams, onDataLoaded }: 
     const [view, setView] = useState<ViewMode>('chart');
     const [refreshKey, setRefreshKey] = useState(0);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     useEffect(() => {
         let cancelled = false;
         setLoading(true);

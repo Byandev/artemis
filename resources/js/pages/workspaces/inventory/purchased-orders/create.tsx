@@ -6,6 +6,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useEffect } from 'react';
 import DatePicker from '@/components/ui/date-picker';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 
 
@@ -118,9 +119,21 @@ export default function Create({ workspace, items }: Props) {
         || !hasValidItems;
 
     const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post(`/workspaces/${workspace.slug}/inventory/purchased-orders`);
-    };
+    e.preventDefault();
+    
+    post(`/workspaces/${workspace.slug}/inventory/purchased-orders`, {
+        preserveScroll: true,
+        onSuccess: () => {
+ 
+            toast.success('Purchased order created successfully');
+        },
+        onError: (errors) => {
+
+            console.error(errors);
+            toast.error('Failed to create order. Please check the form.');
+        }
+    });
+};
 
     return (
         <AppLayout>
@@ -259,19 +272,7 @@ export default function Create({ workspace, items }: Props) {
                        <div className="mt-4 grid grid-cols-[1fr_100px_120px_120px_36px] gap-3">
                             <div className="col-span-3" /> 
                             
-                            <div>
-                                <label className={labelClass}>Total Amount <span className="text-red-400">*</span></label>
-                                <input 
-                                    type="number" 
-                                    step="0.01" 
-                                    min="0" 
-                                    value={data.total_amount} 
-                                    onChange={(e) => setData('total_amount', e.target.value)} 
-                                    placeholder="0.00" 
-                                    className={inputClass} 
-                                />
-                                {errors.total_amount && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.total_amount}</p>}
-                            </div>
+                            
                             
                             <div />
                         </div>
