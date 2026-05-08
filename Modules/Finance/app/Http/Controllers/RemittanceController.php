@@ -68,7 +68,7 @@ class RemittanceController extends Controller
             ])
             ->allowedSorts(['id', 'billing_date_from', 'billing_date_to', 'courier', 'soa_number', 'gross_cod', 'net_amount', 'status', 'created_at'])
             ->defaultSort('-billing_date_to', '-created_at')
-            ->paginate(15)
+            ->paginate($request->input('per_page', 15))
             ->withQueryString();
 
         $remittances->through(function (Remittance $r) {
@@ -91,7 +91,7 @@ class RemittanceController extends Controller
                 ->limit(200)
                 ->get(['id', 'account_id', 'date', 'description', 'amount', 'type']),
             'query' => [
-                ...$request->only(['sort', 'perPage', 'page']),
+                ...$request->only(['sort', 'per_page', 'page']),
                 'filter' => $request->input('filter', []),
             ],
         ]);
