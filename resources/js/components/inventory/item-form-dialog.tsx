@@ -81,10 +81,12 @@ export function ItemFormDialog({ workspace, products, open, onOpenChange, item, 
         preserveScroll: true,
         onSuccess: () => {
             toast.success(isEditing ? 'Item updated successfully' : 'Item created successfully');
-            if (!isEditing) reset();
-            onOpenChange(false);
-            onSuccess?.();
-        },
+
+            reset();
+                clearErrors();
+                onOpenChange(false);
+            },
+            
         onError: () => toast.error('Failed to save item. Please check the form.')
     });
 };
