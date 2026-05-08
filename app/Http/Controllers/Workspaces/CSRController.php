@@ -28,12 +28,8 @@ class CSRController extends Controller
         $this->authorize(Permission::ViewCsrManagement->value, $workspace);
 
         $employees = QueryBuilder::for(PancakeUser::class)
-            ->whereExists(function ($query) use ($workspace) {
-                $query->select(DB::raw(1))
-                    ->from('pancake_shop_users as psu')
-                    ->join('shops as s', 's.id', '=', 'psu.shop_id')
-                    ->whereColumn('psu.user_id', 'pancake_users.id')
-                    ->where('s.workspace_id', $workspace->id);
+            ->whereHas('shops', function ($query) use ($workspace) {
+                $query->where('workspace_id', $workspace->id);
             })
             ->with('systemUser')
             ->allowedFilters([
@@ -100,12 +96,8 @@ class CSRController extends Controller
                 'pancake_users.id as pancake_user_id',
                 'pancake_users.name as csr_name',
             ])
-            ->whereExists(function ($query) use ($workspace) {
-                $query->select(DB::raw(1))
-                    ->from('pancake_shop_users as psu')
-                    ->join('shops as s', 's.id', '=', 'psu.shop_id')
-                    ->whereColumn('psu.user_id', 'pancake_users.id')
-                    ->where('s.workspace_id', $workspace->id);
+            ->whereHas('shops', function ($query) use ($workspace) {
+                $query->where('workspace_id', $workspace->id);
             })
             ->selectSub($drSub()->selectRaw('COALESCE(SUM(total_orders), 0)'), 'total_orders')
             ->selectSub($drSub()->selectRaw('COALESCE(SUM(total_sales), 0)'), 'total_sales')
@@ -166,10 +158,11 @@ class CSRController extends Controller
 
     private function employeeBelongsToWorkspace(string $employeeId, Workspace $workspace): bool
     {
-        return DB::table('pancake_shop_users as psu')
-            ->join('shops as s', 's.id', '=', 'psu.shop_id')
-            ->where('psu.user_id', $employeeId)
-            ->where('s.workspace_id', $workspace->id)
+        return PancakeUser::query()
+            ->whereKey($employeeId)
+            ->whereHas('shops', function ($query) use ($workspace) {
+                $query->where('workspace_id', $workspace->id);
+            })
             ->exists();
     }
 }
