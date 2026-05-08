@@ -168,11 +168,11 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                         />
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <button className="flex h-9 items-center gap-2.5 rounded-full border border-black/8 dark:border-white/8 bg-stone-50 dark:bg-zinc-800 pl-1 pr-3 transition-all hover:bg-stone-100 dark:hover:bg-zinc-700 outline-none">
+                                <button className="flex h-9 min-w-0 max-w-full items-center gap-2.5 rounded-full border border-black/8 dark:border-white/8 bg-stone-50 dark:bg-zinc-800 pl-1 pr-3 transition-all hover:bg-stone-100 dark:hover:bg-zinc-700 outline-none">
                                     <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 font-mono text-[11px] font-bold text-white">
                                         {getInitials(auth.user.name)}
                                     </div>
-                                    <span className="font-mono! text-[12px]! font-medium text-gray-700 dark:text-gray-300 max-w-40 truncate">
+                                    <span className="hidden min-w-0 truncate font-mono! text-[12px]! font-medium text-gray-700 dark:text-gray-300 sm:inline">
                                         {auth.user.name}
                                     </span>
                                 </button>

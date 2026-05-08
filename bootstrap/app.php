@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AuthenticateApiKey;
 use App\Http\Middleware\CheckAdmin;
+use App\Http\Middleware\CheckSubscription;
 use App\Http\Middleware\CheckWorkspace;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -31,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'workspace' => CheckWorkspace::class,
+            'subscription' => CheckSubscription::class,
             'admin' => CheckAdmin::class,
             'api.key' => AuthenticateApiKey::class,
         ]);

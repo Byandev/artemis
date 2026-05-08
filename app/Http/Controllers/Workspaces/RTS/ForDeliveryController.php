@@ -116,6 +116,10 @@ class ForDeliveryController extends Controller
             $baseQuery->where('assignee_id', $request->input('assignee_id'));
         }
 
+        if ($request->input('confirmee_id')) {
+            $baseQuery->where('conferrer_id', $request->input('confirmee_id'));
+        }
+
         $items = QueryBuilder::for($baseQuery)
             ->addSelect([
                 'pancake_order_for_delivery.*',
@@ -249,6 +253,11 @@ class ForDeliveryController extends Controller
             });
         }
 
+        if ($request->input('confirmee_id')) {
+            $statsBase->where('conferrer_id', $request->input('confirmee_id'));
+            $totalOrdersForDeliveryTodayQuery->where('conferrer_id', $request->input('confirmee_id'));
+        }
+
         // Total uses its own base (optionally filtered via whereHas on confirmed_by)
         $totalOrdersForDeliveryToday = $totalOrdersForDeliveryTodayQuery->count();
 
@@ -267,7 +276,7 @@ class ForDeliveryController extends Controller
         $totalReturning = (int) ($statusBreakdown->returning_count ?? 0);
         $totalProblematic = (int) ($statusBreakdown->problematic ?? 0);
 
-        $users = $workspace->users()->get(['users.id', 'users.name']);
+        $users = \Modules\Pancake\Models\User::get();
 
         $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id', 'pageOwners:id,name']);
 
@@ -296,6 +305,10 @@ class ForDeliveryController extends Controller
 
         if ($request->input('assignee_id')) {
             $baseQuery->where('assignee_id', $request->input('assignee_id'));
+        }
+
+        if ($request->input('confirmee_id')) {
+            $baseQuery->where('conferrer_id', $request->input('confirmee_id'));
         }
 
         $query = QueryBuilder::for($baseQuery)

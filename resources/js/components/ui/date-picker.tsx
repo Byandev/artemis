@@ -61,7 +61,7 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
 
             <div
                 onClick={() => fpRef.current?.open()}
-                className="relative inline-flex items-center h-9 rounded-[10px] border border-black/8 dark:border-white/8 bg-white dark:bg-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none hover:border-black/14 dark:hover:border-white/14 transition-all duration-150 cursor-pointer select-none"
+                className="relative inline-flex shrink-0 min-w-max items-center h-9 rounded-[10px] border border-black/8 dark:border-white/8 bg-white dark:bg-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none hover:border-black/14 dark:hover:border-white/14 transition-all duration-150 cursor-pointer select-none"
             >
                 {/* Hidden input flatpickr binds to */}
                 <input
@@ -77,7 +77,7 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
                 </span>
 
                 {/* Date display */}
-                <div className="relative z-10 pointer-events-none flex items-center px-3">
+                <div className="relative z-10 pointer-events-none flex items-center px-3 whitespace-nowrap">
                     {isRange ? (
                         hasStart ? (
                             <div className="flex items-center gap-1.5">

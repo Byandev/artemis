@@ -17,12 +17,9 @@ class InventoryTransactionController extends Controller
 {
     use AuthorizesRequests;
 
-    public function index(Request $request, Workspace $workspace)
+    private function buildQuery(Workspace $workspace): QueryBuilder
     {
-        $this->authorize('View Transaction Logs', $workspace);
-
-        $inventory = QueryBuilder::for(InventoryTransaction::where('inventory_transactions.workspace_id', $workspace->id))
-            ->with(['inventoryItem.product'])
+        return QueryBuilder::for(InventoryTransaction::where('inventory_transactions.workspace_id', $workspace->id))
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where('ref_no', 'like', "%{$value}%");
@@ -51,7 +48,15 @@ class InventoryTransactionController extends Controller
                         ->select('inventory_transactions.*');
                 }),
             ])
-            ->defaultSort('-date')
+            ->defaultSort('-date');
+    }
+
+    public function index(Request $request, Workspace $workspace)
+    {
+        $this->authorize('View Transaction Logs', $workspace);
+
+        $inventory = $this->buildQuery($workspace)
+            ->with(['inventoryItem.product'])
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 

@@ -34,7 +34,7 @@ const Dashboard = ({ workspace }: Props) => {
         } catch {}
         return [
             moment().startOf('month').format('YYYY-MM-DD'),
-            moment().endOf('month').format('YYYY-MM-DD'),
+            moment().subtract(1, 'd').format('YYYY-MM-DD'),
         ];
     });
 
@@ -84,6 +84,7 @@ const Dashboard = ({ workspace }: Props) => {
                 <PageHeader
                     title="Dashboard"
                     description={`Performance overview · ${formatDate(new Date(dateRange[0]), 'MMM d')} – ${formatDate(new Date(dateRange[1]), 'MMM d, yyyy')}`}
+                    stackActionsOnMobile
                 >
                     <MetricPicker
                         initialValue={selectedMetrics}

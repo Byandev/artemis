@@ -16,7 +16,15 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { AlertTriangle, ExternalLink, MoreHorizontal, Search, Trash2, Upload } from 'lucide-react';
+import {
+    AlertTriangle,
+    ExternalLink,
+    MoreHorizontal,
+    Pencil,
+    Search,
+    Trash2,
+    Upload,
+} from 'lucide-react';
 import DatePicker from '@/components/ui/date-picker';
 import moment from 'moment';
 import flatpickr from 'flatpickr';
@@ -33,7 +41,7 @@ interface Props {
     remittances: PaginatedData<Row>;
     unreconciledCount: number;
     transactions: { id: number; account_id: number; date: string; description: string; amount: number | string; type: 'in' | 'out'; account?: { id: number; name: string } | null }[];
-    query?: { sort?: string | null; filter?: { search?: string; status?: string; unreconciled?: string; date_from?: string; date_to?: string } };
+    query?: { sort?: string | null; per_page?: number | string | null; filter?: { search?: string; status?: string; unreconciled?: string; date_from?: string; date_to?: string } };
 }
 
 const fmt = (v: number | string) => Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -66,6 +74,7 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
             router.get(baseUrl,
                 {
                     sort: query?.sort,
+                    per_page: query?.per_page ?? undefined,
                     'filter[search]': s || undefined,
                     'filter[unreconciled]': unreconciled ? 1 : undefined,
                     'filter[date_from]': df || undefined,
@@ -74,7 +83,7 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
                 },
                 { preserveState: true, replace: true, preserveScroll: true, only: ['remittances', 'unreconciledCount'] });
         }, 400),
-        [baseUrl, query?.sort, unreconciled]
+        [baseUrl, query?.sort, query?.per_page, unreconciled]
     );
 
     useEffect(() => { performQuery(search, dateFrom, dateTo); return () => performQuery.cancel(); }, [search, dateFrom, dateTo, performQuery]);
@@ -181,6 +190,8 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
     const toggleUnreconciled = () => {
         router.get(baseUrl,
             {
+                sort: query?.sort,
+                per_page: query?.per_page ?? undefined,
                 'filter[search]': search || undefined,
                 'filter[unreconciled]': unreconciled ? undefined : 1,
                 'filter[date_from]': dateFrom || undefined,
@@ -273,6 +284,7 @@ export default function RemittancesIndex({ workspace, remittances, unreconciledC
                             router.get(baseUrl,
                                 {
                                     sort: params?.sort,
+                                    per_page: params?.per_page ?? undefined,
                                     'filter[search]': search || undefined,
                                     'filter[unreconciled]': unreconciled ? 1 : undefined,
                                     'filter[date_from]': dateFrom || undefined,

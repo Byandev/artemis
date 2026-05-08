@@ -6,6 +6,7 @@ use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use App\Models\WorkspaceApiKey;
+use App\Services\PostHogService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -48,6 +49,11 @@ class WorkspaceApiKeyController extends Controller
             'key_prefix' => $generated['prefix'],
         ]);
 
+        (new PostHogService)->capture((string) $request->user()->id, 'api_key_created', [
+            'workspace_id' => $workspace->id,
+            'key_name' => $request->name,
+        ]);
+
         return back()->with('newApiKey', $generated['raw']);
     }
 
@@ -71,6 +77,11 @@ class WorkspaceApiKeyController extends Controller
         $this->authorize(Permission::ManageApiKeys->value, $workspace);
 
         abort_if($apiKey->workspace_id !== $workspace->id, 404);
+
+        (new PostHogService)->capture((string) $request->user()->id, 'api_key_revoked', [
+            'workspace_id' => $workspace->id,
+            'key_name' => $apiKey->name,
+        ]);
 
         $apiKey->delete();
 

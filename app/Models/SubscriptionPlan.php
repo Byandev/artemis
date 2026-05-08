@@ -18,6 +18,8 @@ class SubscriptionPlan extends Model
 
     public const CODE_SCALE = 'scale';
 
+    public const CODE_ENTERPRISE = 'enterprise';
+
     public const ANALYTICS_BASIC = 'basic';
 
     public const ANALYTICS_FULL = 'full';

@@ -283,7 +283,8 @@ export default function RmoManagement({
     const [userName, setUserName] = useState<string | false>(false);
     const [isOpen, setIsOpen] = useState(false);
     const [showStats, setShowStats] = useState(() => localStorage.getItem('rmo_show_stats') === 'true');
-    const [showMyOnly, setShowMyOnly] = useState(() => localStorage.getItem('rmo_show_my_only') === 'true');
+    const [showMyAssigneeOnly, setShowMyAssigneeOnly] = useState(() => localStorage.getItem('rmo_show_my_assignee_only') === 'true');
+    const [showMyConfirmeeOnly, setShowMyConfirmeeOnly] = useState(() => localStorage.getItem('rmo_show_my_confirmee_only') === 'true');
     const [pendingAssign, setPendingAssign] = useState<{ id: number; currentStatus: string } | null>(null);
     const [callLogModal, setCallLogModal] = useState<{ phone: string; label: string } | null>(null);
     const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -385,9 +386,10 @@ export default function RmoManagement({
             page: page ?? 1,
             per_page: perPage ?? orders.per_page,
             delivery_date: deliveryDate,
-            ...(showMyOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
+            ...(showMyAssigneeOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
+            ...(showMyConfirmeeOnly && localStorage.getItem('user_id') ? { confirmee_id: localStorage.getItem('user_id') } : {}),
         }),
-        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyOnly, orders.per_page, deliveryDate],
+        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyAssigneeOnly, showMyConfirmeeOnly, orders.per_page, deliveryDate],
     );
 
     const handleStatusChange = useCallback(
@@ -436,7 +438,7 @@ export default function RmoManagement({
             { preserveState: true, replace: true, preserveScroll: true },
         );
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [showMyOnly]);
+    }, [showMyAssigneeOnly, showMyConfirmeeOnly]);
 
 
     const doExport = useCallback((columns: string[]) => {
@@ -449,8 +451,11 @@ export default function RmoManagement({
         if (selectedShopIds.length) params.set('filter[shop_id]', selectedShopIds.join(','));
         if (selectedUserIds.length) params.set('filter[user_id]', selectedUserIds.join(','));
         params.set('delivery_date', deliveryDate);
-        if (showMyOnly && localStorage.getItem('user_id')) {
+        if (showMyAssigneeOnly && localStorage.getItem('user_id')) {
             params.set('assignee_id', localStorage.getItem('user_id') ?? '');
+        }
+        if (showMyConfirmeeOnly && localStorage.getItem('user_id')) {
+            params.set('confirmee_id', localStorage.getItem('user_id') ?? '');
         }
         if (columns.length > 0 && columns.length < ALL_COLUMN_KEYS.length) {
             params.set('columns', columns.join(','));
@@ -458,7 +463,7 @@ export default function RmoManagement({
 
         const qs = params.toString();
         window.location.href = `/public/workspaces/${workspace.slug}/rts/rmo-management/export${qs ? `?${qs}` : ''}`;
-    }, [workspace.slug, searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyOnly, deliveryDate]);
+    }, [workspace.slug, searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyAssigneeOnly, showMyConfirmeeOnly, deliveryDate]);
 
     const handleDateChange = useCallback(
         (date: string) => {
@@ -472,7 +477,8 @@ export default function RmoManagement({
                     ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
                     ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
                     ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
-                    ...(showMyOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
+                    ...(showMyAssigneeOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
+                    ...(showMyConfirmeeOnly && localStorage.getItem('user_id') ? { confirmee_id: localStorage.getItem('user_id') } : {}),
                     delivery_date: date,
                     page: 1,
                     per_page: orders.per_page,
@@ -480,7 +486,7 @@ export default function RmoManagement({
                 { preserveState: true, replace: true, preserveScroll: true },
             );
         },
-        [workspace, query?.sort, searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyOnly, orders.per_page],
+        [workspace, query?.sort, searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyAssigneeOnly, showMyConfirmeeOnly, orders.per_page],
     );
 
     const handleAssignUser = useCallback(
@@ -855,7 +861,7 @@ export default function RmoManagement({
     );
 
     return (
-        <div className="min-h-screen bg-stone-50 dark:bg-zinc-950">
+        <div className="min-h-screen overflow-x-hidden bg-stone-50 dark:bg-zinc-950">
             <FormModal
                 open={isOpen}
                 onOpenChange={(open) => {
@@ -993,8 +999,8 @@ export default function RmoManagement({
             </div>
 
             <div className="mx-auto w-full p-4 md:p-6">
-                <div className="mb-6 flex items-center justify-between">
-                    <div>
+                <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
                         <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">
                             RMO Management
                         </h1>
@@ -1003,77 +1009,49 @@ export default function RmoManagement({
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <label className="flex cursor-pointer items-center gap-2.5 select-none">
-                            <button
-                                type="button"
-                                role="switch"
-                                aria-checked={showMyOnly}
-                                onClick={() =>
-                                    setShowMyOnly((prev) => {
-                                        const next = !prev;
-                                        localStorage.setItem('rmo_show_my_only', String(next));
-                                        return next;
-                                    })
-                                }
-                                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 dark:focus-visible:ring-offset-zinc-950 ${
-                                    showMyOnly
-                                        ? 'border-emerald-600/40 bg-emerald-500 dark:border-emerald-400/50 dark:bg-emerald-500'
-                                        : 'border-black/8 bg-gray-200 dark:border-white/8 dark:bg-zinc-700'
-                                }`}
-                            >
-                                <span
-                                    className={`pointer-events-none absolute h-3.5 w-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.25)] transition-transform duration-200 ease-out ${
-                                        showMyOnly ? 'translate-x-[18px]' : 'translate-x-[2px]'
-                                    }`}
-                                />
-                            </button>
-                            <span className="text-[12px] font-medium text-gray-600 dark:text-gray-400">
-                                Only my data
-                            </span>
-                        </label>
-
                         <Filters
                             workspace={workspace}
                             onChange={handleFilterChange}
                             initialValue={initialFilterValue}
                         />
 
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setExportModalOpen(true)}
-                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
-                        >
-                            <Download className="h-3.5 w-3.5" />
-                            Export
-                        </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setExportModalOpen(true)}
+                                className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                            >
+                                <Download className="h-3.5 w-3.5" />
+                                Export
+                            </Button>
 
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                                setShowStats((prev) => {
-                                    const next = !prev;
-                                    localStorage.setItem('rmo_show_stats', String(next));
-                                    return next;
-                                })
-                            }
-                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
-                        >
-                            <BarChart3 className="h-3.5 w-3.5" />
-                            {showStats ? 'Hide' : 'Show'} Statistics
-                            {showStats ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                        </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                    setShowStats((prev) => {
+                                        const next = !prev;
+                                        localStorage.setItem('rmo_show_stats', String(next));
+                                        return next;
+                                    })
+                                }
+                                className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                            >
+                                <BarChart3 className="h-3.5 w-3.5" />
+                                {showStats ? 'Hide' : 'Show'} Statistics
+                                {showStats ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                            </Button>
 
-                        <DatePicker
-                            id="delivery-date"
-                            mode="single"
-                            defaultDate={deliveryDate}
-                            placeholder="Select date"
-                            onChange={(_, dateStr) => {
-                                if (dateStr && dateStr !== deliveryDate) handleDateChange(dateStr);
-                            }}
-                        />
+                            <DatePicker
+                                id="delivery-date"
+                                mode="single"
+                                defaultDate={deliveryDate}
+                                placeholder="Select date"
+                                onChange={(_, dateStr) => {
+                                    if (dateStr && dateStr !== deliveryDate) handleDateChange(dateStr);
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -1091,7 +1069,7 @@ export default function RmoManagement({
 
                 <div className="mb-4">
                     <div className="flex flex-wrap items-center gap-3">
-                        <div className="relative w-lg">
+                        <div className="relative w-full sm:max-w-sm md:max-w-md">
                             <Search className="absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                             <input
                                 type="text"
@@ -1127,6 +1105,64 @@ export default function RmoManagement({
                                 </option>
                             ))}
                         </select>
+
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setShowMyAssigneeOnly((prev) => {
+                                    const next = !prev;
+                                    localStorage.setItem('rmo_show_my_assignee_only', String(next));
+                                    return next;
+                                })
+                            }
+                            className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px] font-medium transition-all ${
+                                showMyAssigneeOnly
+                                    ? 'border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                    : 'border-black/6 bg-stone-100 text-gray-500 hover:border-black/12 hover:text-gray-700 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:text-gray-200'
+                            }`}
+                        >
+                            <span className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded border ${
+                                showMyAssigneeOnly
+                                    ? 'border-emerald-500 bg-emerald-500 dark:border-emerald-400 dark:bg-emerald-400'
+                                    : 'border-gray-300 dark:border-gray-600'
+                            }`}>
+                                {showMyAssigneeOnly && (
+                                    <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                )}
+                            </span>
+                            My Assignee Only
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setShowMyConfirmeeOnly((prev) => {
+                                    const next = !prev;
+                                    localStorage.setItem('rmo_show_my_confirmee_only', String(next));
+                                    return next;
+                                })
+                            }
+                            className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px] font-medium transition-all ${
+                                showMyConfirmeeOnly
+                                    ? 'border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                    : 'border-black/6 bg-stone-100 text-gray-500 hover:border-black/12 hover:text-gray-700 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:text-gray-200'
+                            }`}
+                        >
+                            <span className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded border ${
+                                showMyConfirmeeOnly
+                                    ? 'border-emerald-500 bg-emerald-500 dark:border-emerald-400 dark:bg-emerald-400'
+                                    : 'border-gray-300 dark:border-gray-600'
+                            }`}>
+                                {showMyConfirmeeOnly && (
+                                    <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                )}
+                            </span>
+                            My Confirmee Only
+                        </button>
 
                         {window.location.hostname === 'efb.on-forge.com' && <div className="ml-auto flex items-center gap-2">
                             <Tooltip>
@@ -1168,7 +1204,7 @@ export default function RmoManagement({
                     </div>
                 </div>
 
-                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                <div className="max-w-full overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         columns={columns}
                         enableInternalPagination={false}

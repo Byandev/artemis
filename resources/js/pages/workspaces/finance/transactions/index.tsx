@@ -18,7 +18,15 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { MoreHorizontal, Pencil, Search, Trash2, Upload, X } from 'lucide-react';
+import {
+    Download,
+    MoreHorizontal,
+    Pencil,
+    Search,
+    Trash2,
+    Upload,
+    X,
+} from 'lucide-react';
 import DatePicker from '@/components/ui/date-picker';
 import moment from 'moment';
 import flatpickr from 'flatpickr';
@@ -36,10 +44,13 @@ interface Row extends FinanceTransaction {
 
 interface AccountOpt { id: number; name: string; currency: string }
 
+interface Totals { credit: number; debit: number }
+
 interface Props {
     workspace: Workspace;
     transactions: PaginatedData<Row>;
     accounts: AccountOpt[];
+    totals: Totals;
     query?: {
         sort?: string | null;
         filter?: {
@@ -59,7 +70,7 @@ interface Props {
 const fmt = (v: number | string) => Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 
-export default function TransactionsIndex({ workspace, transactions, accounts, query }: Props) {
+export default function TransactionsIndex({ workspace, transactions, accounts, totals, query }: Props) {
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
     const [createOpen, setCreateOpen] = useState(false);
     const [importOpen, setImportOpen] = useState(false);
@@ -153,7 +164,7 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                 'filter[date_from]': df || undefined,
                 'filter[date_to]': dt || undefined,
                 page: 1,
-            }, { preserveState: true, replace: true, preserveScroll: true, only: ['transactions'] });
+            }, { preserveState: true, replace: true, preserveScroll: true, only: ['transactions', 'totals'] });
         }, 400),
         [baseUrl, query?.sort]
     );
@@ -501,6 +512,15 @@ export default function TransactionsIndex({ workspace, transactions, accounts, q
                         }}
                     />
                 </div>
+
+                <ul className="mt-3 flex flex-col items-start gap-1 rounded-[10px] border border-black/6 bg-stone-50 px-4 py-3 dark:border-white/6 dark:bg-zinc-900/60">
+                    <li className="font-mono text-[12px] text-emerald-700 dark:text-emerald-400">
+                        Total Credit : ₱{fmt(totals.credit)}
+                    </li>
+                    <li className="font-mono text-[12px] text-red-600 dark:text-red-400">
+                        Total Debit : ₱{fmt(totals.debit)}
+                    </li>
+                </ul>
 
                 <TransactionFormDialog
                     open={createOpen || editing !== null}

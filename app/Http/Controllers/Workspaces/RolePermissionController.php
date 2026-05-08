@@ -73,8 +73,12 @@ class RolePermissionController extends Controller
     private function disabledCategoriesFor(Workspace $workspace): array
     {
         return array_values(array_filter([
-            $workspace->show_finance ? null : 'Finance',
-            $workspace->show_inventory ? null : 'Inventory',
+            $workspace->finance_module_enabled ? null : 'Finance',
+            $workspace->inventory_module_enabled ? null : 'Inventory',
+            $workspace->products_module_enabled ? null : 'Products',
+            $workspace->teams_module_enabled ? null : 'Teams',
+            $workspace->checklist_module_enabled ? null : 'Checklist',
+            $workspace->csr_module_enabled ? null : 'CSR',
         ]));
     }
 }

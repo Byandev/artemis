@@ -2,6 +2,8 @@ import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
+import SubscriptionExpiredModal from '@/components/subscription-expired-modal';
+import SyncingDataModal from '@/components/syncing-data-modal';
 import { type BreadcrumbItem } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { type PropsWithChildren } from 'react';
@@ -17,6 +19,8 @@ export default function AppSidebarLayout({
                 <AppSidebarHeader />
                 {children}
             </AppContent>
+            <SubscriptionExpiredModal />
+            <SyncingDataModal />
         </AppShell>
     );
 }
