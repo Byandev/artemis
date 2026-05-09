@@ -12,6 +12,19 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.6.13',
+        date: '2026-05-09',
+        sections: [
+            {
+                title: 'Frontend Formatting Sweep',
+                items: [
+                    'Ran Prettier across the entire frontend (resources/js + resources/css) — 239 files reformatted with no functional changes. Quote-style normalised (single quotes), long lines wrapped, multi-line shadow / arg lists aligned, and a handful of missing spaces after type-annotation colons fixed (e.g. total_rmo_call_attempts:number → : number)',
+                    'Refreshed resources/views/design-guidelines.html with the expanded component reference (~3,800 added lines of HTML samples covering the current design system) so internal contributors have an up-to-date visual catalog',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.6.12',
         date: '2026-05-09',
         sections: [
