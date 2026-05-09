@@ -7,11 +7,15 @@ use App\Http\Middleware\CheckWorkspace;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SetSentryContext;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Sentry\Laravel\Integration;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -22,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+        $middleware->redirectGuestsTo(fn (Request $request) => route('login'));
 
         $middleware->web(append: [
             HandleAppearance::class,
@@ -38,6 +43,20 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        $exceptions->render(function (AuthorizationException|HttpExceptionInterface $exception, Request $request) {
+            $statusCode = $exception instanceof HttpExceptionInterface
+                ? $exception->getStatusCode()
+                : 403;
+
+            if ($statusCode !== 403 || $request->expectsJson()) {
+                return null;
+            }
+
+            return Inertia::render('errors/403')
+                ->toResponse($request)
+                ->setStatusCode(403);
+        });
+
         if (class_exists(Integration::class)) {
             Integration::handles($exceptions);
         }
