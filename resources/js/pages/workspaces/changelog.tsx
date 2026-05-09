@@ -12,6 +12,58 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.6.12',
+        date: '2026-05-09',
+        sections: [
+            {
+                title: 'Customer Support — Tickets',
+                items: [
+                    'Added a workspace-side Support page (resources/js/pages/workspaces/support/index.tsx) with a "Contact Support" modal so users can open a ticket directly from the app — captures subject, message, and source page',
+                    'Added an admin-side Support Tickets triage page (resources/js/pages/workspaces/admin/support-tickets/index.tsx) with status filters and row-click drilldown',
+                    'Backed by a new SupportTicket model + policy + StoreSupportTicketRequest + factory; routes registered in routes/workspaces.php; covered by tests/Feature/Workspaces/SupportTicketsTest.php',
+                    'Sidebar / app header / sidebar header now expose the Support entry, and Inertia shares support ticket data so the indicator stays in sync',
+                ],
+            },
+            {
+                title: 'Admin — Per-Workspace Metric Whitelist',
+                items: [
+                    'Admins can now control which metrics each workspace can see via /admin/workspaces/{slug}/metric-settings — backed by the new workspace_metric_settings table, MetricSettingPolicy, WorkspaceMetricSetting model, and a new App\\Support\\Metrics\\MetricRegistry helper',
+                    'The MetricPicker / LocationCard / CxRtsCard components honour the whitelist; metrics not enabled for a workspace are hidden in the UI rather than silently empty',
+                ],
+            },
+            {
+                title: 'Inventory — Keyword Sync & Public API',
+                items: [
+                    'Added trigger-fetch-inventory-keyword-records scheduled command + TriggerFetchInventoryKeywordRecord job to keep keyword-driven inventory data fresh',
+                    'New /api/v1/public/inventory-items endpoint (PublicApi\\InventoryItemController) for machine-to-machine reads of inventory state',
+                    'Added remaining_qty column on inventory_items (separate migration) — surfaced in the inventory items page and form dialogs so on-hand quantity is no longer derived from running totals',
+                ],
+            },
+            {
+                title: 'CSR Analytics — Search & URL-Persistent Filters',
+                items: [
+                    'Added a search input on the CSR analytics page that filters the per-CSR table by name; the search term, type toggle (POS/ERP), and pagination state are now persisted in the URL so refreshes and shared links keep the filter context',
+                    'Fixed CSR analytics pagination drift (86d2t08ae) and a CSR management update bug',
+                ],
+            },
+            {
+                title: 'Permissions & Errors',
+                items: [
+                    'Added grant-user-all-view-permissions artisan command (App\\Console\\Commands\\GrantUserAllViewPermissions) to bulk-grant every view-* permission to a user in a workspace',
+                    'Added a proper /errors/403 Inertia page with copy and a "Go back" action — middleware now renders this on workspace-permission denials instead of the generic Laravel exception page; covered by tests/Feature/ForbiddenAccessTest.php',
+                ],
+            },
+            {
+                title: 'Data Integrity & Misc Fixes',
+                items: [
+                    'Added a unique index to call_logs (new migration) to enforce one row per (workspace, user, call_date, call_time, phone_number) and prevent duplicate ingestion',
+                    'RTS Analytics — table and pagination fix (86d2t0bg9); Dashboard — crowded-filters layout fix (86d2rz9jz); Finance / Remittance row-filter bugs fixed; inventory transaction form clears state when switching from edit to create',
+                    'RMO Management — JSX structure cleanup (orphaned </div> removed) so the page parses again; minor layout adjustments',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.6.11',
         date: '2026-05-08',
         sections: [
