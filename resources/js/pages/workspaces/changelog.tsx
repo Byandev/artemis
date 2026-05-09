@@ -12,6 +12,20 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.6.14',
+        date: '2026-05-09',
+        sections: [
+            {
+                title: 'Botcake — Page & Shop Filters on Flows / Sequences',
+                items: [
+                    'Added the same Filters dropdown the main dashboard uses (Page + Shop) to /workspaces/{slug}/botcake/flows and /workspaces/{slug}/botcake/sequences — narrow the table to specific Pancake pages or shops without leaving the page',
+                    'Filter state is persisted in the URL as filter[page_ids] / filter[shop_ids] (comma-separated), so refreshes and shared links preserve the selection. Page resets to 1 when the filter changes',
+                    'Server-side: FlowController and SequenceController now whitelist page_ids and shop_ids — page_ids does whereIn on botcake_(flows|sequences).page_id, shop_ids walks the page relation (whereHas page → whereIn shop_id)',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.6.13',
         date: '2026-05-09',
         sections: [
