@@ -35,7 +35,7 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
     const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const isEditing = !!employee; 
+    const isEditing = !!employee;
 
     const url = isEditing
         ? `/workspaces/${workspace.slug}/employees/${employee.id}`
