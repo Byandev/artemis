@@ -22,6 +22,7 @@ interface CsrRecord {
     rts_rate: number;
     total_called: number;
     total_call_time: number;
+    total_rmo_call_attempts:number;
 }
 
 interface Props {
@@ -194,11 +195,10 @@ export default function Analytics({ workspace }: Props) {
     const columns = useMemo<ColumnDef<CsrRecord>[]>(
         () => [
             {
-                accessorKey: 'csr_name',
+                accessorKey: 'name',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="CSR" />
                 ),
-                cell: ({ row }) => row.original.csr_name || '-',
                 size: 220,
             },
             {
@@ -217,14 +217,14 @@ export default function Analytics({ workspace }: Props) {
                 cell: ({ row }) => peso(row.original.total_sales),
             },
             {
-                accessorKey: 'delivered',
+                accessorKey: 'total_delivered',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="Delivered" />
                 ),
                 cell: ({ row }) => peso(row.original.delivered),
             },
             {
-                accessorKey: 'returning_count',
+                accessorKey: 'total_returning',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="Returning" />
                 ),
@@ -245,6 +245,16 @@ export default function Analytics({ workspace }: Props) {
                 ),
                 cell: ({ row }) =>
                     Number(row.original.total_called).toLocaleString(),
+            },
+            {
+                accessorKey: 'total_rmo_call_attempts',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RMO Attempts" />
+                ),
+                cell: ({ row }) =>
+                    Number(
+                        row.original.total_rmo_call_attempts,
+                    ).toLocaleString(),
             },
             {
                 accessorKey: 'total_call_time',
@@ -310,40 +320,40 @@ export default function Analytics({ workspace }: Props) {
                     />
                 </PageHeader>
 
-                <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-                    <StatCard
-                        title="Total Sales"
-                        value={salesStat.value}
-                        loading={salesStat.loading}
-                        format={peso}
-                    />
-                    <StatCard
-                        title="Total Orders"
-                        value={ordersStat.value}
-                        loading={ordersStat.loading}
-                    />
-                    <StatCard
-                        title="Total Delivered"
-                        value={deliveredStat.value}
-                        loading={deliveredStat.loading}
-                    />
-                    <StatCard
-                        title="Total Returning"
-                        value={returningStat.value}
-                        loading={returningStat.loading}
-                    />
-                    <StatCard
-                        title="RTS Rate"
-                        value={rtsStat.value}
-                        loading={rtsStat.loading}
-                        format={(n) => `${n.toFixed(2)}%`}
-                    />
-                    <StatCard
-                        title="RMO Called"
-                        value={rmoCalledStat.value}
-                        loading={rmoCalledStat.loading}
-                    />
-                </div>
+                {/*<div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Sales"*/}
+                {/*        value={salesStat.value}*/}
+                {/*        loading={salesStat.loading}*/}
+                {/*        format={peso}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Orders"*/}
+                {/*        value={ordersStat.value}*/}
+                {/*        loading={ordersStat.loading}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Delivered"*/}
+                {/*        value={deliveredStat.value}*/}
+                {/*        loading={deliveredStat.loading}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Returning"*/}
+                {/*        value={returningStat.value}*/}
+                {/*        loading={returningStat.loading}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="RTS Rate"*/}
+                {/*        value={rtsStat.value}*/}
+                {/*        loading={rtsStat.loading}*/}
+                {/*        format={(n) => `${n.toFixed(2)}%`}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="RMO Called"*/}
+                {/*        value={rmoCalledStat.value}*/}
+                {/*        loading={rmoCalledStat.loading}*/}
+                {/*    />*/}
+                {/*</div>*/}
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable

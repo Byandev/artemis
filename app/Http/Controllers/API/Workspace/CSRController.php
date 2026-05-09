@@ -5,11 +5,12 @@ namespace App\Http\Controllers\API\Workspace;
 use App\Http\Controllers\Controller;
 use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
+use App\Models\PancakeUserRmoDailyReport;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Modules\Pancake\Models\User as PancakeUser;
+use Modules\Pancake\Models\User;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -46,58 +47,53 @@ class CSRController extends Controller
         return [$from, $to];
     }
 
-    private function timestampRange(Request $request): array
+    private function posDailySummarySub(Workspace $workspace, string $from, string $to)
     {
-        [$from, $to] = $this->range($request);
-
-        return [$from.' 00:00:00', $to.' 23:59:59'];
-    }
-
-    private function rmoDeliveryAggregateSub(Workspace $workspace, string $from, string $to)
-    {
-        return DB::table('pancake_order_for_delivery as pofd')
-            ->whereNotNull('pofd.assignee_id')
-            ->where('pofd.workspace_id', $workspace->id)
-            ->whereBetween('pofd.delivery_date', [$from, $to])
-            ->groupBy('pofd.assignee_id')
+        // csr_daily_records is the nightly POS rollup written by sync:csr-daily-records.
+        // It already aggregates pancake_orders per (workspace, csr, date) with rmo_called
+        // counted as pancake_order_for_delivery rows where status != 'PENDING'.
+        // csr_id here is the system users.id, joined later via pancake_users.user_id.
+        return DB::table('csr_daily_records')
+            ->where('workspace_id', $workspace->id)
+            ->where('type', 'POS')
+            ->whereBetween('date', [$from, $to])
+            ->groupBy('csr_id')
             ->selectRaw('
-                pofd.assignee_id as pancake_user_id,
-                SUM(
-                    CASE WHEN EXISTS (
-                        SELECT 1
-                        FROM call_logs cl
-                        WHERE cl.workspace_id = pofd.workspace_id
-                          AND cl.user_id = pofd.assignee_id
-                          AND cl.call_date = pofd.delivery_date
-                          AND cl.phone_number IN (pofd.rider_phone, pofd.customer_phone)
-                    ) THEN 1 ELSE 0 END
-                ) as total_called,
-                COALESCE(SUM(pofd.customer_call_duration), 0) + COALESCE(SUM(pofd.rider_call_duration), 0) as total_call_time
+                csr_id,
+                SUM(total_orders) as total_orders,
+                SUM(total_sales) as total_sales,
+                SUM(delivered) as delivered,
+                SUM(`returning`) as returning_count,
+                SUM(rmo_called) as total_called
             ');
     }
 
-    private function posOrdersAggregateSub(Workspace $workspace, string $start, string $end)
+    private function erpDailySummarySub(Workspace $workspace, string $from, string $to)
     {
-        return DB::table('pancake_orders')
+        return DB::table('pancake_user_erp_daily_reports')
             ->where('workspace_id', $workspace->id)
-            ->whereNotNull('confirmed_by')
-            ->where(function ($q) use ($start, $end) {
-                $q->whereBetween('confirmed_at', [$start, $end])
-                    ->orWhere(function ($q2) use ($start, $end) {
-                        $q2->where('status', 3)->whereBetween('delivered_at', [$start, $end]);
-                    })
-                    ->orWhere(function ($q2) use ($start, $end) {
-                        $q2->whereIn('status', [4, 5])->whereBetween('returning_at', [$start, $end]);
-                    });
-            })
-            ->groupBy('confirmed_by')
+            ->whereBetween('date', [$from, $to])
+            ->groupBy('pancake_user_id')
             ->selectRaw('
-                confirmed_by as pancake_user_id,
-                SUM(CASE WHEN confirmed_at BETWEEN ? AND ? THEN 1 ELSE 0 END) as total_orders,
-                SUM(CASE WHEN confirmed_at BETWEEN ? AND ? THEN final_amount ELSE 0 END) as total_sales,
-                SUM(CASE WHEN status = 3 AND delivered_at BETWEEN ? AND ? THEN final_amount ELSE 0 END) as delivered,
-                SUM(CASE WHEN status IN (4,5) AND returning_at BETWEEN ? AND ? THEN final_amount ELSE 0 END) as returning_count
-            ', [$start, $end, $start, $end, $start, $end, $start, $end]);
+                pancake_user_id,
+                SUM(total_orders) as total_orders,
+                SUM(total_sales) as total_sales,
+                SUM(delivered) as delivered,
+                SUM(`returning`) as returning_count
+            ');
+    }
+
+    private function rmoCallTimeSub(Workspace $workspace, string $from, string $to)
+    {
+        return DB::table('pancake_user_rmo_daily_reports')
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('date', [$from, $to])
+            ->groupBy('pancake_user_id')
+            ->selectRaw('
+                pancake_user_id,
+                SUM(total_call_time) as total_call_time,
+                SUM(total_called) as total_called
+            ');
     }
 
     public function dailyRecords(Request $request, Workspace $workspace)
@@ -108,54 +104,65 @@ class CSRController extends Controller
 
         [$from, $to] = $this->range($request);
 
-        if ($this->isPos($request)) {
-            [$start, $end] = $this->timestampRange($request);
-            $dailyReportsSub = $this->posOrdersAggregateSub($workspace, $start, $end);
-        } else {
-            $dailyReportsSub = DB::table($this->reportTable($request))
-                ->where('workspace_id', $workspace->id)
-                ->whereBetween('date', [$from, $to])
-                ->groupBy('pancake_user_id')
-                ->selectRaw('
-                    pancake_user_id,
-                    SUM(total_orders) as total_orders,
-                    SUM(total_sales) as total_sales,
-                    SUM(delivered) as delivered,
-                    SUM(`returning`) as returning_count
-                ');
-        }
-
-        $rmoSub = $this->rmoDeliveryAggregateSub($workspace, $from, $to);
-
-        $query = PancakeUser::query()
-            ->from('pancake_users as pu')
-            ->whereExists(function ($q) use ($workspace) {
-                $q->select(DB::raw(1))
-                    ->from('pancake_shop_users as psu')
-                    ->join('shops as s', 's.id', '=', 'psu.shop_id')
-                    ->whereColumn('psu.user_id', 'pu.id')
-                    ->where('s.workspace_id', $workspace->id);
-            })
-            ->leftJoinSub($dailyReportsSub, 'dr', 'dr.pancake_user_id', '=', 'pu.id')
-            ->leftJoinSub($rmoSub, 'rmo', 'rmo.pancake_user_id', '=', 'pu.id')
+        $posSummary = PancakeUserPosDailyReport::query()
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('date', [$from, $to])
+            ->groupBy('pancake_user_id')
             ->selectRaw('
-                pu.id as pancake_user_id,
-                pu.name as csr_name,
-                COALESCE(dr.total_orders, 0) as total_orders,
-                COALESCE(dr.total_sales, 0) as total_sales,
-                COALESCE(dr.delivered, 0) as delivered,
-                COALESCE(dr.returning_count, 0) as returning_count,
-                COALESCE(rmo.total_called, 0) as total_called,
-                COALESCE(rmo.total_call_time, 0) as total_call_time,
-                CASE
-                    WHEN (COALESCE(dr.delivered, 0) + COALESCE(dr.returning_count, 0)) > 0
-                    THEN ROUND((COALESCE(dr.returning_count, 0) / (dr.delivered + dr.returning_count)) * 100, 2)
-                    ELSE 0
-                END as rts_rate
+                pancake_user_id,
+                SUM(total_orders)   as total_orders,
+                SUM(total_sales)    as total_sales,
+                SUM(`returning`)    as total_returning,
+                SUM(delivered)      as total_delivered
             ');
 
-        $records = QueryBuilder::for($query)
-            ->allowedSorts(array_map(fn ($s) => AllowedSort::field($s), self::ALLOWED_SORTS))
+        $rmoSummary = PancakeUserRmoDailyReport::query()
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('date', [$from, $to])
+            ->groupBy('pancake_user_id')
+            ->selectRaw('
+                pancake_user_id,
+                SUM(total_called)             as total_called,
+                SUM(total_call_time)          as total_call_time,
+                SUM(total_rmo_call_attempts)  as total_rmo_call_attempts
+            ');
+
+        $base = User::query()
+            ->whereHas('shopUsers.shop', fn ($q) => $q->where('workspace_id', $workspace->id));
+
+        $records = QueryBuilder::for($base)
+            ->leftJoinSub($posSummary, 'pos', 'pos.pancake_user_id', '=', 'pancake_users.id')
+            ->leftJoinSub($rmoSummary, 'rmo', 'rmo.pancake_user_id', '=', 'pancake_users.id')
+            ->select('pancake_users.*')
+            ->selectRaw('COALESCE(pos.total_orders, 0)             as total_orders')
+            ->selectRaw('COALESCE(pos.total_sales, 0)              as total_sales')
+            ->selectRaw('COALESCE(pos.total_returning, 0)          as total_returning')
+            ->selectRaw('COALESCE(pos.total_delivered, 0)          as total_delivered')
+            ->selectRaw('COALESCE(rmo.total_called, 0)             as total_called')
+            ->selectRaw('COALESCE(rmo.total_call_time, 0)          as total_call_time')
+            ->selectRaw('COALESCE(rmo.total_rmo_call_attempts, 0)  as total_rmo_call_attempts')
+            ->selectRaw('
+                CASE
+                    WHEN (COALESCE(pos.total_returning, 0) + COALESCE(pos.total_delivered, 0)) > 0
+                    THEN ROUND(
+                        COALESCE(pos.total_returning, 0)
+                        / (COALESCE(pos.total_returning, 0) + COALESCE(pos.total_delivered, 0))
+                        * 100, 2
+                    )
+                    ELSE 0
+                END as rts_rate
+            ')
+            ->allowedSorts([
+                AllowedSort::field('csr_name', 'pancake_users.name'),
+                'total_orders',
+                'total_sales',
+                'total_returning',
+                'total_delivered',
+                'total_called',
+                'total_call_time',
+                'total_rmo_call_attempts',
+                'rts_rate',
+            ])
             ->defaultSort('-total_sales')
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
@@ -172,86 +179,62 @@ class CSRController extends Controller
             ->whereBetween('date', [$from, $to]);
     }
 
-    private function posOrdersStatQuery(Workspace $workspace, string $dateColumn, string $start, string $end, ?array $statuses = null)
+    private function posSummaryQuery(Request $request, Workspace $workspace)
     {
-        $query = DB::table('pancake_orders')
+        [$from, $to] = $this->range($request);
+
+        return DB::table('csr_daily_records')
             ->where('workspace_id', $workspace->id)
-            ->whereNotNull('confirmed_by')
-            ->whereBetween($dateColumn, [$start, $end]);
-
-        if ($statuses !== null) {
-            $query->whereIn('status', $statuses);
-        }
-
-        return $query;
+            ->where('type', 'POS')
+            ->whereBetween('date', [$from, $to]);
     }
 
     public function statTotalSales(Request $request, Workspace $workspace)
     {
-        if ($this->isPos($request)) {
-            [$start, $end] = $this->timestampRange($request);
-            $value = $this->posOrdersStatQuery($workspace, 'confirmed_at', $start, $end)->sum('final_amount');
-        } else {
-            $value = $this->rollupStatQuery($request, $workspace)->sum('total_sales');
-        }
+        $value = $this->isPos($request)
+            ? $this->posSummaryQuery($request, $workspace)->sum('total_sales')
+            : $this->rollupStatQuery($request, $workspace)->sum('total_sales');
 
         return response()->json(['value' => $value]);
     }
 
     public function statTotalOrders(Request $request, Workspace $workspace)
     {
-        if ($this->isPos($request)) {
-            [$start, $end] = $this->timestampRange($request);
-            $value = $this->posOrdersStatQuery($workspace, 'confirmed_at', $start, $end)->count();
-        } else {
-            $value = $this->rollupStatQuery($request, $workspace)->sum('total_orders');
-        }
+        $value = $this->isPos($request)
+            ? $this->posSummaryQuery($request, $workspace)->sum('total_orders')
+            : $this->rollupStatQuery($request, $workspace)->sum('total_orders');
 
         return response()->json(['value' => $value]);
     }
 
     public function statTotalDelivered(Request $request, Workspace $workspace)
     {
-        if ($this->isPos($request)) {
-            [$start, $end] = $this->timestampRange($request);
-            $value = $this->posOrdersStatQuery($workspace, 'delivered_at', $start, $end, [3])->sum('final_amount');
-        } else {
-            $value = $this->rollupStatQuery($request, $workspace)->sum('delivered');
-        }
+        $value = $this->isPos($request)
+            ? $this->posSummaryQuery($request, $workspace)->sum('delivered')
+            : $this->rollupStatQuery($request, $workspace)->sum('delivered');
 
         return response()->json(['value' => $value]);
     }
 
     public function statTotalReturning(Request $request, Workspace $workspace)
     {
-        if ($this->isPos($request)) {
-            [$start, $end] = $this->timestampRange($request);
-            $value = $this->posOrdersStatQuery($workspace, 'returning_at', $start, $end, [4, 5])->sum('final_amount');
-        } else {
-            $value = $this->rollupStatQuery($request, $workspace)->sum('returning');
-        }
+        $value = $this->isPos($request)
+            ? $this->posSummaryQuery($request, $workspace)->sum('returning')
+            : $this->rollupStatQuery($request, $workspace)->sum('returning');
 
         return response()->json(['value' => $value]);
     }
 
     public function statTotalRts(Request $request, Workspace $workspace)
     {
-        if ($this->isPos($request)) {
-            [$start, $end] = $this->timestampRange($request);
+        $row = ($this->isPos($request)
+            ? $this->posSummaryQuery($request, $workspace)
+            : $this->rollupStatQuery($request, $workspace))
+            ->selectRaw('SUM(delivered) as d, SUM(`returning`) as r')
+            ->first();
 
-            $delivered = $this->posOrdersStatQuery($workspace, 'delivered_at', $start, $end, [3])->sum('final_amount');
-            $returning = $this->posOrdersStatQuery($workspace, 'returning_at', $start, $end, [4, 5])->sum('final_amount');
-
-            $total = $delivered + $returning;
-            $value = $total > 0 ? round(($returning / $total) * 100, 2) : 0;
-        } else {
-            $row = $this->rollupStatQuery($request, $workspace)
-                ->selectRaw('SUM(delivered) as d, SUM(`returning`) as r')
-                ->first();
-
-            $total = ($row->d ?? 0) + ($row->r ?? 0);
-            $value = $total > 0 ? round(($row->r / $total) * 100, 2) : 0;
-        }
+        $total = ($row->d ?? 0) + ($row->r ?? 0);
+        $value = $total > 0 ? round(($row->r / $total) * 100, 2) : 0;
 
         return response()->json(['value' => $value]);
     }
@@ -260,19 +243,20 @@ class CSRController extends Controller
     {
         [$from, $to] = $this->range($request);
 
-        $value = DB::table('pancake_order_for_delivery as pofd')
-            ->whereNotNull('pofd.assignee_id')
-            ->where('pofd.workspace_id', $workspace->id)
-            ->whereBetween('pofd.delivery_date', [$from, $to])
-            ->whereExists(function ($q) {
-                $q->select(DB::raw(1))
-                    ->from('call_logs as cl')
-                    ->whereColumn('cl.workspace_id', 'pofd.workspace_id')
-                    ->whereColumn('cl.user_id', 'pofd.assignee_id')
-                    ->whereColumn('cl.call_date', 'pofd.delivery_date')
-                    ->whereRaw('cl.phone_number IN (pofd.rider_phone, pofd.customer_phone)');
-            })
-            ->count();
+        if ($this->isPos($request)) {
+            // POS rmo_called is pre-aggregated nightly into csr_daily_records
+            // (count of pancake_order_for_delivery rows where status != 'PENDING').
+            $value = DB::table('csr_daily_records')
+                ->where('workspace_id', $workspace->id)
+                ->where('type', 'POS')
+                ->whereBetween('date', [$from, $to])
+                ->sum('rmo_called');
+        } else {
+            $value = DB::table('pancake_user_rmo_daily_reports')
+                ->where('workspace_id', $workspace->id)
+                ->whereBetween('date', [$from, $to])
+                ->sum('total_called');
+        }
 
         return response()->json(['value' => $value]);
     }
