@@ -44,6 +44,18 @@ class FlowController extends Controller
         $flows = QueryBuilder::for($base)
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),
+                AllowedFilter::callback('page_ids', function ($query, $value) {
+                    $ids = $this->parseIds($value);
+                    if (! empty($ids)) {
+                        $query->whereIn('botcake_flows.page_id', $ids);
+                    }
+                }),
+                AllowedFilter::callback('shop_ids', function ($query, $value) {
+                    $ids = $this->parseIds($value);
+                    if (! empty($ids)) {
+                        $query->whereHas('page', fn ($q) => $q->whereIn('shop_id', $ids));
+                    }
+                }),
             ])
             ->allowedSorts(['name', 'sent', 'total_phone_number', 'success_rate'])
             ->defaultSort('-sent')
@@ -51,13 +63,31 @@ class FlowController extends Controller
             ->withQueryString();
 
         return Inertia::render('workspaces/botcake/flows', [
-            'workspace' => $workspace,
+            'workspace' => $workspace->loadMissing([
+                'shops' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                },
+                'pages' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                },
+                'pageOwners:id,name',
+            ]),
             'flows' => $flows,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page', 'mode', 'from', 'to']),
                 'filter' => $request->input('filter', []),
             ],
         ]);
+    }
+
+    private function parseIds($value): array
+    {
+        $arr = is_array($value) ? $value : explode(',', (string) $value);
+
+        return array_values(array_filter(
+            array_map('intval', $arr),
+            fn ($n) => $n > 0,
+        ));
     }
 
     /**

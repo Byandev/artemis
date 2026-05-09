@@ -246,14 +246,14 @@ export default function Analytics({ workspace, query }: Props) {
                 header: ({ column }) => (
                     <SortableHeader column={column} title="Delivered" />
                 ),
-                cell: ({ row }) => peso(row.original.delivered),
+                cell: ({ row }) => peso(row.original.total_delivered),
             },
             {
                 accessorKey: 'total_returning',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="Returning" />
                 ),
-                cell: ({ row }) => peso(row.original.returning_count),
+                cell: ({ row }) => peso(row.original.total_returning),
             },
             {
                 accessorKey: 'rts_rate',
@@ -266,7 +266,7 @@ export default function Analytics({ workspace, query }: Props) {
             {
                 accessorKey: 'total_called',
                 header: ({ column }) => (
-                    <SortableHeader column={column} title="RMO Called" />
+                    <SortableHeader column={column} title="Assigned RMO " />
                 ),
                 cell: ({ row }) =>
                     Number(row.original.total_called).toLocaleString(),
@@ -274,7 +274,10 @@ export default function Analytics({ workspace, query }: Props) {
             {
                 accessorKey: 'total_rmo_call_attempts',
                 header: ({ column }) => (
-                    <SortableHeader column={column} title="RMO Attempts" />
+                    <SortableHeader
+                        column={column}
+                        title="Assigned RMO Called"
+                    />
                 ),
                 cell: ({ row }) =>
                     Number(
@@ -284,7 +287,10 @@ export default function Analytics({ workspace, query }: Props) {
             {
                 accessorKey: 'total_call_time',
                 header: ({ column }) => (
-                    <SortableHeader column={column} title="Total Call Time" />
+                    <SortableHeader
+                        column={column}
+                        title="Assigned RMO Call Time"
+                    />
                 ),
                 cell: ({ row }) => formatCallTime(row.original.total_call_time),
             },
