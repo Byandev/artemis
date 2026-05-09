@@ -69,7 +69,7 @@ export function AccountFormDialog({ open, onOpenChange, account, workspaceSlug }
                             {isEditing ? 'Edit Account' : 'Add Account'}
                         </DialogTitle>
                         <DialogDescription className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5">
-                            {isEditing ? "Update this account’s details." : ‘Create a new finance account.’}
+                            {isEditing ? "Update this account’s details." : "Create a new finance account."}
                         </DialogDescription>
                     </DialogHeader>
                 </div>
