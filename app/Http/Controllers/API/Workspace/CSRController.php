@@ -11,6 +11,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Models\User;
+use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -162,6 +163,11 @@ class CSRController extends Controller
                 'total_call_time',
                 'total_rmo_call_attempts',
                 'rts_rate',
+            ])
+            ->allowedFilters([
+                AllowedFilter::callback('search', function ($q, $value) {
+                    $q->where('pancake_users.name', 'like', "%{$value}%");
+                }),
             ])
             ->defaultSort('-total_sales')
             ->paginate($request->integer('per_page', 10))
