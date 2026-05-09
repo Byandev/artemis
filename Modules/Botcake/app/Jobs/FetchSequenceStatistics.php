@@ -133,6 +133,12 @@ class FetchSequenceStatistics implements ShouldQueue
         $sequenceDelta = array_fill_keys(self::STAT_COLUMNS, 0);
 
         foreach ($deltasById as $messageId => $delta) {
+            // Skip messages with no change this run — avoids writing empty
+            // zero-rows on quiet days.
+            if (array_sum($delta) === 0) {
+                continue;
+            }
+
             // After the upsert, every message in $deltasById exists in the table
             // with $messageId as its id — so we can use $messageId directly.
 
@@ -149,8 +155,9 @@ class FetchSequenceStatistics implements ShouldQueue
             $daily->save();
         }
 
-        // Roll the per-message deltas up into a sequence-level daily delta row.
-        if (! empty($deltasById)) {
+        // Roll the per-message deltas up into a sequence-level daily delta row,
+        // but only when something actually moved this run.
+        if (array_sum($sequenceDelta) > 0) {
             $sequenceDaily = SequenceDailyStat::firstOrNew([
                 'sequence_id' => $sequence->id,
                 'date' => $today,
