@@ -11,7 +11,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { type NavItem } from '@/types';
+import { type NavItem, User as UserType } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
     LayoutDashboard,
@@ -45,30 +45,14 @@ import {
 import { useState } from 'react';
 import AppLogo from './app-logo';
 import { PERMISSIONS } from '@/constants/permissions';
+import { Workspace } from '@/types/models/Workspace';
 
 
 
 export function AppSidebar() {
-    const { auth, currentWorkspace } = usePage().props as unknown as {
-        auth: {
-            user: {
-                can: {
-                    viewAnySupportTickets: boolean;
-                };
-            };
-        };
-        currentWorkspace: {
-            slug: string;
-            inventory_module_enabled: boolean;
-            finance_module_enabled: boolean;
-            products_module_enabled: boolean;
-            teams_module_enabled: boolean;
-            checklist_module_enabled: boolean;
-            csr_module_enabled: boolean;
-            rmo_module_enabled: boolean;
-            leaderboard_module_enabled: boolean;
-            botcake_module_enabled: boolean;
-        };
+    const { currentWorkspace, auth } = usePage().props as unknown as {
+        currentWorkspace: Workspace;
+        auth?: { user: UserType };
     };
 
     const slug = currentWorkspace?.slug ?? '';
@@ -327,10 +311,10 @@ export function AppSidebar() {
 }
 
 function PublicLinks({
-    workspaceSlug,
-    rmoEnabled,
-    leaderboardEnabled,
-}: {
+                         workspaceSlug,
+                         rmoEnabled,
+                         leaderboardEnabled,
+                     }: {
     workspaceSlug: string;
     rmoEnabled: boolean;
     leaderboardEnabled: boolean;
@@ -365,10 +349,10 @@ function PublicLinks({
 }
 
 function PublicLinkItem({
-    title,
-    href,
-    icon: Icon,
-}: {
+                            title,
+                            href,
+                            icon: Icon,
+                        }: {
     title: string;
     href: string;
     icon: typeof Truck;
