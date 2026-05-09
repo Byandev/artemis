@@ -294,7 +294,7 @@ export function AppSidebar() {
 
             <SidebarContent className="p-3">
                 <NavMain items={mainNavItems} group_label="Main" />
-                <NavMain items={adminNavItems} group_label="Admin" />
+                {/*<NavMain items={adminNavItems} group_label="Admin" />*/}
                 {/*<NavMain items={accountNavItems} group_label="Account" />*/}
                 <PublicLinks
                     workspaceSlug={currentWorkspace.slug}
