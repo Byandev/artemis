@@ -129,7 +129,7 @@ class InventoryItemController extends Controller
                 'max:255',
                 Rule::unique('inventory_items')
                     ->where('workspace_id', $workspace->id)
-                    ->ignore($item->id),
+                    ->ignore($item->id)
             ],
             'sales_keywords' => 'nullable|string',
             'transaction_keywords' => 'nullable|string',
@@ -150,6 +150,7 @@ class InventoryItemController extends Controller
         return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
             ->with('success', 'Inventory Items record updated.');
     }
+
 
     public function destroy(Workspace $workspace, InventoryItem $item)
     {

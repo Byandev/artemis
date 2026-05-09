@@ -14,6 +14,8 @@ use App\Http\Controllers\Workspaces\CSRController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\OnboardingController;
 use App\Http\Controllers\Workspaces\PageController;
+use App\Http\Controllers\Workspaces\SupportTicketController;
+use App\Http\Controllers\Workspaces\Admin\SupportTicketAdminController;
 use App\Http\Controllers\Workspaces\Product\AnalyticsController;
 use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\RoleController;
@@ -29,6 +31,7 @@ use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
+use App\Models\SupportTicket;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Modules\Botcake\Http\Controllers\Web\FlowController;
@@ -42,6 +45,10 @@ use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
+use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
+
+
+
 
 /*
 |--------------------------------------------------------------------------
@@ -133,6 +140,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/workspaces/{workspace}/shops', [ShopController::class, 'index'])->name('workspaces.shops.index');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh', [ShopController::class, 'refresh'])->name('workspaces.shops.refresh');
+    Route::post('/workspaces/{workspace}/shops/{shop}/refresh-users', [ShopController::class, 'refreshUsers'])->name('workspaces.shops.refresh-users');
 
     // Product routes
     // Redirect to analytics by default for navigation item active state
@@ -271,6 +279,15 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/remittances/{remittance}', [FinanceRemittanceController::class, 'destroy'])->name('remittances.destroy');
     });
 
+    Route::get('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'index'])->name('support.index');
+    Route::post('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'store'])->name('support.store');
+    Route::get('/workspaces/{workspace:slug}/admin/support-tickets', [SupportTicketAdminController::class, 'index'])
+        ->name('admin.support-tickets.index')
+        ->can('viewAny', [SupportTicket::class, 'workspace']);
+    Route::patch('/workspaces/{workspace:slug}/admin/support-tickets/{ticket}', [SupportTicketAdminController::class, 'update'])
+        ->name('admin.support-tickets.update')
+        ->can('viewAny', [SupportTicket::class, 'workspace']);
+
 });
 
 // Public invitation routes (guest or authenticated)
@@ -297,13 +314,23 @@ Route::middleware(['auth', 'verified', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
+        // Workspace Management
         Route::get('/workspaces', [AdminWorkspaceController::class, 'index'])
             ->name('workspaces.index');
+
         Route::put('/workspaces/{workspace}/subscription', [AdminWorkspaceController::class, 'updateSubscription'])
             ->name('workspaces.update-subscription');
         Route::put('/workspaces/{workspace}/modules', [AdminWorkspaceController::class, 'updateModules'])
             ->name('workspaces.update-modules');
 
+        // Metric Setting Controller
+        Route::get('workspaces/{workspace}/metrics/edit', [MetricSettingController::class, 'edit'])
+            ->name('workspaces.metric-settings.edit');
+
+        Route::put('/workspaces/{workspace}/metrics', [MetricSettingController::class, 'update'])
+            ->name('workspaces.metric-settings.update');
+
+        // Subscription Plans Management
         Route::get('/subscription-plans', [AdminSubscriptionPlanController::class, 'index'])
             ->name('subscription-plans.index');
         Route::get('/subscription-plans/create', [AdminSubscriptionPlanController::class, 'create'])

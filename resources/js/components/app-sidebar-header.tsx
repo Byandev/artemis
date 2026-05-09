@@ -2,6 +2,9 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { NavUser } from '@/components/nav-user';
 import WorkspaceSwitcher from './workspace-switcher';
 import AppearanceToggleDropdown from '@/components/appearance-dropdown';
+import { ContactSupportModal } from '@/components/contact-support-modal';
+import { Button } from '@/components/ui/button';
+import { LifeBuoy } from 'lucide-react';
 
 export function AppSidebarHeader() {
     return (

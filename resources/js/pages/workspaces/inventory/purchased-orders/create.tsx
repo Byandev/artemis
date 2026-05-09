@@ -4,6 +4,8 @@ import { Head, useForm, router } from '@inertiajs/react';
 import { Workspace } from '@/types/models/Workspace';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect } from 'react';
+import DatePicker from '@/components/ui/date-picker';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 
@@ -159,7 +161,18 @@ export default function Create({ workspace, items }: Props) {
                             </div>
                             <div>
                                 <label className={labelClass}>Issue Date <span className="text-red-400">*</span></label>
-                                <input type="date" value={data.issue_date} onChange={(e) => setData('issue_date', e.target.value)} className={inputClass} />
+                                <DatePicker
+                                    id="purchased-order-issue-date"
+                                    mode="single"
+                                    defaultDate={data.issue_date || undefined}
+                                    onChange={(dates) => {
+                                        if (dates.length) {
+                                            setData('issue_date', format(dates[0], 'yyyy-MM-dd'))
+                                        } else {
+                                            setData('issue_date', '')
+                                        }
+                                    }}
+                                />
                                 {data.issue_date !== '' && !isIssueDateValid && (
                                     <p className="mt-1 font-mono text-[11px] text-red-500">Please enter a valid date in YYYY-MM-DD format.</p>
                                 )}
@@ -255,15 +268,6 @@ export default function Create({ workspace, items }: Props) {
                             <div />
                         </div>
 
-                        {/* TOTAL AMOUNT SECTION - NASA RIGHT SIDE (Aligned with totals) */}
-                       <div className="mt-4 grid grid-cols-[1fr_100px_120px_120px_36px] gap-3">
-                            <div className="col-span-3" /> 
-                            
-                            
-                            
-                            <div />
-                        </div>
-
                         {errors.items && <p className="mt-4 font-mono text-[11px] text-red-500">{errors.items}</p>}
                     </div>
 
@@ -278,7 +282,6 @@ export default function Create({ workspace, items }: Props) {
                         </button>
                         <button
                             type="submit"
-                            className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                             disabled={isSubmitDisabled}
                             className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                         >

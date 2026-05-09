@@ -61,7 +61,7 @@ class Workspace extends Model
                 $originalSlug = $workspace->slug;
                 $count = 1;
                 while (static::where('slug', $workspace->slug)->exists()) {
-                    $workspace->slug = $originalSlug.'-'.$count;
+                    $workspace->slug = $originalSlug . '-' . $count;
                     $count++;
                 }
             }
@@ -153,7 +153,7 @@ class Workspace extends Model
      */
     public function addMember(User $user, string $role = 'member'): void
     {
-        if (! $this->hasMember($user)) {
+        if (!$this->hasMember($user)) {
             $this->users()->attach($user->id, ['role' => $role]);
         }
     }
@@ -241,5 +241,30 @@ class Workspace extends Model
     public function checklists(): HasMany
     {
         return $this->hasMany(WorkspaceChecklist::class, 'workspace_id');
+    }
+
+    public function metricSetting()
+    {
+        return $this->hasOne(WorkspaceMetricSetting::class);
+    }
+
+    public function allowedMetrics(): array
+    {
+        return $this->metricSetting?->allowed_metrics
+            ?? \App\Support\Metrics\MetricRegistry::all();
+    }
+
+    public function defaultMetrics(): array
+    {
+        return $this->metricSetting?->default_metrics
+            ?? \App\Support\Metrics\MetricRegistry::defaults();
+    }
+
+    public function getMetricSettings(): array
+    {
+        return [
+            'allowed' => $this->allowedMetrics(),
+            'defaults' => $this->defaultMetrics(),
+        ];
     }
 }
