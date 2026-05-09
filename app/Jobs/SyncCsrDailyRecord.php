@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Models\CsrDailyRecord;
 use App\Models\PancakeUserPosDailyReport;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;

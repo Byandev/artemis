@@ -41,10 +41,9 @@ class AdminWorkspaceController extends Controller
     }
 
     /**
-     * NOTE: updateMetrics was removed from here because you are now using 
+     * NOTE: updateMetrics was removed from here because you are now using
      * MetricSettingController@update to handle the WorkspaceMetricSetting model.
      */
-
     public function updateSubscription(Request $request, Workspace $workspace)
     {
         $validated = $request->validate([

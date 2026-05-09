@@ -11,7 +11,6 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
-
 class HandleInertiaRequests extends Middleware
 {
     /**
@@ -123,7 +122,7 @@ class HandleInertiaRequests extends Middleware
 
             ]) : $currentWorkspace,
 
-            'sidebarOpen' => !$request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'ziggy' => [
                 'location' => $request->url(),
             ],
@@ -136,6 +135,7 @@ class HandleInertiaRequests extends Middleware
             'syncingData' => $syncingData,
         ];
     }
+
     /**
      * Resolve the permission names available to the user in the current workspace.
      * Owners and super admins receive ['*'] which the frontend treats as full access.
@@ -144,7 +144,7 @@ class HandleInertiaRequests extends Middleware
      */
     private function resolvePermissions(?User $user, ?Workspace $workspace): array
     {
-        if (!$user) {
+        if (! $user) {
             return [];
         }
 
@@ -157,7 +157,7 @@ class HandleInertiaRequests extends Middleware
             return ['*'];
         }
 
-        if (!$workspace instanceof Workspace) {
+        if (! $workspace instanceof Workspace) {
             return [];
         }
 
@@ -169,9 +169,9 @@ class HandleInertiaRequests extends Middleware
             ->where('workspaces.id', $workspace->id)
             ->first()
             ?->pivot
-                ?->role_id;
+            ?->role_id;
 
-        if (!$roleId) {
+        if (! $roleId) {
             return [];
         }
 
@@ -188,7 +188,7 @@ class HandleInertiaRequests extends Middleware
         return Role::with('permissions:id,name,category')
             ->find($roleId)
             ?->permissions
-            ->reject(fn($permission) => in_array($permission->category, $disabled, true))
+            ->reject(fn ($permission) => in_array($permission->category, $disabled, true))
             ->pluck('name')
             ->values()
             ->all() ?? [];

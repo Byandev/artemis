@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         // Remove existing duplicates — keep the row with the lowest id
-        DB::statement("
+        DB::statement('
             DELETE c1 FROM call_logs c1
             INNER JOIN call_logs c2
             WHERE c1.id > c2.id
@@ -19,7 +19,7 @@ return new class extends Migration
               AND c1.phone_number = c2.phone_number
               AND c1.call_date = c2.call_date
               AND c1.call_time = c2.call_time
-        ");
+        ');
 
         Schema::table('call_logs', function (Blueprint $table) {
             $table->unique(

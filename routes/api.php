@@ -11,7 +11,7 @@ use App\Http\Controllers\PublicApi\UserController;
 
 Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' => ['api.key']], function () {
     Route::get('/health', HealthController::class)->name('health');
-        Route::get('/users', [UserController::class, 'index'])->name('users.index');
+    Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::post('/csr-daily-records', [CsrDailyRecordController::class, 'store'])->name('csr-daily-records.store');
     Route::post('/rmo-orders/login', [RmoOrderController::class, 'login'])->name('rmo-orders.login');
     Route::get('/pages', [PageController::class, 'index'])->name('pages.index');

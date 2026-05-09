@@ -16,7 +16,6 @@ class RmoOrderController extends Controller
     {
         $query = User::whereRaw('LOWER(status) = ?', ['active']);
 
-
         if ($request->filled('search')) {
             $query->where('name', 'LIKE', "%{$request->input('search')}%");
         }
