@@ -33,7 +33,6 @@ class InventoryItemController extends Controller
 
         $validated = $request->validate([
             'inventory_item_id' => ['required', 'integer'],
-            'total_orders' => ['required', 'integer', 'min:0'],
             'unfulfilled_count' => ['required', 'integer', 'min:0'],
             'three_days_average' => ['required', 'numeric', 'min:0'],
             'remaining_qty' => ['sometimes', 'integer', 'min:0'],
