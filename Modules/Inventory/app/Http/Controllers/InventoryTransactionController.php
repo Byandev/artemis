@@ -3,8 +3,8 @@
 namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Inventory\Models\InventoryItem;
@@ -15,14 +15,11 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class InventoryTransactionController extends Controller
 {
-    public function index(Request $request, Workspace $workspace)
-    {
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
+    use AuthorizesRequests;
 
-        $inventory = QueryBuilder::for(InventoryTransaction::where('inventory_transactions.workspace_id', $workspace->id))
-            ->with(['inventoryItem.product'])
+    private function buildQuery(Workspace $workspace): QueryBuilder
+    {
+        return QueryBuilder::for(InventoryTransaction::where('inventory_transactions.workspace_id', $workspace->id))
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where('ref_no', 'like', "%{$value}%");
@@ -51,11 +48,17 @@ class InventoryTransactionController extends Controller
                         ->select('inventory_transactions.*');
                 }),
             ])
-            ->defaultSort('-date')
+            ->defaultSort('-date');
+    }
+
+    public function index(Request $request, Workspace $workspace)
+    {
+        $this->authorize('View Transaction Logs', $workspace);
+
+        $inventory = $this->buildQuery($workspace)
+            ->with(['inventoryItem.product'])
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
-
-        $users = User::get(['id', 'name']);
 
         return Inertia::render('workspaces/inventory/inventory_transaction/index', [
             'workspace' => $workspace,
@@ -66,12 +69,14 @@ class InventoryTransactionController extends Controller
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
-            'users' => $users,
+            'users' => $workspace->users()->get(['users.id', 'users.name']),
         ]);
     }
 
     public function store(Request $request, Workspace $workspace)
     {
+        $this->authorize('Create Transaction Logs', $workspace);
+
         $validated = $request->validate([
             'inventory_item_id' => 'required|exists:inventory_items,id',
             'date' => [
@@ -97,6 +102,8 @@ class InventoryTransactionController extends Controller
 
     public function update(Request $request, Workspace $workspace, InventoryTransaction $transaction)
     {
+        $this->authorize('Edit Transaction Logs', $workspace);
+
         $validated = $request->validate([
             'inventory_item_id' => 'required|exists:inventory_items,id',
             'date' => 'required|date',
@@ -117,6 +124,8 @@ class InventoryTransactionController extends Controller
 
     public function destroy(Workspace $workspace, InventoryTransaction $transaction)
     {
+        $this->authorize('Delete Transaction Logs', $workspace);
+
         $transaction->delete();
 
         return redirect()->back()->with('success', 'Entry permanently deleted.');

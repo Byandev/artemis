@@ -2,23 +2,36 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Http\Sorts\Checklist\TargetSort;
 use App\Models\Workspace;
 use App\Models\WorkspaceChecklist;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class ChecklistController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
+        $this->authorize(Permission::ViewChecklist->value, $workspace);
+
         $checklists = QueryBuilder::for(WorkspaceChecklist::query()->where('workspace_id', $workspace->id))
-            ->allowedSorts(['title', 'target', 'required', 'created_at'])
+            ->allowedSorts([
+                'title',
+                AllowedSort::custom('target', new TargetSort),
+                'required',
+                'created_at',
+            ])
             ->paginate(10)
             ->withQueryString();
 
@@ -37,6 +50,8 @@ class ChecklistController extends Controller
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
+
+        $this->authorize(Permission::CreateChecklist->value, $workspace);
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:160'],
@@ -61,6 +76,8 @@ class ChecklistController extends Controller
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
+
+        $this->authorize(Permission::EditChecklist->value, $workspace);
 
         if ($checklist->workspace_id !== $workspace->id) {
             abort(403);
@@ -87,6 +104,8 @@ class ChecklistController extends Controller
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
+
+        $this->authorize(Permission::DeleteChecklist->value, $workspace);
 
         if ($checklist->workspace_id !== $workspace->id) {
             abort(403);

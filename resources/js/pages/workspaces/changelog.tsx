@@ -1,5 +1,5 @@
-import { Head, Link } from '@inertiajs/react';
 import { home } from '@/routes';
+import { Head, Link } from '@inertiajs/react';
 
 interface ChangelogEntry {
     version: string;
@@ -11,6 +11,612 @@ interface ChangelogEntry {
 }
 
 const changelog: ChangelogEntry[] = [
+    {
+        version: 'v3.6.11',
+        date: '2026-05-08',
+        sections: [
+            {
+                title: 'CSR Daily Records — One-Pass Read Path',
+                items: [
+                    'GET /api/.../csr/daily-records now collapses the previous 7 correlated subqueries into 2 grouped scans (pancake_user_pos_daily_reports + pancake_user_rmo_daily_reports) joined via leftJoinSub — significantly fewer scans on workspaces with large operator lists',
+                    'Both rollup subqueries are now workspace-scoped, and the outer pancake_users query is constrained to operators in the current workspace via the pancake_shop_users → shops relationship — totals can no longer leak across workspaces',
+                    'Refactored to Eloquent: PancakeUserPosDailyReport::query(), PancakeUserRmoDailyReport::query(), and User::whereHas(shopUsers.shop, ...) replace the raw DB::table calls. Added shopUsers and shop relationships on the Pancake User and ShopUser models',
+                ],
+            },
+            {
+                title: 'CSR Daily Records — Sorting & RTS Rate',
+                items: [
+                    'Added rts_rate as a server-side computed column (returning / (returning + delivered) * 100, rounded to 2 decimals) so CSRs can be sorted by return rate without recomputing in JS',
+                    'Sortable columns: csr_name, total_orders, total_sales, total_returning, total_delivered, total_called, total_call_time, total_rmo_call_attempts, rts_rate. Default sort is -total_sales',
+                ],
+            },
+            {
+                title: 'sync:csr-daily-records — Writes to POS Rollup',
+                items: [
+                    'App\\Jobs\\SyncCsrDailyRecord now writes into pancake_user_pos_daily_reports keyed by pancake_user_id instead of csr_daily_records keyed by users.id — the whereNotNull(pu.user_id) filter that previously excluded Pancake operators without linked system accounts is gone, so every operator with confirmed orders is now captured',
+                    'rmo_called is no longer written from this job — that count now lives exclusively in the RMO rollup (pancake_user_rmo_daily_reports), avoiding the dual-source drift that v3.6.9 already aligned',
+                ],
+            },
+            {
+                title: 'CSR Analytics — UI Column Updates',
+                items: [
+                    'Frontend table column accessors updated to match the new API aliases (name, total_delivered, total_returning) and a new "RMO Attempts" column showing total_rmo_call_attempts per CSR',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.10',
+        date: '2026-05-07',
+        sections: [
+            {
+                title: 'CSR Daily Sync — 7-Day Backfill & Queued',
+                items: [
+                    'sync:csr-daily-records and sync:csr-rmo-daily-records are now queue-based — the per-date aggregation moved into App\\Jobs\\SyncCsrDailyRecord and App\\Jobs\\SyncCsrRmoDailyRecord, and the commands have become thin dispatchers',
+                    'Both commands now backfill the last 7 days by default (one job per day) instead of just yesterday — a transient failure on any night is automatically retried on each of the next 6 nightly runs, since the same dates keep being re-aggregated. updateOrCreate keeps it idempotent',
+                    'Added --days=N (override the trailing-day window) and kept --date=YYYY-MM-DD (single-day mode) for ad-hoc backfills. The 03:00 / 04:00 nightly schedule is unchanged',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.9',
+        date: '2026-05-07',
+        sections: [
+            {
+                title: 'Shops — Refresh Users',
+                items: [
+                    'Added a "Refresh users" action to the shop row menu that re-dispatches the FetchShopUsers job for that shop — newly added Pancake operator accounts now show up in the workspace without having to wait for the next nightly sync or refresh the whole shop',
+                ],
+            },
+            {
+                title: 'CSR Daily Records — Aligned & More Detail',
+                items: [
+                    'sync:csr-daily-records (RMO) now defines total_called the same way the POS rollup does: pancake_order_for_delivery rows where status != PENDING. Previously the RMO and POS sides counted "called" differently, which made cross-tab comparisons drift',
+                    'Added a separate total_rmo_call_attempts column to pancake_user_rmo_daily_reports — counts every matching call log per delivery row instead of collapsing to 0/1, so you can now see how many call attempts a CSR actually made versus how many deliveries they reached',
+                ],
+            },
+            {
+                title: 'CSR Performance API — Faster Reads',
+                items: [
+                    'GET /api/.../csr/daily-records now reads from the pre-aggregated daily rollup tables (csr_daily_records, pancake_user_erp_daily_reports, pancake_user_rmo_daily_reports) instead of recomputing from raw orders / deliveries on every request — same numbers, dramatically less work per page load on workspaces with large order volumes',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.8',
+        date: '2026-05-07',
+        sections: [
+            {
+                title: 'CSR Analytics — Index Coverage for Live Queries',
+                items: [
+                    'Added composite index (workspace_id, delivery_date, assignee_id) on pancake_order_for_delivery so the RMO outer query becomes a range scan and GROUP BY assignee_id has an ordered source — avoids the temp-table sort that was kicking in on workspaces with large delivery volume',
+                    'Added composite index (workspace_id, user_id, call_date, phone_number) on call_logs so the EXISTS subquery powering RMO Called resolves via a single index seek per delivery row instead of falling back to (workspace_id, user_id) plus a row-level date / phone match',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.7',
+        date: '2026-05-07',
+        sections: [
+            {
+                title: 'CSR Analytics — Live POS Data',
+                items: [
+                    'POS metrics (Total Sales, Orders, Delivered, Returning, RTS Rate, and the per-CSR table) now read directly from pancake_orders instead of the pancake_user_pos_daily_reports rollup — figures reflect live order activity within the selected range without waiting on the daily rollup job',
+                    'Per-CSR aggregation groups pancake_orders by confirmed_by; total_orders / total_sales use confirmed_at, delivered uses status=3 + delivered_at, returning uses status IN (4,5) + returning_at',
+                ],
+            },
+            {
+                title: 'CSR Analytics — Live RMO Called',
+                items: [
+                    'RMO Called and Total Call Time now derive directly from pancake_order_for_delivery (joined to call_logs via workspace + assignee + delivery date + rider/customer phone) instead of pancake_user_rmo_daily_reports — same aggregation logic the SyncCsrRmoDailyRecords command used, just evaluated at request time',
+                ],
+            },
+            {
+                title: 'CSR Analytics — ERP Toggle Disabled',
+                items: [
+                    'ERP option in the POS / ERP toggle is temporarily disabled (greyed out, unclickable) while the ERP data path is being reworked; POS remains the default and only selectable mode',
+                ],
+            },
+            {
+                title: 'Scheduler — Analytics Rollup Paused',
+                items: [
+                    'Hourly and back-fill analytics:rollup schedules in routes/console.php are commented out now that POS / RMO analytics no longer depend on the rollup tables — frees the queue from redundant work',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.6',
+        date: '2026-05-07',
+        sections: [
+            {
+                title: 'Onboarding — Help Panel',
+                items: [
+                    'Added a "Need help getting started?" panel under the onboarding form with three quick links: a setup-tutorial video, an email shortcut to hello@artemis.ph, and a Facebook message link — each with an icon and emerald hover accent that matches the brand palette',
+                ],
+            },
+            {
+                title: 'Onboarding — Sync Complete',
+                items: [
+                    'After the initial sync finishes, the onboarding page now does a full reload instead of an Inertia visit — server-side props (workspace flags, sync timestamps, sidebar visibility) refresh cleanly so the dashboard renders with up-to-date state on first paint',
+                ],
+            },
+            {
+                title: 'Dashboard — Default Date Range',
+                items: [
+                    'Dashboard date range now defaults to "start of month → yesterday" instead of "start of month → end of month" so the chart no longer extends into future days and dilutes today\'s metrics with empty buckets',
+                ],
+            },
+            {
+                title: 'Pancake Sync — Initial Backfill Window',
+                items: [
+                    "First-time Pancake page connect (and the Refresh button on Pages) now backfills 1 month of orders and shop customers instead of 3 months, cutting onboarding sync time and keeping queue load proportional to a typical seller's active window",
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.5',
+        date: '2026-05-06',
+        sections: [
+            {
+                title: 'Botcake — Module Toggle',
+                items: [
+                    "Added a per-workspace botcake_module_enabled flag — the Botcake nav group (Sequences + Flows) is hidden from the sidebar when the module is off, and any permission with the Botcake category is filtered out of the user's effective permission set",
+                ],
+            },
+            {
+                title: 'Botcake — Overall vs Historical Stats',
+                items: [
+                    'Flows and Sequences index pages now have an Overall / Historical toggle; Historical reveals a date-range picker (defaulting to the last 7 days) and re-aggregates Sent / Phone Numbers / Success Rate from the new daily delta tables',
+                    'FetchFlowStatistics and FetchSequenceStatistics now compute per-day deltas against the prior cumulative snapshot (clamped at 0 to absorb counter resets) so historical sums add up to real activity within any window — the cumulative-as-of-now value is still saved on the Flow / SequenceMessage row for the Overall view',
+                    'Trigger commands renamed under the botcake: namespace (botcake:trigger-fetch-flows, botcake:trigger-fetch-sequences, botcake:trigger-fetch-flow-statistics, botcake:trigger-fetch-sequence-statistics); old names kept as aliases',
+                    'Stats triggers now chunk through Flows / Sequences in batches of 200 instead of fetching all at once, preventing memory spikes on workspaces with thousands of records',
+                ],
+            },
+            {
+                title: 'Botcake — Schema & Code Layout',
+                items: [
+                    'botcake_flows, botcake_sequences, and botcake_sequence_messages now use the Botcake-supplied id directly as the primary key — collapsing the previous (auto-increment id + flow_id / sequence_id / message_id) split into a single column. The migration drops and recreates the six related tables to apply the change',
+                    'Web controllers for Flows and Sequences moved from app/Http/Controllers/Workspaces/Botcake/ into Modules/Botcake/Http/Controllers/Web/, keeping module-owned code inside the module',
+                ],
+            },
+            {
+                title: 'Telescope & Horizon — Access Control',
+                items: [
+                    'Both /telescope and /horizon now require is_super_admin = true in non-local environments — non-super-admin users get a 403 instead of seeing the dashboards. Local development continues to bypass the gate via the framework default',
+                ],
+            },
+            {
+                title: 'Workspace Middleware — Lookup Fallbacks',
+                items: [
+                    "CheckWorkspace now falls back to the route-bound {workspace} parameter and the user's session current_workspace_id when the X-Workspace-Id header is absent, so URL-scoped routes don't need clients to set the header explicitly",
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.4',
+        date: '2026-05-06',
+        sections: [
+            {
+                title: 'Inventory — SKU Uniqueness',
+                items: [
+                    'Editing an inventory item now rejects a SKU that is already used by another item in the same workspace, returning a clear validation error instead of silently saving a duplicate',
+                ],
+            },
+            {
+                title: 'Call Logs API — Idempotent Sync',
+                items: [
+                    'Public /call-logs/sync endpoint now upserts on (workspace, user, phone number, call date, call time) so re-syncing the same logs from the mobile app no longer creates duplicate rows',
+                    'Response now returns a synced count alongside total, and incoming timestamps are preserved as-sent rather than re-anchored to the app timezone',
+                ],
+            },
+            {
+                title: 'Purchased Orders — Create Feedback',
+                items: [
+                    'Creating a purchased order now shows a success toast on save and an error toast (with console-logged validation details) when the form fails, matching the edit-flow behaviour',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.3',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'Sign-up — Terms & Privacy',
+                items: [
+                    'Registration form now requires checking an "I agree to the Terms & Conditions and Privacy Policy" box before submit, with links opening the legal pages in a new tab',
+                    'Backend validates the acceptance flag and returns a clear error ("You must accept the Terms & Conditions to create an account.") if it is missing',
+                ],
+            },
+            {
+                title: 'Plans — New Enterprise Tier',
+                items: [
+                    'Added a new Enterprise plan to the pricing line-up: custom pricing, unlimited orders and pages, 24-month data retention, full analytics, Parcel Journey SMS included, and dedicated support',
+                    'Re-balanced Scale to ₱14,999/mo (down from ₱19,999) to slot under the new Enterprise tier',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.2',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'Plans — Pricing & Page Limits',
+                items: [
+                    'Re-priced and capped page counts on paid tiers: Starter ₱1,499→₱2,999 with a 5-page cap, Growth ₱3,999→₱5,999 with 25 pages, Scale ₱9,999→₱19,999 with 100 pages',
+                    'Parcel Journey SMS is now bundled (free) on every paid tier — removed the per-message rates (₱0.50 / ₱0.35 / ₱0.20) and turned SMS on for Starter so every paid plan includes it',
+                ],
+            },
+            {
+                title: 'Marketing Site',
+                items: [
+                    'Landing page now consistently reads "30-day free trial" everywhere (hero subline, pricing card label, pricing card lede, final CTA, and FAQ) — matches the actual trial length',
+                ],
+            },
+            {
+                title: 'Navigation',
+                items: [
+                    'Removed the Changelog item from the public sidebar; it stays reachable directly at /changelog',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.1',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'Pages — Plan Limits',
+                items: [
+                    'Pages list now enforces the workspace\'s plan page limit — the index shows an "X/Y pages used" indicator under the Add New Page button, the button disables once the limit is reached, and a tooltip points to upgrading the plan',
+                    'Backend now blocks the Add Page flow when the limit is hit (both the create page and the store endpoint) with a clear validation message instead of letting the request through silently',
+                ],
+            },
+            {
+                title: 'Free Trial Plan',
+                items: [
+                    'Bumped Free Trial defaults so new workspaces get a more useful evaluation: 10,000 order cap (was unlimited), 6 months of data retention (was 1), full analytics tier (was basic), Parcel Journey SMS enabled, and priority chat support',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.0',
+        date: '2026-05-05',
+        sections: [
+            {
+                title: 'RTS — RMO Management',
+                items: [
+                    'Split the single "Only my data" toggle into two independent filters — "My Assignee Only" and "My Confirmee Only" — so reps can narrow the list to orders they confirmed separately from those assigned to them, and combine both when needed',
+                    'Public endpoint and CSV export now accept a confirmee_id filter (mirrors the existing assignee_id filter), and toggle state is persisted per browser via localStorage',
+                ],
+            },
+            {
+                title: 'Subscription Gate & Syncing Modal',
+                items: [
+                    'Restored the subscription-expired gate on every authenticated Inertia page — workspaces with an expired, cancelled, or lapsed trial/active subscription are surfaced the upgrade modal with active non-trial plans (skipped on local environments)',
+                    'Restored the "syncing data" modal that appears on first connect until at least one page finishes its initial order sync; copy softened to "Please be patient." now that the sync runs in the background',
+                ],
+            },
+            {
+                title: 'Onboarding — Initial Sync Window',
+                items: [
+                    'First-time Pancake page connect now backfills 3 months of orders and shop customers (was 1 month), so newly onboarded workspaces have deeper history available immediately',
+                ],
+            },
+            {
+                title: 'Mobile / Public API — Call Logs',
+                items: [
+                    'Synced call-log timestamps are now normalised to the workspace timezone before storage, eliminating the off-by-hours drift on the KPI screen',
+                    'Total talk time KPI now only counts calls whose phone number matches a delivery on that date (customer or rider phone on pancake_order_for_delivery), giving an accurate read of talk time tied to actual delivery work',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.5.0',
+        date: '2026-05-04',
+        sections: [
+            {
+                title: 'Analytics',
+                items: [
+                    'Page-view analytics via PostHog — tracks Inertia route changes, identifies the signed-in user, and groups events by workspace so funnels and retention can be sliced per workspace',
+                    'Toggleable per environment via the VITE_POSTHOG_DISABLED flag, so local development stays out of production analytics',
+                ],
+            },
+            {
+                title: 'Pancake — Order Sync',
+                items: [
+                    'Consolidated the separate shipped-orders sync into the main page-orders job — at 9 AM, 12 PM, 3 PM, 6 PM, and 9 PM the run pulls shipped orders (filter_status[]=2); other runs pull orders updated since the last sync',
+                    'Removed the standalone trigger-fetch-page-shipped-orders command and FetchPageShippedOrders job — same coverage with one scheduled command instead of two',
+                    'trigger-fetch-page-orders now runs hourly (was every 30 minutes), reducing duplicate fetch overhead now that shipped pulls are interleaved',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.4.1',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Inventory — Purchased Orders',
+                items: [
+                    'List now shows subtotal and summary totals for the active filtered view, so you can see overall delivery fee and total amount without exporting',
+                    'Excel export includes the same summary rows at the bottom of the file',
+                ],
+            },
+            {
+                title: 'Finance — Transactions',
+                items: [
+                    'Index page now surfaces totals for credit (in) and debit (out) across the active filters, giving a quick read on cashflow without leaving the page',
+                ],
+            },
+            {
+                title: 'Inventory — Stock Transactions',
+                items: [
+                    'Date-range filter added to the stock transactions list, with the selection preserved across pagination and sort',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.4.0',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Pancake — Courier Shipments',
+                items: [
+                    'New Courier Shipments page under Pancake — import courier reports (xlsx) and reconcile them against your Pancake orders by waybill / tracking code',
+                    'J&T Express xlsx importer — uploads are parsed, upserted by (workspace, courier, waybill), and automatically linked to the matching pancake_orders row',
+                    'Totals strip surfaces overall and matched-only sums for total shipping cost, COD fee, COD collected, and receivable freight, so you can see exactly how much shipping fee is tied to confirmed Pancake orders',
+                    'List supports search by waybill / order # / receiver / phone, matched-only or unmatched-only filters, pickup-date range, and sortable shipping-cost columns',
+                    'Two new role permissions — View Courier Shipments and Import Courier Shipments — assignable from the Roles screen',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.3.2',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Inventory — Purchased Orders',
+                items: [
+                    'List now defaults to sorting by issue date (newest first) instead of created date, so the most recently issued POs surface at the top',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.3.1',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Inventory — Purchased Orders',
+                items: [
+                    'Search the list by delivery no., customer PO, or control no.',
+                    'Filter the list by issue-date range, with the selection preserved across pagination and sort',
+                    'Export CSV now respects the active search, date range, and sort',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.3.0',
+        date: '2026-05-01',
+        sections: [
+            {
+                title: 'Admin — Subscription Plans',
+                items: [
+                    'New Subscription Plans admin panel — create, edit, and manage plans with pricing, trial settings, and feature flags',
+                    'Plan list with quick row actions and a shared form between create and edit screens',
+                    'Subscription plan seeder updated to match the new schema, safe to re-run idempotently',
+                ],
+            },
+            {
+                title: 'Admin — Workspaces',
+                items: [
+                    'Workspace Management panel reworked — sidebar logo and workspace name added, plus richer per-workspace controls for plan, subscription, and trial state',
+                    'Inline plan assignment and subscription edits directly from the workspaces list',
+                ],
+            },
+            {
+                title: 'Subscriptions',
+                items: [
+                    'Core subscription management and 30-day free trial — new workspaces start on a one-month trial that auto-expires via a scheduled command',
+                    'Subscription Expired modal — gracefully blocks workspace access when an active plan lapses, with a clear path to upgrade',
+                    'Syncing Data modal — friendlier first-run state while initial workspace data is being pulled in',
+                    'Subscription gate is temporarily disabled in production while the billing flow is finalised — workspaces continue working as normal in the meantime',
+                ],
+            },
+            {
+                title: 'Workspaces — Onboarding',
+                items: [
+                    'New onboarding flow at /workspaces/onboarding — guided first-run setup that lands new workspaces in a ready-to-use state without manual configuration',
+                ],
+            },
+            {
+                title: 'Public API — Call Logs',
+                items: [
+                    'Two new Bearer-token endpoints under /api/v1/public for call log listing and KPI summary',
+                    'CSR mobile clients can now read call log data directly without going through the workspace UI',
+                ],
+            },
+            {
+                title: 'Dashboard',
+                items: [
+                    'Header and dashboard filter — alignment and reset behaviour fixed; selections now persist correctly across navigation',
+                    'Statistic breakdown — removed a duplicate total row that was double-counting in summary cards',
+                ],
+            },
+            {
+                title: 'RTS Analytics',
+                items: [
+                    'Breakdown chart x-axis labels now align cleanly with extra bottom padding, so dates no longer overlap on dense ranges',
+                ],
+            },
+            {
+                title: 'Inventory',
+                items: [
+                    'Inventory Items — row-level filtering fixed; filters now apply correctly on first load',
+                    'Purchased Orders — total computation fix on the create screen',
+                ],
+            },
+            {
+                title: 'Checklist',
+                items: [
+                    'Edit Checklist — fixed a mobile-only bug that prevented edits from saving',
+                    'Add Task dialog — sorting and notification handling tightened',
+                ],
+            },
+            {
+                title: 'Polish',
+                items: [
+                    'Tab titles normalised to "Artemis | <Page>" across both client and SSR for consistent browser tab labels everywhere',
+                    'Sidebar settings entry removed in favour of inline controls already available elsewhere',
+                    'Small visual cleanups across workspace switcher, app header, and sidebar',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.2.0',
+        date: '2026-04-30',
+        sections: [
+            {
+                title: 'Analytics — Live by default',
+                items: [
+                    'Dashboard cards and breakdowns now compute directly from pancake_orders instead of the hourly rollup table, so numbers reflect activity in near real time rather than waiting for the next rollup pass',
+                    'Opt back into the rollup by passing ?source=rollup on the analytics endpoints — useful when you want a faster (but slightly stale) read or to compare values against the rollup baseline',
+                    'Per-metric source toggle — each metric class can be flipped between live and rollup independently via setSource(); RtsRate, the avg-days metrics, and the count/amount metrics all support both modes',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.1.0',
+        date: '2026-04-28',
+        sections: [
+            {
+                title: 'Finance — Transactions',
+                items: [
+                    'Export CSV — download the current transactions view as a CSV file with date, account, description, type, transaction type, sub-category, amount, running balance, and notes',
+                    'Date range filter — filter transactions by date directly from the toolbar, with the selection preserved across pagination and other filters',
+                ],
+            },
+            {
+                title: 'Finance — Remittances',
+                items: [
+                    'Edit remittances in place — new Edit action in the row dropdown on the remittances list and a dedicated Edit button on the remittance detail page',
+                    'Date range filter on the remittances list, matching against the billing period',
+                    'Linked Transaction picker now only lists remittance-type transactions and shows amounts formatted in pesos (₱) for easier scanning',
+                ],
+            },
+            {
+                title: 'Fixes',
+                items: [
+                    'Pages — removed a dead duplicate dispatch in the manual refresh path',
+                    'SuperAdmin — fixed a casing mismatch on the workspaces index that prevented the page from resolving on case-sensitive filesystems',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.0.2',
+        date: '2026-04-27',
+        sections: [
+            {
+                title: 'Fixes',
+                items: [
+                    'Analytics Rollup — page daily metrics with no activity (all-zero counts and amounts) are no longer written to the rollup table, keeping the metrics dataset compact and avoiding empty rows for inactive pages',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.0.1',
+        date: '2026-04-27',
+        sections: [
+            {
+                title: 'Fixes',
+                items: [
+                    'Purchased Orders — fixed a missing AuthorizesRequests import that caused authorization checks to fail on the Purchased Orders controller',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.0.0',
+        date: '2026-04-27',
+        sections: [
+            {
+                title: 'Artemis — Public Launch',
+                items: [
+                    'Rebranded from ecomm-control-hub to Artemis — the analytics & automation platform for Philippine COD e-commerce',
+                    'New public marketing site with Hunt down RTS positioning — hero, problem, features, free trial, how it works, real seller results, and FAQ sections',
+                    'New /rts-calculator page — sellers can quantify their monthly RTS bleed in pesos before signing up',
+                    'New about, blog, contact, privacy, terms, data-policy, and security pages',
+                    'New Artemis logo, emerald brand palette, and dark/light theme toggle on all marketing pages',
+                ],
+            },
+            {
+                title: 'Subscriptions',
+                items: [
+                    'Subscription management UI — workspaces can now view their plan, current period, and billing status',
+                    'Plan selection and upgrade flow built on top of the v2.7.1 subscriptions foundation',
+                    '14-day free trial flow — new workspaces start on a trial subscription with no credit card required',
+                    'Plan tier gating across feature surfaces (gracefully shown rather than hidden when out of plan)',
+                ],
+            },
+            {
+                title: 'Roles & Permissions',
+                items: [
+                    'Reworked permissions engine — roles now resolve through a single source of truth across workspace, module, and action layers',
+                    'Per-action permission checks across Members, Roles, Orders, Products, Teams, Inventory, Reports, Shops, and API Keys',
+                    'Workspace members with the manage-api-keys permission can now generate and revoke API keys without owner intervention',
+                    'Bypass mode for owner-level accounts to keep workspace recovery flows working when permissions are misconfigured',
+                ],
+            },
+            {
+                title: 'Finance — Remittances',
+                items: [
+                    'Detailed remittance management view with per-account balance, transaction history, and date-range filters',
+                    'Bulk import from Excel — paste or upload remittance entries in batches with validation and preview before commit',
+                    'Inline edit and delete of individual remittance entries from the management view',
+                ],
+            },
+            {
+                title: 'Shops',
+                items: [
+                    'Shops management view aligned with the Pages experience — search, sort, filter, and per-shop checklist progress',
+                    'Per-shop status badge and last-sync indicator',
+                ],
+            },
+            {
+                title: 'Performance & Polish',
+                items: [
+                    'Optimization pass on dashboard and analytics queries — faster initial loads with smaller payloads',
+                    'New skeleton loading states across dashboard, RTS analytics, and inventory pages',
+                    'Sidebar scrollbar fix — no longer overlaps content on narrow viewports',
+                    'Metrics pipeline tightened — fewer redundant recalculations across workspace metrics',
+                ],
+            },
+            {
+                title: 'Internal',
+                items: [
+                    'Marketing plan, content playbook, and post calendar documents added to the repository for the launch',
+                    'Project documentation refreshed to reflect the Artemis brand and RTS-first positioning',
+                ],
+            },
+        ],
+    },
     {
         version: 'v2.7.1',
         date: '2026-04-24',
@@ -88,9 +694,7 @@ const changelog: ChangelogEntry[] = [
             },
             {
                 title: 'Finance',
-                items: [
-                    'Initial rollout of finance features (feat/finance)',
-                ],
+                items: ['Initial rollout of finance features (feat/finance)'],
             },
             {
                 title: 'Parcel Journey',
@@ -101,9 +705,7 @@ const changelog: ChangelogEntry[] = [
             },
             {
                 title: 'Internal',
-                items: [
-                    'Sentry integration added for error monitoring',
-                ],
+                items: ['Sentry integration added for error monitoring'],
             },
         ],
     },
@@ -165,7 +767,7 @@ const changelog: ChangelogEntry[] = [
             {
                 title: 'RMO Management',
                 items: [
-                    'Status picker, Assign to me, and Remove assignee are disabled unless the order\'s delivery date is today — backend validation mirrors the UI',
+                    "Status picker, Assign to me, and Remove assignee are disabled unless the order's delivery date is today — backend validation mirrors the UI",
                     'Date picker moved to the right side of the toolbar, next to the Show/Hide Statistics button',
                 ],
             },
@@ -265,9 +867,7 @@ const changelog: ChangelogEntry[] = [
         sections: [
             {
                 title: 'Fixes',
-                items: [
-                    'New CSR users now default to ACTIVE status',
-                ],
+                items: ['New CSR users now default to ACTIVE status'],
             },
         ],
     },
@@ -557,6 +1157,15 @@ const changelog: ChangelogEntry[] = [
 ];
 
 const versionColors: Record<string, string> = {
+    'v3.3.0':
+        'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 ring-yellow-500/20',
+    'v3.1.0': 'bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20',
+    'v3.0.2':
+        'bg-teal-500/10 text-teal-600 dark:text-teal-400 ring-teal-500/20',
+    'v3.0.1':
+        'bg-green-500/10 text-green-600 dark:text-green-400 ring-green-500/20',
+    'v3.0.0':
+        'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20',
     'v2.7.1':
         'bg-lime-500/10 text-lime-600 dark:text-lime-400 ring-lime-500/20',
     'v2.7.0':
@@ -601,11 +1210,20 @@ export default function Changelog() {
                 {/* Header */}
                 <header className="border-b border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-                        <Link href={home().url} className="flex items-center gap-2.5">
-                            <img src="/img/logo/artemis.png" alt="Artemis" className="h-7 w-7 object-contain" />
-                            <span className="font-semibold tracking-tight text-gray-900 dark:text-white">Artemis</span>
+                        <Link
+                            href={home().url}
+                            className="flex items-center gap-2.5"
+                        >
+                            <img
+                                src="/img/logo/artemis.png"
+                                alt="Artemis"
+                                className="h-7 w-7 object-contain"
+                            />
+                            <span className="font-semibold tracking-tight text-gray-900 dark:text-white">
+                                Artemis
+                            </span>
                         </Link>
-                        <span className="font-mono text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                        <span className="font-mono text-[11px] font-semibold tracking-widest text-gray-400 uppercase dark:text-gray-500">
                             Changelog
                         </span>
                     </div>
@@ -644,19 +1262,21 @@ export default function Changelog() {
                                 <div className="space-y-5">
                                     {entry.sections.map((section) => (
                                         <div key={section.title}>
-                                            <p className="mb-2.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                                            <p className="mb-2.5 font-mono text-[10px] font-semibold tracking-widest text-gray-400 uppercase dark:text-gray-500">
                                                 {section.title}
                                             </p>
                                             <ul className="space-y-1.5">
-                                                {section.items.map((item, i) => (
-                                                    <li
-                                                        key={i}
-                                                        className="flex items-start gap-2.5 font-mono text-[12px] text-gray-600 dark:text-gray-400"
-                                                    >
-                                                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300 dark:bg-zinc-600" />
-                                                        {item}
-                                                    </li>
-                                                ))}
+                                                {section.items.map(
+                                                    (item, i) => (
+                                                        <li
+                                                            key={i}
+                                                            className="flex items-start gap-2.5 font-mono text-[12px] text-gray-600 dark:text-gray-400"
+                                                        >
+                                                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300 dark:bg-zinc-600" />
+                                                            {item}
+                                                        </li>
+                                                    ),
+                                                )}
                                             </ul>
                                         </div>
                                     ))}
@@ -666,7 +1286,8 @@ export default function Changelog() {
                     </div>
 
                     <p className="mt-8 text-center font-mono text-[11px] text-gray-400 dark:text-gray-600">
-                        © {new Date().getFullYear()} Artemis. All rights reserved.
+                        © {new Date().getFullYear()} Artemis. All rights
+                        reserved.
                     </p>
                 </main>
             </div>

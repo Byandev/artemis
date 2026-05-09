@@ -38,6 +38,9 @@ interface PagesProps {
             search?: string
         }
     }
+    pageLimit?: number | null
+    pageCount?: number
+    pageLimitReached?: boolean
 }
 
 const StatusBadge = ({ status }: { status: 'active' | 'inactive' }) => {
@@ -90,7 +93,7 @@ const ChecklistsBadge = ({ pending }: { pending: number }) => {
     );
 };
 
-const Pages = ({ pages, workspace, query }: PagesProps) => {
+const Pages = ({ pages, workspace, query, pageLimit, pageCount, pageLimitReached }: PagesProps) => {
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
@@ -248,9 +251,27 @@ const Pages = ({ pages, workspace, query }: PagesProps) => {
             <Head title={`${workspace.name} - Pages`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader title="Pages" description="Manage your shop pages and their connected stores">
-                    <Button size="sm" onClick={handleCreate}>
-                        Add New Page
-                    </Button>
+                    <div className="flex flex-col items-end gap-1">
+                        <Button
+                            size="sm"
+                            onClick={handleCreate}
+                            disabled={pageLimitReached}
+                            title={pageLimitReached ? `Page limit reached (${pageCount}/${pageLimit}). Upgrade your plan to add more.` : undefined}
+                        >
+                            Add New Page
+                        </Button>
+                        {pageLimit != null && (
+                            <span className={clsx(
+                                'font-mono text-[10px] uppercase tracking-wider',
+                                pageLimitReached
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                    : 'text-gray-400 dark:text-gray-500',
+                            )}>
+                                {pageCount ?? 0}/{pageLimit} pages used
+                                {pageLimitReached && ' · upgrade to add more'}
+                            </span>
+                        )}
+                    </div>
                 </PageHeader>
 
                 <div className="mb-3 flex items-center gap-2">

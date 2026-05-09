@@ -63,7 +63,6 @@ export function RemittanceFormDialog({ open, onOpenChange, remittance, workspace
 
     const [codFeeOverride, setCodFeeOverride] = useState(false);
     const [codFeeVatOverride, setCodFeeVatOverride] = useState(false);
-    const [txnSearch, setTxnSearch] = useState('');
 
     useEffect(() => {
         if (open) {
@@ -91,7 +90,6 @@ export function RemittanceFormDialog({ open, onOpenChange, remittance, workspace
                 setCodFeeOverride(false);
                 setCodFeeVatOverride(false);
             }
-            setTxnSearch('');
         }
     }, [open, remittance]);
 
@@ -121,18 +119,6 @@ export function RemittanceFormDialog({ open, onOpenChange, remittance, workspace
     useEffect(() => {
         if (net !== data.net_amount) setData('net_amount', net);
     }, [net]);
-
-    const filteredTxns = useMemo(() => {
-        const q = txnSearch.trim().toLowerCase();
-        const list = q
-            ? transactions.filter(t =>
-                t.description.toLowerCase().includes(q) ||
-                String(t.id).includes(q) ||
-                String(t.amount).includes(q) ||
-                (t.account?.name ?? '').toLowerCase().includes(q))
-            : transactions;
-        return list.slice(0, 50);
-    }, [txnSearch, transactions]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -236,23 +222,15 @@ export function RemittanceFormDialog({ open, onOpenChange, remittance, workspace
                         </Field>
 
                         <Field label="Linked Transaction" error={errors.transaction_id}>
-                            <input
-                                type="text"
-                                placeholder="Search by description, account, amount..."
-                                value={txnSearch}
-                                onChange={(e) => setTxnSearch(e.target.value)}
-                                className={`${inputCls} mb-2`}
-                            />
                             <select
                                 value={data.transaction_id}
                                 onChange={(e) => setData('transaction_id', e.target.value)}
                                 className={inputCls}
-                                size={Math.min(6, filteredTxns.length + 1) || 1}
                             >
                                 <option value="">— none —</option>
-                                {filteredTxns.map((t) => (
+                                {transactions.map((t) => (
                                     <option key={t.id} value={t.id}>
-                                        {String(t.date).slice(0, 10)} · {t.account?.name ?? '—'} · {t.type.toUpperCase()} {Number(t.amount).toLocaleString()} · {t.description}
+                                        {String(t.date).slice(0, 10)} · {t.account?.name ?? '—'} · ₱{Number(t.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · {t.description}
                                     </option>
                                 ))}
                             </select>

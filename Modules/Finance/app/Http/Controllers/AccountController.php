@@ -2,8 +2,10 @@
 
 namespace Modules\Finance\Http\Controllers;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Finance\Http\Requests\AccountRequest;
@@ -14,6 +16,8 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class AccountController extends Controller
 {
+    use AuthorizesRequests;
+
     protected function guard(Request $request, Workspace $workspace): void
     {
         if (! $request->user()->isMemberOf($workspace)) {
@@ -31,6 +35,7 @@ class AccountController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewFinanceAccounts->value, $workspace);
 
         $accounts = QueryBuilder::for(Account::where('workspace_id', $workspace->id)->withCount(['transactions']))
             ->allowedFilters([
@@ -39,7 +44,7 @@ class AccountController extends Controller
             ])
             ->allowedSorts(['id', 'name', 'currency', 'is_active', 'created_at'])
             ->defaultSort('name')
-            ->paginate(15)
+            ->paginate($request->input('per_page', 15))
             ->withQueryString();
 
         // Get last transaction per account for running_balance
@@ -68,7 +73,7 @@ class AccountController extends Controller
             'workspace' => $workspace,
             'accounts' => $accounts,
             'query' => [
-                ...$request->only(['sort', 'perPage', 'page']),
+                ...$request->only(['sort', 'per_page', 'page']),
                 'filter' => $request->input('filter', []),
             ],
         ]);
@@ -77,6 +82,7 @@ class AccountController extends Controller
     public function store(AccountRequest $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::CreateFinanceAccounts->value, $workspace);
 
         Account::create([...$request->validated(), 'workspace_id' => $workspace->id]);
 
@@ -87,6 +93,7 @@ class AccountController extends Controller
     public function show(Request $request, Workspace $workspace, Account $account)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewFinanceAccounts->value, $workspace);
         $this->ensureOwns($workspace, $account);
 
         $transactions = $account->transactions()
@@ -105,6 +112,7 @@ class AccountController extends Controller
     public function update(AccountRequest $request, Workspace $workspace, Account $account)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::EditFinanceAccounts->value, $workspace);
         $this->ensureOwns($workspace, $account);
 
         $account->update($request->validated());
@@ -116,6 +124,7 @@ class AccountController extends Controller
     public function destroy(Request $request, Workspace $workspace, Account $account)
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::DeleteFinanceAccounts->value, $workspace);
         $this->ensureOwns($workspace, $account);
 
         $account->delete();

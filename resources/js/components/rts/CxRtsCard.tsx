@@ -15,7 +15,7 @@ export default function CxRtsCard({ workspaceSlug, queryParams, onDataLoaded }: 
     const [type, setType] = useState<'latest' | 'initial'>('latest');
     const [refreshKey, setRefreshKey] = useState(0);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     useEffect(() => {
         let cancelled = false;
         setLoading(true);
@@ -30,8 +30,8 @@ export default function CxRtsCard({ workspaceSlug, queryParams, onDataLoaded }: 
 
     return (
         <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
-            <div className="flex items-center justify-between border-b border-black/6 dark:border-white/6 px-5 py-4">
-                <div>
+            <div className="flex flex-col gap-3 border-b border-black/6 px-5 py-4 dark:border-white/6 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
                     <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">By Customer RTS (Phone Number Report)</h2>
                     <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
                         {type === 'latest'
@@ -39,7 +39,7 @@ export default function CxRtsCard({ workspaceSlug, queryParams, onDataLoaded }: 
                             : 'Initial report — RTS rate at the time the order was placed'}
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                     <div className="flex overflow-hidden rounded-lg border border-black/8 text-[12px] font-medium dark:border-white/8">
                         <button
                             onClick={() => setType('latest')}

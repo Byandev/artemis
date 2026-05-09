@@ -4,8 +4,8 @@ namespace Database\Seeders;
 
 use App\Models\SubscriptionPlan;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class SubscriptionPlanSeeder extends Seeder
 {
@@ -21,27 +21,27 @@ class SubscriptionPlanSeeder extends Seeder
                 'code' => SubscriptionPlan::CODE_FREE_TRIAL,
                 'name' => 'Free Trial',
                 'price_php' => 0,
-                'order_limit' => null,
+                'order_limit' => 10000,
                 'page_limit' => 1,
-                'data_retention_months' => 1,
-                'analytics_tier' => SubscriptionPlan::ANALYTICS_BASIC,
+                'data_retention_months' => 6,
+                'analytics_tier' => SubscriptionPlan::ANALYTICS_FULL,
                 'parcel_journey_rate_php' => null,
-                'parcel_journey_sms_enabled' => false,
-                'support_tier' => SubscriptionPlan::SUPPORT_CHAT,
-                'trial_days' => 14,
+                'parcel_journey_sms_enabled' => true,
+                'support_tier' => SubscriptionPlan::SUPPORT_PRIORITY_CHAT,
+                'trial_days' => 30,
                 'is_active' => true,
                 'sort_order' => 1,
             ],
             [
                 'code' => SubscriptionPlan::CODE_STARTER,
                 'name' => 'Starter',
-                'price_php' => 1499,
-                'order_limit' => 5000,
-                'page_limit' => 3,
+                'price_php' => 2999,
+                'order_limit' => 3000,
+                'page_limit' => 5,
                 'data_retention_months' => 3,
                 'analytics_tier' => SubscriptionPlan::ANALYTICS_BASIC,
-                'parcel_journey_rate_php' => 3.00,
-                'parcel_journey_sms_enabled' => false,
+                'parcel_journey_rate_php' => null,
+                'parcel_journey_sms_enabled' => true,
                 'support_tier' => SubscriptionPlan::SUPPORT_CHAT,
                 'trial_days' => null,
                 'is_active' => true,
@@ -50,12 +50,12 @@ class SubscriptionPlanSeeder extends Seeder
             [
                 'code' => SubscriptionPlan::CODE_GROWTH,
                 'name' => 'Growth',
-                'price_php' => 4999,
-                'order_limit' => 15000,
-                'page_limit' => 10,
-                'data_retention_months' => 12,
+                'price_php' => 5999,
+                'order_limit' => 10000,
+                'page_limit' => 25,
+                'data_retention_months' => 6,
                 'analytics_tier' => SubscriptionPlan::ANALYTICS_FULL,
-                'parcel_journey_rate_php' => 2.50,
+                'parcel_journey_rate_php' => null,
                 'parcel_journey_sms_enabled' => true,
                 'support_tier' => SubscriptionPlan::SUPPORT_PRIORITY_CHAT,
                 'trial_days' => null,
@@ -65,17 +65,32 @@ class SubscriptionPlanSeeder extends Seeder
             [
                 'code' => SubscriptionPlan::CODE_SCALE,
                 'name' => 'Scale',
-                'price_php' => 9999,
+                'price_php' => 14999,
                 'order_limit' => 30000,
-                'page_limit' => null,
-                'data_retention_months' => 24,
+                'page_limit' => 100,
+                'data_retention_months' => 12,
                 'analytics_tier' => SubscriptionPlan::ANALYTICS_FULL,
-                'parcel_journey_rate_php' => 2.00,
+                'parcel_journey_rate_php' => null,
                 'parcel_journey_sms_enabled' => true,
                 'support_tier' => SubscriptionPlan::SUPPORT_DEDICATED,
                 'trial_days' => null,
                 'is_active' => true,
                 'sort_order' => 4,
+            ],
+            [
+                'code' => SubscriptionPlan::CODE_ENTERPRISE,
+                'name' => 'Enterprise',
+                'price_php' => 0, // Custom — negotiated per customer; UI displays "Custom"
+                'order_limit' => null, // unlimited
+                'page_limit' => null,  // unlimited
+                'data_retention_months' => 24,
+                'analytics_tier' => SubscriptionPlan::ANALYTICS_FULL,
+                'parcel_journey_rate_php' => null,
+                'parcel_journey_sms_enabled' => true,
+                'support_tier' => SubscriptionPlan::SUPPORT_DEDICATED,
+                'trial_days' => null,
+                'is_active' => true,
+                'sort_order' => 5,
             ],
         ];
 

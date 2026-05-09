@@ -50,6 +50,9 @@ import { MoreHorizontal, Send, Trash2, UserMinus, CopyleftIcon, UserCog, KeyRoun
 import { useMemo, useState } from 'react';
 import { Role } from '@/types/models/Role';
 import { toast } from 'sonner';
+import { Can } from '@/components/can';
+import { usePermission } from '@/hooks/use-permission';
+import { PERMISSIONS } from '@/constants/permissions';
 
 interface Invitation {
     id: number;
@@ -82,7 +85,12 @@ interface Props {
 
 export default function WorkspaceMembers({ workspace, members, pendingInvitations, isAdmin, query, roles }: Props) {
     const { auth } = usePage<SharedData>().props;
-    const canRemoveMembers = auth?.user?.id === workspace.owner_id;
+    const isOwner = auth?.user?.id === workspace.owner_id;
+    const canEditMembers = usePermission(PERMISSIONS.EditMembers);
+    const canRemoveMembersPerm = usePermission(PERMISSIONS.RemoveMembers);
+    const canRemoveMembers = isOwner || canRemoveMembersPerm;
+    const canResetPassword = usePermission(PERMISSIONS.ResetMemberPassword);
+    const canInvite = usePermission(PERMISSIONS.InviteMembers);
     const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
     const initialInvitationSorting = useMemo(() => toFrontendSort(query?.invitation_sort ?? null), [query?.invitation_sort]);
 
@@ -260,6 +268,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                 const member = row.original;
 
                 if (member.id === workspace.owner_id) return null;
+                if (!canEditMembers && !canRemoveMembers && !canResetPassword) return null;
 
                 return (
                     <DropdownMenu>
@@ -269,40 +278,35 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                                onClick={() => {
-                                    if (!isAdmin) {
-                                        showNoPermissionToast();
-
-                                        return;
-                                    }
-
-                                    setMemberToUpdateRole(member);
-                                    updateRoleForm.setData('role_id', member.pivot?.role_id?.toString() ?? '');
-                                }}
-                            >
-                                <UserCog className="mr-2 h-4 w-4" />
-                                Change Role
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => copyResetPasswordUrl(member)}>
-                                <KeyRound className="mr-2 h-4 w-4" />
-                                {copiedMemberId === member.id ? 'Copied!' : 'Copy Reset Link'}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onClick={() => {
-                                    if (!canRemoveMembers) {
-                                        showNoPermissionToast();
-                                        return;
-                                    }
-
-                                    setMemberToRemove(member);
-                                }}
-                                className="text-destructive focus:text-destructive"
-                            >
-                                <UserMinus className="mr-2 h-4 w-4" />
-                                Remove
-                            </DropdownMenuItem>
+                            {canEditMembers && (
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        setMemberToUpdateRole(member);
+                                        updateRoleForm.setData('role_id', member.pivot?.role_id?.toString() ?? '');
+                                    }}
+                                >
+                                    <UserCog className="mr-2 h-4 w-4" />
+                                    Change Role
+                                </DropdownMenuItem>
+                            )}
+                            {canResetPassword && (
+                                <DropdownMenuItem onClick={() => copyResetPasswordUrl(member)}>
+                                    <KeyRound className="mr-2 h-4 w-4" />
+                                    {copiedMemberId === member.id ? 'Copied!' : 'Copy Reset Link'}
+                                </DropdownMenuItem>
+                            )}
+                            {canRemoveMembers && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onClick={() => setMemberToRemove(member)}
+                                        className="text-destructive focus:text-destructive"
+                                    >
+                                        <UserMinus className="mr-2 h-4 w-4" />
+                                        Remove
+                                    </DropdownMenuItem>
+                                </>
+                            )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 );
@@ -355,7 +359,7 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
             cell: ({ row }) => {
                 const invitation = row.original;
 
-                if (!isAdmin) return null;
+                if (!isAdmin && !canInvite) return null;
 
                 return (
                     <DropdownMenu>
@@ -408,9 +412,11 @@ export default function WorkspaceMembers({ workspace, members, pendingInvitation
                             open={inviteDialogOpen}
                             onOpenChange={setInviteDialogOpen}
                         >
-                            <DialogTrigger asChild>
-                                <Button size="sm">Invite Member</Button>
-                            </DialogTrigger>
+                            <Can permission={PERMISSIONS.InviteMembers}>
+                                <DialogTrigger asChild>
+                                    <Button size="sm">Invite Member</Button>
+                                </DialogTrigger>
+                            </Can>
                             <DialogContent>
                                 <form onSubmit={handleInvite}>
                                     <DialogHeader>

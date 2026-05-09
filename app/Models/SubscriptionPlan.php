@@ -11,15 +11,23 @@ class SubscriptionPlan extends Model
     use HasFactory;
 
     public const CODE_FREE_TRIAL = 'free_trial';
+
     public const CODE_STARTER = 'starter';
+
     public const CODE_GROWTH = 'growth';
+
     public const CODE_SCALE = 'scale';
 
+    public const CODE_ENTERPRISE = 'enterprise';
+
     public const ANALYTICS_BASIC = 'basic';
+
     public const ANALYTICS_FULL = 'full';
 
     public const SUPPORT_CHAT = 'chat';
+
     public const SUPPORT_PRIORITY_CHAT = 'priority_chat';
+
     public const SUPPORT_DEDICATED = 'dedicated';
 
     protected $fillable = [

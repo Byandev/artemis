@@ -1,5 +1,5 @@
-import PageHeader from '@/components/common/PageHeader';
 import { TargetChecklistDrawer } from '@/components/checklist/target-checklist-drawer';
+import PageHeader from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -12,6 +12,7 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
 import { PaginatedData } from '@/types';
+import { Shop } from '@/types/models/Shop';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
@@ -22,9 +23,10 @@ import {
     MoreHorizontal,
     RefreshCw,
     Search,
+    Users,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Shop } from '@/types/models/Shop';
+import { toast } from 'sonner'; // Added toast import
 
 const ChecklistsBadge = ({ pending }: { pending: number }) => {
     const hasPending = pending > 0;
@@ -37,7 +39,12 @@ const ChecklistsBadge = ({ pending }: { pending: number }) => {
                     : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
             )}
         >
-            <span className={clsx('h-1.5 w-1.5 rounded-full', hasPending ? 'bg-amber-500' : 'bg-emerald-500')} />
+            <span
+                className={clsx(
+                    'h-1.5 w-1.5 rounded-full',
+                    hasPending ? 'bg-amber-500' : 'bg-emerald-500',
+                )}
+            />
             {hasPending ? `${pending} Pending` : 'Complete'}
         </span>
     );
@@ -47,15 +54,14 @@ interface ShopsPage {
     workspace: Workspace;
     pages: PaginatedData<Shop>;
     query?: {
-        sort?: string | null
-        perPage?: number | string
-        page?: number | string
+        sort?: string | null;
+        perPage?: number | string;
+        page?: number | string;
         filter?: {
-            search?: string
-        }
-    }
+            search?: string;
+        };
+    };
 }
-
 
 const Shops = ({ pages, workspace, query }: ShopsPage) => {
     const initialSorting = useMemo(() => {
@@ -89,7 +95,23 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
 
     const refresh = (shop: Shop) => {
         post(workspaces.shops.refresh.url({ workspace, shop }), {
-            onSuccess: () => alert('Refresh Started'),
+            onStart: () => toast.info(`Starting refresh for ${shop.name}...`),
+            onSuccess: () =>
+                toast.success(`${shop.name} data refreshed successfully.`),
+            onError: () =>
+                toast.error(
+                    `Failed to refresh ${shop.name}. Please try again.`,
+                ),
+        });
+    };
+
+    const refreshUsers = (shop: Shop) => {
+        post(workspaces.shops.refreshUsers.url({ workspace, shop }), {
+            onStart: () => toast.info(`Refreshing users for ${shop.name}...`),
+            onSuccess: () =>
+                toast.success(`${shop.name} users queued for refresh.`),
+            onError: () =>
+                toast.error(`Failed to refresh users for ${shop.name}.`),
         });
     };
 
@@ -122,7 +144,11 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                 <SortableHeader column={column} title={'Checklists'} />
             ),
             cell: ({ row }) => (
-                <ChecklistsBadge pending={Number(row.original.pending_required_checklists_count ?? 0)} />
+                <ChecklistsBadge
+                    pending={Number(
+                        row.original.pending_required_checklists_count ?? 0,
+                    )}
+                />
             ),
         },
         {
@@ -138,7 +164,9 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openChecklist(shop)}>
+                            <DropdownMenuItem
+                                onClick={() => openChecklist(shop)}
+                            >
                                 <ListChecks className="mr-2 h-4 w-4" />
                                 View Checklist
                             </DropdownMenuItem>
@@ -152,6 +180,13 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                                 {processing
                                     ? 'Refreshing...'
                                     : 'Refresh customers'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => refreshUsers(shop)}
+                                disabled={processing}
+                            >
+                                <Users className="mr-2 h-4 w-4" />
+                                Refresh users
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>

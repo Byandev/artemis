@@ -16,14 +16,14 @@ export function NavUser() {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <button className="flex h-9 items-center gap-2 rounded-xl border border-black/8 dark:border-white/8 bg-stone-50 dark:bg-zinc-800 pl-1 pr-2.5 transition-all hover:bg-stone-100 dark:hover:bg-zinc-700 outline-none cursor-pointer">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500 font-mono text-[11px] font-bold text-white shrink-0">
+                <button className="inline-flex h-8 min-w-0 max-w-full items-center gap-2 rounded-[8px] border border-black/8 dark:border-white/8 bg-black/[0.04] dark:bg-white/[0.05] px-2 transition-colors duration-150 outline-none cursor-pointer hover:bg-black/[0.07] dark:hover:bg-white/[0.08]">
+                    <div className="flex h-5 w-5 items-center justify-center rounded-[5px] bg-emerald-500 font-mono text-[10px] font-bold text-white shrink-0">
                         {getInitials(auth.user.name)}
                     </div>
-                    <span className="font-mono text-[12px] font-semibold text-gray-800 dark:text-gray-100 max-w-[140px] truncate">
+                    <span className="min-w-0 truncate font-mono text-[12px] font-medium text-gray-800 dark:text-gray-100">
                         {auth.user.name}
                     </span>
-                    <ChevronDown className="ml-1 h-3.5 w-3.5 text-gray-400 dark:text-gray-500 shrink-0" />
+                    <ChevronDown className="ml-1 hidden h-3.5 w-3.5 text-gray-400 dark:text-gray-500 shrink-0 sm:block" />
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" side="bottom">
