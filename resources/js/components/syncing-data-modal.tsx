@@ -1,8 +1,10 @@
-import { usePage, router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
 export default function SyncingDataModal() {
-    const { syncingData } = usePage().props as { syncingData?: { workspaceSlug: string } | null };
+    const { syncingData } = usePage().props as {
+        syncingData?: { workspaceSlug: string } | null;
+    };
     const [dismissed, setDismissed] = useState(false);
     const [dots, setDots] = useState('');
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -23,9 +25,12 @@ export default function SyncingDataModal() {
         if (!syncingData || dismissed) return;
 
         const poll = () => {
-            fetch(`/workspaces/${syncingData.workspaceSlug}/onboarding/status`, {
-                headers: { Accept: 'application/json' },
-            })
+            fetch(
+                `/workspaces/${syncingData.workspaceSlug}/onboarding/status`,
+                {
+                    headers: { Accept: 'application/json' },
+                },
+            )
                 .then((res) => res.json())
                 .then((data) => {
                     if (data.complete) {
@@ -53,12 +58,21 @@ export default function SyncingDataModal() {
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-xl mx-4 rounded-3xl bg-white shadow-2xl dark:bg-zinc-900">
+            <div className="mx-4 w-full max-w-xl rounded-3xl bg-white shadow-2xl dark:bg-zinc-900">
                 {/* Spinner area */}
                 <div className="flex justify-center pt-14 pb-8">
                     <div className="relative h-24 w-24">
-                        <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-emerald-500 border-r-emerald-500/30" style={{ animationDuration: '1.2s' }} />
-                        <div className="absolute inset-2.5 animate-spin rounded-full border-4 border-transparent border-b-emerald-400 border-l-emerald-400/20" style={{ animationDirection: 'reverse', animationDuration: '1.8s' }} />
+                        <div
+                            className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-emerald-500 border-r-emerald-500/30"
+                            style={{ animationDuration: '1.2s' }}
+                        />
+                        <div
+                            className="absolute inset-2.5 animate-spin rounded-full border-4 border-transparent border-b-emerald-400 border-l-emerald-400/20"
+                            style={{
+                                animationDirection: 'reverse',
+                                animationDuration: '1.8s',
+                            }}
+                        />
                         <div className="absolute inset-6 animate-pulse rounded-full bg-emerald-500/15 dark:bg-emerald-500/10" />
                     </div>
                 </div>
@@ -69,7 +83,8 @@ export default function SyncingDataModal() {
                         Preparing your data{dots}
                     </h2>
                     <p className="mx-auto mt-3 max-w-sm text-[15px] leading-relaxed text-gray-500 dark:text-gray-400">
-                        We're syncing your orders and customer data. This usually takes a few minutes.
+                        We're syncing your orders and customer data. This
+                        usually takes a few minutes.
                     </p>
                 </div>
 
@@ -78,17 +93,21 @@ export default function SyncingDataModal() {
                     <div className="overflow-hidden rounded-full bg-gray-100 dark:bg-zinc-800">
                         <div
                             className="h-2.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400"
-                            style={{ animation: 'syncProgress 2s ease-in-out infinite' }}
+                            style={{
+                                animation:
+                                    'syncProgress 2s ease-in-out infinite',
+                            }}
                         />
                     </div>
                 </div>
 
                 {/* Footer hint */}
-                <div className="px-12 pb-12 pt-5 text-center">
+                <div className="px-12 pt-5 pb-12 text-center">
                     <p className="text-sm text-gray-400 dark:text-gray-500">
                         Please be patient.
                         <br />
-                        This will disappear automatically once everything is ready.
+                        This will disappear automatically once everything is
+                        ready.
                     </p>
                 </div>
             </div>

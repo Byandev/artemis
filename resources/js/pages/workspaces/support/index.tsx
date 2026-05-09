@@ -4,8 +4,8 @@ import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
-import { Workspace } from '@/types/models/Workspace';
 import { SupportTicket } from '@/types/models/SupportTicket';
+import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
@@ -36,20 +36,33 @@ const CATEGORY_LABELS: Record<SupportTicket['category'], string> = {
     other: 'Other',
 };
 
-export default function SupportTicketsIndex({ workspace, tickets, query }: Props) {
-    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
+export default function SupportTicketsIndex({
+    workspace,
+    tickets,
+    query,
+}: Props) {
+    const initialSorting = useMemo(
+        () => toFrontendSort(query?.sort ?? null),
+        [query?.sort],
+    );
 
     const columns: ColumnDef<SupportTicket>[] = [
         {
             accessorKey: 'reference',
-            header: ({ column }) => <SortableHeader column={column} title="Reference" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Reference" />
+            ),
             cell: ({ row }) => (
-                <span className="font-mono text-[11px] text-gray-500">{row.original.reference}</span>
+                <span className="font-mono text-[11px] text-gray-500">
+                    {row.original.reference}
+                </span>
             ),
         },
         {
             accessorKey: 'subject',
-            header: ({ column }) => <SortableHeader column={column} title="Subject" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Subject" />
+            ),
             cell: ({ row }) => (
                 <div className="space-y-1">
                     <p className="text-[12px] font-medium text-gray-800 dark:text-gray-100">
@@ -63,7 +76,9 @@ export default function SupportTicketsIndex({ workspace, tickets, query }: Props
         },
         {
             accessorKey: 'status',
-            header: ({ column }) => <SortableHeader column={column} title="Status" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Status" />
+            ),
             cell: ({ row }) => (
                 <Badge className={STATUS_STYLES[row.original.status]}>
                     {row.original.status.replace('_', ' ')}
@@ -72,8 +87,11 @@ export default function SupportTicketsIndex({ workspace, tickets, query }: Props
         },
         {
             accessorKey: 'created_at',
-            header: ({ column }) => <SortableHeader column={column} title="Created" />,
-            cell: ({ row }) => new Date(row.original.created_at).toLocaleDateString(),
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Created" />
+            ),
+            cell: ({ row }) =>
+                new Date(row.original.created_at).toLocaleDateString(),
         },
     ];
 
@@ -101,7 +119,11 @@ export default function SupportTicketsIndex({ workspace, tickets, query }: Props
                                     page: params?.page ?? 1,
                                     per_page: params?.per_page,
                                 },
-                                { preserveState: true, replace: true, preserveScroll: true },
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true,
+                                },
                             );
                         }}
                     />

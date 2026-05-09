@@ -1,11 +1,11 @@
-import { CircleHelp } from 'lucide-react';
-import React from 'react';
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { CircleHelp } from 'lucide-react';
+import React from 'react';
 
 type Props = {
     title: string;

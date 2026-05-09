@@ -3,19 +3,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-} from '@/components/ui/sheet';
-import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import supportTickets from '@/routes/admin/support-tickets';
@@ -57,11 +57,23 @@ const CATEGORY_LABELS: Record<SupportTicket['category'], string> = {
     other: 'Other',
 };
 
-export default function SupportTicketsAdminIndex({ workspace, tickets, filters, query }: Props) {
-    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
+export default function SupportTicketsAdminIndex({
+    workspace,
+    tickets,
+    filters,
+    query,
+}: Props) {
+    const initialSorting = useMemo(
+        () => toFrontendSort(query?.sort ?? null),
+        [query?.sort],
+    );
     const [statusFilter, setStatusFilter] = useState(filters?.status ?? '');
-    const [categoryFilter, setCategoryFilter] = useState(filters?.category ?? '');
-    const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
+    const [categoryFilter, setCategoryFilter] = useState(
+        filters?.category ?? '',
+    );
+    const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(
+        null,
+    );
 
     const statusForm = useForm({
         status: selectedTicket?.status ?? 'open',
@@ -90,7 +102,10 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
         if (!selectedTicket) return;
 
         statusForm.patch(
-            supportTickets.update.url({ workspace: workspace.slug, ticket: selectedTicket.id }),
+            supportTickets.update.url({
+                workspace: workspace.slug,
+                ticket: selectedTicket.id,
+            }),
             {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -106,14 +121,20 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
     const columns: ColumnDef<SupportTicket>[] = [
         {
             accessorKey: 'reference',
-            header: ({ column }) => <SortableHeader column={column} title="Reference" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Reference" />
+            ),
             cell: ({ row }) => (
-                <span className="font-mono text-[11px] text-gray-500">{row.original.reference}</span>
+                <span className="font-mono text-[11px] text-gray-500">
+                    {row.original.reference}
+                </span>
             ),
         },
         {
             accessorKey: 'user',
-            header: ({ column }) => <SortableHeader column={column} title="Reporter" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Reporter" />
+            ),
             cell: ({ row }) => (
                 <div className="space-y-1">
                     <p className="text-[12px] font-medium text-gray-800 dark:text-gray-100">
@@ -127,12 +148,16 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
         },
         {
             accessorKey: 'category',
-            header: ({ column }) => <SortableHeader column={column} title="Category" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Category" />
+            ),
             cell: ({ row }) => CATEGORY_LABELS[row.original.category],
         },
         {
             accessorKey: 'status',
-            header: ({ column }) => <SortableHeader column={column} title="Status" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Status" />
+            ),
             cell: ({ row }) => (
                 <Badge className={STATUS_STYLES[row.original.status]}>
                     {row.original.status.replace('_', ' ')}
@@ -141,8 +166,11 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
         },
         {
             accessorKey: 'created_at',
-            header: ({ column }) => <SortableHeader column={column} title="Created" />,
-            cell: ({ row }) => new Date(row.original.created_at).toLocaleDateString(),
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Created" />
+            ),
+            cell: ({ row }) =>
+                new Date(row.original.created_at).toLocaleDateString(),
         },
     ];
 
@@ -157,31 +185,43 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
 
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                     <div className="min-w-[180px]">
-                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <Select
+                            value={statusFilter}
+                            onValueChange={setStatusFilter}
+                        >
                             <SelectTrigger className="h-9">
                                 <SelectValue placeholder="Filter by status" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="">All statuses</SelectItem>
                                 <SelectItem value="open">Open</SelectItem>
-                                <SelectItem value="in_progress">In progress</SelectItem>
-                                <SelectItem value="resolved">Resolved</SelectItem>
+                                <SelectItem value="in_progress">
+                                    In progress
+                                </SelectItem>
+                                <SelectItem value="resolved">
+                                    Resolved
+                                </SelectItem>
                                 <SelectItem value="closed">Closed</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
                     <div className="min-w-[200px]">
-                        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                        <Select
+                            value={categoryFilter}
+                            onValueChange={setCategoryFilter}
+                        >
                             <SelectTrigger className="h-9">
                                 <SelectValue placeholder="Filter by category" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="">All categories</SelectItem>
-                                {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-                                    <SelectItem key={value} value={value}>
-                                        {label}
-                                    </SelectItem>
-                                ))}
+                                {Object.entries(CATEGORY_LABELS).map(
+                                    ([value, label]) => (
+                                        <SelectItem key={value} value={value}>
+                                            {label}
+                                        </SelectItem>
+                                    ),
+                                )}
                             </SelectContent>
                         </Select>
                     </div>
@@ -197,100 +237,145 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
                         onRowClick={(row) => setSelectedTicket(row)}
                         onFetch={(params) => {
                             router.get(
-                                supportTickets.index.url({ workspace: workspace.slug }),
+                                supportTickets.index.url({
+                                    workspace: workspace.slug,
+                                }),
                                 {
                                     sort: params?.sort,
                                     page: params?.page ?? 1,
                                     per_page: params?.per_page,
                                     'filter[status]': statusFilter || undefined,
-                                    'filter[category]': categoryFilter || undefined,
+                                    'filter[category]':
+                                        categoryFilter || undefined,
                                 },
-                                { preserveState: true, replace: true, preserveScroll: true },
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true,
+                                },
                             );
                         }}
                     />
                 </div>
             </div>
 
-            <Sheet open={!!selectedTicket} onOpenChange={(open) => !open && setSelectedTicket(null)}>
+            <Sheet
+                open={!!selectedTicket}
+                onOpenChange={(open) => !open && setSelectedTicket(null)}
+            >
                 <SheetContent className="sm:max-w-xl">
                     <SheetHeader>
                         <SheetTitle>{selectedTicket?.subject}</SheetTitle>
                         <SheetDescription>
-                            {selectedTicket ? `Ticket ${selectedTicket.reference}` : ''}
+                            {selectedTicket
+                                ? `Ticket ${selectedTicket.reference}`
+                                : ''}
                         </SheetDescription>
                     </SheetHeader>
 
                     {selectedTicket && (
                         <div className="mt-6 space-y-5 text-sm">
                             <div className="flex flex-wrap items-center gap-2">
-                                <Badge className={STATUS_STYLES[selectedTicket.status]}>
+                                <Badge
+                                    className={
+                                        STATUS_STYLES[selectedTicket.status]
+                                    }
+                                >
                                     {selectedTicket.status.replace('_', ' ')}
                                 </Badge>
                                 <Badge variant="outline">
                                     {CATEGORY_LABELS[selectedTicket.category]}
                                 </Badge>
                                 <span className="text-xs text-gray-400">
-                                    {new Date(selectedTicket.created_at).toLocaleString()}
+                                    {new Date(
+                                        selectedTicket.created_at,
+                                    ).toLocaleString()}
                                 </span>
                             </div>
 
                             <div>
-                                <p className="text-xs uppercase tracking-wide text-gray-400">Reporter</p>
+                                <p className="text-xs tracking-wide text-gray-400 uppercase">
+                                    Reporter
+                                </p>
                                 <p className="text-[13px] font-medium text-gray-800 dark:text-gray-100">
                                     {selectedTicket.user?.name}
                                 </p>
-                                <p className="text-[12px] text-gray-500">{selectedTicket.user?.email}</p>
+                                <p className="text-[12px] text-gray-500">
+                                    {selectedTicket.user?.email}
+                                </p>
                             </div>
 
                             <div>
-                                <p className="text-xs uppercase tracking-wide text-gray-400">Description</p>
-                                <p className="mt-1 whitespace-pre-wrap text-[13px] text-gray-700 dark:text-gray-200">
+                                <p className="text-xs tracking-wide text-gray-400 uppercase">
+                                    Description
+                                </p>
+                                <p className="mt-1 text-[13px] whitespace-pre-wrap text-gray-700 dark:text-gray-200">
                                     {selectedTicket.description}
                                 </p>
                             </div>
 
                             <div>
-                                <p className="text-xs uppercase tracking-wide text-gray-400">Page URL</p>
-                                <p className="mt-1 text-[12px] text-gray-500 wrap-break-word">
+                                <p className="text-xs tracking-wide text-gray-400 uppercase">
+                                    Page URL
+                                </p>
+                                <p className="mt-1 text-[12px] wrap-break-word text-gray-500">
                                     {selectedTicket.current_url ?? '—'}
                                 </p>
                             </div>
 
                             <div>
-                                <p className="text-xs uppercase tracking-wide text-gray-400">User agent</p>
-                                <p className="mt-1 text-[12px] text-gray-500 wrap-break-word">
+                                <p className="text-xs tracking-wide text-gray-400 uppercase">
+                                    User agent
+                                </p>
+                                <p className="mt-1 text-[12px] wrap-break-word text-gray-500">
                                     {selectedTicket.user_agent ?? '—'}
                                 </p>
                             </div>
 
                             <div className="space-y-2">
-                                <p className="text-xs uppercase tracking-wide text-gray-400">Update status</p>
+                                <p className="text-xs tracking-wide text-gray-400 uppercase">
+                                    Update status
+                                </p>
                                 <Select
                                     value={statusForm.data.status}
                                     onValueChange={(value) =>
-                                        statusForm.setData('status', value as SupportTicket['status'])
+                                        statusForm.setData(
+                                            'status',
+                                            value as SupportTicket['status'],
+                                        )
                                     }
                                 >
                                     <SelectTrigger className="h-9">
                                         <SelectValue placeholder="Select status" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="open">Open</SelectItem>
-                                        <SelectItem value="in_progress">In progress</SelectItem>
-                                        <SelectItem value="resolved">Resolved</SelectItem>
-                                        <SelectItem value="closed">Closed</SelectItem>
+                                        <SelectItem value="open">
+                                            Open
+                                        </SelectItem>
+                                        <SelectItem value="in_progress">
+                                            In progress
+                                        </SelectItem>
+                                        <SelectItem value="resolved">
+                                            Resolved
+                                        </SelectItem>
+                                        <SelectItem value="closed">
+                                            Closed
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                                 {statusForm.errors.status && (
-                                    <p className="text-xs text-red-500">{statusForm.errors.status}</p>
+                                    <p className="text-xs text-red-500">
+                                        {statusForm.errors.status}
+                                    </p>
                                 )}
                                 <Button
                                     type="button"
                                     onClick={handleStatusUpdate}
                                     disabled={statusForm.processing}
                                 >
-                                    {statusForm.processing ? 'Saving...' : 'Update status'}
+                                    {statusForm.processing
+                                        ? 'Saving...'
+                                        : 'Update status'}
                                 </Button>
                             </div>
                         </div>

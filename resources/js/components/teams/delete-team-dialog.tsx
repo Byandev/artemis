@@ -1,4 +1,3 @@
-import { useForm } from '@inertiajs/react';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -9,8 +8,9 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Workspace } from '@/types/models/Workspace';
 import workspaces from '@/routes/workspaces';
+import { Workspace } from '@/types/models/Workspace';
+import { useForm } from '@inertiajs/react';
 import { toast } from 'sonner';
 
 interface Team {
@@ -50,12 +50,13 @@ export function DeleteTeamDialog({
                         Delete Team?
                     </AlertDialogTitle>
                     <AlertDialogDescription className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
-                        Are you sure you want to delete the team <strong>{team?.name}</strong>? 
-                        This action cannot be undone and may affect associated members.
+                        Are you sure you want to delete the team{' '}
+                        <strong>{team?.name}</strong>? This action cannot be
+                        undone and may affect associated members.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-4 gap-2">
-                    <AlertDialogCancel 
+                    <AlertDialogCancel
                         disabled={processing}
                         className="h-9 rounded-lg border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
                     >

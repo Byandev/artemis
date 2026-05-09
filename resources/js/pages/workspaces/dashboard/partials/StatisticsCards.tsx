@@ -1,16 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
-import axios, { AxiosResponse } from 'axios';
-import moment from 'moment';
 import {
     currencyFormatter,
     numberFormatter,
     percentageFormatter,
 } from '@/lib/utils';
 import { Workspace } from '@/types/models/Workspace';
+import axios, { AxiosResponse } from 'axios';
+import moment from 'moment';
+import { useEffect, useMemo, useState } from 'react';
 
-import  { FilterValue } from '@/components/filters/Filters';
-
-
+import { FilterValue } from '@/components/filters/Filters';
 
 interface Analytics {
     totalOrders: number;
@@ -30,7 +28,6 @@ interface Props {
     dateRange: string[];
 }
 
-
 function CardSkeleton({ label }: { label: string }) {
     return (
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -44,7 +41,11 @@ function CardSkeleton({ label }: { label: string }) {
     );
 }
 
-export  default function StatisticsCards({ filter, workspace, dateRange }: Props) {
+export default function StatisticsCards({
+    filter,
+    workspace,
+    dateRange,
+}: Props) {
     const [analytics, setAnalytics] = useState<Analytics | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -86,7 +87,6 @@ export  default function StatisticsCards({ filter, workspace, dateRange }: Props
             },
         ];
     }, [analytics]);
-
 
     useEffect(() => {
         const controller = new AbortController();

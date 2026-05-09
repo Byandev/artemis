@@ -1,10 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import { FilterIcon } from 'lucide-react';
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
-import SearchSelect from './SearchSelect';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Workspace } from '@/types/models/Workspace';
+import { FilterIcon } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import SearchSelect from './SearchSelect';
 
 type Props = {
     workspace: Workspace;
@@ -14,7 +23,7 @@ type Props = {
     setSelectedUsersFilter: React.Dispatch<React.SetStateAction<number[]>>;
     selectedShopFilter: number[];
     setSelectedShopFilter: React.Dispatch<React.SetStateAction<number[]>>;
-}
+};
 
 const AnalyticsFilters = ({
     workspace,
@@ -37,11 +46,14 @@ const AnalyticsFilters = ({
             try {
                 const res = await fetch(
                     `/workspaces/${workspace.slug}/rts/analytics/group-by/pages`,
-                    { credentials: 'same-origin' }
+                    { credentials: 'same-origin' },
                 );
                 if (res.ok) {
                     const result = await res.json();
-                    setFilterOptions(prev => ({ ...prev, pages: result.filter_options ?? [] }));
+                    setFilterOptions((prev) => ({
+                        ...prev,
+                        pages: result.filter_options ?? [],
+                    }));
                 }
             } catch (error) {
                 console.error('Error fetching page filter options:', error);
@@ -50,11 +62,14 @@ const AnalyticsFilters = ({
             try {
                 const res = await fetch(
                     `/workspaces/${workspace.slug}/rts/analytics/group-by/users`,
-                    { credentials: 'same-origin' }
+                    { credentials: 'same-origin' },
                 );
                 if (res.ok) {
                     const result = await res.json();
-                    setFilterOptions(prev => ({ ...prev, users: result.filter_options ?? [] }));
+                    setFilterOptions((prev) => ({
+                        ...prev,
+                        users: result.filter_options ?? [],
+                    }));
                 }
             } catch (error) {
                 console.error('Error fetching user filter options:', error);
@@ -63,11 +78,14 @@ const AnalyticsFilters = ({
             try {
                 const res = await fetch(
                     `/workspaces/${workspace.slug}/rts/analytics/group-by/shops`,
-                    { credentials: 'same-origin' }
+                    { credentials: 'same-origin' },
                 );
                 if (res.ok) {
                     const result = await res.json();
-                    setFilterOptions(prev => ({ ...prev, shops: result.filter_options ?? [] }));
+                    setFilterOptions((prev) => ({
+                        ...prev,
+                        shops: result.filter_options ?? [],
+                    }));
                 }
             } catch (error) {
                 console.error('Error fetching shops filter options:', error);
@@ -81,17 +99,16 @@ const AnalyticsFilters = ({
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="outline">
-                    <FilterIcon className='mr-2 h-4 w-4' />
+                    <FilterIcon className="mr-2 h-4 w-4" />
                     Filter
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-54 p-3">
-                <Accordion
-                    type="multiple"
-                    className="w-full"
-                >
+                <Accordion type="multiple" className="w-full">
                     <AccordionItem value="item-1">
-                        <AccordionTrigger className='py-2'>Page</AccordionTrigger>
+                        <AccordionTrigger className="py-2">
+                            Page
+                        </AccordionTrigger>
                         <AccordionContent className="flex flex-col gap-4 text-balance">
                             <SearchSelect
                                 items={filterOptions.pages.map((page) => ({
@@ -104,7 +121,9 @@ const AnalyticsFilters = ({
                         </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-2">
-                        <AccordionTrigger className='py-2'>User</AccordionTrigger>
+                        <AccordionTrigger className="py-2">
+                            User
+                        </AccordionTrigger>
                         <AccordionContent className="flex flex-col gap-4 text-balance">
                             <SearchSelect
                                 items={filterOptions.users.map((user) => ({
@@ -117,7 +136,9 @@ const AnalyticsFilters = ({
                         </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-3">
-                        <AccordionTrigger className='py-2'>Shop</AccordionTrigger>
+                        <AccordionTrigger className="py-2">
+                            Shop
+                        </AccordionTrigger>
                         <AccordionContent className="flex flex-col gap-4 text-balance">
                             <SearchSelect
                                 items={filterOptions.shops.map((shop) => ({
@@ -132,7 +153,7 @@ const AnalyticsFilters = ({
                 </Accordion>
             </DropdownMenuContent>
         </DropdownMenu>
-    )
-}
+    );
+};
 
 export default AnalyticsFilters;
