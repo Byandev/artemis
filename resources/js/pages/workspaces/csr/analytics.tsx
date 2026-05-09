@@ -246,14 +246,14 @@ export default function Analytics({ workspace, query }: Props) {
                 header: ({ column }) => (
                     <SortableHeader column={column} title="Delivered" />
                 ),
-                cell: ({ row }) => peso(row.original.delivered),
+                cell: ({ row }) => peso(row.original.total_delivered),
             },
             {
                 accessorKey: 'total_returning',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="Returning" />
                 ),
-                cell: ({ row }) => peso(row.original.returning_count),
+                cell: ({ row }) => peso(row.original.total_returning),
             },
             {
                 accessorKey: 'rts_rate',
