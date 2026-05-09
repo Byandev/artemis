@@ -47,6 +47,18 @@ class SequenceController extends Controller
         $sequences = QueryBuilder::for($base)
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),
+                AllowedFilter::callback('page_ids', function ($query, $value) {
+                    $ids = $this->parseIds($value);
+                    if (! empty($ids)) {
+                        $query->whereIn('botcake_sequences.page_id', $ids);
+                    }
+                }),
+                AllowedFilter::callback('shop_ids', function ($query, $value) {
+                    $ids = $this->parseIds($value);
+                    if (! empty($ids)) {
+                        $query->whereHas('page', fn ($q) => $q->whereIn('shop_id', $ids));
+                    }
+                }),
             ])
             ->allowedSorts($allowedSorts)
             ->defaultSort('-total_sent')
@@ -54,13 +66,31 @@ class SequenceController extends Controller
             ->withQueryString();
 
         return Inertia::render('workspaces/botcake/sequences', [
-            'workspace' => $workspace,
+            'workspace' => $workspace->loadMissing([
+                'shops' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                },
+                'pages' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                },
+                'pageOwners:id,name',
+            ]),
             'sequences' => $sequences,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page', 'mode', 'from', 'to']),
                 'filter' => $request->input('filter', []),
             ],
         ]);
+    }
+
+    private function parseIds($value): array
+    {
+        $arr = is_array($value) ? $value : explode(',', (string) $value);
+
+        return array_values(array_filter(
+            array_map('intval', $arr),
+            fn ($n) => $n > 0,
+        ));
     }
 
     /**
