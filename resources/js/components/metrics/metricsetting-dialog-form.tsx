@@ -1,7 +1,13 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { metricConfigs } from '@/types/metrics';
 import { useForm, usePage } from '@inertiajs/react';
 import React, { useEffect } from 'react';
-import { metricConfigs } from '@/types/metrics';
 import { useRoute } from 'ziggy-js';
 
 interface Workspace {
@@ -17,7 +23,11 @@ interface Props {
     workspace: Workspace | null;
 }
 
-export function MetricSettingDialog({ open, onOpenChange, workspace: localWorkspace }: Props) {
+export function MetricSettingDialog({
+    open,
+    onOpenChange,
+    workspace: localWorkspace,
+}: Props) {
     const { props } = usePage();
     const ziggy = (props as any).ziggy;
 
@@ -34,12 +44,15 @@ export function MetricSettingDialog({ open, onOpenChange, workspace: localWorksp
     useEffect(() => {
         if (open && workspace) {
             // Check both snake_case and camelCase to match your Middleware/Model naming
-            const setting = (workspace as any).metric_setting || (workspace as any).metricSetting;
+            const setting =
+                (workspace as any).metric_setting ||
+                (workspace as any).metricSetting;
 
             if (setting?.allowed_metrics) {
                 setData({
                     allowed_metrics: setting.allowed_metrics,
-                    default_metrics: setting.default_metrics || setting.allowed_metrics,
+                    default_metrics:
+                        setting.default_metrics || setting.allowed_metrics,
                 });
             } else {
                 setData({
@@ -57,7 +70,7 @@ export function MetricSettingDialog({ open, onOpenChange, workspace: localWorksp
         put(`/admin/workspaces/${workspace.slug}/metrics`, {
             preserveScroll: true,
             onSuccess: () => {
-                // The onOpenChange(false) will close the modal, 
+                // The onOpenChange(false) will close the modal,
                 // and the 'back()' redirect from Laravel will refresh the page props.
                 onOpenChange(false);
             },
@@ -79,32 +92,40 @@ export function MetricSettingDialog({ open, onOpenChange, workspace: localWorksp
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden border-none shadow-2xl dark:bg-zinc-900">
-                <div className="px-5 pt-5 pb-4 border-b border-black/6 dark:border-white/6">
+            <DialogContent className="gap-0 overflow-hidden border-none p-0 shadow-2xl sm:max-w-md dark:bg-zinc-900">
+                <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
                             Workspace Metrics
                         </DialogTitle>
-                        <DialogDescription className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5">
-                            Select which metrics are enabled for <strong>{workspace?.name}</strong>.
+                        <DialogDescription className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
+                            Select which metrics are enabled for{' '}
+                            <strong>{workspace?.name}</strong>.
                         </DialogDescription>
                     </DialogHeader>
                 </div>
 
                 <form onSubmit={handleSubmit}>
-                    <div className="max-h-[60vh] overflow-y-auto px-5 py-4 space-y-4">
-                        <Field label="Allowed Metrics" error={errors.allowed_metrics}>
+                    <div className="max-h-[60vh] space-y-4 overflow-y-auto px-5 py-4">
+                        <Field
+                            label="Allowed Metrics"
+                            error={errors.allowed_metrics}
+                        >
                             <div className="grid gap-2">
                                 {metricConfigs.map((metric) => (
                                     <label
                                         key={metric.key}
-                                        className="flex items-center gap-3 p-3 rounded-xl border border-black/5 bg-stone-50/50 hover:bg-stone-100/50 dark:border-white/5 dark:bg-white/2 cursor-pointer transition-colors"
+                                        className="flex cursor-pointer items-center gap-3 rounded-xl border border-black/5 bg-stone-50/50 p-3 transition-colors hover:bg-stone-100/50 dark:border-white/5 dark:bg-white/2"
                                     >
                                         <input
                                             type="checkbox"
                                             // Check against the current form state
-                                            checked={data.allowed_metrics.includes(metric.key)}
-                                            onChange={() => toggleMetric(metric.key)}
+                                            checked={data.allowed_metrics.includes(
+                                                metric.key,
+                                            )}
+                                            onChange={() =>
+                                                toggleMetric(metric.key)
+                                            }
                                             className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                                         />
                                         <div className="flex flex-col">
@@ -128,21 +149,39 @@ export function MetricSettingDialog({ open, onOpenChange, workspace: localWorksp
     );
 }
 
-function Field({ label, error, children }: { label: string; error?: any; children: React.ReactNode }) {
+function Field({
+    label,
+    error,
+    children,
+}: {
+    label: string;
+    error?: any;
+    children: React.ReactNode;
+}) {
     return (
         <div className="space-y-1.5">
-            <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            <label className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                 {label}
             </label>
             {children}
-            {error && <p className="font-mono text-[11px] text-red-500 mt-1">{error}</p>}
+            {error && (
+                <p className="mt-1 font-mono text-[11px] text-red-500">
+                    {error}
+                </p>
+            )}
         </div>
     );
 }
 
-function Footer({ processing, onCancel }: { processing: boolean; onCancel: () => void }) {
+function Footer({
+    processing,
+    onCancel,
+}: {
+    processing: boolean;
+    onCancel: () => void;
+}) {
     return (
-        <div className="flex items-center justify-end gap-2 border-t border-black/6 dark:border-white/6 px-5 py-3 bg-stone-50/50 dark:bg-white/2">
+        <div className="flex items-center justify-end gap-2 border-t border-black/6 bg-stone-50/50 px-5 py-3 dark:border-white/6 dark:bg-white/2">
             <button
                 type="button"
                 onClick={onCancel}

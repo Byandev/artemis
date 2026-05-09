@@ -1,6 +1,6 @@
+import { User } from '@/types';
 import { Page } from '@/types/models/Page';
 import { Shop } from '@/types/models/Shop';
-import { User } from '@/types';
 
 export interface Workspace {
     id: number;
@@ -19,7 +19,7 @@ export interface Workspace {
     created_at: string;
     updated_at: string;
 
-    pages?: Page[]
-    shops?: Shop[]
-    page_owners?: User[]
+    pages?: Page[];
+    shops?: Shop[];
+    page_owners?: User[];
 }

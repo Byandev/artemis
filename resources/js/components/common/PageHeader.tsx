@@ -35,11 +35,7 @@ export default function PageHeader({
                     </p>
                 )}
             </div>
-            {children && (
-                <div className={actionsClass}>
-                    {children}
-                </div>
-            )}
+            {children && <div className={actionsClass}>{children}</div>}
         </div>
     );
 }

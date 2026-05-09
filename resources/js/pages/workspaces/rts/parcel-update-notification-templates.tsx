@@ -1,22 +1,22 @@
-import AppLayout from '@/layouts/app-layout';
 import PageHeader from '@/components/common/PageHeader';
+import TemplateForm from '@/components/rts/template-form';
+import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
+import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
 import { PaginatedData } from '@/types';
-import { Workspace } from '@/types/models/Workspace';
 import { ParcelJourneyNotificationTemplate } from '@/types/models/ParcelJourneyNotificationTemplate';
+import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { formatDate } from 'date-fns';
-import { omit, startCase } from 'lodash';
-import moment from 'moment';
-import { useState, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import TemplateForm from '@/components/rts/template-form';
-import { MessageSquare, TrendingUp, Package, Send } from 'lucide-react';
 import flatpickr from 'flatpickr';
+import { omit, startCase } from 'lodash';
+import { MessageSquare, Package, Send, TrendingUp } from 'lucide-react';
+import moment from 'moment';
+import { useMemo, useState } from 'react';
 import DateOption = flatpickr.Options.DateOption;
 
 interface Analytics {
@@ -48,7 +48,7 @@ type Props = {
         stats_page?: number;
         stats_per_page?: number;
     };
-}
+};
 
 const statCards = (analytics: Analytics) => [
     {
@@ -81,16 +81,27 @@ const statCards = (analytics: Analytics) => [
     },
 ];
 
-const ParcelUpdateNotificationTemplates = ({ workspace, templates, pageStats, analytics, query }: Props) => {
+const ParcelUpdateNotificationTemplates = ({
+    workspace,
+    templates,
+    pageStats,
+    analytics,
+    query,
+}: Props) => {
     const [openForm, setOpenForm] = useState(false);
-    const [selected, setSelected] = useState<ParcelJourneyNotificationTemplate | undefined>(undefined);
+    const [selected, setSelected] = useState<
+        ParcelJourneyNotificationTemplate | undefined
+    >(undefined);
 
     const [dateRange, setDateRange] = useState([
         query?.start_date ?? moment().startOf('month').format('YYYY-MM-DD'),
         query?.end_date ?? moment().endOf('month').format('YYYY-MM-DD'),
     ]);
 
-    const statsInitialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
+    const statsInitialSorting = useMemo(
+        () => toFrontendSort(query?.sort ?? null),
+        [query?.sort],
+    );
 
     const url = workspaces.rts.parcelJourneys.url(workspace.slug);
 
@@ -102,7 +113,12 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates, pageStats, an
         router.get(
             url,
             { start_date: start, end_date: end },
-            { preserveState: true, replace: true, preserveScroll: true, only: ['analytics', 'pageStats', 'query'] },
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['analytics', 'pageStats', 'query'],
+            },
         );
     };
 
@@ -138,7 +154,7 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates, pageStats, an
             accessorKey: 'message',
             header: 'Message',
             cell: ({ row }) => (
-                <div className="truncate max-w-3xl font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                <div className="max-w-3xl truncate font-mono text-[11px] text-gray-500 dark:text-gray-400">
                     {row.original.message}
                 </div>
             ),
@@ -146,7 +162,7 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates, pageStats, an
         {
             accessorKey: 'is_enabled',
             header: 'Status',
-            cell: ({ row }) => (
+            cell: ({ row }) =>
                 row.original.is_enabled ? (
                     <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-medium text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
                         Enabled
@@ -155,8 +171,7 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates, pageStats, an
                     <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] font-medium text-gray-500 dark:bg-zinc-800 dark:text-gray-400">
                         Disabled
                     </span>
-                )
-            ),
+                ),
         },
         {
             id: 'actions',
@@ -178,46 +193,73 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates, pageStats, an
         },
     ];
 
-    const pageStatsColumns = useMemo<ColumnDef<PageStat>[]>(() => [
-        {
-            accessorKey: 'page_name',
-            header: ({ column }) => <SortableHeader column={column} title="Page" />,
-            cell: ({ row }) => (
-                <div>
-                    <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">{row.original.page_name}</p>
-                    <p className="font-mono text-[10px] text-gray-400">ID: {row.original.id}</p>
-                </div>
-            ),
-            size: 220,
-        },
-        {
-            accessorKey: 'parcel_journey_started',
-            header: ({ column }) => <SortableHeader column={column} title="Journey Started" />,
-            cell: ({ row }) => row.original.parcel_journey_started
-                ? formatDate(new Date(row.original.parcel_journey_started), 'MMM dd, yyyy')
-                : '-',
-        },
-        {
-            accessorKey: 'tracked_orders',
-            header: ({ column }) => <SortableHeader column={column} title="Tracked Orders" />,
-            cell: ({ row }) => Number(row.original.tracked_orders).toLocaleString(),
-        },
-        {
-            accessorKey: 'sms_sent',
-            header: ({ column }) => <SortableHeader column={column} title="SMS Sent" />,
-            cell: ({ row }) => Number(row.original.sms_sent).toLocaleString(),
-        },
-        {
-            accessorKey: 'chat_sent',
-            header: ({ column }) => <SortableHeader column={column} title="Chat Sent" />,
-            cell: ({ row }) => Number(row.original.chat_sent).toLocaleString(),
-        },
-        {
-            accessorKey: 'rts_rate',
-            header: ({ column }) => <SortableHeader column={column} title="RTS Rate" />,
-            cell: ({ row }) => `${Number(row.original.rts_rate).toFixed(2)}%`,
-        },
-    ], []);
+    const pageStatsColumns = useMemo<ColumnDef<PageStat>[]>(
+        () => [
+            {
+                accessorKey: 'page_name',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Page" />
+                ),
+                cell: ({ row }) => (
+                    <div>
+                        <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
+                            {row.original.page_name}
+                        </p>
+                        <p className="font-mono text-[10px] text-gray-400">
+                            ID: {row.original.id}
+                        </p>
+                    </div>
+                ),
+                size: 220,
+            },
+            {
+                accessorKey: 'parcel_journey_started',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Journey Started" />
+                ),
+                cell: ({ row }) =>
+                    row.original.parcel_journey_started
+                        ? formatDate(
+                              new Date(row.original.parcel_journey_started),
+                              'MMM dd, yyyy',
+                          )
+                        : '-',
+            },
+            {
+                accessorKey: 'tracked_orders',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Tracked Orders" />
+                ),
+                cell: ({ row }) =>
+                    Number(row.original.tracked_orders).toLocaleString(),
+            },
+            {
+                accessorKey: 'sms_sent',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="SMS Sent" />
+                ),
+                cell: ({ row }) =>
+                    Number(row.original.sms_sent).toLocaleString(),
+            },
+            {
+                accessorKey: 'chat_sent',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Chat Sent" />
+                ),
+                cell: ({ row }) =>
+                    Number(row.original.chat_sent).toLocaleString(),
+            },
+            {
+                accessorKey: 'rts_rate',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RTS Rate" />
+                ),
+                cell: ({ row }) =>
+                    `${Number(row.original.rts_rate).toFixed(2)}%`,
+            },
+        ],
+        [],
+    );
 
     return (
         <AppLayout>
@@ -245,15 +287,19 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates, pageStats, an
                             >
                                 <div className="flex items-start justify-between gap-3">
                                     <div>
-                                        <p className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                        <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                                             {card.label}
                                         </p>
                                         <p className="mt-1.5 text-[22px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
                                             {card.value}
                                         </p>
                                     </div>
-                                    <div className={`rounded-[10px] p-2 ${card.bgClass}`}>
-                                        <Icon className={`h-4 w-4 ${card.iconClass}`} />
+                                    <div
+                                        className={`rounded-[10px] p-2 ${card.bgClass}`}
+                                    >
+                                        <Icon
+                                            className={`h-4 w-4 ${card.iconClass}`}
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -263,7 +309,7 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates, pageStats, an
 
                 <div className="mb-6 rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <div className="border-b border-black/6 px-4 py-3 dark:border-white/6">
-                        <p className="font-mono text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                        <p className="font-mono text-[11px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                             Per Page Analytics
                         </p>
                     </div>
@@ -278,11 +324,19 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates, pageStats, an
                                 {
                                     sort: params?.sort,
                                     stats_page: params?.page ?? 1,
-                                    per_page_stats: params?.per_page ?? query?.stats_per_page ?? pageStats.per_page,
+                                    per_page_stats:
+                                        params?.per_page ??
+                                        query?.stats_per_page ??
+                                        pageStats.per_page,
                                     start_date: dateRange[0],
                                     end_date: dateRange[1],
                                 },
-                                { preserveState: true, replace: true, preserveScroll: true, only: ['pageStats', 'query'] },
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true,
+                                    only: ['pageStats', 'query'],
+                                },
                             )
                         }
                     />
@@ -297,8 +351,18 @@ const ParcelUpdateNotificationTemplates = ({ workspace, templates, pageStats, an
                         onFetch={(params) => {
                             router.get(
                                 url,
-                                { page: params?.page ?? 1, per_page: params?.per_page, start_date: dateRange[0], end_date: dateRange[1] },
-                                { preserveState: true, replace: true, preserveScroll: true, only: ['templates'] },
+                                {
+                                    page: params?.page ?? 1,
+                                    per_page: params?.per_page,
+                                    start_date: dateRange[0],
+                                    end_date: dateRange[1],
+                                },
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true,
+                                    only: ['templates'],
+                                },
                             );
                         }}
                     />

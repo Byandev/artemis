@@ -1,26 +1,28 @@
+import ComponentCard from '@/components/common/ComponentCard';
+import PageHeader from '@/components/common/PageHeader';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import AppLayout from '@/layouts/app-layout';
-import { useEffect, useState } from 'react';
-import axios, { AxiosResponse } from 'axios';
 import { PaginatedData } from '@/types';
 import { Campaign } from '@/types/models/AdManager';
 import { ColumnDef } from '@tanstack/react-table';
-import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import axios, { AxiosResponse } from 'axios';
 import { omit } from 'lodash';
-import ComponentCard from '@/components/common/ComponentCard';
-import PageHeader from '@/components/common/PageHeader';
-
+import { useEffect, useState } from 'react';
 
 const Campaigns = () => {
-    const [campaigns, setCampaigns] = useState<PaginatedData<Campaign> | null>()
+    const [campaigns, setCampaigns] =
+        useState<PaginatedData<Campaign> | null>();
 
     useEffect(() => {
-        axios.get(`/api/v1/ads-manager/campaigns`, {
-            params: {
-                include: 'adAccount',
-            },
-        }).then((response: AxiosResponse<PaginatedData<Campaign>>) => {
-            setCampaigns(response.data);
-        });
+        axios
+            .get(`/api/v1/ads-manager/campaigns`, {
+                params: {
+                    include: 'adAccount',
+                },
+            })
+            .then((response: AxiosResponse<PaginatedData<Campaign>>) => {
+                setCampaigns(response.data);
+            });
     }, []);
 
     const columns: ColumnDef<Campaign>[] = [
@@ -47,7 +49,10 @@ const Campaigns = () => {
     return (
         <AppLayout>
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <PageHeader title="Ads Manager" description="Monitor and manage your ad campaigns, ad sets, and ads" />
+                <PageHeader
+                    title="Ads Manager"
+                    description="Monitor and manage your ad campaigns, ad sets, and ads"
+                />
 
                 <div className="space-y-5 sm:space-y-6">
                     <ComponentCard desc="List of shop pages and their connected stores">
@@ -59,7 +64,7 @@ const Campaigns = () => {
                                 // initialSorting={initialSorting}
                                 meta={{ ...omit(campaigns, ['data']) }}
                                 onFetch={(params) => {
-                                    console.log(params)
+                                    console.log(params);
                                 }}
                             />
                         </div>
@@ -68,6 +73,6 @@ const Campaigns = () => {
             </div>
         </AppLayout>
     );
-}
+};
 
 export default Campaigns;

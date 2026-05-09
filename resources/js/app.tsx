@@ -12,7 +12,9 @@ if (import.meta.env.VITE_SENTRY_DSN) {
         dsn: import.meta.env.VITE_SENTRY_DSN,
         environment:
             import.meta.env.VITE_SENTRY_ENVIRONMENT ?? import.meta.env.MODE,
-        tracesSampleRate: Number(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE ?? 0.1),
+        tracesSampleRate: Number(
+            import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE ?? 0.1,
+        ),
         integrations: [Sentry.browserTracingIntegration()],
     });
 }
@@ -43,13 +45,15 @@ type SharedAuthUser = { id?: number | string; email?: string; name?: string };
 type SharedWorkspace = { id?: number | string; slug?: string; name?: string };
 
 const posthogToken = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN;
-const posthogDisabled = String(import.meta.env.VITE_POSTHOG_DISABLED ?? '').toLowerCase() === 'true';
+const posthogDisabled =
+    String(import.meta.env.VITE_POSTHOG_DISABLED ?? '').toLowerCase() ===
+    'true';
 let posthogReady = false;
-
 
 if (posthogToken && !posthogDisabled) {
     posthog.init(posthogToken, {
-        api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
+        api_host:
+            import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
         capture_pageview: false,
         capture_pageleave: true,
     });

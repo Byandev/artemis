@@ -1,23 +1,22 @@
 import LineChart from '@/components/charts/LineChart';
 import LineChartSkeleton from '@/components/charts/skeletons/LineChartSkeleton';
-import { FilterValue } from '@/components/filters/Filters';
 import DropdownSelect from '@/components/common/DropdownSelect';
+import { FilterValue } from '@/components/filters/Filters';
 import { Button } from '@/components/ui/button';
 import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { metricConfigs, MetricKey } from '@/types/metrics';
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
 import { RefreshCcw } from 'lucide-react';
 import moment from 'moment/moment';
 import { useEffect, useMemo, useState } from 'react';
-import ComponentCard from '@/components/common/ComponentCard';
-import { metricConfigs, MetricKey } from '@/types/metrics';
 
 interface Props {
-    metrics: MetricKey[],
+    metrics: MetricKey[];
     workspace: Workspace;
     dateRange: string[];
     filter: FilterValue;
@@ -25,12 +24,19 @@ interface Props {
 
 interface Breakdown {
     period: string;
-    value: number
+    value: number;
 }
 
-export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Props) {
+export function StatisticBreakdown({
+    metrics,
+    workspace,
+    dateRange,
+    filter,
+}: Props) {
     const [primaryBreakdown, setPrimaryBreakdown] = useState<Breakdown[]>([]);
-    const [secondaryBreakdown, setSecondaryBreakdown] = useState<Breakdown[]>([]);
+    const [secondaryBreakdown, setSecondaryBreakdown] = useState<Breakdown[]>(
+        [],
+    );
 
     const [option, setOption] = useState<MetricKey>(metrics[0]);
     const [secondOption, setSecondOption] = useState<MetricKey>(metrics[1]);
@@ -166,7 +172,11 @@ export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Pr
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex min-w-0 items-center justify-between gap-2">
                     <h2 className="truncate text-[14px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
-                        {metricOne?.name} <span className="text-gray-300 dark:text-gray-600">vs</span> {metricTwo?.name}
+                        {metricOne?.name}{' '}
+                        <span className="text-gray-300 dark:text-gray-600">
+                            vs
+                        </span>{' '}
+                        {metricTwo?.name}
                     </h2>
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -194,8 +204,8 @@ export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Pr
                                 onClick={() => setGroup(g)}
                                 className={`h-full rounded-lg px-3 text-[12px]! font-semibold tracking-tight transition-all ${
                                     group === g
-                                        ? 'bg-white dark:bg-zinc-700 text-gray-800 dark:text-gray-100 shadow-sm'
-                                        : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                                        ? 'bg-white text-gray-800 shadow-sm dark:bg-zinc-700 dark:text-gray-100'
+                                        : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
                                 }`}
                             >
                                 {capitalizeFirstLetter(g)}
@@ -208,7 +218,16 @@ export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Pr
                             <DropdownSelect
                                 value={option}
                                 onChange={(val) => setOption(val as MetricKey)}
-                                options={metricConfigs.filter((m) => metrics.includes(m.key) && m.key !== secondOption).map((m) => ({ key: m.key, label: m.name }))}
+                                options={metricConfigs
+                                    .filter(
+                                        (m) =>
+                                            metrics.includes(m.key) &&
+                                            m.key !== secondOption,
+                                    )
+                                    .map((m) => ({
+                                        key: m.key,
+                                        label: m.name,
+                                    }))}
                                 label="Metric"
                                 align="start"
                                 width="w-44"
@@ -218,14 +237,24 @@ export function StatisticBreakdown({ metrics, workspace, dateRange, filter }: Pr
                         <div className="shrink-0">
                             <DropdownSelect
                                 value={secondOption}
-                                onChange={(val) => setSecondOption(val as MetricKey)}
-                                options={metricConfigs.filter((m) => metrics.includes(m.key) && m.key !== option).map((m) => ({ key: m.key, label: m.name }))}
+                                onChange={(val) =>
+                                    setSecondOption(val as MetricKey)
+                                }
+                                options={metricConfigs
+                                    .filter(
+                                        (m) =>
+                                            metrics.includes(m.key) &&
+                                            m.key !== option,
+                                    )
+                                    .map((m) => ({
+                                        key: m.key,
+                                        label: m.name,
+                                    }))}
                                 label="Metric"
                                 align="start"
                                 width="w-44"
                             />
                         </div>
-
                     </div>
                 </div>
             </div>

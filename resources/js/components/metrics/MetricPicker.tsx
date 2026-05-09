@@ -4,7 +4,12 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { groupedMetrics, MetricConfig, metricConfigs, MetricKey } from '@/types/metrics';
+import {
+    groupedMetrics,
+    MetricConfig,
+    metricConfigs,
+    MetricKey,
+} from '@/types/metrics';
 import { ChartNoAxesColumn } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -46,7 +51,7 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
             <PopoverTrigger asChild>
                 <button
                     className={[
-                        'group/picker inline-flex h-9 shrink-0 min-w-max items-center overflow-hidden rounded-[10px] border transition-all duration-200',
+                        'group/picker inline-flex h-9 min-w-max shrink-0 items-center overflow-hidden rounded-[10px] border transition-all duration-200',
                         'bg-gradient-to-b from-white to-stone-50 dark:from-zinc-900 dark:to-zinc-950',
                         'shadow-[0_1px_2px_rgba(16,24,40,0.06),0_1px_3px_rgba(16,24,40,0.10),inset_0_1px_0_rgba(255,255,255,0.5)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.04)]',
                         'hover:-translate-y-px hover:shadow-[0_2px_4px_rgba(16,24,40,0.08),0_4px_10px_rgba(16,24,40,0.10),inset_0_1px_0_rgba(255,255,255,0.5)]',
@@ -54,8 +59,8 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
                         isOpen
                             ? 'border-emerald-500/50 ring-2 ring-emerald-500/15 dark:border-emerald-500/40'
                             : activeCount > 0
-                                ? 'border-emerald-500/40 hover:border-emerald-500/60 dark:border-emerald-500/30 dark:hover:border-emerald-500/40'
-                                : 'border-black/[0.08] hover:border-black/[0.16] dark:border-white/[0.08] dark:hover:border-white/[0.16]',
+                              ? 'border-emerald-500/40 hover:border-emerald-500/60 dark:border-emerald-500/30 dark:hover:border-emerald-500/40'
+                              : 'border-black/[0.08] hover:border-black/[0.16] dark:border-white/[0.08] dark:hover:border-white/[0.16]',
                     ].join(' ')}
                 >
                     {/* Icon cell */}
@@ -164,10 +169,10 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
                                                     setLocalValue((prev) =>
                                                         prev.includes(m.key)
                                                             ? prev.filter(
-                                                                (item) =>
-                                                                    item !==
-                                                                    m.key,
-                                                            )
+                                                                  (item) =>
+                                                                      item !==
+                                                                      m.key,
+                                                              )
                                                             : [...prev, m.key],
                                                     )
                                                 }

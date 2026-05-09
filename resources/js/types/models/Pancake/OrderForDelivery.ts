@@ -1,5 +1,5 @@
-import { Order } from '@/types/models/Pancake/Order';
 import { Page } from '@/types/models/Page';
+import { Order } from '@/types/models/Pancake/Order';
 import { User } from '@/types/models/Pancake/User';
 
 export const ORDER_STATUSES = [
@@ -17,7 +17,7 @@ export const ORDER_STATUSES = [
     'IN TRANSIT',
     'INCORRECT NUMBER',
     'AUTO DROP CX',
-    'AUTO DROP RIDER'
+    'AUTO DROP RIDER',
 ] as const;
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number];

@@ -1,7 +1,6 @@
+import type { PermissionName } from '@/constants/permissions';
 import { InertiaLinkProps } from '@inertiajs/react';
 import { LucideIcon } from 'lucide-react';
-import { Role } from '@/types/models/Role';
-import type { PermissionName } from '@/constants/permissions';
 
 export interface Auth {
     user: User;
@@ -22,7 +21,7 @@ export interface NavItem {
     href?: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon | null;
     isActive?: boolean;
-    items?: NavItem[]
+    items?: NavItem[];
     permission?: PermissionName | PermissionName[];
     anyOf?: PermissionName | PermissionName[];
 }
@@ -75,7 +74,6 @@ export interface PaginatedData<T> {
     from: number;
     to: number;
 }
-
 
 export interface RequestParams {
     [key: string]: string | number | null;

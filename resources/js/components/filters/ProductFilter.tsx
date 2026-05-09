@@ -1,7 +1,6 @@
+import { EntityFilter } from '@/components/filters/EntityFilter';
 import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
-import { EntityFilter } from '@/components/filters/EntityFilter';
-
 
 interface Props {
     workspace: Workspace;

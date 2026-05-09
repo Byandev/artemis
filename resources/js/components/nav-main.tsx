@@ -14,7 +14,11 @@ import {
     SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/hooks/use-current-url';
-import { hasAnyPermission, hasPermission, useUserPermissions } from '@/hooks/use-permission';
+import {
+    hasAnyPermission,
+    hasPermission,
+    useUserPermissions,
+} from '@/hooks/use-permission';
 import type { NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
 import { ChevronDown } from 'lucide-react';
@@ -52,7 +56,7 @@ export function NavMain({ items = [], group_label = '' }: NavMainProps) {
     return (
         <SidebarGroup>
             {group_label && (
-                <SidebarGroupLabel className="text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-300 dark:text-gray-600 px-3.5 mb-2">
+                <SidebarGroupLabel className="mb-2 px-3.5 font-mono text-[10px] font-medium tracking-[0.08em] text-gray-300 uppercase dark:text-gray-600">
                     {group_label}
                 </SidebarGroupLabel>
             )}
@@ -76,10 +80,10 @@ export function NavMain({ items = [], group_label = '' }: NavMainProps) {
                                             className={[
                                                 'relative h-9 justify-between rounded-[10px] !text-[13px]',
                                                 'text-gray-400 dark:text-gray-500',
-                                                'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]',
+                                                'hover:bg-black/[0.02] hover:text-gray-600 dark:hover:bg-white/[0.02] dark:hover:text-gray-400',
                                                 'transition-colors',
                                                 childActive
-                                                    ? '!bg-emerald-500/[0.08] dark:!bg-emerald-500/[0.10] !text-emerald-600 dark:!text-emerald-400 font-medium'
+                                                    ? '!bg-emerald-500/[0.08] font-medium !text-emerald-600 dark:!bg-emerald-500/[0.10] dark:!text-emerald-400'
                                                     : '',
                                             ].join(' ')}
                                         >
@@ -109,10 +113,10 @@ export function NavMain({ items = [], group_label = '' }: NavMainProps) {
                                                             isActive={subActive}
                                                             className={[
                                                                 'h-8 rounded-[10px] text-[12px] text-gray-400 dark:text-gray-500',
-                                                                'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]',
+                                                                'hover:bg-black/[0.02] hover:text-gray-600 dark:hover:bg-white/[0.02] dark:hover:text-gray-400',
                                                                 'transition-colors',
                                                                 subActive
-                                                                    ? '!bg-emerald-500/[0.08] dark:!bg-emerald-500/[0.10] !text-emerald-600 dark:!text-emerald-400 font-medium'
+                                                                    ? '!bg-emerald-500/[0.08] font-medium !text-emerald-600 dark:!bg-emerald-500/[0.10] dark:!text-emerald-400'
                                                                     : '',
                                                             ].join(' ')}
                                                         >
@@ -145,10 +149,10 @@ export function NavMain({ items = [], group_label = '' }: NavMainProps) {
                                 className={[
                                     'relative h-9 justify-start rounded-[10px] !text-[13px]',
                                     'text-gray-400 dark:text-gray-500',
-                                    'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]',
+                                    'hover:bg-black/[0.02] hover:text-gray-600 dark:hover:bg-white/[0.02] dark:hover:text-gray-400',
                                     'transition-colors',
                                     active
-                                        ? '!bg-emerald-500/[0.08] dark:!bg-emerald-500/[0.10] !text-emerald-600 dark:!text-emerald-400 font-medium'
+                                        ? '!bg-emerald-500/[0.08] font-medium !text-emerald-600 dark:!bg-emerald-500/[0.10] dark:!text-emerald-400'
                                         : '',
                                 ].join(' ')}
                             >

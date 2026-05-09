@@ -1,5 +1,5 @@
-import PageHeader from '@/components/common/PageHeader';
 import { TargetChecklistDrawer } from '@/components/checklist/target-checklist-drawer';
+import PageHeader from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -31,16 +31,16 @@ interface PagesProps {
     workspace: Workspace;
     pages: PaginatedData<Page>;
     query?: {
-        sort?: string | null
-        perPage?: number | string
-        page?: number | string
+        sort?: string | null;
+        perPage?: number | string;
+        page?: number | string;
         filter?: {
-            search?: string
-        }
-    }
-    pageLimit?: number | null
-    pageCount?: number
-    pageLimitReached?: boolean
+            search?: string;
+        };
+    };
+    pageLimit?: number | null;
+    pageCount?: number;
+    pageLimitReached?: boolean;
 }
 
 const StatusBadge = ({ status }: { status: 'active' | 'inactive' }) => {
@@ -48,13 +48,18 @@ const StatusBadge = ({ status }: { status: 'active' | 'inactive' }) => {
     return (
         <span
             className={clsx(
-                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] font-medium uppercase tracking-wide',
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] font-medium tracking-wide uppercase',
                 isActive
                     ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
                     : 'bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400',
             )}
         >
-            <span className={clsx('h-1.5 w-1.5 rounded-full', isActive ? 'bg-emerald-500' : 'bg-red-400')} />
+            <span
+                className={clsx(
+                    'h-1.5 w-1.5 rounded-full',
+                    isActive ? 'bg-emerald-500' : 'bg-red-400',
+                )}
+            />
             {isActive ? 'Active' : 'Inactive'}
         </span>
     );
@@ -70,7 +75,12 @@ const EnableBadge = ({ isEnabled }: { isEnabled: boolean }) => {
                     : 'bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400',
             )}
         >
-            <span className={clsx('h-1.5 w-1.5 rounded-full', isEnabled ? 'bg-emerald-500' : 'bg-red-500')} />
+            <span
+                className={clsx(
+                    'h-1.5 w-1.5 rounded-full',
+                    isEnabled ? 'bg-emerald-500' : 'bg-red-500',
+                )}
+            />
             {isEnabled ? 'Enabled' : 'Disabled'}
         </span>
     );
@@ -87,17 +97,28 @@ const ChecklistsBadge = ({ pending }: { pending: number }) => {
                     : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
             )}
         >
-            <span className={clsx('h-1.5 w-1.5 rounded-full', hasPending ? 'bg-amber-500' : 'bg-emerald-500')} />
+            <span
+                className={clsx(
+                    'h-1.5 w-1.5 rounded-full',
+                    hasPending ? 'bg-amber-500' : 'bg-emerald-500',
+                )}
+            />
             {hasPending ? `${pending} Pending` : 'Complete'}
         </span>
     );
 };
 
-const Pages = ({ pages, workspace, query, pageLimit, pageCount, pageLimitReached }: PagesProps) => {
+const Pages = ({
+    pages,
+    workspace,
+    query,
+    pageLimit,
+    pageCount,
+    pageLimitReached,
+}: PagesProps) => {
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
-
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [checklistDrawerOpen, setChecklistDrawerOpen] = useState(false);
@@ -112,7 +133,7 @@ const Pages = ({ pages, workspace, query, pageLimit, pageCount, pageLimitReached
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
-                    page: searchValue ? 1 : query?.page ?? 1
+                    page: searchValue ? 1 : (query?.page ?? 1),
                 },
                 {
                     preserveState: true,
@@ -136,17 +157,20 @@ const Pages = ({ pages, workspace, query, pageLimit, pageCount, pageLimitReached
 
     const refresh = (page: Page) => {
         setProcessing(true);
-        router.post(workspaces.pages.refresh.url({ workspace, page }), {}, {
-            onSuccess: () => alert('Refresh Started'),
-            onFinish: () => setProcessing(false),
-        });
+        router.post(
+            workspaces.pages.refresh.url({ workspace, page }),
+            {},
+            {
+                onSuccess: () => alert('Refresh Started'),
+                onFinish: () => setProcessing(false),
+            },
+        );
     };
 
     const openChecklist = (page: Page) => {
         setSelectedPage(page);
         setChecklistDrawerOpen(true);
     };
-
 
     const columns: ColumnDef<Page>[] = [
         {
@@ -184,7 +208,11 @@ const Pages = ({ pages, workspace, query, pageLimit, pageCount, pageLimitReached
             ),
             cell: ({ row }) => {
                 const date = row.original.orders_last_synced_at;
-                return <span>{date ? new Date(date).toLocaleString() : 'Never'}</span>;
+                return (
+                    <span>
+                        {date ? new Date(date).toLocaleString() : 'Never'}
+                    </span>
+                );
             },
         },
         {
@@ -211,7 +239,11 @@ const Pages = ({ pages, workspace, query, pageLimit, pageCount, pageLimitReached
                 <SortableHeader column={column} title={'Checklists'} />
             ),
             cell: ({ row }) => (
-                <ChecklistsBadge pending={Number(row.original.pending_required_checklists_count ?? 0)} />
+                <ChecklistsBadge
+                    pending={Number(
+                        row.original.pending_required_checklists_count ?? 0,
+                    )}
+                />
             ),
         },
         {
@@ -227,18 +259,25 @@ const Pages = ({ pages, workspace, query, pageLimit, pageCount, pageLimitReached
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
-                                <DropdownMenuItem onClick={() => openChecklist(page)}>
-                                    <ListChecks />
-                                    View Checklist
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleEdit(page)}>
-                                    <Edit />
-                                    Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => refresh(page)} disabled={processing}>
-                                    <RefreshCw className={processing ? 'animate-spin' : ''} />
-                                    {processing ? 'Refreshing…' : 'Refresh Orders'}
-                                </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => openChecklist(page)}
+                            >
+                                <ListChecks />
+                                View Checklist
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEdit(page)}>
+                                <Edit />
+                                Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => refresh(page)}
+                                disabled={processing}
+                            >
+                                <RefreshCw
+                                    className={processing ? 'animate-spin' : ''}
+                                />
+                                {processing ? 'Refreshing…' : 'Refresh Orders'}
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 );
@@ -250,23 +289,32 @@ const Pages = ({ pages, workspace, query, pageLimit, pageCount, pageLimitReached
         <AppLayout>
             <Head title={`${workspace.name} - Pages`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <PageHeader title="Pages" description="Manage your shop pages and their connected stores">
+                <PageHeader
+                    title="Pages"
+                    description="Manage your shop pages and their connected stores"
+                >
                     <div className="flex flex-col items-end gap-1">
                         <Button
                             size="sm"
                             onClick={handleCreate}
                             disabled={pageLimitReached}
-                            title={pageLimitReached ? `Page limit reached (${pageCount}/${pageLimit}). Upgrade your plan to add more.` : undefined}
+                            title={
+                                pageLimitReached
+                                    ? `Page limit reached (${pageCount}/${pageLimit}). Upgrade your plan to add more.`
+                                    : undefined
+                            }
                         >
                             Add New Page
                         </Button>
                         {pageLimit != null && (
-                            <span className={clsx(
-                                'font-mono text-[10px] uppercase tracking-wider',
-                                pageLimitReached
-                                    ? 'text-amber-600 dark:text-amber-400'
-                                    : 'text-gray-400 dark:text-gray-500',
-                            )}>
+                            <span
+                                className={clsx(
+                                    'font-mono text-[10px] tracking-wider uppercase',
+                                    pageLimitReached
+                                        ? 'text-amber-600 dark:text-amber-400'
+                                        : 'text-gray-400 dark:text-gray-500',
+                                )}
+                            >
                                 {pageCount ?? 0}/{pageLimit} pages used
                                 {pageLimitReached && ' · upgrade to add more'}
                             </span>
@@ -276,9 +324,9 @@ const Pages = ({ pages, workspace, query, pageLimit, pageCount, pageLimitReached
 
                 <div className="mb-3 flex items-center gap-2">
                     <div className="relative w-full max-w-xs">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
-                            className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-mono! text-[12px]! text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
+                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                             placeholder="Search page name..."
                             value={searchValue}
                             onChange={(e) => setSearchValue(e.target.value)}
@@ -286,7 +334,7 @@ const Pages = ({ pages, workspace, query, pageLimit, pageCount, pageLimitReached
                     </div>
                 </div>
 
-                <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         columns={columns}
                         enableInternalPagination={false}
@@ -294,7 +342,7 @@ const Pages = ({ pages, workspace, query, pageLimit, pageCount, pageLimitReached
                         initialSorting={initialSorting}
                         meta={{ ...omit(pages, ['data']) }}
                         onFetch={(params) => {
-                            console.log(params)
+                            console.log(params);
                             router.get(
                                 workspaces.pages.index({ workspace }),
                                 {
@@ -327,7 +375,6 @@ const Pages = ({ pages, workspace, query, pageLimit, pageCount, pageLimitReached
                     targetId={selectedPage?.id ?? null}
                     targetName={selectedPage?.name ?? ''}
                 />
-
             </div>
         </AppLayout>
     );

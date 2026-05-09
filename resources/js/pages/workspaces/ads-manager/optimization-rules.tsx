@@ -47,8 +47,12 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
     }, [query?.sort]);
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
-    const [statusFilter, setStatusFilter] = useState(query?.filter?.status ?? '');
-    const [ruleToDelete, setRuleToDelete] = useState<OptimizationRule | null>(null);
+    const [statusFilter, setStatusFilter] = useState(
+        query?.filter?.status ?? '',
+    );
+    const [ruleToDelete, setRuleToDelete] = useState<OptimizationRule | null>(
+        null,
+    );
 
     // Debounce search
     useEffect(() => {
@@ -59,7 +63,7 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
                     'filter[status]': statusFilter || undefined,
-                    page: searchValue ? 1 : query?.page ?? 1
+                    page: searchValue ? 1 : (query?.page ?? 1),
                 },
                 {
                     preserveState: true,
@@ -97,7 +101,9 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
         if (!ruleToDelete) return;
 
         try {
-            await axios.delete(`/workspaces/${workspace.slug}/api/optimization-rules/${ruleToDelete.id}`);
+            await axios.delete(
+                `/workspaces/${workspace.slug}/api/optimization-rules/${ruleToDelete.id}`,
+            );
             setRuleToDelete(null);
             router.reload({ only: ['rules'] });
         } catch (error) {
@@ -107,7 +113,9 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
     };
 
     const handleEdit = (rule: OptimizationRule) => {
-        router.get(`/workspaces/${workspace.slug}/ads-manager/optimization-rules/${rule.id}/edit`);
+        router.get(
+            `/workspaces/${workspace.slug}/ads-manager/optimization-rules/${rule.id}/edit`,
+        );
     };
 
     const getActionLabel = (action: string, actionValue: number | null) => {
@@ -124,7 +132,9 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
     const columns: ColumnDef<OptimizationRule>[] = [
         {
             accessorKey: 'name',
-            header: ({ column }) => <SortableHeader column={column} title="Name" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Name" />
+            ),
             cell: ({ row }) => (
                 <div className="font-medium text-gray-900 dark:text-white/90">
                     {row.original.name}
@@ -133,16 +143,24 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
         },
         {
             accessorKey: 'description',
-            header: ({ column }) => <SortableHeader column={column} title="Description" enabled={false} />,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Description"
+                    enabled={false}
+                />
+            ),
             cell: ({ row }) => (
-                <div className="text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">
+                <div className="max-w-xs truncate text-sm text-gray-600 dark:text-gray-400">
                     {row.original.description || '-'}
                 </div>
             ),
         },
         {
             accessorKey: 'target',
-            header: ({ column }) => <SortableHeader column={column} title="Target" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Target" />
+            ),
             cell: ({ row }) => (
                 <div className="text-sm">
                     {row.original.target === 'campaign' ? 'Campaign' : 'Ad Set'}
@@ -151,21 +169,40 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
         },
         {
             accessorKey: 'action',
-            header: ({ column }) => <SortableHeader column={column} title="Action" enabled={false} />,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Action"
+                    enabled={false}
+                />
+            ),
             cell: ({ row }) => (
                 <div className="text-sm">
-                    {getActionLabel(row.original.action, row.original.action_value)}
+                    {getActionLabel(
+                        row.original.action,
+                        row.original.action_value,
+                    )}
                 </div>
             ),
         },
         {
             accessorKey: 'conditions',
-            header: ({ column }) => <SortableHeader column={column} title="Conditions" enabled={false} />,
-            cell: ({ row }) => <ConditionsBadge conditions={row.original.conditions} />,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Conditions"
+                    enabled={false}
+                />
+            ),
+            cell: ({ row }) => (
+                <ConditionsBadge conditions={row.original.conditions} />
+            ),
         },
         {
             accessorKey: 'status',
-            header: ({ column }) => <SortableHeader column={column} title="Status" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Status" />
+            ),
             cell: ({ row }) => <StatusBadge status={row.original.status} />,
         },
 
@@ -207,7 +244,11 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
                                 onSearchChange={setSearchValue}
                                 statusFilter={statusFilter}
                                 onStatusChange={handleStatusFilterChange}
-                                onAddRule={() => router.get(`/workspaces/${workspace.slug}/ads-manager/optimization-rules/create`)}
+                                onAddRule={() =>
+                                    router.get(
+                                        `/workspaces/${workspace.slug}/ads-manager/optimization-rules/create`,
+                                    )
+                                }
                             />
 
                             <DataTable
@@ -221,8 +262,10 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
                                         `/workspaces/${workspace.slug}/ads-manager/optimization-rules`,
                                         {
                                             sort: params?.sort,
-                                            'filter[search]': searchValue || undefined,
-                                            'filter[status]': statusFilter || undefined,
+                                            'filter[search]':
+                                                searchValue || undefined,
+                                            'filter[status]':
+                                                statusFilter || undefined,
                                             page: params?.page ?? 1,
                                         },
                                         {
@@ -238,13 +281,19 @@ const OptimizationRulesPage = ({ workspace, rules, query }: PageProps) => {
                 </div>
 
                 {/* Delete Confirmation Dialog */}
-                <AlertDialog open={!!ruleToDelete} onOpenChange={() => setRuleToDelete(null)}>
+                <AlertDialog
+                    open={!!ruleToDelete}
+                    onOpenChange={() => setRuleToDelete(null)}
+                >
                     <AlertDialogContent>
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Optimization Rule</AlertDialogTitle>
+                            <AlertDialogTitle>
+                                Delete Optimization Rule
+                            </AlertDialogTitle>
                             <AlertDialogDescription>
-                                Are you sure you want to delete "{ruleToDelete?.name}"?
-                                This action cannot be undone.
+                                Are you sure you want to delete "
+                                {ruleToDelete?.name}"? This action cannot be
+                                undone.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

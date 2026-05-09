@@ -31,15 +31,18 @@ export function DeleteOrderDialog({ order, workspace, onClose }: Props) {
     const handleDelete = () => {
         if (!order) return;
 
-        router.delete(`/workspaces/${workspace.slug}/inventory/purchased-orders/${order.id}`, {
-            preserveScroll: true,
-            onStart: () => setProcessing(true),
-            onSuccess: () => {
-                toast.success(`Purchased Order deleted successfully`);
-                onClose();
+        router.delete(
+            `/workspaces/${workspace.slug}/inventory/purchased-orders/${order.id}`,
+            {
+                preserveScroll: true,
+                onStart: () => setProcessing(true),
+                onSuccess: () => {
+                    toast.success(`Purchased Order deleted successfully`);
+                    onClose();
+                },
+                onFinish: () => setProcessing(false),
             },
-            onFinish: () => setProcessing(false),
-        });
+        );
     };
 
     return (
@@ -50,12 +53,19 @@ export function DeleteOrderDialog({ order, workspace, onClose }: Props) {
                         Delete Purchased Order?
                     </AlertDialogTitle>
                     <AlertDialogDescription className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
-                        Are you sure you want to delete the order 
+                        Are you sure you want to delete the order
                         {order?.control_no ? (
-                            <> with Control No. <span className="font-mono text-emerald-600 dark:text-emerald-400">{order.control_no}</span></>
+                            <>
+                                {' '}
+                                with Control No.{' '}
+                                <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                                    {order.control_no}
+                                </span>
+                            </>
                         ) : (
                             ' this record'
-                        )}? This action cannot be undone.
+                        )}
+                        ? This action cannot be undone.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 

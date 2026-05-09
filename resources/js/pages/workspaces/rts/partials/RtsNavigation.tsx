@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import { extractPathFromUrl } from '@/lib/utils';
 import { Workspace } from '@/types/models/Workspace';
 import { Link, usePage } from '@inertiajs/react';
-import { extractPathFromUrl } from '@/lib/utils';
+import React, { useMemo } from 'react';
 
 type Tab = {
     key: string;
@@ -9,14 +9,23 @@ type Tab = {
     href: string;
 };
 
-const TabItem = ({ href, label, isActive }: { href: string; label: React.ReactNode; isActive: boolean }) => {
+const TabItem = ({
+    href,
+    label,
+    isActive,
+}: {
+    href: string;
+    label: React.ReactNode;
+    isActive: boolean;
+}) => {
     return (
         <Link
             href={href}
-            className={`inline-flex items-center border-b-2 px-2.5 py-2 text-sm font-medium transition-colors duration-200 ease-in-out ${isActive
-                ? 'text-brand-500 dark:text-brand-400 border-brand-500 dark:border-brand-400'
-                : 'bg-transparent text-gray-500 border-transparent hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                }`}
+            className={`inline-flex items-center border-b-2 px-2.5 py-2 text-sm font-medium transition-colors duration-200 ease-in-out ${
+                isActive
+                    ? 'border-brand-500 text-brand-500 dark:border-brand-400 dark:text-brand-400'
+                    : 'border-transparent bg-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
             aria-current={isActive ? 'page' : undefined}
             role="tab"
         >
@@ -26,33 +35,61 @@ const TabItem = ({ href, label, isActive }: { href: string; label: React.ReactNo
 };
 
 const RtsNavigation = ({ workspace }: { workspace: Workspace }) => {
-    const { url,  } = usePage();
+    const { url } = usePage();
 
     const currentPath = useMemo(() => extractPathFromUrl(url), [url]);
 
     const tabs: Tab[] = useMemo(
         () => [
-            { key: 'analytics', label: 'Analytics', href: `/workspaces/${workspace.slug}/rts/analytics` },
-            { key: 'for-delivery-today', label: 'For Delivery Today', href: `/workspaces/${workspace.slug}/rts/for-delivery-today` },
-            { key: 'parcel-update-notification', label: 'Parcel Updates', href: `/workspaces/${workspace.slug}/rts/parcel-update-notification` },
-            { key: 'parcel-journey-notification-templates', label: 'Parcel Update Templates', href: `/workspaces/${workspace.slug}/rts/parcel-journey-notification-templates` },
+            {
+                key: 'analytics',
+                label: 'Analytics',
+                href: `/workspaces/${workspace.slug}/rts/analytics`,
+            },
+            {
+                key: 'for-delivery-today',
+                label: 'For Delivery Today',
+                href: `/workspaces/${workspace.slug}/rts/for-delivery-today`,
+            },
+            {
+                key: 'parcel-update-notification',
+                label: 'Parcel Updates',
+                href: `/workspaces/${workspace.slug}/rts/parcel-update-notification`,
+            },
+            {
+                key: 'parcel-journey-notification-templates',
+                label: 'Parcel Update Templates',
+                href: `/workspaces/${workspace.slug}/rts/parcel-journey-notification-templates`,
+            },
         ],
-        [workspace.slug]
+        [workspace.slug],
     );
 
     const activeKey = useMemo(() => {
         if (currentPath.includes('/rts/analytics')) return 'analytics';
-        if (currentPath.includes('/rts/for-delivery-today')) return 'for-delivery-today';
-        if (currentPath.includes('/rts/parcel-update-notification')) return 'parcel-update-notification';
-        if (currentPath.includes('/rts/parcel-journey-notification-templates')) return 'parcel-journey-notification-templates';
+        if (currentPath.includes('/rts/for-delivery-today'))
+            return 'for-delivery-today';
+        if (currentPath.includes('/rts/parcel-update-notification'))
+            return 'parcel-update-notification';
+        if (currentPath.includes('/rts/parcel-journey-notification-templates'))
+            return 'parcel-journey-notification-templates';
         return 'analytics';
     }, [currentPath]);
 
     return (
         <div className="border-b border-gray-200 dark:border-gray-800">
-            <nav className="-mb-px flex space-x-2 overflow-x-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-200 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600 dark:[&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:h-1.5" role="tablist" aria-label="RTS navigation">
+            <nav
+                className="-mb-px flex space-x-2 overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-200 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600 dark:[&::-webkit-scrollbar-track]:bg-transparent"
+                role="tablist"
+                aria-label="RTS navigation"
+            >
                 {tabs.map((t) => (
-                    <TabItem key={t.key} href={t.href} label={t.label} isActive={t.key === activeKey} />
+                    <TabItem
+                        key={t.key}
+                        href={t.href}
+                        label={t.label}
+                        isActive={t.key === activeKey}
+                    />
                 ))}
             </nav>
         </div>

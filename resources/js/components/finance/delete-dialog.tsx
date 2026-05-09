@@ -21,7 +21,14 @@ interface Props {
     successMessage?: string;
 }
 
-export function FinanceDeleteDialog({ open, onClose, title, description, url, successMessage = 'Deleted.' }: Props) {
+export function FinanceDeleteDialog({
+    open,
+    onClose,
+    title,
+    description,
+    url,
+    successMessage = 'Deleted.',
+}: Props) {
     const [processing, setProcessing] = useState(false);
 
     const handleDelete = () => {
@@ -55,7 +62,10 @@ export function FinanceDeleteDialog({ open, onClose, title, description, url, su
                         Cancel
                     </AlertDialogCancel>
                     <AlertDialogAction
-                        onClick={(e) => { e.preventDefault(); handleDelete(); }}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            handleDelete();
+                        }}
                         disabled={processing}
                         className="h-9 rounded-lg bg-red-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-red-700 disabled:opacity-50"
                     >

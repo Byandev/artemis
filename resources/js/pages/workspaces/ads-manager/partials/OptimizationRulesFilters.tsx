@@ -18,16 +18,16 @@ const OptimizationRulesFilters = ({
     return (
         <div className="flex flex-col gap-3 rounded-t-xl border border-b-0 border-gray-100 px-3 py-3 sm:px-4 sm:py-4 lg:flex-row lg:items-center lg:justify-between dark:border-white/5">
             <input
-                className="w-full lg:max-w-sm border rounded-lg appearance-none px-3 py-2 sm:px-4 sm:py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3 dark:bg-gray-900 dark:placeholder:text-white/30 bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90 dark:focus:border-brand-800"
+                className="w-full appearance-none rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/20 focus:outline-hidden sm:px-4 sm:py-2.5 lg:max-w-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
                 placeholder="Search optimization rules..."
                 value={searchValue}
                 onChange={(e) => onSearchChange(e.target.value)}
             />
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 relative z-50">
+            <div className="relative z-50 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
                 <select
                     value={statusFilter}
                     onChange={(e) => onStatusChange(e.target.value)}
-                    className="h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-800 dark:text-white/90 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 dark:focus:border-brand-800"
+                    className="h-9 rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:border-brand-300 focus:ring-2 focus:ring-brand-500/20 focus:outline-hidden dark:border-gray-700 dark:text-white/90 dark:focus:border-brand-800"
                 >
                     <option value="">All Status</option>
                     <option value="active">Active</option>

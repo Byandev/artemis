@@ -26,7 +26,9 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
         action: 'increase_budget_fixed',
         action_value: '',
         status: 'active' as 'active' | 'paused',
-        conditions: [{ metric: 'spend', operator: 'greater_than', value: '' }] as Array<{
+        conditions: [
+            { metric: 'spend', operator: 'greater_than', value: '' },
+        ] as Array<{
             metric: string;
             operator: string;
             value: string;
@@ -44,7 +46,7 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                 action: rule.action,
                 action_value: rule.action_value?.toString() || '',
                 status: rule.status,
-                conditions: rule.conditions.map(c => ({
+                conditions: rule.conditions.map((c) => ({
                     ...c,
                     value: c.value.toString(),
                 })),
@@ -57,7 +59,9 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                 action: 'increase_budget_fixed',
                 action_value: '',
                 status: 'active',
-                conditions: [{ metric: 'spend', operator: 'greater_than', value: '' }],
+                conditions: [
+                    { metric: 'spend', operator: 'greater_than', value: '' },
+                ],
             });
         }
         setErrors({});
@@ -74,9 +78,11 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                 description: formData.description || null,
                 target: formData.target,
                 action: formData.action,
-                action_value: formData.action_value ? parseFloat(formData.action_value) : null,
+                action_value: formData.action_value
+                    ? parseFloat(formData.action_value)
+                    : null,
                 status: formData.status,
-                conditions: formData.conditions.map(c => ({
+                conditions: formData.conditions.map((c) => ({
                     metric: c.metric,
                     operator: c.operator,
                     value: parseFloat(c.value),
@@ -86,13 +92,18 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
             if (rule) {
                 await axios.put(
                     `/workspaces/${workspace.slug}/api/optimization-rules/${rule.id}`,
-                    payload
+                    payload,
                 );
             } else {
-                await axios.post(`/workspaces/${workspace.slug}/api/optimization-rules`, payload);
+                await axios.post(
+                    `/workspaces/${workspace.slug}/api/optimization-rules`,
+                    payload,
+                );
             }
 
-            router.get(`/workspaces/${workspace.slug}/ads-manager/optimization-rules`);
+            router.get(
+                `/workspaces/${workspace.slug}/ads-manager/optimization-rules`,
+            );
         } catch (error: any) {
             if (error.response?.data?.errors) {
                 setErrors(error.response.data.errors);
@@ -122,7 +133,11 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
         });
     };
 
-    const updateCondition = (index: number, field: keyof typeof formData.conditions[0], value: string) => {
+    const updateCondition = (
+        index: number,
+        field: keyof (typeof formData.conditions)[0],
+        value: string,
+    ) => {
         const newConditions = [...formData.conditions];
         newConditions[index] = { ...newConditions[index], [field]: value };
         setFormData({ ...formData, conditions: newConditions });
@@ -130,91 +145,162 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
 
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - ${rule ? 'Edit' : 'Create'} Optimization Rule`} />
+            <Head
+                title={`${workspace.name} - ${rule ? 'Edit' : 'Create'} Optimization Rule`}
+            />
             <AdsManagerLayout
                 workspace={workspace}
                 activeTab="optimizationRules"
             >
-                <div className="flex justify-center py-4 md:py-6 px-3 md:px-4">
+                <div className="flex justify-center px-3 py-4 md:px-4 md:py-6">
                     <div className="w-full">
-                        <div className="bg-white rounded-lg border border-gray-200 p-4 md:p-6">
-                            <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">
-                                {rule ? 'Edit Optimization Rule' : 'Create New Optimization Rule'}
+                        <div className="rounded-lg border border-gray-200 bg-white p-4 md:p-6">
+                            <h1 className="mb-4 text-xl font-bold text-gray-900 md:mb-6 md:text-2xl">
+                                {rule
+                                    ? 'Edit Optimization Rule'
+                                    : 'Create New Optimization Rule'}
                             </h1>
 
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 {/* Name */}
                                 <div>
                                     <Label htmlFor="name">
-                                        Name <span className="text-red-500">*</span>
+                                        Name{' '}
+                                        <span className="text-red-500">*</span>
                                     </Label>
                                     <Input
                                         id="name"
                                         value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        onChange={(e) =>
+                                            setFormData({
+                                                ...formData,
+                                                name: e.target.value,
+                                            })
+                                        }
                                         placeholder="Rule name"
                                         required
                                     />
-                                    {errors.name && <p className="text-sm text-red-500 mt-1">{errors.name}</p>}
+                                    {errors.name && (
+                                        <p className="mt-1 text-sm text-red-500">
+                                            {errors.name}
+                                        </p>
+                                    )}
                                 </div>
 
                                 {/* Description */}
                                 <div>
-                                    <Label htmlFor="description">Description</Label>
+                                    <Label htmlFor="description">
+                                        Description
+                                    </Label>
                                     <Textarea
                                         id="description"
                                         value={formData.description}
-                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                        onChange={(e) =>
+                                            setFormData({
+                                                ...formData,
+                                                description: e.target.value,
+                                            })
+                                        }
                                         placeholder="Rule description"
                                         rows={3}
                                     />
-                                    {errors.description && <p className="text-sm text-red-500 mt-1">{errors.description}</p>}
+                                    {errors.description && (
+                                        <p className="mt-1 text-sm text-red-500">
+                                            {errors.description}
+                                        </p>
+                                    )}
                                 </div>
 
                                 {/* Target, Action, and Amount */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                     {/* Target */}
                                     <div>
                                         <Label htmlFor="target">
-                                            Target <span className="text-red-500">*</span>
+                                            Target{' '}
+                                            <span className="text-red-500">
+                                                *
+                                            </span>
                                         </Label>
                                         <select
                                             id="target"
                                             value={formData.target}
-                                            onChange={(e) => setFormData({ ...formData, target: e.target.value as 'campaign' | 'ad_set' })}
-                                            className="h-10 w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300"
+                                            onChange={(e) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    target: e.target.value as
+                                                        | 'campaign'
+                                                        | 'ad_set',
+                                                })
+                                            }
+                                            className="h-10 w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:border-brand-300 focus:ring-2 focus:ring-brand-500/20 focus:outline-hidden"
                                             required
                                         >
-                                            <option value="campaign">Campaign</option>
-                                            <option value="ad_set">Ad Set</option>
+                                            <option value="campaign">
+                                                Campaign
+                                            </option>
+                                            <option value="ad_set">
+                                                Ad Set
+                                            </option>
                                         </select>
-                                        {errors.target && <p className="text-sm text-red-500 mt-1">{errors.target}</p>}
+                                        {errors.target && (
+                                            <p className="mt-1 text-sm text-red-500">
+                                                {errors.target}
+                                            </p>
+                                        )}
                                     </div>
 
                                     {/* Action */}
                                     <div>
                                         <Label htmlFor="action">
-                                            Action <span className="text-red-500">*</span>
+                                            Action{' '}
+                                            <span className="text-red-500">
+                                                *
+                                            </span>
                                         </Label>
                                         <select
                                             id="action"
                                             value={formData.action}
-                                            onChange={(e) => setFormData({ ...formData, action: e.target.value })}
-                                            className="h-10 w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300"
+                                            onChange={(e) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    action: e.target.value,
+                                                })
+                                            }
+                                            className="h-10 w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:border-brand-300 focus:ring-2 focus:ring-brand-500/20 focus:outline-hidden"
                                             required
                                         >
-                                            <option value="increase_budget_fixed">Increase Daily Budget By Fixed Amount</option>
-                                            <option value="decrease_budget_fixed">Decrease Daily Budget By Fixed Amount</option>
-                                            <option value="increase_budget_percentage">Increase Daily Budget By Percentage</option>
-                                            <option value="decrease_budget_percentage">Decrease Daily Budget By Percentage</option>
+                                            <option value="increase_budget_fixed">
+                                                Increase Daily Budget By Fixed
+                                                Amount
+                                            </option>
+                                            <option value="decrease_budget_fixed">
+                                                Decrease Daily Budget By Fixed
+                                                Amount
+                                            </option>
+                                            <option value="increase_budget_percentage">
+                                                Increase Daily Budget By
+                                                Percentage
+                                            </option>
+                                            <option value="decrease_budget_percentage">
+                                                Decrease Daily Budget By
+                                                Percentage
+                                            </option>
                                         </select>
-                                        {errors.action && <p className="text-sm text-red-500 mt-1">{errors.action}</p>}
+                                        {errors.action && (
+                                            <p className="mt-1 text-sm text-red-500">
+                                                {errors.action}
+                                            </p>
+                                        )}
                                     </div>
 
                                     {/* Amount/Percentage */}
                                     <div>
                                         <Label htmlFor="action_value">
-                                            {formData.action.includes('percentage') ? 'Percentage (%)' : 'Amount'}
+                                            {formData.action.includes(
+                                                'percentage',
+                                            )
+                                                ? 'Percentage (%)'
+                                                : 'Amount'}
                                         </Label>
                                         <Input
                                             id="action_value"
@@ -222,130 +308,241 @@ const OptimizationRulesFormPage = ({ workspace, rule }: PageProps) => {
                                             step="0.01"
                                             min="0"
                                             value={formData.action_value}
-                                            onChange={(e) => setFormData({ ...formData, action_value: e.target.value })}
-                                            placeholder={formData.action.includes('percentage') ? 'e.g., 10' : 'e.g., 100'}
+                                            onChange={(e) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    action_value:
+                                                        e.target.value,
+                                                })
+                                            }
+                                            placeholder={
+                                                formData.action.includes(
+                                                    'percentage',
+                                                )
+                                                    ? 'e.g., 10'
+                                                    : 'e.g., 100'
+                                            }
                                         />
-                                        {errors.action_value && <p className="text-sm text-red-500 mt-1">{errors.action_value}</p>}
+                                        {errors.action_value && (
+                                            <p className="mt-1 text-sm text-red-500">
+                                                {errors.action_value}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
 
                                 {/* Conditions */}
-                                <div className='border border-gray-200 p-3 md:p-5 rounded-lg bg-gray-50'>
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-0 mb-4 md:mb-5">
+                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 md:p-5">
+                                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between md:mb-5 md:gap-0">
                                         <div>
-                                            <Label className="text-base md:text-lg">Conditions</Label>
-                                            <p className="text-sm text-gray-500 mt-0.5">Define when this rule should trigger</p>
+                                            <Label className="text-base md:text-lg">
+                                                Conditions
+                                            </Label>
+                                            <p className="mt-0.5 text-sm text-gray-500">
+                                                Define when this rule should
+                                                trigger
+                                            </p>
                                         </div>
                                         <Button
                                             type="button"
                                             variant="outline"
                                             size="sm"
                                             onClick={addCondition}
-                                            className="border-gray-300 w-full sm:w-auto"
+                                            className="w-full border-gray-300 sm:w-auto"
                                         >
-                                            <Plus className="h-4 w-4 mr-2" />
+                                            <Plus className="mr-2 h-4 w-4" />
                                             Add Condition
                                         </Button>
                                     </div>
 
-                                    <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 md:gap-3">
-
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap md:gap-3">
                                         {/* Condition Rows */}
-                                        {formData.conditions.map((condition, index) => {
-                                            return (
-                                                <div
-                                                    key={index}
-                                                    className="flex flex-col sm:flex-row sm:items-center gap-2 px-3 py-2.5 bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-colors w-full sm:w-fit"
-                                                >
-                                                    {/* Where/Or label */}
-                                                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap shrink-0">
-                                                        {index === 0 ? 'Where' : 'And'}
-                                                    </div>
-
-                                                    {/* Metric */}
-                                                    <select
-                                                        value={condition.metric}
-                                                        onChange={(e) => updateCondition(index, 'metric', e.target.value)}
-                                                        className="h-8 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-800 hover:border-gray-400 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-colors flex-1 sm:flex-none"
-                                                        required
+                                        {formData.conditions.map(
+                                            (condition, index) => {
+                                                return (
+                                                    <div
+                                                        key={index}
+                                                        className="flex w-full flex-col gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 transition-colors hover:border-gray-300 sm:w-fit sm:flex-row sm:items-center"
                                                     >
-                                                        <option value="spend">Spend</option>
-                                                        <option value="impressions">Impressions</option>
-                                                        <option value="clicks">Clicks</option>
-                                                        <option value="sales">Sales</option>
-                                                        <option value="roas">ROAS</option>
-                                                    </select>
+                                                        {/* Where/Or label */}
+                                                        <div className="shrink-0 text-xs font-semibold tracking-wide whitespace-nowrap text-gray-500 uppercase">
+                                                            {index === 0
+                                                                ? 'Where'
+                                                                : 'And'}
+                                                        </div>
 
-                                                    {/* Operator */}
-                                                    <select
-                                                        value={condition.operator}
-                                                        onChange={(e) => updateCondition(index, 'operator', e.target.value)}
-                                                        className="h-8 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-800 hover:border-gray-400 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-colors flex-1 sm:flex-none"
-                                                        title={startCase(condition.operator)}
-                                                        required
-                                                    >
-                                                        <option value="greater_than">{startCase('greater_than')}</option>
-                                                        <option value="less_than">{startCase('less_than')}</option>
-                                                        <option value="equal">{startCase('equal')}</option>
-                                                        <option value="greater_than_or_equal">{startCase('greater_than_or_equal')}</option>
-                                                        <option value="less_than_or_equal">{startCase('less_than_or_equal')}</option>
-                                                    </select>
-
-                                                    {/* Value */}
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={condition.value}
-                                                        onChange={(e) => updateCondition(index, 'value', e.target.value)}
-                                                        placeholder="Value"
-                                                        className="h-8 w-full sm:w-20"
-                                                        required
-                                                    />
-
-                                                    {/* Remove button */}
-                                                    {formData.conditions.length > 1 && (
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => removeCondition(index)}
-                                                            className="h-8 px-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                        {/* Metric */}
+                                                        <select
+                                                            value={
+                                                                condition.metric
+                                                            }
+                                                            onChange={(e) =>
+                                                                updateCondition(
+                                                                    index,
+                                                                    'metric',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            className="h-8 flex-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-800 transition-colors hover:border-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20 focus:outline-hidden sm:flex-none"
+                                                            required
                                                         >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
+                                                            <option value="spend">
+                                                                Spend
+                                                            </option>
+                                                            <option value="impressions">
+                                                                Impressions
+                                                            </option>
+                                                            <option value="clicks">
+                                                                Clicks
+                                                            </option>
+                                                            <option value="sales">
+                                                                Sales
+                                                            </option>
+                                                            <option value="roas">
+                                                                ROAS
+                                                            </option>
+                                                        </select>
+
+                                                        {/* Operator */}
+                                                        <select
+                                                            value={
+                                                                condition.operator
+                                                            }
+                                                            onChange={(e) =>
+                                                                updateCondition(
+                                                                    index,
+                                                                    'operator',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            className="h-8 flex-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-800 transition-colors hover:border-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20 focus:outline-hidden sm:flex-none"
+                                                            title={startCase(
+                                                                condition.operator,
+                                                            )}
+                                                            required
+                                                        >
+                                                            <option value="greater_than">
+                                                                {startCase(
+                                                                    'greater_than',
+                                                                )}
+                                                            </option>
+                                                            <option value="less_than">
+                                                                {startCase(
+                                                                    'less_than',
+                                                                )}
+                                                            </option>
+                                                            <option value="equal">
+                                                                {startCase(
+                                                                    'equal',
+                                                                )}
+                                                            </option>
+                                                            <option value="greater_than_or_equal">
+                                                                {startCase(
+                                                                    'greater_than_or_equal',
+                                                                )}
+                                                            </option>
+                                                            <option value="less_than_or_equal">
+                                                                {startCase(
+                                                                    'less_than_or_equal',
+                                                                )}
+                                                            </option>
+                                                        </select>
+
+                                                        {/* Value */}
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={
+                                                                condition.value
+                                                            }
+                                                            onChange={(e) =>
+                                                                updateCondition(
+                                                                    index,
+                                                                    'value',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="Value"
+                                                            className="h-8 w-full sm:w-20"
+                                                            required
+                                                        />
+
+                                                        {/* Remove button */}
+                                                        {formData.conditions
+                                                            .length > 1 && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    removeCondition(
+                                                                        index,
+                                                                    )
+                                                                }
+                                                                className="h-8 px-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            },
+                                        )}
                                     </div>
-                                    {errors.conditions && <p className="text-sm text-red-500 mt-2">{errors.conditions}</p>}
+                                    {errors.conditions && (
+                                        <p className="mt-2 text-sm text-red-500">
+                                            {errors.conditions}
+                                        </p>
+                                    )}
                                 </div>
 
                                 {/* Status */}
-                                <div className='flex flex-col gap-2 justify-between'>
+                                <div className="flex flex-col justify-between gap-2">
                                     <div className="flex items-center gap-3">
                                         <Label htmlFor="status">Status</Label>
                                     </div>
                                     <Switch
                                         id="status"
                                         checked={formData.status === 'active'}
-                                        onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'active' : 'paused' })}
+                                        onCheckedChange={(checked) =>
+                                            setFormData({
+                                                ...formData,
+                                                status: checked
+                                                    ? 'active'
+                                                    : 'paused',
+                                            })
+                                        }
                                     />
-                                    {errors.status && <p className="text-sm text-red-500 mt-1">{errors.status}</p>}
+                                    {errors.status && (
+                                        <p className="mt-1 text-sm text-red-500">
+                                            {errors.status}
+                                        </p>
+                                    )}
                                 </div>
 
                                 {/* Form Actions */}
-                                <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-4 md:pt-6 border-t border-gray-200">
+                                <div className="flex flex-col-reverse gap-2 border-t border-gray-200 pt-4 sm:flex-row sm:justify-end sm:gap-3 md:pt-6">
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        onClick={() => router.get(`/workspaces/${workspace.slug}/ads-manager/optimization-rules`)}
+                                        onClick={() =>
+                                            router.get(
+                                                `/workspaces/${workspace.slug}/ads-manager/optimization-rules`,
+                                            )
+                                        }
                                         disabled={loading}
                                     >
                                         Cancel
                                     </Button>
                                     <Button type="submit" disabled={loading}>
-                                        {loading ? 'Saving...' : rule ? 'Update Rule' : 'Create Rule'}
+                                        {loading
+                                            ? 'Saving...'
+                                            : rule
+                                              ? 'Update Rule'
+                                              : 'Create Rule'}
                                     </Button>
                                 </div>
                             </form>
