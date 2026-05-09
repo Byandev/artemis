@@ -21,6 +21,7 @@ class InventoryItem extends Model
         'lead_time',
         'unfulfilled_count',
         'three_days_average',
+        'remaining_qty',
     ];
 
     public function workspace(): BelongsTo

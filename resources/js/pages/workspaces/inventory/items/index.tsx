@@ -29,6 +29,7 @@ interface Item {
     lead_time: number;
     unfulfilled_count: number;
     product?: { id: number; name: string };
+    remaining_qty: number | null;
     unfulfilled: number | null;
     current_stocks: number | null;
     waiting_for_delivery_stocks: number | null;
@@ -135,6 +136,14 @@ export default function ItemIndex({ workspace, items, products, query }: Props) 
             header: ({ column }) => <SortableHeader column={column} title="Current Stocks" className="justify-center" />,
             cell: ({ row }) => (
                 <div className="text-center"><MetricCell value={row.original.current_stocks} color="text-emerald-600 dark:text-emerald-400" /></div>
+            ),
+        },
+        {
+            accessorKey: 'remaining_qty',
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Remaining Qty" className="justify-center" />,
+            cell: ({ row }) => (
+                <div className="text-center"><MetricCell value={row.original.remaining_qty} color="text-violet-600 dark:text-violet-400" /></div>
             ),
         },
         {

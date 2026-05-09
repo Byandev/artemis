@@ -94,4 +94,21 @@ class ShopController extends Controller
 
         return redirect()->route('workspaces.shops.index', $workspace);
     }
+
+    public function refreshUsers(Request $request, Workspace $workspace, Shop $shop)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $this->authorize(Permission::RefreshShops->value, $workspace);
+
+        if ($shop->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
+        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
+
+        return redirect()->route('workspaces.shops.index', $workspace);
+    }
 }
