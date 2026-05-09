@@ -6,9 +6,9 @@ use App\Jobs\TriggerFetchInventoryKeywordRecord;
 use Illuminate\Console\Command;
 use Modules\Inventory\Models\InventoryItem;
 
-class TriggerFetchInventoryKeywordRecords extends Command
+class TriggerFetchERPInventory extends Command
 {
-    protected $signature = 'trigger-fetch-inventory-keyword-records {--delay=30}';
+    protected $signature = 'trigger-fetch-erp-inventory {--delay=30}';
 
     protected $description = 'Trigger n8n webhook for each inventory item with sales keywords to fetch ERP data';
 
