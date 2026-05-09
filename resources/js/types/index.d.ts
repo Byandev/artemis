@@ -47,6 +47,10 @@ export interface User {
     is_super_admin?: boolean;
     is_workspace_owner?: boolean;
     permissions?: (PermissionName | '*')[];
+    can?: {
+        viewAnySupportTickets?: boolean;
+        [key: string]: boolean | undefined;
+    };
     [key: string]: unknown; // This allows for additional properties...
     pivot?: {
         role_id: number | null;

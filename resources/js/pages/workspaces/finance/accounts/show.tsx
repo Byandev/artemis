@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
 import { SUB_CATEGORY_LABEL, SubCategory } from '@/components/finance/sub-category';
+import { TRANSACTION_TYPE_LABEL, TRANSACTION_TYPE_STYLE, TransactionType } from '@/components/finance/transaction-type';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
@@ -30,7 +31,7 @@ interface Txn {
     date: string;
     description: string;
     type: 'in' | 'out';
-    transaction_type: 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance' | null;
+    transaction_type: TransactionType | null;
     amount: number | string;
     running_balance: number | string | null;
     sub_category: SubCategory | null;
@@ -46,13 +47,6 @@ interface Props {
 
 const fmt = (v: number | string) => Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const TXN_TYPE_STYLE: Record<string, { label: string; cls: string }> = {
-    funds: { label: 'funds', cls: 'bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400' },
-    profit_share: { label: 'profit share', cls: 'bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400' },
-    expenses: { label: 'expenses', cls: 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400' },
-    transfer: { label: 'transfer', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-500/10 dark:text-slate-300' },
-    remittance: { label: 'remittance', cls: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' },
-};
 
 export default function AccountShow({ workspace, account, transactions }: Props) {
     const [createOpen, setCreateOpen] = useState(false);
@@ -113,7 +107,8 @@ export default function AccountShow({ workspace, account, transactions }: Props)
                                 <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">No transactions yet.</td></tr>
                             )}
                             {rows.map((r) => {
-                                const s = r.transaction_type ? TXN_TYPE_STYLE[r.transaction_type] : TXN_TYPE_STYLE.funds;
+                                const s = r.transaction_type ? TRANSACTION_TYPE_STYLE[r.transaction_type as TransactionType] ?? TRANSACTION_TYPE_STYLE.funds : TRANSACTION_TYPE_STYLE.funds;
+                                const label = r.transaction_type ? TRANSACTION_TYPE_LABEL[r.transaction_type as TransactionType] ?? r.transaction_type : 'funds';
                                 return (
                                     <tr key={r.id} className="border-b border-black/6 last:border-0 hover:bg-stone-50 dark:border-white/6 dark:hover:bg-white/2">
                                         <td className="px-4 py-2.5 font-mono text-[11px] text-gray-600 dark:text-gray-400">{String(r.date).slice(0, 10)}</td>
@@ -131,7 +126,7 @@ export default function AccountShow({ workspace, account, transactions }: Props)
                                                     <span className="inline-flex w-fit items-center rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] uppercase text-gray-500 dark:bg-zinc-800 dark:text-gray-400">{SUB_CATEGORY_LABEL[r.sub_category]}</span>
                                                 )}
                                                 {r.transaction_type && (
-                                                    <span className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${s.cls}`}>{s.label}</span>
+                                                    <span className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${s.cls}`}>{label}</span>
                                                 )}
                                             </div>
                                         </td>

@@ -23,6 +23,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Modules\Pancake\Models\OrderForDelivery;
+use Modules\Pancake\Models\User;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -276,7 +277,7 @@ class ForDeliveryController extends Controller
         $totalReturning = (int) ($statusBreakdown->returning_count ?? 0);
         $totalProblematic = (int) ($statusBreakdown->problematic ?? 0);
 
-        $users = \Modules\Pancake\Models\User::get();
+        $users = User::get();
 
         $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id', 'pageOwners:id,name']);
 

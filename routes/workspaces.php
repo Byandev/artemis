@@ -3,6 +3,8 @@
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
 use App\Http\Controllers\Workspaces\AdAccountController;
+use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
+use App\Http\Controllers\Workspaces\Admin\SupportTicketAdminController;
 use App\Http\Controllers\Workspaces\AdsManager\AdController;
 use App\Http\Controllers\Workspaces\AdsManager\AdSetController;
 use App\Http\Controllers\Workspaces\AdsManager\CampaignController;
@@ -23,12 +25,14 @@ use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\ShopController;
+use App\Http\Controllers\Workspaces\SupportTicketController;
 use App\Http\Controllers\Workspaces\TeamController;
 use App\Http\Controllers\Workspaces\WorkspaceApiKeyController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
+use App\Models\SupportTicket;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Modules\Botcake\Http\Controllers\Web\FlowController;
@@ -272,6 +276,15 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/remittances/{remittance}', [FinanceRemittanceController::class, 'destroy'])->name('remittances.destroy');
     });
 
+    Route::get('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'index'])->name('support.index');
+    Route::post('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'store'])->name('support.store');
+    Route::get('/workspaces/{workspace:slug}/admin/support-tickets', [SupportTicketAdminController::class, 'index'])
+        ->name('admin.support-tickets.index')
+        ->can('viewAny', [SupportTicket::class, 'workspace']);
+    Route::patch('/workspaces/{workspace:slug}/admin/support-tickets/{ticket}', [SupportTicketAdminController::class, 'update'])
+        ->name('admin.support-tickets.update')
+        ->can('viewAny', [SupportTicket::class, 'workspace']);
+
 });
 
 // Public invitation routes (guest or authenticated)
@@ -298,13 +311,23 @@ Route::middleware(['auth', 'verified', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
+        // Workspace Management
         Route::get('/workspaces', [AdminWorkspaceController::class, 'index'])
             ->name('workspaces.index');
+
         Route::put('/workspaces/{workspace}/subscription', [AdminWorkspaceController::class, 'updateSubscription'])
             ->name('workspaces.update-subscription');
         Route::put('/workspaces/{workspace}/modules', [AdminWorkspaceController::class, 'updateModules'])
             ->name('workspaces.update-modules');
 
+        // Metric Setting Controller
+        Route::get('workspaces/{workspace}/metrics/edit', [MetricSettingController::class, 'edit'])
+            ->name('workspaces.metric-settings.edit');
+
+        Route::put('/workspaces/{workspace}/metrics', [MetricSettingController::class, 'update'])
+            ->name('workspaces.metric-settings.update');
+
+        // Subscription Plans Management
         Route::get('/subscription-plans', [AdminSubscriptionPlanController::class, 'index'])
             ->name('subscription-plans.index');
         Route::get('/subscription-plans/create', [AdminSubscriptionPlanController::class, 'create'])

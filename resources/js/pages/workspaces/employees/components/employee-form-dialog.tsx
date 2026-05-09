@@ -35,7 +35,7 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
     const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const isEditing = !!employee; 
+    const isEditing = !!employee;
 
     const url = isEditing
         ? `/workspaces/${workspace.slug}/employees/${employee.id}`
@@ -105,8 +105,8 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
                                 Employee Status
                             </label>
                             <select
-                                value={data.user_id ?? ''}
-                                onChange={(e) => setData('user_id', e.target.value)}
+                                value={data.status ?? 'ACTIVE'}
+                                onChange={(e) => setData('status', e.target.value)}
                                 className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 outline-none transition-all focus:border-emerald-500 dark:border-white/8 dark:bg-zinc-800 dark:text-white"
                             >
                                 <option value="ACTIVE">ACTIVE</option>

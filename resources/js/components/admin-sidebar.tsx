@@ -15,7 +15,10 @@ import {
     Layers,
     Users,
     Settings,
+
     CreditCard,
+    ChartBar,
+
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
@@ -26,11 +29,13 @@ export function AdminSidebar() {
             href: '/admin/workspaces',
             icon: Layers,
         },
+
         {
             title: 'Subscription Plans',
             href: '/admin/subscription-plans',
             icon: CreditCard,
         },
+
     ];
 
     return (

@@ -9,8 +9,8 @@ import { Head } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { format, subDays } from 'date-fns';
-import { omit } from 'lodash';
-import { useEffect, useMemo, useState } from 'react';
+import { debounce, omit } from 'lodash';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface CsrRecord {
     csr_id: number;
@@ -33,6 +33,8 @@ interface Props {
         from?: string | null;
         to?: string | null;
         page?: number | string;
+        type?: 'erp' | 'pos' | null;
+        search?: string | null;
     };
 }
 
@@ -106,18 +108,30 @@ function StatCard({ title, value, loading, format: fmt }: StatCardProps) {
     );
 }
 
-export default function Analytics({ workspace }: Props) {
+export default function Analytics({ workspace, query }: Props) {
     const today = new Date();
+    const initialType = query?.type === 'erp' ? 'erp' : 'pos';
     const [range, setRange] = useState<{ from: Date; to: Date }>({
         from: subDays(today, 6),
         to: today,
     });
-    const [paginatedRecords, setPaginatedRecords] =
-        useState<PaginatedData<CsrRecord> | null>(null);
-    const [currentType, setCurrentType] = useState('pos');
+    const [paginatedRecords, setPaginatedRecords] = useState<PaginatedData<CsrRecord> | null>(null);
+    const [currentType, setCurrentType] = useState(initialType);
     const [sort, setSort] = useState('-total_sales');
     const [page, setPage] = useState(1);
     const [perPage, setPerPage] = useState(10);
+    const [searchInput, setSearchInput] = useState(query?.search ?? '');
+    const [search, setSearch] = useState(query?.search ?? '');
+
+    const debouncedSetSearch = useCallback(
+        debounce((value: string) => setSearch(value), 400),
+        [],
+    );
+
+    useEffect(() => {
+        debouncedSetSearch(searchInput);
+        return () => debouncedSetSearch.cancel();
+    }, [searchInput, debouncedSetSearch]);
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
     const toStr = format(range.to, 'yyyy-MM-dd');
@@ -167,20 +181,13 @@ export default function Analytics({ workspace }: Props) {
 
     useEffect(() => {
         setPage(1);
-    }, [range?.from, range?.to, currentType]);
+    }, [range?.from, range?.to, currentType, search]);
 
     useEffect(() => {
         const controller = new AbortController();
         axios
             .get(`/api/workspaces/${workspace.slug}/csrs/daily-records`, {
-                params: {
-                    from: fromStr,
-                    to: toStr,
-                    type: currentType,
-                    sort,
-                    page,
-                    per_page: perPage,
-                },
+                params: { from: fromStr, to: toStr, type: currentType, sort, page, per_page: perPage, 'filter[search]': search || undefined },
                 signal: controller.signal,
             })
             .then((res) => setPaginatedRecords(res.data))
@@ -188,7 +195,7 @@ export default function Analytics({ workspace }: Props) {
                 if (!axios.isCancel(err)) console.error(err);
             });
         return () => controller.abort();
-    }, [workspace.slug, fromStr, toStr, currentType, sort, page, perPage]);
+    }, [workspace.slug, fromStr, toStr, currentType, sort, page, perPage, search]);
 
     const initialSorting = useMemo(() => toFrontendSort(sort), [sort]);
 
@@ -274,8 +281,9 @@ export default function Analytics({ workspace }: Props) {
                 <PageHeader
                     title="CSR Analytics"
                     description="Aggregated CSR performance from daily records"
+                    stackActionsOnMobile
                 >
-                    <div className="flex items-center rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
+                    <div className="flex items-center p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
                         {['erp', 'pos'].map((value) => {
                             const label = value === 'erp' ? 'ERP' : 'POS';
                             const isActive = currentType === value;
@@ -283,21 +291,17 @@ export default function Analytics({ workspace }: Props) {
                             return (
                                 <button
                                     key={value}
-                                    onClick={() =>
-                                        !isDisabled && setCurrentType(value)
-                                    }
                                     disabled={isDisabled}
-                                    title={
-                                        isDisabled
-                                            ? 'ERP is temporarily unavailable'
-                                            : undefined
-                                    }
+                                    onClick={() => {
+                                        setCurrentType(value);
+                                        const url = new URL(window.location.href);
+                                        url.searchParams.set('type', value);
+                                        window.history.replaceState({}, '', url.toString());
+                                    }}
                                     className={`rounded-lg px-3 py-1.5 text-[12px]! font-medium transition-colors ${
-                                        isDisabled
-                                            ? 'cursor-not-allowed text-zinc-300 dark:text-zinc-600'
-                                            : isActive
-                                              ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-600 dark:text-white'
-                                              : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
+                                        isActive
+                                            ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-600 dark:text-white'
+                                            : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
                                     }`}
                                 >
                                     {label}
@@ -355,7 +359,15 @@ export default function Analytics({ workspace }: Props) {
                 {/*    />*/}
                 {/*</div>*/}
 
-                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                <input
+                    type="text"
+                    placeholder="Search CSR..."
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm! text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500 dark:focus:border-zinc-500"
+                />
+
+                <div className="rounded-[14px] mt-2 border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         key={sort}
                         columns={columns}
