@@ -1,6 +1,5 @@
-import React from 'react'
-import { Button } from '@/components/ui/button'
-import { router } from '@inertiajs/react'
+import { Button } from '@/components/ui/button';
+import { router } from '@inertiajs/react';
 
 interface PaginationLink {
     url: string | null;
@@ -21,7 +20,9 @@ export default function Pagination({ data }: { data: Props }) {
         <div className="mt-4 flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
                 {data.total > 0 ? (
-                    <>Showing {data.from} to {data.to} of {data.total} results</>
+                    <>
+                        Showing {data.from} to {data.to} of {data.total} results
+                    </>
                 ) : null}
             </div>
 
@@ -29,14 +30,21 @@ export default function Pagination({ data }: { data: Props }) {
                 <div className="flex gap-2">
                     {data.links.map((link, index) => (
                         <Button
-                            className='hover:cursor-pointer'
+                            className="hover:cursor-pointer"
                             key={index}
                             variant={link.active ? 'default' : 'outline'}
                             size="sm"
                             disabled={!link.url}
                             onClick={() => {
                                 if (link.url) {
-                                    router.get(link.url, {}, { preserveState: true, preserveScroll: true });
+                                    router.get(
+                                        link.url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    );
                                 }
                             }}
                             dangerouslySetInnerHTML={{ __html: link.label }}
@@ -45,5 +53,5 @@ export default function Pagination({ data }: { data: Props }) {
                 </div>
             )}
         </div>
-    )
+    );
 }

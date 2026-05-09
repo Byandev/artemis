@@ -14,13 +14,8 @@ import { Label } from '@/components/ui/label';
 import { edit } from '@/routes/password';
 import { Workspace } from '@/types/models/Workspace';
 
-
-export default function Password({
-                                     workspace
-                                 }: {
-    workspace: Workspace
-}) {
-    console.log(workspace)
+export default function Password({ workspace }: { workspace: Workspace }) {
+    console.log(workspace);
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: 'Password settings',
@@ -43,7 +38,9 @@ export default function Password({
                     />
 
                     <Form
-                        {...PasswordController.update.form({ workspace: workspace.slug })}
+                        {...PasswordController.update.form({
+                            workspace: workspace.slug,
+                        })}
                         options={{
                             preserveScroll: true,
                         }}

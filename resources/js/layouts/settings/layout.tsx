@@ -2,27 +2,26 @@ import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editPassword } from '@/routes/password';
 import { edit } from '@/routes/profile';
-import { show } from '@/routes/two-factor';
 import { type NavItem } from '@/types';
+import { Workspace } from '@/types/models/Workspace';
 import { Link } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
-import { Workspace } from '@/types/models/Workspace';
 
-
-
-export default function SettingsLayout({ children , workspace }: PropsWithChildren<{workspace: Workspace}>) {
+export default function SettingsLayout({
+    children,
+    workspace,
+}: PropsWithChildren<{ workspace: Workspace }>) {
     const sidebarNavItems: NavItem[] = [
         {
             title: 'Profile',
-            href: edit({workspace: workspace.slug}),
+            href: edit({ workspace: workspace.slug }),
             icon: null,
         },
         {
             title: 'Password',
-            href: editPassword({workspace: workspace.slug}),
+            href: editPassword({ workspace: workspace.slug }),
             icon: null,
         },
         // {

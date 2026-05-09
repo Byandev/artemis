@@ -23,9 +23,9 @@ export default function AuthSplitLayout({
                     href={home()}
                     className="relative z-20 flex items-center text-lg font-medium"
                 >
-                    <img 
-                        src="/img/logo/artemis.png" 
-                        alt="Artemis Logo" 
+                    <img
+                        src="/img/logo/artemis.png"
+                        alt="Artemis Logo"
                         className="mr-2 size-8 object-contain"
                     />
                     {name}
@@ -49,9 +49,9 @@ export default function AuthSplitLayout({
                         href={home()}
                         className="relative z-20 flex items-center justify-center lg:hidden"
                     >
-                        <img 
-                            src="/img/logo/artemis.png" 
-                            alt="Artemis Logo" 
+                        <img
+                            src="/img/logo/artemis.png"
+                            alt="Artemis Logo"
                             className="h-10 object-contain sm:h-12"
                         />
                     </Link>

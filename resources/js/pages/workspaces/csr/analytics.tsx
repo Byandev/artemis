@@ -22,7 +22,7 @@ interface CsrRecord {
     rts_rate: number;
     total_called: number;
     total_call_time: number;
-    total_rmo_call_attempts:number;
+    total_rmo_call_attempts: number;
 }
 
 interface Props {
@@ -115,7 +115,8 @@ export default function Analytics({ workspace, query }: Props) {
         from: subDays(today, 6),
         to: today,
     });
-    const [paginatedRecords, setPaginatedRecords] = useState<PaginatedData<CsrRecord> | null>(null);
+    const [paginatedRecords, setPaginatedRecords] =
+        useState<PaginatedData<CsrRecord> | null>(null);
     const [currentType, setCurrentType] = useState(initialType);
     const [sort, setSort] = useState('-total_sales');
     const [page, setPage] = useState(1);
@@ -187,7 +188,15 @@ export default function Analytics({ workspace, query }: Props) {
         const controller = new AbortController();
         axios
             .get(`/api/workspaces/${workspace.slug}/csrs/daily-records`, {
-                params: { from: fromStr, to: toStr, type: currentType, sort, page, per_page: perPage, 'filter[search]': search || undefined },
+                params: {
+                    from: fromStr,
+                    to: toStr,
+                    type: currentType,
+                    sort,
+                    page,
+                    per_page: perPage,
+                    'filter[search]': search || undefined,
+                },
                 signal: controller.signal,
             })
             .then((res) => setPaginatedRecords(res.data))
@@ -195,7 +204,16 @@ export default function Analytics({ workspace, query }: Props) {
                 if (!axios.isCancel(err)) console.error(err);
             });
         return () => controller.abort();
-    }, [workspace.slug, fromStr, toStr, currentType, sort, page, perPage, search]);
+    }, [
+        workspace.slug,
+        fromStr,
+        toStr,
+        currentType,
+        sort,
+        page,
+        perPage,
+        search,
+    ]);
 
     const initialSorting = useMemo(() => toFrontendSort(sort), [sort]);
 
@@ -283,7 +301,7 @@ export default function Analytics({ workspace, query }: Props) {
                     description="Aggregated CSR performance from daily records"
                     stackActionsOnMobile
                 >
-                    <div className="flex items-center p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+                    <div className="flex items-center rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
                         {['erp', 'pos'].map((value) => {
                             const label = value === 'erp' ? 'ERP' : 'POS';
                             const isActive = currentType === value;
@@ -294,9 +312,15 @@ export default function Analytics({ workspace, query }: Props) {
                                     disabled={isDisabled}
                                     onClick={() => {
                                         setCurrentType(value);
-                                        const url = new URL(window.location.href);
+                                        const url = new URL(
+                                            window.location.href,
+                                        );
                                         url.searchParams.set('type', value);
-                                        window.history.replaceState({}, '', url.toString());
+                                        window.history.replaceState(
+                                            {},
+                                            '',
+                                            url.toString(),
+                                        );
                                     }}
                                     className={`rounded-lg px-3 py-1.5 text-[12px]! font-medium transition-colors ${
                                         isActive
@@ -367,7 +391,7 @@ export default function Analytics({ workspace, query }: Props) {
                     className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm! text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500 dark:focus:border-zinc-500"
                 />
 
-                <div className="rounded-[14px] mt-2 border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                <div className="mt-2 rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         key={sort}
                         columns={columns}

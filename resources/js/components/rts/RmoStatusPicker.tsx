@@ -9,9 +9,9 @@ import {
     ORDER_STATUSES,
     OrderStatus,
 } from '@/types/models/Pancake/OrderForDelivery';
-import { Check, ChevronDown, Loader2 } from 'lucide-react';
-import { orderStatusConfig } from './rmo-config';
+import { Check, ChevronDown } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { orderStatusConfig } from './rmo-config';
 
 interface Props {
     currentStatus: OrderStatus;
@@ -19,7 +19,11 @@ interface Props {
     disabled?: boolean;
 }
 
-export function RmoStatusPicker({ currentStatus, onChangeStatus, disabled = false }: Props) {
+export function RmoStatusPicker({
+    currentStatus,
+    onChangeStatus,
+    disabled = false,
+}: Props) {
     const [status, setStatus] = useState(currentStatus);
 
     useEffect(() => {
@@ -30,11 +34,16 @@ export function RmoStatusPicker({ currentStatus, onChangeStatus, disabled = fals
 
     if (disabled) {
         return (
-            <span className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium opacity-60 cursor-not-allowed',
-                cfg?.pill ?? 'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400',
-            )}>
-                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cfg?.dot ?? 'bg-gray-400'}`} />
+            <span
+                className={cn(
+                    'inline-flex cursor-not-allowed items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium opacity-60',
+                    cfg?.pill ??
+                        'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400',
+                )}
+            >
+                <span
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${cfg?.dot ?? 'bg-gray-400'}`}
+                />
                 <span className="max-w-[110px] truncate">{status}</span>
             </span>
         );
@@ -42,16 +51,24 @@ export function RmoStatusPicker({ currentStatus, onChangeStatus, disabled = fals
 
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger className={cn(
-                'group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium font-[inherit] outline-none transition-all hover:opacity-80',
-                cfg?.pill ?? 'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400',
-            )}>
-                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cfg?.dot ?? 'bg-gray-400'}`} />
+            <DropdownMenuTrigger
+                className={cn(
+                    'group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-[inherit] text-[11px] font-medium transition-all outline-none hover:opacity-80',
+                    cfg?.pill ??
+                        'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400',
+                )}
+            >
+                <span
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${cfg?.dot ?? 'bg-gray-400'}`}
+                />
                 <span className="max-w-[110px] truncate">{status}</span>
                 <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52 overflow-hidden p-1">
-                <p className="px-2 pb-1.5 pt-1 font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            <DropdownMenuContent
+                align="end"
+                className="w-52 overflow-hidden p-1"
+            >
+                <p className="px-2 pt-1 pb-1.5 font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
                     Change status
                 </p>
                 <div className="max-h-72 overflow-y-auto">
@@ -62,7 +79,7 @@ export function RmoStatusPicker({ currentStatus, onChangeStatus, disabled = fals
                             <DropdownMenuItem
                                 key={s}
                                 onClick={() => {
-                                    setStatus(s)
+                                    setStatus(s);
                                     onChangeStatus(s);
                                 }}
                                 className={cn(
@@ -72,11 +89,22 @@ export function RmoStatusPicker({ currentStatus, onChangeStatus, disabled = fals
                                         : 'text-gray-600 dark:text-gray-400',
                                 )}
                             >
-                                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${sCfg?.dot ?? 'bg-gray-400'}`} />
-                                <span className={cn('flex-1', isActive ? `font-semibold ${sCfg?.text ?? ''}` : '')}>
+                                <span
+                                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${sCfg?.dot ?? 'bg-gray-400'}`}
+                                />
+                                <span
+                                    className={cn(
+                                        'flex-1',
+                                        isActive
+                                            ? `font-semibold ${sCfg?.text ?? ''}`
+                                            : '',
+                                    )}
+                                >
                                     {s}
                                 </span>
-                                {isActive && <Check className="h-3 w-3 text-emerald-500" />}
+                                {isActive && (
+                                    <Check className="h-3 w-3 text-emerald-500" />
+                                )}
                             </DropdownMenuItem>
                         );
                     })}

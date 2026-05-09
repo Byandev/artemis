@@ -1,19 +1,13 @@
-
-import { useEffect, useMemo, useState } from 'react';
 import axios, { AxiosResponse } from 'axios';
+import { useEffect, useState } from 'react';
 
 import { PaginatedData } from '@/types';
 
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Workspace } from '@/types/models/Workspace';
 import { useDebouncedState } from '@/hooks/use-debounced-state';
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Workspace } from '@/types/models/Workspace';
 
 type IdLike = string | number;
 
@@ -24,8 +18,8 @@ type EntityFilterProps<T> = {
     getId: (item: T) => IdLike;
     getLabel: (item: T) => string;
     queryParam?: string;
-    selected: IdLike[],
-    onSelect: (id: IdLike) => void
+    selected: IdLike[];
+    onSelect: (id: IdLike) => void;
 };
 
 export function EntityFilter<T>({
@@ -36,7 +30,7 @@ export function EntityFilter<T>({
     getLabel,
     queryParam = 'filter[search]',
     selected,
-    onSelect
+    onSelect,
 }: EntityFilterProps<T>) {
     const [items, setItems] = useState<T[]>([]);
     const {
@@ -83,8 +77,16 @@ export function EntityFilter<T>({
                                 key={idStr}
                                 className="flex items-center gap-x-2 text-xs"
                             >
-                                <Checkbox id={idStr} name={idStr} checked={selected.includes(idStr)} onSelect={() => onSelect(idStr)}/>
-                                <Label htmlFor={idStr} className="text-xs text-gray-800">
+                                <Checkbox
+                                    id={idStr}
+                                    name={idStr}
+                                    checked={selected.includes(idStr)}
+                                    onSelect={() => onSelect(idStr)}
+                                />
+                                <Label
+                                    htmlFor={idStr}
+                                    className="text-xs text-gray-800"
+                                >
                                     {getLabel(item)}
                                 </Label>
                             </div>

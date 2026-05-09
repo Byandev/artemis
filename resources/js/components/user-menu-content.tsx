@@ -7,11 +7,10 @@ import {
 import { UserInfo } from '@/components/user-info';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
 import { logout } from '@/routes';
-import { edit } from '@/routes/profile';
 import { type SharedData, type User } from '@/types';
+import { Workspace } from '@/types/models/Workspace';
 import { Link, router, usePage } from '@inertiajs/react';
 import { LogOut, Settings } from 'lucide-react';
-import { Workspace } from '@/types/models/Workspace';
 
 interface UserMenuContentProps {
     user: User;
@@ -20,7 +19,6 @@ interface UserMenuContentProps {
 export function UserMenuContent({ user }: UserMenuContentProps) {
     const cleanup = useMobileNavigation();
     const { workspace } = usePage<SharedData>().props;
-
 
     const handleLogout = () => {
         cleanup();

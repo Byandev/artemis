@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import { Line, LineChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import {
     ChartContainer,
     ChartTooltip,
     ChartTooltipContent,
 } from '@/components/ui/chart';
+import { useEffect, useState } from 'react';
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 
 interface SalesData {
     date: string;
@@ -13,8 +13,8 @@ interface SalesData {
 
 const chartConfig = {
     total_sales: {
-        label: "Total Sales",
-        color: "#2563eb",
+        label: 'Total Sales',
+        color: '#2563eb',
     },
 };
 
@@ -44,8 +44,12 @@ const SalesChart = () => {
     }
 
     return (
-        <div className="w-full h-[300px] rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
-            <ChartContainer id={'total_sales'} config={chartConfig} className="h-full w-full">
+        <div className="h-[300px] w-full rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
+            <ChartContainer
+                id={'total_sales'}
+                config={chartConfig}
+                className="h-full w-full"
+            >
                 <LineChart data={salesData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
@@ -55,7 +59,10 @@ const SalesChart = () => {
                         tickMargin={8}
                         tickFormatter={(value) => {
                             const date = new Date(value);
-                            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            return date.toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                            });
                         }}
                     />
                     <YAxis
@@ -68,11 +75,14 @@ const SalesChart = () => {
                         content={
                             <ChartTooltipContent
                                 labelFormatter={(value) => {
-                                    return new Date(value).toLocaleDateString('en-US', {
-                                        month: 'long',
-                                        day: 'numeric',
-                                        year: 'numeric',
-                                    });
+                                    return new Date(value).toLocaleDateString(
+                                        'en-US',
+                                        {
+                                            month: 'long',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                        },
+                                    );
                                 }}
                             />
                         }
@@ -88,6 +98,6 @@ const SalesChart = () => {
             </ChartContainer>
         </div>
     );
-}
+};
 
 export default SalesChart;

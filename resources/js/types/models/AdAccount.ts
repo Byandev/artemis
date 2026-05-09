@@ -7,5 +7,5 @@ export interface AdAccount {
     currency: string;
     country_code: string;
     status: number;
-    facebook_accounts: FacebookAccount[]
+    facebook_accounts: FacebookAccount[];
 }

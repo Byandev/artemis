@@ -1,5 +1,8 @@
 import PageHeader from '@/components/common/PageHeader';
-import { FinanceRemittance, RemittanceFormDialog } from '@/components/finance/remittance-form-dialog';
+import {
+    FinanceRemittance,
+    RemittanceFormDialog,
+} from '@/components/finance/remittance-form-dialog';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -10,7 +13,11 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
@@ -19,8 +26,22 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { AlertTriangle, ArrowLeft, ChevronDown, Pencil, Search, Trash2, Upload } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    AlertTriangle,
+    ArrowLeft,
+    ChevronDown,
+    Pencil,
+    Search,
+    Trash2,
+    Upload,
+} from 'lucide-react';
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 
 interface RemittanceItem {
     id: number;
@@ -67,13 +88,24 @@ interface Props {
     workspace: Workspace;
     remittance: Remittance;
     items: PaginatedData<RemittanceItem>;
-    itemsQuery?: { sort?: string | null; perPage?: string | null; filter?: { search?: string } };
+    itemsQuery?: {
+        sort?: string | null;
+        perPage?: string | null;
+        filter?: { search?: string };
+    };
     transactions: TransactionOpt[];
 }
 
-const peso = (v: number | string) => `₱${Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const peso = (v: number | string) =>
+    `₱${Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export default function RemittanceShow({ workspace, remittance, items, itemsQuery, transactions }: Props) {
+export default function RemittanceShow({
+    workspace,
+    remittance,
+    items,
+    itemsQuery,
+    transactions,
+}: Props) {
     const [editOpen, setEditOpen] = useState(false);
     const [importing, setImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -92,80 +124,204 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
         });
     };
 
-    const initialSorting = useMemo(() => toFrontendSort(itemsQuery?.sort ?? null), [itemsQuery?.sort]);
+    const initialSorting = useMemo(
+        () => toFrontendSort(itemsQuery?.sort ?? null),
+        [itemsQuery?.sort],
+    );
     const [search, setSearch] = useState(itemsQuery?.filter?.search ?? '');
 
     const performSearch = useCallback(
         debounce((s: string) => {
-            router.get(showUrl,
-                { sort: itemsQuery?.sort, 'filter[search]': s || undefined, perPage: itemsQuery?.perPage, page: 1 },
-                { preserveState: true, replace: true, preserveScroll: true, only: ['items', 'itemsQuery'] });
+            router.get(
+                showUrl,
+                {
+                    sort: itemsQuery?.sort,
+                    'filter[search]': s || undefined,
+                    perPage: itemsQuery?.perPage,
+                    page: 1,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['items', 'itemsQuery'],
+                },
+            );
         }, 400),
-        [showUrl, itemsQuery?.sort, itemsQuery?.perPage]
+        [showUrl, itemsQuery?.sort, itemsQuery?.perPage],
     );
 
-    useEffect(() => { performSearch(search); return () => performSearch.cancel(); }, [search, performSearch]);
+    useEffect(() => {
+        performSearch(search);
+        return () => performSearch.cancel();
+    }, [search, performSearch]);
 
     const columns: ColumnDef<RemittanceItem>[] = [
         {
-            accessorKey: 'waybill_number', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Waybill" />,
-            cell: ({ row }) => <span className="font-mono text-[12px] font-medium text-gray-800 dark:text-gray-100">{row.original.waybill_number}</span>,
+            accessorKey: 'waybill_number',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Waybill" />
+            ),
+            cell: ({ row }) => (
+                <span className="font-mono text-[12px] font-medium text-gray-800 dark:text-gray-100">
+                    {row.original.waybill_number}
+                </span>
+            ),
         },
         {
-            accessorKey: 'order_number', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Order No." />,
-            cell: ({ row }) => <span className="text-gray-500">{row.original.order_number ?? '—'}</span>,
+            accessorKey: 'order_number',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Order No." />
+            ),
+            cell: ({ row }) => (
+                <span className="text-gray-500">
+                    {row.original.order_number ?? '—'}
+                </span>
+            ),
         },
         {
-            accessorKey: 'shipping_date', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Ship Date" />,
-            cell: ({ row }) => <span className="text-gray-500">{row.original.shipping_date ? String(row.original.shipping_date).slice(0, 10) : '—'}</span>,
+            accessorKey: 'shipping_date',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Ship Date" />
+            ),
+            cell: ({ row }) => (
+                <span className="text-gray-500">
+                    {row.original.shipping_date
+                        ? String(row.original.shipping_date).slice(0, 10)
+                        : '—'}
+                </span>
+            ),
         },
         {
-            accessorKey: 'sender_city', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="From" />,
-            cell: ({ row }) => <span className="text-gray-500">{row.original.sender_city ?? '—'}</span>,
+            accessorKey: 'sender_city',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="From" />
+            ),
+            cell: ({ row }) => (
+                <span className="text-gray-500">
+                    {row.original.sender_city ?? '—'}
+                </span>
+            ),
         },
         {
-            accessorKey: 'destination_city', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="To" />,
-            cell: ({ row }) => <span className="text-gray-500">{row.original.destination_city ?? '—'}</span>,
+            accessorKey: 'destination_city',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="To" />
+            ),
+            cell: ({ row }) => (
+                <span className="text-gray-500">
+                    {row.original.destination_city ?? '—'}
+                </span>
+            ),
         },
         {
             id: 'package_billing_weight',
-            header: () => <div className="text-right font-mono text-[10px] uppercase tracking-wider text-gray-300">Weight</div>,
-            cell: ({ row }) => <div className="text-right text-gray-500">{Number(row.original.package_billing_weight).toFixed(2)}</div>,
+            header: () => (
+                <div className="text-right font-mono text-[10px] tracking-wider text-gray-300 uppercase">
+                    Weight
+                </div>
+            ),
+            cell: ({ row }) => (
+                <div className="text-right text-gray-500">
+                    {Number(row.original.package_billing_weight).toFixed(2)}
+                </div>
+            ),
         },
         {
-            accessorKey: 'item_value', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Item Value" className="justify-end" />,
-            cell: ({ row }) => <div className="text-right text-gray-700 dark:text-gray-200">{peso(row.original.item_value)}</div>,
+            accessorKey: 'item_value',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Item Value"
+                    className="justify-end"
+                />
+            ),
+            cell: ({ row }) => (
+                <div className="text-right text-gray-700 dark:text-gray-200">
+                    {peso(row.original.item_value)}
+                </div>
+            ),
         },
         {
-            accessorKey: 'total_shipping_cost', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Shipping" className="justify-end" />,
-            cell: ({ row }) => <div className="text-right text-gray-500">{peso(row.original.total_shipping_cost)}</div>,
+            accessorKey: 'total_shipping_cost',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Shipping"
+                    className="justify-end"
+                />
+            ),
+            cell: ({ row }) => (
+                <div className="text-right text-gray-500">
+                    {peso(row.original.total_shipping_cost)}
+                </div>
+            ),
         },
         {
-            accessorKey: 'cod', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="COD" className="justify-end" />,
-            cell: ({ row }) => <div className="text-right text-gray-700 dark:text-gray-200">{peso(row.original.cod)}</div>,
+            accessorKey: 'cod',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="COD"
+                    className="justify-end"
+                />
+            ),
+            cell: ({ row }) => (
+                <div className="text-right text-gray-700 dark:text-gray-200">
+                    {peso(row.original.cod)}
+                </div>
+            ),
         },
         {
-            accessorKey: 'cod_commission', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Commission" className="justify-end" />,
-            cell: ({ row }) => <div className="text-right text-rose-600 dark:text-rose-400">{peso(row.original.cod_commission)}</div>,
+            accessorKey: 'cod_commission',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Commission"
+                    className="justify-end"
+                />
+            ),
+            cell: ({ row }) => (
+                <div className="text-right text-rose-600 dark:text-rose-400">
+                    {peso(row.original.cod_commission)}
+                </div>
+            ),
         },
         {
             id: 'cod_commission_vat_fee',
-            header: () => <div className="text-right font-mono text-[10px] uppercase tracking-wider text-gray-300">VAT</div>,
-            cell: ({ row }) => <div className="text-right text-rose-600 dark:text-rose-400">{peso(row.original.cod_commission_vat_fee)}</div>,
+            header: () => (
+                <div className="text-right font-mono text-[10px] tracking-wider text-gray-300 uppercase">
+                    VAT
+                </div>
+            ),
+            cell: ({ row }) => (
+                <div className="text-right text-rose-600 dark:text-rose-400">
+                    {peso(row.original.cod_commission_vat_fee)}
+                </div>
+            ),
         },
         {
-            accessorKey: 'signing_time', enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Signed" />,
-            cell: ({ row }) => <span className="text-gray-500">{row.original.signing_time ? String(row.original.signing_time).slice(0, 10) : '—'}</span>,
+            accessorKey: 'signing_time',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Signed" />
+            ),
+            cell: ({ row }) => (
+                <span className="text-gray-500">
+                    {row.original.signing_time
+                        ? String(row.original.signing_time).slice(0, 10)
+                        : '—'}
+                </span>
+            ),
         },
     ];
 
@@ -173,7 +329,10 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
         <AppLayout>
             <Head title={`${workspace.name} - SOA ${remittance.soa_number}`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <Link href={`${base}/remittances`} className="mb-3 inline-flex items-center gap-1 text-[12px] text-gray-500 hover:text-gray-800 dark:text-gray-400">
+                <Link
+                    href={`${base}/remittances`}
+                    className="mb-3 inline-flex items-center gap-1 text-[12px] text-gray-500 hover:text-gray-800 dark:text-gray-400"
+                >
                     <ArrowLeft className="h-3.5 w-3.5" /> Back to Remittances
                 </Link>
 
@@ -191,13 +350,18 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
                                 const file = e.target.files?.[0];
                                 if (!file) return;
                                 setImporting(true);
-                                router.post(`${base}/remittances/${remittance.id}/import-items`, { file }, {
-                                    forceFormData: true,
-                                    onFinish: () => {
-                                        setImporting(false);
-                                        if (fileInputRef.current) fileInputRef.current.value = '';
+                                router.post(
+                                    `${base}/remittances/${remittance.id}/import-items`,
+                                    { file },
+                                    {
+                                        forceFormData: true,
+                                        onFinish: () => {
+                                            setImporting(false);
+                                            if (fileInputRef.current)
+                                                fileInputRef.current.value = '';
+                                        },
                                     },
-                                });
+                                );
                             }}
                         />
                         <button
@@ -233,44 +397,89 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
                     </div>
                 )}
 
-                <Collapsible defaultOpen={false} className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                <Collapsible
+                    defaultOpen={false}
+                    className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900"
+                >
                     <CollapsibleTrigger className="flex w-full items-center justify-between px-6 py-4">
                         <div className="flex items-center gap-3">
-                            <h3 className="font-mono text-[10px] uppercase tracking-wider text-gray-400">Breakdown</h3>
-                            <span className="font-mono text-[13px] font-semibold text-gray-900 dark:text-gray-100">{peso(remittance.net_amount)}</span>
+                            <h3 className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                                Breakdown
+                            </h3>
+                            <span className="font-mono text-[13px] font-semibold text-gray-900 dark:text-gray-100">
+                                {peso(remittance.net_amount)}
+                            </span>
                         </div>
                         <ChevronDown className="h-4 w-4 text-gray-400 transition-transform [[data-state=open]>&]:rotate-180" />
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                        <div className="border-t border-black/6 px-6 pb-6 pt-4 dark:border-white/6">
+                        <div className="border-t border-black/6 px-6 pt-4 pb-6 dark:border-white/6">
                             <dl className="space-y-2 font-mono text-[13px]">
-                                <LineItem label="Gross COD" value={peso(remittance.gross_cod)} />
-                                <LineItem label="Less COD Fee" value={`-${peso(remittance.cod_fee)}`} negative />
-                                <LineItem label="Less COD Fee VAT" value={`-${peso(remittance.cod_fee_vat)}`} negative />
-                                <LineItem label="Less Shipping Fee" value={`-${peso(remittance.shipping_fee)}`} negative />
-                                <LineItem label="Less Return Shipping" value={`-${peso(remittance.return_shipping)}`} negative />
+                                <LineItem
+                                    label="Gross COD"
+                                    value={peso(remittance.gross_cod)}
+                                />
+                                <LineItem
+                                    label="Less COD Fee"
+                                    value={`-${peso(remittance.cod_fee)}`}
+                                    negative
+                                />
+                                <LineItem
+                                    label="Less COD Fee VAT"
+                                    value={`-${peso(remittance.cod_fee_vat)}`}
+                                    negative
+                                />
+                                <LineItem
+                                    label="Less Shipping Fee"
+                                    value={`-${peso(remittance.shipping_fee)}`}
+                                    negative
+                                />
+                                <LineItem
+                                    label="Less Return Shipping"
+                                    value={`-${peso(remittance.return_shipping)}`}
+                                    negative
+                                />
                                 <div className="my-2 border-t border-dashed border-black/10 dark:border-white/10" />
-                                <LineItem label="Net Remittance" value={peso(remittance.net_amount)} bold />
+                                <LineItem
+                                    label="Net Remittance"
+                                    value={peso(remittance.net_amount)}
+                                    bold
+                                />
                             </dl>
 
                             <div className="mt-6 grid grid-cols-2 gap-4 border-t border-black/6 pt-4 text-[13px] dark:border-white/6">
                                 <Meta label="Status">
-                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${remittance.status === 'remitted' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400'}`}>
+                                    <span
+                                        className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${remittance.status === 'remitted' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400'}`}
+                                    >
                                         {remittance.status}
                                     </span>
                                 </Meta>
                                 <Meta label="Linked Transaction">
                                     {remittance.transaction ? (
-                                        <Link href={`${base}/accounts/${remittance.transaction.account?.id}`} className="text-emerald-600 hover:underline">
-                                            #{remittance.transaction.id} · {remittance.transaction.account?.name ?? '—'} · {peso(remittance.transaction.amount)}
+                                        <Link
+                                            href={`${base}/accounts/${remittance.transaction.account?.id}`}
+                                            className="text-emerald-600 hover:underline"
+                                        >
+                                            #{remittance.transaction.id} ·{' '}
+                                            {remittance.transaction.account
+                                                ?.name ?? '—'}{' '}
+                                            ·{' '}
+                                            {peso(
+                                                remittance.transaction.amount,
+                                            )}
                                         </Link>
                                     ) : (
-                                        <span className="text-gray-400">Not yet linked</span>
+                                        <span className="text-gray-400">
+                                            Not yet linked
+                                        </span>
                                     )}
                                 </Meta>
                                 {remittance.notes && (
                                     <Meta label="Notes" fullWidth>
-                                        <p className="text-gray-700 dark:text-gray-200">{remittance.notes}</p>
+                                        <p className="text-gray-700 dark:text-gray-200">
+                                            {remittance.notes}
+                                        </p>
                                     </Meta>
                                 )}
                             </div>
@@ -280,13 +489,13 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
 
                 <div className="mt-4">
                     <div className="mb-3 flex items-center gap-2">
-                        <h3 className="font-mono text-[10px] uppercase tracking-wider text-gray-400">
+                        <h3 className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
                             Items ({items.total})
                         </h3>
-                        <div className="ml-auto relative w-full max-w-xs">
-                            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                        <div className="relative ml-auto w-full max-w-xs">
+                            <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                             <input
-                                className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pl-8 pr-3 font-mono! text-[12px]! text-gray-800 outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100"
+                                className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100"
                                 placeholder="Search waybill, order, city..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
@@ -302,9 +511,23 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
                             initialSorting={initialSorting}
                             meta={{ ...omit(items, ['data']) }}
                             onFetch={(params) => {
-                                router.get(showUrl,
-                                    { sort: params?.sort, 'filter[search]': search || undefined, perPage: params?.per_page ?? itemsQuery?.perPage, page: params?.page ?? 1 },
-                                    { preserveState: true, replace: true, preserveScroll: true, only: ['items', 'itemsQuery'] });
+                                router.get(
+                                    showUrl,
+                                    {
+                                        sort: params?.sort,
+                                        'filter[search]': search || undefined,
+                                        perPage:
+                                            params?.per_page ??
+                                            itemsQuery?.perPage,
+                                        page: params?.page ?? 1,
+                                    },
+                                    {
+                                        preserveState: true,
+                                        replace: true,
+                                        preserveScroll: true,
+                                        only: ['items', 'itemsQuery'],
+                                    },
+                                );
                             }}
                         />
                     </div>
@@ -325,7 +548,9 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
                                 Delete all {items.total} items?
                             </AlertDialogTitle>
                             <AlertDialogDescription className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
-                                This will permanently delete every item attached to this remittance. This action cannot be undone.
+                                This will permanently delete every item attached
+                                to this remittance. This action cannot be
+                                undone.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter className="mt-4 gap-2">
@@ -336,11 +561,16 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
                                 Cancel
                             </AlertDialogCancel>
                             <AlertDialogAction
-                                onClick={(e) => { e.preventDefault(); performClearAll(); }}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    performClearAll();
+                                }}
                                 disabled={clearing}
                                 className="h-9 rounded-lg bg-red-600 px-4 font-mono! text-[12px]! font-medium text-white hover:bg-red-700 disabled:opacity-50"
                             >
-                                {clearing ? 'Deleting...' : 'Confirm Delete All'}
+                                {clearing
+                                    ? 'Deleting...'
+                                    : 'Confirm Delete All'}
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
@@ -350,19 +580,51 @@ export default function RemittanceShow({ workspace, remittance, items, itemsQuer
     );
 }
 
-function LineItem({ label, value, bold, negative }: { label: string; value: string; bold?: boolean; negative?: boolean }) {
+function LineItem({
+    label,
+    value,
+    bold,
+    negative,
+}: {
+    label: string;
+    value: string;
+    bold?: boolean;
+    negative?: boolean;
+}) {
     return (
         <div className="flex items-center justify-between">
-            <dt className={bold ? 'font-semibold text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}>{label}</dt>
-            <dd className={`${bold ? 'text-[16px] font-semibold text-gray-900 dark:text-gray-100' : negative ? 'text-rose-600 dark:text-rose-400' : 'text-gray-700 dark:text-gray-200'}`}>{value}</dd>
+            <dt
+                className={
+                    bold
+                        ? 'font-semibold text-gray-900 dark:text-gray-100'
+                        : 'text-gray-500 dark:text-gray-400'
+                }
+            >
+                {label}
+            </dt>
+            <dd
+                className={`${bold ? 'text-[16px] font-semibold text-gray-900 dark:text-gray-100' : negative ? 'text-rose-600 dark:text-rose-400' : 'text-gray-700 dark:text-gray-200'}`}
+            >
+                {value}
+            </dd>
         </div>
     );
 }
 
-function Meta({ label, children, fullWidth }: { label: string; children: React.ReactNode; fullWidth?: boolean }) {
+function Meta({
+    label,
+    children,
+    fullWidth,
+}: {
+    label: string;
+    children: React.ReactNode;
+    fullWidth?: boolean;
+}) {
     return (
         <div className={fullWidth ? 'col-span-2' : ''}>
-            <dt className="font-mono text-[10px] uppercase tracking-wider text-gray-400">{label}</dt>
+            <dt className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                {label}
+            </dt>
             <dd className="mt-0.5">{children}</dd>
         </div>
     );

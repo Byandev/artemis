@@ -1,16 +1,20 @@
-import PageHeader from '@/components/common/PageHeader';
 import { AddTaskDialog } from '@/components/checklist/add-task-dialog';
-import { DeleteChecklistDialog } from '@/components/checklist/delete-checklist-dialog';
 import { getChecklistColumns } from '@/components/checklist/checklist-columns';
-import { ADD_TASK_FORM_INITIAL, AddTaskForm, ChecklistItem } from '@/components/checklist/types';
+import { DeleteChecklistDialog } from '@/components/checklist/delete-checklist-dialog';
+import {
+    ADD_TASK_FORM_INITIAL,
+    AddTaskForm,
+    ChecklistItem,
+} from '@/components/checklist/types';
+import PageHeader from '@/components/common/PageHeader';
 import { DataTable } from '@/components/ui/data-table';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
 import { omit } from 'lodash';
+import { Plus } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 interface Props {
@@ -25,15 +29,23 @@ interface Props {
 }
 
 export default function ChecklistPage({ workspace, checklists, query }: Props) {
-    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
+    const initialSorting = useMemo(
+        () => toFrontendSort(query?.sort ?? null),
+        [query?.sort],
+    );
     const [addTaskOpen, setAddTaskOpen] = useState(false);
     const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
     const [editingItemId, setEditingItemId] = useState<number | null>(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [itemToDelete, setItemToDelete] = useState<ChecklistItem | null>(null);
-    const [addTaskForm, setAddTaskForm] = useState<AddTaskForm>(ADD_TASK_FORM_INITIAL);
+    const [itemToDelete, setItemToDelete] = useState<ChecklistItem | null>(
+        null,
+    );
+    const [addTaskForm, setAddTaskForm] = useState<AddTaskForm>(
+        ADD_TASK_FORM_INITIAL,
+    );
 
-    const isAddTaskValid = addTaskForm.title.trim().length > 0 && addTaskForm.target !== '';
+    const isAddTaskValid =
+        addTaskForm.title.trim().length > 0 && addTaskForm.target !== '';
 
     const resetAddTaskForm = () => setAddTaskForm(ADD_TASK_FORM_INITIAL);
 
@@ -49,16 +61,20 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
         };
 
         if (dialogMode === 'edit' && editingItemId !== null) {
-            router.put(`/workspaces/${workspace.slug}/checklist/${editingItemId}`, payload, {
-                preserveState: true,
-                preserveScroll: true,
-                onSuccess: () => {
-                    setAddTaskOpen(false);
-                    setDialogMode('add');
-                    setEditingItemId(null);
-                    resetAddTaskForm();
+            router.put(
+                `/workspaces/${workspace.slug}/checklist/${editingItemId}`,
+                payload,
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        setAddTaskOpen(false);
+                        setDialogMode('add');
+                        setEditingItemId(null);
+                        resetAddTaskForm();
+                    },
                 },
-            });
+            );
         } else {
             router.post(`/workspaces/${workspace.slug}/checklist`, payload, {
                 preserveState: true,
@@ -95,22 +111,26 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
             return;
         }
 
-        router.delete(`/workspaces/${workspace.slug}/checklist/${itemToDelete.id}`, {
-            preserveState: true,
-            preserveScroll: true,
-            onSuccess: () => {
-                setDeleteDialogOpen(false);
-                setItemToDelete(null);
+        router.delete(
+            `/workspaces/${workspace.slug}/checklist/${itemToDelete.id}`,
+            {
+                preserveState: true,
+                preserveScroll: true,
+                onSuccess: () => {
+                    setDeleteDialogOpen(false);
+                    setItemToDelete(null);
+                },
             },
-        });
+        );
     }, [itemToDelete, workspace.slug]);
 
     const columns = useMemo(
-        () => getChecklistColumns({
-            onEdit: openEdit,
-            onDelete: openDelete,
-        }),
-        [openDelete, openEdit, workspace.slug]
+        () =>
+            getChecklistColumns({
+                onEdit: openEdit,
+                onDelete: openDelete,
+            }),
+        [openDelete, openEdit, workspace.slug],
     );
 
     return (
@@ -189,7 +209,7 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                                     replace: true,
                                     preserveScroll: true,
                                     only: ['checklists', 'query'],
-                                }
+                                },
                             );
                         }}
                     />

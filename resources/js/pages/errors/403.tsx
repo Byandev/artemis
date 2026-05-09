@@ -25,7 +25,7 @@ export default function AccessDenied() {
             >
                 <div className="space-y-6">
                     <div className="rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3.5 text-rose-900 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-100">
-                        <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-700 dark:text-rose-300">
+                        <p className="font-mono text-[11px] font-semibold tracking-[0.18em] text-rose-700 uppercase dark:text-rose-300">
                             Access denied
                         </p>
                         <p className="mt-2 text-[14px] leading-relaxed text-rose-800 dark:text-rose-100/90">
@@ -34,7 +34,7 @@ export default function AccessDenied() {
                     </div>
 
                     <div className="space-y-3">
-                        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+                        <p className="font-mono text-[10px] font-semibold tracking-[0.18em] text-gray-400 uppercase dark:text-gray-500">
                             Next steps
                         </p>
                         <ul className="space-y-3 text-[14px] leading-relaxed text-gray-600 dark:text-gray-300">

@@ -1,8 +1,14 @@
-import { useForm } from '@inertiajs/react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { MemberSelector } from '@/components/teams/member-selector';
-import { Workspace } from '@/types/models/Workspace';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import workspaces from '@/routes/workspaces';
+import { Workspace } from '@/types/models/Workspace';
+import { useForm } from '@inertiajs/react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 
@@ -26,7 +32,13 @@ interface TeamFormDialogProps {
     team?: Team | null;
 }
 
-export function TeamFormDialog({ workspace, workspaceMembers, open, onOpenChange, team }: TeamFormDialogProps) {
+export function TeamFormDialog({
+    workspace,
+    workspaceMembers,
+    open,
+    onOpenChange,
+    team,
+}: TeamFormDialogProps) {
     const isEditing = !!team;
 
     const { data, setData, post, put, processing, errors, reset } = useForm({
@@ -36,36 +48,39 @@ export function TeamFormDialog({ workspace, workspaceMembers, open, onOpenChange
 
     useEffect(() => {
         if (team) {
-            setData({ name: team.name, members: team.members.map((m) => m.id) });
+            setData({
+                name: team.name,
+                members: team.members.map((m) => m.id),
+            });
         } else {
             reset();
         }
     }, [team, open]);
 
     const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+        e.preventDefault();
 
-    if (isEditing) {
-        put(workspaces.teams.update.url({ workspace, team: team.id }), {
-            preserveScroll: true,
-            onSuccess: () => { 
-                toast.success('Team updated successfully!');
-                reset(); 
-                onOpenChange(false); 
-            },
-        });
-    } else {
-        post(workspaces.teams.store.url({ workspace }), {
-            preserveScroll: true,
-            onSuccess: () => { 
-                // 3. Add the success notification for Creating
-                toast.success('Team created successfully!');
-                reset(); 
-                onOpenChange(false); 
-            },
-        });
-    }
-};
+        if (isEditing) {
+            put(workspaces.teams.update.url({ workspace, team: team.id }), {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Team updated successfully!');
+                    reset();
+                    onOpenChange(false);
+                },
+            });
+        } else {
+            post(workspaces.teams.store.url({ workspace }), {
+                preserveScroll: true,
+                onSuccess: () => {
+                    // 3. Add the success notification for Creating
+                    toast.success('Team created successfully!');
+                    reset();
+                    onOpenChange(false);
+                },
+            });
+        }
+    };
 
     const handleOpenChange = (open: boolean) => {
         onOpenChange(open);
@@ -74,14 +89,16 @@ export function TeamFormDialog({ workspace, workspaceMembers, open, onOpenChange
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
-                <div className="px-5 pt-5 pb-4 border-b border-black/6 dark:border-white/6">
+            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
+                <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
                             {isEditing ? 'Edit Team' : 'Create Team'}
                         </DialogTitle>
-                        <DialogDescription className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5">
-                            {isEditing ? 'Update team name and members' : 'Create a new team and add members from your workspace'}
+                        <DialogDescription className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
+                            {isEditing
+                                ? 'Update team name and members'
+                                : 'Create a new team and add members from your workspace'}
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -90,30 +107,44 @@ export function TeamFormDialog({ workspace, workspaceMembers, open, onOpenChange
                     <div className="space-y-5 px-5 py-4">
                         {/* Team Name */}
                         <div className="space-y-1.5">
-                            <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                Team Name <span className="text-red-400">*</span>
+                            <label className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                Team Name{' '}
+                                <span className="text-red-400">*</span>
                             </label>
                             <input
                                 type="text"
                                 autoFocus
                                 placeholder="Enter team name"
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
-                                className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
+                                className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none placeholder:text-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                             />
-                            {errors.name && <p className="font-mono text-[11px] text-red-500">{errors.name}</p>}
+                            {errors.name && (
+                                <p className="font-mono text-[11px] text-red-500">
+                                    {errors.name}
+                                </p>
+                            )}
                         </div>
 
                         {/* Member Selector */}
                         <MemberSelector
                             workspaceMembers={workspaceMembers}
                             selectedMemberIds={data.members}
-                            onAddMember={(id) => setData('members', [...data.members, id])}
-                            onRemoveMember={(id) => setData('members', data.members.filter((m) => m !== id))}
+                            onAddMember={(id) =>
+                                setData('members', [...data.members, id])
+                            }
+                            onRemoveMember={(id) =>
+                                setData(
+                                    'members',
+                                    data.members.filter((m) => m !== id),
+                                )
+                            }
                         />
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 border-t border-black/6 dark:border-white/6 px-5 py-3">
+                    <div className="flex items-center justify-end gap-2 border-t border-black/6 px-5 py-3 dark:border-white/6">
                         <button
                             type="button"
                             onClick={() => onOpenChange(false)}
@@ -126,7 +157,13 @@ export function TeamFormDialog({ workspace, workspaceMembers, open, onOpenChange
                             disabled={processing}
                             className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                         >
-                            {processing ? (isEditing ? 'Saving…' : 'Creating…') : (isEditing ? 'Save Changes' : 'Create Team')}
+                            {processing
+                                ? isEditing
+                                    ? 'Saving…'
+                                    : 'Creating…'
+                                : isEditing
+                                  ? 'Save Changes'
+                                  : 'Create Team'}
                         </button>
                     </div>
                 </form>

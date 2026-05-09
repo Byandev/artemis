@@ -29,15 +29,22 @@ export default function WorkspaceSetup({ userName }: Props) {
     };
 
     return (
-        <AuthLayout title="Set up your workspace" description="Give your workspace a name to get started">
+        <AuthLayout
+            title="Set up your workspace"
+            description="Give your workspace a name to get started"
+        >
             <Head title="Create Your Workspace" />
 
             <form onSubmit={submit} className="flex flex-col gap-5">
                 <div className="space-y-4">
                     {/* Workspace name */}
                     <div className="space-y-1.5">
-                        <label htmlFor="name" className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                            Workspace name <span className="text-red-400">*</span>
+                        <label
+                            htmlFor="name"
+                            className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500"
+                        >
+                            Workspace name{' '}
+                            <span className="text-red-400">*</span>
                         </label>
                         <input
                             id="name"
@@ -46,36 +53,54 @@ export default function WorkspaceSetup({ userName }: Props) {
                             required
                             autoFocus
                             value={data.name}
-                            onChange={e => setData('name', e.target.value)}
+                            onChange={(e) => setData('name', e.target.value)}
                             placeholder="My Workspace"
-                            className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                            className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none placeholder:text-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                         />
-                        {errors.name
-                            ? <p className="font-mono text-[11px] text-red-500">{errors.name}</p>
-                            : <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">You can always change this later.</p>
-                        }
+                        {errors.name ? (
+                            <p className="font-mono text-[11px] text-red-500">
+                                {errors.name}
+                            </p>
+                        ) : (
+                            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                You can always change this later.
+                            </p>
+                        )}
                     </div>
 
                     {/* Monthly order volume */}
                     <div className="space-y-1.5">
-                        <label htmlFor="monthly_order_volume" className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                        <label
+                            htmlFor="monthly_order_volume"
+                            className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500"
+                        >
                             Monthly order volume
                         </label>
                         <select
                             id="monthly_order_volume"
                             name="monthly_order_volume"
                             value={data.monthly_order_volume}
-                            onChange={e => setData('monthly_order_volume', e.target.value)}
-                            className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:focus:border-emerald-400"
+                            onChange={(e) =>
+                                setData('monthly_order_volume', e.target.value)
+                            }
+                            className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:focus:border-emerald-400"
                         >
                             {volumeOptions.map((opt) => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                </option>
                             ))}
                         </select>
-                        {errors.monthly_order_volume
-                            ? <p className="font-mono text-[11px] text-red-500">{errors.monthly_order_volume}</p>
-                            : <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">Approximate range — helps us tailor your experience.</p>
-                        }
+                        {errors.monthly_order_volume ? (
+                            <p className="font-mono text-[11px] text-red-500">
+                                {errors.monthly_order_volume}
+                            </p>
+                        ) : (
+                            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                Approximate range — helps us tailor your
+                                experience.
+                            </p>
+                        )}
                     </div>
 
                     {/* Submit */}
@@ -84,7 +109,9 @@ export default function WorkspaceSetup({ userName }: Props) {
                         disabled={processing}
                         className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-emerald-600 font-mono! text-[13px]! font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                     >
-                        {processing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        {processing && (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        )}
                         {processing ? 'Creating…' : 'Create Workspace'}
                     </button>
                 </div>

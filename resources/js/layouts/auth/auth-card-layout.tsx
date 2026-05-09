@@ -14,18 +14,27 @@ export default function AuthCardLayout({
     return (
         <div className="flex min-h-svh">
             {/* ── Left branding panel (desktop only) ──────────────────── */}
-            <div className="hidden lg:flex lg:w-[460px] xl:w-[520px] flex-col justify-between bg-zinc-950 p-12 relative overflow-hidden shrink-0">
+            <div className="relative hidden shrink-0 flex-col justify-between overflow-hidden bg-zinc-950 p-12 lg:flex lg:w-[460px] xl:w-[520px]">
                 {/* Grid overlay */}
                 <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:48px_48px]" />
                 {/* Glow accents */}
                 <div className="pointer-events-none absolute -top-40 -left-40 h-80 w-80 rounded-full bg-brand-500/10 blur-3xl" />
-                <div className="pointer-events-none absolute bottom-0 right-0 h-[28rem] w-[28rem] rounded-full bg-brand-500/5 blur-3xl" />
+                <div className="pointer-events-none absolute right-0 bottom-0 h-[28rem] w-[28rem] rounded-full bg-brand-500/5 blur-3xl" />
 
                 {/* Logo */}
                 <div className="relative z-10">
-                    <Link href={home()} className="flex items-center gap-3 w-fit">
-                        <img src="/img/logo/artemis.png" alt="Artemis" className="h-9 w-9 object-contain" />
-                        <span className="text-white font-semibold text-[17px] tracking-tight">Artemis</span>
+                    <Link
+                        href={home()}
+                        className="flex w-fit items-center gap-3"
+                    >
+                        <img
+                            src="/img/logo/artemis.png"
+                            alt="Artemis"
+                            className="h-9 w-9 object-contain"
+                        />
+                        <span className="text-[17px] font-semibold tracking-tight text-white">
+                            Artemis
+                        </span>
                     </Link>
                 </div>
 
@@ -38,11 +47,14 @@ export default function AuthCardLayout({
                                 Artemis
                             </span>
                         </div>
-                        <h2 className="text-[32px] font-bold leading-tight tracking-tight text-white">
-                            Your operations,<br />streamlined.
+                        <h2 className="text-[32px] leading-tight font-bold tracking-tight text-white">
+                            Your operations,
+                            <br />
+                            streamlined.
                         </h2>
                         <p className="text-[14px] leading-relaxed text-zinc-400">
-                            Manage orders, track deliveries, and analyse<br />
+                            Manage orders, track deliveries, and analyse
+                            <br />
                             performance — all in one unified platform.
                         </p>
                     </div>
@@ -54,13 +66,28 @@ export default function AuthCardLayout({
                             'Multi-workspace Support',
                             'Role-based Access Control',
                         ].map((feature) => (
-                            <div key={feature} className="flex items-center gap-3">
+                            <div
+                                key={feature}
+                                className="flex items-center gap-3"
+                            >
                                 <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-500/15">
-                                    <svg className="h-3 w-3 text-brand-400" fill="none" viewBox="0 0 12 12">
-                                        <path d="M2 6l2.5 2.5L10 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                    <svg
+                                        className="h-3 w-3 text-brand-400"
+                                        fill="none"
+                                        viewBox="0 0 12 12"
+                                    >
+                                        <path
+                                            d="M2 6l2.5 2.5L10 3"
+                                            stroke="currentColor"
+                                            strokeWidth="1.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        />
                                     </svg>
                                 </div>
-                                <span className="text-[13px] text-zinc-300">{feature}</span>
+                                <span className="text-[13px] text-zinc-300">
+                                    {feature}
+                                </span>
                             </div>
                         ))}
                     </div>
@@ -73,12 +100,18 @@ export default function AuthCardLayout({
             </div>
 
             {/* ── Right form panel ────────────────────────────────────── */}
-            <div className="flex flex-1 flex-col items-center justify-center bg-white dark:bg-zinc-900 px-6 py-12">
+            <div className="flex flex-1 flex-col items-center justify-center bg-white px-6 py-12 dark:bg-zinc-900">
                 {/* Mobile logo */}
-                <div className="mb-8 flex lg:hidden flex-col items-center gap-2">
+                <div className="mb-8 flex flex-col items-center gap-2 lg:hidden">
                     <Link href={home()} className="flex items-center gap-2.5">
-                        <img src="/img/logo/artemis.png" alt="Artemis" className="h-10 w-10 object-contain" />
-                        <span className="text-[17px] font-semibold tracking-tight text-gray-900 dark:text-white">Artemis</span>
+                        <img
+                            src="/img/logo/artemis.png"
+                            alt="Artemis"
+                            className="h-10 w-10 object-contain"
+                        />
+                        <span className="text-[17px] font-semibold tracking-tight text-gray-900 dark:text-white">
+                            Artemis
+                        </span>
                     </Link>
                 </div>
 

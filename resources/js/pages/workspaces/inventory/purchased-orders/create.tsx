@@ -1,14 +1,12 @@
-import AppLayout from '@/layouts/app-layout';
 import PageHeader from '@/components/common/PageHeader';
-import { Head, useForm, router } from '@inertiajs/react';
+import DatePicker from '@/components/ui/date-picker';
+import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
+import { Head, router, useForm } from '@inertiajs/react';
+import { format } from 'date-fns';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect } from 'react';
-import DatePicker from '@/components/ui/date-picker';
-import { format } from 'date-fns';
 import { toast } from 'sonner';
-
-
 
 interface InventoryItem {
     id: number;
@@ -72,19 +70,33 @@ export default function Create({ workspace, items }: Props) {
         }
     }, [data.items, data.delivery_fee]);
 
-   
-    const inputClass = "h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600";
-    const labelClass = "block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1.5";
+    const inputClass =
+        'h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600';
+    const labelClass =
+        'block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1.5';
     const dateFormatRegex = /^\d{4}-\d{2}-\d{2}$/;
 
-    const updateItem = (index: number, field: keyof OrderItem, value: string) => {
+    const updateItem = (
+        index: number,
+        field: keyof OrderItem,
+        value: string,
+    ) => {
         const updated = data.items.map((item, i) => {
             if (i !== index) return item;
             const next = { ...item, [field]: value };
             if (field === 'count' || field === 'amount') {
-                const count = field === 'count' ? parseFloat(value) : parseFloat(next.count);
-                const amount = field === 'amount' ? parseFloat(value) : parseFloat(next.amount);
-                next.total_amount = (!isNaN(count) && !isNaN(amount)) ? (count * amount).toFixed(2) : '';
+                const count =
+                    field === 'count'
+                        ? parseFloat(value)
+                        : parseFloat(next.count);
+                const amount =
+                    field === 'amount'
+                        ? parseFloat(value)
+                        : parseFloat(next.amount);
+                next.total_amount =
+                    !isNaN(count) && !isNaN(amount)
+                        ? (count * amount).toFixed(2)
+                        : '';
             }
             return next;
         });
@@ -94,46 +106,50 @@ export default function Create({ workspace, items }: Props) {
     const addItem = () => setData('items', [...data.items, emptyItem()]);
 
     const removeItem = (index: number) =>
-        setData('items', data.items.filter((_, i) => i !== index));
-
-    const hasValidItems = data.items.length > 0 && data.items.every((item) => {
-        const count = Number(item.count);
-        const amount = Number(item.amount);
-        return (
-            item.inventory_item_id !== ''
-            && Number.isFinite(count)
-            && count >= 1
-            && Number.isFinite(amount)
-            && amount >= 0
+        setData(
+            'items',
+            data.items.filter((_, i) => i !== index),
         );
-    });
+
+    const hasValidItems =
+        data.items.length > 0 &&
+        data.items.every((item) => {
+            const count = Number(item.count);
+            const amount = Number(item.amount);
+            return (
+                item.inventory_item_id !== '' &&
+                Number.isFinite(count) &&
+                count >= 1 &&
+                Number.isFinite(amount) &&
+                amount >= 0
+            );
+        });
 
     const isIssueDateValid = dateFormatRegex.test(data.issue_date);
-    const isSubmitDisabled = processing
-        || !isIssueDateValid
-        || data.status === ''
-        || data.delivery_fee === ''
-        || Number(data.delivery_fee) < 0
-        || data.total_amount === ''
-        || Number(data.total_amount) < 0
-        || !hasValidItems;
+    const isSubmitDisabled =
+        processing ||
+        !isIssueDateValid ||
+        data.status === '' ||
+        data.delivery_fee === '' ||
+        Number(data.delivery_fee) < 0 ||
+        data.total_amount === '' ||
+        Number(data.total_amount) < 0 ||
+        !hasValidItems;
 
     const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    post(`/workspaces/${workspace.slug}/inventory/purchased-orders`, {
-        preserveScroll: true,
-        onSuccess: () => {
- 
-            toast.success('Purchased order created successfully');
-        },
-        onError: (errors) => {
+        e.preventDefault();
 
-            console.error(errors);
-            toast.error('Failed to create order. Please check the form.');
-        }
-    });
-};
+        post(`/workspaces/${workspace.slug}/inventory/purchased-orders`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Purchased order created successfully');
+            },
+            onError: (errors) => {
+                console.error(errors);
+                toast.error('Failed to create order. Please check the form.');
+            },
+        });
+    };
 
     return (
         <AppLayout>
@@ -142,65 +158,135 @@ export default function Create({ workspace, items }: Props) {
                 <PageHeader
                     title="Create Purchased Order"
                     description="Add a new purchased order record."
-                >
-
-                </PageHeader>
+                ></PageHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Order Details */}
-                    <div className="rounded-[14px] border border-black/6 bg-white p-5 dark:border-white/6 dark:bg-zinc-900 shadow-sm">
-                        <h3 className="mb-4 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Order Details</h3>
+                    <div className="rounded-[14px] border border-black/6 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-zinc-900">
+                        <h3 className="mb-4 font-mono text-[11px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                            Order Details
+                        </h3>
                         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                             <div>
-                                <label className={labelClass}>Status <span className="text-red-400">*</span></label>
-                                <select value={data.status} onChange={(e) => setData('status', e.target.value)} className={inputClass}>
+                                <label className={labelClass}>
+                                    Status{' '}
+                                    <span className="text-red-400">*</span>
+                                </label>
+                                <select
+                                    value={data.status}
+                                    onChange={(e) =>
+                                        setData('status', e.target.value)
+                                    }
+                                    className={inputClass}
+                                >
                                     {STATUSES.map((s) => (
-                                        <option key={s.value} value={s.value}>{s.label}</option>
+                                        <option key={s.value} value={s.value}>
+                                            {s.label}
+                                        </option>
                                     ))}
                                 </select>
                             </div>
                             <div>
-                                <label className={labelClass}>Issue Date <span className="text-red-400">*</span></label>
+                                <label className={labelClass}>
+                                    Issue Date{' '}
+                                    <span className="text-red-400">*</span>
+                                </label>
                                 <DatePicker
                                     id="purchased-order-issue-date"
                                     mode="single"
                                     defaultDate={data.issue_date || undefined}
                                     onChange={(dates) => {
                                         if (dates.length) {
-                                            setData('issue_date', format(dates[0], 'yyyy-MM-dd'))
+                                            setData(
+                                                'issue_date',
+                                                format(dates[0], 'yyyy-MM-dd'),
+                                            );
                                         } else {
-                                            setData('issue_date', '')
+                                            setData('issue_date', '');
                                         }
                                     }}
                                 />
-                                {data.issue_date !== '' && !isIssueDateValid && (
-                                    <p className="mt-1 font-mono text-[11px] text-red-500">Please enter a valid date in YYYY-MM-DD format.</p>
+                                {data.issue_date !== '' &&
+                                    !isIssueDateValid && (
+                                        <p className="mt-1 font-mono text-[11px] text-red-500">
+                                            Please enter a valid date in
+                                            YYYY-MM-DD format.
+                                        </p>
+                                    )}
+                                {errors.issue_date && (
+                                    <p className="mt-1 font-mono text-[11px] text-red-500">
+                                        {errors.issue_date}
+                                    </p>
                                 )}
-                                {errors.issue_date && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.issue_date}</p>}
                             </div>
                             <div>
-                                <label className={labelClass}>Delivery No.</label>
-                                <input type="text" value={data.delivery_no} onChange={(e) => setData('delivery_no', e.target.value)} placeholder="DR-001" className={inputClass} />
+                                <label className={labelClass}>
+                                    Delivery No.
+                                </label>
+                                <input
+                                    type="text"
+                                    value={data.delivery_no}
+                                    onChange={(e) =>
+                                        setData('delivery_no', e.target.value)
+                                    }
+                                    placeholder="DR-001"
+                                    className={inputClass}
+                                />
                             </div>
                             <div>
-                                <label className={labelClass}>Cust PO No.</label>
-                                <input type="text" value={data.cust_po_no} onChange={(e) => setData('cust_po_no', e.target.value)} placeholder="PO-001" className={inputClass} />
+                                <label className={labelClass}>
+                                    Cust PO No.
+                                </label>
+                                <input
+                                    type="text"
+                                    value={data.cust_po_no}
+                                    onChange={(e) =>
+                                        setData('cust_po_no', e.target.value)
+                                    }
+                                    placeholder="PO-001"
+                                    className={inputClass}
+                                />
                             </div>
                             <div>
-                                <label className={labelClass}>Control No.</label>
-                                <input type="text" value={data.control_no} onChange={(e) => setData('control_no', e.target.value)} placeholder="CN-001" className={inputClass} />
+                                <label className={labelClass}>
+                                    Control No.
+                                </label>
+                                <input
+                                    type="text"
+                                    value={data.control_no}
+                                    onChange={(e) =>
+                                        setData('control_no', e.target.value)
+                                    }
+                                    placeholder="CN-001"
+                                    className={inputClass}
+                                />
                             </div>
                             <div>
-                                <label className={labelClass}>Delivery Fee <span className="text-red-400">*</span></label>
-                                <input type="number" step="0.01" min="0" value={data.delivery_fee} onChange={(e) => setData('delivery_fee', e.target.value)} placeholder="0.00" className={inputClass} />
+                                <label className={labelClass}>
+                                    Delivery Fee{' '}
+                                    <span className="text-red-400">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={data.delivery_fee}
+                                    onChange={(e) =>
+                                        setData('delivery_fee', e.target.value)
+                                    }
+                                    placeholder="0.00"
+                                    className={inputClass}
+                                />
                             </div>
                         </div>
                     </div>
 
                     {/* Order Items Card */}
-                    <div className="rounded-[14px] border border-black/6 bg-white p-5 dark:border-white/6 dark:bg-zinc-900 shadow-sm">
+                    <div className="rounded-[14px] border border-black/6 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-zinc-900">
                         <div className="mb-4 flex items-center justify-between">
-                            <h3 className="font-mono text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Order Items</h3>
+                            <h3 className="font-mono text-[11px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                Order Items
+                            </h3>
                             <button
                                 type="button"
                                 onClick={addItem}
@@ -213,30 +299,83 @@ export default function Create({ workspace, items }: Props) {
 
                         <div className="space-y-3">
                             <div className="grid grid-cols-[1fr_100px_120px_120px_36px] gap-3">
-                                <span className={labelClass}>Inventory Item <span className="text-red-400">*</span></span>
-                                <span className={labelClass}>Count <span className="text-red-400">*</span></span>
-                                <span className={labelClass}>Amount <span className="text-red-400">*</span></span>
+                                <span className={labelClass}>
+                                    Inventory Item{' '}
+                                    <span className="text-red-400">*</span>
+                                </span>
+                                <span className={labelClass}>
+                                    Count{' '}
+                                    <span className="text-red-400">*</span>
+                                </span>
+                                <span className={labelClass}>
+                                    Amount{' '}
+                                    <span className="text-red-400">*</span>
+                                </span>
                                 <span className={labelClass}>Total</span>
                                 <span />
                             </div>
 
                             {data.items.map((item, i) => (
-                                <div key={i} className="grid grid-cols-[1fr_100px_120px_120px_36px] items-center gap-3">
+                                <div
+                                    key={i}
+                                    className="grid grid-cols-[1fr_100px_120px_120px_36px] items-center gap-3"
+                                >
                                     <select
                                         value={item.inventory_item_id}
-                                        onChange={(e) => updateItem(i, 'inventory_item_id', e.target.value)}
+                                        onChange={(e) =>
+                                            updateItem(
+                                                i,
+                                                'inventory_item_id',
+                                                e.target.value,
+                                            )
+                                        }
                                         className={inputClass}
                                     >
                                         <option value="">Select item...</option>
                                         {items.map((inv) => (
                                             <option key={inv.id} value={inv.id}>
-                                                {inv.sku}{inv.product ? ` — ${inv.product.name}` : ''}
+                                                {inv.sku}
+                                                {inv.product
+                                                    ? ` — ${inv.product.name}`
+                                                    : ''}
                                             </option>
                                         ))}
                                     </select>
-                                    <input type="number" min="1" placeholder="0" value={item.count} onChange={(e) => updateItem(i, 'count', e.target.value)} className={inputClass} />
-                                    <input type="number" step="0.01" min="0" placeholder="0.00" value={item.amount} onChange={(e) => updateItem(i, 'amount', e.target.value)} className={inputClass} />
-                                    <input type="text" readOnly value={item.total_amount} className={`${inputClass} bg-black/5 opacity-50 cursor-not-allowed`} />
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        placeholder="0"
+                                        value={item.count}
+                                        onChange={(e) =>
+                                            updateItem(
+                                                i,
+                                                'count',
+                                                e.target.value,
+                                            )
+                                        }
+                                        className={inputClass}
+                                    />
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        placeholder="0.00"
+                                        value={item.amount}
+                                        onChange={(e) =>
+                                            updateItem(
+                                                i,
+                                                'amount',
+                                                e.target.value,
+                                            )
+                                        }
+                                        className={inputClass}
+                                    />
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={item.total_amount}
+                                        className={`${inputClass} cursor-not-allowed bg-black/5 opacity-50`}
+                                    />
                                     <button
                                         type="button"
                                         onClick={() => removeItem(i)}
@@ -248,34 +387,51 @@ export default function Create({ workspace, items }: Props) {
                                 </div>
                             ))}
                         </div>
-                         <div className="mt-4 grid grid-cols-[1fr_100px_120px_120px_36px] gap-3">
-                            <div className="col-span-3" /> 
-                            
+                        <div className="mt-4 grid grid-cols-[1fr_100px_120px_120px_36px] gap-3">
+                            <div className="col-span-3" />
+
                             <div>
-                                <label className={labelClass}>Total Amount <span className="text-red-400">*</span></label>
-                                <input 
-                                    type="number" 
-                                    step="0.01" 
-                                    min="0" 
-                                    value={data.total_amount} 
-                                    onChange={(e) => setData('total_amount', e.target.value)} 
-                                    placeholder="0.00" 
-                                    className={inputClass} 
+                                <label className={labelClass}>
+                                    Total Amount{' '}
+                                    <span className="text-red-400">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={data.total_amount}
+                                    onChange={(e) =>
+                                        setData('total_amount', e.target.value)
+                                    }
+                                    placeholder="0.00"
+                                    className={inputClass}
                                 />
-                                {errors.total_amount && <p className="mt-1 font-mono text-[11px] text-red-500">{errors.total_amount}</p>}
+                                {errors.total_amount && (
+                                    <p className="mt-1 font-mono text-[11px] text-red-500">
+                                        {errors.total_amount}
+                                    </p>
+                                )}
                             </div>
-                            
+
                             <div />
                         </div>
 
-                        {errors.items && <p className="mt-4 font-mono text-[11px] text-red-500">{errors.items}</p>}
+                        {errors.items && (
+                            <p className="mt-4 font-mono text-[11px] text-red-500">
+                                {errors.items}
+                            </p>
+                        )}
                     </div>
 
                     {/* Footer Actions */}
                     <div className="flex justify-end gap-2">
                         <button
                             type="button"
-                            onClick={() => router.get(`/workspaces/${workspace.slug}/inventory/purchased-orders`)}
+                            onClick={() =>
+                                router.get(
+                                    `/workspaces/${workspace.slug}/inventory/purchased-orders`,
+                                )
+                            }
                             className="flex h-10 items-center rounded-lg border border-black/8 bg-white px-5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300"
                         >
                             Cancel

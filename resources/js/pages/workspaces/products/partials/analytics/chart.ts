@@ -1,15 +1,17 @@
 import { ApexOptions } from 'apexcharts';
-import { numberFormatter } from '@/lib/utils';
 
-export const chartOptions = ({ yAxisLabelFormatter, tooltipFormatter }: {
-    yAxisLabelFormatter?: (value: number) => string,
-    tooltipFormatter?: (value: number) => string,
-}): ApexOptions=>  {
+export const chartOptions = ({
+    yAxisLabelFormatter,
+    tooltipFormatter,
+}: {
+    yAxisLabelFormatter?: (value: number) => string;
+    tooltipFormatter?: (value: number) => string;
+}): ApexOptions => {
     return {
-        colors: ["#10d3a1"],
+        colors: ['#10d3a1'],
         chart: {
-            fontFamily: "Outfit, sans-serif",
-            type: "bar",
+            fontFamily: 'Outfit, sans-serif',
+            type: 'bar',
             height: 180,
             toolbar: {
                 show: false,
@@ -18,9 +20,9 @@ export const chartOptions = ({ yAxisLabelFormatter, tooltipFormatter }: {
         plotOptions: {
             bar: {
                 horizontal: false,
-                columnWidth: "39%",
+                columnWidth: '39%',
                 borderRadius: 5,
-                borderRadiusApplication: "end",
+                borderRadiusApplication: 'end',
             },
         },
         dataLabels: {
@@ -29,7 +31,7 @@ export const chartOptions = ({ yAxisLabelFormatter, tooltipFormatter }: {
         stroke: {
             show: true,
             width: 4,
-            colors: ["transparent"],
+            colors: ['transparent'],
         },
         xaxis: {
             axisBorder: {
@@ -41,17 +43,17 @@ export const chartOptions = ({ yAxisLabelFormatter, tooltipFormatter }: {
         },
         legend: {
             show: true,
-            position: "top",
-            horizontalAlign: "left",
-            fontFamily: "Outfit",
+            position: 'top',
+            horizontalAlign: 'left',
+            fontFamily: 'Outfit',
         },
         yaxis: {
             title: {
                 text: undefined,
             },
             labels: {
-                formatter: yAxisLabelFormatter
-            }
+                formatter: yAxisLabelFormatter,
+            },
         },
         grid: {
             yaxis: {
@@ -72,5 +74,5 @@ export const chartOptions = ({ yAxisLabelFormatter, tooltipFormatter }: {
                 formatter: tooltipFormatter,
             },
         },
-    }
-}
+    };
+};

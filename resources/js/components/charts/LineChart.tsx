@@ -4,9 +4,9 @@ import Chart from 'react-apexcharts';
 interface Props {
     series:
         | {
-        name: string;
-        data: number[];
-    }[]
+              name: string;
+              data: number[];
+          }[]
         | undefined;
     categories: string[];
     leftAxisTitle: string;
@@ -16,13 +16,13 @@ interface Props {
 }
 
 export default function LineChart({
-                                      categories,
-                                      series,
-                                      leftAxisTitle,
-                                      rightAxisTitle,
-                                      leftFormatter,
-                                      rightFormatter,
-                                  }: Props) {
+    categories,
+    series,
+    leftAxisTitle,
+    rightAxisTitle,
+    leftFormatter,
+    rightFormatter,
+}: Props) {
     const colors = ['#10b981', '#818cf8'];
 
     const options: ApexOptions = {
@@ -83,12 +83,22 @@ export default function LineChart({
             shared: true,
             intersect: false,
             custom: ({ dataPointIndex, w }) => {
-                const category = w.globals.categoryLabels[dataPointIndex] ?? w.globals.labels[dataPointIndex] ?? '';
-                const rows = w.globals.seriesNames.map((name: string, i: number) => {
-                    const val = w.globals.series[i][dataPointIndex];
-                    const fmt = i === 0 ? leftFormatter(val) : rightFormatter(val);
-                    return `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${colors[i]};flex-shrink:0;margin-right:6px;"></span><span style="font-size:12px;color:#6B7280;font-weight:500;flex:1;">${name}</span><span style="font-size:12px;color:#111827;font-weight:600;font-family:'DM Mono',monospace;margin-left:16px;">${fmt}</span>`;
-                }).map(r => `<div style="display:flex;align-items:center;margin-top:5px;">${r}</div>`).join('');
+                const category =
+                    w.globals.categoryLabels[dataPointIndex] ??
+                    w.globals.labels[dataPointIndex] ??
+                    '';
+                const rows = w.globals.seriesNames
+                    .map((name: string, i: number) => {
+                        const val = w.globals.series[i][dataPointIndex];
+                        const fmt =
+                            i === 0 ? leftFormatter(val) : rightFormatter(val);
+                        return `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${colors[i]};flex-shrink:0;margin-right:6px;"></span><span style="font-size:12px;color:#6B7280;font-weight:500;flex:1;">${name}</span><span style="font-size:12px;color:#111827;font-weight:600;font-family:'DM Mono',monospace;margin-left:16px;">${fmt}</span>`;
+                    })
+                    .map(
+                        (r) =>
+                            `<div style="display:flex;align-items:center;margin-top:5px;">${r}</div>`,
+                    )
+                    .join('');
                 return `<div style="background:#fff;border:1px solid rgba(0,0,0,0.07);border-radius:12px;padding:11px 14px;box-shadow:0 4px 20px rgba(0,0,0,0.08);font-family:'DM Sans',sans-serif;min-width:196px;"><p style="font-family:'DM Mono',monospace;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.08em;color:#9CA3AF;margin:0 0 1px;">${category}</p>${rows}</div>`;
             },
         },
@@ -120,7 +130,11 @@ export default function LineChart({
                 },
                 title: {
                     text: leftAxisTitle,
-                    style: { fontSize: '11px', fontWeight: 500, color: '#9CA3AF' },
+                    style: {
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: '#9CA3AF',
+                    },
                 },
             },
             {
@@ -137,7 +151,11 @@ export default function LineChart({
                 },
                 title: {
                     text: rightAxisTitle,
-                    style: { fontSize: '11px', fontWeight: 500, color: '#9CA3AF' },
+                    style: {
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: '#9CA3AF',
+                    },
                 },
             },
         ],
