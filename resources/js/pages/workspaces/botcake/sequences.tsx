@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import Filters, { FilterValue } from '@/components/filters/Filters';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
@@ -13,6 +14,14 @@ import { omit } from 'lodash';
 import { Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
+const parseIds = (str?: string): number[] => {
+    if (!str) return [];
+    return str
+        .split(',')
+        .map((s) => Number(s.trim()))
+        .filter((n) => Number.isFinite(n) && n > 0);
+};
+
 type Mode = 'overall' | 'historical';
 
 interface Props {
@@ -25,7 +34,11 @@ interface Props {
         mode?: Mode;
         from?: string;
         to?: string;
-        filter?: { search?: string };
+        filter?: {
+            search?: string;
+            page_ids?: string;
+            shop_ids?: string;
+        };
     };
 }
 
@@ -48,6 +61,19 @@ export default function Sequences({ workspace, sequences, query }: Props) {
     );
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
+    const initialFilterValue: FilterValue = useMemo(
+        () => ({
+            teamIds: [],
+            productIds: [],
+            shopIds: parseIds(query?.filter?.shop_ids),
+            pageIds: parseIds(query?.filter?.page_ids),
+            userIds: [],
+        }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [],
+    );
+    const [filter, setFilter] = useState<FilterValue>(initialFilterValue);
+
     const mode: Mode = query?.mode === 'historical' ? 'historical' : 'overall';
     const [defaultFrom, defaultTo] = defaultRange();
     const fromDate = query?.from ?? defaultFrom;
@@ -61,6 +87,8 @@ export default function Sequences({ workspace, sequences, query }: Props) {
             {
                 sort: query?.sort ?? undefined,
                 'filter[search]': searchValue || undefined,
+                'filter[page_ids]': filter.pageIds.join(',') || undefined,
+                'filter[shop_ids]': filter.shopIds.join(',') || undefined,
                 page: query?.page ?? 1,
                 mode: mode === 'historical' ? 'historical' : undefined,
                 from: mode === 'historical' ? fromDate : undefined,
@@ -182,6 +210,21 @@ export default function Sequences({ workspace, sequences, query }: Props) {
                     </div>
 
                     <div className="ml-auto flex items-center gap-2">
+                        <Filters
+                            workspace={workspace}
+                            initialValue={filter}
+                            onChange={(value) => {
+                                setFilter(value);
+                                navigate({
+                                    'filter[page_ids]':
+                                        value.pageIds.join(',') || undefined,
+                                    'filter[shop_ids]':
+                                        value.shopIds.join(',') || undefined,
+                                    page: 1,
+                                });
+                            }}
+                        />
+
                         {mode === 'historical' && (
                             <DatePicker
                                 id="sequences-date-range"
