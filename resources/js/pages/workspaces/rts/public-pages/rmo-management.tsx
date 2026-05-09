@@ -861,7 +861,7 @@ export default function RmoManagement({
     );
 
     return (
-        <div className="min-h-screen bg-stone-50 dark:bg-zinc-950">
+        <div className="min-h-screen overflow-x-hidden bg-stone-50 dark:bg-zinc-950">
             <FormModal
                 open={isOpen}
                 onOpenChange={(open) => {
@@ -999,8 +999,8 @@ export default function RmoManagement({
             </div>
 
             <div className="mx-auto w-full p-4 md:p-6">
-                <div className="mb-6 flex items-center justify-between">
-                    <div>
+                <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
                         <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">
                             RMO Management
                         </h1>
@@ -1015,42 +1015,42 @@ export default function RmoManagement({
                             initialValue={initialFilterValue}
                         />
 
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setExportModalOpen(true)}
-                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
-                        >
-                            <Download className="h-3.5 w-3.5" />
-                            Export
-                        </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setExportModalOpen(true)}
+                                className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                            >
+                                <Download className="h-3.5 w-3.5" />
+                                Export
+                            </Button>
 
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                                setShowStats((prev) => {
-                                    const next = !prev;
-                                    localStorage.setItem('rmo_show_stats', String(next));
-                                    return next;
-                                })
-                            }
-                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
-                        >
-                            <BarChart3 className="h-3.5 w-3.5" />
-                            {showStats ? 'Hide' : 'Show'} Statistics
-                            {showStats ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                        </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                    setShowStats((prev) => {
+                                        const next = !prev;
+                                        localStorage.setItem('rmo_show_stats', String(next));
+                                        return next;
+                                    })
+                                }
+                                className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                            >
+                                <BarChart3 className="h-3.5 w-3.5" />
+                                {showStats ? 'Hide' : 'Show'} Statistics
+                                {showStats ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                            </Button>
 
-                        <DatePicker
-                            id="delivery-date"
-                            mode="single"
-                            defaultDate={deliveryDate}
-                            placeholder="Select date"
-                            onChange={(_, dateStr) => {
-                                if (dateStr && dateStr !== deliveryDate) handleDateChange(dateStr);
-                            }}
-                        />
+                            <DatePicker
+                                id="delivery-date"
+                                mode="single"
+                                defaultDate={deliveryDate}
+                                placeholder="Select date"
+                                onChange={(_, dateStr) => {
+                                    if (dateStr && dateStr !== deliveryDate) handleDateChange(dateStr);
+                                }}
+                            />
                     </div>
                 </div>
 
@@ -1068,7 +1068,7 @@ export default function RmoManagement({
 
                 <div className="mb-4">
                     <div className="flex flex-wrap items-center gap-3">
-                        <div className="relative w-lg">
+                        <div className="relative w-full sm:max-w-sm md:max-w-md">
                             <Search className="absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                             <input
                                 type="text"
@@ -1114,7 +1114,7 @@ export default function RmoManagement({
                                     return next;
                                 })
                             }
-                            className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px] font-medium transition-all ${
+                            className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px]! font-medium transition-all ${
                                 showMyAssigneeOnly
                                     ? 'border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-400'
                                     : 'border-black/6 bg-stone-100 text-gray-500 hover:border-black/12 hover:text-gray-700 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:text-gray-200'
@@ -1143,7 +1143,7 @@ export default function RmoManagement({
                                     return next;
                                 })
                             }
-                            className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px] font-medium transition-all ${
+                            className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px]! font-medium transition-all ${
                                 showMyConfirmeeOnly
                                     ? 'border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-400'
                                     : 'border-black/6 bg-stone-100 text-gray-500 hover:border-black/12 hover:text-gray-700 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:text-gray-200'
@@ -1203,7 +1203,7 @@ export default function RmoManagement({
                     </div>
                 </div>
 
-                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                <div className="max-w-full overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         columns={columns}
                         enableInternalPagination={false}

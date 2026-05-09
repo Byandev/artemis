@@ -59,6 +59,7 @@ class InventoryItemController extends Controller
                 AllowedSort::field('product_name', 'products.name'),
                 'lead_time',
                 'unfulfilled_count',
+                'remaining_qty',
                 'three_days_average',
                 'current_stocks',
                 'waiting_for_delivery_stocks',

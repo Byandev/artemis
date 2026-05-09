@@ -1,4 +1,5 @@
 import { NavMain } from '@/components/nav-main';
+import { ContactSupportModal } from '@/components/contact-support-modal';
 import {
     Sidebar,
     SidebarContent,
@@ -10,7 +11,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { type NavItem } from '@/types';
+import { type NavItem, User as UserType } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
     LayoutDashboard,
@@ -39,33 +40,27 @@ import {
     PieChart,
     Shield,
     MessageSquare,
+    LifeBuoy,
 } from 'lucide-react';
 import { useState } from 'react';
 import AppLogo from './app-logo';
 import { PERMISSIONS } from '@/constants/permissions';
-import { dashboard as workspaceDashboard } from '@/actions/App/Http/Controllers/Workspaces/WorkspaceController';
+import { Workspace } from '@/types/models/Workspace';
+
+
 
 export function AppSidebar() {
-    const { currentWorkspace } = usePage().props as unknown as {
-        currentWorkspace: {
-            slug: string;
-            inventory_module_enabled: boolean;
-            finance_module_enabled: boolean;
-            products_module_enabled: boolean;
-            teams_module_enabled: boolean;
-            checklist_module_enabled: boolean;
-            csr_module_enabled: boolean;
-            rmo_module_enabled: boolean;
-            leaderboard_module_enabled: boolean;
-            botcake_module_enabled: boolean;
-        };
+    const { currentWorkspace, auth } = usePage().props as unknown as {
+        currentWorkspace: Workspace;
+        auth?: { user: UserType };
     };
 
+    const slug = currentWorkspace?.slug ?? '';
+
     const dashboardUrl = currentWorkspace
-        ? workspaceDashboard(currentWorkspace.slug).url
+        ? `/workspaces/${slug}/dashboard`
         : dashboard().url;
 
-    const slug = currentWorkspace?.slug ?? '';
 
     const mainNavItems: NavItem[] = [
         {
@@ -269,6 +264,16 @@ export function AppSidebar() {
             : []),
     ];
 
+    const adminNavItems: NavItem[] = auth?.user?.can?.viewAnySupportTickets
+        ? [
+            {
+                title: 'Support Tickets',
+                href: `/workspaces/${slug}/admin/support-tickets`,
+                icon: LifeBuoy,
+            },
+        ]
+        : [];
+
     return (
         <Sidebar
             className="bg-white dark:bg-zinc-900"
@@ -289,6 +294,7 @@ export function AppSidebar() {
 
             <SidebarContent className="p-3">
                 <NavMain items={mainNavItems} group_label="Main" />
+                {/*<NavMain items={adminNavItems} group_label="Admin" />*/}
                 {/*<NavMain items={accountNavItems} group_label="Account" />*/}
                 <PublicLinks
                     workspaceSlug={currentWorkspace.slug}

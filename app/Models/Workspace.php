@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Metrics\MetricRegistry;
 use App\Support\WorkspaceMetrics;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -241,5 +242,30 @@ class Workspace extends Model
     public function checklists(): HasMany
     {
         return $this->hasMany(WorkspaceChecklist::class, 'workspace_id');
+    }
+
+    public function metricSetting()
+    {
+        return $this->hasOne(WorkspaceMetricSetting::class);
+    }
+
+    public function allowedMetrics(): array
+    {
+        return $this->metricSetting?->allowed_metrics
+            ?? MetricRegistry::all();
+    }
+
+    public function defaultMetrics(): array
+    {
+        return $this->metricSetting?->default_metrics
+            ?? MetricRegistry::defaults();
+    }
+
+    public function getMetricSettings(): array
+    {
+        return [
+            'allowed' => $this->allowedMetrics(),
+            'defaults' => $this->defaultMetrics(),
+        ];
     }
 }

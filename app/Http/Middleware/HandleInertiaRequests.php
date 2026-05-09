@@ -43,22 +43,26 @@ class HandleInertiaRequests extends Middleware
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
-        // Get current workspace from URL route parameter
-        $currentWorkspace = null;
-        if ($request->user() && $request->route('workspace')) {
-            $currentWorkspace = $request->route('workspace');
-        }
+        $currentWorkspace = $request->route('workspace');
 
-        // Get first 3 workspaces of the authenticated user
+        $workspaceModel = ($currentWorkspace instanceof Workspace) ? $currentWorkspace : null;
+
         $workspaces = $request->user()
             ? $request->user()->workspaces()->limit(3)->get()
             : collect();
 
         $user = $request->user();
-        $permissions = $this->resolvePermissions($user, $currentWorkspace);
-        $isOwner = $user && $currentWorkspace instanceof Workspace
-            ? $user->ownsWorkspace($currentWorkspace)
+        $permissions = $this->resolvePermissions($user, $workspaceModel);
+        $isOwner = $user && $workspaceModel
+            ? $user->ownsWorkspace($workspaceModel)
             : false;
+        $can = [
+            'viewAnySupportTickets' => $user && $currentWorkspace instanceof Workspace
+                ? $user->ownsWorkspace($currentWorkspace)
+                    || $user->isAdminOf($currentWorkspace)
+                    || $user->hasWorkspaceRole($currentWorkspace, 'admin')
+                : false,
+        ];
 
         // Show syncing modal when any page has no orders_last_synced_at
         $syncingData = null;
@@ -106,10 +110,18 @@ class HandleInertiaRequests extends Middleware
                     'is_super_admin' => $user->isSuperAdmin(),
                     'is_workspace_owner' => $isOwner,
                     'permissions' => $permissions,
+                    'can' => $can,
                 ]) : null,
             ],
             'workspaces' => $workspaces,
-            'currentWorkspace' => $currentWorkspace,
+
+            'currentWorkspace' => $workspaceModel ? array_merge($workspaceModel->toArray(), [
+
+                'metric_setting' => $workspaceModel->loadMissing('metricSetting')->metricSetting,
+                'metricSettings' => $workspaceModel->getMetricSettings(),
+
+            ]) : $currentWorkspace,
+
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'ziggy' => [
                 'location' => $request->url(),

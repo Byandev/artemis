@@ -26,7 +26,7 @@ interface Account extends FinanceAccount {
 interface Props {
     workspace: Workspace;
     accounts: PaginatedData<Account>;
-    query?: { sort?: string | null; filter?: { search?: string } };
+    query?: { sort?: string | null; per_page?: number | string | null; filter?: { search?: string } };
 }
 
 const fmt = (v: number | string) =>
@@ -43,10 +43,10 @@ export default function AccountsIndex({ workspace, accounts, query }: Props) {
 
     const performQuery = useCallback(
         debounce((s: string) => {
-            router.get(baseUrl, { sort: query?.sort, 'filter[search]': s || undefined, page: 1 },
+            router.get(baseUrl, { sort: query?.sort, per_page: query?.per_page ?? undefined, 'filter[search]': s || undefined, page: 1 },
                 { preserveState: true, replace: true, preserveScroll: true, only: ['accounts'] });
         }, 400),
-        [baseUrl, query?.sort]
+        [baseUrl, query?.sort, query?.per_page]
     );
 
     useEffect(() => { performQuery(search); return () => performQuery.cancel(); }, [search, performQuery]);
@@ -157,7 +157,7 @@ export default function AccountsIndex({ workspace, accounts, query }: Props) {
                         meta={{ ...omit(accounts, ['data']) }}
                         onFetch={(params) => {
                             router.get(baseUrl,
-                                { sort: params?.sort, 'filter[search]': search || undefined, page: params?.page ?? 1 },
+                                { sort: params?.sort, 'filter[search]': search || undefined, page: params?.page ?? 1, per_page: params?.per_page ?? undefined },
                                 { preserveState: true, replace: true, preserveScroll: true });
                         }}
                     />
