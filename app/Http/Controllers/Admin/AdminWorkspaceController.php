@@ -87,4 +87,22 @@ class AdminWorkspaceController extends Controller
 
         return back()->with('success', "Subscription updated for {$workspace->name}.");
     }
+
+    public function updateModules(Request $request, Workspace $workspace)
+    {
+        $validated = $request->validate([
+            'inventory_module_enabled' => 'required|boolean',
+            'finance_module_enabled' => 'required|boolean',
+            'products_module_enabled' => 'required|boolean',
+            'teams_module_enabled' => 'required|boolean',
+            'checklist_module_enabled' => 'required|boolean',
+            'csr_module_enabled' => 'required|boolean',
+            'rmo_module_enabled' => 'required|boolean',
+            'leaderboard_module_enabled' => 'required|boolean',
+        ]);
+
+        $workspace->update($validated);
+
+        return back()->with('success', "Modules updated for {$workspace->name}.");
+    }
 }
