@@ -2,8 +2,11 @@
 
 namespace Modules\MetaAds\Providers;
 
-use Nwidart\Modules\Support\ModuleServiceProvider;
 use Illuminate\Console\Scheduling\Schedule;
+use Modules\MetaAds\Console\Commands\SyncAdAccountsCommand;
+use Modules\MetaAds\Console\Commands\SyncAdSetsCommand;
+use Modules\MetaAds\Console\Commands\SyncCampaignsCommand;
+use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class MetaAdsServiceProvider extends ModuleServiceProvider
 {
@@ -22,7 +25,11 @@ class MetaAdsServiceProvider extends ModuleServiceProvider
      *
      * @var string[]
      */
-    // protected array $commands = [];
+    protected array $commands = [
+        SyncAdAccountsCommand::class,
+        SyncCampaignsCommand::class,
+        SyncAdSetsCommand::class,
+    ];
 
     /**
      * Provider classes to register.
@@ -36,8 +43,8 @@ class MetaAdsServiceProvider extends ModuleServiceProvider
 
     /**
      * Define module schedules.
-     * 
-     * @param $schedule
+     *
+     * @param  $schedule
      */
     // protected function configureSchedules(Schedule $schedule): void
     // {

@@ -39,6 +39,8 @@ use Modules\Finance\Http\Controllers\TransactionController as FinanceTransaction
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
+use Modules\MetaAds\Http\Controllers\IntegrationsController;
+use Modules\MetaAds\Http\Controllers\MetaOAuthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
 
 /*
@@ -167,6 +169,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/rts/parcel-update-notification', [ParcelUpdateNotificationController::class, 'index'])->name('workspaces.rts.parcel-update-notification');
     Route::get('/workspaces/{workspace}/rts/parcel-journey-notification-templates', [ParcelUpdateNotificationTemplateController::class, 'index'])->name('workspaces.rts.parcel-journey-notification-templates.index');
     Route::put('/workspaces/{workspace}/rts/parcel-journey-notification-templates/{template}', [ParcelUpdateNotificationTemplateController::class, 'update'])->name('workspaces.rts.parcel-journey-notification-templates.update');
+
+    Route::get('/workspaces/{workspace}/integrations/meta', [IntegrationsController::class, 'index'])
+        ->name('workspaces.metaads.integrations');
+    Route::get('/workspaces/{workspace}/integrations/meta/connect', [MetaOAuthController::class, 'redirect'])
+        ->name('workspaces.metaads.connect');
+    Route::post('/workspaces/{workspace}/integrations/meta/users/{metaUser}/sync-ad-accounts', \Modules\MetaAds\Http\Controllers\AdAccountSyncController::class)
+        ->name('workspaces.metaads.sync-ad-accounts');
 
     Route::put('/workspaces/{workspace:slug}/employees/{employee}', [CSRController::class, 'update'])->name('employees.update');
     Route::get('/workspaces/{workspace}/csr/management', [CSRController::class, 'index'])->name('workspaces.csr.index');

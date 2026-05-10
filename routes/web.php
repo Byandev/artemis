@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use Modules\MetaAds\Http\Controllers\MetaOAuthController;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
@@ -66,6 +67,9 @@ Route::get('/blog/{slug}', function (string $slug) {
 Route::get('/design-guidelines', function () {
     return view('design-guidelines');
 });
+
+Route::middleware(['auth'])->get('/auth/facebook/callback', [MetaOAuthController::class, 'callback'])
+    ->name('auth.facebook.callback');
 
 Route::middleware(['auth'])->group(function () {
 
