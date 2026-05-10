@@ -3,6 +3,7 @@
 namespace Modules\MetaAds\Providers;
 
 use Illuminate\Console\Scheduling\Schedule;
+use Modules\MetaAds\Console\Commands\CaptureBudgetSnapshotsCommand;
 use Modules\MetaAds\Console\Commands\SyncAdAccountsCommand;
 use Modules\MetaAds\Console\Commands\SyncAdsCommand;
 use Modules\MetaAds\Console\Commands\SyncAdSetsCommand;
@@ -37,6 +38,7 @@ class MetaAdsServiceProvider extends ModuleServiceProvider
         SyncCreativesCommand::class,
         SyncInsightsCommand::class,
         SyncAllCommand::class,
+        CaptureBudgetSnapshotsCommand::class,
     ];
 
     /**

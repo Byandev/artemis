@@ -41,6 +41,11 @@ Schedule::command('metaads:sync-insights --days=1')->everyFifteenMinutes()->with
 // Hourly catch-up for the last 7 days to absorb late-attributed conversions.
 Schedule::command('metaads:sync-insights --days=7')->hourly()->withoutOverlapping();
 
+// Snapshot end-of-day budgets so we have history Meta doesn't keep. Runs at
+// 23:55 server time, after the 23:30 entity sync has captured the day's
+// final budget state.
+Schedule::command('metaads:capture-budgets')->dailyAt('23:55')->withoutOverlapping();
+
 // Schedule::command('analytics:rollup --date=today')->hourly()->withoutOverlapping();
 // Schedule::command('analytics:rollup --date=yesterday')->dailyAt('01:00')->withoutOverlapping();
 // Schedule::command('analytics:rollup --date="2 days ago"')->dailyAt('02:00')->withoutOverlapping();

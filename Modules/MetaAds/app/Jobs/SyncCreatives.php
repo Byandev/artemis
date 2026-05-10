@@ -56,6 +56,7 @@ class SyncCreatives implements ShouldQueue
                     ['id' => $row['id']],
                     [
                         'meta_ads_account_id' => $this->adAccount->id,
+                        'meta_page_id' => $this->extractPageId($row),
                         'name' => $row['name'] ?? null,
                         'title' => $row['title'] ?? null,
                         'body' => $row['body'] ?? null,
@@ -80,5 +81,28 @@ class SyncCreatives implements ShouldQueue
         } catch (Throwable $e) {
             $this->handleSyncError($run, $e);
         }
+    }
+
+    /**
+     * Pull the FB page id off a creative row. Prefer `object_story_spec.page_id`
+     * (most reliable). Fall back to the leading numeric portion of
+     * `effective_object_story_id` (which is `<page_id>_<post_id>`).
+     */
+    private function extractPageId(array $row): ?int
+    {
+        $fromSpec = $row['object_story_spec']['page_id'] ?? null;
+        if ($fromSpec) {
+            return (int) $fromSpec;
+        }
+
+        $story = $row['effective_object_story_id'] ?? null;
+        if ($story && str_contains($story, '_')) {
+            $head = explode('_', $story, 2)[0];
+            if (ctype_digit($head)) {
+                return (int) $head;
+            }
+        }
+
+        return null;
     }
 }
