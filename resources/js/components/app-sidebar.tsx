@@ -15,6 +15,7 @@ import { type NavItem, User as UserType } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Link, usePage } from '@inertiajs/react';
 import {
+    Activity,
     ArrowLeftRight,
     BarChart2,
     BookOpenIcon,
@@ -22,13 +23,16 @@ import {
     Check,
     ClipboardList,
     Copy,
+    Database,
     ExternalLink,
+    Facebook,
     Landmark,
     Layers,
     LayoutDashboard,
     LifeBuoy,
     ListChecks,
     MapPin,
+    Megaphone,
     MessageSquare,
     Package,
     PieChart,
@@ -131,6 +135,27 @@ export function AppSidebar() {
                   },
               ]
             : []),
+        {
+            title: 'Meta Ads',
+            icon: Megaphone,
+            items: [
+                {
+                    title: 'FB Account',
+                    href: `/workspaces/${slug}/integrations/meta`,
+                    icon: Facebook,
+                },
+                {
+                    title: 'Ad Accounts',
+                    href: `/workspaces/${slug}/integrations/meta/ad-accounts`,
+                    icon: Database,
+                },
+                {
+                    title: 'Sync Health',
+                    href: `/workspaces/${slug}/integrations/meta/health`,
+                    icon: Activity,
+                },
+            ],
+        },
         ...(currentWorkspace.csr_module_enabled
             ? [
                   {

@@ -39,8 +39,10 @@ use Modules\Finance\Http\Controllers\TransactionController as FinanceTransaction
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
+use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
 use Modules\MetaAds\Http\Controllers\IntegrationsController;
 use Modules\MetaAds\Http\Controllers\MetaOAuthController;
+use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
 
 /*
@@ -170,11 +172,15 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/rts/parcel-journey-notification-templates', [ParcelUpdateNotificationTemplateController::class, 'index'])->name('workspaces.rts.parcel-journey-notification-templates.index');
     Route::put('/workspaces/{workspace}/rts/parcel-journey-notification-templates/{template}', [ParcelUpdateNotificationTemplateController::class, 'update'])->name('workspaces.rts.parcel-journey-notification-templates.update');
 
-    Route::get('/workspaces/{workspace}/integrations/meta', [IntegrationsController::class, 'index'])
-        ->name('workspaces.metaads.integrations');
+    Route::get('/workspaces/{workspace}/integrations/meta', [IntegrationsController::class, 'fbAccounts'])
+        ->name('workspaces.metaads.fb-accounts');
+    Route::get('/workspaces/{workspace}/integrations/meta/ad-accounts', [IntegrationsController::class, 'adAccounts'])
+        ->name('workspaces.metaads.ad-accounts');
+    Route::get('/workspaces/{workspace}/integrations/meta/health', [SyncHealthController::class, 'index'])
+        ->name('workspaces.metaads.health');
     Route::get('/workspaces/{workspace}/integrations/meta/connect', [MetaOAuthController::class, 'redirect'])
         ->name('workspaces.metaads.connect');
-    Route::post('/workspaces/{workspace}/integrations/meta/users/{metaUser}/sync-ad-accounts', \Modules\MetaAds\Http\Controllers\AdAccountSyncController::class)
+    Route::post('/workspaces/{workspace}/integrations/meta/users/{metaUser}/sync-ad-accounts', AdAccountSyncController::class)
         ->name('workspaces.metaads.sync-ad-accounts');
 
     Route::put('/workspaces/{workspace:slug}/employees/{employee}', [CSRController::class, 'update'])->name('employees.update');

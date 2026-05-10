@@ -47,7 +47,7 @@ class MetaOAuthController extends Controller
         }
 
         if ($error = $request->query('error_description') ?? $request->query('error')) {
-            return redirect()->route('workspaces.metaads.integrations', Workspace::findOrFail($workspaceId))
+            return redirect()->route('workspaces.metaads.fb-accounts', Workspace::findOrFail($workspaceId))
                 ->with('error', 'Meta connection failed: '.$error);
         }
 
@@ -77,7 +77,7 @@ class MetaOAuthController extends Controller
             $metaUser->id => ['connected_by_user_id' => $request->user()->id],
         ]);
 
-        return redirect()->route('workspaces.metaads.integrations', $workspace)
+        return redirect()->route('workspaces.metaads.fb-accounts', $workspace)
             ->with('success', "Connected Meta account: {$metaUser->name}");
     }
 
