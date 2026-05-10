@@ -4,24 +4,19 @@ namespace Modules\MetaAds\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Campaign extends Model
+class Ad extends Model
 {
-    protected $table = 'meta_ads_campaigns';
+    protected $table = 'meta_ads_ads';
 
     public $incrementing = false;
 
     protected $guarded = [];
 
     protected $casts = [
-        'start_time' => 'datetime',
-        'stop_time' => 'datetime',
         'created_time' => 'datetime',
         'updated_time' => 'datetime',
         'last_synced_at' => 'datetime',
-        'daily_budget' => 'decimal:2',
-        'lifetime_budget' => 'decimal:2',
     ];
 
     public function adAccount(): BelongsTo
@@ -29,13 +24,13 @@ class Campaign extends Model
         return $this->belongsTo(AdAccount::class, 'meta_ads_account_id');
     }
 
-    public function adSets(): HasMany
+    public function campaign(): BelongsTo
     {
-        return $this->hasMany(AdSet::class, 'meta_ads_campaign_id');
+        return $this->belongsTo(Campaign::class, 'meta_ads_campaign_id');
     }
 
-    public function ads(): HasMany
+    public function adSet(): BelongsTo
     {
-        return $this->hasMany(Ad::class, 'meta_ads_campaign_id');
+        return $this->belongsTo(AdSet::class, 'meta_ads_set_id');
     }
 }

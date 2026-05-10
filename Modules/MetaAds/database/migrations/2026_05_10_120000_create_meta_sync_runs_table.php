@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('meta_ads_sync_runs', function (Blueprint $table) {
             $table->id();
             $table->string('entity_type', 32);
-            $table->string('scope_type', 32)->nullable();
+            $table->string('scope_type', 64)->nullable();
             $table->unsignedBigInteger('scope_id')->nullable();
             $table->string('status', 16)->default('running');
             $table->unsignedInteger('records_synced')->default(0);

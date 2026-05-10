@@ -16,7 +16,7 @@ class IntegrationsController extends Controller
 
         $metaUsers = $workspace->metaUsers()
             ->with(['adAccounts' => function ($q) {
-                $q->select('meta_ads_accounts.id', 'meta_account_id', 'name', 'currency', 'country_code', 'account_status', 'business_name', 'last_synced_at');
+                $q->select('meta_ads_accounts.id', 'name', 'currency', 'country_code', 'account_status', 'business_name', 'last_synced_at');
             }])
             ->select('meta_ads_users.id', 'meta_ads_users.name', 'meta_ads_users.email', 'meta_ads_users.token_expires_at', 'meta_ads_users.last_synced_at')
             ->orderByDesc('meta_ads_workspace_user.created_at')

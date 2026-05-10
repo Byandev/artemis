@@ -10,12 +10,13 @@ return new class extends Migration
     {
         Schema::create('meta_ads_user_account', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('meta_ads_user_id')->constrained('meta_ads_users')->cascadeOnDelete();
-            $table->foreignId('meta_ads_account_id')->constrained('meta_ads_accounts')->cascadeOnDelete();
+            $table->unsignedBigInteger('meta_ads_user_id');
+            $table->unsignedBigInteger('meta_ads_account_id');
             $table->json('permitted_tasks')->nullable();
             $table->timestamps();
 
             $table->unique(['meta_ads_user_id', 'meta_ads_account_id'], 'meta_ads_user_account_unique');
+            $table->index('meta_ads_account_id');
         });
     }
 

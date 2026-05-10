@@ -11,6 +11,8 @@ class User extends Model
 {
     protected $table = 'meta_ads_users';
 
+    public $incrementing = false;
+
     protected $guarded = [];
 
     protected $casts = [

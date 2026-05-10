@@ -9,10 +9,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('meta_ads_sets', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('meta_ads_account_id')->constrained('meta_ads_accounts')->cascadeOnDelete();
-            $table->foreignId('meta_ads_campaign_id')->constrained('meta_ads_campaigns')->cascadeOnDelete();
-            $table->string('meta_ad_set_id')->unique();
+            $table->unsignedBigInteger('id')->primary();
+            $table->unsignedBigInteger('meta_ads_account_id');
+            $table->unsignedBigInteger('meta_ads_campaign_id');
             $table->string('name');
             $table->string('status', 32)->nullable();
             $table->string('effective_status', 32)->nullable();
@@ -29,6 +28,8 @@ return new class extends Migration
             $table->timestamp('last_synced_at')->nullable();
             $table->timestamps();
 
+            $table->index('meta_ads_account_id');
+            $table->index('meta_ads_campaign_id');
             $table->index('status');
             $table->index('effective_status');
             $table->index(['meta_ads_account_id', 'effective_status']);

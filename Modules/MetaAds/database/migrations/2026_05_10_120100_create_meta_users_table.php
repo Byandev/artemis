@@ -9,8 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('meta_ads_users', function (Blueprint $table) {
-            $table->id();
-            $table->string('meta_user_id')->unique();
+            $table->unsignedBigInteger('id')->primary();
             $table->string('name');
             $table->string('email')->nullable();
             $table->text('access_token');

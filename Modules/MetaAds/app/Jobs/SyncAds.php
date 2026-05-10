@@ -9,13 +9,13 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Modules\MetaAds\Jobs\Concerns\HandlesMetaSyncErrors;
+use Modules\MetaAds\Models\Ad;
 use Modules\MetaAds\Models\AdAccount;
-use Modules\MetaAds\Models\Campaign;
 use Modules\MetaAds\Models\SyncRun;
 use RuntimeException;
 use Throwable;
 
-class SyncCampaigns implements ShouldQueue
+class SyncAds implements ShouldQueue
 {
     use Dispatchable, HandlesMetaSyncErrors, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -28,7 +28,7 @@ class SyncCampaigns implements ShouldQueue
     public function handle(): void
     {
         $run = SyncRun::start(
-            entityType: SyncRun::ENTITY_CAMPAIGNS,
+            entityType: SyncRun::ENTITY_ADS,
             scopeType: AdAccount::class,
             scopeId: $this->adAccount->id,
         );
@@ -42,25 +42,26 @@ class SyncCampaigns implements ShouldQueue
 
             $client = $metaUser->graphClient();
 
-            $fields = 'id,name,objective,status,effective_status,buying_type,bid_strategy,daily_budget,lifetime_budget,start_time,stop_time,created_time,updated_time';
+            $fields = 'id,name,adset_id,campaign_id,creative,status,effective_status,created_time,updated_time,created_by';
 
             $count = 0;
 
-            foreach ($client->paginated("{$this->adAccount->graphAccountId()}/campaigns", ['fields' => $fields]) as $row) {
-                Campaign::updateOrCreate(
+            foreach ($client->paginated("{$this->adAccount->graphAccountId()}/ads", ['fields' => $fields]) as $row) {
+                if (! ($row['campaign_id'] ?? null) || ! ($row['adset_id'] ?? null)) {
+                    continue;
+                }
+
+                Ad::updateOrCreate(
                     ['id' => $row['id']],
                     [
                         'meta_ads_account_id' => $this->adAccount->id,
+                        'meta_ads_campaign_id' => $row['campaign_id'],
+                        'meta_ads_set_id' => $row['adset_id'],
+                        'meta_ads_creative_id' => $row['creative']['id'] ?? null,
                         'name' => $row['name'] ?? $row['id'],
-                        'objective' => $row['objective'] ?? null,
                         'status' => $row['status'] ?? null,
                         'effective_status' => $row['effective_status'] ?? null,
-                        'buying_type' => $row['buying_type'] ?? null,
-                        'bid_strategy' => $row['bid_strategy'] ?? null,
-                        'daily_budget' => $this->minorToMajor($row['daily_budget'] ?? null),
-                        'lifetime_budget' => $this->minorToMajor($row['lifetime_budget'] ?? null),
-                        'start_time' => $row['start_time'] ?? null,
-                        'stop_time' => $row['stop_time'] ?? null,
+                        'created_by_meta_user_id' => $row['created_by']['id'] ?? null,
                         'created_time' => $row['created_time'] ?? null,
                         'updated_time' => $row['updated_time'] ?? null,
                         'last_synced_at' => Carbon::now(),
@@ -70,18 +71,9 @@ class SyncCampaigns implements ShouldQueue
                 $count++;
             }
 
-            $run->succeed($count, ['campaign_count' => $count]);
+            $run->succeed($count, ['ad_count' => $count]);
         } catch (Throwable $e) {
             $this->handleSyncError($run, $e);
         }
-    }
-
-    private function minorToMajor(mixed $minor): ?float
-    {
-        if ($minor === null || $minor === '') {
-            return null;
-        }
-
-        return ((int) $minor) / 100;
     }
 }

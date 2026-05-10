@@ -14,6 +14,8 @@ class SyncRun extends Model
 
     public const STATUS_FAILED = 'failed';
 
+    public const STATUS_RATE_LIMITED = 'rate_limited';
+
     public const ENTITY_AD_ACCOUNTS = 'ad_accounts';
 
     public const ENTITY_CAMPAIGNS = 'campaigns';
@@ -37,7 +39,7 @@ class SyncRun extends Model
         'records_synced' => 'integer',
     ];
 
-    public static function start(string $entityType, ?string $scopeType = null, ?int $scopeId = null, array $meta = []): self
+    public static function start(string $entityType, ?string $scopeType = null, ?string $scopeId = null, array $meta = []): self
     {
         return self::create([
             'entity_type' => $entityType,
@@ -66,6 +68,16 @@ class SyncRun extends Model
             'finished_at' => Carbon::now(),
             'error_message' => $error instanceof Throwable ? $error->getMessage() : $error,
             'meta' => array_merge((array) $this->meta, $meta) ?: null,
+        ])->save();
+    }
+
+    public function markRateLimited(Throwable|string $error, int $retryAfterSeconds, array $meta = []): void
+    {
+        $this->forceFill([
+            'status' => self::STATUS_RATE_LIMITED,
+            'finished_at' => Carbon::now(),
+            'error_message' => $error instanceof Throwable ? $error->getMessage() : $error,
+            'meta' => array_merge((array) $this->meta, $meta, ['retry_after_seconds' => $retryAfterSeconds]) ?: null,
         ])->save();
     }
 }

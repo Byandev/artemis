@@ -9,8 +9,7 @@ import { ColumnDef } from '@tanstack/react-table'
 import { Facebook, RefreshCw } from 'lucide-react'
 
 interface MetaAdAccount {
-    id: number
-    meta_account_id: string
+    id: string
     name: string
     currency: string | null
     country_code: string | null
@@ -20,7 +19,7 @@ interface MetaAdAccount {
 }
 
 interface MetaUser {
-    id: number
+    id: string
     name: string
     email: string | null
     token_expires_at: string | null
@@ -40,9 +39,9 @@ const adAccountColumns: ColumnDef<MetaAdAccount>[] = [
         cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
     },
     {
-        accessorKey: 'meta_account_id',
+        accessorKey: 'id',
         header: ({ column }) => <SortableHeader column={column} title="Account ID" enabled={false} />,
-        cell: ({ row }) => <span className="font-mono text-xs">{row.original.meta_account_id}</span>,
+        cell: ({ row }) => <span className="font-mono text-xs">{row.original.id}</span>,
     },
     {
         accessorKey: 'business_name',
@@ -72,7 +71,7 @@ const adAccountColumns: ColumnDef<MetaAdAccount>[] = [
 export default function MetaIntegrations({ workspace, metaUsers }: Props) {
     const connectUrl = `/workspaces/${workspace.slug}/integrations/meta/connect`
 
-    const sync = (metaUserId: number) => {
+    const sync = (metaUserId: string) => {
         router.post(
             `/workspaces/${workspace.slug}/integrations/meta/users/${metaUserId}/sync-ad-accounts`,
             {},

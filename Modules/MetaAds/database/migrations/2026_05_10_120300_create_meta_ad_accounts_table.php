@@ -9,8 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('meta_ads_accounts', function (Blueprint $table) {
-            $table->id();
-            $table->string('meta_account_id')->unique();
+            $table->unsignedBigInteger('id')->primary();
             $table->string('name');
             $table->string('currency', 8)->nullable();
             $table->string('timezone_name')->nullable();

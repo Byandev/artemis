@@ -12,11 +12,18 @@ class AdAccount extends Model
 {
     protected $table = 'meta_ads_accounts';
 
+    public $incrementing = false;
+
     protected $guarded = [];
 
     protected $casts = [
         'last_synced_at' => 'datetime',
     ];
+
+    public function graphAccountId(): string
+    {
+        return 'act_'.$this->id;
+    }
 
     public function metaUsers(): BelongsToMany
     {
@@ -33,6 +40,11 @@ class AdAccount extends Model
     public function adSets(): HasMany
     {
         return $this->hasMany(AdSet::class, 'meta_ads_account_id');
+    }
+
+    public function ads(): HasMany
+    {
+        return $this->hasMany(Ad::class, 'meta_ads_account_id');
     }
 
     public function scopeForWorkspace(Builder $query, Workspace $workspace): Builder

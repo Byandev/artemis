@@ -60,7 +60,7 @@ class MetaOAuthController extends Controller
         $profile = $this->fetchMe($longToken['access_token']);
 
         $metaUser = MetaUser::updateOrCreate(
-            ['meta_user_id' => $profile['id']],
+            ['id' => $profile['id']],
             [
                 'name' => $profile['name'] ?? 'Unknown',
                 'email' => $profile['email'] ?? null,

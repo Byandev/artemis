@@ -10,12 +10,13 @@ return new class extends Migration
     {
         Schema::create('meta_ads_workspace_user', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('workspace_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('meta_ads_user_id')->constrained('meta_ads_users')->cascadeOnDelete();
-            $table->foreignId('connected_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->unsignedBigInteger('workspace_id');
+            $table->unsignedBigInteger('meta_ads_user_id');
+            $table->unsignedBigInteger('connected_by_user_id')->nullable();
             $table->timestamps();
 
             $table->unique(['workspace_id', 'meta_ads_user_id']);
+            $table->index('meta_ads_user_id');
         });
     }
 

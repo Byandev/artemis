@@ -4,6 +4,7 @@ namespace Modules\MetaAds\Providers;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Modules\MetaAds\Console\Commands\SyncAdAccountsCommand;
+use Modules\MetaAds\Console\Commands\SyncAdsCommand;
 use Modules\MetaAds\Console\Commands\SyncAdSetsCommand;
 use Modules\MetaAds\Console\Commands\SyncCampaignsCommand;
 use Nwidart\Modules\Support\ModuleServiceProvider;
@@ -29,6 +30,7 @@ class MetaAdsServiceProvider extends ModuleServiceProvider
         SyncAdAccountsCommand::class,
         SyncCampaignsCommand::class,
         SyncAdSetsCommand::class,
+        SyncAdsCommand::class,
     ];
 
     /**

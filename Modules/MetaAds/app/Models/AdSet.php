@@ -4,10 +4,13 @@ namespace Modules\MetaAds\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AdSet extends Model
 {
     protected $table = 'meta_ads_sets';
+
+    public $incrementing = false;
 
     protected $guarded = [];
 
@@ -30,5 +33,10 @@ class AdSet extends Model
     public function campaign(): BelongsTo
     {
         return $this->belongsTo(Campaign::class, 'meta_ads_campaign_id');
+    }
+
+    public function ads(): HasMany
+    {
+        return $this->hasMany(Ad::class, 'meta_ads_set_id');
     }
 }

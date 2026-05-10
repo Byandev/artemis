@@ -8,6 +8,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
+use Modules\MetaAds\Jobs\Concerns\HandlesMetaSyncErrors;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\SyncRun;
 use Modules\MetaAds\Models\User as MetaUser;
@@ -15,11 +16,11 @@ use Throwable;
 
 class SyncMetaAdAccounts implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, HandlesMetaSyncErrors, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $timeout = 300;
 
-    public int $tries = 3;
+    public int $tries = 8;
 
     public function __construct(public MetaUser $metaUser) {}
 
@@ -40,10 +41,13 @@ class SyncMetaAdAccounts implements ShouldQueue
             $fields = 'id,account_id,name,currency,timezone_name,business_country_code,account_status,business';
 
             foreach ($client->paginated('me/adaccounts', ['fields' => $fields]) as $row) {
-                $account = AdAccount::updateOrCreate(
-                    ['meta_account_id' => $row['id']],
+                // Meta returns id with `act_` prefix; account_id is the bare numeric form.
+                $accountId = $row['account_id'] ?? preg_replace('/^act_/', '', (string) $row['id']);
+
+                AdAccount::updateOrCreate(
+                    ['id' => $accountId],
                     [
-                        'name' => $row['name'] ?? $row['id'],
+                        'name' => $row['name'] ?? $accountId,
                         'currency' => $row['currency'] ?? null,
                         'timezone_name' => $row['timezone_name'] ?? null,
                         'country_code' => $row['business_country_code'] ?? null,
@@ -54,7 +58,7 @@ class SyncMetaAdAccounts implements ShouldQueue
                     ],
                 );
 
-                $accountIds[$account->id] = ['permitted_tasks' => null];
+                $accountIds[$accountId] = ['permitted_tasks' => null];
                 $count++;
             }
 
@@ -63,8 +67,7 @@ class SyncMetaAdAccounts implements ShouldQueue
 
             $run->succeed($count, ['account_count' => $count]);
         } catch (Throwable $e) {
-            $run->fail($e);
-            throw $e;
+            $this->handleSyncError($run, $e);
         }
     }
 }

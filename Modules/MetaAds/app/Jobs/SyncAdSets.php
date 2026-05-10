@@ -8,20 +8,20 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
+use Modules\MetaAds\Jobs\Concerns\HandlesMetaSyncErrors;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
-use Modules\MetaAds\Models\Campaign;
 use Modules\MetaAds\Models\SyncRun;
 use RuntimeException;
 use Throwable;
 
 class SyncAdSets implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, HandlesMetaSyncErrors, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $timeout = 600;
 
-    public int $tries = 3;
+    public int $tries = 8;
 
     public function __construct(public AdAccount $adAccount) {}
 
@@ -37,44 +37,25 @@ class SyncAdSets implements ShouldQueue
             $metaUser = $this->adAccount->metaUsers()->first();
 
             if (! $metaUser) {
-                throw new RuntimeException("No MetaUser linked to AdAccount {$this->adAccount->meta_account_id}");
+                throw new RuntimeException("No MetaUser linked to AdAccount {$this->adAccount->id}");
             }
 
             $client = $metaUser->graphClient();
 
-            $campaignMap = Campaign::where('meta_ads_account_id', $this->adAccount->id)
-                ->pluck('id', 'meta_campaign_id')
-                ->all();
-
             $fields = 'id,name,campaign_id,status,effective_status,daily_budget,lifetime_budget,bid_strategy,optimization_goal,billing_event,targeting,start_time,end_time,created_time,updated_time';
 
             $count = 0;
-            $stubbedCampaigns = 0;
 
-            foreach ($client->paginated("{$this->adAccount->meta_account_id}/adsets", ['fields' => $fields]) as $row) {
-                $metaCampaignId = $row['campaign_id'] ?? null;
-
-                if (! $metaCampaignId) {
+            foreach ($client->paginated("{$this->adAccount->graphAccountId()}/adsets", ['fields' => $fields]) as $row) {
+                if (! ($row['campaign_id'] ?? null)) {
                     continue;
                 }
 
-                if (! isset($campaignMap[$metaCampaignId])) {
-                    $stub = Campaign::firstOrCreate(
-                        ['meta_campaign_id' => $metaCampaignId],
-                        [
-                            'meta_ads_account_id' => $this->adAccount->id,
-                            'name' => $metaCampaignId,
-                        ],
-                    );
-                    $campaignMap[$metaCampaignId] = $stub->id;
-                    $stubbedCampaigns++;
-                }
-
                 AdSet::updateOrCreate(
-                    ['meta_ad_set_id' => $row['id']],
+                    ['id' => $row['id']],
                     [
                         'meta_ads_account_id' => $this->adAccount->id,
-                        'meta_ads_campaign_id' => $campaignMap[$metaCampaignId],
+                        'meta_ads_campaign_id' => $row['campaign_id'],
                         'name' => $row['name'] ?? $row['id'],
                         'status' => $row['status'] ?? null,
                         'effective_status' => $row['effective_status'] ?? null,
@@ -95,13 +76,9 @@ class SyncAdSets implements ShouldQueue
                 $count++;
             }
 
-            $run->succeed($count, [
-                'ad_set_count' => $count,
-                'stubbed_campaigns' => $stubbedCampaigns,
-            ]);
+            $run->succeed($count, ['ad_set_count' => $count]);
         } catch (Throwable $e) {
-            $run->fail($e);
-            throw $e;
+            $this->handleSyncError($run, $e);
         }
     }
 
