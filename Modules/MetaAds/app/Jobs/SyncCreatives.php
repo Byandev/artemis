@@ -46,7 +46,12 @@ class SyncCreatives implements ShouldQueue
 
             $count = 0;
 
-            foreach ($client->paginated("{$this->adAccount->graphAccountId()}/adcreatives", ['fields' => $fields]) as $row) {
+            // Creatives carry a large `object_story_spec` JSON; cap page size
+            // so the response doesn't blow Meta's per-request size limit.
+            foreach ($client->paginated(
+                "{$this->adAccount->graphAccountId()}/adcreatives",
+                ['fields' => $fields, 'limit' => 25],
+            ) as $row) {
                 Creative::updateOrCreate(
                     ['id' => $row['id']],
                     [

@@ -39,6 +39,14 @@ class MetaGraphException extends RuntimeException
         return in_array($this->errorCode, [4, 17, 32, 613], true);
     }
 
+    public function isTransient(): bool
+    {
+        // 1 = "An unknown error occurred" (often Meta's 30s compute timeout on insights).
+        // 2 = "Service temporarily unavailable" (Meta-side outage).
+        // Both are worth retrying after a short delay.
+        return in_array($this->errorCode, [1, 2], true);
+    }
+
     public function isTokenInvalid(): bool
     {
         // OAuthException with code 190 = invalid/expired token.

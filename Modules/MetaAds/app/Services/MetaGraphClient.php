@@ -67,11 +67,13 @@ class MetaGraphClient
         return $this->decode($response);
     }
 
+    public int $timeoutSeconds = 120;
+
     private function request(): PendingRequest
     {
         return Http::withToken($this->accessToken)
             ->acceptJson()
-            ->timeout(30)
+            ->timeout($this->timeoutSeconds)
             ->retry(2, 500, function ($exception, $request) {
                 // Retry on transport errors only; HTTP-level errors are surfaced via decode().
                 return $exception instanceof ConnectionException;

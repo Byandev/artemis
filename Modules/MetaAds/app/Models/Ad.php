@@ -4,6 +4,7 @@ namespace Modules\MetaAds\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Ad extends Model
 {
@@ -37,5 +38,10 @@ class Ad extends Model
     public function creative(): BelongsTo
     {
         return $this->belongsTo(Creative::class, 'meta_ads_creative_id');
+    }
+
+    public function insights(): HasMany
+    {
+        return $this->hasMany(Insight::class, 'meta_ads_ad_id');
     }
 }

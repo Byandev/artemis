@@ -52,6 +52,11 @@ class AdAccount extends Model
         return $this->hasMany(Creative::class, 'meta_ads_account_id');
     }
 
+    public function insights(): HasMany
+    {
+        return $this->hasMany(Insight::class, 'meta_ads_account_id');
+    }
+
     public function scopeForWorkspace(Builder $query, Workspace $workspace): Builder
     {
         return $query->whereHas('metaUsers.workspaces', function ($q) use ($workspace) {

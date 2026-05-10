@@ -6,7 +6,7 @@ return [
     'app_id' => env('META_ADS_APP_ID'),
     'app_secret' => env('META_ADS_APP_SECRET'),
     'redirect_uri' => env('META_ADS_REDIRECT_URI'),
-    'graph_version' => env('META_ADS_GRAPH_VERSION', 'v21.0'),
+    'graph_version' => env('META_ADS_GRAPH_VERSION', 'v25.0'),
     'graph_base_url' => env('META_ADS_GRAPH_BASE_URL', 'https://graph.facebook.com'),
 
     'insights_backfill_days' => (int) env('META_ADS_INSIGHTS_BACKFILL_DAYS', 90),
