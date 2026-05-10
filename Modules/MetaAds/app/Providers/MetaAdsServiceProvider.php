@@ -6,6 +6,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Modules\MetaAds\Console\Commands\SyncAdAccountsCommand;
 use Modules\MetaAds\Console\Commands\SyncAdsCommand;
 use Modules\MetaAds\Console\Commands\SyncAdSetsCommand;
+use Modules\MetaAds\Console\Commands\SyncAllCommand;
 use Modules\MetaAds\Console\Commands\SyncCampaignsCommand;
 use Modules\MetaAds\Console\Commands\SyncCreativesCommand;
 use Modules\MetaAds\Console\Commands\SyncInsightsCommand;
@@ -35,6 +36,7 @@ class MetaAdsServiceProvider extends ModuleServiceProvider
         SyncAdsCommand::class,
         SyncCreativesCommand::class,
         SyncInsightsCommand::class,
+        SyncAllCommand::class,
     ];
 
     /**
