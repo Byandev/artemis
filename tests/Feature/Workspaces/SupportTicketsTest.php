@@ -68,13 +68,17 @@ test('member only sees their own support tickets', function () {
         );
 });
 
-test('non-member and guest cannot access support pages', function () {
+test('non-member cannot access support pages', function () {
     $user = User::factory()->create();
     $workspace = Workspace::factory()->create();
 
     $this->actingAs($user)
         ->get("/workspaces/{$workspace->slug}/support")
         ->assertForbidden();
+});
+
+test('guest is redirected to login from support pages', function () {
+    $workspace = Workspace::factory()->create();
 
     $this->get("/workspaces/{$workspace->slug}/support")
         ->assertRedirect(route('login'));

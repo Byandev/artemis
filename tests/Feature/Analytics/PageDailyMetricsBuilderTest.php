@@ -20,18 +20,17 @@ function rebuildAndFetch(int $workspaceId, int $pageId, string $date): Workspace
         ->firstOrFail();
 }
 
-test('rebuild produces zero row when no orders match the date', function () {
+test('rebuild does not insert a row when no orders match the date', function () {
     $workspace = Workspace::factory()->create();
     $page = Page::factory()->forWorkspace($workspace)->create();
 
-    $row = rebuildAndFetch($workspace->id, $page->id, '2026-04-01');
+    app(PageDailyMetricsBuilder::class)->rebuild($workspace->id, $page->id, '2026-04-01');
 
-    expect($row->confirmed_count)->toBe(0)
-        ->and($row->confirmed_amount)->toEqual('0.00')
-        ->and($row->shipped_count)->toBe(0)
-        ->and($row->delivered_count)->toBe(0)
-        ->and($row->entered_returning_count)->toBe(0)
-        ->and($row->returned_count)->toBe(0);
+    expect(WorkspacePageDailyMetric::query()
+        ->where('workspace_id', $workspace->id)
+        ->where('page_id', $page->id)
+        ->where('date', '2026-04-01')
+        ->exists())->toBeFalse();
 });
 
 test('confirmed_count and confirmed_amount sum orders confirmed on the date', function () {
