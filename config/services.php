@@ -40,12 +40,4 @@ return [
         'inventory_webhook_url' => env('N8N_INVENTORY_WEBHOOK_URL'),
     ],
 
-    'facebook' => [
-        'config_id' => env('FACEBOOK_CONFIG_ID'),
-        'client_id' => env('FACEBOOK_CLIENT_ID'),
-        'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
-        'redirect' => env('FACEBOOK_REDIRECT_URI'),
-        'sample_account_token' => env('FACEBOOK_SAMPLE_ACCOUNT_TOKEN'),
-    ],
-
 ];

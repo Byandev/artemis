@@ -182,11 +182,6 @@ class Workspace extends Model
         return $this->hasMany(ParcelJourneyNotificationTemplate::class);
     }
 
-    public function facebookAccounts(): BelongsToMany
-    {
-        return $this->belongsToMany(FacebookAccount::class, 'workspace_facebook_account');
-    }
-
     public function metrics(array $dateRange, array $filter, string $source = 'live'): WorkspaceMetrics
     {
         return new WorkspaceMetrics($this, $dateRange, $filter, $source);

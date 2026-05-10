@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Integrations\FacebookController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -67,8 +66,6 @@ Route::get('/blog/{slug}', function (string $slug) {
 Route::get('/design-guidelines', function () {
     return view('design-guidelines');
 });
-
-Route::get('/auth/facebook/callback', [FacebookController::class, 'callback']);
 
 Route::middleware(['auth'])->group(function () {
 

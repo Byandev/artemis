@@ -2,18 +2,12 @@
 
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
-use App\Http\Controllers\Workspaces\AdAccountController;
 use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
 use App\Http\Controllers\Workspaces\Admin\SupportTicketAdminController;
-use App\Http\Controllers\Workspaces\AdsManager\AdController;
-use App\Http\Controllers\Workspaces\AdsManager\AdSetController;
-use App\Http\Controllers\Workspaces\AdsManager\CampaignController;
-use App\Http\Controllers\Workspaces\AdsManager\OptimizationRuleController;
 use App\Http\Controllers\Workspaces\AskDataController;
 use App\Http\Controllers\Workspaces\ChecklistController;
 use App\Http\Controllers\Workspaces\ChecklistProgressController;
 use App\Http\Controllers\Workspaces\CSRController;
-use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\OnboardingController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\Product\AnalyticsController;
@@ -173,27 +167,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/rts/parcel-update-notification', [ParcelUpdateNotificationController::class, 'index'])->name('workspaces.rts.parcel-update-notification');
     Route::get('/workspaces/{workspace}/rts/parcel-journey-notification-templates', [ParcelUpdateNotificationTemplateController::class, 'index'])->name('workspaces.rts.parcel-journey-notification-templates.index');
     Route::put('/workspaces/{workspace}/rts/parcel-journey-notification-templates/{template}', [ParcelUpdateNotificationTemplateController::class, 'update'])->name('workspaces.rts.parcel-journey-notification-templates.update');
-
-    Route::get('/workspaces/{workspace}/facebook-accounts', [FacebookAccountController::class, 'index'])->name('workspaces.facebook-accounts.index');
-    Route::get('/workspaces/{workspace}/ad-accounts', [AdAccountController::class, 'index'])->name('workspaces.ad-accounts.index');
-    Route::post('/workspaces/{workspace}/ad-accounts/{adAccount}/refresh', [AdAccountController::class, 'refresh'])->name('workspaces.ad-accounts.refresh');
-
-    // Redirect to campaigns by default for navigation item active state
-    Route::get('/workspaces/{workspace}/ads-manager', function (Workspace $workspace) {
-        return redirect()->route('workspaces.ads-manager.campaigns', $workspace);
-    })->name('workspaces.ads-manager');
-    Route::get('/workspaces/{workspace}/ads-manager/campaigns', [CampaignController::class, 'index'])->name('workspaces.ads-manager.campaigns');
-    Route::get('/workspaces/{workspace}/ads-manager/ad-sets', [AdSetController::class, 'index'])->name('workspaces.ads-manager.ad-sets');
-    Route::get('/workspaces/{workspace}/ads-manager/ads', [AdController::class, 'index'])->name('workspaces.ads-manager.ads');
-    Route::get('/workspaces/{workspace}/ads-manager/optimization-rules', [OptimizationRuleController::class, 'page'])->name('workspaces.ads-manager.optimization-rules');
-    Route::get('/workspaces/{workspace}/ads-manager/optimization-rules/create', [OptimizationRuleController::class, 'create'])->name('workspaces.ads-manager.optimization-rules.create');
-    Route::get('/workspaces/{workspace}/ads-manager/optimization-rules/{optimizationRule}/edit', [OptimizationRuleController::class, 'edit'])->name('workspaces.ads-manager.optimization-rules.edit');
-
-    // Optimization Rules API routes
-    Route::post('/workspaces/{workspace}/api/optimization-rules', [OptimizationRuleController::class, 'store'])->name('workspaces.api.optimization-rules.store');
-    Route::get('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'show'])->name('workspaces.api.optimization-rules.show');
-    Route::put('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'update'])->name('workspaces.api.optimization-rules.update');
-    Route::delete('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'destroy'])->name('workspaces.api.optimization-rules.destroy');
 
     Route::put('/workspaces/{workspace:slug}/employees/{employee}', [CSRController::class, 'update'])->name('employees.update');
     Route::get('/workspaces/{workspace}/csr/management', [CSRController::class, 'index'])->name('workspaces.csr.index');
