@@ -7,6 +7,7 @@ use Modules\MetaAds\Console\Commands\SyncAdAccountsCommand;
 use Modules\MetaAds\Console\Commands\SyncAdsCommand;
 use Modules\MetaAds\Console\Commands\SyncAdSetsCommand;
 use Modules\MetaAds\Console\Commands\SyncCampaignsCommand;
+use Modules\MetaAds\Console\Commands\SyncCreativesCommand;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class MetaAdsServiceProvider extends ModuleServiceProvider
@@ -31,6 +32,7 @@ class MetaAdsServiceProvider extends ModuleServiceProvider
         SyncCampaignsCommand::class,
         SyncAdSetsCommand::class,
         SyncAdsCommand::class,
+        SyncCreativesCommand::class,
     ];
 
     /**

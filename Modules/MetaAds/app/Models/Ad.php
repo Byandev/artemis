@@ -33,4 +33,9 @@ class Ad extends Model
     {
         return $this->belongsTo(AdSet::class, 'meta_ads_set_id');
     }
+
+    public function creative(): BelongsTo
+    {
+        return $this->belongsTo(Creative::class, 'meta_ads_creative_id');
+    }
 }
