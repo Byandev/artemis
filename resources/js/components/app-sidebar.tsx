@@ -150,6 +150,11 @@ export function AppSidebar() {
                     icon: Database,
                 },
                 {
+                    title: 'Pages',
+                    href: `/workspaces/${slug}/integrations/meta/pages`,
+                    icon: BookOpenIcon,
+                },
+                {
                     title: 'Sync Health',
                     href: `/workspaces/${slug}/integrations/meta/health`,
                     icon: Activity,

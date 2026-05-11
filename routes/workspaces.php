@@ -42,6 +42,7 @@ use Modules\Inventory\Http\Controllers\PurchasedOrderController;
 use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
 use Modules\MetaAds\Http\Controllers\IntegrationsController;
 use Modules\MetaAds\Http\Controllers\MetaOAuthController;
+use Modules\MetaAds\Http\Controllers\PagesController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
 
@@ -176,6 +177,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('workspaces.metaads.fb-accounts');
     Route::get('/workspaces/{workspace}/integrations/meta/ad-accounts', [IntegrationsController::class, 'adAccounts'])
         ->name('workspaces.metaads.ad-accounts');
+    Route::get('/workspaces/{workspace}/integrations/meta/pages', [PagesController::class, 'index'])
+        ->name('workspaces.metaads.pages');
     Route::get('/workspaces/{workspace}/integrations/meta/health', [SyncHealthController::class, 'index'])
         ->name('workspaces.metaads.health');
     Route::get('/workspaces/{workspace}/integrations/meta/connect', [MetaOAuthController::class, 'redirect'])
