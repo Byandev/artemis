@@ -4,15 +4,33 @@ namespace App\Jobs;
 
 use App\Services\Botcake;
 use DateTime;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\ThrottlesExceptions;
 use Illuminate\Support\Facades\Http;
 use Modules\Pancake\Models\ParcelJourneyNotification;
 
-class SendParcelUpdateNotification implements ShouldQueue
+class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
+
+    public int $tries = 1;
+
+    /**
+     * Dedupe the queue: two dispatches for the same notification collapse into
+     * one running job. Lock auto-releases after 1 hour as a safety net so a
+     * crashed worker can't permanently block a retry.
+     */
+    public function uniqueId(): string
+    {
+        return (string) $this->parcelJourneyNotification->id;
+    }
+
+    public function uniqueFor(): int
+    {
+        return 3600;
+    }
 
     /**
      * Create a new job instance.
@@ -28,7 +46,15 @@ class SendParcelUpdateNotification implements ShouldQueue
             return;
         }
 
-        sleep(0.5);
+        // Re-read the row before sending so we see any status update committed
+        // by an earlier attempt (or by CheckParcelUpdateNotification).
+        $this->parcelJourneyNotification->refresh();
+
+        if ($this->alreadyProcessed()) {
+            return;
+        }
+
+        usleep(500_000);
 
         $this->parcelJourneyNotification->load('order.page');
 
@@ -85,5 +111,23 @@ class SendParcelUpdateNotification implements ShouldQueue
     public function retryUntil(): DateTime
     {
         return now()->addHour();
+    }
+
+    /**
+     * Has this notification already been sent (or definitively failed) by an
+     * earlier attempt? Used to short-circuit duplicate runs.
+     *
+     * - SMS: presence of `sms_id` means we got a response back from Infotxt;
+     *   `CheckParcelUpdateNotification` will own the final status.
+     * - Chat: `status` already reflects the outcome.
+     */
+    private function alreadyProcessed(): bool
+    {
+        if ($this->parcelJourneyNotification->type === 'sms'
+            && $this->parcelJourneyNotification->sms_id !== null) {
+            return true;
+        }
+
+        return in_array($this->parcelJourneyNotification->status, ['sent', 'failed'], true);
     }
 }
