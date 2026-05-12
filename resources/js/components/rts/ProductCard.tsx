@@ -30,7 +30,7 @@ export default function ProductCard({
     const fetchPage = (
         page: number,
         currentSort: string,
-        perPage = 15,
+        perPage = 10,
         isInitial = false,
     ) => {
         setLoading(true);
@@ -53,7 +53,7 @@ export default function ProductCard({
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
-        fetchPage(1, sort, true);
+        fetchPage(1, sort, 10, true);
     }, [workspaceSlug, JSON.stringify(queryParams)]);
 
     const columns: ColumnDef<OrderItemRow>[] = useMemo(
@@ -121,7 +121,9 @@ export default function ProductCard({
                     </p>
                 </div>
                 <RefreshButton
-                    onClick={() => fetchPage(1, sort, 15, true)}
+                    onClick={() =>
+                        fetchPage(1, sort, data?.per_page ?? 10, true)
+                    }
                     loading={loading}
                 />
             </div>
