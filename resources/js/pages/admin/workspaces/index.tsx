@@ -3,11 +3,12 @@ import { MetricSettingDialog } from '@/components/metrics/metricsetting-dialog-f
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { PaginatedData } from '@/types';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import debounce from 'lodash/debounce';
 import {
+    ArrowUpRight,
     Boxes,
     CreditCard,
     Files,
@@ -266,6 +267,13 @@ export default function Index({ workspaces, plans, filters }: Props) {
             ),
             cell: ({ row }) => (
                 <div className="flex items-center justify-end gap-1 text-right">
+                    <Link
+                        href={`/workspaces/${row.original.slug}/dashboard`}
+                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                        title="Open workspace dashboard"
+                    >
+                        <ArrowUpRight className="h-4 w-4" />
+                    </Link>
                     <button
                         onClick={() => setEditingModules(row.original)}
                         className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
