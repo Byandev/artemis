@@ -48,7 +48,9 @@ class HandleInertiaRequests extends Middleware
         $workspaceModel = ($currentWorkspace instanceof Workspace) ? $currentWorkspace : null;
 
         $workspaces = $request->user()
-            ? $request->user()->workspaces()->limit(3)->get()
+            ? ($request->user()->isSuperAdmin()
+                ? Workspace::query()->limit(50)->get()
+                : $request->user()->workspaces()->limit(3)->get())
             : collect();
 
         $user = $request->user();

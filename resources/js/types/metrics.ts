@@ -274,38 +274,38 @@ export const metricConfigs: MetricConfig[] = [
             'Of customers who placed their first order 90–180 days ago, what percentage came back and ordered again within 90 days. Always shows a complete, up-to-date result.',
         formatter: percentageFormatter,
     },
-    {
-        key: 'totalForDeliveryCount',
-        groupKey: 'deliveryOutcomes',
-        name: 'For Delivery Count',
-        description:
-            'How many orders are currently out for delivery in the selected period.',
-        formatter: numberFormatter,
-    },
-    {
-        key: 'totalForDeliveryAmount',
-        groupKey: 'deliveryOutcomes',
-        name: 'For Delivery Amount',
-        description:
-            'Total value of orders currently out for delivery in the selected period.',
-        formatter: currencyFormatter,
-    },
-    {
-        key: 'newCustomerCount',
-        groupKey: 'revenueVolume',
-        name: 'New Customer Count',
-        description:
-            'How many new customers were added (first interaction with a page) in the selected period.',
-        formatter: numberFormatter,
-    },
-    {
-        key: 'allCustomerConversionRate',
-        groupKey: 'revenueVolume',
-        name: 'All Customer Conversion Rate',
-        description:
-            'Out of all customers active in the selected period, what percentage placed a confirmed order.',
-        formatter: percentageFormatter,
-    },
+    // {
+    //     key: 'totalForDeliveryCount',
+    //     groupKey: 'deliveryOutcomes',
+    //     name: 'For Delivery Count',
+    //     description:
+    //         'How many orders are currently out for delivery in the selected period.',
+    //     formatter: numberFormatter,
+    // },
+    // {
+    //     key: 'totalForDeliveryAmount',
+    //     groupKey: 'deliveryOutcomes',
+    //     name: 'For Delivery Amount',
+    //     description:
+    //         'Total value of orders currently out for delivery in the selected period.',
+    //     formatter: currencyFormatter,
+    // },
+    // {
+    //     key: 'newCustomerCount',
+    //     groupKey: 'revenueVolume',
+    //     name: 'New Customer Count',
+    //     description:
+    //         'How many new customers were added (first interaction with a page) in the selected period.',
+    //     formatter: numberFormatter,
+    // },
+    // {
+    //     key: 'allCustomerConversionRate',
+    //     groupKey: 'revenueVolume',
+    //     name: 'All Customer Conversion Rate',
+    //     description:
+    //         'Out of all customers active in the selected period, what percentage placed a confirmed order.',
+    //     formatter: percentageFormatter,
+    // },
 ];
 
 export const metricGroups = [
