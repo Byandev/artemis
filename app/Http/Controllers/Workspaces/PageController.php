@@ -33,7 +33,7 @@ class PageController extends Controller
 
     private function getPageLimitInfo(Workspace $workspace): array
     {
-        $limit = $workspace->subscription?->plan?->page_limit;
+        $limit = $workspace->max_pages ?? $workspace->subscription?->plan?->page_limit;
         $count = $workspace->pages()->count();
 
         return [
