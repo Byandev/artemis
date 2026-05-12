@@ -8,6 +8,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Modules\MetaAds\Jobs\Concerns\HandlesMetaSyncErrors;
+use Modules\MetaAds\Jobs\Concerns\SerializesPerAdAccount;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\Insight;
 use Modules\MetaAds\Models\SyncRun;
@@ -16,11 +17,11 @@ use Throwable;
 
 class SyncInsights implements ShouldQueue
 {
-    use Dispatchable, HandlesMetaSyncErrors, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, HandlesMetaSyncErrors, InteractsWithQueue, Queueable, SerializesModels, SerializesPerAdAccount;
 
     public int $timeout = 300;
 
-    public int $tries = 1;
+    public int $tries = 8;
 
     /**
      * Single-source action chains: walk in priority order, take first match.

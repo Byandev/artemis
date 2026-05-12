@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { DataTable, SortableHeader } from '@/components/ui/data-table'
 import AppLayout from '@/layouts/app-layout'
 import { toFrontendSort } from '@/lib/sort'
+import { currencyFormatter } from '@/lib/utils'
 import { PaginatedData } from '@/types'
 import { Workspace } from '@/types/models/Workspace'
 import { Head, router } from '@inertiajs/react'
@@ -45,10 +46,7 @@ interface Props {
 function formatMoney(value: number | string | null | undefined) {
     const n = typeof value === 'string' ? parseFloat(value) : (value ?? 0)
     if (!n) return '—'
-    return new Intl.NumberFormat(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    }).format(n)
+    return currencyFormatter(n)
 }
 
 function StatCard({

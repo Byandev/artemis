@@ -4,6 +4,7 @@ namespace Modules\MetaAds\Console\Commands;
 
 use Illuminate\Console\Command;
 use Modules\MetaAds\Jobs\SyncAdSets;
+use Modules\MetaAds\Jobs\SyncCampaigns;
 use Modules\MetaAds\Models\AdAccount;
 
 class SyncAdSetsCommand extends Command
@@ -28,10 +29,10 @@ class SyncAdSetsCommand extends Command
             return self::SUCCESS;
         }
 
-        foreach ($accounts as $account) {
+        foreach ($accounts as $index => $account) {
             $this->info("Dispatching ad sets sync for AdAccount #{$account->id} ({$account->meta_account_id})");
 
-            SyncAdSets::dispatch($account);
+            SyncAdSets::dispatch($account)->delay(now()->addSeconds($index * 5));
         }
 
         return self::SUCCESS;

@@ -14,12 +14,13 @@ class MetaGraphException extends RuntimeException
         public readonly ?string $errorType = null,
         public readonly ?string $fbtraceId = null,
         public readonly ?int $httpStatus = null,
+        public readonly ?int $resetSeconds = null,
         ?Throwable $previous = null,
     ) {
         parent::__construct($message, 0, $previous);
     }
 
-    public static function fromResponseBody(array $body, int $httpStatus): self
+    public static function fromResponseBody(array $body, int $httpStatus, ?int $resetSeconds = null): self
     {
         $error = $body['error'] ?? [];
 
@@ -30,13 +31,15 @@ class MetaGraphException extends RuntimeException
             errorType: $error['type'] ?? null,
             fbtraceId: $error['fbtrace_id'] ?? null,
             httpStatus: $httpStatus,
+            resetSeconds: $resetSeconds,
         );
     }
 
     public function isRateLimited(): bool
     {
         // Meta uses code 17, 4, 32, 613 plus subcodes 2446079 etc. for throttling.
-        return in_array($this->errorCode, [4, 17, 32, 613], true);
+        // 80000/80003/80004/80014 are the Business Use Case throttling codes.
+        return in_array($this->errorCode, [4, 17, 32, 613, 80000, 80003, 80004, 80014], true);
     }
 
     public function isTransient(): bool

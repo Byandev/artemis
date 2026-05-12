@@ -9,6 +9,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Modules\MetaAds\Jobs\Concerns\HandlesMetaSyncErrors;
+use Modules\MetaAds\Jobs\Concerns\SerializesPerAdAccount;
 use Modules\MetaAds\Models\Ad;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\SyncRun;
@@ -17,7 +18,7 @@ use Throwable;
 
 class SyncAds implements ShouldQueue
 {
-    use Dispatchable, HandlesMetaSyncErrors, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, HandlesMetaSyncErrors, InteractsWithQueue, Queueable, SerializesModels, SerializesPerAdAccount;
 
     public int $timeout = 600;
 
@@ -27,6 +28,8 @@ class SyncAds implements ShouldQueue
 
     public function handle(): void
     {
+        sleep(2);
+
         $run = SyncRun::start(
             entityType: SyncRun::ENTITY_ADS,
             scopeType: AdAccount::class,

@@ -156,6 +156,11 @@ export function AppSidebar() {
                     icon: BookOpenIcon,
                 },
                 {
+                    title: 'Ads Manager',
+                    href: `/workspaces/${slug}/integrations/meta/ads-manager/campaigns`,
+                    icon: BarChart2,
+                },
+                {
                     title: 'Sync Health',
                     href: `/workspaces/${slug}/integrations/meta/health`,
                     icon: Activity,

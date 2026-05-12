@@ -40,6 +40,7 @@ use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
 use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
+use Modules\MetaAds\Http\Controllers\AdsManagerController;
 use Modules\MetaAds\Http\Controllers\IntegrationsController;
 use Modules\MetaAds\Http\Controllers\MetaOAuthController;
 use Modules\MetaAds\Http\Controllers\PagesController;
@@ -179,6 +180,15 @@ Route::middleware(['auth'])->group(function () {
         ->name('workspaces.metaads.ad-accounts');
     Route::get('/workspaces/{workspace}/integrations/meta/pages', [PagesController::class, 'index'])
         ->name('workspaces.metaads.pages');
+    Route::get('/workspaces/{workspace}/integrations/meta/ads-manager', function ($workspace) {
+        return redirect()->route('workspaces.metaads.campaigns', ['workspace' => $workspace, ...request()->query()]);
+    })->name('workspaces.metaads.ads-manager');
+    Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/campaigns', [AdsManagerController::class, 'campaignsPage'])
+        ->name('workspaces.metaads.campaigns');
+    Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/ad-sets', [AdsManagerController::class, 'adSetsPage'])
+        ->name('workspaces.metaads.ad-sets');
+    Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/ads', [AdsManagerController::class, 'adsPage'])
+        ->name('workspaces.metaads.ads');
     Route::get('/workspaces/{workspace}/integrations/meta/health', [SyncHealthController::class, 'index'])
         ->name('workspaces.metaads.health');
     Route::get('/workspaces/{workspace}/integrations/meta/connect', [MetaOAuthController::class, 'redirect'])

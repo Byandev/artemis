@@ -6,6 +6,7 @@ import {
     PaginationState,
     RowSelectionState,
     SortingState,
+    VisibilityState,
     flexRender,
     getCoreRowModel,
     getSortedRowModel,
@@ -45,6 +46,8 @@ interface DataTableProps<TData, TValue> {
     onRowSelectionChange?: (selection: RowSelectionState) => void
     getRowId?: (row: TData, index: number) => string
     onRowClick?: (row: TData) => void
+    columnVisibility?: VisibilityState
+    onColumnVisibilityChange?: (state: VisibilityState) => void
 }
 
 export function DataTable<TData, TValue>({
@@ -57,6 +60,8 @@ export function DataTable<TData, TValue>({
     onRowSelectionChange,
     getRowId,
     onRowClick,
+    columnVisibility,
+    onColumnVisibilityChange,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
 
@@ -93,10 +98,17 @@ export function DataTable<TData, TValue>({
                 onRowSelectionChange(next)
             }
             : undefined,
+        onColumnVisibilityChange: onColumnVisibilityChange
+            ? (updater) => {
+                const next = typeof updater === 'function' ? updater(columnVisibility ?? {}) : updater
+                onColumnVisibilityChange(next)
+            }
+            : undefined,
         state: {
             sorting,
             pagination,
             ...(rowSelection !== undefined ? { rowSelection } : {}),
+            ...(columnVisibility !== undefined ? { columnVisibility } : {}),
         },
         manualSorting: true,
     })

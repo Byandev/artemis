@@ -28,10 +28,10 @@ class SyncCampaignsCommand extends Command
             return self::SUCCESS;
         }
 
-        foreach ($accounts as $account) {
+        foreach ($accounts as $index => $account) {
             $this->info("Dispatching campaigns sync for AdAccount #{$account->id} ({$account->meta_account_id})");
 
-            SyncCampaigns::dispatch($account);
+            SyncCampaigns::dispatch($account)->delay(now()->addSeconds($index * 5));
         }
 
         return self::SUCCESS;

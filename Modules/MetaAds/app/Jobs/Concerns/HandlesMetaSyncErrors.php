@@ -10,9 +10,12 @@ trait HandlesMetaSyncErrors
 {
     /**
      * Decide what to do with a sync exception:
-     *  - Rate-limit (Meta codes 4/17/32/613) → release with $rateLimitBackoff (default 5 min)
-     *  - Transient   (Meta codes 1/2)        → release with $transientBackoff   (default 60 s)
-     *  - Anything else                       → mark run as failed and rethrow
+     *  - Rate-limit (Meta codes 4/17/32/613/80000+) → release with Meta's own
+     *    estimated_time_to_regain_access if present, else exponential backoff
+     *    (min $rateLimitBackoff, doubled per attempt, capped at 30 min)
+     *  - Transient   (Meta codes 1/2)               → release with exponential
+     *    backoff (min $transientBackoff, capped at 5 min)
+     *  - Anything else                              → mark run as failed and rethrow
      */
     protected function handleSyncError(
         SyncRun $run,
@@ -21,24 +24,35 @@ trait HandlesMetaSyncErrors
         int $transientBackoff = 60,
     ): void {
         if ($e instanceof MetaGraphException && $e->isRateLimited()) {
-            $run->markRateLimited($e, $rateLimitBackoff, [
+            // Prefer Meta's own hint; otherwise exponential backoff with floor.
+            $attempts = max(1, $this->attempts());
+            $backoff = $e->resetSeconds
+                ?? min(1800, $rateLimitBackoff * (2 ** ($attempts - 1)));
+
+            $run->markRateLimited($e, $backoff, [
                 'error_code' => $e->errorCode,
                 'error_subcode' => $e->errorSubcode,
+                'reset_hint' => $e->resetSeconds,
+                'attempt' => $attempts,
             ]);
 
-            $this->release($rateLimitBackoff);
+            $this->release($backoff);
 
             return;
         }
 
         if ($e instanceof MetaGraphException && $e->isTransient()) {
-            $run->markRateLimited($e, $transientBackoff, [
+            $attempts = max(1, $this->attempts());
+            $backoff = min(300, $transientBackoff * (2 ** ($attempts - 1)));
+
+            $run->markRateLimited($e, $backoff, [
                 'error_code' => $e->errorCode,
                 'error_subcode' => $e->errorSubcode,
                 'transient' => true,
+                'attempt' => $attempts,
             ]);
 
-            $this->release($transientBackoff);
+            $this->release($backoff);
 
             return;
         }

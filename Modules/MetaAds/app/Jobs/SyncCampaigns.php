@@ -9,6 +9,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Modules\MetaAds\Jobs\Concerns\HandlesMetaSyncErrors;
+use Modules\MetaAds\Jobs\Concerns\SerializesPerAdAccount;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\Campaign;
 use Modules\MetaAds\Models\SyncRun;
@@ -17,7 +18,7 @@ use Throwable;
 
 class SyncCampaigns implements ShouldQueue
 {
-    use Dispatchable, HandlesMetaSyncErrors, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, HandlesMetaSyncErrors, InteractsWithQueue, Queueable, SerializesModels, SerializesPerAdAccount;
 
     public int $timeout = 600;
 
@@ -27,6 +28,8 @@ class SyncCampaigns implements ShouldQueue
 
     public function handle(): void
     {
+        sleep(2);
+
         $run = SyncRun::start(
             entityType: SyncRun::ENTITY_CAMPAIGNS,
             scopeType: AdAccount::class,
@@ -59,7 +62,7 @@ class SyncCampaigns implements ShouldQueue
                         'bid_strategy' => $row['bid_strategy'] ?? null,
                         'daily_budget' => $this->minorToMajor($row['daily_budget'] ?? null),
                         'lifetime_budget' => $this->minorToMajor($row['lifetime_budget'] ?? null),
-                        'start_time' => $row['start_time'] ?? null,
+                        'start_time' => $this->normalizeTimestamp($row['start_time'] ?? null),
                         'stop_time' => $row['stop_time'] ?? null,
                         'created_time' => $row['created_time'] ?? null,
                         'updated_time' => $row['updated_time'] ?? null,
@@ -83,5 +86,22 @@ class SyncCampaigns implements ShouldQueue
         }
 
         return ((int) $minor) / 100;
+    }
+
+    private function normalizeTimestamp(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            if (Carbon::parse($value)->getTimestamp() <= 0) {
+                return null;
+            }
+        } catch (Throwable) {
+            return null;
+        }
+
+        return $value;
     }
 }

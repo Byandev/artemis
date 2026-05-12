@@ -9,6 +9,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Modules\MetaAds\Jobs\Concerns\HandlesMetaSyncErrors;
+use Modules\MetaAds\Jobs\Concerns\SerializesPerAdAccount;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
 use Modules\MetaAds\Models\SyncRun;
@@ -17,7 +18,7 @@ use Throwable;
 
 class SyncAdSets implements ShouldQueue
 {
-    use Dispatchable, HandlesMetaSyncErrors, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, HandlesMetaSyncErrors, InteractsWithQueue, Queueable, SerializesModels, SerializesPerAdAccount;
 
     public int $timeout = 600;
 
@@ -27,6 +28,8 @@ class SyncAdSets implements ShouldQueue
 
     public function handle(): void
     {
+        sleep(2);
+
         $run = SyncRun::start(
             entityType: SyncRun::ENTITY_AD_SETS,
             scopeType: AdAccount::class,
@@ -42,7 +45,7 @@ class SyncAdSets implements ShouldQueue
 
             $client = $metaUser->graphClient();
 
-            $fields = 'id,name,campaign_id,status,effective_status,daily_budget,lifetime_budget,bid_strategy,optimization_goal,billing_event,targeting,start_time,end_time,created_time,updated_time';
+            $fields = 'id,name,campaign_id,status,effective_status,daily_budget,lifetime_budget,bid_strategy,optimization_goal,billing_event,targeting,promoted_object,start_time,end_time,created_time,updated_time';
 
             $count = 0;
 
@@ -51,11 +54,14 @@ class SyncAdSets implements ShouldQueue
                     continue;
                 }
 
+                $pageId = $row['promoted_object']['page_id'] ?? null;
+
                 AdSet::updateOrCreate(
                     ['id' => $row['id']],
                     [
                         'meta_ads_account_id' => $this->adAccount->id,
                         'meta_ads_campaign_id' => $row['campaign_id'],
+                        'meta_page_id' => $pageId,
                         'name' => $row['name'] ?? $row['id'],
                         'status' => $row['status'] ?? null,
                         'effective_status' => $row['effective_status'] ?? null,

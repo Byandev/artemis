@@ -13,6 +13,18 @@ return [
 
     'page_size' => (int) env('META_ADS_PAGE_SIZE', 100),
 
+    'throttle' => [
+        'soft_threshold' => (int) env('META_ADS_THROTTLE_SOFT', 75),
+        'soft_sleep_seconds' => (int) env('META_ADS_THROTTLE_SOFT_SLEEP', 10),
+        'hard_threshold' => (int) env('META_ADS_THROTTLE_HARD', 95),
+        'hard_sleep_seconds' => (int) env('META_ADS_THROTTLE_HARD_SLEEP', 60),
+
+        // Minimum seconds between successive requests on the same access token.
+        // Dev / Limited tier caps you at 60 score / 300s ≈ 12 calls/min, so 6s
+        // keeps you strictly under. Bump down once you're on Full Access.
+        'min_interval_seconds' => (int) env('META_ADS_MIN_INTERVAL', 6),
+    ],
+
     'oauth_scopes' => [
         'ads_read',
         'ads_management',

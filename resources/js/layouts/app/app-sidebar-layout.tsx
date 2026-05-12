@@ -18,7 +18,7 @@ export default function AppSidebarLayout({ children }: PropsWithChildren<{}>) {
                 {children}
             </AppContent>
             <SubscriptionExpiredModal />
-            <SyncingDataModal />
+            {/*<SyncingDataModal />*/}
         </AppShell>
     );
 }

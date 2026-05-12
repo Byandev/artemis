@@ -4,6 +4,7 @@ namespace Modules\MetaAds\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Bus;
 use Modules\MetaAds\Jobs\SyncAds;
 use Modules\MetaAds\Jobs\SyncAdSets;
 use Modules\MetaAds\Jobs\SyncCampaigns;
@@ -17,7 +18,8 @@ class SyncAllCommand extends Command
 {
     protected $signature = 'metaads:sync-all
         {--insights-days=7 : Number of days back from today to sync insights for}
-        {--skip-creatives : Skip the (heavy) creatives sync}';
+        {--skip-creatives : Skip the (heavy) creatives sync}
+        {--limited : Limited-tier safe mode: 1 insights day, skip creatives, chained per account}';
 
     protected $description = 'Dispatch a full sync (ad accounts, campaigns, ad sets, ads, creatives, insights) for every connected MetaUser.';
 
@@ -32,6 +34,10 @@ class SyncAllCommand extends Command
             return self::SUCCESS;
         }
 
+        $limited = (bool) $this->option('limited');
+        $skipCreatives = $limited || $this->option('skip-creatives');
+        $insightsDays = $limited ? 1 : (int) $this->option('insights-days');
+
         $jobs = 0;
 
         foreach ($metaUsers as $user) {
@@ -40,35 +46,35 @@ class SyncAllCommand extends Command
         }
         $this->info("Dispatched {$metaUsers->count()} ad-account syncs.");
 
-        $perAccount = 0;
-        foreach ($accounts as $account) {
-            SyncCampaigns::dispatch($account);
-            SyncAdSets::dispatch($account);
-            SyncAds::dispatch($account);
-
-            if (! $this->option('skip-creatives')) {
-                SyncCreatives::dispatch($account);
-            }
-
-            $perAccount++;
-        }
-        $entityJobsPerAccount = $this->option('skip-creatives') ? 3 : 4;
-        $jobs += $perAccount * $entityJobsPerAccount;
-        $this->info("Dispatched {$entityJobsPerAccount} entity syncs × {$perAccount} accounts.");
-
-        $days = (int) $this->option('insights-days');
+        // Chain entity + insights jobs per ad account so that within one
+        // account they run strictly sequentially — the next job only fires
+        // when the previous one finishes. Pairs with SerializesPerAdAccount
+        // (which is now per-MetaUser) to keep us strictly under the dev-tier
+        // 60-score-per-300s cap.
         $until = Carbon::today();
-        $insightJobs = 0;
+        foreach ($accounts as $account) {
+            $chain = [
+                new SyncCampaigns($account),
+                new SyncAdSets($account),
+                new SyncAds($account),
+            ];
 
-        for ($i = 0; $i < $days; $i++) {
-            $date = $until->copy()->subDays($i)->toDateString();
-            foreach ($accounts as $account) {
-                SyncInsights::dispatch($account, $date);
-                $insightJobs++;
+            if (! $skipCreatives) {
+                $chain[] = new SyncCreatives($account);
             }
+
+            for ($i = 0; $i < $insightsDays; $i++) {
+                $date = $until->copy()->subDays($i)->toDateString();
+                $chain[] = new SyncInsights($account, $date);
+            }
+
+            Bus::chain($chain)->dispatch();
+            $jobs += count($chain);
         }
-        $jobs += $insightJobs;
-        $this->info("Dispatched {$insightJobs} insights syncs ({$days} days × {$accounts->count()} accounts).");
+
+        $this->info("Chained syncs queued — entity({$accounts->count()}) + insights({$insightsDays} days)"
+            .($skipCreatives ? ' (creatives skipped)' : '')
+            .($limited ? ' [limited-tier mode]' : ''));
 
         $this->info("Total jobs queued: {$jobs}");
 
