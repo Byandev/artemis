@@ -196,8 +196,18 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'destroy'])->name('workspaces.api.optimization-rules.destroy');
 
     Route::put('/workspaces/{workspace:slug}/employees/{employee}', [CSRController::class, 'update'])->name('employees.update');
+    Route::get('/workspaces/{workspace}/csr/dashboard', [CSRController::class, 'dashboard'])->name('workspaces.csr.dashboard');
     Route::get('/workspaces/{workspace}/csr/management', [CSRController::class, 'index'])->name('workspaces.csr.index');
     Route::get('/workspaces/{workspace}/csr/analytics', [CSRController::class, 'analytics'])->name('workspaces.csr.analytics');
+
+    // CSR RMO Management (authenticated)
+    Route::get('/workspaces/{workspace}/csr/rmo-management', [ForDeliveryController::class, 'csrRmoManagement'])->name('workspaces.csr.rmo-management');
+    Route::get('/workspaces/{workspace}/csr/rmo-management/export', [ForDeliveryController::class, 'publicExport'])->name('workspaces.csr.rmo-management.export');
+    Route::post('/workspaces/{workspace}/csr/rmo-management/{id}', [ForDeliveryController::class, 'publicUpdateStatus'])->name('workspaces.csr.rmo-management.updateStatus');
+    Route::post('/workspaces/{workspace}/csr/rmo-management/{id}/assign', [ForDeliveryController::class, 'publicAssignUser'])->name('workspaces.csr.rmo-management.assign');
+    Route::post('/workspaces/{workspace}/csr/rmo-management/{id}/remove-assignee', [ForDeliveryController::class, 'publicRemoveAssignee'])->name('workspaces.csr.rmo-management.removeAssignee');
+    Route::post('/workspaces/{workspace}/csr/rmo-management/{id}/update-phones', [ForDeliveryController::class, 'publicUpdatePhones'])->name('workspaces.csr.rmo-management.updatePhones');
+    Route::get('/workspaces/{workspace}/csr/rmo-management/call-logs', [ForDeliveryController::class, 'callLogs'])->name('workspaces.csr.rmo-management.callLogs');
 
     // Checklist routes
     Route::get('/workspaces/{workspace}/checklist', [ChecklistController::class, 'index'])->name('workspaces.checklist.index');

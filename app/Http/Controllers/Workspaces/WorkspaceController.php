@@ -126,6 +126,10 @@ class WorkspaceController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
+        if ($workspace->csr_module_enabled && $request->user()->isCsrOf($workspace)) {
+            return redirect()->route('workspaces.csr.dashboard', $workspace);
+        }
+
         return Inertia::render('workspaces/dashboard/index', [
             'workspace' => $workspace->loadMissing([
                 'shops' => function ($query) {
