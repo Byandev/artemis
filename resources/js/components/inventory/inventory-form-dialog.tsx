@@ -1,9 +1,7 @@
 import { Workspace } from '@/types/models/Workspace';
 import { InventoryTransaction } from '@/types/models/InventoryTransaction';
-import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import DatePicker from '@/components/ui/date-picker';
 import { useForm } from '@inertiajs/react';
 import React, { useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
@@ -139,34 +137,18 @@ const InventoryFormDialog = ({ workspace, open, onOpenChange, inventory, items =
                                 <label className={labelClass}>
                                     Transaction Date <span className="text-red-400">*</span>
                                 </label>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            className="h-10 w-full justify-start border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! font-normal text-gray-800 shadow-none hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:hover:bg-zinc-800"
-                                        >
-                                            <span className="flex w-full items-center gap-2 overflow-hidden text-left">
-                                                <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400">
-                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
-                                                        <path d="M8 2v4M16 2v4M3 10h18M5 6h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" />
-                                                    </svg>
-                                                </span>
-                                                <span className={data.date ? 'truncate text-gray-800 dark:text-gray-100' : 'truncate text-gray-300 dark:text-gray-600'}>
-                                                    {data.date ? format(new Date(data.date), 'MMM d, yyyy') : 'Select date'}
-                                                </span>
-                                            </span>
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                            mode="single"
-                                            selected={data.date ? new Date(data.date) : undefined}
-                                            onSelect={(date) => setData('date', date ? format(date, 'yyyy-MM-dd') : '')}
-                                            initialFocus
-                                        />
-                                    </PopoverContent>
-                                </Popover>
+                                <DatePicker
+                                    id="inventory-transaction-date"
+                                    mode="single"
+                                    defaultDate={data.date || undefined}
+                                    onChange={(dates) => {
+                                        if (dates.length) {
+                                            setData('date', format(dates[0], 'yyyy-MM-dd'));
+                                        } else {
+                                            setData('date', '');
+                                        }
+                                    }}
+                                />
                                 {errors.date && <p className="text-[11px] text-red-500">{errors.date}</p>}
                             </div>
                             <div className="space-y-1.5">
