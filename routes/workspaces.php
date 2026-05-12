@@ -319,6 +319,8 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('workspaces.update-subscription');
         Route::put('/workspaces/{workspace}/modules', [AdminWorkspaceController::class, 'updateModules'])
             ->name('workspaces.update-modules');
+        Route::put('/workspaces/{workspace}/max-pages', [AdminWorkspaceController::class, 'updateMaxPages'])
+            ->name('workspaces.update-max-pages');
 
         // Metric Setting Controller
         Route::get('workspaces/{workspace}/metrics/edit', [MetricSettingController::class, 'edit'])
