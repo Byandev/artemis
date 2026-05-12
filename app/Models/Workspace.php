@@ -270,4 +270,26 @@ class Workspace extends Model
             'defaults' => $this->defaultMetrics(),
         ];
     }
+
+    public function pageLimit(): ?int
+    {
+        return $this->max_pages ?? $this->subscription?->plan?->page_limit;
+    }
+
+    public function pageLimitInfo(): array
+    {
+        $limit = $this->pageLimit();
+        $count = $this->pages()->count();
+
+        return [
+            'limit' => $limit,
+            'count' => $count,
+            'reached' => $limit !== null && $count >= $limit,
+        ];
+    }
+
+    public function hasReachedPageLimit(): bool
+    {
+        return $this->pageLimitInfo()['reached'];
+    }
 }
