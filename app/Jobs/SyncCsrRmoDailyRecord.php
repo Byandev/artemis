@@ -24,6 +24,8 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
     public function handle(): void
     {
         $date = $this->date;
+        $start = $date.' 00:00:00';
+        $end = $date.' 23:59:59';
 
         // total_called: pancake_order_for_delivery rows assigned to the user where status != 'PENDING'.
         $base = DB::table('pancake_order_for_delivery')
@@ -57,18 +59,34 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
                 COALESCE(SUM(cl.duration), 0) AS total_duration
             ');
 
+        // confirmed_orders: orders confirmed by this user on this date.
+        $confirmedAgg = DB::table('pancake_orders')
+            ->whereNotNull('confirmed_by')
+            ->whereBetween('confirmed_at', [$start, $end])
+            ->groupBy('workspace_id', 'confirmed_by')
+            ->selectRaw('
+                workspace_id,
+                confirmed_by AS pancake_user_id,
+                COUNT(*) AS confirmed_orders
+            ');
+
         $rows = DB::query()
             ->fromSub($base, 'base')
             ->leftJoinSub($callsAgg, 'calls', function ($join) {
                 $join->on('calls.workspace_id', '=', 'base.workspace_id')
                     ->on('calls.pancake_user_id', '=', 'base.pancake_user_id');
             })
+            ->leftJoinSub($confirmedAgg, 'confirmed', function ($join) {
+                $join->on('confirmed.workspace_id', '=', 'base.workspace_id')
+                    ->on('confirmed.pancake_user_id', '=', 'base.pancake_user_id');
+            })
             ->selectRaw('
                 base.workspace_id,
                 base.pancake_user_id,
                 base.total_called,
-                COALESCE(calls.total_calls, 0)    AS total_rmo_call_attempts,
-                COALESCE(calls.total_duration, 0) AS total_call_time
+                COALESCE(calls.total_calls, 0)       AS total_rmo_call_attempts,
+                COALESCE(calls.total_duration, 0)     AS total_call_time,
+                COALESCE(confirmed.confirmed_orders, 0) AS confirmed_orders
             ')
             ->get();
 
@@ -83,6 +101,7 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
                     'total_called' => (int) $row->total_called,
                     'total_call_time' => (int) $row->total_call_time,
                     'total_rmo_call_attempts' => (int) $row->total_rmo_call_attempts,
+                    'confirmed_orders' => (int) $row->confirmed_orders,
                 ]
             );
         }
