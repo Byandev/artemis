@@ -18,12 +18,7 @@ import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { omit } from 'lodash';
-import {
-    Edit,
-    MoreHorizontal,
-    Search,
-    Trash2,
-} from 'lucide-react';
+import { Edit, MoreHorizontal, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 interface ProductsProps {
@@ -44,10 +39,10 @@ const StatusBadge = ({ status }: { status: string }) => {
     return (
         <span
             className={clsx(
-                "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset",
+                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset',
                 isActive
-                    ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                    : "bg-slate-50 text-slate-700 ring-slate-200"
+                    ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                    : 'bg-slate-50 text-slate-700 ring-slate-200',
             )}
         >
             {status.toUpperCase()}
@@ -61,7 +56,9 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
     }, [query?.sort]);
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
-    const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+    const [productToDelete, setProductToDelete] = useState<Product | null>(
+        null,
+    );
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -70,7 +67,7 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
-                    page: searchValue ? 1 : query?.page ?? 1,
+                    page: searchValue ? 1 : (query?.page ?? 1),
                     per_page: query?.perPage ?? products.per_page,
                 },
                 {
@@ -116,7 +113,9 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Status'} />
             ),
-            cell: ({ row }) => <StatusBadge status={row.original.status || 'inactive'} />,
+            cell: ({ row }) => (
+                <StatusBadge status={row.original.status || 'inactive'} />
+            ),
         },
         {
             id: 'actions',
@@ -131,12 +130,17 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-36">
-                            <DropdownMenuItem onClick={() => handleEdit(product)}>
+                            <DropdownMenuItem
+                                onClick={() => handleEdit(product)}
+                            >
                                 <Edit />
                                 Edit
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem variant="destructive" onClick={() => setProductToDelete(product)}>
+                            <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => setProductToDelete(product)}
+                            >
                                 <Trash2 />
                                 Delete
                             </DropdownMenuItem>
@@ -153,7 +157,9 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
             headerActions={
                 <Button
                     size="sm"
-                    onClick={() => router.get(workspaces.products.create({ workspace }))}
+                    onClick={() =>
+                        router.get(workspaces.products.create({ workspace }))
+                    }
                 >
                     Add Product
                 </Button>
@@ -163,9 +169,9 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
 
             <div className="mb-3 flex items-center gap-2">
                 <div className="relative w-full max-w-xs">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                    <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                     <input
-                        className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-mono! text-[12px]! text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
+                        className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                         placeholder="Search product name or code..."
                         value={searchValue}
                         onChange={(e) => setSearchValue(e.target.value)}
@@ -173,7 +179,7 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
                 </div>
             </div>
 
-            <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+            <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                 <DataTable
                     columns={columns}
                     enableInternalPagination={false}
@@ -187,7 +193,10 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
                                 sort: params?.sort,
                                 'filter[search]': searchValue || undefined,
                                 page: params?.page ?? 1,
-                                per_page: params?.per_page ?? query?.perPage ?? products.per_page,
+                                per_page:
+                                    params?.per_page ??
+                                    query?.perPage ??
+                                    products.per_page,
                             },
                             {
                                 preserveState: false,
@@ -210,4 +219,3 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
 };
 
 export default Index;
-

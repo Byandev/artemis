@@ -29,7 +29,11 @@ export default function Register() {
     return (
         <AuthLayout
             title="Create an account"
-            description={invitation ? `Join ${invitation.workspace.name}` : 'Enter your details to get started'}
+            description={
+                invitation
+                    ? `Join ${invitation.workspace.name}`
+                    : 'Enter your details to get started'
+            }
         >
             <Head title="Register" />
 
@@ -38,9 +42,14 @@ export default function Register() {
                     <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-500" />
                     <p className="font-mono text-[11px] leading-relaxed text-gray-600 dark:text-gray-400">
                         You've been invited to join{' '}
-                        <span className="font-semibold text-gray-800 dark:text-gray-200">{invitation.workspace.name}</span>{' '}
-                        as a <span className="font-semibold text-gray-800 dark:text-gray-200">{invitation.role?.name}</span>.
-                        Create your account to accept.
+                        <span className="font-semibold text-gray-800 dark:text-gray-200">
+                            {invitation.workspace.name}
+                        </span>{' '}
+                        as a{' '}
+                        <span className="font-semibold text-gray-800 dark:text-gray-200">
+                            {invitation.role?.name}
+                        </span>
+                        . Create your account to accept.
                     </p>
                 </div>
             )}
@@ -54,14 +63,22 @@ export default function Register() {
                 {({ processing, errors }) => (
                     <>
                         {invitationToken && (
-                            <input type="hidden" name="invitation" value={invitationToken} />
+                            <input
+                                type="hidden"
+                                name="invitation"
+                                value={invitationToken}
+                            />
                         )}
 
                         <div className="space-y-4">
                             {/* Full name */}
                             <div className="space-y-1.5">
-                                <label htmlFor="name" className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                    Full name <span className="text-red-400">*</span>
+                                <label
+                                    htmlFor="name"
+                                    className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500"
+                                >
+                                    Full name{' '}
+                                    <span className="text-red-400">*</span>
                                 </label>
                                 <input
                                     id="name"
@@ -72,15 +89,23 @@ export default function Register() {
                                     tabIndex={1}
                                     autoComplete="name"
                                     placeholder="Juan dela Cruz"
-                                    className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                                    className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none placeholder:text-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                                 />
-                                {errors.name && <p className="font-mono text-[11px] text-red-500">{errors.name}</p>}
+                                {errors.name && (
+                                    <p className="font-mono text-[11px] text-red-500">
+                                        {errors.name}
+                                    </p>
+                                )}
                             </div>
 
                             {/* Email */}
                             <div className="space-y-1.5">
-                                <label htmlFor="email" className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                    Email address <span className="text-red-400">*</span>
+                                <label
+                                    htmlFor="email"
+                                    className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500"
+                                >
+                                    Email address{' '}
+                                    <span className="text-red-400">*</span>
                                 </label>
                                 <input
                                     id="email"
@@ -92,15 +117,23 @@ export default function Register() {
                                     placeholder="email@example.com"
                                     defaultValue={invitation?.email || ''}
                                     readOnly={!!invitation}
-                                    className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 read-only:opacity-60 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                                    className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none placeholder:text-gray-300 read-only:opacity-60 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                                 />
-                                {errors.email && <p className="font-mono text-[11px] text-red-500">{errors.email}</p>}
+                                {errors.email && (
+                                    <p className="font-mono text-[11px] text-red-500">
+                                        {errors.email}
+                                    </p>
+                                )}
                             </div>
 
                             {/* Password */}
                             <div className="space-y-1.5">
-                                <label htmlFor="password" className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                    Password <span className="text-red-400">*</span>
+                                <label
+                                    htmlFor="password"
+                                    className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500"
+                                >
+                                    Password{' '}
+                                    <span className="text-red-400">*</span>
                                 </label>
                                 <input
                                     id="password"
@@ -110,15 +143,23 @@ export default function Register() {
                                     tabIndex={3}
                                     autoComplete="new-password"
                                     placeholder="At least 8 characters"
-                                    className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                                    className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none placeholder:text-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                                 />
-                                {errors.password && <p className="font-mono text-[11px] text-red-500">{errors.password}</p>}
+                                {errors.password && (
+                                    <p className="font-mono text-[11px] text-red-500">
+                                        {errors.password}
+                                    </p>
+                                )}
                             </div>
 
                             {/* Confirm password */}
                             <div className="space-y-1.5">
-                                <label htmlFor="password_confirmation" className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                    Confirm password <span className="text-red-400">*</span>
+                                <label
+                                    htmlFor="password_confirmation"
+                                    className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500"
+                                >
+                                    Confirm password{' '}
+                                    <span className="text-red-400">*</span>
                                 </label>
                                 <input
                                     id="password_confirmation"
@@ -128,19 +169,67 @@ export default function Register() {
                                     tabIndex={4}
                                     autoComplete="new-password"
                                     placeholder="Re-enter your password"
-                                    className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                                    className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none placeholder:text-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                                 />
-                                {errors.password_confirmation && <p className="font-mono text-[11px] text-red-500">{errors.password_confirmation}</p>}
+                                {errors.password_confirmation && (
+                                    <p className="font-mono text-[11px] text-red-500">
+                                        {errors.password_confirmation}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Terms & Conditions */}
+                            <div className="space-y-1.5 pt-1">
+                                <label
+                                    htmlFor="terms_accepted"
+                                    className="flex cursor-pointer items-start gap-2.5 text-[12px] leading-relaxed text-gray-600 dark:text-gray-400"
+                                >
+                                    <input
+                                        id="terms_accepted"
+                                        type="checkbox"
+                                        name="terms_accepted"
+                                        value="1"
+                                        required
+                                        tabIndex={5}
+                                        className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer rounded border border-black/15 bg-stone-50 accent-emerald-600 transition-all outline-none focus:ring-2 focus:ring-emerald-500/15 dark:border-white/15 dark:bg-zinc-800"
+                                    />
+                                    <span>
+                                        I agree to the{' '}
+                                        <TextLink
+                                            href="/terms"
+                                            target="_blank"
+                                            className="text-[12px]!"
+                                        >
+                                            Terms &amp; Conditions
+                                        </TextLink>{' '}
+                                        and{' '}
+                                        <TextLink
+                                            href="/privacy"
+                                            target="_blank"
+                                            className="text-[12px]!"
+                                        >
+                                            Privacy Policy
+                                        </TextLink>
+                                        .
+                                    </span>
+                                </label>
+                                {errors.terms_accepted && (
+                                    <p className="font-mono text-[11px] text-red-500">
+                                        {errors.terms_accepted}
+                                    </p>
+                                )}
                             </div>
 
                             {/* Submit */}
                             <button
                                 type="submit"
-                                tabIndex={5}
+                                tabIndex={6}
                                 disabled={processing}
                                 className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-emerald-600 font-mono! text-[13px]! font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                             >
-                                {processing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                                {processing && (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                )}
                                 Create account
                             </button>
                         </div>
@@ -148,9 +237,17 @@ export default function Register() {
                         <p className="text-center font-mono text-[11px] text-gray-400 dark:text-gray-500">
                             Already have an account?{' '}
                             <TextLink
-                                href={invitationToken ? login({ query: { invitation: invitationToken } }).url : login().url}
+                                href={
+                                    invitationToken
+                                        ? login({
+                                              query: {
+                                                  invitation: invitationToken,
+                                              },
+                                          }).url
+                                        : login().url
+                                }
                                 className="font-mono! text-[11px]!"
-                                tabIndex={6}
+                                tabIndex={7}
                             >
                                 Log in
                             </TextLink>

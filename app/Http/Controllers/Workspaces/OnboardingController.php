@@ -8,6 +8,7 @@ use App\Models\Shop;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\Workspace;
+use App\Services\PostHogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -79,7 +80,7 @@ class OnboardingController extends Controller
         // Create free trial subscription if none exists
         if (! $workspace->subscription) {
             $trialPlan = SubscriptionPlan::where('code', SubscriptionPlan::CODE_FREE_TRIAL)->first();
-            $trialDays = $trialPlan?->trial_days ?? 14;
+            $trialDays = $trialPlan?->trial_days ?? 30;
 
             Subscription::create([
                 'workspace_id' => $workspace->id,
@@ -96,6 +97,13 @@ class OnboardingController extends Controller
         dispatch(new FetchPageOrders($page, 1, $now->copy()->subMonth()->unix(), $now->unix()))->onQueue('pancake');
         dispatch(new FetchShopCustomers($shop, 1, $now->copy()->subMonth()->unix(), $now->unix()))->onQueue('pancake');
         dispatch(new FetchShopUsers($shop))->onQueue('pancake');
+
+        (new PostHogService)->capture((string) $request->user()->id, 'onboarding_page_connected', [
+            'workspace_id' => $workspace->id,
+            'page_id' => $page->id,
+            'page_name' => $page->name,
+            'shop_id' => $shop->id,
+        ]);
 
         return back()->with('success', 'Page connected! Syncing your data...');
     }
@@ -121,7 +129,7 @@ class OnboardingController extends Controller
         // Create free trial subscription if none exists
         if (! $workspace->subscription) {
             $trialPlan = SubscriptionPlan::where('code', SubscriptionPlan::CODE_FREE_TRIAL)->first();
-            $trialDays = $trialPlan?->trial_days ?? 14;
+            $trialDays = $trialPlan?->trial_days ?? 30;
 
             Subscription::create([
                 'workspace_id' => $workspace->id,

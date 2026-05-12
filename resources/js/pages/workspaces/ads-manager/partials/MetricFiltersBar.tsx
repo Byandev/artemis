@@ -1,4 +1,3 @@
-
 import { MetricFilterSection } from './components/MetricFilterSection';
 import { SearchAndFiltersRow } from './components/SearchAndFiltersRow';
 import { useMetricFilters } from './hooks/useMetricFilters';
@@ -29,7 +28,7 @@ export const MetricFiltersBar = ({
     onMetricsChange,
     onMetricFiltersChange,
     onClearFilters,
-    searchPlaceholder = "Search...",
+    searchPlaceholder = 'Search...',
 }: MetricFiltersBarProps) => {
     const {
         formState,
@@ -45,7 +44,12 @@ export const MetricFiltersBar = ({
         handleCancelEdit,
     } = useMetricFilters(metricFilters, onMetricFiltersChange);
 
-    const hasActiveFilters = !!(searchValue || statusFilter || metricFilters.length > 0 || selectedMetrics.length > 0);
+    const hasActiveFilters = !!(
+        searchValue ||
+        statusFilter ||
+        metricFilters.length > 0 ||
+        selectedMetrics.length > 0
+    );
 
     return (
         <div className="flex flex-col gap-3 rounded-t-xl border border-b-0 border-gray-100 px-3 py-3 sm:px-4 sm:py-4">
@@ -58,7 +62,7 @@ export const MetricFiltersBar = ({
                 searchPlaceholder={searchPlaceholder}
                 onSearchChange={onSearchChange}
                 onStatusChange={onStatusChange}
-                onMetricsChange={onMetricsChange || (() => { })}
+                onMetricsChange={onMetricsChange || (() => {})}
                 onClearFilters={onClearFilters}
             />
 

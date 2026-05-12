@@ -15,7 +15,7 @@ enum Permission: string
     case ViewRoles = 'View Roles';
     case CreateRoles = 'Create Roles';
     case EditRoles = 'Edit Roles';
-    case DeleteRoles = 'Delete Roles';
+    case DeleteRoles = 'Archive Roles';
     case ManageRolePermissions = 'Manage Role Permissions';
 
     // Pages
@@ -84,6 +84,10 @@ enum Permission: string
     case CreateFinanceRemittances = 'Create Finance Remittances';
     case EditFinanceRemittances = 'Edit Finance Remittances';
     case DeleteFinanceRemittances = 'Delete Finance Remittances';
+
+    // Pancake
+    case ViewCourierShipments = 'View Courier Shipments';
+    case ImportCourierShipments = 'Import Courier Shipments';
 
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
@@ -161,6 +165,9 @@ enum Permission: string
             self::CreateFinanceRemittances,
             self::EditFinanceRemittances,
             self::DeleteFinanceRemittances => 'Finance',
+
+            self::ViewCourierShipments,
+            self::ImportCourierShipments => 'Pancake',
 
             self::EditWorkspaceSettings,
             self::ManageApiKeys => 'Settings',

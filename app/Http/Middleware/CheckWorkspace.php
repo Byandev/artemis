@@ -18,27 +18,55 @@ class CheckWorkspace
     {
         $workspace_id = $request->header('X-Workspace-Id');
 
+        // Fallback to route-bound workspace for URL-scoped routes.
         if (! $workspace_id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You dont have access to this resource.',
-            ], Response::HTTP_FORBIDDEN);
+            $routeWorkspace = $request->route('workspace');
+
+            if ($routeWorkspace instanceof Workspace) {
+                $workspace_id = $routeWorkspace->id;
+            } elseif (! empty($routeWorkspace)) {
+                $workspace_id = $routeWorkspace;
+            }
+        }
+
+        // Fallback to the user's active workspace in session.
+        if (! $workspace_id) {
+            $workspace_id = session('current_workspace_id');
+        }
+
+        if (! $workspace_id) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You do not have permission to view this page.',
+                ], Response::HTTP_FORBIDDEN);
+            }
+
+            abort(Response::HTTP_FORBIDDEN);
         }
 
         $workspace = Workspace::find($workspace_id);
 
         if (! $workspace) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You dont have access to this resource.',
-            ], Response::HTTP_FORBIDDEN);
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You do not have permission to view this page.',
+                ], Response::HTTP_FORBIDDEN);
+            }
+
+            abort(Response::HTTP_FORBIDDEN);
         }
 
         if (! $request->user()->isMemberOf($workspace)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You dont have access to this resource.',
-            ], Response::HTTP_FORBIDDEN);
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You do not have permission to view this page.',
+                ], Response::HTTP_FORBIDDEN);
+            }
+
+            abort(Response::HTTP_FORBIDDEN);
         }
 
         $request->merge(['workspace' => $workspace]);

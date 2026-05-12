@@ -22,7 +22,7 @@ return new class extends Migration
             $table->unsignedBigInteger('impressions');
             $table->float('spend');
             $table->float('sales');
-            $table->unique(['ad_id', 'date']);
+            $table->primary(['ad_id', 'date']);
         });
     }
 

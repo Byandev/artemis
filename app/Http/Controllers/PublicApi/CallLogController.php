@@ -5,6 +5,7 @@ namespace App\Http\Controllers\PublicApi;
 use App\Http\Controllers\Controller;
 use App\Models\CallLog;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Pancake\Models\OrderForDelivery;
@@ -42,12 +43,19 @@ class CallLogController extends Controller
 
         }, $request->input('call_logs'));
 
+        $inserted = 0;
+
         foreach (array_chunk($rows, 500) as $chunk) {
-            CallLog::insert($chunk);
+            $inserted += CallLog::upsert(
+                $chunk,
+                ['workspace_id', 'user_id', 'phone_number', 'call_date', 'call_time'],
+                ['type', 'duration', 'updated_at']
+            );
         }
 
         return response()->json([
             'total' => count($rows),
+            'synced' => $inserted,
         ]);
     }
 
@@ -76,6 +84,12 @@ class CallLogController extends Controller
         $totalTalkTime = CallLog::where('workspace_id', $workspace->id)
             ->where('user_id', $request->input('user_id'))
             ->whereDate('call_date', $date)
+            ->whereExists(function ($query) use ($workspace, $date) {
+                $query->from('pancake_order_for_delivery')
+                    ->where('pancake_order_for_delivery.workspace_id', $workspace->id)
+                    ->whereDate('pancake_order_for_delivery.delivery_date', $date)
+                    ->whereRaw('(pancake_order_for_delivery.customer_phone = call_logs.phone_number OR pancake_order_for_delivery.rider_phone = call_logs.phone_number)');
+            })
             ->sum('duration');
 
         return response()->json([
@@ -123,7 +137,7 @@ class CallLogController extends Controller
                 'phone_number' => $r->phone_number,
                 'type' => $r->type,
                 'duration' => (int) $r->duration,
-                'call_date' => $r->call_date instanceof \Carbon\CarbonInterface ? $r->call_date->toDateString() : (string) $r->call_date,
+                'call_date' => $r->call_date instanceof CarbonInterface ? $r->call_date->toDateString() : (string) $r->call_date,
                 'call_time' => (string) $r->call_time,
             ]);
 

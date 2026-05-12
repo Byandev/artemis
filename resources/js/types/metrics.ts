@@ -33,7 +33,9 @@ export type MetricKey =
     | 'repeatCustomerRatio'
     | 'retention30dRateCohort'
     | 'retention60dRateCohort'
-    | 'retention90dRateCohort';
+    | 'retention90dRateCohort'
+    | 'newCustomerCount'
+    | 'allCustomerConversionRate';
 
 export type MetricGroupKey =
     | 'revenueVolume'
@@ -49,7 +51,7 @@ export type MetricConfig = {
     description: string;
     formatter: (value: number) => string;
     icon?: LucideIcon | null;
-    reverse?: boolean
+    reverse?: boolean;
 };
 
 export const metricConfigs: MetricConfig[] = [
@@ -57,7 +59,8 @@ export const metricConfigs: MetricConfig[] = [
         key: 'totalSales',
         groupKey: 'revenueVolume',
         name: 'Total Sales',
-        description: 'Total revenue earned from all orders in the selected period.',
+        description:
+            'Total revenue earned from all orders in the selected period.',
         formatter: currencyFormatter,
     },
     {
@@ -71,21 +74,24 @@ export const metricConfigs: MetricConfig[] = [
         key: 'uniqueCustomerCount',
         groupKey: 'revenueVolume',
         name: 'Unique Customers',
-        description: 'How many different customers placed at least one order in the selected period.',
+        description:
+            'How many different customers placed at least one order in the selected period.',
         formatter: numberFormatter,
     },
     {
         key: 'aov',
         groupKey: 'revenueVolume',
         name: 'AOV',
-        description: 'On average, how much does a customer spend per order in the selected period.',
+        description:
+            'On average, how much does a customer spend per order in the selected period.',
         formatter: currencyFormatter,
     },
     {
         key: 'averageDaysFromConfirmedToShipped',
         groupKey: 'fulfillmentLeadTime',
         name: 'Ave. Confirmed - Shipped',
-        description: 'On average, how many days it takes to ship an order after it is confirmed.',
+        description:
+            'On average, how many days it takes to ship an order after it is confirmed.',
         formatter: (value: number) => `${value} days`,
         reverse: true,
     },
@@ -93,7 +99,8 @@ export const metricConfigs: MetricConfig[] = [
         key: 'averageDaysFromConfirmedToFirstAttempt',
         groupKey: 'fulfillmentLeadTime',
         name: 'Ave. Confirmed - 1st Delivery',
-        description: 'On average, how many days it takes from confirming an order to the courier\'s first delivery attempt.',
+        description:
+            "On average, how many days it takes from confirming an order to the courier's first delivery attempt.",
         formatter: (value: number) => `${value} days`,
         reverse: true,
     },
@@ -101,7 +108,8 @@ export const metricConfigs: MetricConfig[] = [
         key: 'averageDaysFromShippedToFirstAttempt',
         groupKey: 'fulfillmentLeadTime',
         name: 'Ave. Shipped - 1st Delivery',
-        description: 'On average, how many days it takes from shipping to the courier\'s first delivery attempt.',
+        description:
+            "On average, how many days it takes from shipping to the courier's first delivery attempt.",
         formatter: (value: number) => `${value} days`,
         reverse: true,
     },
@@ -109,7 +117,8 @@ export const metricConfigs: MetricConfig[] = [
         key: 'averageDaysFromShippedToDelivered',
         groupKey: 'fulfillmentLeadTime',
         name: 'Ave. Shipped - Delivered',
-        description: 'On average, how many days it takes for a package to be delivered after it is shipped.',
+        description:
+            'On average, how many days it takes for a package to be delivered after it is shipped.',
         formatter: (value: number) => `${value} days`,
         reverse: true,
     },
@@ -117,7 +126,8 @@ export const metricConfigs: MetricConfig[] = [
         key: 'averageDaysFromConfirmedToDelivered',
         groupKey: 'fulfillmentLeadTime',
         name: 'Ave. Confirmed - Delivered',
-        description: 'On average, how many days it takes from confirming an order to it being delivered to the customer.',
+        description:
+            'On average, how many days it takes from confirming an order to it being delivered to the customer.',
         formatter: (value: number) => `${value} days`,
         reverse: true,
     },
@@ -125,7 +135,8 @@ export const metricConfigs: MetricConfig[] = [
         key: 'averageDaysFromReturningToReturned',
         groupKey: 'fulfillmentLeadTime',
         name: 'Ave. Returning - Returned',
-        description: 'On average, how many days it takes for a return to be completed after it is initiated.',
+        description:
+            'On average, how many days it takes for a return to be completed after it is initiated.',
         formatter: (value: number) => `${value} days`,
         reverse: true,
     },
@@ -133,21 +144,24 @@ export const metricConfigs: MetricConfig[] = [
         key: 'deliveredAmount',
         groupKey: 'deliveryOutcomes',
         name: 'Delivered Amount',
-        description: 'Total value of orders that were successfully delivered in the selected period.',
+        description:
+            'Total value of orders that were successfully delivered in the selected period.',
         formatter: currencyFormatter,
     },
     {
         key: 'returningAmount',
         groupKey: 'deliveryOutcomes',
         name: 'Entered Returning Amount',
-        description: 'Total value of orders that entered the returning state in the selected period.',
+        description:
+            'Total value of orders that entered the returning state in the selected period.',
         formatter: currencyFormatter,
     },
     {
         key: 'returnedAmount',
         groupKey: 'deliveryOutcomes',
         name: 'Returned Amount',
-        description: 'Total value of orders that have been returned to the seller in the selected period.',
+        description:
+            'Total value of orders that have been returned to the seller in the selected period.',
         formatter: currencyFormatter,
     },
     {
@@ -163,14 +177,16 @@ export const metricConfigs: MetricConfig[] = [
         key: 'repeatOrderRatio',
         groupKey: 'customerQualityRetention',
         name: 'Repeat Order Ratio',
-        description: 'Out of all orders in the selected period, what percentage were placed by repeat customers.',
+        description:
+            'Out of all orders in the selected period, what percentage were placed by repeat customers.',
         formatter: percentageFormatter,
     },
     {
         key: 'repeatCustomerRatio',
         groupKey: 'customerQualityRetention',
         name: 'Repeat Customer Ratio',
-        description: 'Out of all unique customers in the selected period, what percentage have ordered more than once.',
+        description:
+            'Out of all unique customers in the selected period, what percentage have ordered more than once.',
         formatter: percentageFormatter,
     },
     {
@@ -186,7 +202,8 @@ export const metricConfigs: MetricConfig[] = [
         key: 'avgLifetimeValue',
         groupKey: 'customerQualityRetention',
         name: 'Average Lifetime Value',
-        description: 'On average, how much a customer has spent in total across all their orders.',
+        description:
+            'On average, how much a customer has spent in total across all their orders.',
         formatter: currencyFormatter,
     },
 
@@ -194,14 +211,16 @@ export const metricConfigs: MetricConfig[] = [
         key: 'deliveredAvgCustomerRts',
         groupKey: 'deliveryQualitySignals',
         name: 'Delivered Avg Customer RTS',
-        description: 'For orders that were delivered, what is the average RTS history of those customers. Lower is better.',
+        description:
+            'For orders that were delivered, what is the average RTS history of those customers. Lower is better.',
         formatter: percentageFormatter,
     },
     {
         key: 'returnedAvgCustomerRts',
         groupKey: 'deliveryQualitySignals',
         name: 'Returned Avg Customer RTS',
-        description: 'For orders that were returned, what is the average RTS history of those customers. Higher means riskier buyers.',
+        description:
+            'For orders that were returned, what is the average RTS history of those customers. Higher means riskier buyers.',
         formatter: percentageFormatter,
         reverse: true,
     },
@@ -209,7 +228,8 @@ export const metricConfigs: MetricConfig[] = [
         key: 'deliveredAvgDeliveryAttempts',
         groupKey: 'deliveryQualitySignals',
         name: 'Delivered Avg Delivery Attempts',
-        description: 'For orders that were delivered, how many delivery attempts it took on average.',
+        description:
+            'For orders that were delivered, how many delivery attempts it took on average.',
         formatter: numberFormatter,
         reverse: true,
     },
@@ -217,7 +237,8 @@ export const metricConfigs: MetricConfig[] = [
         key: 'returnedAvgDeliveryAttempts',
         groupKey: 'deliveryQualitySignals',
         name: 'Returned Avg Delivery Attempts',
-        description: 'For orders that were returned, how many delivery attempts were made before giving up.',
+        description:
+            'For orders that were returned, how many delivery attempts were made before giving up.',
         formatter: numberFormatter,
         reverse: true,
     },
@@ -225,44 +246,66 @@ export const metricConfigs: MetricConfig[] = [
         key: 'repeatCustomerOrderCount',
         groupKey: 'customerQualityRetention',
         name: 'Repeat Unique Customers',
-        description: 'How many customers ordered in the selected period and have placed 2 or more orders in total up to that point.',
+        description:
+            'How many customers ordered in the selected period and have placed 2 or more orders in total up to that point.',
         formatter: numberFormatter,
     },
     {
         key: 'retention30dRateCohort',
         groupKey: 'customerQualityRetention',
         name: '30-Day Retention Rate',
-        description: 'Of customers who placed their first order 30–60 days ago, what percentage came back and ordered again within 30 days. Always shows a complete, up-to-date result.',
+        description:
+            'Of customers who placed their first order 30–60 days ago, what percentage came back and ordered again within 30 days. Always shows a complete, up-to-date result.',
         formatter: percentageFormatter,
     },
     {
         key: 'retention60dRateCohort',
         groupKey: 'customerQualityRetention',
         name: '60-Day Retention Rate',
-        description: 'Of customers who placed their first order 60–120 days ago, what percentage came back and ordered again within 60 days. Always shows a complete, up-to-date result.',
+        description:
+            'Of customers who placed their first order 60–120 days ago, what percentage came back and ordered again within 60 days. Always shows a complete, up-to-date result.',
         formatter: percentageFormatter,
     },
     {
         key: 'retention90dRateCohort',
         groupKey: 'customerQualityRetention',
         name: '90-Day Retention Rate',
-        description: 'Of customers who placed their first order 90–180 days ago, what percentage came back and ordered again within 90 days. Always shows a complete, up-to-date result.',
+        description:
+            'Of customers who placed their first order 90–180 days ago, what percentage came back and ordered again within 90 days. Always shows a complete, up-to-date result.',
         formatter: percentageFormatter,
     },
-    {
-        key: 'totalForDeliveryCount',
-        groupKey: 'deliveryOutcomes',
-        name: 'For Delivery Count',
-        description: 'How many orders are currently out for delivery in the selected period.',
-        formatter: numberFormatter,
-    },
-    {
-        key: 'totalForDeliveryAmount',
-        groupKey: 'deliveryOutcomes',
-        name: 'For Delivery Amount',
-        description: 'Total value of orders currently out for delivery in the selected period.',
-        formatter: currencyFormatter,
-    },
+    // {
+    //     key: 'totalForDeliveryCount',
+    //     groupKey: 'deliveryOutcomes',
+    //     name: 'For Delivery Count',
+    //     description:
+    //         'How many orders are currently out for delivery in the selected period.',
+    //     formatter: numberFormatter,
+    // },
+    // {
+    //     key: 'totalForDeliveryAmount',
+    //     groupKey: 'deliveryOutcomes',
+    //     name: 'For Delivery Amount',
+    //     description:
+    //         'Total value of orders currently out for delivery in the selected period.',
+    //     formatter: currencyFormatter,
+    // },
+    // {
+    //     key: 'newCustomerCount',
+    //     groupKey: 'revenueVolume',
+    //     name: 'New Customer Count',
+    //     description:
+    //         'How many new customers were added (first interaction with a page) in the selected period.',
+    //     formatter: numberFormatter,
+    // },
+    // {
+    //     key: 'allCustomerConversionRate',
+    //     groupKey: 'revenueVolume',
+    //     name: 'All Customer Conversion Rate',
+    //     description:
+    //         'Out of all customers active in the selected period, what percentage placed a confirmed order.',
+    //     formatter: percentageFormatter,
+    // },
 ];
 
 export const metricGroups = [

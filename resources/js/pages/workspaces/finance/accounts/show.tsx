@@ -1,6 +1,18 @@
 import PageHeader from '@/components/common/PageHeader';
 import { FinanceDeleteDialog } from '@/components/finance/delete-dialog';
-import { TransactionFormDialog, FinanceTransaction } from '@/components/finance/transaction-form-dialog';
+import {
+    SUB_CATEGORY_LABEL,
+    SubCategory,
+} from '@/components/finance/sub-category';
+import {
+    FinanceTransaction,
+    TransactionFormDialog,
+} from '@/components/finance/transaction-form-dialog';
+import {
+    TRANSACTION_TYPE_LABEL,
+    TRANSACTION_TYPE_STYLE,
+    TransactionType,
+} from '@/components/finance/transaction-type';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -9,7 +21,6 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
-import { SUB_CATEGORY_LABEL, SubCategory } from '@/components/finance/sub-category';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
@@ -30,7 +41,7 @@ interface Txn {
     date: string;
     description: string;
     type: 'in' | 'out';
-    transaction_type: 'funds' | 'profit_share' | 'expenses' | 'transfer' | 'remittance' | null;
+    transaction_type: TransactionType | null;
     amount: number | string;
     running_balance: number | string | null;
     sub_category: SubCategory | null;
@@ -44,17 +55,17 @@ interface Props {
     transactions: Txn[];
 }
 
-const fmt = (v: number | string) => Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (v: number | string) =>
+    Number(v).toLocaleString('en-PH', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
 
-const TXN_TYPE_STYLE: Record<string, { label: string; cls: string }> = {
-    funds: { label: 'funds', cls: 'bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400' },
-    profit_share: { label: 'profit share', cls: 'bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400' },
-    expenses: { label: 'expenses', cls: 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400' },
-    transfer: { label: 'transfer', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-500/10 dark:text-slate-300' },
-    remittance: { label: 'remittance', cls: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' },
-};
-
-export default function AccountShow({ workspace, account, transactions }: Props) {
+export default function AccountShow({
+    workspace,
+    account,
+    transactions,
+}: Props) {
     const [createOpen, setCreateOpen] = useState(false);
     const [editing, setEditing] = useState<FinanceTransaction | null>(null);
     const [toDelete, setToDelete] = useState<Txn | null>(null);
@@ -71,19 +82,27 @@ export default function AccountShow({ workspace, account, transactions }: Props)
             running += t.type === 'in' ? Number(t.amount) : -Number(t.amount);
             computed.set(t.id, running);
         }
-        return transactions.map(t => ({
+        return transactions.map((t) => ({
             ...t,
-            display_balance: t.running_balance != null ? Number(t.running_balance) : (computed.get(t.id) ?? running),
+            display_balance:
+                t.running_balance != null
+                    ? Number(t.running_balance)
+                    : (computed.get(t.id) ?? running),
         }));
     }, [transactions, account.opening_balance]);
 
-    const currentBalance = rows.length ? rows[0].display_balance : Number(account.opening_balance);
+    const currentBalance = rows.length
+        ? rows[0].display_balance
+        : Number(account.opening_balance);
 
     return (
         <AppLayout>
             <Head title={`${workspace.name} - ${account.name}`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <Link href={`${base}/accounts`} className="mb-3 inline-flex items-center gap-1 text-[12px] text-gray-500 hover:text-gray-800 dark:text-gray-400">
+                <Link
+                    href={`${base}/accounts`}
+                    className="mb-3 inline-flex items-center gap-1 text-[12px] text-gray-500 hover:text-gray-800 dark:text-gray-400"
+                >
                     <ArrowLeft className="h-3.5 w-3.5" /> Back to Accounts
                 </Link>
 
@@ -103,61 +122,155 @@ export default function AccountShow({ workspace, account, transactions }: Props)
                     <table className="w-full text-[12px]">
                         <thead>
                             <tr className="border-b border-black/6 dark:border-white/6">
-                                {['Date', 'Description', 'Sub Category', 'Credit', 'Debit', 'Balance', ''].map((h, i) => (
-                                    <th key={i} className={`px-4 py-2.5 font-mono text-[10px] font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600 ${i >= 3 && i <= 5 ? 'text-right' : 'text-left'}`}>{h}</th>
+                                {[
+                                    'Date',
+                                    'Description',
+                                    'Sub Category',
+                                    'Credit',
+                                    'Debit',
+                                    'Balance',
+                                    '',
+                                ].map((h, i) => (
+                                    <th
+                                        key={i}
+                                        className={`px-4 py-2.5 font-mono text-[10px] font-medium tracking-wider text-gray-300 uppercase dark:text-gray-600 ${i >= 3 && i <= 5 ? 'text-right' : 'text-left'}`}
+                                    >
+                                        {h}
+                                    </th>
                                 ))}
                             </tr>
                         </thead>
                         <tbody>
                             {rows.length === 0 && (
-                                <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">No transactions yet.</td></tr>
+                                <tr>
+                                    <td
+                                        colSpan={7}
+                                        className="px-4 py-10 text-center text-gray-400"
+                                    >
+                                        No transactions yet.
+                                    </td>
+                                </tr>
                             )}
                             {rows.map((r) => {
-                                const s = r.transaction_type ? TXN_TYPE_STYLE[r.transaction_type] : TXN_TYPE_STYLE.funds;
+                                const s = r.transaction_type
+                                    ? (TRANSACTION_TYPE_STYLE[
+                                          r.transaction_type as TransactionType
+                                      ] ?? TRANSACTION_TYPE_STYLE.funds)
+                                    : TRANSACTION_TYPE_STYLE.funds;
+                                const label = r.transaction_type
+                                    ? (TRANSACTION_TYPE_LABEL[
+                                          r.transaction_type as TransactionType
+                                      ] ?? r.transaction_type)
+                                    : 'funds';
                                 return (
-                                    <tr key={r.id} className="border-b border-black/6 last:border-0 hover:bg-stone-50 dark:border-white/6 dark:hover:bg-white/2">
-                                        <td className="px-4 py-2.5 font-mono text-[11px] text-gray-600 dark:text-gray-400">{String(r.date).slice(0, 10)}</td>
+                                    <tr
+                                        key={r.id}
+                                        className="border-b border-black/6 last:border-0 hover:bg-stone-50 dark:border-white/6 dark:hover:bg-white/2"
+                                    >
+                                        <td className="px-4 py-2.5 font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                                            {String(r.date).slice(0, 10)}
+                                        </td>
                                         <td className="px-4 py-2.5 text-gray-800 dark:text-gray-200">
-                                            <div className="max-w-[320px] truncate" title={r.description}>{r.description}</div>
+                                            <div
+                                                className="max-w-[320px] truncate"
+                                                title={r.description}
+                                            >
+                                                {r.description}
+                                            </div>
                                             {r.remittance && (
-                                                <Link href={`${base}/remittances/${r.remittance.id}`} className="block max-w-[320px] truncate text-[10px] text-gray-400 hover:text-emerald-600">
-                                                    SOA {r.remittance.soa_number} · {r.remittance.courier}
+                                                <Link
+                                                    href={`${base}/remittances/${r.remittance.id}`}
+                                                    className="block max-w-[320px] truncate text-[10px] text-gray-400 hover:text-emerald-600"
+                                                >
+                                                    SOA{' '}
+                                                    {r.remittance.soa_number} ·{' '}
+                                                    {r.remittance.courier}
                                                 </Link>
                                             )}
                                         </td>
                                         <td className="px-4 py-2.5">
                                             <div className="flex flex-col gap-1">
                                                 {r.sub_category && (
-                                                    <span className="inline-flex w-fit items-center rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] uppercase text-gray-500 dark:bg-zinc-800 dark:text-gray-400">{SUB_CATEGORY_LABEL[r.sub_category]}</span>
+                                                    <span className="inline-flex w-fit items-center rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] text-gray-500 uppercase dark:bg-zinc-800 dark:text-gray-400">
+                                                        {
+                                                            SUB_CATEGORY_LABEL[
+                                                                r.sub_category
+                                                            ]
+                                                        }
+                                                    </span>
                                                 )}
                                                 {r.transaction_type && (
-                                                    <span className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${s.cls}`}>{s.label}</span>
+                                                    <span
+                                                        className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${s.cls}`}
+                                                    >
+                                                        {label}
+                                                    </span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-4 py-2.5 text-right font-mono text-[12px] text-emerald-600 dark:text-emerald-400">{r.type === 'in' ? fmt(r.amount) : ''}</td>
-                                        <td className="px-4 py-2.5 text-right font-mono text-[12px] text-red-500 dark:text-red-400">{r.type === 'out' ? fmt(r.amount) : ''}</td>
-                                        <td className="px-4 py-2.5 text-right font-mono text-[12px] font-medium text-gray-700 dark:text-gray-200">{fmt(r.display_balance)}</td>
+                                        <td className="px-4 py-2.5 text-right font-mono text-[12px] text-emerald-600 dark:text-emerald-400">
+                                            {r.type === 'in'
+                                                ? fmt(r.amount)
+                                                : ''}
+                                        </td>
+                                        <td className="px-4 py-2.5 text-right font-mono text-[12px] text-red-500 dark:text-red-400">
+                                            {r.type === 'out'
+                                                ? fmt(r.amount)
+                                                : ''}
+                                        </td>
+                                        <td className="px-4 py-2.5 text-right font-mono text-[12px] font-medium text-gray-700 dark:text-gray-200">
+                                            {fmt(r.display_balance)}
+                                        </td>
                                         <td className="px-4 py-2.5">
                                             <div className="flex justify-center">
                                                 <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
+                                                    <DropdownMenuTrigger
+                                                        asChild
+                                                    >
                                                         <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800">
                                                             <MoreHorizontal className="h-3.5 w-3.5" />
                                                         </button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-36">
-                                                        <DropdownMenuItem onClick={() => setEditing({
-                                                            id: r.id, account_id: account.id, date: String(r.date).slice(0, 10),
-                                                            description: r.description, type: r.type,
-                                                            transaction_type: r.transaction_type,
-                                                            amount: r.amount, sub_category: r.sub_category, notes: r.notes,
-                                                        })}>
-                                                            <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                                                    <DropdownMenuContent
+                                                        align="end"
+                                                        className="w-36"
+                                                    >
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                setEditing({
+                                                                    id: r.id,
+                                                                    account_id:
+                                                                        account.id,
+                                                                    date: String(
+                                                                        r.date,
+                                                                    ).slice(
+                                                                        0,
+                                                                        10,
+                                                                    ),
+                                                                    description:
+                                                                        r.description,
+                                                                    type: r.type,
+                                                                    transaction_type:
+                                                                        r.transaction_type,
+                                                                    amount: r.amount,
+                                                                    sub_category:
+                                                                        r.sub_category,
+                                                                    notes: r.notes,
+                                                                })
+                                                            }
+                                                        >
+                                                            <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
+                                                            Edit
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
-                                                        <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => setToDelete(r)}>
-                                                            <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                                                        <DropdownMenuItem
+                                                            className="text-red-600 focus:text-red-600"
+                                                            onClick={() =>
+                                                                setToDelete(r)
+                                                            }
+                                                        >
+                                                            <Trash2 className="mr-2 h-3.5 w-3.5" />{' '}
+                                                            Delete
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
@@ -172,9 +285,20 @@ export default function AccountShow({ workspace, account, transactions }: Props)
 
                 <TransactionFormDialog
                     open={createOpen || editing !== null}
-                    onOpenChange={(o) => { if (!o) { setCreateOpen(false); setEditing(null); } }}
+                    onOpenChange={(o) => {
+                        if (!o) {
+                            setCreateOpen(false);
+                            setEditing(null);
+                        }
+                    }}
                     transaction={editing}
-                    accounts={[{ id: account.id, name: account.name, currency: account.currency }]}
+                    accounts={[
+                        {
+                            id: account.id,
+                            name: account.name,
+                            currency: account.currency,
+                        },
+                    ]}
                     defaults={{ account_id: account.id }}
                     workspaceSlug={workspace.slug}
                 />

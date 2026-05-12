@@ -1,16 +1,16 @@
 import PageHeader from '@/components/common/PageHeader';
-import DatePicker from '@/components/ui/date-picker';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { format, subDays } from 'date-fns';
-import { omit } from 'lodash';
-import { useEffect, useMemo, useState } from 'react';
+import { debounce, omit } from 'lodash';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface CsrRecord {
     csr_id: number;
@@ -22,6 +22,7 @@ interface CsrRecord {
     rts_rate: number;
     total_called: number;
     total_call_time: number;
+    total_rmo_call_attempts: number;
 }
 
 interface Props {
@@ -32,11 +33,16 @@ interface Props {
         from?: string | null;
         to?: string | null;
         page?: number | string;
+        type?: 'erp' | 'pos' | null;
+        search?: string | null;
     };
 }
 
 const peso = (n: number) =>
-    new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(n) || 0);
+    new Intl.NumberFormat('en-PH', {
+        style: 'currency',
+        currency: 'PHP',
+    }).format(Number(n) || 0);
 
 const formatCallTime = (seconds: number) => {
     const s = Math.max(0, Math.floor(Number(seconds) || 0));
@@ -47,7 +53,13 @@ const formatCallTime = (seconds: number) => {
     return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
 };
 
-function useStatCard(workspace: Workspace, endpoint: string, from: string, to: string, type: string) {
+function useStatCard(
+    workspace: Workspace,
+    endpoint: string,
+    from: string,
+    to: string,
+    type: string,
+) {
     const [value, setValue] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -80,51 +92,111 @@ interface StatCardProps {
 function StatCard({ title, value, loading, format: fmt }: StatCardProps) {
     return (
         <div className="rounded-xl border border-black/6 bg-white p-4 dark:border-white/6 dark:bg-zinc-900">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+            <p className="text-[11px] font-medium tracking-wider text-zinc-400 uppercase dark:text-zinc-500">
                 {title}
             </p>
             {loading ? (
                 <div className="mt-2 h-7 w-24 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
             ) : (
-                <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-900 dark:text-white">
-                    {fmt ? fmt(value ?? 0) : Number(value ?? 0).toLocaleString()}
+                <p className="mt-1 text-xl font-semibold text-zinc-900 tabular-nums dark:text-white">
+                    {fmt
+                        ? fmt(value ?? 0)
+                        : Number(value ?? 0).toLocaleString()}
                 </p>
             )}
         </div>
     );
 }
 
-export default function Analytics({ workspace }: Props) {
+export default function Analytics({ workspace, query }: Props) {
     const today = new Date();
+    const initialType = query?.type === 'erp' ? 'erp' : 'pos';
     const [range, setRange] = useState<{ from: Date; to: Date }>({
         from: subDays(today, 6),
         to: today,
     });
-    const [paginatedRecords, setPaginatedRecords] = useState<PaginatedData<CsrRecord> | null>(null);
-    const [currentType, setCurrentType] = useState('pos');
+    const [paginatedRecords, setPaginatedRecords] =
+        useState<PaginatedData<CsrRecord> | null>(null);
+    const [currentType, setCurrentType] = useState(initialType);
     const [sort, setSort] = useState('-total_sales');
     const [page, setPage] = useState(1);
     const [perPage, setPerPage] = useState(10);
+    const [searchInput, setSearchInput] = useState(query?.search ?? '');
+    const [search, setSearch] = useState(query?.search ?? '');
+
+    const debouncedSetSearch = useCallback(
+        debounce((value: string) => setSearch(value), 400),
+        [],
+    );
+
+    useEffect(() => {
+        debouncedSetSearch(searchInput);
+        return () => debouncedSetSearch.cancel();
+    }, [searchInput, debouncedSetSearch]);
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
     const toStr = format(range.to, 'yyyy-MM-dd');
 
-    const salesStat = useStatCard(workspace, 'total-sales', fromStr, toStr, currentType);
-    const ordersStat = useStatCard(workspace, 'total-orders', fromStr, toStr, currentType);
-    const deliveredStat = useStatCard(workspace, 'total-delivered', fromStr, toStr, currentType);
-    const returningStat = useStatCard(workspace, 'total-returning', fromStr, toStr, currentType);
-    const rtsStat = useStatCard(workspace, 'total-rts', fromStr, toStr, currentType);
-    const rmoCalledStat = useStatCard(workspace, 'total-rmo-called', fromStr, toStr, currentType);
+    const salesStat = useStatCard(
+        workspace,
+        'total-sales',
+        fromStr,
+        toStr,
+        currentType,
+    );
+    const ordersStat = useStatCard(
+        workspace,
+        'total-orders',
+        fromStr,
+        toStr,
+        currentType,
+    );
+    const deliveredStat = useStatCard(
+        workspace,
+        'total-delivered',
+        fromStr,
+        toStr,
+        currentType,
+    );
+    const returningStat = useStatCard(
+        workspace,
+        'total-returning',
+        fromStr,
+        toStr,
+        currentType,
+    );
+    const rtsStat = useStatCard(
+        workspace,
+        'total-rts',
+        fromStr,
+        toStr,
+        currentType,
+    );
+    const rmoCalledStat = useStatCard(
+        workspace,
+        'total-rmo-called',
+        fromStr,
+        toStr,
+        currentType,
+    );
 
     useEffect(() => {
         setPage(1);
-    }, [range?.from, range?.to, currentType]);
+    }, [range?.from, range?.to, currentType, search]);
 
     useEffect(() => {
         const controller = new AbortController();
         axios
             .get(`/api/workspaces/${workspace.slug}/csrs/daily-records`, {
-                params: { from: fromStr, to: toStr, type: currentType, sort, page, per_page: perPage },
+                params: {
+                    from: fromStr,
+                    to: toStr,
+                    type: currentType,
+                    sort,
+                    page,
+                    per_page: perPage,
+                    'filter[search]': search || undefined,
+                },
                 signal: controller.signal,
             })
             .then((res) => setPaginatedRecords(res.data))
@@ -132,51 +204,94 @@ export default function Analytics({ workspace }: Props) {
                 if (!axios.isCancel(err)) console.error(err);
             });
         return () => controller.abort();
-    }, [workspace.slug, fromStr, toStr, currentType, sort, page, perPage]);
+    }, [
+        workspace.slug,
+        fromStr,
+        toStr,
+        currentType,
+        sort,
+        page,
+        perPage,
+        search,
+    ]);
 
     const initialSorting = useMemo(() => toFrontendSort(sort), [sort]);
 
     const columns = useMemo<ColumnDef<CsrRecord>[]>(
         () => [
             {
-                accessorKey: 'csr_name',
-                header: ({ column }) => <SortableHeader column={column} title="CSR" />,
-                cell: ({ row }) => row.original.csr_name || '-',
+                accessorKey: 'name',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="CSR" />
+                ),
                 size: 220,
             },
             {
                 accessorKey: 'total_orders',
-                header: ({ column }) => <SortableHeader column={column} title="Orders" />,
-                cell: ({ row }) => Number(row.original.total_orders).toLocaleString(),
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Orders" />
+                ),
+                cell: ({ row }) =>
+                    Number(row.original.total_orders).toLocaleString(),
             },
             {
                 accessorKey: 'total_sales',
-                header: ({ column }) => <SortableHeader column={column} title="Sales" />,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Sales" />
+                ),
                 cell: ({ row }) => peso(row.original.total_sales),
             },
             {
-                accessorKey: 'delivered',
-                header: ({ column }) => <SortableHeader column={column} title="Delivered" />,
-                cell: ({ row }) => peso(row.original.delivered),
+                accessorKey: 'total_delivered',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Delivered" />
+                ),
+                cell: ({ row }) => peso(row.original.total_delivered),
             },
             {
-                accessorKey: 'returning_count',
-                header: ({ column }) => <SortableHeader column={column} title="Returning" />,
-                cell: ({ row }) => peso(row.original.returning_count),
+                accessorKey: 'total_returning',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Returning" />
+                ),
+                cell: ({ row }) => peso(row.original.total_returning),
             },
             {
                 accessorKey: 'rts_rate',
-                header: ({ column }) => <SortableHeader column={column} title="RTS Rate" />,
-                cell: ({ row }) => `${Number(row.original.rts_rate).toFixed(2)}%`,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RTS Rate" />
+                ),
+                cell: ({ row }) =>
+                    `${Number(row.original.rts_rate).toFixed(2)}%`,
             },
             {
                 accessorKey: 'total_called',
-                header: ({ column }) => <SortableHeader column={column} title="RMO Called" />,
-                cell: ({ row }) => Number(row.original.total_called).toLocaleString(),
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Assigned RMO " />
+                ),
+                cell: ({ row }) =>
+                    Number(row.original.total_called).toLocaleString(),
+            },
+            {
+                accessorKey: 'total_rmo_call_attempts',
+                header: ({ column }) => (
+                    <SortableHeader
+                        column={column}
+                        title="Assigned RMO Called"
+                    />
+                ),
+                cell: ({ row }) =>
+                    Number(
+                        row.original.total_rmo_call_attempts,
+                    ).toLocaleString(),
             },
             {
                 accessorKey: 'total_call_time',
-                header: ({ column }) => <SortableHeader column={column} title="Total Call Time" />,
+                header: ({ column }) => (
+                    <SortableHeader
+                        column={column}
+                        title="Assigned RMO Call Time"
+                    />
+                ),
                 cell: ({ row }) => formatCallTime(row.original.total_call_time),
             },
         ],
@@ -190,16 +305,30 @@ export default function Analytics({ workspace }: Props) {
                 <PageHeader
                     title="CSR Analytics"
                     description="Aggregated CSR performance from daily records"
+                    stackActionsOnMobile
                 >
-                    <div className="flex items-center p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+                    <div className="flex items-center rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
                         {['erp', 'pos'].map((value) => {
                             const label = value === 'erp' ? 'ERP' : 'POS';
                             const isActive = currentType === value;
+                            const isDisabled = value === 'erp';
                             return (
                                 <button
                                     key={value}
-                                    onClick={() => setCurrentType(value)}
-                                    className={`rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                                    disabled={isDisabled}
+                                    onClick={() => {
+                                        setCurrentType(value);
+                                        const url = new URL(
+                                            window.location.href,
+                                        );
+                                        url.searchParams.set('type', value);
+                                        window.history.replaceState(
+                                            {},
+                                            '',
+                                            url.toString(),
+                                        );
+                                    }}
+                                    className={`rounded-lg px-3 py-1.5 text-[12px]! font-medium transition-colors ${
                                         isActive
                                             ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-600 dark:text-white'
                                             : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
@@ -225,22 +354,60 @@ export default function Analytics({ workspace }: Props) {
                     />
                 </PageHeader>
 
-                <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-                    <StatCard title="Total Sales" value={salesStat.value} loading={salesStat.loading} format={peso} />
-                    <StatCard title="Total Orders" value={ordersStat.value} loading={ordersStat.loading} />
-                    <StatCard title="Total Delivered" value={deliveredStat.value} loading={deliveredStat.loading} />
-                    <StatCard title="Total Returning" value={returningStat.value} loading={returningStat.loading} />
-                    <StatCard title="RTS Rate" value={rtsStat.value} loading={rtsStat.loading} format={(n) => `${n.toFixed(2)}%`} />
-                    <StatCard title="RMO Called" value={rmoCalledStat.value} loading={rmoCalledStat.loading} />
-                </div>
+                {/*<div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Sales"*/}
+                {/*        value={salesStat.value}*/}
+                {/*        loading={salesStat.loading}*/}
+                {/*        format={peso}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Orders"*/}
+                {/*        value={ordersStat.value}*/}
+                {/*        loading={ordersStat.loading}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Delivered"*/}
+                {/*        value={deliveredStat.value}*/}
+                {/*        loading={deliveredStat.loading}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Returning"*/}
+                {/*        value={returningStat.value}*/}
+                {/*        loading={returningStat.loading}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="RTS Rate"*/}
+                {/*        value={rtsStat.value}*/}
+                {/*        loading={rtsStat.loading}*/}
+                {/*        format={(n) => `${n.toFixed(2)}%`}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="RMO Called"*/}
+                {/*        value={rmoCalledStat.value}*/}
+                {/*        loading={rmoCalledStat.loading}*/}
+                {/*    />*/}
+                {/*</div>*/}
 
-                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                <input
+                    type="text"
+                    placeholder="Search CSR..."
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm! text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500 dark:focus:border-zinc-500"
+                />
+
+                <div className="mt-2 rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         key={sort}
                         columns={columns}
                         data={paginatedRecords?.data ?? []}
                         initialSorting={initialSorting}
-                        meta={paginatedRecords ? omit(paginatedRecords, ['data']) : undefined}
+                        meta={
+                            paginatedRecords
+                                ? omit(paginatedRecords, ['data'])
+                                : undefined
+                        }
                         onFetch={(params) => {
                             if (params?.sort !== undefined) {
                                 setSort(params.sort as string);

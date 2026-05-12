@@ -7,6 +7,7 @@ use App\Models\Shop;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Model
@@ -20,6 +21,11 @@ class User extends Model
     public function systemUser(): BelongsTo
     {
         return $this->belongsTo(SystemUser::class, 'user_id');
+    }
+
+    public function shopUsers(): HasMany
+    {
+        return $this->hasMany(ShopUser::class, 'user_id');
     }
 
     public function shops(): BelongsToMany

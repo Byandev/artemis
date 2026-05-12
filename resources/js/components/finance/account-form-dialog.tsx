@@ -1,4 +1,10 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { useForm } from '@inertiajs/react';
 import React, { useEffect } from 'react';
 
@@ -18,16 +24,22 @@ interface Props {
     workspaceSlug: string;
 }
 
-export function AccountFormDialog({ open, onOpenChange, account, workspaceSlug }: Props) {
+export function AccountFormDialog({
+    open,
+    onOpenChange,
+    account,
+    workspaceSlug,
+}: Props) {
     const isEditing = !!account;
 
-    const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm({
-        name: '',
-        opening_balance: '0',
-        currency: 'PHP',
-        notes: '',
-        is_active: true,
-    });
+    const { data, setData, post, put, processing, errors, reset, clearErrors } =
+        useForm({
+            name: '',
+            opening_balance: '0',
+            currency: 'PHP',
+            notes: '',
+            is_active: true,
+        });
 
     useEffect(() => {
         if (open) {
@@ -50,7 +62,10 @@ export function AccountFormDialog({ open, onOpenChange, account, workspaceSlug }
         e.preventDefault();
         const options = {
             preserveScroll: true,
-            onSuccess: () => { reset(); onOpenChange(false); },
+            onSuccess: () => {
+                reset();
+                onOpenChange(false);
+            },
         };
         const base = `/workspaces/${workspaceSlug}/finance/accounts`;
         if (isEditing) {
@@ -62,14 +77,16 @@ export function AccountFormDialog({ open, onOpenChange, account, workspaceSlug }
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden border-none shadow-2xl dark:bg-zinc-900">
-                <div className="px-5 pt-5 pb-4 border-b border-black/6 dark:border-white/6">
+            <DialogContent className="gap-0 overflow-hidden border-none p-0 shadow-2xl sm:max-w-md dark:bg-zinc-900">
+                <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
                             {isEditing ? 'Edit Account' : 'Add Account'}
                         </DialogTitle>
-                        <DialogDescription className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5">
-                            {isEditing ? 'Update this account’s details.' : 'Create a new finance account.'}
+                        <DialogDescription className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
+                            {isEditing
+                                ? 'Update this account’s details.'
+                                : 'Create a new finance account.'}
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -80,27 +97,44 @@ export function AccountFormDialog({ open, onOpenChange, account, workspaceSlug }
                             <input
                                 type="text"
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
                                 className={inputCls}
                             />
                         </Field>
 
-                        <Field label="Opening Balance" required error={errors.opening_balance}>
+                        <Field
+                            label="Opening Balance"
+                            required
+                            error={errors.opening_balance}
+                        >
                             <input
                                 type="number"
                                 step="0.01"
                                 value={data.opening_balance}
-                                onChange={(e) => setData('opening_balance', e.target.value)}
+                                onChange={(e) =>
+                                    setData('opening_balance', e.target.value)
+                                }
                                 className={inputCls}
                             />
                         </Field>
 
-                        <Field label="Currency" required error={errors.currency}>
+                        <Field
+                            label="Currency"
+                            required
+                            error={errors.currency}
+                        >
                             <input
                                 type="text"
                                 maxLength={3}
                                 value={data.currency}
-                                onChange={(e) => setData('currency', e.target.value.toUpperCase())}
+                                onChange={(e) =>
+                                    setData(
+                                        'currency',
+                                        e.target.value.toUpperCase(),
+                                    )
+                                }
                                 className={inputCls}
                             />
                         </Field>
@@ -108,8 +142,10 @@ export function AccountFormDialog({ open, onOpenChange, account, workspaceSlug }
                         <Field label="Notes" error={errors.notes}>
                             <textarea
                                 value={data.notes ?? ''}
-                                onChange={(e) => setData('notes', e.target.value)}
-                                className={`${inputCls} min-h-[80px] py-2 resize-none`}
+                                onChange={(e) =>
+                                    setData('notes', e.target.value)
+                                }
+                                className={`${inputCls} min-h-[80px] resize-none py-2`}
                             />
                         </Field>
 
@@ -117,13 +153,19 @@ export function AccountFormDialog({ open, onOpenChange, account, workspaceSlug }
                             <input
                                 type="checkbox"
                                 checked={data.is_active}
-                                onChange={(e) => setData('is_active', e.target.checked)}
+                                onChange={(e) =>
+                                    setData('is_active', e.target.checked)
+                                }
                             />
                             Active
                         </label>
                     </div>
 
-                    <Footer processing={processing} isEditing={isEditing} onCancel={() => onOpenChange(false)} />
+                    <Footer
+                        processing={processing}
+                        isEditing={isEditing}
+                        onCancel={() => onOpenChange(false)}
+                    />
                 </form>
             </DialogContent>
         </Dialog>
@@ -133,21 +175,43 @@ export function AccountFormDialog({ open, onOpenChange, account, workspaceSlug }
 const inputCls =
     'h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100';
 
-function Field({ label, required, error, children }: { label: string; required?: boolean; error?: string; children: React.ReactNode }) {
+function Field({
+    label,
+    required,
+    error,
+    children,
+}: {
+    label: string;
+    required?: boolean;
+    error?: string;
+    children: React.ReactNode;
+}) {
     return (
         <div className="space-y-1.5">
-            <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            <label className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                 {label} {required && <span className="text-red-400">*</span>}
             </label>
             {children}
-            {error && <p className="font-mono text-[11px] text-red-500 mt-1">{error}</p>}
+            {error && (
+                <p className="mt-1 font-mono text-[11px] text-red-500">
+                    {error}
+                </p>
+            )}
         </div>
     );
 }
 
-function Footer({ processing, isEditing, onCancel }: { processing: boolean; isEditing: boolean; onCancel: () => void }) {
+function Footer({
+    processing,
+    isEditing,
+    onCancel,
+}: {
+    processing: boolean;
+    isEditing: boolean;
+    onCancel: () => void;
+}) {
     return (
-        <div className="flex items-center justify-end gap-2 border-t border-black/6 dark:border-white/6 px-5 py-3 bg-stone-50/50 dark:bg-white/2">
+        <div className="flex items-center justify-end gap-2 border-t border-black/6 bg-stone-50/50 px-5 py-3 dark:border-white/6 dark:bg-white/2">
             <button
                 type="button"
                 onClick={onCancel}
@@ -160,7 +224,13 @@ function Footer({ processing, isEditing, onCancel }: { processing: boolean; isEd
                 disabled={processing}
                 className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
             >
-                {processing ? (isEditing ? 'Saving…' : 'Creating…') : (isEditing ? 'Save Changes' : 'Create')}
+                {processing
+                    ? isEditing
+                        ? 'Saving…'
+                        : 'Creating…'
+                    : isEditing
+                      ? 'Save Changes'
+                      : 'Create'}
             </button>
         </div>
     );

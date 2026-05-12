@@ -4,7 +4,6 @@ import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Transition } from '@headlessui/react';
 import { Form, Head, Link, usePage } from '@inertiajs/react';
 
-import DeleteUser from '@/components/delete-user';
 import HeadingSmall from '@/components/heading-small';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -15,16 +14,14 @@ import SettingsLayout from '@/layouts/settings/layout';
 import { edit } from '@/routes/profile';
 import { Workspace } from '@/types/models/Workspace';
 
-
-
 export default function Profile({
     mustVerifyEmail,
     status,
-    workspace
+    workspace,
 }: {
     mustVerifyEmail: boolean;
     status?: string;
-    workspace: Workspace
+    workspace: Workspace;
 }) {
     const { auth } = usePage<SharedData>().props;
 
@@ -47,7 +44,9 @@ export default function Profile({
                     />
 
                     <Form
-                        {...ProfileController.update.form({ workspace: workspace.slug })}
+                        {...ProfileController.update.form({
+                            workspace: workspace.slug,
+                        })}
                         options={{
                             preserveScroll: true,
                         }}

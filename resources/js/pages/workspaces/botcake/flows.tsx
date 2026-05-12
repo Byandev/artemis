@@ -1,45 +1,169 @@
-import AppLayout from '@/layouts/app-layout';
-import { useEffect, useState } from 'react';
-import axios, {AxiosResponse} from 'axios';
-import { PaginatedData, RequestParams } from '@/types';
-import { Flow } from '@/types/models/Botcake/Flow';
-import { ColumnDef } from '@tanstack/react-table';
-import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import { Head } from '@inertiajs/react';
-import ComponentCard from '@/components/common/ComponentCard';
 import PageHeader from '@/components/common/PageHeader';
-import { omit } from 'lodash';
-import { Workspace } from '@/types/models/Workspace';
+import Filters, { FilterValue } from '@/components/filters/Filters';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import DatePicker from '@/components/ui/date-picker';
+import AppLayout from '@/layouts/app-layout';
+import { toFrontendSort } from '@/lib/sort';
 import { numberFormatter, percentageFormatter } from '@/lib/utils';
+import { PaginatedData } from '@/types';
+import { Flow } from '@/types/models/Botcake/Flow';
+import { Workspace } from '@/types/models/Workspace';
+import { Head, router } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
+import { omit } from 'lodash';
+import { ExternalLink, Search } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
-const Flows = ({ workspace }: {workspace: Workspace}) => {
-    const [flows, setFlows] = useState<PaginatedData<Flow> | null>(null);
-    const [params, setParams] = useState<RequestParams| undefined>({
-        include: 'page',
-        page: 1,
-    });
+const parseIds = (str?: string): number[] => {
+    if (!str) return [];
+    return str
+        .split(',')
+        .map((s) => Number(s.trim()))
+        .filter((n) => Number.isFinite(n) && n > 0);
+};
+
+type Mode = 'overall' | 'historical';
+
+interface Props {
+    workspace: Workspace;
+    flows: PaginatedData<Flow>;
+    query?: {
+        sort?: string | null;
+        perPage?: number | string;
+        page?: number | string;
+        mode?: Mode;
+        from?: string;
+        to?: string;
+        filter?: {
+            search?: string;
+            page_ids?: string;
+            shop_ids?: string;
+        };
+    };
+}
+
+const toIsoDate = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+const defaultRange = (): [string, string] => {
+    const to = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - 6);
+    return [toIsoDate(from), toIsoDate(to)];
+};
+
+export default function Flows({ workspace, flows, query }: Props) {
+    const initialSorting = useMemo(
+        () => toFrontendSort(query?.sort ?? null),
+        [query?.sort],
+    );
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+
+    const initialFilterValue: FilterValue = useMemo(
+        () => ({
+            teamIds: [],
+            productIds: [],
+            shopIds: parseIds(query?.filter?.shop_ids),
+            pageIds: parseIds(query?.filter?.page_ids),
+            userIds: [],
+        }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [],
+    );
+    const [filter, setFilter] = useState<FilterValue>(initialFilterValue);
+
+    const mode: Mode = query?.mode === 'historical' ? 'historical' : 'overall';
+    const [defaultFrom, defaultTo] = defaultRange();
+    const fromDate = query?.from ?? defaultFrom;
+    const toDate = query?.to ?? defaultTo;
+
+    const navigate = (
+        overrides: Record<string, string | number | null | undefined> = {},
+    ) => {
+        router.get(
+            `/workspaces/${workspace.slug}/botcake/flows`,
+            {
+                sort: query?.sort ?? undefined,
+                'filter[search]': searchValue || undefined,
+                'filter[page_ids]': filter.pageIds.join(',') || undefined,
+                'filter[shop_ids]': filter.shopIds.join(',') || undefined,
+                page: query?.page ?? 1,
+                mode: mode === 'historical' ? 'historical' : undefined,
+                from: mode === 'historical' ? fromDate : undefined,
+                to: mode === 'historical' ? toDate : undefined,
+                ...overrides,
+            },
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['flows', 'query'],
+            },
+        );
+    };
 
     useEffect(() => {
-        axios.get('/api/v1/botcake/flows', {
-            params,
-            headers: { 'X-Workspace-Id': workspace.id }
-        }).then((response: AxiosResponse<PaginatedData<Flow>>) => {
-            setFlows(response.data)
+        const timer = setTimeout(() => {
+            navigate({ page: searchValue ? 1 : (query?.page ?? 1) });
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchValue]);
+
+    const switchMode = (next: Mode) => {
+        if (next === mode) return;
+        if (next === 'historical') {
+            navigate({
+                mode: 'historical',
+                from: defaultFrom,
+                to: defaultTo,
+                page: 1,
+            });
+        } else {
+            navigate({
+                mode: undefined,
+                from: undefined,
+                to: undefined,
+                page: 1,
+            });
+        }
+    };
+
+    const onRangeChange = (dates: Date[]) => {
+        if (dates.length !== 2) return;
+        navigate({
+            mode: 'historical',
+            from: toIsoDate(dates[0]),
+            to: toIsoDate(dates[1]),
+            page: 1,
         });
-    }, [params, workspace.id]);
+    };
 
     const columns: ColumnDef<Flow>[] = [
         {
             accessorKey: 'name',
+            enableSorting: true,
             header: ({ column }) => (
-                <SortableHeader column={column} title={'ID'} />
+                <SortableHeader column={column} title="Name" />
             ),
             cell: ({ row }) => {
+                const flow = row.original;
+                const previewUrl = `https://botcake.io/${flow.page_id}/flows/${flow.id}/flow_preview`;
+
                 return (
                     <div>
-                        <p className="font-medium">{row.original.name}</p>
-                        <p className="text-xs font-light text-gray-700">
-                            {row.original.page?.name}
+                        <a
+                            href={previewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group inline-flex items-center gap-1.5 font-medium text-gray-900 hover:text-emerald-600 dark:text-gray-100 dark:hover:text-emerald-400"
+                        >
+                            {flow.name}
+                            <ExternalLink className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+                        </a>
+                        <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                            {flow.page?.name ?? '-'}
                         </p>
                     </div>
                 );
@@ -48,11 +172,7 @@ const Flows = ({ workspace }: {workspace: Workspace}) => {
         {
             accessorKey: 'sent',
             header: ({ column }) => (
-                <SortableHeader
-                    className={'w-24'}
-                    column={column}
-                    title={'Sent'}
-                />
+                <SortableHeader className="w-28" column={column} title="Sent" />
             ),
             cell: ({ row }) => numberFormatter(row.original.sent),
         },
@@ -60,9 +180,9 @@ const Flows = ({ workspace }: {workspace: Workspace}) => {
             accessorKey: 'total_phone_number',
             header: ({ column }) => (
                 <SortableHeader
-                    className={'w-24'}
+                    className="w-32"
                     column={column}
-                    title={'Phone Number'}
+                    title="Phone Number"
                 />
             ),
             cell: ({ row }) => numberFormatter(row.original.total_phone_number),
@@ -71,41 +191,108 @@ const Flows = ({ workspace }: {workspace: Workspace}) => {
             accessorKey: 'success_rate',
             header: ({ column }) => (
                 <SortableHeader
-                    className={'w-24'}
+                    className="w-28"
                     column={column}
-                    title={'Success Rate'}
+                    title="Success Rate"
                 />
             ),
-            cell: ({ row }) => percentageFormatter(row.original.success_rate ?? 0),
+            cell: ({ row }) =>
+                percentageFormatter(row.original.success_rate ?? 0),
         },
     ];
-
 
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Botcake Flows`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <PageHeader title="Flows" description="Automate customer interactions with messenger flows" />
+                <PageHeader
+                    title="Flows"
+                    description="Automate customer interactions with messenger flows"
+                />
 
-                <div className="space-y-5 sm:space-y-6">
-                    <ComponentCard desc="Manage workspace teams and their members">
-                        <div>
-                            <DataTable
-                                columns={columns}
-                                enableInternalPagination={false}
-                                data={flows?.data || []}
-                                meta={{ ...omit(flows, ['data']) }}
-                                onFetch={(params) => {
-                                    setParams((prev) => ({ ...prev, ...params }))
-                                }}
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <div className="relative w-full max-w-xs">
+                        <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <input
+                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                            placeholder="Search flows…"
+                            value={searchValue}
+                            onChange={(e) => setSearchValue(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="ml-auto flex items-center gap-2">
+                        <Filters
+                            workspace={workspace}
+                            initialValue={filter}
+                            onChange={(value) => {
+                                setFilter(value);
+                                navigate({
+                                    'filter[page_ids]':
+                                        value.pageIds.join(',') || undefined,
+                                    'filter[shop_ids]':
+                                        value.shopIds.join(',') || undefined,
+                                    page: 1,
+                                });
+                            }}
+                        />
+
+                        {mode === 'historical' && (
+                            <DatePicker
+                                id="flows-date-range"
+                                mode="range"
+                                defaultDate={
+                                    [fromDate, toDate] as unknown as string
+                                }
+                                onChange={onRangeChange}
+                                placeholder="Select range"
                             />
+                        )}
+
+                        <div className="inline-flex h-9 items-center rounded-[10px] border border-black/8 bg-white p-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] dark:border-white/8 dark:bg-zinc-900 dark:shadow-none">
+                            <button
+                                type="button"
+                                onClick={() => switchMode('overall')}
+                                className={`h-8 rounded-lg px-3 text-[12px]! font-medium transition-colors ${
+                                    mode === 'overall'
+                                        ? 'bg-emerald-500 text-white'
+                                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+                                }`}
+                            >
+                                Overall
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => switchMode('historical')}
+                                className={`h-8 rounded-lg px-3 text-[12px]! font-medium transition-colors ${
+                                    mode === 'historical'
+                                        ? 'bg-emerald-500 text-white'
+                                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+                                }`}
+                            >
+                                Historical
+                            </button>
                         </div>
-                    </ComponentCard>
+                    </div>
                 </div>
 
+                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                    <DataTable
+                        columns={columns}
+                        enableInternalPagination={false}
+                        data={flows.data || []}
+                        initialSorting={initialSorting}
+                        meta={{ ...omit(flows, ['data']) }}
+                        onFetch={(params) => {
+                            navigate({
+                                sort: params?.sort,
+                                page: params?.page ?? 1,
+                                per_page: params?.per_page,
+                            });
+                        }}
+                    />
+                </div>
             </div>
         </AppLayout>
     );
 }
-
-export default Flows;

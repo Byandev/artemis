@@ -14,22 +14,35 @@ type ChecklistColumnActions = {
     onDelete: (item: ChecklistItem) => void;
 };
 
-export function getChecklistColumns({ onEdit, onDelete }: ChecklistColumnActions): ColumnDef<ChecklistItem>[] {
+export function getChecklistColumns({
+    onEdit,
+    onDelete,
+}: ChecklistColumnActions): ColumnDef<ChecklistItem>[] {
     return [
         {
             accessorKey: 'title',
-            header: ({ column }) => <SortableHeader column={column} title="Title" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Title" />
+            ),
             cell: ({ row }) => (
-                <span className="block truncate text-[12px] text-gray-800 dark:text-gray-100" title={row.original.title}>
+                <span
+                    className="block truncate text-[12px] text-gray-800 dark:text-gray-100"
+                    title={row.original.title}
+                >
                     {row.original.title}
                 </span>
             ),
         },
         {
             accessorKey: 'target',
-            header: ({ column }) => <SortableHeader column={column} title="Target" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Target" />
+            ),
             cell: ({ row }) => (
-                <span className="block truncate whitespace-nowrap text-[12px] text-gray-700 dark:text-gray-200" title={row.original.target}>
+                <span
+                    className="block truncate text-[12px] whitespace-nowrap text-gray-700 dark:text-gray-200"
+                    title={row.original.target}
+                >
                     {row.original.target}
                 </span>
             ),
@@ -67,8 +80,13 @@ export function getChecklistColumns({ onEdit, onDelete }: ChecklistColumnActions
                                 <MoreHorizontal className="h-4 w-4" />
                             </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-[165px] p-1.5">
-                            <DropdownMenuItem onClick={() => onEdit(row.original)}>
+                        <DropdownMenuContent
+                            align="end"
+                            className="w-[165px] p-1.5"
+                        >
+                            <DropdownMenuItem
+                                onClick={() => onEdit(row.original)}
+                            >
                                 <Pencil className="mr-1.5 h-3.5 w-3.5" />
                                 Edit
                             </DropdownMenuItem>

@@ -1,11 +1,9 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\Workspace;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Fortify\Features;
-
-uses(RefreshDatabase::class);
 
 test('two factor settings page can be rendered', function () {
     if (! Features::canManageTwoFactorAuthentication()) {
@@ -18,10 +16,11 @@ test('two factor settings page can be rendered', function () {
     ]);
 
     $user = User::factory()->withoutTwoFactor()->create();
+    $workspace = Workspace::factory()->forOwner($user)->create();
 
     $this->actingAs($user)
         ->withSession(['auth.password_confirmed_at' => time()])
-        ->get(route('two-factor.show'))
+        ->get(route('two-factor.show', ['workspace' => $workspace->slug]))
         ->assertInertia(fn (Assert $page) => $page
             ->component('settings/two-factor')
             ->where('twoFactorEnabled', false)
@@ -34,6 +33,7 @@ test('two factor settings page requires password confirmation when enabled', fun
     }
 
     $user = User::factory()->create();
+    $workspace = Workspace::factory()->forOwner($user)->create();
 
     Features::twoFactorAuthentication([
         'confirm' => true,
@@ -41,7 +41,7 @@ test('two factor settings page requires password confirmation when enabled', fun
     ]);
 
     $response = $this->actingAs($user)
-        ->get(route('two-factor.show'));
+        ->get(route('two-factor.show', ['workspace' => $workspace->slug]));
 
     $response->assertRedirect(route('password.confirm'));
 });
@@ -52,6 +52,7 @@ test('two factor settings page does not requires password confirmation when disa
     }
 
     $user = User::factory()->create();
+    $workspace = Workspace::factory()->forOwner($user)->create();
 
     Features::twoFactorAuthentication([
         'confirm' => true,
@@ -59,7 +60,7 @@ test('two factor settings page does not requires password confirmation when disa
     ]);
 
     $this->actingAs($user)
-        ->get(route('two-factor.show'))
+        ->get(route('two-factor.show', ['workspace' => $workspace->slug]))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('settings/two-factor')
@@ -74,9 +75,10 @@ test('two factor settings page returns forbidden response when two factor is dis
     config(['fortify.features' => []]);
 
     $user = User::factory()->create();
+    $workspace = Workspace::factory()->forOwner($user)->create();
 
     $this->actingAs($user)
         ->withSession(['auth.password_confirmed_at' => time()])
-        ->get(route('two-factor.show'))
+        ->get(route('two-factor.show', ['workspace' => $workspace->slug]))
         ->assertForbidden();
 });

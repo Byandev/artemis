@@ -1,4 +1,5 @@
 import { Breadcrumbs } from '@/components/breadcrumbs';
+import { ContactSupportModal } from '@/components/contact-support-modal';
 import { Icon } from '@/components/icon';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,7 +27,7 @@ import { dashboard } from '@/routes';
 import workspace from '@/routes/workspace';
 import { type BreadcrumbItem, type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { LayoutGrid, Menu } from 'lucide-react';
+import { LayoutGrid, LifeBuoy, Menu } from 'lucide-react';
 import AppLogo from './app-logo';
 import AppLogoIcon from './app-logo-icon';
 
@@ -152,14 +153,26 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                         </NavigationMenu>
                     </div>
 
-                    <div className="ml-auto flex items-center">
+                    <div className="ml-auto flex items-center gap-2">
+                        <ContactSupportModal
+                            trigger={
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-9 w-9 rounded-full"
+                                    aria-label="Contact support"
+                                >
+                                    <LifeBuoy className="h-4 w-4" />
+                                </Button>
+                            }
+                        />
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <button className="flex h-9 min-w-0 max-w-full items-center gap-2.5 rounded-full border border-black/8 dark:border-white/8 bg-stone-50 dark:bg-zinc-800 pl-1 pr-3 transition-all hover:bg-stone-100 dark:hover:bg-zinc-700 outline-none">
+                                <button className="flex h-9 max-w-full min-w-0 items-center gap-2.5 rounded-full border border-black/8 bg-stone-50 pr-3 pl-1 transition-all outline-none hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:hover:bg-zinc-700">
                                     <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 font-mono text-[11px] font-bold text-white">
                                         {getInitials(auth.user.name)}
                                     </div>
-                                    <span className="hidden min-w-0 truncate font-mono! text-[12px]! font-medium text-gray-700 dark:text-gray-300 sm:inline">
+                                    <span className="hidden min-w-0 truncate font-mono! text-[12px]! font-medium text-gray-700 sm:inline dark:text-gray-300">
                                         {auth.user.name}
                                     </span>
                                 </button>

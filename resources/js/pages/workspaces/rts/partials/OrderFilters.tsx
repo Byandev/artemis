@@ -1,7 +1,6 @@
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
-import { Search, X } from 'lucide-react'
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Search, X } from 'lucide-react';
 
 interface OrderFiltersProps {
     pageNameSearch: string;
@@ -22,14 +21,14 @@ const OrderFilters = ({
     riders,
     onPageNameChange,
     onFilterChange,
-    onClearFilters
+    onClearFilters,
 }: OrderFiltersProps) => {
     return (
-        <div className='flex flex-col items-start justify-between gap-4 mb-8'>
-            <div className="flex flex-col gap-4 w-1/2 sm:flex-row sm:items-end">
+        <div className="mb-8 flex flex-col items-start justify-between gap-4">
+            <div className="flex w-1/2 flex-col gap-4 sm:flex-row sm:items-end">
                 <div className="flex-1">
                     <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             type="text"
                             placeholder="Search page..."
@@ -40,7 +39,7 @@ const OrderFilters = ({
                         {pageNameSearch !== '' && (
                             <button
                                 onClick={() => onPageNameChange('')}
-                                className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground"
+                                className="absolute top-2.5 right-2.5 h-4 w-4 text-muted-foreground"
                                 aria-label="Clear search"
                             >
                                 <X className="h-4 w-4" />

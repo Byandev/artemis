@@ -72,6 +72,22 @@ The pool is carved only from Bryan's share. Everyone else stays undiluted.
 
 ---
 
+## Pricing Model (Summary)
+
+| Plan | Monthly | Orders/mo | Pages | Retention | Analytics | Parcel Journey + SMS | Support |
+|---|---|---|---|---|---|---|---|
+| Free Trial (30 days) | ₱0 | 10,000 | 1 | 6mo | Advanced | ✅ Included | Priority |
+| **Starter** | **₱2,999** | 3,000 | 5 | 3mo | Basic | ✅ Included | Chat |
+| **Growth** | **₱5,999** | 10,000 | 25 | 6mo | Advanced | ✅ Included | Priority |
+| **Scale** | **₱14,999** | 30,000 | 100 | 12mo | Advanced | ✅ Included | Dedicated |
+| Enterprise | Custom | Unlimited | Unlimited | Custom | Advanced | ✅ Included | Dedicated + SLA |
+
+Billing is **monthly, manual** (bank transfer / GCash / Maya). Parcel Journey + SMS bundled into every paid plan — no usage-based billing, no add-on fees.
+
+Average revenue per customer (weighted 65/25/10 mix): **₱4,949/mo**.
+
+---
+
 ## Operating Costs
 
 Artemis is self-funded by Bryan. Here are the ongoing costs to run the business:
@@ -80,23 +96,26 @@ Artemis is self-funded by Bryan. Here are the ongoing costs to run the business:
 
 | Cost | Amount | Notes |
 |---|---|---|
-| **Server / Infrastructure** | ₱3,000/mo (minimum) | Scales proportionally as the client base grows |
-| **Domain** | ₱1,500/yr (~₱125/mo) | Annual renewal |
-| **Full-time Developer** | ₱18,000/mo | Development and client support |
-| **Total (minimum)** | **~₱21,125/mo** | Before any variable costs |
+| **Server / Infrastructure** | ₱7,500/mo (current) | DigitalOcean droplet + managed MySQL. Scales with client base. |
+| **Domain** | ₱5,700/yr (~₱475/mo) | Annual renewal |
+| **Full-time Developer** | ₱17,000/mo | Development and client support |
+| **Tooling** | ₱3,500/mo | Laravel Forge, S3/Spaces, email, Sentry, PostHog |
+| **Total (current)** | **~₱28,500/mo** | Before significant scaling |
 
 ### How costs scale
 
-- **Server costs grow significantly with customers.** At minimum ₱3,000/mo for early stage, scaling fast — ~₱10k at 80 customers, ~₱30k at 250, ~₱60k at 500. More clients means more data, more API calls, more processing power.
-- **The developer hire is planned.** Bryan currently handles all engineering. The plan is to hire a full-time developer at ₱18,000/mo to handle ongoing development and client support, freeing Bryan to focus on product strategy and growth.
+- **Server costs grow with customers.** Currently ~₱7.5k/mo (4GB DB + 8GB app). Expect ~₱15k at 80 customers, ~₱30k at 250, ~₱60k at 500. More clients = more data, more API calls, more processing.
+- **Developer hire is in plan.** ~₱17k/mo to free Bryan for product strategy and growth.
 - **All operating costs are funded by Bryan** until the business generates enough revenue to cover them. Partners are not expected to contribute financially.
 
 ### Break-even context
 
 | Milestone | Customers needed | MRR | Covers |
 |---|---|---|---|
-| Cover operating costs | ~10 | ~₱23k | Server + domain + developer salary |
-| Profitable operation | ~30 | ~₱70k | All costs covered, healthy margin |
+| Cover operating costs | ~5 | ~₱30k | Server + domain + developer + tooling |
+| Profitable operation | ~10 | ~₱60k | All costs covered, healthy margin |
+
+The break-even is dramatically easier than it looks because parcel journey + SMS are bundled into the subscription. Average revenue per customer ₱4,949/mo means even 6 customers covers everything.
 
 ---
 
@@ -107,6 +126,7 @@ Artemis is self-funded by Bryan. Here are the ongoing costs to run the business:
 | **RMO Call Statistics** | In Development | Sync RMO call data directly into Artemis for unified analytics and reporting |
 | **FB Ads Analytics** | Feasible | Full Facebook Ads analytics built into Artemis — a Super Ads replacement. Beta company currently pays ₱10k/mo for a similar tool |
 | **Auto Scale / Descale Ads** | Feasible | Automated ad budget scaling and descaling based on performance rules and thresholds |
+| **MCP Server + AI Chat Assistant** | Feasible | Conversational AI assistant for your shop data — also accessible via MCP from Claude, Cursor, and other AI tools |
 | **AUTO RMO Call** | In Research | Automated RMO calls to customers — both standard scripted messages and AI-connected conversations |
 | **Auto Process** | In Research | End-to-end automation of order processing workflows to reduce manual work |
 
@@ -122,11 +142,13 @@ Equity value is based on **net profit after operating expenses** — not raw rev
 
 | Stage | Customers | MRR | Opex/mo | Net Profit/mo | Net Profit/yr | 10% Share |
 |---|---|---|---|---|---|---|
-| Month 6 | ~80 | ₱215k | ₱28k | ₱187k | ₱2.24M | ₱224,000/yr |
-| Month 12 | ~250 | ₱712k | ₱48k | ₱664k | ₱7.97M | ₱797,000/yr |
-| Year 2 | ~500 | ₱1.4M | ₱78k | ₱1.32M | ₱15.9M | ₱1,590,000/yr |
+| Month 6 | ~80 | ₱396k | ₱45k | ₱351k | ₱4.21M | ₱421,000/yr |
+| Month 12 | ~250 | ₱1.24M | ₱75k | ₱1.16M | ₱13.95M | ₱1,395,000/yr |
+| Year 2 | ~500 | ₱2.47M | ₱120k | ₱2.35M | ₱28.25M | ₱2,825,000/yr |
 
-**Opex assumptions:** Server starts at ₱3k/mo minimum, scaling significantly with client base — ~₱10k at 80 customers, ~₱30k at 250, ~₱60k at 500 (more data, API calls, processing). Developer at ₱18k/mo. Domain ₱125/mo. All funded by Bryan.
+**MRR assumptions:** weighted blend of 65% Starter (₱2,999), 25% Growth (₱5,999), 10% Scale (₱14,999) = avg ₱4,949/customer/mo.
+
+**Opex assumptions:** server scales with client base — ~₱15k at 80 customers, ~₱45k at 250, ~₱90k at 500 (more data, API calls, processing). Developer at ₱17k/mo. Domain ₱475/mo. Tooling ₱3.5k/mo. Bundled SMS cost factored into fixed margin (capped per parcel in code). All funded by Bryan.
 
 ---
 

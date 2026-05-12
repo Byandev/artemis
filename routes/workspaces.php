@@ -3,13 +3,13 @@
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
 use App\Http\Controllers\Workspaces\AdAccountController;
+use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
+use App\Http\Controllers\Workspaces\Admin\SupportTicketAdminController;
 use App\Http\Controllers\Workspaces\AdsManager\AdController;
 use App\Http\Controllers\Workspaces\AdsManager\AdSetController;
 use App\Http\Controllers\Workspaces\AdsManager\CampaignController;
 use App\Http\Controllers\Workspaces\AdsManager\OptimizationRuleController;
 use App\Http\Controllers\Workspaces\AskDataController;
-use App\Http\Controllers\Workspaces\Botcake\FlowController;
-use App\Http\Controllers\Workspaces\Botcake\SequenceController;
 use App\Http\Controllers\Workspaces\ChecklistController;
 use App\Http\Controllers\Workspaces\ChecklistProgressController;
 use App\Http\Controllers\Workspaces\CSRController;
@@ -25,14 +25,18 @@ use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\ShopController;
+use App\Http\Controllers\Workspaces\SupportTicketController;
 use App\Http\Controllers\Workspaces\TeamController;
 use App\Http\Controllers\Workspaces\WorkspaceApiKeyController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
+use App\Models\SupportTicket;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
+use Modules\Botcake\Http\Controllers\Web\FlowController;
+use Modules\Botcake\Http\Controllers\Web\SequenceController;
 use Modules\Finance\Http\Controllers\AccountController as FinanceAccountController;
 use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardController;
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
@@ -41,6 +45,7 @@ use Modules\Finance\Http\Controllers\TransactionController as FinanceTransaction
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
+use Modules\Pancake\Http\Controllers\CourierShipmentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -121,6 +126,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/pages', [PageController::class, 'index'])->name('workspaces.pages.index');
     Route::get('/workspaces/{workspace}/pages/create', [PageController::class, 'create'])->name('workspaces.pages.create');
     Route::post('/workspaces/{workspace}/pages', [PageController::class, 'store'])->name('workspaces.pages.store');
+    Route::post('/workspaces/{workspace}/pages/validate-pos-token', [PageController::class, 'validatePosToken'])->name('workspaces.pages.validate-pos-token');
     Route::post('/workspaces/{workspace}/pages/validate-pancake-token', [PageController::class, 'validatePancakeToken'])->name('workspaces.pages.validate-pancake-token');
     Route::post('/workspaces/{workspace}/pages/validate-botcake-token', [PageController::class, 'validateBotcakeToken'])->name('workspaces.pages.validate-botcake-token');
     Route::get('/workspaces/{workspace}/pages/{page}/edit', [PageController::class, 'edit'])->name('workspaces.pages.edit');
@@ -131,6 +137,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/workspaces/{workspace}/shops', [ShopController::class, 'index'])->name('workspaces.shops.index');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh', [ShopController::class, 'refresh'])->name('workspaces.shops.refresh');
+    Route::post('/workspaces/{workspace}/shops/{shop}/refresh-users', [ShopController::class, 'refreshUsers'])->name('workspaces.shops.refresh-users');
 
     // Product routes
     // Redirect to analytics by default for navigation item active state
@@ -218,8 +225,14 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
         Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
     });
+    Route::prefix('/workspaces/{workspace}/pancake/courier-shipments')->name('workspaces.pancake.courier-shipments.')->group(function () {
+        Route::get('/', [CourierShipmentController::class, 'index'])->name('index');
+        Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');
+    });
+
     Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {
         Route::get('/', [PurchasedOrderController::class, 'index'])->name('index');
+        Route::get('/export', [PurchasedOrderController::class, 'export'])->name('export');
         Route::get('/create', [PurchasedOrderController::class, 'create'])->name('create');
         Route::post('/', [PurchasedOrderController::class, 'store'])->name('store');
         Route::get('/{purchasedOrder}/edit', [PurchasedOrderController::class, 'edit'])->name('edit');
@@ -263,6 +276,15 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/remittances/{remittance}', [FinanceRemittanceController::class, 'destroy'])->name('remittances.destroy');
     });
 
+    Route::get('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'index'])->name('support.index');
+    Route::post('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'store'])->name('support.store');
+    Route::get('/workspaces/{workspace:slug}/admin/support-tickets', [SupportTicketAdminController::class, 'index'])
+        ->name('admin.support-tickets.index')
+        ->can('viewAny', [SupportTicket::class, 'workspace']);
+    Route::patch('/workspaces/{workspace:slug}/admin/support-tickets/{ticket}', [SupportTicketAdminController::class, 'update'])
+        ->name('admin.support-tickets.update')
+        ->can('viewAny', [SupportTicket::class, 'workspace']);
+
 });
 
 // Public invitation routes (guest or authenticated)
@@ -289,11 +311,23 @@ Route::middleware(['auth', 'verified', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
+        // Workspace Management
         Route::get('/workspaces', [AdminWorkspaceController::class, 'index'])
             ->name('workspaces.index');
+
         Route::put('/workspaces/{workspace}/subscription', [AdminWorkspaceController::class, 'updateSubscription'])
             ->name('workspaces.update-subscription');
+        Route::put('/workspaces/{workspace}/modules', [AdminWorkspaceController::class, 'updateModules'])
+            ->name('workspaces.update-modules');
 
+        // Metric Setting Controller
+        Route::get('workspaces/{workspace}/metrics/edit', [MetricSettingController::class, 'edit'])
+            ->name('workspaces.metric-settings.edit');
+
+        Route::put('/workspaces/{workspace}/metrics', [MetricSettingController::class, 'update'])
+            ->name('workspaces.metric-settings.update');
+
+        // Subscription Plans Management
         Route::get('/subscription-plans', [AdminSubscriptionPlanController::class, 'index'])
             ->name('subscription-plans.index');
         Route::get('/subscription-plans/create', [AdminSubscriptionPlanController::class, 'create'])

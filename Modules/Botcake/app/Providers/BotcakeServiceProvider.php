@@ -2,6 +2,7 @@
 
 namespace Modules\Botcake\Providers;
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Modules\Botcake\Console\TriggerFetchFlows;
@@ -60,10 +61,13 @@ class BotcakeServiceProvider extends ServiceProvider
      */
     protected function registerCommandSchedules(): void
     {
-        // $this->app->booted(function () {
-        //     $schedule = $this->app->make(Schedule::class);
-        //     $schedule->command('inspire')->hourly();
-        // });
+        $this->app->booted(function () {
+            $schedule = $this->app->make(Schedule::class);
+            $schedule->command('botcake:trigger-fetch-flows')->dailyAt('23:00');
+            $schedule->command('botcake:trigger-fetch-sequences')->dailyAt('23:15');
+            $schedule->command('botcake:trigger-fetch-flow-statistics')->dailyAt('23:00');
+            $schedule->command('botcake:trigger-fetch-sequence-statistics')->dailyAt('23:00');
+        });
     }
 
     /**

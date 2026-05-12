@@ -44,7 +44,7 @@ class AccountController extends Controller
             ])
             ->allowedSorts(['id', 'name', 'currency', 'is_active', 'created_at'])
             ->defaultSort('name')
-            ->paginate(15)
+            ->paginate($request->input('per_page', 15))
             ->withQueryString();
 
         // Get last transaction per account for running_balance
@@ -73,7 +73,7 @@ class AccountController extends Controller
             'workspace' => $workspace,
             'accounts' => $accounts,
             'query' => [
-                ...$request->only(['sort', 'perPage', 'page']),
+                ...$request->only(['sort', 'per_page', 'page']),
                 'filter' => $request->input('filter', []),
             ],
         ]);

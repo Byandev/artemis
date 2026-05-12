@@ -99,6 +99,10 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isMemberOf(Workspace $workspace): bool
     {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         return DB::table('workspace_user')
             ->where('user_id', $this->id)
             ->where('workspace_id', $workspace->id)
@@ -139,7 +143,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isSuperAdmin(): bool
     {
-        return $this->role === 'superadmin';
+        return $this->is_super_admin;
     }
 
     // public function hasReach(string $requiredRole): bool

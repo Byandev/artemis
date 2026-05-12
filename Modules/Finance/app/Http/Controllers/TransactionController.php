@@ -42,16 +42,9 @@ class TransactionController extends Controller
         }
     }
 
-    public function index(Request $request, Workspace $workspace)
+    protected function buildQuery(Workspace $workspace): QueryBuilder
     {
-        $this->guard($request, $workspace);
-        $this->authorize(Permission::ViewFinanceTransactions->value, $workspace);
-
-        $transactions = QueryBuilder::for(
-            Transaction::where('workspace_id', $workspace->id)
-                ->with(['account', 'remittance'])
-        )
-
+        return QueryBuilder::for(Transaction::where('workspace_id', $workspace->id))
             ->allowedFilters([
                 AllowedFilter::callback('search', fn ($q, $v) => $q->where(function ($q2) use ($v) {
                     $q2->where('description', 'like', "%{$v}%")
@@ -68,17 +61,35 @@ class TransactionController extends Controller
                     : $q),
                 AllowedFilter::callback('date_from', fn ($q, $v) => $q->whereDate('date', '>=', $v)),
                 AllowedFilter::callback('date_to', fn ($q, $v) => $q->whereDate('date', '<=', $v)),
-            ])
+            ]);
+    }
+
+    public function index(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewFinanceTransactions->value, $workspace);
+
+        $transactions = $this->buildQuery($workspace)
+            ->with(['account', 'remittance'])
             ->orderBy('date', 'desc')
             ->orderBy('position', 'desc')
             ->paginate((int) $request->input('per_page', 100))
             ->withQueryString();
+
+        $totals = $this->buildQuery($workspace)
+            ->selectRaw("COALESCE(SUM(CASE WHEN type = 'in' THEN amount ELSE 0 END), 0) as total_credit")
+            ->selectRaw("COALESCE(SUM(CASE WHEN type = 'out' THEN amount ELSE 0 END), 0) as total_debit")
+            ->first();
 
         return Inertia::render('workspaces/finance/transactions/index', [
             'workspace' => $workspace,
             'transactions' => $transactions,
             'accounts' => Account::where('workspace_id', $workspace->id)
                 ->orderBy('name')->get(['id', 'name', 'currency']),
+            'totals' => [
+                'credit' => (float) $totals->total_credit,
+                'debit' => (float) $totals->total_debit,
+            ],
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
@@ -123,7 +134,14 @@ class TransactionController extends Controller
         $this->ensureOwns($workspace, $transaction);
         $this->validateWorkspaceFor($workspace, $request->validated());
 
-        $transaction->update($request->validated());
+        $data = $request->validated();
+
+        // Preserve existing position if not provided
+        if (empty($data['position'])) {
+            unset($data['position']);
+        }
+
+        $transaction->update($data);
 
         return redirect()->back()->with('success', 'Transaction updated.');
     }
@@ -139,11 +157,11 @@ class TransactionController extends Controller
             'rows.*.date' => ['required', 'date'],
             'rows.*.description' => ['required', 'string', 'max:255'],
             'rows.*.type' => ['required', 'in:in,out'],
-            'rows.*.transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement'],
+            'rows.*.transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement,capex'],
             'rows.*.amount' => ['required', 'numeric', 'min:0'],
             'rows.*.running_balance' => ['nullable', 'numeric'],
             'rows.*.position' => ['nullable', 'integer', 'min:1'],
-            'rows.*.sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,delivery_fee,operation_expense,salary,transfer_fee,seminar_fee,rent,others'],
+            'rows.*.sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,delivery_fee,operation_expense,salary,transfer_fee,seminar_fee,rent,capex_payment,others'],
             'rows.*.notes' => ['nullable', 'string'],
         ]);
 
@@ -193,7 +211,7 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
-            'transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement'],
+            'transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement,capex'],
         ]);
 
         $updated = Transaction::where('workspace_id', $workspace->id)
@@ -211,7 +229,7 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
-            'sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,delivery_fee,operation_expense,salary,transfer_fee,seminar_fee,rent,others'],
+            'sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,delivery_fee,operation_expense,salary,transfer_fee,seminar_fee,rent,capex_payment,others'],
         ]);
 
         $updated = Transaction::where('workspace_id', $workspace->id)

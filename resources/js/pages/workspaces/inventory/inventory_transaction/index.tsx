@@ -1,7 +1,14 @@
-import AppLayout from '@/layouts/app-layout';
+import PageHeader from '@/components/common/PageHeader';
+import InventoryFormDialog from '@/components/inventory/inventory-form-dialog';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import { Head, router } from '@inertiajs/react';
-import { ColumnDef } from '@tanstack/react-table';
+import DatePicker from '@/components/ui/date-picker';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -9,22 +16,19 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-    Search,
-    MoreHorizontal,
-    Edit,
-    Trash2,
-} from 'lucide-react';
-import { useState, useEffect, useMemo } from 'react';
+import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { toast, Toaster } from 'sonner';
-import { Workspace } from '@/types/models/Workspace';
 import { InventoryTransaction } from '@/types/models/InventoryTransaction';
-import InventoryFormDialog from '@/components/inventory/inventory-form-dialog';
-import PageHeader from '@/components/common/PageHeader';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import moment from 'moment';
+import { Workspace } from '@/types/models/Workspace';
+import { Head, router } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
+import flatpickr from 'flatpickr';
 import { omit } from 'lodash';
+import { Edit, MoreHorizontal, Search, Trash2 } from 'lucide-react';
+import moment from 'moment';
+import { useEffect, useMemo, useState } from 'react';
+import { toast, Toaster } from 'sonner';
+import DateOption = flatpickr.Options.DateOption;
 
 interface InventoryItem {
     id: number;
@@ -45,32 +49,58 @@ interface Props {
         last_page: number;
         current_page: number;
         per_page: number;
-    }
+    };
     workspace: Workspace;
     items?: InventoryItem[];
     query?: {
         sort?: string | null;
         page?: number | string;
-        search?: string;
+        perPage?: number | string;
+        filter?: { search?: string; start_date?: string; end_date?: string };
     };
 }
 
-export default function Index({ inventory, workspace, items = [], query }: Props) {
-    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
-    const [searchQuery, setSearchQuery] = useState(query?.search ?? '');
+export default function Index({
+    inventory,
+    workspace,
+    items = [],
+    query,
+}: Props) {
+    const initialSorting = useMemo(
+        () => toFrontendSort(query?.sort ?? null),
+        [query?.sort],
+    );
+    const [searchQuery, setSearchQuery] = useState(query?.filter?.search ?? '');
+    const [dateRange, setDateRange] = useState<string[]>(() => [
+        query?.filter?.start_date ?? '',
+        query?.filter?.end_date ?? '',
+    ]);
     const [openFormModal, setOpenFormModal] = useState(false);
-    const [selectedInventory, setSelectedInventory] = useState<InventoryTransaction | undefined>(undefined);
+    const [selectedInventory, setSelectedInventory] = useState<
+        InventoryTransaction | undefined
+    >(undefined);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
+    const buildFilter = (search: string, range: string[]) => ({
+        search: search || undefined,
+        start_date: range[0] || undefined,
+        end_date: range[1] || undefined,
+    });
+
     useEffect(() => {
+        const filterChanged =
+            searchQuery !== (query?.filter?.search ?? '') ||
+            (dateRange[0] || undefined) !==
+                (query?.filter?.start_date ?? undefined) ||
+            (dateRange[1] || undefined) !==
+                (query?.filter?.end_date ?? undefined);
+        if (!filterChanged) return;
         const timer = setTimeout(() => {
             router.get(
                 `/workspaces/${workspace.slug}/inventory/transactions`,
                 {
-                    filter: {
-                        search: searchQuery || undefined,
-                    },
-                    page: searchQuery ? 1 : query?.page ?? 1,
+                    filter: buildFilter(searchQuery, dateRange),
+                    page: 1,
                     sort: query?.sort,
                     per_page: query?.perPage ?? inventory.per_page,
                 },
@@ -78,12 +108,12 @@ export default function Index({ inventory, workspace, items = [], query }: Props
                     preserveState: true,
                     replace: true,
                     preserveScroll: true,
-                    only: ['inventory', 'query']
-                }
+                    only: ['inventory', 'query'],
+                },
             );
         }, 500);
         return () => clearTimeout(timer);
-    }, [searchQuery]);
+    }, [searchQuery, dateRange]);
 
     const handleEdit = (item: InventoryTransaction) => {
         setSelectedInventory(item);
@@ -98,13 +128,16 @@ export default function Index({ inventory, workspace, items = [], query }: Props
     const handleDeleteAction = () => {
         if (!selectedInventory) return;
 
-        router.delete(`/workspaces/${workspace.slug}/inventory/transactions/${selectedInventory.id}`, {
-            onSuccess: () => {
-                setDeleteModalOpen(false);
-                setSelectedInventory(undefined);
-                toast.success('Record deleted successfully');
-            }
-        });
+        router.delete(
+            `/workspaces/${workspace.slug}/inventory/transactions/${selectedInventory.id}`,
+            {
+                onSuccess: () => {
+                    setDeleteModalOpen(false);
+                    setSelectedInventory(undefined);
+                    toast.success('Record deleted successfully');
+                },
+            },
+        );
     };
 
     const columns: ColumnDef<InventoryTransaction>[] = [
@@ -112,16 +145,22 @@ export default function Index({ inventory, workspace, items = [], query }: Props
             id: 'inventory_item',
             accessorFn: (row) => row.inventory_item?.sku,
             enableSorting: false,
-            header: ({ column }) => <SortableHeader column={column} title="Inventory Item" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Inventory Item" />
+            ),
             cell: ({ row }) => {
                 const item = row.original.inventory_item;
                 return (
                     <div className="flex h-10 items-center">
                         {item ? (
                             <div className="flex flex-col gap-0.5">
-                                <span className="font-mono text-[11px] font-medium text-gray-600 dark:text-gray-400">{item.sku}</span>
+                                <span className="font-mono text-[11px] font-medium text-gray-600 dark:text-gray-400">
+                                    {item.sku}
+                                </span>
                                 {item.product && (
-                                    <span className="text-[10px] text-gray-400 dark:text-gray-500">{item.product.name}</span>
+                                    <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                                        {item.product.name}
+                                    </span>
                                 )}
                             </div>
                         ) : (
@@ -134,23 +173,31 @@ export default function Index({ inventory, workspace, items = [], query }: Props
         {
             accessorKey: 'date',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Date" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Date" />
+            ),
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
-                        {moment(row.original.date).format('DD MMM YYYY')}</span>
-
+                        {moment(row.original.date).format('DD MMM YYYY')}
+                    </span>
                 </div>
             ),
         },
         {
             accessorKey: 'ref_no',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Reference No." />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Reference No." />
+            ),
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                        {row.original.ref_no || <span className="italic opacity-50">No Reference</span>}
+                        {row.original.ref_no || (
+                            <span className="italic opacity-50">
+                                No Reference
+                            </span>
+                        )}
                     </p>
                 </div>
             ),
@@ -158,70 +205,98 @@ export default function Index({ inventory, workspace, items = [], query }: Props
         {
             accessorKey: 'po_qty_in',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="PO Quantity In" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="PO Quantity In" />
+            ),
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
-                    <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.po_qty_in || 0}</p>
+                    <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                        {row.original.po_qty_in || 0}
+                    </p>
                 </div>
             ),
         },
         {
             accessorKey: 'po_qty_out',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="PO Quantity Out" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="PO Quantity Out" />
+            ),
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
-                    <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.po_qty_out || 0}</p>
+                    <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                        {row.original.po_qty_out || 0}
+                    </p>
                 </div>
             ),
         },
         {
             accessorKey: 'rts_goods_in',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="RTS Goods In" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="RTS Goods In" />
+            ),
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
-                    <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.rts_goods_in || 0}</p>
+                    <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                        {row.original.rts_goods_in || 0}
+                    </p>
                 </div>
             ),
         },
         {
             accessorKey: 'rts_goods_out',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="RTS Goods Out" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="RTS Goods Out" />
+            ),
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
-                    <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.rts_goods_out || 0}</p>
+                    <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                        {row.original.rts_goods_out || 0}
+                    </p>
                 </div>
             ),
         },
         {
             accessorKey: 'rts_bad',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="RTS Bad" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="RTS Bad" />
+            ),
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
-                    <p className="text-[12px] text-gray-500 dark:text-gray-400">{row.original.rts_bad || 0}</p>
+                    <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                        {row.original.rts_bad || 0}
+                    </p>
                 </div>
             ),
         },
         {
             accessorKey: 'lost',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Lost" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Lost" />
+            ),
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
-                    <p className="text-[12px] text-orange-500 dark:text-orange-400">{row.original.lost || 0}</p>
+                    <p className="text-[12px] text-orange-500 dark:text-orange-400">
+                        {row.original.lost || 0}
+                    </p>
                 </div>
             ),
         },
         {
             accessorKey: 'remaining_qty',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Remaining Quantity" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Remaining Quantity" />
+            ),
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
-                    <p className={`text-[12px] font-bold ${row.original.remaining_qty < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                    <p
+                        className={`text-[12px] font-bold ${row.original.remaining_qty < 0 ? 'text-red-500' : 'text-emerald-600'}`}
+                    >
                         {row.original.remaining_qty ?? 0}
                     </p>
                 </div>
@@ -229,7 +304,11 @@ export default function Index({ inventory, workspace, items = [], query }: Props
         },
         {
             id: 'actions',
-            header: () => <div className="text-center font-mono text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">Actions</div>,
+            header: () => (
+                <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                    Actions
+                </div>
+            ),
             cell: ({ row }) => (
                 <div className="flex h-10 items-center justify-center">
                     <DropdownMenu>
@@ -239,12 +318,17 @@ export default function Index({ inventory, workspace, items = [], query }: Props
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="center" className="w-36">
-                            <DropdownMenuItem onClick={() => handleEdit(row.original)}>
+                            <DropdownMenuItem
+                                onClick={() => handleEdit(row.original)}
+                            >
                                 <Edit className="mr-2 h-3.5 w-3.5" />
                                 Edit
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem variant="destructive" onClick={() => confirmDelete(row.original)}>
+                            <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => confirmDelete(row.original)}
+                            >
                                 <Trash2 className="mr-2 h-3.5 w-3.5" />
                                 Delete
                             </DropdownMenuItem>
@@ -328,7 +412,7 @@ export default function Index({ inventory, workspace, items = [], query }: Props
                     </button>
                 </PageHeader>
 
-                <div className="mb-3 flex items-center gap-2">
+                <div className="mb-3 flex flex-col items-stretch gap-2 md:flex-row md:items-center">
                     <div className="relative w-full max-w-xs">
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                         <input
@@ -339,6 +423,26 @@ export default function Index({ inventory, workspace, items = [], query }: Props
                             className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pl-8 font-mono! text-[12px]! text-gray-800 outline-none focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                         />
                     </div>
+                    <DatePicker
+                        id="inventory-transactions-date-range"
+                        mode="range"
+                        placeholder="Filter by date"
+                        defaultDate={
+                            (dateRange[0] && dateRange[1]
+                                ? dateRange
+                                : undefined) as never as DateOption
+                        }
+                        onChange={(dates) => {
+                            if (dates.length === 2) {
+                                setDateRange([
+                                    moment(dates[0]).format('YYYY-MM-DD'),
+                                    moment(dates[1]).format('YYYY-MM-DD'),
+                                ]);
+                            } else if (dates.length === 0) {
+                                setDateRange(['', '']);
+                            }
+                        }}
+                    />
                 </div>
 
                 <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -353,17 +457,17 @@ export default function Index({ inventory, workspace, items = [], query }: Props
                                 `/workspaces/${workspace.slug}/inventory/transactions`,
                                 {
                                     sort: params?.sort,
-                                    filter: {
-                                        search: searchQuery || undefined,
-                                    },
+                                    filter: buildFilter(searchQuery, dateRange),
                                     page: params?.page ?? 1,
-                                    per_page: params?.per_page ?? query?.perPage ?? inventory.per_page,
+                                    per_page:
+                                        params?.per_page ??
+                                        query?.perPage ??
+                                        inventory.per_page,
                                 },
                                 {
                                     preserveState: true,
                                     replace: true,
                                     preserveScroll: true,
-                                    only: ['inventory'],
                                 },
                             );
                         }}

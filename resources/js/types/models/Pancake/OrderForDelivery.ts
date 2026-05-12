@@ -1,5 +1,5 @@
-import { Order } from '@/types/models/Pancake/Order';
 import { Page } from '@/types/models/Page';
+import { Order } from '@/types/models/Pancake/Order';
 import { User } from '@/types/models/Pancake/User';
 
 export const ORDER_STATUSES = [
@@ -14,7 +14,10 @@ export const ORDER_STATUSES = [
     'WRONG SEGMENT CODE',
     'CX RINGING',
     'RIDER RINGING',
-    'IN TRANSIT'
+    'IN TRANSIT',
+    'INCORRECT NUMBER',
+    'AUTO DROP CX',
+    'AUTO DROP RIDER',
 ] as const;
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -82,6 +85,21 @@ export const STATUS_COLORS: Record<
         bg: 'bg-cyan-100',
         text: 'text-cyan-800',
         border: 'border-cyan-200',
+    },
+    'INCORRECT NUMBER': {
+        bg: 'bg-gray-100',
+        text: 'text-gray-800',
+        border: 'border-gray-200',
+    },
+    'AUTO DROP CX': {
+        bg: 'bg-pink-100',
+        text: 'text-pink-800',
+        border: 'border-pink-200',
+    },
+    'AUTO DROP RIDER': {
+        bg: 'bg-indigo-100',
+        text: 'text-indigo-800',
+        border: 'border-indigo-200',
     },
 };
 

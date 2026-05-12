@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Workspaces;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Http\Sorts\Checklist\TargetSort;
 use App\Models\Workspace;
 use App\Models\WorkspaceChecklist;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class ChecklistController extends Controller
@@ -24,7 +26,12 @@ class ChecklistController extends Controller
         $this->authorize(Permission::ViewChecklist->value, $workspace);
 
         $checklists = QueryBuilder::for(WorkspaceChecklist::query()->where('workspace_id', $workspace->id))
-            ->allowedSorts(['title', 'target', 'required', 'created_at'])
+            ->allowedSorts([
+                'title',
+                AllowedSort::custom('target', new TargetSort),
+                'required',
+                'created_at',
+            ])
             ->paginate(10)
             ->withQueryString();
 

@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
@@ -58,6 +59,7 @@ class InventoryItemController extends Controller
                 AllowedSort::field('product_name', 'products.name'),
                 'lead_time',
                 'unfulfilled_count',
+                'remaining_qty',
                 'three_days_average',
                 'current_stocks',
                 'waiting_for_delivery_stocks',
@@ -72,7 +74,7 @@ class InventoryItemController extends Controller
                 }),
             ])
             ->defaultSort('-created_at')
-            ->paginate(10)
+            ->paginate((int) $request->input('per_page', 100))
             ->withQueryString();
 
         return Inertia::render('workspaces/inventory/items/index', [
@@ -122,14 +124,20 @@ class InventoryItemController extends Controller
 
         $request->validate([
             'product_id' => 'required|exists:products,id',
-            'sku' => 'required|string|max:255',
+            'sku' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('inventory_items')
+                    ->where('workspace_id', $workspace->id)
+                    ->ignore($item->id),
+            ],
             'sales_keywords' => 'nullable|string',
             'transaction_keywords' => 'nullable|string',
             'lead_time' => 'nullable|integer|min:0',
             'unfulfilled_count' => 'nullable|integer|min:0',
             'three_days_average' => 'nullable|numeric|min:0',
         ]);
-
         $item->update([
             'product_id' => $request->product_id,
             'sku' => $request->sku,

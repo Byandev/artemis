@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AdRecord;
 use App\Models\Order;
 use App\Models\Workspace;
+use App\Services\PostHogService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -48,6 +49,11 @@ class WorkspaceController extends Controller
         ]);
 
         $workspace->users()->attach($request->user()->id, ['role' => 'owner']);
+
+        (new PostHogService)->capture((string) $request->user()->id, 'workspace_additional_created', [
+            'workspace_id' => $workspace->id,
+            'workspace_name' => $workspace->name,
+        ]);
 
         return redirect()->route('workspaces.show', $workspace->slug)
             ->with('success', 'Workspace created successfully.');
@@ -112,6 +118,10 @@ class WorkspaceController extends Controller
 
     public function dashboard(Request $request, Workspace $workspace)
     {
+        if ($request->user()->role === 'admin') {
+            return redirect()->route('workspaces.admin.dashboard', $workspace->slug);
+        }
+
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
@@ -126,6 +136,11 @@ class WorkspaceController extends Controller
                 },
                 'pageOwners:id,name',
             ]),
+            'metricSettings' => [
+                'allowed' => $workspace->allowedMetrics(),
+                'defaults' => $workspace->metricSetting?->default_metrics
+                    ?? ['totalSales', 'totalOrders', 'aov', 'rtsRate'],
+            ],
         ]);
     }
 
