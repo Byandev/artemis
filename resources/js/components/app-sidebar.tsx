@@ -108,6 +108,7 @@ export function AppSidebar() {
                       title: 'Checklist',
                       href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/checklist`,
                       icon: ListChecks,
+                      permission: PERMISSIONS.ViewChecklist,
                   },
               ]
             : []),
