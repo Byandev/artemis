@@ -1,7 +1,8 @@
-import AppLayout from '@/layouts/app-layout';
+import { Can } from '@/components/can';
+import PageHeader from '@/components/common/PageHeader';
+import RoleFormDialog from '@/components/roles/role-form-dialog';
+import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import { Head, router } from '@inertiajs/react';
-import { ColumnDef } from '@tanstack/react-table';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -9,31 +10,30 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
+import AppLayout from '@/layouts/app-layout';
+import { toFrontendSort } from '@/lib/sort';
+import * as rolesRoute from '@/routes/roles';
+import { PaginatedData } from '@/types';
+import { Role } from '@/types/models/Role';
+import { Workspace } from '@/types/models/Workspace';
+import { Head, router } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
+import clsx from 'clsx';
+import { omit } from 'lodash';
 import {
-    Pencil,
+    AlertTriangle,
     Archive,
+    KeyRound,
+    MoreHorizontal,
+    Pencil,
     RefreshCcw,
     Search,
-    AlertTriangle,
     ShieldCheck,
-    MoreHorizontal,
-    KeyRound,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast, Toaster } from 'sonner';
-import { Workspace } from '@/types/models/Workspace';
-import { Role } from '@/types/models/Role';
-import RoleFormDialog from '@/components/roles/role-form-dialog';
-import PageHeader from '@/components/common/PageHeader';
-import { Button } from '@/components/ui/button';
-import { PaginatedData } from '@/types';
-import { toFrontendSort } from '@/lib/sort';
-import { omit } from 'lodash';
-import * as rolesRoute from '@/routes/roles';
-import clsx from 'clsx';
-import { Can } from '@/components/can';
-import { usePermission } from '@/hooks/use-permission';
-import { PERMISSIONS } from '@/constants/permissions';
 
 interface Props {
     roles: PaginatedData<Role>;
@@ -51,23 +51,33 @@ function StatusBadge({ deletedAt }: { deletedAt?: string | null }) {
     return (
         <span
             className={clsx(
-                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] font-medium uppercase tracking-wide',
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] font-medium tracking-wide uppercase',
                 isActive
                     ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
                     : 'bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400',
             )}
         >
-            <span className={clsx('h-1.5 w-1.5 rounded-full', isActive ? 'bg-emerald-500' : 'bg-red-400')} />
+            <span
+                className={clsx(
+                    'h-1.5 w-1.5 rounded-full',
+                    isActive ? 'bg-emerald-500' : 'bg-red-400',
+                )}
+            />
             {isActive ? 'Active' : 'Archived'}
         </span>
     );
 }
 
 export default function Index({ roles, workspace, query }: Props) {
-    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
+    const initialSorting = useMemo(
+        () => toFrontendSort(query?.sort ?? null),
+        [query?.sort],
+    );
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
-    const [selectedRole, setSelectedRole] = useState<Role | undefined>(undefined);
+    const [selectedRole, setSelectedRole] = useState<Role | undefined>(
+        undefined,
+    );
     const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
     const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
     const [openFormModal, setOpenFormModal] = useState(false);
@@ -84,10 +94,15 @@ export default function Index({ roles, workspace, query }: Props) {
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
-                    page: searchValue ? 1 : query?.page ?? 1,
+                    page: searchValue ? 1 : (query?.page ?? 1),
                     per_page: query?.perPage ?? roles.per_page,
                 },
-                { preserveState: true, replace: true, preserveScroll: true, only: ['roles'] },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['roles'],
+                },
             );
         }, 500);
         return () => clearTimeout(timer);
@@ -95,45 +110,62 @@ export default function Index({ roles, workspace, query }: Props) {
 
     const handleConfirmArchive = () => {
         if (!selectedRole) return;
-        router.delete(`/workspaces/${workspace.slug}/roles/${selectedRole.id}`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success(`${selectedRole.name} has been archived.`);
-                setIsArchiveModalOpen(false);
-                setSelectedRole(undefined);
+        router.delete(
+            `/workspaces/${workspace.slug}/roles/${selectedRole.id}`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success(`${selectedRole.name} has been archived.`);
+                    setIsArchiveModalOpen(false);
+                    setSelectedRole(undefined);
+                },
             },
-        });
+        );
     };
 
     const handleConfirmRestore = () => {
         if (!selectedRole) return;
-        router.post(rolesRoute.restore({ workspace, role: selectedRole.id }).url, {}, {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success(`${selectedRole.name} has been restored.`);
-                setIsRestoreModalOpen(false);
-                setSelectedRole(undefined);
+        router.post(
+            rolesRoute.restore({ workspace, role: selectedRole.id }).url,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success(`${selectedRole.name} has been restored.`);
+                    setIsRestoreModalOpen(false);
+                    setSelectedRole(undefined);
+                },
             },
-        });
+        );
     };
 
     const columns: ColumnDef<Role>[] = [
         {
             accessorKey: 'name',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Name" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Name" />
+            ),
             cell: ({ row }) => (
-                <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">{row.original.name}</span>
+                <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                    {row.original.name}
+                </span>
             ),
         },
         {
             accessorKey: 'description',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Description" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Description" />
+            ),
             cell: ({ row }) => (
                 <div className="max-w-[400px]">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                        {row.original.description || <span className="text-gray-300 dark:text-gray-600 italic">No description</span>}
+                        {row.original.description || (
+                            <span className="text-gray-300 italic dark:text-gray-600">
+                                No description
+                            </span>
+                        )}
                     </p>
                 </div>
             ),
@@ -141,58 +173,101 @@ export default function Index({ roles, workspace, query }: Props) {
         {
             accessorKey: 'deleted_at',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Status" />,
-            cell: ({ row }) => <StatusBadge deletedAt={row.original.deleted_at} />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Status" />
+            ),
+            cell: ({ row }) => (
+                <StatusBadge deletedAt={row.original.deleted_at} />
+            ),
         },
         ...(showActions
-            ? [{
-                id: 'actions',
-                cell: ({ row }) => (
-                    <div className="flex justify-end">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
-                                    <MoreHorizontal className="h-3.5 w-3.5" />
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                                {!row.original.deleted_at ? (
-                                    <>
-                                        {canEdit && (
-                                            <DropdownMenuItem onClick={() => { setSelectedRole(row.original); setOpenFormModal(true); }}>
-                                                <Pencil />
-                                                Edit
-                                            </DropdownMenuItem>
-                                        )}
-                                        {canManagePerms && (
-                                            <DropdownMenuItem onClick={() => router.get(`/workspaces/${workspace.slug}/roles/${row.original.id}/permissions`)}>
-                                                <KeyRound />
-                                                Manage Permissions
-                                            </DropdownMenuItem>
-                                        )}
-                                        {canDelete && (
-                                            <>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem variant="destructive" onClick={() => { setSelectedRole(row.original); setIsArchiveModalOpen(true); }}>
-                                                    <Archive />
-                                                    Archive
-                                                </DropdownMenuItem>
-                                            </>
-                                        )}
-                                    </>
-                                ) : (
-                                    canDelete && (
-                                        <DropdownMenuItem onClick={() => { setSelectedRole(row.original); setIsRestoreModalOpen(true); }}>
-                                            <RefreshCcw />
-                                            Restore
-                                        </DropdownMenuItem>
-                                    )
-                                )}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                ),
-            } as ColumnDef<Role>]
+            ? [
+                  {
+                      id: 'actions',
+                      cell: ({ row }) => (
+                          <div className="flex justify-end">
+                              <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                      <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
+                                          <MoreHorizontal className="h-3.5 w-3.5" />
+                                      </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                      align="end"
+                                      className="w-48"
+                                  >
+                                      {!row.original.deleted_at ? (
+                                          <>
+                                              {canEdit && (
+                                                  <DropdownMenuItem
+                                                      onClick={() => {
+                                                          setSelectedRole(
+                                                              row.original,
+                                                          );
+                                                          setOpenFormModal(
+                                                              true,
+                                                          );
+                                                      }}
+                                                  >
+                                                      <Pencil />
+                                                      Edit
+                                                  </DropdownMenuItem>
+                                              )}
+                                              {canManagePerms && (
+                                                  <DropdownMenuItem
+                                                      onClick={() =>
+                                                          router.get(
+                                                              `/workspaces/${workspace.slug}/roles/${row.original.id}/permissions`,
+                                                          )
+                                                      }
+                                                  >
+                                                      <KeyRound />
+                                                      Manage Permissions
+                                                  </DropdownMenuItem>
+                                              )}
+                                              {canDelete && (
+                                                  <>
+                                                      <DropdownMenuSeparator />
+                                                      <DropdownMenuItem
+                                                          variant="destructive"
+                                                          onClick={() => {
+                                                              setSelectedRole(
+                                                                  row.original,
+                                                              );
+                                                              setIsArchiveModalOpen(
+                                                                  true,
+                                                              );
+                                                          }}
+                                                      >
+                                                          <Archive />
+                                                          Archive
+                                                      </DropdownMenuItem>
+                                                  </>
+                                              )}
+                                          </>
+                                      ) : (
+                                          canDelete && (
+                                              <DropdownMenuItem
+                                                  onClick={() => {
+                                                      setSelectedRole(
+                                                          row.original,
+                                                      );
+                                                      setIsRestoreModalOpen(
+                                                          true,
+                                                      );
+                                                  }}
+                                              >
+                                                  <RefreshCcw />
+                                                  Restore
+                                              </DropdownMenuItem>
+                                          )
+                                      )}
+                                  </DropdownMenuContent>
+                              </DropdownMenu>
+                          </div>
+                      ),
+                  } as ColumnDef<Role>,
+              ]
             : []),
     ];
 
@@ -218,7 +293,10 @@ export default function Index({ roles, workspace, query }: Props) {
                 >
                     <Can permission={PERMISSIONS.CreateRoles}>
                         <button
-                            onClick={() => { setSelectedRole(undefined); setOpenFormModal(true); }}
+                            onClick={() => {
+                                setSelectedRole(undefined);
+                                setOpenFormModal(true);
+                            }}
                             className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
                         >
                             Add New Role
@@ -253,9 +331,16 @@ export default function Index({ roles, workspace, query }: Props) {
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
                                     page: params?.page ?? 1,
-                                    per_page: params?.per_page ?? query?.perPage ?? roles.per_page,
+                                    per_page:
+                                        params?.per_page ??
+                                        query?.perPage ??
+                                        roles.per_page,
                                 },
-                                { preserveState: true, replace: true, preserveScroll: true },
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true,
+                                },
                             );
                         }}
                     />
@@ -269,27 +354,40 @@ export default function Index({ roles, workspace, query }: Props) {
                         className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px]"
                         onClick={() => setIsArchiveModalOpen(false)}
                     />
-                    <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl duration-150 animate-in fade-in zoom-in dark:bg-zinc-900">
+                    <div className="animate-in fade-in zoom-in relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl duration-150 dark:bg-zinc-900">
                         <div className="flex flex-col items-center p-6 text-center">
                             <div className="mb-4 rounded-xl bg-red-50 p-3">
                                 <AlertTriangle className="h-6 w-6 text-red-500" />
                             </div>
-                            <h3 className="mb-2 text-xl font-bold text-slate-900 dark:text-slate-100">Archive Role</h3>
+                            <h3 className="mb-2 text-xl font-bold text-slate-900 dark:text-slate-100">
+                                Archive Role
+                            </h3>
                             <p className="mb-5 text-sm text-slate-500">
                                 Are you sure you want to archive{' '}
-                                <span className="font-semibold text-slate-900 dark:text-slate-100">"{selectedRole?.name}"</span>?
+                                <span className="font-semibold text-slate-900 dark:text-slate-100">
+                                    "{selectedRole?.name}"
+                                </span>
+                                ?
                             </p>
                             <div className="mb-6 w-full rounded-xl border border-orange-100 bg-orange-50/60 p-3">
                                 <p className="flex items-center justify-center gap-2 text-xs font-medium text-orange-800">
                                     <ShieldCheck className="h-4 w-4" />
-                                    This role will be hidden but can be restored later.
+                                    This role will be hidden but can be restored
+                                    later.
                                 </p>
                             </div>
                             <div className="flex w-full items-center gap-3">
-                                <Button variant="outline" onClick={() => setIsArchiveModalOpen(false)} className="h-10 flex-1 rounded-lg">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setIsArchiveModalOpen(false)}
+                                    className="h-10 flex-1 rounded-lg"
+                                >
                                     Cancel
                                 </Button>
-                                <Button onClick={handleConfirmArchive} className="h-10 flex-1 rounded-lg bg-red-600 text-white hover:bg-red-700">
+                                <Button
+                                    onClick={handleConfirmArchive}
+                                    className="h-10 flex-1 rounded-lg bg-red-600 text-white hover:bg-red-700"
+                                >
                                     Confirm Archive
                                 </Button>
                             </div>
@@ -305,28 +403,40 @@ export default function Index({ roles, workspace, query }: Props) {
                         className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px]"
                         onClick={() => setIsRestoreModalOpen(false)}
                     />
-                    <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl duration-150 animate-in fade-in zoom-in dark:bg-zinc-900">
+                    <div className="animate-in fade-in zoom-in relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl duration-150 dark:bg-zinc-900">
                         <div className="flex flex-col items-center p-6 text-center">
                             <div className="mb-4 rounded-xl bg-emerald-50 p-3">
                                 <RefreshCcw className="h-6 w-6 text-emerald-500" />
                             </div>
-                            <h3 className="mb-2 text-xl font-bold text-slate-900 dark:text-slate-100">Restore Role</h3>
+                            <h3 className="mb-2 text-xl font-bold text-slate-900 dark:text-slate-100">
+                                Restore Role
+                            </h3>
                             <p className="mb-5 text-sm text-slate-500">
                                 Restore{' '}
-                                <span className="font-semibold text-slate-900 dark:text-slate-100">"{selectedRole?.name}"</span>{' '}
+                                <span className="font-semibold text-slate-900 dark:text-slate-100">
+                                    "{selectedRole?.name}"
+                                </span>{' '}
                                 to active status?
                             </p>
                             <div className="mb-6 w-full rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
                                 <p className="flex items-center justify-center gap-2 text-xs font-medium text-emerald-800">
                                     <ShieldCheck className="h-4 w-4" />
-                                    This role will be visible and usable in the workspace again.
+                                    This role will be visible and usable in the
+                                    workspace again.
                                 </p>
                             </div>
                             <div className="flex w-full items-center gap-3">
-                                <Button variant="outline" onClick={() => setIsRestoreModalOpen(false)} className="h-10 flex-1 rounded-lg">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setIsRestoreModalOpen(false)}
+                                    className="h-10 flex-1 rounded-lg"
+                                >
                                     Cancel
                                 </Button>
-                                <Button onClick={handleConfirmRestore} className="h-10 flex-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+                                <Button
+                                    onClick={handleConfirmRestore}
+                                    className="h-10 flex-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+                                >
                                     Confirm Restore
                                 </Button>
                             </div>

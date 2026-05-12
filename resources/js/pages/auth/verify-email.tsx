@@ -36,7 +36,7 @@ export default function VerifyEmail({ status }: { status?: string }) {
                             Resend verification email
                         </Button>
 
-                        <div className='flex justify-center mt-10'>
+                        <div className="mt-10 flex justify-center">
                             <TextLink
                                 href={logout()}
                                 className="mx-auto block text-sm"

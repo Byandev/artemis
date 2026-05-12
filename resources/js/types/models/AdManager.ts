@@ -100,7 +100,7 @@ export interface PageProps {
         end_date?: string;
         status?: string;
         search?: string;
-    }
+    };
 }
 
 export enum AdMetric {

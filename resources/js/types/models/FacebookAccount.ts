@@ -4,6 +4,6 @@ export interface FacebookAccount {
     name: string;
     email: string;
     picture_url: string;
-    access_token: string
-    created_at: string
+    access_token: string;
+    created_at: string;
 }

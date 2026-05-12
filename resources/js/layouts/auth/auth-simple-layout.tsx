@@ -23,9 +23,9 @@ export default function AuthSimpleLayout({
                             className="flex flex-col items-center gap-2 font-medium"
                         >
                             <div className="mb-1 flex h-16 w-16 items-center justify-center rounded-md">
-                                <img 
-                                    src="/img/logo/artemis.png" 
-                                    alt="Artemis Logo" 
+                                <img
+                                    src="/img/logo/artemis.png"
+                                    alt="Artemis Logo"
                                     className="size-16 object-contain"
                                 />
                             </div>

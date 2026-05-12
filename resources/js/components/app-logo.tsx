@@ -2,9 +2,9 @@ export default function AppLogo() {
     return (
         <>
             <div className="flex aspect-square size-8 items-center justify-center">
-                <img 
-                    src="/img/logo/artemis.png" 
-                    alt="Artemis Logo" 
+                <img
+                    src="/img/logo/artemis.png"
+                    alt="Artemis Logo"
                     className="size-8 object-contain"
                 />
             </div>

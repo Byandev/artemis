@@ -1,4 +1,8 @@
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { Check, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 
@@ -37,10 +41,10 @@ export default function DropdownSelect({
                     className={`flex h-8 items-center overflow-hidden rounded-[10px] border transition-all ${
                         open
                             ? 'border-emerald-500 ring-2 ring-emerald-500/15'
-                            : 'border-black/6 dark:border-white/6 hover:border-black/12 dark:hover:border-white/12'
+                            : 'border-black/6 hover:border-black/12 dark:border-white/6 dark:hover:border-white/12'
                     } bg-stone-100 dark:bg-zinc-800`}
                 >
-                    <span className="flex h-full items-center justify-center border-r border-black/6 dark:border-white/6 px-2.5 text-gray-400 dark:text-gray-500">
+                    <span className="flex h-full items-center justify-center border-r border-black/6 px-2.5 text-gray-400 dark:border-white/6 dark:text-gray-500">
                         <ChevronDown
                             className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180 text-emerald-500' : ''}`}
                         />
@@ -52,29 +56,31 @@ export default function DropdownSelect({
             </PopoverTrigger>
             <PopoverContent
                 align={align}
-                className={`${width} overflow-hidden rounded-xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900 p-1 shadow-lg dark:shadow-black/30`}
+                className={`${width} overflow-hidden rounded-xl border border-black/6 bg-white p-1 shadow-lg dark:border-white/6 dark:bg-zinc-900 dark:shadow-black/30`}
             >
-                <p className="px-3 pb-1.5 pt-2 font-mono text-[10px] font-medium uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                <p className="px-3 pt-2 pb-1.5 font-mono text-[10px] font-medium tracking-widest text-gray-400 uppercase dark:text-gray-500">
                     {label}
                 </p>
                 <div className="max-h-72 overflow-y-auto">
-                {options.map((option) => (
-                    <button
-                        key={option.key}
-                        className={`flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-[12px]! font-medium tracking-tight transition-colors ${
-                            value === option.key
-                                ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                                : 'text-gray-600 dark:text-gray-300 hover:bg-stone-50 dark:hover:bg-zinc-800'
-                        }`}
-                        onClick={() => {
-                            onChange(option.key);
-                            setOpen(false);
-                        }}
-                    >
-                        {option.label}
-                        {value === option.key && <Check className="h-3 w-3 text-emerald-500" />}
-                    </button>
-                ))}
+                    {options.map((option) => (
+                        <button
+                            key={option.key}
+                            className={`flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-[12px]! font-medium tracking-tight transition-colors ${
+                                value === option.key
+                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                    : 'text-gray-600 hover:bg-stone-50 dark:text-gray-300 dark:hover:bg-zinc-800'
+                            }`}
+                            onClick={() => {
+                                onChange(option.key);
+                                setOpen(false);
+                            }}
+                        >
+                            {option.label}
+                            {value === option.key && (
+                                <Check className="h-3 w-3 text-emerald-500" />
+                            )}
+                        </button>
+                    ))}
                 </div>
             </PopoverContent>
         </Popover>

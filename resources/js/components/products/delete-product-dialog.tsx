@@ -1,4 +1,3 @@
-import { useForm } from '@inertiajs/react';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -9,9 +8,10 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import workspaces from '@/routes/workspaces';
 import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
-import workspaces from '@/routes/workspaces';
+import { useForm } from '@inertiajs/react';
 import { toast } from 'sonner';
 
 interface DeleteProductDialogProps {
@@ -37,19 +37,25 @@ export function DeleteProductDialog({
             },
         });
     };
-    
+
     return (
-        <AlertDialog open={!!product} onOpenChange={(open) => !open && onClose()}>
+        <AlertDialog
+            open={!!product}
+            onOpenChange={(open) => !open && onClose()}
+        >
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Delete Product</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Are you sure you want to delete <strong>{product?.name}</strong>{' '}
-                        (Code: {product?.code})? This action cannot be undone.
+                        Are you sure you want to delete{' '}
+                        <strong>{product?.name}</strong> (Code: {product?.code}
+                        )? This action cannot be undone.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel disabled={processing}>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel disabled={processing}>
+                        Cancel
+                    </AlertDialogCancel>
                     <AlertDialogAction
                         onClick={handleDelete}
                         disabled={processing}

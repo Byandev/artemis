@@ -27,7 +27,7 @@ export function DeleteChecklistDialog({
         <AlertDialog open={open} onOpenChange={onOpenChange}>
             <AlertDialogContent className="rounded-xl border border-black/8 dark:border-white/8">
                 <AlertDialogHeader>
-                    <AlertDialogTitle className="font-mono text-[14px] uppercase tracking-wide">
+                    <AlertDialogTitle className="font-mono text-[14px] tracking-wide uppercase">
                         Delete Checklist Item
                     </AlertDialogTitle>
                     <AlertDialogDescription className="text-[12px] text-gray-500 dark:text-gray-400">
@@ -37,7 +37,9 @@ export function DeleteChecklistDialog({
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel className="h-8 rounded-lg text-[12px]">Cancel</AlertDialogCancel>
+                    <AlertDialogCancel className="h-8 rounded-lg text-[12px]">
+                        Cancel
+                    </AlertDialogCancel>
                     <AlertDialogAction
                         className="h-8 rounded-lg bg-red-600 text-[12px] text-white hover:bg-red-700"
                         onClick={onConfirm}

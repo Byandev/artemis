@@ -9,7 +9,7 @@ const INITIAL_FORM_STATE: FormState = {
 
 export const useMetricFilters = (
     metricFilters: MetricFilter[],
-    onMetricFiltersChange: (filters: MetricFilter[]) => void
+    onMetricFiltersChange: (filters: MetricFilter[]) => void,
 ) => {
     const [formState, setFormState] = useState<FormState>(INITIAL_FORM_STATE);
     const [isFormOpen, setIsFormOpen] = useState(false);

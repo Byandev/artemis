@@ -1,9 +1,18 @@
-import React from 'react';
-import { FilterIcon } from 'lucide-react';
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import SearchSelect from '@/pages/workspaces/rts/partials/SearchSelect';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { FilterIcon } from 'lucide-react';
+import React from 'react';
 
 type Props = {
     availableTeams: { id: number; name: string }[];
@@ -18,7 +27,7 @@ type Props = {
     setSelectedPages: React.Dispatch<React.SetStateAction<number[]>>;
     selectedShops: number[];
     setSelectedShops: React.Dispatch<React.SetStateAction<number[]>>;
-}
+};
 
 const DashboardFilters = ({
     availableTeams,
@@ -38,17 +47,16 @@ const DashboardFilters = ({
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="outline">
-                    <FilterIcon className='mr-2 h-4 w-4' />
+                    <FilterIcon className="mr-2 h-4 w-4" />
                     Filter
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-54 p-3">
-                <Accordion
-                    type="multiple"
-                    className="w-full"
-                >
+                <Accordion type="multiple" className="w-full">
                     <AccordionItem value="item-1">
-                        <AccordionTrigger className='py-2'>Team</AccordionTrigger>
+                        <AccordionTrigger className="py-2">
+                            Team
+                        </AccordionTrigger>
                         <AccordionContent className="flex flex-col gap-4 text-balance">
                             <SearchSelect
                                 items={availableTeams}
@@ -58,7 +66,9 @@ const DashboardFilters = ({
                         </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-2">
-                        <AccordionTrigger className='py-2'>Product</AccordionTrigger>
+                        <AccordionTrigger className="py-2">
+                            Product
+                        </AccordionTrigger>
                         <AccordionContent className="flex flex-col gap-4 text-balance">
                             <SearchSelect
                                 items={availableProducts}
@@ -68,7 +78,9 @@ const DashboardFilters = ({
                         </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-3">
-                        <AccordionTrigger className='py-2'>Page</AccordionTrigger>
+                        <AccordionTrigger className="py-2">
+                            Page
+                        </AccordionTrigger>
                         <AccordionContent className="flex flex-col gap-4 text-balance">
                             <SearchSelect
                                 items={availablePages}
@@ -78,7 +90,9 @@ const DashboardFilters = ({
                         </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-4">
-                        <AccordionTrigger className='py-2'>Shop</AccordionTrigger>
+                        <AccordionTrigger className="py-2">
+                            Shop
+                        </AccordionTrigger>
                         <AccordionContent className="flex flex-col gap-4 text-balance">
                             <SearchSelect
                                 items={availableShops}
@@ -90,7 +104,7 @@ const DashboardFilters = ({
                 </Accordion>
             </DropdownMenuContent>
         </DropdownMenu>
-    )
-}
+    );
+};
 
 export default DashboardFilters;

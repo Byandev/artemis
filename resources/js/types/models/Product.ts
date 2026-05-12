@@ -18,5 +18,5 @@ export interface Product {
     sales?: number;
     ad_spent?: number;
     roas?: number;
-    rts?: number
+    rts?: number;
 }

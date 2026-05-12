@@ -14,8 +14,7 @@ class RmoOrderController extends Controller
 {
     public function login(Request $request): JsonResponse
     {
-        $query = User::where('status', 'active');
-
+        $query = User::whereRaw('LOWER(status) = ?', ['active']);
 
         if ($request->filled('search')) {
             $query->where('name', 'LIKE', "%{$request->input('search')}%");

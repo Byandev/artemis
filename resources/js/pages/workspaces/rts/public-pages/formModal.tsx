@@ -17,7 +17,12 @@ interface Props {
     onSubmit?: (userId: string) => void;
 }
 
-export default function FormModal({ open, onOpenChange, users, onSubmit }: Props) {
+export default function FormModal({
+    open,
+    onOpenChange,
+    users,
+    onSubmit,
+}: Props) {
     const [search, setSearch] = useState('');
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
@@ -48,28 +53,33 @@ export default function FormModal({ open, onOpenChange, users, onSubmit }: Props
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-sm p-0 gap-0 overflow-hidden">
-                <div className="px-5 pt-5 pb-4 border-b border-black/6 dark:border-white/6">
+            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-sm">
+                <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader className="mb-4">
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
                             Who are you?
                         </DialogTitle>
-                        <DialogDescription className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5">
+                        <DialogDescription className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
                             Select your name to track actions in this session.
                         </DialogDescription>
                     </DialogHeader>
 
                     {/* Current selection preview */}
                     {selectedUser && (
-                        <div className="mb-3 flex items-center gap-3 rounded-xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-2.5">
+                        <div className="mb-3 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-500/20 dark:bg-emerald-500/10">
                             <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[11px] font-bold text-white">
-                                {selectedUser.name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
+                                {selectedUser.name
+                                    .split(' ')
+                                    .slice(0, 2)
+                                    .map((w) => w[0])
+                                    .join('')
+                                    .toUpperCase()}
                             </span>
                             <div className="flex flex-col">
-                                <span className="font-mono text-[9px] uppercase tracking-wider text-emerald-500 dark:text-emerald-400">
+                                <span className="font-mono text-[9px] tracking-wider text-emerald-500 uppercase dark:text-emerald-400">
                                     Selected
                                 </span>
-                                <span className="text-[13px] font-semibold text-emerald-800 dark:text-emerald-300 leading-tight">
+                                <span className="text-[13px] leading-tight font-semibold text-emerald-800 dark:text-emerald-300">
                                     {selectedUser.name}
                                 </span>
                             </div>
@@ -79,14 +89,14 @@ export default function FormModal({ open, onOpenChange, users, onSubmit }: Props
 
                     {/* Search */}
                     <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
                             autoFocus
                             type="text"
                             placeholder="Search name…"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="h-9 w-full rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 pl-8 pr-3 font-mono! text-[12px]! text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
+                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                         />
                     </div>
                 </div>
@@ -116,18 +126,22 @@ export default function FormModal({ open, onOpenChange, users, onSubmit }: Props
                                             : 'hover:bg-stone-50 dark:hover:bg-zinc-800'
                                     }`}
                                 >
-                                    <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
-                                        isSelected
-                                            ? 'bg-emerald-500 text-white'
-                                            : 'bg-stone-200 text-gray-600 dark:bg-zinc-700 dark:text-gray-300'
-                                    }`}>
+                                    <span
+                                        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
+                                            isSelected
+                                                ? 'bg-emerald-500 text-white'
+                                                : 'bg-stone-200 text-gray-600 dark:bg-zinc-700 dark:text-gray-300'
+                                        }`}
+                                    >
                                         {initials}
                                     </span>
-                                    <span className={`flex-1 text-[13px] font-medium ${
-                                        isSelected
-                                            ? 'text-emerald-700 dark:text-emerald-400'
-                                            : 'text-gray-700 dark:text-gray-300'
-                                    }`}>
+                                    <span
+                                        className={`flex-1 text-[13px] font-medium ${
+                                            isSelected
+                                                ? 'text-emerald-700 dark:text-emerald-400'
+                                                : 'text-gray-700 dark:text-gray-300'
+                                        }`}
+                                    >
                                         {user.name}
                                     </span>
                                     {isSelected && (
@@ -140,7 +154,7 @@ export default function FormModal({ open, onOpenChange, users, onSubmit }: Props
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-2 border-t border-black/6 dark:border-white/6 px-4 py-3">
+                <div className="flex items-center justify-end gap-2 border-t border-black/6 px-4 py-3 dark:border-white/6">
                     <Button
                         type="button"
                         variant="outline"

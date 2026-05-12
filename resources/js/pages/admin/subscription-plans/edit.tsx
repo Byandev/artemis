@@ -1,8 +1,8 @@
+import ComponentCard from '@/components/common/ComponentCard';
+import PageHeader from '@/components/common/PageHeader';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
-import PageHeader from '@/components/common/PageHeader';
-import ComponentCard from '@/components/common/ComponentCard';
 import SubscriptionPlanForm from './partials/subscription-plan-form';
 
 interface SubscriptionPlan {
@@ -59,7 +59,7 @@ export default function Edit({ plan }: Props) {
                 >
                     <Link
                         href="/admin/subscription-plans"
-                        className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
                     >
                         <ArrowLeft className="h-4 w-4" />
                         Back
@@ -68,12 +68,16 @@ export default function Edit({ plan }: Props) {
 
                 <ComponentCard className="mt-6">
                     <form onSubmit={handleSubmit}>
-                        <SubscriptionPlanForm data={data} setData={setData} errors={errors} />
-                        <div className="mt-6 flex justify-end border-t border-zinc-100 dark:border-zinc-800 pt-6">
+                        <SubscriptionPlanForm
+                            data={data}
+                            setData={setData}
+                            errors={errors}
+                        />
+                        <div className="mt-6 flex justify-end border-t border-zinc-100 pt-6 dark:border-zinc-800">
                             <button
                                 type="submit"
                                 disabled={processing}
-                                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
                             >
                                 Update Plan
                             </button>

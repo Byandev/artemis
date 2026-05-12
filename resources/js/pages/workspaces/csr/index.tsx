@@ -1,22 +1,22 @@
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import AppLayout from '@/layouts/app-layout';
-import { toFrontendSort } from '@/lib/sort';
-import { PaginatedData } from '@/types';
-import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
-import { ColumnDef } from '@tanstack/react-table';
-import { omit } from 'lodash';
-import { Search, MoreHorizontal, Pencil, User as UserIcon } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuTrigger
+    DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import AppLayout from '@/layouts/app-layout';
+import { toFrontendSort } from '@/lib/sort';
 import { EmployeeFormDialog } from '@/pages/workspaces/employees/components/employee-form-dialog';
+import { PaginatedData } from '@/types';
 import { User } from '@/types/models/Pancake/User';
+import { Workspace } from '@/types/models/Workspace';
+import { Head, router } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
+import { omit } from 'lodash';
+import { MoreHorizontal, Pencil, Search, User as UserIcon } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface Props {
     workspace: Workspace;
@@ -30,8 +30,16 @@ interface Props {
     };
 }
 
-export default function EmployeesIndex({ workspace, employees, systemUsers, query }: Props) {
-    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
+export default function EmployeesIndex({
+    workspace,
+    employees,
+    systemUsers,
+    query,
+}: Props) {
+    const initialSorting = useMemo(
+        () => toFrontendSort(query?.sort ?? null),
+        [query?.sort],
+    );
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [editingEmployee, setEditingEmployee] = useState<User | null>(null);
 
@@ -42,7 +50,7 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
-                    page: searchValue ? 1 : query?.page ?? 1,
+                    page: searchValue ? 1 : (query?.page ?? 1),
                     per_page: query?.perPage ?? employees.per_page,
                 },
                 { preserveState: true, replace: true, preserveScroll: true },
@@ -58,7 +66,7 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
                 enableSorting: true,
                 size: 240,
                 header: ({ column }) => (
-                    <SortableHeader column={column} title="Name" enabled/>
+                    <SortableHeader column={column} title="Name" enabled />
                 ),
             },
             {
@@ -167,13 +175,16 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
         <AppLayout>
             <Head title={`${workspace.name} - Employees`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <PageHeader title="Employees" description="Manage Pancake users connected to your workspace" />
+                <PageHeader
+                    title="Employees"
+                    description="Manage Pancake users connected to your workspace"
+                />
 
                 <div className="mb-3 flex items-center gap-2">
                     <div className="relative w-full max-w-xs">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                        <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                         <input
-                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pl-8 pr-3 font-mono! text-[12px]! text-gray-800 outline-none transition-all focus:border-emerald-500 dark:bg-zinc-800 dark:text-white"
+                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none focus:border-emerald-500 dark:bg-zinc-800 dark:text-white"
                             placeholder="Search employees..."
                             value={searchValue}
                             onChange={(e) => setSearchValue(e.target.value)}
@@ -194,7 +205,10 @@ export default function EmployeesIndex({ workspace, employees, systemUsers, quer
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
                                     page: params?.page ?? 1,
-                                    per_page: params?.per_page ?? query?.perPage ?? employees.per_page,
+                                    per_page:
+                                        params?.per_page ??
+                                        query?.perPage ??
+                                        employees.per_page,
                                 },
                                 {
                                     preserveState: true,

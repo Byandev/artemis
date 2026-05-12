@@ -1,8 +1,8 @@
-export default function  BarChartSkeleton (){
+export default function BarChartSkeleton() {
     return (
         <div className="relative h-60 w-full pb-12">
             {/* Y-axis labels skeleton */}
-            <div className="absolute -left-2 top-0 flex h-full flex-col justify-between py-4">
+            <div className="absolute top-0 -left-2 flex h-full flex-col justify-between py-4">
                 {[...Array(6)].map((_, i) => (
                     <div
                         key={i}
@@ -38,7 +38,7 @@ export default function  BarChartSkeleton (){
                 </div>
 
                 {/* X-axis labels skeleton */}
-                <div className="absolute -bottom-8 left-0 right-0 flex justify-between px-2">
+                <div className="absolute right-0 -bottom-8 left-0 flex justify-between px-2">
                     {[...Array(8)].map((_, i) => (
                         <div
                             key={i}
@@ -50,4 +50,3 @@ export default function  BarChartSkeleton (){
         </div>
     );
 }
-

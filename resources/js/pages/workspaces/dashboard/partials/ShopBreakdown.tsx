@@ -1,16 +1,19 @@
 import BarChart from '@/components/charts/BarChart';
-import { FilterValue } from '@/components/filters/Filters';
+import BarChartSkeleton from '@/components/charts/skeletons/BarChartSkeleton';
 import DropdownSelect from '@/components/common/DropdownSelect';
+import { FilterValue } from '@/components/filters/Filters';
 import { Button } from '@/components/ui/button';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { metricConfigs, MetricKey } from '@/types/metrics';
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
+import { RefreshCcw } from 'lucide-react';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
-import BarChartSkeleton from '@/components/charts/skeletons/BarChartSkeleton';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { RefreshCcw } from 'lucide-react';
-import ComponentCard from '@/components/common/ComponentCard';
-import { metricConfigs, MetricKey } from '@/types/metrics';
 
 interface Props {
     workspace: Workspace;
@@ -27,12 +30,12 @@ interface BreakdownItem {
 }
 
 export default function ShopBreakdown({
-                                          workspace,
-                                          dateRange,
-                                          filter,
-                                          metrics,
-                                          onDataLoaded,
-                                      }: Props) {
+    workspace,
+    dateRange,
+    filter,
+    metrics,
+    onDataLoaded,
+}: Props) {
     const [breakdown, setBreakdown] = useState<BreakdownItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -59,13 +62,18 @@ export default function ShopBreakdown({
     }, [metrics]);
 
     useEffect(() => {
-        if (filteredOptions.length > 0 && !filteredOptions.find((m) => m.key === option)) {
+        if (
+            filteredOptions.length > 0 &&
+            !filteredOptions.find((m) => m.key === option)
+        ) {
             setOption(filteredOptions[0].key);
         }
     }, [filteredOptions]);
 
     const formatValue = (value: number) =>
-        activeMetric?.formatter ? activeMetric.formatter(value) : value.toLocaleString();
+        activeMetric?.formatter
+            ? activeMetric.formatter(value)
+            : value.toLocaleString();
 
     useEffect(() => {
         const controller = new AbortController();
@@ -140,14 +148,21 @@ export default function ShopBreakdown({
             <div className="flex items-center justify-between gap-4">
                 <div>
                     <h2 className="text-[14px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
-                        {activeMetric?.name} <span className="text-gray-300 dark:text-gray-600">·</span> Per Shop
+                        {activeMetric?.name}{' '}
+                        <span className="text-gray-300 dark:text-gray-600">
+                            ·
+                        </span>{' '}
+                        Per Shop
                     </h2>
                 </div>
                 <div className="flex items-center gap-4">
                     <DropdownSelect
                         value={option}
                         onChange={setOption}
-                        options={filteredOptions.map((m) => ({ key: m.key, label: m.name }))}
+                        options={filteredOptions.map((m) => ({
+                            key: m.key,
+                            label: m.name,
+                        }))}
                         label="Metric"
                         align="end"
                     />
@@ -156,7 +171,7 @@ export default function ShopBreakdown({
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 w-8 rounded-[10px] border border-black/6 dark:border-white/6 bg-stone-100 dark:bg-zinc-800 p-0 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-stone-200 dark:hover:bg-zinc-700"
+                                className="h-8 w-8 rounded-[10px] border border-black/6 bg-stone-100 p-0 text-gray-400 hover:bg-stone-200 hover:text-gray-700 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:bg-zinc-700 dark:hover:text-gray-300"
                                 onClick={() =>
                                     setReload((prevState) => !prevState)
                                 }
