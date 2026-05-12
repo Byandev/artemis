@@ -15,6 +15,7 @@ class PancakeUserRmoDailyReport extends Model
         'total_called',
         'total_call_time',
         'total_rmo_call_attempts',
+        'total_confirmed',
     ];
 
     protected $casts = [
