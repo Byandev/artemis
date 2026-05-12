@@ -25,6 +25,8 @@ import {
     Search,
     Users,
 } from 'lucide-react';
+import { Can } from '@/components/can';
+import { PERMISSIONS } from '@/constants/permissions';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner'; // Added toast import
 
@@ -164,12 +166,14 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                                onClick={() => openChecklist(shop)}
-                            >
-                                <ListChecks className="mr-2 h-4 w-4" />
-                                View Checklist
-                            </DropdownMenuItem>
+                            <Can permission={PERMISSIONS.ViewChecklist}>
+                                <DropdownMenuItem
+                                    onClick={() => openChecklist(shop)}
+                                >
+                                    <ListChecks className="mr-2 h-4 w-4" />
+                                    View Checklist
+                                </DropdownMenuItem>
+                            </Can>
                             <DropdownMenuItem
                                 onClick={() => refresh(shop)}
                                 disabled={processing}
