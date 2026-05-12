@@ -25,8 +25,25 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
     {
         $date = $this->date;
 
+        // All distinct (workspace, user) pairs from assignee_id and conferrer_id.
+        $userPool = DB::table('pancake_order_for_delivery')
+            ->whereNotNull('assignee_id')
+            ->where('delivery_date', $date)
+            ->selectRaw('DISTINCT workspace_id, assignee_id AS pancake_user_id')
+            ->unionAll(
+                DB::table('pancake_order_for_delivery')
+                    ->whereNotNull('conferrer_id')
+                    ->where('delivery_date', $date)
+                    ->selectRaw('DISTINCT workspace_id, conferrer_id AS pancake_user_id')
+            );
+
+        $base = DB::query()
+            ->fromSub($userPool, 'pool')
+            ->groupBy('workspace_id', 'pancake_user_id')
+            ->selectRaw('workspace_id, pancake_user_id');
+
         // total_called: pancake_order_for_delivery rows assigned to the user where status != 'PENDING'.
-        $base = DB::table('pancake_order_for_delivery')
+        $assignedAgg = DB::table('pancake_order_for_delivery')
             ->whereNotNull('assignee_id')
             ->where('delivery_date', $date)
             ->groupBy('workspace_id', 'assignee_id')
@@ -35,6 +52,17 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
                 assignee_id AS pancake_user_id,
                 SUM(CASE WHEN status != 'PENDING' THEN 1 ELSE 0 END) AS total_called
             ");
+
+        // confirmed_orders: pancake_order_for_delivery rows confirmed by the user on the date.
+        $confirmedAgg = DB::table('pancake_order_for_delivery')
+            ->whereNotNull('conferrer_id')
+            ->where('delivery_date', $date)
+            ->groupBy('workspace_id', 'conferrer_id')
+            ->selectRaw('
+                workspace_id,
+                conferrer_id AS pancake_user_id,
+                COUNT(*) AS confirmed_orders
+            ');
 
         // total_rmo_call_attempts / total_call_time: per (workspace, user), count and sum call_logs
         // whose phone_number matches any customer_phone or rider_phone from that user's deliveries
@@ -59,6 +87,14 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
 
         $rows = DB::query()
             ->fromSub($base, 'base')
+            ->leftJoinSub($assignedAgg, 'assigned', function ($join) {
+                $join->on('assigned.workspace_id', '=', 'base.workspace_id')
+                    ->on('assigned.pancake_user_id', '=', 'base.pancake_user_id');
+            })
+            ->leftJoinSub($confirmedAgg, 'confirmed', function ($join) {
+                $join->on('confirmed.workspace_id', '=', 'base.workspace_id')
+                    ->on('confirmed.pancake_user_id', '=', 'base.pancake_user_id');
+            })
             ->leftJoinSub($callsAgg, 'calls', function ($join) {
                 $join->on('calls.workspace_id', '=', 'base.workspace_id')
                     ->on('calls.pancake_user_id', '=', 'base.pancake_user_id');
@@ -66,9 +102,10 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
             ->selectRaw('
                 base.workspace_id,
                 base.pancake_user_id,
-                base.total_called,
-                COALESCE(calls.total_calls, 0)    AS total_rmo_call_attempts,
-                COALESCE(calls.total_duration, 0) AS total_call_time
+                COALESCE(assigned.total_called, 0)      AS total_called,
+                COALESCE(calls.total_calls, 0)          AS total_rmo_call_attempts,
+                COALESCE(calls.total_duration, 0)       AS total_call_time,
+                COALESCE(confirmed.confirmed_orders, 0) AS confirmed_orders
             ')
             ->get();
 
@@ -83,6 +120,7 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
                     'total_called' => (int) $row->total_called,
                     'total_call_time' => (int) $row->total_call_time,
                     'total_rmo_call_attempts' => (int) $row->total_rmo_call_attempts,
+                    'confirmed_orders' => (int) $row->confirmed_orders,
                 ]
             );
         }

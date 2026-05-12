@@ -125,7 +125,8 @@ class CSRController extends Controller
                 pancake_user_id,
                 SUM(total_called)             as total_called,
                 SUM(total_call_time)          as total_call_time,
-                SUM(total_rmo_call_attempts)  as total_rmo_call_attempts
+                SUM(total_rmo_call_attempts)  as total_rmo_call_attempts,
+                SUM(confirmed_orders)         as confirmed_orders
             ');
 
         $base = User::query()
@@ -142,6 +143,7 @@ class CSRController extends Controller
             ->selectRaw('COALESCE(rmo.total_called, 0)             as total_called')
             ->selectRaw('COALESCE(rmo.total_call_time, 0)          as total_call_time')
             ->selectRaw('COALESCE(rmo.total_rmo_call_attempts, 0)  as total_rmo_call_attempts')
+            ->selectRaw('COALESCE(rmo.confirmed_orders, 0)         as confirmed_orders')
             ->selectRaw('
                 CASE
                     WHEN (COALESCE(pos.total_returning, 0) + COALESCE(pos.total_delivered, 0)) > 0
@@ -163,6 +165,7 @@ class CSRController extends Controller
                 'total_call_time',
                 'total_rmo_call_attempts',
                 'rts_rate',
+                'confirmed_orders',
             ])
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($q, $value) {
