@@ -128,12 +128,20 @@ class CSRController extends Controller
                 SUM(total_rmo_call_attempts)  as total_rmo_call_attempts
             ');
 
+        $confirmedSummary = DB::table('pancake_orders')
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('confirmed_at', [$from.' 00:00:00', $to.' 23:59:59'])
+            ->whereNotNull('confirmed_by')
+            ->groupBy('confirmed_by')
+            ->selectRaw('confirmed_by, COUNT(*) as confirmed_orders');
+
         $base = User::query()
             ->whereHas('shopUsers.shop', fn ($q) => $q->where('workspace_id', $workspace->id));
 
         $records = QueryBuilder::for($base)
             ->leftJoinSub($posSummary, 'pos', 'pos.pancake_user_id', '=', 'pancake_users.id')
             ->leftJoinSub($rmoSummary, 'rmo', 'rmo.pancake_user_id', '=', 'pancake_users.id')
+            ->leftJoinSub($confirmedSummary, 'confirmed', 'confirmed.confirmed_by', '=', 'pancake_users.id')
             ->select('pancake_users.*')
             ->selectRaw('COALESCE(pos.total_orders, 0)             as total_orders')
             ->selectRaw('COALESCE(pos.total_sales, 0)              as total_sales')
@@ -142,6 +150,7 @@ class CSRController extends Controller
             ->selectRaw('COALESCE(rmo.total_called, 0)             as total_called')
             ->selectRaw('COALESCE(rmo.total_call_time, 0)          as total_call_time')
             ->selectRaw('COALESCE(rmo.total_rmo_call_attempts, 0)  as total_rmo_call_attempts')
+            ->selectRaw('COALESCE(confirmed.confirmed_orders, 0)   as confirmed_orders')
             ->selectRaw('
                 CASE
                     WHEN (COALESCE(pos.total_returning, 0) + COALESCE(pos.total_delivered, 0)) > 0
@@ -163,6 +172,7 @@ class CSRController extends Controller
                 'total_call_time',
                 'total_rmo_call_attempts',
                 'rts_rate',
+                'confirmed_orders',
             ])
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($q, $value) {

@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 
 class SyncCsrRmoDailyRecords extends Command
 {
-    protected $signature = 'sync:csr-rmo-daily-records
+        protected $signature = 'sync:csr-rmo-daily-records
                             {--date= : Single target date in Y-m-d format. If omitted, the last --days days are dispatched (one job per day).}
                             {--days=7 : Number of trailing days to backfill when --date is not provided. Defaults to 7.}';
 

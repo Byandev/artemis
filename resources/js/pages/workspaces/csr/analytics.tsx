@@ -23,6 +23,7 @@ interface CsrRecord {
     total_called: number;
     total_call_time: number;
     total_rmo_call_attempts: number;
+    confirmed_orders: number;
 }
 
 interface Props {
@@ -235,6 +236,17 @@ export default function Analytics({ workspace, query }: Props) {
                     Number(row.original.total_orders).toLocaleString(),
             },
             {
+                accessorKey: 'confirmed_orders',
+                header: ({ column }) => (
+                    <SortableHeader
+                        column={column}
+                        title="RMO Confirmed"
+                    />
+                ),
+                cell: ({ row }) =>
+                    Number(row.original.confirmed_orders).toLocaleString(),
+            },
+            {
                 accessorKey: 'total_sales',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="Sales" />
@@ -266,7 +278,7 @@ export default function Analytics({ workspace, query }: Props) {
             {
                 accessorKey: 'total_called',
                 header: ({ column }) => (
-                    <SortableHeader column={column} title="Assigned RMO " />
+                    <SortableHeader column={column} title="RMO Assigned" />
                 ),
                 cell: ({ row }) =>
                     Number(row.original.total_called).toLocaleString(),
@@ -276,7 +288,7 @@ export default function Analytics({ workspace, query }: Props) {
                 header: ({ column }) => (
                     <SortableHeader
                         column={column}
-                        title="Assigned RMO Called"
+                        title="RMO Called"
                     />
                 ),
                 cell: ({ row }) =>
@@ -289,7 +301,7 @@ export default function Analytics({ workspace, query }: Props) {
                 header: ({ column }) => (
                     <SortableHeader
                         column={column}
-                        title="Assigned RMO Call Time"
+                        title="RMO Call Time"
                     />
                 ),
                 cell: ({ row }) => formatCallTime(row.original.total_call_time),
