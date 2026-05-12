@@ -3,11 +3,12 @@ import { MetricSettingDialog } from '@/components/metrics/metricsetting-dialog-f
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { PaginatedData } from '@/types';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import debounce from 'lodash/debounce';
 import {
+    ArrowUpRight,
     Boxes,
     CreditCard,
     Files,
@@ -40,6 +41,7 @@ interface Workspace {
     slug: string;
     owner?: { name: string };
     pages_count: number;
+    max_pages: number | null;
     subscription?: Subscription | null;
     inventory_module_enabled: boolean;
     finance_module_enabled: boolean;
@@ -141,6 +143,9 @@ export default function Index({ workspaces, plans, filters }: Props) {
     const [editingModules, setEditingModules] = useState<Workspace | null>(
         null,
     );
+    const [editingMaxPages, setEditingMaxPages] = useState<Workspace | null>(
+        null,
+    );
 
     const initialSorting = useMemo(() => {
         if (filters.sort) {
@@ -222,7 +227,11 @@ export default function Index({ workspaces, plans, filters }: Props) {
                 <div className="text-center">
                     <div className="inline-flex items-center gap-1.5 rounded-full border border-brand-100 bg-brand-50/50 px-3 py-1 text-xs font-bold text-brand-600 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-400">
                         <Files className="h-3 w-3" />
-                        {row.original.pages_count} Pages
+                        {row.original.pages_count}
+                        {row.original.max_pages !== null
+                            ? ` / ${row.original.max_pages}`
+                            : ''}{' '}
+                        Pages
                     </div>
                 </div>
             ),
@@ -266,6 +275,20 @@ export default function Index({ workspaces, plans, filters }: Props) {
             ),
             cell: ({ row }) => (
                 <div className="flex items-center justify-end gap-1 text-right">
+                    <Link
+                        href={`/workspaces/${row.original.slug}/dashboard`}
+                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                        title="Open workspace dashboard"
+                    >
+                        <ArrowUpRight className="h-4 w-4" />
+                    </Link>
+                    <button
+                        onClick={() => setEditingMaxPages(row.original)}
+                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                        title="Set max pages"
+                    >
+                        <Files className="h-4 w-4" />
+                    </button>
                     <button
                         onClick={() => setEditingModules(row.original)}
                         className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
@@ -367,6 +390,13 @@ export default function Index({ workspaces, plans, filters }: Props) {
                     workspace={editingWorkspace}
                     plans={plans}
                     onClose={() => setEditingWorkspace(null)}
+                />
+            )}
+
+            {editingMaxPages && (
+                <MaxPagesModal
+                    workspace={editingMaxPages}
+                    onClose={() => setEditingMaxPages(null)}
                 />
             )}
 
@@ -512,6 +542,95 @@ function SubscriptionModal({
                             <option value="canceled">Canceled</option>
                             <option value="expired">Expired</option>
                         </select>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={processing}
+                            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+function MaxPagesModal({
+    workspace,
+    onClose,
+}: {
+    workspace: Workspace;
+    onClose: () => void;
+}) {
+    const { data, setData, put, processing } = useForm({
+        max_pages: workspace.max_pages?.toString() ?? '',
+    });
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        put(`/admin/workspaces/${workspace.slug}/max-pages`, {
+            onSuccess: () => onClose(),
+            preserveScroll: true,
+        });
+    }
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            onClick={onClose}
+        >
+            <div
+                className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="mb-5 flex items-center justify-between">
+                    <div>
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                            Max Pages Limit
+                        </h3>
+                        <p className="text-sm text-zinc-500">
+                            {workspace.name}
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                            Maximum Pages
+                        </label>
+                        <input
+                            type="number"
+                            min="1"
+                            placeholder="No limit"
+                            value={data.max_pages}
+                            onChange={(e) =>
+                                setData('max_pages', e.target.value)
+                            }
+                            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-zinc-700 dark:bg-zinc-800"
+                        />
+                        <p className="mt-1 text-xs text-zinc-500">
+                            Leave empty to use the subscription plan limit
+                            instead. Currently using{' '}
+                            {workspace.pages_count} page(s).
+                        </p>
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">

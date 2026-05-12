@@ -259,12 +259,14 @@ const Pages = ({
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
-                            <DropdownMenuItem
-                                onClick={() => openChecklist(page)}
-                            >
-                                <ListChecks />
-                                View Checklist
-                            </DropdownMenuItem>
+                            <Can permission={PERMISSIONS.ViewChecklist}>
+                                <DropdownMenuItem
+                                    onClick={() => openChecklist(page)}
+                                >
+                                    <ListChecks />
+                                    View Checklist
+                                </DropdownMenuItem>
+                            </Can>
                             <DropdownMenuItem onClick={() => handleEdit(page)}>
                                 <Edit />
                                 Edit

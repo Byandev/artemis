@@ -118,3 +118,61 @@ test('progress endpoint 403s when target belongs to another workspace', function
         ->getJson("/workspaces/{$workspaceA->slug}/checklist/progress/page/{$foreignPage->id}")
         ->assertForbidden();
 });
+
+test('member without View Checklist permission cannot view checklist progress', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    $member = makeWorkspaceMember($workspace);
+    $page = Page::factory()->forWorkspace($workspace)->create();
+
+    $this->actingAs($member)
+        ->getJson("/workspaces/{$workspace->slug}/checklist/progress/page/{$page->id}")
+        ->assertForbidden();
+});
+
+test('member without Edit Checklist permission cannot store checklist progress', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $member = makeWorkspaceMember($workspace);
+    $shop = Shop::factory()->forWorkspace($workspace)->create();
+
+    $item = WorkspaceChecklist::create([
+        'workspace_id' => $workspace->id,
+        'created_by' => $owner->id,
+        'title' => 'X',
+        'target' => 'Shop',
+        'required' => false,
+    ]);
+
+    $this->actingAs($member)
+        ->postJson("/workspaces/{$workspace->slug}/checklist/progress/shop/{$shop->id}", [
+            'checklist_id' => $item->id,
+        ])
+        ->assertForbidden();
+});
+
+test('member without Edit Checklist permission cannot delete checklist progress', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $member = makeWorkspaceMember($workspace);
+    $page = Page::factory()->forWorkspace($workspace)->create();
+    $item = WorkspaceChecklist::create([
+        'workspace_id' => $workspace->id,
+        'created_by' => $owner->id,
+        'title' => 'X',
+        'target' => 'Page',
+        'required' => false,
+    ]);
+
+    WorkspaceChecklistCompletion::create([
+        'workspace_id' => $workspace->id,
+        'workspace_checklist_id' => $item->id,
+        'target_type' => Page::class,
+        'target_id' => $page->id,
+        'checked_by' => $owner->id,
+        'checked_at' => now(),
+    ]);
+
+    $this->actingAs($member)
+        ->deleteJson("/workspaces/{$workspace->slug}/checklist/progress/page/{$page->id}", [
+            'checklist_id' => $item->id,
+        ])
+        ->assertForbidden();
+});
