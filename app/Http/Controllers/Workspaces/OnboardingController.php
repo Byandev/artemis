@@ -27,13 +27,25 @@ class OnboardingController extends Controller
             return redirect()->route('workspace.dashboard', $workspace->slug);
         }
 
+        $info = $workspace->pageLimitInfo();
+
         return Inertia::render('workspaces/onboarding', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
+            'pageLimit' => $info['limit'],
+            'pageCount' => $info['count'],
+            'pageLimitReached' => $info['reached'],
         ]);
     }
 
     public function store(Request $request, Workspace $workspace)
     {
+        $info = $workspace->pageLimitInfo();
+        if ($info['reached']) {
+            throw ValidationException::withMessages([
+                'page_limit' => "You've reached your plan's page limit ({$info['limit']}). Upgrade your plan to add more pages.",
+            ]);
+        }
+
         $validated = $request->validate([
             'page_id' => ['required', 'integer'],
             'shop_id' => ['required', 'integer'],
