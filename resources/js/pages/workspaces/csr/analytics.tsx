@@ -110,14 +110,13 @@ function StatCard({ title, value, loading, format: fmt }: StatCardProps) {
 
 export default function Analytics({ workspace, query }: Props) {
     const today = new Date();
-    const initialType = query?.type === 'erp' ? 'erp' : 'pos';
     const [range, setRange] = useState<{ from: Date; to: Date }>({
         from: subDays(today, 6),
         to: today,
     });
     const [paginatedRecords, setPaginatedRecords] =
         useState<PaginatedData<CsrRecord> | null>(null);
-    const [currentType, setCurrentType] = useState(initialType);
+    const currentType = 'pos';
     const [sort, setSort] = useState('-total_sales');
     const [page, setPage] = useState(1);
     const [perPage, setPerPage] = useState(10);
@@ -307,38 +306,6 @@ export default function Analytics({ workspace, query }: Props) {
                     description="Aggregated CSR performance from daily records"
                     stackActionsOnMobile
                 >
-                    <div className="flex items-center rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
-                        {['erp', 'pos'].map((value) => {
-                            const label = value === 'erp' ? 'ERP' : 'POS';
-                            const isActive = currentType === value;
-                            const isDisabled = value === 'erp';
-                            return (
-                                <button
-                                    key={value}
-                                    disabled={isDisabled}
-                                    onClick={() => {
-                                        setCurrentType(value);
-                                        const url = new URL(
-                                            window.location.href,
-                                        );
-                                        url.searchParams.set('type', value);
-                                        window.history.replaceState(
-                                            {},
-                                            '',
-                                            url.toString(),
-                                        );
-                                    }}
-                                    className={`rounded-lg px-3 py-1.5 text-[12px]! font-medium transition-colors ${
-                                        isActive
-                                            ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-600 dark:text-white'
-                                            : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
-                                    }`}
-                                >
-                                    {label}
-                                </button>
-                            );
-                        })}
-                    </div>
                     <DatePicker
                         id="csr-analytics-date-range"
                         mode="range"
