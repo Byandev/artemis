@@ -10,7 +10,7 @@ class SyncCsrRmoDailyRecords extends Command
 {
     protected $signature = 'sync:csr-rmo-daily-records
                             {--date= : Single target date in Y-m-d format. If omitted, the last --days days are dispatched (one job per day).}
-                            {--days=7 : Number of trailing days to backfill when --date is not provided. Defaults to 7.}';
+                            {--days=14 : Number of trailing days to backfill when --date is not provided. Defaults to 7.}';
 
     protected $description = 'Dispatch SyncCsrRmoDailyRecord jobs to aggregate per-CSR RMO call metrics. Backfills the last 7 days by default.';
 
