@@ -265,6 +265,14 @@ export default function Analytics({ workspace, query }: Props) {
                     `${Number(row.original.rts_rate).toFixed(2)}%`,
             },
             {
+                accessorKey: 'total_confirmed',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RMO Confirmed" />
+                ),
+                cell: ({ row }) =>
+                    Number(row.original.total_confirmed).toLocaleString(),
+            },
+            {
                 accessorKey: 'total_called',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="RMO Assigned" />
@@ -288,14 +296,6 @@ export default function Analytics({ workspace, query }: Props) {
                     <SortableHeader column={column} title="RMO Call Time" />
                 ),
                 cell: ({ row }) => formatCallTime(row.original.total_call_time),
-            },
-            {
-                accessorKey: 'total_confirmed',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="RMO Confirmed" />
-                ),
-                cell: ({ row }) =>
-                    Number(row.original.total_confirmed).toLocaleString(),
             },
         ],
         [],
