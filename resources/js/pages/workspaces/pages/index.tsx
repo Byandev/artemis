@@ -26,6 +26,8 @@ import {
     Search,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { Can } from '@/components/can';
+import { PERMISSIONS } from '@/constants/permissions';
 
 interface PagesProps {
     workspace: Workspace;
