@@ -134,6 +134,9 @@ class WorkspaceController extends Controller
                 'pages' => function ($query) {
                     $query->select('id', 'name', 'workspace_id')->orderBy('name');
                 },
+                'teams' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                },
                 'pageOwners:id,name',
             ]),
             'metricSettings' => [
