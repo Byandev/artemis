@@ -176,7 +176,7 @@ const STATUS_COLORS: Record<string, string> = {
 const fallbackColor = '#71717a';
 
 // ---------------------------------------------------------------------------
-// Sub-components (matching system theme)
+// Sub-components
 // ---------------------------------------------------------------------------
 
 function StatCard({
@@ -227,7 +227,7 @@ function SectionCard({
 }) {
     return (
         <div
-            className={`rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900 ${className ?? ''}`}
+            className={`overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900 ${className ?? ''}`}
         >
             <div className="flex items-center justify-between px-6 py-5">
                 <div>
@@ -243,7 +243,7 @@ function SectionCard({
                 {action && (
                     <Link
                         href={action.href}
-                        className="flex items-center gap-1 text-[11px] font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+                        className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
                     >
                         {action.label}
                         <ArrowRight className="h-3 w-3" />
@@ -288,7 +288,7 @@ function ComparisonBadge({
 
 function EmptyState({ message }: { message: string }) {
     return (
-        <div className="flex h-56 items-center justify-center px-6 py-10">
+        <div className="flex h-52 items-center justify-center px-6 py-10">
             <p className="text-sm text-gray-400 dark:text-gray-500">
                 {message}
             </p>
@@ -297,7 +297,7 @@ function EmptyState({ message }: { message: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Chart configs — using theme-aware colors
+// Chart configs
 // ---------------------------------------------------------------------------
 
 const salesTrendConfig: ChartConfig = {
@@ -314,25 +314,25 @@ const salesTrendConfig: ChartConfig = {
 const deliveryTrendConfig: ChartConfig = {
     delivered: {
         label: 'Delivered',
-        theme: { light: '#12b76a', dark: '#32d583' },
+        theme: { light: '#10b981', dark: '#34d399' },
     },
     returning: {
         label: 'Returning',
-        theme: { light: '#fb6514', dark: '#fd853a' },
+        theme: { light: '#f97316', dark: '#fb923c' },
     },
 };
 
 const rtsTrendConfig: ChartConfig = {
     rts_rate: {
         label: 'RTS Rate %',
-        theme: { light: '#f04438', dark: '#f97066' },
+        theme: { light: '#ef4444', dark: '#f87171' },
     },
 };
 
 const callTrendConfig: ChartConfig = {
     called: {
         label: 'Calls Made',
-        theme: { light: '#7a5af8', dark: '#9b8afb' },
+        theme: { light: '#8b5cf6', dark: '#a78bfa' },
     },
 };
 
@@ -445,19 +445,18 @@ export default function CsrDashboard({
                                                 <stop
                                                     offset="0%"
                                                     stopColor="var(--color-sales)"
-                                                    stopOpacity={0.25}
+                                                    stopOpacity={0.2}
                                                 />
                                                 <stop
                                                     offset="95%"
                                                     stopColor="var(--color-sales)"
-                                                    stopOpacity={0.02}
+                                                    stopOpacity={0}
                                                 />
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid
                                             strokeDasharray="3 3"
                                             vertical={false}
-                                            className="stroke-gray-200 dark:stroke-white/6"
                                         />
                                         <XAxis
                                             dataKey="date"
@@ -465,7 +464,6 @@ export default function CsrDashboard({
                                             axisLine={false}
                                             tickMargin={12}
                                             tickFormatter={shortDate}
-                                            className="text-[11px]"
                                         />
                                         <YAxis
                                             yAxisId="sales"
@@ -474,7 +472,6 @@ export default function CsrDashboard({
                                             axisLine={false}
                                             tickMargin={8}
                                             tickFormatter={pesoCompact}
-                                            className="text-[11px]"
                                             width={54}
                                         />
                                         <YAxis
@@ -483,7 +480,6 @@ export default function CsrDashboard({
                                             tickLine={false}
                                             axisLine={false}
                                             tickMargin={8}
-                                            className="text-[11px]"
                                             width={32}
                                         />
                                         <ChartTooltip
@@ -521,11 +517,7 @@ export default function CsrDashboard({
                                             strokeWidth={2}
                                             fill="url(#salesGrad)"
                                             dot={false}
-                                            activeDot={{
-                                                r: 4,
-                                                strokeWidth: 2,
-                                                fill: 'var(--color-sales)',
-                                            }}
+                                            activeDot={{ r: 4, strokeWidth: 2 }}
                                         />
                                         <Line
                                             yAxisId="orders"
@@ -534,11 +526,7 @@ export default function CsrDashboard({
                                             stroke="var(--color-orders)"
                                             strokeWidth={2}
                                             dot={false}
-                                            activeDot={{
-                                                r: 4,
-                                                strokeWidth: 2,
-                                                fill: 'var(--color-orders)',
-                                            }}
+                                            activeDot={{ r: 4, strokeWidth: 2 }}
                                         />
                                         <ChartLegend
                                             content={<ChartLegendContent />}
@@ -549,7 +537,6 @@ export default function CsrDashboard({
                         )}
                     </SectionCard>
 
-                    {/* Status Breakdown Donut */}
                     <SectionCard title="Status Breakdown" desc="Today's orders">
                         {statusBreakdown.length === 0 ? (
                             <EmptyState message="No orders today." />
@@ -592,7 +579,7 @@ export default function CsrDashboard({
                                         />
                                     </PieChart>
                                 </ChartContainer>
-                                <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 px-1">
+                                <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2">
                                     {statusBreakdown.map((entry) => (
                                         <div
                                             key={entry.status}
@@ -646,7 +633,6 @@ export default function CsrDashboard({
                                         <CartesianGrid
                                             strokeDasharray="3 3"
                                             vertical={false}
-                                            className="stroke-gray-200 dark:stroke-white/6"
                                         />
                                         <XAxis
                                             dataKey="date"
@@ -654,13 +640,11 @@ export default function CsrDashboard({
                                             axisLine={false}
                                             tickMargin={12}
                                             tickFormatter={shortDate}
-                                            className="text-[11px]"
                                         />
                                         <YAxis
                                             tickLine={false}
                                             axisLine={false}
                                             tickMargin={8}
-                                            className="text-[11px]"
                                             width={32}
                                         />
                                         <ChartTooltip
@@ -711,19 +695,18 @@ export default function CsrDashboard({
                                                 <stop
                                                     offset="0%"
                                                     stopColor="var(--color-rts_rate)"
-                                                    stopOpacity={0.2}
+                                                    stopOpacity={0.15}
                                                 />
                                                 <stop
                                                     offset="95%"
                                                     stopColor="var(--color-rts_rate)"
-                                                    stopOpacity={0.02}
+                                                    stopOpacity={0}
                                                 />
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid
                                             strokeDasharray="3 3"
                                             vertical={false}
-                                            className="stroke-gray-200 dark:stroke-white/6"
                                         />
                                         <XAxis
                                             dataKey="date"
@@ -731,7 +714,6 @@ export default function CsrDashboard({
                                             axisLine={false}
                                             tickMargin={12}
                                             tickFormatter={shortDate}
-                                            className="text-[11px]"
                                         />
                                         <YAxis
                                             tickLine={false}
@@ -739,7 +721,6 @@ export default function CsrDashboard({
                                             tickMargin={8}
                                             tickFormatter={(v) => `${v}%`}
                                             domain={[0, 'auto']}
-                                            className="text-[11px]"
                                             width={40}
                                         />
                                         <ChartTooltip
@@ -760,11 +741,7 @@ export default function CsrDashboard({
                                             strokeWidth={2}
                                             fill="url(#rtsGrad)"
                                             dot={false}
-                                            activeDot={{
-                                                r: 4,
-                                                strokeWidth: 2,
-                                                fill: 'var(--color-rts_rate)',
-                                            }}
+                                            activeDot={{ r: 4, strokeWidth: 2 }}
                                         />
                                     </AreaChart>
                                 </ChartContainer>
@@ -783,7 +760,7 @@ export default function CsrDashboard({
                             href: `/workspaces/${slug}/csr/analytics`,
                         }}
                     >
-                        <div className="grid grid-cols-2 gap-px border-t border-gray-100 bg-gray-100 dark:border-white/4 dark:bg-white/4">
+                        <div className="grid grid-cols-2 gap-px border-t border-black/4 bg-black/4 dark:border-white/4 dark:bg-white/4">
                             {(
                                 [
                                     {
@@ -855,7 +832,7 @@ export default function CsrDashboard({
                                             }
                                         />
                                     </div>
-                                    <h4 className="mt-1.5 font-mono text-[18px] font-semibold tracking-tight text-gray-900 tabular-nums dark:text-gray-100">
+                                    <h4 className="mt-1.5 font-mono text-lg font-semibold tracking-tight text-gray-900 tabular-nums dark:text-gray-100">
                                         {item.format(item.mine)}
                                     </h4>
                                     <p className="mt-1 text-[10px] text-gray-400 dark:text-gray-500">
@@ -883,30 +860,9 @@ export default function CsrDashboard({
                                         data={dailyTrend}
                                         barCategoryGap="25%"
                                     >
-                                        <defs>
-                                            <linearGradient
-                                                id="callGrad"
-                                                x1="0"
-                                                y1="0"
-                                                x2="0"
-                                                y2="1"
-                                            >
-                                                <stop
-                                                    offset="0%"
-                                                    stopColor="var(--color-called)"
-                                                    stopOpacity={1}
-                                                />
-                                                <stop
-                                                    offset="100%"
-                                                    stopColor="var(--color-called)"
-                                                    stopOpacity={0.6}
-                                                />
-                                            </linearGradient>
-                                        </defs>
                                         <CartesianGrid
                                             strokeDasharray="3 3"
                                             vertical={false}
-                                            className="stroke-gray-200 dark:stroke-white/6"
                                         />
                                         <XAxis
                                             dataKey="date"
@@ -914,13 +870,11 @@ export default function CsrDashboard({
                                             axisLine={false}
                                             tickMargin={12}
                                             tickFormatter={shortDate}
-                                            className="text-[11px]"
                                         />
                                         <YAxis
                                             tickLine={false}
                                             axisLine={false}
                                             tickMargin={8}
-                                            className="text-[11px]"
                                             width={32}
                                         />
                                         <ChartTooltip
@@ -932,7 +886,7 @@ export default function CsrDashboard({
                                         />
                                         <Bar
                                             dataKey="called"
-                                            fill="url(#callGrad)"
+                                            fill="var(--color-called)"
                                             radius={[5, 5, 0, 0]}
                                         />
                                     </BarChart>
@@ -958,17 +912,17 @@ export default function CsrDashboard({
                             <div className="overflow-x-auto">
                                 <table className="w-full">
                                     <thead>
-                                        <tr className="border-t border-gray-100 text-left text-[11px] font-medium text-gray-400 uppercase dark:border-white/4 dark:text-gray-500">
-                                            <th className="px-6 py-3">
+                                        <tr className="border-t border-black/4 text-left text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:border-white/4 dark:text-gray-500">
+                                            <th className="px-6 py-2.5">
                                                 Order
                                             </th>
-                                            <th className="px-6 py-3">
+                                            <th className="px-6 py-2.5">
                                                 Customer
                                             </th>
-                                            <th className="px-6 py-3">
+                                            <th className="px-6 py-2.5">
                                                 Rider
                                             </th>
-                                            <th className="px-6 py-3 text-right">
+                                            <th className="px-6 py-2.5 text-right">
                                                 SRP
                                             </th>
                                         </tr>
@@ -977,14 +931,14 @@ export default function CsrDashboard({
                                         {pendingOrders.map((o) => (
                                             <tr
                                                 key={o.id}
-                                                className="border-t border-gray-100 dark:border-white/4"
+                                                className="border-t border-black/4 dark:border-white/4"
                                             >
-                                                <td className="px-6 py-3">
-                                                    <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+                                                <td className="px-6 py-2.5">
+                                                    <p className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                                         {o.order.order_number}
                                                     </p>
                                                     {o.order.tracking_code && (
-                                                        <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                                                        <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
                                                             {
                                                                 o.order
                                                                     .tracking_code
@@ -992,14 +946,14 @@ export default function CsrDashboard({
                                                         </p>
                                                     )}
                                                 </td>
-                                                <td className="px-6 py-3 text-[13px] text-gray-600 dark:text-gray-400">
+                                                <td className="px-6 py-2.5 text-[12px] text-gray-600 dark:text-gray-400">
                                                     {o.order.shipping_address
                                                         ?.full_name ?? '—'}
                                                 </td>
-                                                <td className="px-6 py-3 text-[13px] text-gray-600 dark:text-gray-400">
+                                                <td className="px-6 py-2.5 text-[12px] text-gray-600 dark:text-gray-400">
                                                     {o.rider_name ?? '—'}
                                                 </td>
-                                                <td className="px-6 py-3 text-right font-mono text-[13px] font-medium tabular-nums text-gray-800 dark:text-gray-200">
+                                                <td className="px-6 py-2.5 text-right font-mono text-[12px] tabular-nums text-gray-600 dark:text-gray-400">
                                                     {peso(
                                                         o.order.final_amount,
                                                     )}
@@ -1029,24 +983,24 @@ export default function CsrDashboard({
                             <div className="overflow-x-auto">
                                 <table className="w-full">
                                     <thead>
-                                        <tr className="border-t border-gray-100 text-left text-[11px] font-medium text-gray-400 uppercase dark:border-white/4 dark:text-gray-500">
-                                            <th className="w-12 px-6 py-3">
+                                        <tr className="border-t border-black/4 text-left text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:border-white/4 dark:text-gray-500">
+                                            <th className="w-12 px-6 py-2.5">
                                                 #
                                             </th>
-                                            <th className="px-6 py-3">CSR</th>
-                                            <th className="px-6 py-3 text-right">
+                                            <th className="px-6 py-2.5">CSR</th>
+                                            <th className="px-6 py-2.5 text-right">
                                                 Orders
                                             </th>
-                                            <th className="px-6 py-3 text-right">
+                                            <th className="px-6 py-2.5 text-right">
                                                 Sales
                                             </th>
-                                            <th className="px-6 py-3 text-right">
+                                            <th className="px-6 py-2.5 text-right">
                                                 Delivered
                                             </th>
-                                            <th className="px-6 py-3 text-right">
+                                            <th className="px-6 py-2.5 text-right">
                                                 Returning
                                             </th>
-                                            <th className="px-6 py-3 text-right">
+                                            <th className="px-6 py-2.5 text-right">
                                                 RTS Rate
                                             </th>
                                         </tr>
@@ -1063,54 +1017,54 @@ export default function CsrDashboard({
                                             return (
                                                 <tr
                                                     key={csr.pancake_user_id}
-                                                    className={`border-t border-gray-100 dark:border-white/4 ${isMine ? 'bg-brand-25 dark:bg-brand-500/5' : ''}`}
+                                                    className={`border-t border-black/4 dark:border-white/4 ${isMine ? 'bg-emerald-50/50 dark:bg-emerald-500/5' : ''}`}
                                                 >
                                                     <td className="px-6 py-3">
                                                         <span
-                                                            className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
+                                                            className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
                                                                 i === 0
                                                                     ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
                                                                     : i === 1
-                                                                      ? 'bg-gray-200 text-gray-600 dark:bg-zinc-700 dark:text-zinc-300'
+                                                                      ? 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300'
                                                                       : i === 2
                                                                         ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400'
-                                                                        : 'bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-zinc-400'
+                                                                        : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
                                                             }`}
                                                         >
                                                             {i + 1}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-3 text-[13px] font-medium text-gray-800 dark:text-gray-200">
+                                                    <td className="px-6 py-3 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                                         {csr.csr_name}
                                                         {isMine && (
-                                                            <span className="ml-1.5 text-[10px] font-medium text-brand-500 dark:text-brand-400">
+                                                            <span className="ml-1.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
                                                                 (You)
                                                             </span>
                                                         )}
                                                     </td>
-                                                    <td className="px-6 py-3 text-right font-mono text-[13px] tabular-nums text-gray-600 dark:text-gray-400">
+                                                    <td className="px-6 py-3 text-right text-[12px] tabular-nums text-gray-600 dark:text-gray-400">
                                                         {Number(
                                                             csr.total_orders,
                                                         ).toLocaleString()}
                                                     </td>
-                                                    <td className="px-6 py-3 text-right font-mono text-[13px] tabular-nums text-gray-600 dark:text-gray-400">
+                                                    <td className="px-6 py-3 text-right text-[12px] tabular-nums text-gray-600 dark:text-gray-400">
                                                         {peso(
                                                             Number(
                                                                 csr.total_sales,
                                                             ),
                                                         )}
                                                     </td>
-                                                    <td className="px-6 py-3 text-right font-mono text-[13px] tabular-nums text-gray-600 dark:text-gray-400">
+                                                    <td className="px-6 py-3 text-right text-[12px] tabular-nums text-gray-600 dark:text-gray-400">
                                                         {Number(
                                                             csr.delivered,
                                                         ).toLocaleString()}
                                                     </td>
-                                                    <td className="px-6 py-3 text-right font-mono text-[13px] tabular-nums text-gray-600 dark:text-gray-400">
+                                                    <td className="px-6 py-3 text-right text-[12px] tabular-nums text-gray-600 dark:text-gray-400">
                                                         {Number(
                                                             csr.returning_count,
                                                         ).toLocaleString()}
                                                     </td>
-                                                    <td className="px-6 py-3 text-right font-mono text-[13px] font-medium tabular-nums">
+                                                    <td className="px-6 py-3 text-right text-[12px] font-medium tabular-nums">
                                                         <span
                                                             className={
                                                                 Number(
@@ -1120,8 +1074,8 @@ export default function CsrDashboard({
                                                                     : Number(
                                                                             csr.rts_rate,
                                                                         ) > 10
-                                                                      ? 'text-orange-500 dark:text-orange-400'
-                                                                      : 'text-green-600 dark:text-green-400'
+                                                                      ? 'text-amber-600 dark:text-amber-400'
+                                                                      : 'text-emerald-600 dark:text-emerald-400'
                                                             }
                                                         >
                                                             {Number(
