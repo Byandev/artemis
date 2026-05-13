@@ -16,10 +16,10 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData, User } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
+import { Calendar, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 interface Team {
@@ -136,6 +136,14 @@ export default function TeamsIndex({
                                           align="end"
                                           className="w-36"
                                       >
+                                          <DropdownMenuItem asChild>
+                                              <Link
+                                                  href={`/workspaces/${workspace.slug}/teams/${team.id}/schedule`}
+                                              >
+                                                  <Calendar />
+                                                  Schedule
+                                              </Link>
+                                          </DropdownMenuItem>
                                           {canEditTeams && (
                                               <DropdownMenuItem
                                                   onClick={() =>
