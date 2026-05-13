@@ -139,7 +139,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isSuperAdmin(): bool
     {
-        return $this->is_super_admin;
+        return (bool) $this->is_super_admin;
     }
 
     // public function hasReach(string $requiredRole): bool
@@ -179,7 +179,7 @@ class User extends Authenticatable implements MustVerifyEmail
             ->where('workspace_id', $workspace->id)
             ->value('role_id');
 
-        if (! $roleId) {
+        if (!$roleId) {
             return false;
         }
 

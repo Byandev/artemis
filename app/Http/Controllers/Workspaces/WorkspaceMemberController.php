@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Workspaces;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Http\Sorts\WorkspaceMember\RoleNameSort;
 use App\Http\Sorts\WorkspaceInvitation\InviterNameSort;
 use App\Models\Role;
 use App\Models\User;
@@ -35,6 +36,7 @@ class WorkspaceMemberController extends Controller
             ->where('workspace_user.workspace_id', $workspace->id)
             ->select(
                 'users.*',
+                'workspace_user.role as pivot_legacy_role',
                 'workspace_user.role_id as pivot_role_id',
                 'workspace_user.created_at as pivot_created_at',
                 'roles.name as pivot_role_name',
@@ -51,19 +53,25 @@ class WorkspaceMemberController extends Controller
                 AllowedSort::field('id', 'users.id'),
                 AllowedSort::field('name', 'users.name'),
                 AllowedSort::field('email', 'users.email'),
-                AllowedSort::field('role', 'roles.name'),
+                AllowedSort::custom('role', new RoleNameSort),
                 'pivot_created_at',
             ])
             ->defaultSort('-pivot_created_at')
             ->paginate($request->integer('per_page', 10))
             ->withQueryString()
             ->through(function ($user) {
+                $role = $user->pivot_role_name;
+
+                if (! $role && $user->pivot_legacy_role) {
+                    $role = ucfirst($user->pivot_legacy_role);
+                }
+
                 $user->pivot = (object) [
                     'role_id' => $user->pivot_role_id,
-                    'role' => $user->pivot_role_name,
+                    'role' => $role,
                     'created_at' => $user->pivot_created_at,
                 ];
-                unset($user->pivot_role_id, $user->pivot_role_name, $user->pivot_created_at);
+                unset($user->pivot_legacy_role, $user->pivot_role_id, $user->pivot_role_name, $user->pivot_created_at);
 
                 return $user;
             });

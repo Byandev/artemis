@@ -14,7 +14,7 @@ import workspaces from '@/routes/workspaces';
 import { PaginatedData } from '@/types';
 import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { omit } from 'lodash';
@@ -25,6 +25,7 @@ import {
     Trash2,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 interface ProductsProps {
     workspace: Workspace;
@@ -36,6 +37,12 @@ interface ProductsProps {
         filter?: {
             search?: string;
         };
+    };
+}
+
+interface ProductsPageProps {
+    flash?: {
+        success?: string | null;
     };
 }
 
@@ -56,12 +63,19 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 const Index = ({ products, workspace, query }: ProductsProps) => {
+    const { flash } = usePage().props as ProductsPageProps;
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+
+    useEffect(() => {
+        if (flash?.success) {
+            toast.success(flash.success);
+        }
+    }, [flash?.success]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -210,4 +224,3 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
 };
 
 export default Index;
-
