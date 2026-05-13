@@ -16,9 +16,6 @@ import { formatDate } from 'date-fns';
 import MetricPicker from '@/components/metrics/MetricPicker';
 import { metricConfigs, MetricKey } from '@/types/metrics';
 import PageHeader from '@/components/common/PageHeader';
-import { ContactSupportModal } from '@/components/contact-support-modal';
-import { Button } from '@/components/ui/button';
-import { LifeBuoy } from 'lucide-react';
 
 interface Props {
     workspace: Workspace;
@@ -152,17 +149,6 @@ const Dashboard = ({ workspace }: Props) => {
                 </ComponentCard>
             </div>
 
-            <ContactSupportModal
-                trigger={
-                    <Button
-                        type="button"
-                        className="fixed bottom-6 right-6 z-50 h-12 w-12 rounded-full bg-brand-500 text-white shadow-lg shadow-brand-500/30 hover:bg-brand-600"
-                        aria-label="Contact support"
-                    >
-                        <LifeBuoy className="h-5 w-5" />
-                    </Button>
-                }
-            />
         </AppLayout>
     );
 };
