@@ -12,7 +12,7 @@ import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Link, usePage } from '@inertiajs/react';
-import { BarChart2, LayoutDashboard, Truck, Users } from 'lucide-react';
+import { LayoutDashboard, Truck } from 'lucide-react';
 import AppLogo from './app-logo';
 
 export function CsrSidebar() {
@@ -28,17 +28,7 @@ export function CsrSidebar() {
             href: `/workspaces/${slug}/csr/dashboard`,
             icon: LayoutDashboard,
         },
-        {
-            title: 'Management',
-            href: `/workspaces/${slug}/csr/management`,
-            icon: Users,
-        },
-        {
-            title: 'Analytics',
-            href: `/workspaces/${slug}/csr/analytics`,
-            icon: BarChart2,
-        },
-        {
+{
             title: 'RMO Management',
             href: `/workspaces/${slug}/csr/rmo-management`,
             icon: Truck,
