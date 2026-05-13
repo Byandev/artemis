@@ -19,12 +19,20 @@ import {
 
 interface Props {
     workspace: { id: number; name: string; slug: string };
+    pageLimit?: number | null;
+    pageCount?: number;
+    pageLimitReached?: boolean;
 }
 
 const inputCls =
     'h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400';
 
-export default function Onboarding({ workspace }: Props) {
+export default function Onboarding({
+    workspace,
+    pageLimit,
+    pageCount,
+    pageLimitReached,
+}: Props) {
     const { flash } = usePage().props as { flash?: { success?: string } };
     const [syncing, setSyncing] = useState(false);
     const [complete, setComplete] = useState(false);
@@ -252,7 +260,12 @@ export default function Onboarding({ workspace }: Props) {
                     {/* Submit */}
                     <button
                         type="submit"
-                        disabled={processing}
+                        disabled={processing || pageLimitReached}
+                        title={
+                            pageLimitReached
+                                ? `Page limit reached (${pageCount ?? 0}/${pageLimit}). Upgrade your plan to add more.`
+                                : undefined
+                        }
                         className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-emerald-600 font-mono! text-[13px]! font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                     >
                         {processing && (
@@ -260,6 +273,19 @@ export default function Onboarding({ workspace }: Props) {
                         )}
                         {processing ? 'Connecting...' : 'Connect & Sync Orders'}
                     </button>
+
+                    {pageLimit != null && (
+                        <p
+                            className={`text-center font-mono text-[10px] tracking-wider uppercase ${
+                                pageLimitReached
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                    : 'text-gray-400 dark:text-gray-500'
+                            }`}
+                        >
+                            {pageCount ?? 0}/{pageLimit} pages used
+                            {pageLimitReached && ' · upgrade to add more'}
+                        </p>
+                    )}
 
                     {/* Skip */}
                     <button
