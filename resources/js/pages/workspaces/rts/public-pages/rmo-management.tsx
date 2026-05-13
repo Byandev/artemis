@@ -1014,7 +1014,7 @@ export default function RmoManagement({
                             onChange={handleFilterChange}
                             initialValue={initialFilterValue}
                         />
-
+                        <div className="flex items-center gap-2">
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -1164,43 +1164,45 @@ export default function RmoManagement({
                             My Confirmee Only
                         </button>
 
-                        {window.location.hostname === 'efb.on-forge.com' && <div className="ml-auto flex items-center gap-2">
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={pendingOrders.length === 0}
-                                        onClick={() => copyPendingPhones('rider')}
-                                        className="flex items-center gap-1.5 rounded-lg text-[12px]"
-                                    >
-                                        <ClipboardCopy className="h-3.5 w-3.5" />
-                                        {copiedRider ? 'Copied!' : 'Copy Rider Phones'}
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom">
-                                    <p className="text-xs">Copy rider phone numbers from top 10 pending orders</p>
-                                </TooltipContent>
-                            </Tooltip>
+                        {typeof window !== 'undefined' && window.location.hostname === 'efb.on-forge.com' && (
+                            <div className="ml-auto flex items-center gap-2">
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={pendingOrders.length === 0}
+                                            onClick={() => copyPendingPhones('rider')}
+                                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                                        >
+                                            <ClipboardCopy className="h-3.5 w-3.5" />
+                                            {copiedRider ? 'Copied!' : 'Copy Rider Phones'}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom">
+                                        <p className="text-xs">Copy rider phone numbers from top 10 pending orders</p>
+                                    </TooltipContent>
+                                </Tooltip>
 
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={pendingOrders.length === 0}
-                                        onClick={() => copyPendingPhones('customer')}
-                                        className="flex items-center gap-1.5 rounded-lg text-[12px]"
-                                    >
-                                        <ClipboardCopy className="h-3.5 w-3.5" />
-                                        {copiedCustomer ? 'Copied!' : 'Copy CX Phones'}
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom">
-                                    <p className="text-xs">Copy customer phone numbers from top 10 pending orders</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </div>}
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={pendingOrders.length === 0}
+                                            onClick={() => copyPendingPhones('customer')}
+                                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                                        >
+                                            <ClipboardCopy className="h-3.5 w-3.5" />
+                                            {copiedCustomer ? 'Copied!' : 'Copy CX Phones'}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom">
+                                        <p className="text-xs">Copy customer phone numbers from top 10 pending orders</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                        )}
                     </div>
                 </div>
 
