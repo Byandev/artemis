@@ -99,6 +99,7 @@ class AdminWorkspaceController extends Controller
             'csr_module_enabled' => 'required|boolean',
             'rmo_module_enabled' => 'required|boolean',
             'leaderboard_module_enabled' => 'required|boolean',
+            'botcake_module_enabled' => 'required|boolean',
         ]);
 
         $workspace->update($validated);
