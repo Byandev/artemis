@@ -20,9 +20,7 @@ class TriggerFetchPageOrders extends Command
         Page::whereNotNull('orders_last_synced_at')
             ->whereNotNull('pos_token')
             ->whereNotNull('shop_id')
-            ->whereNotNull('botcake_token')
-            ->whereNotNull('infotxt_token')
-            ->whereNotNull('infotxt_user_id')
+            ->where('status', 'active')
             ->orderBy('created_at', 'asc')
             ->get()
             ->each(function (Page $page) use ($shipped) {
