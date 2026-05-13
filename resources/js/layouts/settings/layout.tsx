@@ -4,24 +4,34 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { edit as editPassword } from '@/routes/password';
 import { edit } from '@/routes/profile';
-import { type NavItem } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Link } from '@inertiajs/react';
+import { Link, type InertiaLinkProps } from '@inertiajs/react';
+import type { LucideIcon } from 'lucide-react';
 import { type PropsWithChildren } from 'react';
+
+type SettingsNavItem = {
+    title: string;
+    href: NonNullable<InertiaLinkProps['href']>;
+    icon: LucideIcon | null;
+};
 
 export default function SettingsLayout({
     children,
     workspace,
-}: PropsWithChildren<{ workspace: Workspace }>) {
-    const sidebarNavItems: NavItem[] = [
+}: PropsWithChildren<{ workspace?: Workspace | null }>) {
+    const sidebarNavItems: SettingsNavItem[] = [
         {
             title: 'Profile',
-            href: edit({ workspace: workspace.slug }),
+            href: workspace
+                ? edit({ workspace: workspace.slug })
+                : '/settings/profile',
             icon: null,
         },
         {
             title: 'Password',
-            href: editPassword({ workspace: workspace.slug }),
+            href: workspace
+                ? editPassword({ workspace: workspace.slug })
+                : '/settings/password',
             icon: null,
         },
         // {
@@ -68,9 +78,13 @@ export default function SettingsLayout({
                                 })}
                             >
                                 <Link href={item.href}>
-                                    {item.icon && (
-                                        <item.icon className="h-4 w-4" />
-                                    )}
+                                    {(() => {
+                                        const Icon = item.icon;
+
+                                        return Icon ? (
+                                            <Icon className="h-4 w-4" />
+                                        ) : null;
+                                    })()}
                                     {item.title}
                                 </Link>
                             </Button>
