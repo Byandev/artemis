@@ -5,6 +5,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Can } from '@/components/can';
+import { PERMISSIONS } from '@/constants/permissions';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { ChecklistItem } from './types';
@@ -70,35 +72,37 @@ export function getChecklistColumns({
             header: () => <div className="text-center">Actions</div>,
             cell: ({ row }) => (
                 <div className="flex justify-center">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button
-                                type="button"
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-black/4 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/6 dark:hover:text-gray-300"
-                                aria-label={`Open actions for ${row.original.title}`}
+                    <Can permission={PERMISSIONS.EditChecklist}>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    type="button"
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-black/4 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/6 dark:hover:text-gray-300"
+                                    aria-label={`Open actions for ${row.original.title}`}
+                                >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                                align="end"
+                                className="w-[165px] p-1.5"
                             >
-                                <MoreHorizontal className="h-4 w-4" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                            align="end"
-                            className="w-[165px] p-1.5"
-                        >
-                            <DropdownMenuItem
-                                onClick={() => onEdit(row.original)}
-                            >
-                                <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                                Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                className="text-red-500 focus:text-red-500"
-                                onClick={() => onDelete(row.original)}
-                            >
-                                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                                Delete
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                                <DropdownMenuItem
+                                    onClick={() => onEdit(row.original)}
+                                >
+                                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                                    Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    className="text-red-500 focus:text-red-500"
+                                    onClick={() => onDelete(row.original)}
+                                >
+                                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                                    Delete
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </Can>
                 </div>
             ),
         },
