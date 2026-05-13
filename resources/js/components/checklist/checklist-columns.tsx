@@ -69,7 +69,11 @@ export function getChecklistColumns({
         },
         {
             id: 'actions',
-            header: () => <div className="text-center">Actions</div>,
+            header: () => (
+                <Can permission={PERMISSIONS.EditChecklist}>
+                    <div className="text-center">Actions</div>
+                </Can>
+            ),
             cell: ({ row }) => (
                 <div className="flex justify-center">
                     <Can permission={PERMISSIONS.EditChecklist}>
