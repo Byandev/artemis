@@ -106,4 +106,15 @@ class AdminWorkspaceController extends Controller
 
         return back()->with('success', "Modules updated for {$workspace->name}.");
     }
+
+    public function updateMaxPages(Request $request, Workspace $workspace)
+    {
+        $validated = $request->validate([
+            'max_pages' => 'nullable|integer|min:1',
+        ]);
+
+        $workspace->update($validated);
+
+        return back()->with('success', "Max pages updated for {$workspace->name}.");
+    }
 }
