@@ -1,5 +1,4 @@
 import { NavMain } from '@/components/nav-main';
-import { ContactSupportModal } from '@/components/contact-support-modal';
 import {
     Sidebar,
     SidebarContent,
@@ -10,8 +9,11 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { PERMISSIONS } from '@/constants/permissions';
 import { dashboard } from '@/routes';
-import { type NavItem } from '@/types';
+import workspace from '@/routes/workspace';
+import { type NavItem, User as UserType } from '@/types';
+import { Workspace } from '@/types/models/Workspace';
 import { Link, usePage } from '@inertiajs/react';
 import {
     LayoutDashboard,
@@ -40,30 +42,19 @@ import {
     PieChart,
     Shield,
     MessageSquare,
+    LifeBuoy,
 } from 'lucide-react';
 import { useState } from 'react';
 import AppLogo from './app-logo';
-import { PERMISSIONS } from '@/constants/permissions';
-import { dashboard as workspaceDashboard } from '@/actions/App/Http/Controllers/Workspaces/WorkspaceController';
 
 export function AppSidebar() {
-    const { currentWorkspace } = usePage().props as unknown as {
-        currentWorkspace: {
-            slug: string;
-            inventory_module_enabled: boolean;
-            finance_module_enabled: boolean;
-            products_module_enabled: boolean;
-            teams_module_enabled: boolean;
-            checklist_module_enabled: boolean;
-            csr_module_enabled: boolean;
-            rmo_module_enabled: boolean;
-            leaderboard_module_enabled: boolean;
-            botcake_module_enabled: boolean;
-        };
+    const { currentWorkspace, auth } = usePage().props as unknown as {
+        currentWorkspace: Workspace;
+        auth?: { user: UserType };
     };
 
     const dashboardUrl = currentWorkspace
-        ? workspaceDashboard(currentWorkspace.slug).url
+        ? workspace.dashboard.url(currentWorkspace.slug)
         : dashboard().url;
 
     const slug = currentWorkspace?.slug ?? '';
@@ -118,6 +109,7 @@ export function AppSidebar() {
                       title: 'Checklist',
                       href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/checklist`,
                       icon: ListChecks,
+                      permission: PERMISSIONS.ViewChecklist,
                   },
               ]
             : []),
@@ -272,13 +264,23 @@ export function AppSidebar() {
 
     const adminNavItems: NavItem[] = auth?.user?.can?.viewAnySupportTickets
         ? [
-            {
-                title: 'Support Tickets',
-                href: `/workspaces/${slug}/admin/support-tickets`,
-                icon: LifeBuoy,
-            },
-        ]
+              {
+                  title: 'Support Tickets',
+                  href: `/workspaces/${slug}/admin/support-tickets`,
+                  icon: LifeBuoy,
+              },
+          ]
         : [];
+
+    const supportNavItems: NavItem[] = auth?.user?.can?.viewAnySupportTickets
+        ? adminNavItems
+        : [
+              {
+                  title: 'Customer Support',
+                  href: `/workspaces/${slug}/support`,
+                  icon: LifeBuoy,
+              },
+          ];
 
     return (
         <Sidebar
@@ -300,13 +302,15 @@ export function AppSidebar() {
 
             <SidebarContent className="p-3">
                 <NavMain items={mainNavItems} group_label="Main" />
-                <NavMain items={adminNavItems} group_label="Admin" />
                 {/*<NavMain items={accountNavItems} group_label="Account" />*/}
                 <PublicLinks
                     workspaceSlug={currentWorkspace.slug}
                     rmoEnabled={currentWorkspace.rmo_module_enabled}
                     leaderboardEnabled={currentWorkspace.leaderboard_module_enabled}
                 />
+                <div className="mt-auto">
+                    <NavMain items={supportNavItems} group_label="Support" />
+                </div>
             </SidebarContent>
 
             {/*<SidebarFooter>*/}
@@ -328,20 +332,22 @@ function PublicLinks({
     const links = [
         ...(rmoEnabled
             ? [
-                {
-                    title: 'RMO Management',
-                    href: `/public/workspaces/${workspaceSlug}/rts/rmo-management`,
-                    icon: Truck,
-                },
-            ]
+                  {
+                      title: 'RMO Management',
+                      href: `/public/workspaces/${workspaceSlug}/rts/rmo-management`,
+                      icon: Truck,
+                  },
+              ]
             : []),
         ...(leaderboardEnabled
             ? [{ title: 'Leaderboards', href: '/leaderboards', icon: Trophy }]
             : []),
     ];
 
+    if (links.length === 0) return null;
+
     return (
-        <SidebarGroup className="mt-auto">
+        <SidebarGroup>
             <SidebarGroupLabel className="text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-300 dark:text-gray-600 px-3.5 mb-2">
                 Public Links
             </SidebarGroupLabel>
@@ -385,7 +391,7 @@ function PublicLinkItem({
                 asChild
                 tooltip={{ children: title }}
                 className={[
-                    'group/public relative h-9 justify-between rounded-[10px] text-[13px]!',
+                    'group/public relative h-9 justify-between rounded-[10px] text-[13px]! ',
                     'text-gray-400 dark:text-gray-500',
                     'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/2 dark:hover:bg-white/2',
                     'transition-colors',
@@ -425,3 +431,4 @@ function PublicLinkItem({
         </SidebarMenuItem>
     );
 }
+
