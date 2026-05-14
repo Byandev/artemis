@@ -183,7 +183,7 @@ class User extends Authenticatable implements MustVerifyEmail
             ->where('workspace_id', $workspace->id)
             ->value('role_id');
 
-        if (!$roleId) {
+        if (! $roleId) {
             return false;
         }
 

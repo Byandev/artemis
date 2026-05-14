@@ -15,8 +15,6 @@ use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
-
-
 class InventoryItemController extends Controller
 {
     use AuthorizesRequests;
