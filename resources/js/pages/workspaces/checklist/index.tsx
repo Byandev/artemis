@@ -1,3 +1,4 @@
+import { Can } from '@/components/can';
 import { AddTaskDialog } from '@/components/checklist/add-task-dialog';
 import { getChecklistColumns } from '@/components/checklist/checklist-columns';
 import { DeleteChecklistDialog } from '@/components/checklist/delete-checklist-dialog';
@@ -8,12 +9,11 @@ import {
 } from '@/components/checklist/types';
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable } from '@/components/ui/data-table';
-import { Can } from '@/components/can';
+import { PERMISSIONS } from '@/constants/permissions';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { PERMISSIONS } from '@/constants/permissions';
 import { Head, router } from '@inertiajs/react';
 import { omit } from 'lodash';
 import { Plus } from 'lucide-react';

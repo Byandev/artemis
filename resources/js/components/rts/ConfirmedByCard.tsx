@@ -117,9 +117,7 @@ export default function ConfirmedByCard({ workspaceSlug, queryParams }: Props) {
                 </div>
                 <div className="flex items-center gap-2">
                     <RefreshButton
-                        onClick={() =>
-                            fetchPage(1, sort, data?.per_page ?? 10)
-                        }
+                        onClick={() => fetchPage(1, sort, data?.per_page ?? 10)}
                         loading={loading}
                     />
                     <ViewToggle value={view} onChange={setView} />

@@ -1,3 +1,4 @@
+import { Can } from '@/components/can';
 import { SortableHeader } from '@/components/ui/data-table';
 import {
     DropdownMenu,
@@ -5,7 +6,6 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Can } from '@/components/can';
 import { PERMISSIONS } from '@/constants/permissions';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';

@@ -601,8 +601,8 @@ function MaxPagesModal({
                         />
                         <p className="mt-1 text-xs text-zinc-500">
                             Leave empty to use the subscription plan limit
-                            instead. Currently using{' '}
-                            {workspace.pages_count} page(s).
+                            instead. Currently using {workspace.pages_count}{' '}
+                            page(s).
                         </p>
                     </div>
 
