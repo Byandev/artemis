@@ -1,8 +1,7 @@
+import { Can } from '@/components/can';
 import { ChecklistProgressItem } from '@/components/checklist/types';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Can } from '@/components/can';
-import { PERMISSIONS } from '@/constants/permissions';
 import {
     Dialog,
     DialogContent,
@@ -10,6 +9,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { PERMISSIONS } from '@/constants/permissions';
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
 import { formatDistanceToNow } from 'date-fns';
@@ -213,7 +213,11 @@ export function TargetChecklistDrawer({
                                         className="rounded-lg border border-black/6 bg-white p-3 dark:border-white/8 dark:bg-zinc-900"
                                     >
                                         <div className="flex items-start gap-3">
-                                            <Can permission={PERMISSIONS.EditChecklist}>
+                                            <Can
+                                                permission={
+                                                    PERMISSIONS.EditChecklist
+                                                }
+                                            >
                                                 <Checkbox
                                                     checked={item.is_completed}
                                                     disabled={savingId !== null}
