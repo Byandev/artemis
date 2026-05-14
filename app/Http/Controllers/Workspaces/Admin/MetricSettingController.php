@@ -39,9 +39,17 @@ class MetricSettingController extends Controller
             'default_metrics.*' => [Rule::in($validKeys)],
         ]);
 
+        $allowedMetrics = array_values($validated['allowed_metrics']);
+        $defaultMetrics = array_values(
+            array_intersect(
+                $validated['default_metrics'] ?? [],
+                $allowedMetrics
+            )
+        );
+
         $dataToUpdate = [
-            'allowed_metrics' => array_values($validated['allowed_metrics']),
-            'default_metrics' => array_values($validated['default_metrics'] ?? $validated['allowed_metrics']),
+            'allowed_metrics' => $allowedMetrics,
+            'default_metrics' => $defaultMetrics ?: $allowedMetrics,
         ];
 
         $workspace->metricSetting()->updateOrCreate(
