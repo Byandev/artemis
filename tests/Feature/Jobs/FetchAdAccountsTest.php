@@ -1,10 +1,10 @@
 <?php
 
-use App\Jobs\FetchAdAccounts;
-use App\Jobs\FetchAdRecords;
 use App\Jobs\AdsManager\FetchAds;
 use App\Jobs\AdsManager\FetchAdSets;
 use App\Jobs\AdsManager\FetchCampaigns;
+use App\Jobs\FetchAdAccounts;
+use App\Jobs\FetchAdRecords;
 use App\Models\AdAccount;
 use App\Models\FacebookAccount;
 use App\Models\User;

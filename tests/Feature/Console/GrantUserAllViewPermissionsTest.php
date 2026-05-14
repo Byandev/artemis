@@ -4,10 +4,11 @@ use App\Enums\Permission as PermissionEnum;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 
 test('errors when user does not exist', function () {
-    $w = \App\Models\Workspace::factory()->create();
+    $w = Workspace::factory()->create();
 
     $this->artisan('permissions:grant-all-view', ['user_email' => 'nope@example.test', 'workspace_slug' => $w->slug])
         ->expectsOutputToContain('User with email nope@example.test not found.')
@@ -24,7 +25,7 @@ test('errors when workspace does not exist', function () {
 
 test('errors when user is not a member of the workspace', function () {
     $u = User::factory()->create();
-    $w = \App\Models\Workspace::factory()->create();
+    $w = Workspace::factory()->create();
 
     $this->artisan('permissions:grant-all-view', ['user_email' => $u->email, 'workspace_slug' => $w->slug])
         ->expectsOutputToContain("{$u->email} is not a member of {$w->slug}")

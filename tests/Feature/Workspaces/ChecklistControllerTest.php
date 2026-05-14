@@ -1,10 +1,7 @@
 <?php
 
-use App\Models\Page;
-use App\Models\Shop;
 use App\Models\User;
 use App\Models\WorkspaceChecklist;
-use App\Models\WorkspaceChecklistCompletion;
 
 test('owner can view checklist index', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();

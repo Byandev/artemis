@@ -28,14 +28,14 @@ test('updateCustomField throws when API returns 4xx', function () {
     Http::fake(['botcake.io/*' => Http::response(['error' => 'bad'], 401)]);
 
     expect(fn () => $this->botcake->updateCustomField('PSID', 'f', 'v'))
-        ->toThrow(\Exception::class);
+        ->toThrow(Exception::class);
 });
 
 test('updateCustomField throws when API returns success:false', function () {
     Http::fake(['botcake.io/*' => Http::response(['success' => false, 'message' => 'denied'], 200)]);
 
     expect(fn () => $this->botcake->updateCustomField('PSID', 'f', 'v'))
-        ->toThrow(\Exception::class);
+        ->toThrow(Exception::class);
 });
 
 test('updateCustomField propagates connection exception', function () {
@@ -59,7 +59,7 @@ test('sendFlow throws when API returns failure status', function () {
     Http::fake(['botcake.io/*' => Http::response([], 500)]);
 
     expect(fn () => $this->botcake->sendFlow('PSID', 'flow-1'))
-        ->toThrow(\Exception::class);
+        ->toThrow(Exception::class);
 });
 
 // fetchFlows
@@ -79,7 +79,7 @@ test('fetchFlows returns empty array when key missing', function () {
 test('fetchFlows throws on API failure', function () {
     Http::fake(['botcake.io/*' => Http::response([], 503)]);
 
-    expect(fn () => $this->botcake->fetchFlows())->toThrow(\Exception::class);
+    expect(fn () => $this->botcake->fetchFlows())->toThrow(Exception::class);
 });
 
 // fetchSequences
@@ -93,7 +93,7 @@ test('fetchSequences returns array from data', function () {
 test('fetchSequences throws on API failure', function () {
     Http::fake(['botcake.io/*' => Http::response([], 502)]);
 
-    expect(fn () => $this->botcake->fetchSequences())->toThrow(\Exception::class);
+    expect(fn () => $this->botcake->fetchSequences())->toThrow(Exception::class);
 });
 
 // fetchFlowStatistics
@@ -107,7 +107,7 @@ test('fetchFlowStatistics returns data', function () {
 test('fetchFlowStatistics throws on non-2xx', function () {
     Http::fake(['botcake.io/*' => Http::response([], 404)]);
 
-    expect(fn () => $this->botcake->fetchFlowStatistics('flow-1'))->toThrow(\Exception::class);
+    expect(fn () => $this->botcake->fetchFlowStatistics('flow-1'))->toThrow(Exception::class);
 });
 
 // fetchSequenceStatistics
@@ -121,5 +121,5 @@ test('fetchSequenceStatistics returns data', function () {
 test('fetchSequenceStatistics throws on non-2xx', function () {
     Http::fake(['botcake.io/*' => Http::response([], 500)]);
 
-    expect(fn () => $this->botcake->fetchSequenceStatistics('seq-1'))->toThrow(\Exception::class);
+    expect(fn () => $this->botcake->fetchSequenceStatistics('seq-1'))->toThrow(Exception::class);
 });

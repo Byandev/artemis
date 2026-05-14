@@ -5,6 +5,7 @@ use App\Models\AdAccount;
 use App\Models\Campaign;
 use App\Models\FacebookAccount;
 use App\Models\User;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 
 function setupAdsContext(): array
@@ -84,5 +85,5 @@ test('FetchCampaigns throws on upstream error (no swallow)', function () {
     [$fb, $ad] = setupAdsContext();
 
     expect(fn () => (new FetchCampaigns($fb, $ad))->handle())
-        ->toThrow(\Illuminate\Http\Client\RequestException::class);
+        ->toThrow(RequestException::class);
 });

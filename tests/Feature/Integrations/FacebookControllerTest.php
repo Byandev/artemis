@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\FetchAdAccounts;
 use App\Models\FacebookAccount;
 use App\Models\User;
 use App\Models\Workspace;
@@ -38,7 +39,7 @@ test('callback exchanges code, persists account, links workspace, dispatches Fet
     expect($account->user_id)->toBe($user->id);
     expect($account->access_token)->toBe('fb-token-123');
     expect($account->workspaces()->where('workspaces.id', $workspace->id)->exists())->toBeTrue();
-    Bus::assertDispatched(\App\Jobs\FetchAdAccounts::class);
+    Bus::assertDispatched(FetchAdAccounts::class);
 });
 
 test('callback redirects home when token exchange fails', function () {

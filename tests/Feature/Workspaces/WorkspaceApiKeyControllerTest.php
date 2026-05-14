@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use App\Models\WorkspaceApiKey;
 
 test('owner can view the API keys page', function () {
@@ -12,7 +13,7 @@ test('owner can view the API keys page', function () {
 
 test('non-member cannot view API keys', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
-    $stranger = \App\Models\User::factory()->create();
+    $stranger = User::factory()->create();
 
     $this->actingAs($stranger)
         ->get("/workspaces/{$workspace->slug}/api-keys")
