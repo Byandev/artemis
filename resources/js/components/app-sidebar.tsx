@@ -350,7 +350,7 @@ function PublicLinks({
 
     return (
         <SidebarGroup>
-            <SidebarGroupLabel className="text-[10px] font-mono font-medium uppercase tracking-[0.08em] text-gray-300 dark:text-gray-600 px-3.5 mb-2">
+            <SidebarGroupLabel className="mb-2 px-3.5 font-mono text-[10px] font-medium tracking-[0.08em] text-gray-300 uppercase dark:text-gray-600">
                 Public Links
             </SidebarGroupLabel>
             <SidebarMenu className="mt-2">
@@ -395,7 +395,7 @@ function PublicLinkItem({
                 asChild
                 tooltip={{ children: title }}
                 className={[
-                    'group/public relative h-9 justify-between rounded-[10px] text-[13px]! ',
+                    'group/public relative h-9 justify-between rounded-[10px] text-[13px]!',
                     'text-gray-400 dark:text-gray-500',
                     'hover:bg-black/2 hover:text-gray-600 dark:hover:bg-white/2 dark:hover:text-gray-400',
                     'transition-colors',
@@ -436,4 +436,3 @@ function PublicLinkItem({
         </SidebarMenuItem>
     );
 }
-

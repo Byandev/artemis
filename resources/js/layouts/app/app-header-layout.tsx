@@ -4,9 +4,9 @@ import { AppShell } from '@/components/app-shell';
 import { ContactSupportModal } from '@/components/contact-support-modal';
 import { Button } from '@/components/ui/button';
 import { type BreadcrumbItem } from '@/types';
-import type { PropsWithChildren } from 'react';
-import { LifeBuoy } from 'lucide-react';
 import { usePage } from '@inertiajs/react';
+import { LifeBuoy } from 'lucide-react';
+import type { PropsWithChildren } from 'react';
 
 export default function AppHeaderLayout({
     children,
@@ -24,7 +24,7 @@ export default function AppHeaderLayout({
                     trigger={
                         <Button
                             type="button"
-                            className="fixed bottom-6 right-6 z-50 h-12 w-12 rounded-full bg-brand-500 text-white shadow-lg shadow-brand-500/30 hover:bg-brand-600"
+                            className="fixed right-6 bottom-6 z-50 h-12 w-12 rounded-full bg-brand-500 text-white shadow-lg shadow-brand-500/30 hover:bg-brand-600"
                             aria-label="Customer support"
                         >
                             <LifeBuoy className="h-5 w-5" />
