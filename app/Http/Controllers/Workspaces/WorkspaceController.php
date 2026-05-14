@@ -61,7 +61,7 @@ class WorkspaceController extends Controller
 
     public function show(Request $request, Workspace $workspace)
     {
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -94,7 +94,7 @@ class WorkspaceController extends Controller
 
     public function destroy(Request $request, Workspace $workspace)
     {
-        if (!$request->user()->ownsWorkspace($workspace)) {
+        if (! $request->user()->ownsWorkspace($workspace)) {
             abort(403, 'Only the workspace owner can delete it.');
         }
 
@@ -106,7 +106,7 @@ class WorkspaceController extends Controller
 
     public function switch(Request $request, Workspace $workspace)
     {
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -122,7 +122,7 @@ class WorkspaceController extends Controller
             return redirect()->route('workspaces.admin.dashboard', $workspace->slug);
         }
 
-        if (!$request->user()->isMemberOf($workspace)) {
+        if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
 
@@ -132,6 +132,9 @@ class WorkspaceController extends Controller
                     $query->select('id', 'name', 'workspace_id')->orderBy('name');
                 },
                 'pages' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                },
+                'teams' => function ($query) {
                     $query->select('id', 'name', 'workspace_id')->orderBy('name');
                 },
                 'pageOwners:id,name',
@@ -152,7 +155,7 @@ class WorkspaceController extends Controller
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
 
-        if (!$startDate && !$endDate) {
+        if (! $startDate && ! $endDate) {
             $endDate = now()->format('Y-m-d');
             $startDate = now()->subDays($days)->format('Y-m-d');
         }

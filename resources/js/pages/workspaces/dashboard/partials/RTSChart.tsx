@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import { Line, LineChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import {
     ChartContainer,
     ChartTooltip,
     ChartTooltipContent,
 } from '@/components/ui/chart';
+import { useEffect, useState } from 'react';
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 
 interface RTSData {
     date: string;
@@ -13,8 +13,8 @@ interface RTSData {
 
 const chartConfig = {
     rts_rate_percentage: {
-        label: "RTS RATE",
-        color: "#2563eb",
+        label: 'RTS RATE',
+        color: '#2563eb',
     },
 };
 
@@ -40,49 +40,59 @@ const RTSChart = () => {
     }
 
     return (
-        <div className="w-full h-[300px] rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
-        <ChartContainer id={'rts_rate_percentage'} config={chartConfig} className="h-full w-full">
-            <LineChart data={salesData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                    dataKey="date"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    tickFormatter={(value) => {
-                        const date = new Date(value);
-                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                    }}
-                />
-                <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    tickFormatter={(value) => `${value.toLocaleString()}%`}
-                />
-                <ChartTooltip
-                    content={
-                        <ChartTooltipContent
-                            labelFormatter={(value) => {
-                                return new Date(value).toLocaleDateString('en-US', {
-                                    month: 'long',
-                                    day: 'numeric',
-                                    year: 'numeric',
-                                });
-                            }}
-                        />
-                    }
-                />
-                <Line
-                    type="monotone"
-                    dataKey="rts_rate_percentage"
-                    strokeWidth={2}
-                    dot={false}
-                />
-            </LineChart>
-        </ChartContainer>
+        <div className="h-[300px] w-full rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
+            <ChartContainer
+                id={'rts_rate_percentage'}
+                config={chartConfig}
+                className="h-full w-full"
+            >
+                <LineChart data={salesData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                        dataKey="date"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tickFormatter={(value) => {
+                            const date = new Date(value);
+                            return date.toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                            });
+                        }}
+                    />
+                    <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tickFormatter={(value) => `${value.toLocaleString()}%`}
+                    />
+                    <ChartTooltip
+                        content={
+                            <ChartTooltipContent
+                                labelFormatter={(value) => {
+                                    return new Date(value).toLocaleDateString(
+                                        'en-US',
+                                        {
+                                            month: 'long',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                        },
+                                    );
+                                }}
+                            />
+                        }
+                    />
+                    <Line
+                        type="monotone"
+                        dataKey="rts_rate_percentage"
+                        strokeWidth={2}
+                        dot={false}
+                    />
+                </LineChart>
+            </ChartContainer>
         </div>
     );
-}
+};
 
 export default RTSChart;

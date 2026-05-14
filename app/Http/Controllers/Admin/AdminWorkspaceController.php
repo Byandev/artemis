@@ -41,10 +41,9 @@ class AdminWorkspaceController extends Controller
     }
 
     /**
-     * NOTE: updateMetrics was removed from here because you are now using 
+     * NOTE: updateMetrics was removed from here because you are now using
      * MetricSettingController@update to handle the WorkspaceMetricSetting model.
      */
-
     public function updateSubscription(Request $request, Workspace $workspace)
     {
         $validated = $request->validate([
@@ -87,5 +86,35 @@ class AdminWorkspaceController extends Controller
         }
 
         return back()->with('success', "Subscription updated for {$workspace->name}.");
+    }
+
+    public function updateModules(Request $request, Workspace $workspace)
+    {
+        $validated = $request->validate([
+            'inventory_module_enabled' => 'required|boolean',
+            'finance_module_enabled' => 'required|boolean',
+            'products_module_enabled' => 'required|boolean',
+            'teams_module_enabled' => 'required|boolean',
+            'checklist_module_enabled' => 'required|boolean',
+            'csr_module_enabled' => 'required|boolean',
+            'rmo_module_enabled' => 'required|boolean',
+            'leaderboard_module_enabled' => 'required|boolean',
+            'botcake_module_enabled' => 'required|boolean',
+        ]);
+
+        $workspace->update($validated);
+
+        return back()->with('success', "Modules updated for {$workspace->name}.");
+    }
+
+    public function updateMaxPages(Request $request, Workspace $workspace)
+    {
+        $validated = $request->validate([
+            'max_pages' => 'nullable|integer|min:1',
+        ]);
+
+        $workspace->update($validated);
+
+        return back()->with('success', "Max pages updated for {$workspace->name}.");
     }
 }

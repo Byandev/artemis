@@ -3,6 +3,8 @@
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
 use App\Http\Controllers\Workspaces\AdAccountController;
+use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
+use App\Http\Controllers\Workspaces\Admin\SupportTicketAdminController;
 use App\Http\Controllers\Workspaces\AdsManager\AdController;
 use App\Http\Controllers\Workspaces\AdsManager\AdSetController;
 use App\Http\Controllers\Workspaces\AdsManager\CampaignController;
@@ -14,8 +16,6 @@ use App\Http\Controllers\Workspaces\CSRController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\OnboardingController;
 use App\Http\Controllers\Workspaces\PageController;
-use App\Http\Controllers\Workspaces\SupportTicketController;
-use App\Http\Controllers\Workspaces\Admin\SupportTicketAdminController;
 use App\Http\Controllers\Workspaces\Product\AnalyticsController;
 use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\RoleController;
@@ -25,7 +25,9 @@ use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\ShopController;
+use App\Http\Controllers\Workspaces\SupportTicketController;
 use App\Http\Controllers\Workspaces\TeamController;
+use App\Http\Controllers\Workspaces\TeamScheduleController;
 use App\Http\Controllers\Workspaces\WorkspaceApiKeyController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
@@ -45,10 +47,6 @@ use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
-use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
-
-
-
 
 /*
 |--------------------------------------------------------------------------
@@ -140,6 +138,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/workspaces/{workspace}/shops', [ShopController::class, 'index'])->name('workspaces.shops.index');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh', [ShopController::class, 'refresh'])->name('workspaces.shops.refresh');
+    Route::post('/workspaces/{workspace}/shops/{shop}/refresh-users', [ShopController::class, 'refreshUsers'])->name('workspaces.shops.refresh-users');
 
     // Product routes
     // Redirect to analytics by default for navigation item active state
@@ -215,6 +214,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace}/teams', [TeamController::class, 'store'])->name('workspaces.teams.store');
     Route::put('/workspaces/{workspace}/teams/{team}', [TeamController::class, 'update'])->name('workspaces.teams.update');
     Route::delete('/workspaces/{workspace}/teams/{team}', [TeamController::class, 'destroy'])->name('workspaces.teams.destroy');
+    Route::get('/workspaces/{workspace}/teams/{team}/schedule', [TeamScheduleController::class, 'index'])->name('workspaces.teams.schedule');
+    Route::put('/workspaces/{workspace}/teams/{team}/schedule', [TeamScheduleController::class, 'update'])->name('workspaces.teams.schedule.update');
 
     Route::get('/workspaces/{workspace}/botcake', function (Workspace $workspace) {
         return redirect()->route('workspaces.botcake.sequences.index', $workspace);
@@ -321,6 +322,8 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('workspaces.update-subscription');
         Route::put('/workspaces/{workspace}/modules', [AdminWorkspaceController::class, 'updateModules'])
             ->name('workspaces.update-modules');
+        Route::put('/workspaces/{workspace}/max-pages', [AdminWorkspaceController::class, 'updateMaxPages'])
+            ->name('workspaces.update-max-pages');
 
         // Metric Setting Controller
         Route::get('workspaces/{workspace}/metrics/edit', [MetricSettingController::class, 'edit'])

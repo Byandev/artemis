@@ -1,7 +1,7 @@
-import AppLayout from '@/layouts/app-layout';
 import PageHeader from '@/components/common/PageHeader';
-import type { ReactNode } from 'react';
+import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
+import type { ReactNode } from 'react';
 
 interface LayoutProps {
     children: ReactNode;
@@ -9,20 +9,21 @@ interface LayoutProps {
     headerActions?: ReactNode;
 }
 
-const Layout = ({  children, workspace, headerActions }: LayoutProps) => {
+const Layout = ({ children, workspace, headerActions }: LayoutProps) => {
     return (
         <AppLayout>
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <PageHeader title="Products" description="Manage your product catalog and track performance">
+                <PageHeader
+                    title="Products"
+                    description="Manage your product catalog and track performance"
+                >
                     {headerActions}
                 </PageHeader>
 
-                <div>
-                    {children}
-                </div>
+                <div>{children}</div>
             </div>
         </AppLayout>
-    )
-}
+    );
+};
 
 export default Layout;

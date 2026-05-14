@@ -1,10 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { omit } from 'lodash';
-import { ColumnDef } from '@tanstack/react-table';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import { PaginatedData } from '@/types';
 import { toFrontendSort } from '@/lib/sort';
-import { buildBaseParams, CityRow, ProvinceRow, RefreshButton, RtsCell, RtsQueryParams } from './rts-shared';
+import { PaginatedData } from '@/types';
+import { ColumnDef } from '@tanstack/react-table';
+import { omit } from 'lodash';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+    buildBaseParams,
+    CityRow,
+    ProvinceRow,
+    RefreshButton,
+    RtsCell,
+    RtsQueryParams,
+} from './rts-shared';
 
 type GroupBy = 'province' | 'city';
 
@@ -14,10 +21,15 @@ interface Props {
     onDataLoaded?: (provinces: ProvinceRow[]) => void;
 }
 
-export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded }: Props) {
+export default function LocationCard({
+    workspaceSlug,
+    queryParams,
+    onDataLoaded,
+}: Props) {
     const [groupBy, setGroupBy] = useState<GroupBy>('province');
 
-    const [provinces, setProvinces] = useState<PaginatedData<ProvinceRow> | null>(null);
+    const [provinces, setProvinces] =
+        useState<PaginatedData<ProvinceRow> | null>(null);
     const [provincesLoading, setProvincesLoading] = useState(true);
     const [provinceSort, setProvinceSort] = useState('-total_orders');
     const [provinceSearch, setProvinceSearch] = useState('');
@@ -29,40 +41,64 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
     const [citySearch, setCitySearch] = useState('');
     const [cityPerPage, setCityPerPage] = useState(10);
 
-    const fetchProvinces = (page = 1, search = provinceSearch, sort = provinceSort, perPage = provincePerPage) => {
+    const fetchProvinces = (
+        page = 1,
+        search = provinceSearch,
+        sort = provinceSort,
+        perPage = provincePerPage,
+    ) => {
         setProvincesLoading(true);
         const p = buildBaseParams(queryParams);
         p.append('page', String(page));
         p.append('per_page', String(perPage));
         if (search) p.append('search', search);
         p.append('sort', sort);
-        fetch(`/workspaces/${workspaceSlug}/rts/analytics/group-by/provinces?${p}`, { credentials: 'same-origin' })
+        fetch(
+            `/workspaces/${workspaceSlug}/rts/analytics/group-by/provinces?${p}`,
+            { credentials: 'same-origin' },
+        )
             .then((res) => (res.ok ? res.json() : null))
-            .then((data) => { setProvinces(data); setProvincesLoading(false); })
+            .then((data) => {
+                setProvinces(data);
+                setProvincesLoading(false);
+            })
             .catch(() => setProvincesLoading(false));
     };
 
-    const fetchCities = (page = 1, search = citySearch, sort = citySort, perPage = cityPerPage) => {
+    const fetchCities = (
+        page = 1,
+        search = citySearch,
+        sort = citySort,
+        perPage = cityPerPage,
+    ) => {
         setCitiesLoading(true);
         const p = buildBaseParams(queryParams);
         p.append('page', String(page));
         p.append('per_page', String(perPage));
         if (search) p.append('search', search);
         p.append('sort', sort);
-        fetch(`/workspaces/${workspaceSlug}/rts/analytics/group-by/cities?${p}`, { credentials: 'same-origin' })
+        fetch(
+            `/workspaces/${workspaceSlug}/rts/analytics/group-by/cities?${p}`,
+            { credentials: 'same-origin' },
+        )
             .then((res) => (res.ok ? res.json() : null))
-            .then((data) => { setCities(data); setCitiesLoading(false); })
+            .then((data) => {
+                setCities(data);
+                setCitiesLoading(false);
+            })
             .catch(() => setCitiesLoading(false));
     };
 
-     
     useEffect(() => {
         setProvincesLoading(true);
         const p = buildBaseParams(queryParams);
         p.append('page', '1');
         p.append('per_page', String(provincePerPage));
         p.append('sort', provinceSort);
-        fetch(`/workspaces/${workspaceSlug}/rts/analytics/group-by/provinces?${p}`, { credentials: 'same-origin' })
+        fetch(
+            `/workspaces/${workspaceSlug}/rts/analytics/group-by/provinces?${p}`,
+            { credentials: 'same-origin' },
+        )
             .then((res) => (res.ok ? res.json() : null))
             .then((data) => {
                 setProvinces(data);
@@ -75,88 +111,167 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
     }, [workspaceSlug, JSON.stringify(queryParams)]);
 
     useEffect(() => {
-        if (groupBy === 'province') fetchProvinces(1, provinceSearch, provinceSort, provincePerPage);
+        if (groupBy === 'province')
+            fetchProvinces(1, provinceSearch, provinceSort, provincePerPage);
         else fetchCities(1, citySearch, citySort, cityPerPage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [groupBy]);
 
-    const provinceSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const provinceSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(
+        null,
+    );
     useEffect(() => {
-        if (provinceSearchTimer.current) clearTimeout(provinceSearchTimer.current);
-        provinceSearchTimer.current = setTimeout(() => fetchProvinces(1, provinceSearch, provinceSort, provincePerPage), 400);
-        return () => { if (provinceSearchTimer.current) clearTimeout(provinceSearchTimer.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        if (provinceSearchTimer.current)
+            clearTimeout(provinceSearchTimer.current);
+        provinceSearchTimer.current = setTimeout(
+            () =>
+                fetchProvinces(
+                    1,
+                    provinceSearch,
+                    provinceSort,
+                    provincePerPage,
+                ),
+            400,
+        );
+        return () => {
+            if (provinceSearchTimer.current)
+                clearTimeout(provinceSearchTimer.current);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [provinceSearch]);
 
     const citySearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => {
         if (citySearchTimer.current) clearTimeout(citySearchTimer.current);
-        citySearchTimer.current = setTimeout(() => fetchCities(1, citySearch, citySort, cityPerPage), 400);
-        return () => { if (citySearchTimer.current) clearTimeout(citySearchTimer.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        citySearchTimer.current = setTimeout(
+            () => fetchCities(1, citySearch, citySort, cityPerPage),
+            400,
+        );
+        return () => {
+            if (citySearchTimer.current) clearTimeout(citySearchTimer.current);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [citySearch]);
 
-    const provinceColumns: ColumnDef<ProvinceRow>[] = useMemo(() => [
-        {
-            accessorKey: 'province_name',
-            header: ({ column }) => <SortableHeader column={column} title="Province" />,
-            cell: ({ row }) => row.original.province_name || <span className="text-gray-400">Unknown</span>,
-        },
-        {
-            accessorKey: 'total_orders',
-            header: ({ column }) => <SortableHeader column={column} title="Total Orders" />,
-        },
-        {
-            accessorKey: 'delivered_count',
-            header: ({ column }) => <SortableHeader column={column} title="Delivered" />,
-            cell: ({ row }) => <span className="text-green-600 dark:text-green-400">{row.original.delivered_count}</span>,
-        },
-        {
-            accessorKey: 'returned_count',
-            header: ({ column }) => <SortableHeader column={column} title="Returned" />,
-            cell: ({ row }) => <span className="text-red-500">{row.original.returned_count}</span>,
-        },
-        {
-            accessorKey: 'rts_rate_percentage',
-            header: ({ column }) => <SortableHeader column={column} title="RTS Rate" />,
-            cell: ({ row }) => <RtsCell value={row.original.rts_rate_percentage} />,
-        },
-    ], []);
+    const provinceColumns: ColumnDef<ProvinceRow>[] = useMemo(
+        () => [
+            {
+                accessorKey: 'province_name',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Province" />
+                ),
+                cell: ({ row }) =>
+                    row.original.province_name || (
+                        <span className="text-gray-400">Unknown</span>
+                    ),
+            },
+            {
+                accessorKey: 'total_orders',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Total Orders" />
+                ),
+            },
+            {
+                accessorKey: 'delivered_count',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Delivered" />
+                ),
+                cell: ({ row }) => (
+                    <span className="text-green-600 dark:text-green-400">
+                        {row.original.delivered_count}
+                    </span>
+                ),
+            },
+            {
+                accessorKey: 'returned_count',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Returned" />
+                ),
+                cell: ({ row }) => (
+                    <span className="text-red-500">
+                        {row.original.returned_count}
+                    </span>
+                ),
+            },
+            {
+                accessorKey: 'rts_rate_percentage',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RTS Rate" />
+                ),
+                cell: ({ row }) => (
+                    <RtsCell value={row.original.rts_rate_percentage} />
+                ),
+            },
+        ],
+        [],
+    );
 
-    const cityColumns: ColumnDef<CityRow>[] = useMemo(() => [
-        {
-            accessorKey: 'city_name',
-            header: ({ column }) => <SortableHeader column={column} title="City" />,
-            cell: ({ row }) => row.original.city_name || <span className="text-gray-400">Unknown</span>,
-        },
-        {
-            accessorKey: 'province_name',
-            header: ({ column }) => <SortableHeader column={column} title="Province" />,
-            cell: ({ row }) => <span className="text-gray-500 dark:text-gray-400">{row.original.province_name || '—'}</span>,
-        },
-        {
-            accessorKey: 'total_orders',
-            header: ({ column }) => <SortableHeader column={column} title="Total Orders" />,
-        },
-        {
-            accessorKey: 'delivered_count',
-            header: ({ column }) => <SortableHeader column={column} title="Delivered" />,
-            cell: ({ row }) => <span className="text-green-600 dark:text-green-400">{row.original.delivered_count}</span>,
-        },
-        {
-            accessorKey: 'returned_count',
-            header: ({ column }) => <SortableHeader column={column} title="Returned" />,
-            cell: ({ row }) => <span className="text-red-500">{row.original.returned_count}</span>,
-        },
-        {
-            accessorKey: 'rts_rate_percentage',
-            header: ({ column }) => <SortableHeader column={column} title="RTS Rate" />,
-            cell: ({ row }) => <RtsCell value={row.original.rts_rate_percentage} />,
-        },
-    ], []);
+    const cityColumns: ColumnDef<CityRow>[] = useMemo(
+        () => [
+            {
+                accessorKey: 'city_name',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="City" />
+                ),
+                cell: ({ row }) =>
+                    row.original.city_name || (
+                        <span className="text-gray-400">Unknown</span>
+                    ),
+            },
+            {
+                accessorKey: 'province_name',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Province" />
+                ),
+                cell: ({ row }) => (
+                    <span className="text-gray-500 dark:text-gray-400">
+                        {row.original.province_name || '—'}
+                    </span>
+                ),
+            },
+            {
+                accessorKey: 'total_orders',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Total Orders" />
+                ),
+            },
+            {
+                accessorKey: 'delivered_count',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Delivered" />
+                ),
+                cell: ({ row }) => (
+                    <span className="text-green-600 dark:text-green-400">
+                        {row.original.delivered_count}
+                    </span>
+                ),
+            },
+            {
+                accessorKey: 'returned_count',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Returned" />
+                ),
+                cell: ({ row }) => (
+                    <span className="text-red-500">
+                        {row.original.returned_count}
+                    </span>
+                ),
+            },
+            {
+                accessorKey: 'rts_rate_percentage',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RTS Rate" />
+                ),
+                cell: ({ row }) => (
+                    <RtsCell value={row.original.rts_rate_percentage} />
+                ),
+            },
+        ],
+        [],
+    );
 
     return (
-        <div className="rounded-2xl border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900">
+        <div className="rounded-2xl border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
             <div className="flex flex-col gap-3 border-b border-black/6 px-5 py-4 dark:border-white/6">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -164,29 +279,59 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
                             {groupBy === 'province' ? 'By Province' : 'By City'}
                         </h2>
                         <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
-                            {groupBy === 'province' ? 'RTS rate grouped by province' : 'RTS rate grouped by city'}
+                            {groupBy === 'province'
+                                ? 'RTS rate grouped by province'
+                                : 'RTS rate grouped by city'}
                         </p>
                     </div>
                     <RefreshButton
                         onClick={() => {
-                            if (groupBy === 'province') fetchProvinces(1, provinceSearch, provinceSort, provincePerPage);
-                            else fetchCities(1, citySearch, citySort, cityPerPage);
+                            if (groupBy === 'province')
+                                fetchProvinces(
+                                    1,
+                                    provinceSearch,
+                                    provinceSort,
+                                    provincePerPage,
+                                );
+                            else
+                                fetchCities(
+                                    1,
+                                    citySearch,
+                                    citySort,
+                                    cityPerPage,
+                                );
                         }}
-                        loading={groupBy === 'province' ? provincesLoading : citiesLoading}
+                        loading={
+                            groupBy === 'province'
+                                ? provincesLoading
+                                : citiesLoading
+                        }
                     />
                 </div>
                 <div className="flex w-full flex-wrap items-center gap-3">
                     <div className="relative">
-                        <svg className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+                        <svg
+                            className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-gray-300 dark:text-gray-600"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z"
+                            />
                         </svg>
                         {groupBy === 'province' ? (
                             <input
                                 type="text"
                                 value={provinceSearch}
-                                onChange={(e) => setProvinceSearch(e.target.value)}
+                                onChange={(e) =>
+                                    setProvinceSearch(e.target.value)
+                                }
                                 placeholder="Search province…"
-                                className="h-8 w-full min-w-[11rem] rounded-lg border border-black/8 bg-stone-50 pl-8 pr-3 text-[12px]! text-gray-700 placeholder-gray-300 outline-none transition-colors focus:border-black/20 dark:border-white/8 dark:bg-white/3 dark:text-gray-300 dark:placeholder-gray-600 dark:focus:border-white/20 sm:w-48"
+                                className="h-8 w-full min-w-[11rem] rounded-lg border border-black/8 bg-stone-50 pr-3 pl-8 text-[12px]! text-gray-700 placeholder-gray-300 transition-colors outline-none focus:border-black/20 sm:w-48 dark:border-white/8 dark:bg-white/3 dark:text-gray-300 dark:placeholder-gray-600 dark:focus:border-white/20"
                             />
                         ) : (
                             <input
@@ -194,7 +339,7 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
                                 value={citySearch}
                                 onChange={(e) => setCitySearch(e.target.value)}
                                 placeholder="Search city or province…"
-                                className="h-8 w-full min-w-[12rem] rounded-lg border border-black/8 bg-stone-50 pl-8 pr-3 text-[12px]! text-gray-700 placeholder-gray-300 outline-none transition-colors focus:border-black/20 dark:border-white/8 dark:bg-white/3 dark:text-gray-300 dark:placeholder-gray-600 dark:focus:border-white/20 sm:w-52"
+                                className="h-8 w-full min-w-[12rem] rounded-lg border border-black/8 bg-stone-50 pr-3 pl-8 text-[12px]! text-gray-700 placeholder-gray-300 transition-colors outline-none focus:border-black/20 sm:w-52 dark:border-white/8 dark:bg-white/3 dark:text-gray-300 dark:placeholder-gray-600 dark:focus:border-white/20"
                             />
                         )}
                     </div>
@@ -217,42 +362,70 @@ export default function LocationCard({ workspaceSlug, queryParams, onDataLoaded 
             <div className="p-4">
                 {groupBy === 'province' ? (
                     provincesLoading ? (
-                        <div className="flex h-32 items-center justify-center text-[13px] text-gray-400">Loading…</div>
+                        <div className="flex h-32 items-center justify-center text-[13px] text-gray-400">
+                            Loading…
+                        </div>
                     ) : (
                         <DataTable
                             columns={provinceColumns}
                             data={provinces?.data ?? []}
                             enableInternalPagination={false}
-                            meta={provinces ? { ...omit(provinces, ['data']) } : undefined}
+                            meta={
+                                provinces
+                                    ? { ...omit(provinces, ['data']) }
+                                    : undefined
+                            }
                             initialSorting={toFrontendSort(provinceSort)}
                             onFetch={(params) => {
-                                const s = params?.sort as string ?? '-total_orders';
-                                const perPage = Number(params?.per_page ?? provinces?.per_page ?? provincePerPage);
+                                const s =
+                                    (params?.sort as string) ?? '-total_orders';
+                                const perPage = Number(
+                                    params?.per_page ??
+                                        provinces?.per_page ??
+                                        provincePerPage,
+                                );
                                 setProvinceSort(s);
                                 setProvincePerPage(perPage);
-                                fetchProvinces(Number(params?.page ?? 1), provinceSearch, s, perPage);
+                                fetchProvinces(
+                                    Number(params?.page ?? 1),
+                                    provinceSearch,
+                                    s,
+                                    perPage,
+                                );
                             }}
                         />
                     )
+                ) : citiesLoading ? (
+                    <div className="flex h-32 items-center justify-center text-[13px] text-gray-400">
+                        Loading…
+                    </div>
                 ) : (
-                    citiesLoading ? (
-                        <div className="flex h-32 items-center justify-center text-[13px] text-gray-400">Loading…</div>
-                    ) : (
-                        <DataTable
-                            columns={cityColumns}
-                            data={cities?.data ?? []}
-                            enableInternalPagination={false}
-                            meta={cities ? { ...omit(cities, ['data']) } : undefined}
-                            initialSorting={toFrontendSort(citySort)}
-                            onFetch={(params) => {
-                                const s = params?.sort as string ?? '-total_orders';
-                                const perPage = Number(params?.per_page ?? cities?.per_page ?? cityPerPage);
-                                setCitySort(s);
-                                setCityPerPage(perPage);
-                                fetchCities(Number(params?.page ?? 1), citySearch, s, perPage);
-                            }}
-                        />
-                    )
+                    <DataTable
+                        columns={cityColumns}
+                        data={cities?.data ?? []}
+                        enableInternalPagination={false}
+                        meta={
+                            cities ? { ...omit(cities, ['data']) } : undefined
+                        }
+                        initialSorting={toFrontendSort(citySort)}
+                        onFetch={(params) => {
+                            const s =
+                                (params?.sort as string) ?? '-total_orders';
+                            const perPage = Number(
+                                params?.per_page ??
+                                    cities?.per_page ??
+                                    cityPerPage,
+                            );
+                            setCitySort(s);
+                            setCityPerPage(perPage);
+                            fetchCities(
+                                Number(params?.page ?? 1),
+                                citySearch,
+                                s,
+                                perPage,
+                            );
+                        }}
+                    />
                 )}
             </div>
         </div>

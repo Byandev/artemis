@@ -11,7 +11,12 @@ interface Props {
 const IN_COLOR = '#10b981';
 const OUT_COLOR = '#f43f5e';
 
-export default function CashflowChart({ categories, inSeries, outSeries, formatValue }: Props) {
+export default function CashflowChart({
+    categories,
+    inSeries,
+    outSeries,
+    formatValue,
+}: Props) {
     const columnWidth =
         categories.length > 20 ? '80%' : categories.length > 10 ? '60%' : '40%';
 
@@ -39,13 +44,21 @@ export default function CashflowChart({ categories, inSeries, outSeries, formatV
             axisBorder: { show: false },
             axisTicks: { show: false },
             labels: {
-                style: { fontSize: '11px', fontFamily: 'DM Mono, monospace', colors: '#9CA3AF' },
+                style: {
+                    fontSize: '11px',
+                    fontFamily: 'DM Mono, monospace',
+                    colors: '#9CA3AF',
+                },
             },
         },
         yaxis: {
             labels: {
                 formatter: formatValue,
-                style: { fontSize: '11px', fontFamily: 'DM Mono, monospace', colors: ['#9CA3AF'] },
+                style: {
+                    fontSize: '11px',
+                    fontFamily: 'DM Mono, monospace',
+                    colors: ['#9CA3AF'],
+                },
             },
         },
         legend: {
@@ -91,7 +104,12 @@ export default function CashflowChart({ categories, inSeries, outSeries, formatV
     return (
         <div className="custom-scrollbar max-w-full overflow-x-auto">
             <div className={categories.length > 15 ? 'min-w-[900px]' : ''}>
-                <Chart options={options} series={series} type="bar" height={300} />
+                <Chart
+                    options={options}
+                    series={series}
+                    type="bar"
+                    height={300}
+                />
             </div>
         </div>
     );

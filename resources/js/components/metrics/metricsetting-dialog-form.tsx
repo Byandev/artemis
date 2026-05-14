@@ -1,13 +1,32 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import type { SharedData } from '@/types';
+import { groupedMetrics } from '@/types/metrics';
 import { useForm, usePage } from '@inertiajs/react';
 import React, { useEffect } from 'react';
 import { groupedMetrics } from '@/types/metrics';
+
+interface MetricSetting {
+    allowed_metrics?: string[];
+    default_metrics?: string[];
+}
 
 interface Workspace {
     id: number;
     name: string;
     slug: string;
     metric_settings?: { metric_key: string }[];
+    metric_setting?: MetricSetting;
+    metricSetting?: MetricSetting;
+}
+
+interface MetricSettingsPageProps extends SharedData {
+    currentWorkspace?: Workspace;
 }
 
 interface Props {
@@ -16,11 +35,16 @@ interface Props {
     workspace: Workspace | null;
 }
 
-export function MetricSettingDialog({ open, onOpenChange, workspace: localWorkspace }: Props) {
+export function MetricSettingDialog({
+    open,
+    onOpenChange,
+    workspace: localWorkspace,
+}: Props) {
+    const { currentWorkspace } = usePage<MetricSettingsPageProps>().props;
     const { props } = usePage();
 
     // Always prioritize the workspace from the shared page props to ensure we have fresh DB data
-    const workspace = (props as any).currentWorkspace || localWorkspace;
+    const workspace = currentWorkspace || localWorkspace;
 
     const { data, setData, put, processing, errors } = useForm({
         allowed_metrics: [] as string[],
@@ -30,12 +54,13 @@ export function MetricSettingDialog({ open, onOpenChange, workspace: localWorksp
     useEffect(() => {
         if (open && workspace) {
             // Check both snake_case and camelCase to match your Middleware/Model naming
-            const setting = (workspace as any).metric_setting || (workspace as any).metricSetting;
+            const setting = workspace.metric_setting || workspace.metricSetting;
 
             if (setting?.allowed_metrics) {
                 setData({
                     allowed_metrics: setting.allowed_metrics,
-                    default_metrics: setting.default_metrics || setting.allowed_metrics,
+                    default_metrics:
+                        setting.default_metrics || setting.allowed_metrics,
                 });
             } else {
                 setData({
@@ -44,7 +69,7 @@ export function MetricSettingDialog({ open, onOpenChange, workspace: localWorksp
                 });
             }
         }
-    }, [open, workspace]);
+    }, [open, setData, workspace]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -53,8 +78,6 @@ export function MetricSettingDialog({ open, onOpenChange, workspace: localWorksp
         put(`/admin/workspaces/${workspace.slug}/metrics`, {
             preserveScroll: true,
             onSuccess: () => {
-                // The onOpenChange(false) will close the modal, 
-                // and the 'back()' redirect from Laravel will refresh the page props.
                 onOpenChange(false);
             },
         });
@@ -138,46 +161,10 @@ export function MetricSettingDialog({ open, onOpenChange, workspace: localWorksp
                                                 {selectedCount} of {group.metrics.length} metrics enabled
                                             </p>
                                         </div>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleGroup(groupMetricKeys, !allSelected)}
-                                            className="h-10 rounded-lg border border-black/8 bg-white px-5 font-mono text-[13px] font-medium text-gray-700 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
-                                        >
-                                            {allSelected ? 'Clear Group' : 'Select Group'}
-                                        </button>
-                                    </div>
-
-                                    <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
-                                        {group.metrics.map((metric) => {
-                                            const checked = data.allowed_metrics.includes(metric.key);
-
-                                            return (
-                                                <label
-                                                    key={metric.key}
-                                                    className="flex min-h-[132px] cursor-pointer gap-4 rounded-xl border border-black/6 bg-stone-50/70 p-5 transition-all hover:border-emerald-300 hover:bg-emerald-50/60 dark:border-white/6 dark:bg-white/3 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-500/10"
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={checked}
-                                                        onChange={() => toggleMetric(metric.key)}
-                                                        className="mt-1 h-6 w-6 shrink-0 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                                                    />
-                                                    <span className="flex min-w-0 flex-col">
-                                                        <span className="text-[16px] font-semibold leading-snug text-gray-900 dark:text-gray-100">
-                                                            {metric.name}
-                                                        </span>
-                                                        <span className="mt-2 text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
-                                                            {metric.description}
-                                                        </span>
-                                                    </span>
-                                                </label>
-                                            );
-                                        })}
-                                    </div>
-                                </section>
-                            );
-                        })}
+                                    </label>
+                                ))}
+                            </div>
+                        </Field>
                     </div>
 
                     <Footer

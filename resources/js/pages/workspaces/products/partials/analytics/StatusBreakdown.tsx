@@ -1,30 +1,41 @@
-import Chart from "react-apexcharts";
-import { ApexOptions } from "apexcharts";
+import { ApexOptions } from 'apexcharts';
 import { useMemo } from 'react';
+import Chart from 'react-apexcharts';
 
 type Props = {
     scaling_product_count: number;
     testing_product_count: number;
     inactive_product_count: number;
-}
+};
 
-export default function StatusBreakdown({ scaling_product_count, testing_product_count, inactive_product_count }: Props) {
-    const series = useMemo(() => [scaling_product_count, testing_product_count, inactive_product_count], [scaling_product_count, testing_product_count, inactive_product_count]);
+export default function StatusBreakdown({
+    scaling_product_count,
+    testing_product_count,
+    inactive_product_count,
+}: Props) {
+    const series = useMemo(
+        () => [
+            scaling_product_count,
+            testing_product_count,
+            inactive_product_count,
+        ],
+        [scaling_product_count, testing_product_count, inactive_product_count],
+    );
 
     const options: ApexOptions = {
-        colors: ["#0eaa82", "#8cd9c5", "#ecf3f1"],
-        labels: ["Active", "Testing", "Inactive"],
+        colors: ['#0eaa82', '#8cd9c5', '#ecf3f1'],
+        labels: ['Active', 'Testing', 'Inactive'],
         chart: {
-            fontFamily: "Outfit, sans-serif",
-            type: "donut",
+            fontFamily: 'Outfit, sans-serif',
+            type: 'donut',
             width: 445,
             height: 290,
         },
         plotOptions: {
             pie: {
                 donut: {
-                    size: "65%",
-                    background: "transparent",
+                    size: '65%',
+                    background: 'transparent',
                     labels: {
                         show: true,
                         value: {
@@ -38,13 +49,13 @@ export default function StatusBreakdown({ scaling_product_count, testing_product
         states: {
             hover: {
                 filter: {
-                    type: "none",
+                    type: 'none',
                 },
             },
             active: {
                 allowMultipleDataPointsSelection: false,
                 filter: {
-                    type: "darken",
+                    type: 'darken',
                 },
             },
         },
@@ -61,14 +72,14 @@ export default function StatusBreakdown({ scaling_product_count, testing_product
 
         legend: {
             show: true,
-            position: "bottom",
-            horizontalAlign: "center",
-            fontFamily: "Outfit",
-            fontSize: "14px",
+            position: 'bottom',
+            horizontalAlign: 'center',
+            fontFamily: 'Outfit',
+            fontSize: '14px',
             fontWeight: 400,
             markers: {
                 size: 4,
-                shape: "circle",
+                shape: 'circle',
                 strokeWidth: 0,
             },
             itemMargin: {
@@ -93,15 +104,20 @@ export default function StatusBreakdown({ scaling_product_count, testing_product
     };
 
     return (
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
-            <div className="flex items-center justify-between mb-9">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+            <div className="mb-9 flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
                     Products Breakdown
                 </h3>
             </div>
             <div>
-                <div className="flex justify-center mx-auto">
-                    <Chart options={options} series={series} type="donut" height={290} />
+                <div className="mx-auto flex justify-center">
+                    <Chart
+                        options={options}
+                        series={series}
+                        type="donut"
+                        height={290}
+                    />
                 </div>
             </div>
         </div>

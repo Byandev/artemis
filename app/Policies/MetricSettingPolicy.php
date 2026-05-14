@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\User;
 use App\Models\Workspace;
-use App\Models\WorkspaceMetricSetting;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class MetricSettingPolicy

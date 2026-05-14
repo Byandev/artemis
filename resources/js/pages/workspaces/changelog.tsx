@@ -1,5 +1,5 @@
-import { Head, Link } from '@inertiajs/react';
 import { home } from '@/routes';
+import { Head, Link } from '@inertiajs/react';
 
 interface ChangelogEntry {
     version: string;
@@ -11,6 +11,218 @@ interface ChangelogEntry {
 }
 
 const changelog: ChangelogEntry[] = [
+    {
+        version: 'v3.6.15',
+        date: '2026-05-12',
+        sections: [
+            {
+                title: 'Per-Workspace Page Limit Override',
+                items: [
+                    "Added a workspaces.max_pages column (new migration) that overrides the subscription plan's page_limit on a per-workspace basis — when set it wins, when null the plan limit is used, when both are null pages are unlimited",
+                    'Centralised the resolution on the Workspace model — new pageLimit(), pageLimitInfo(), and hasReachedPageLimit() helpers so every creation site reads the same source of truth instead of duplicating the ?? chain',
+                    "PageController::store and OnboardingController::store both now throw a ValidationException with a page_limit message when the workspace is at capacity; PageController::create still redirects to index with a flash error so users can't land on the create form when full",
+                    'Onboarding page (resources/js/pages/workspaces/onboarding.tsx) now receives pageLimit/pageCount/pageLimitReached and disables the "Connect & Sync Orders" button with a tooltip + small counter ("X/Y pages used"), matching the pattern already on the pages index',
+                    'Admin — /admin/workspaces now exposes a max_pages field on the workspace edit form and shows current usage as "count / max_pages" in the listing; AdminWorkspaceController validates max_pages as nullable|integer|min:1',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.14',
+        date: '2026-05-09',
+        sections: [
+            {
+                title: 'Botcake — Page & Shop Filters on Flows / Sequences',
+                items: [
+                    'Added the same Filters dropdown the main dashboard uses (Page + Shop) to /workspaces/{slug}/botcake/flows and /workspaces/{slug}/botcake/sequences — narrow the table to specific Pancake pages or shops without leaving the page',
+                    'Filter state is persisted in the URL as filter[page_ids] / filter[shop_ids] (comma-separated), so refreshes and shared links preserve the selection. Page resets to 1 when the filter changes',
+                    'Server-side: FlowController and SequenceController now whitelist page_ids and shop_ids — page_ids does whereIn on botcake_(flows|sequences).page_id, shop_ids walks the page relation (whereHas page → whereIn shop_id)',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.13',
+        date: '2026-05-09',
+        sections: [
+            {
+                title: 'Frontend Formatting Sweep',
+                items: [
+                    'Ran Prettier across the entire frontend (resources/js + resources/css) — 239 files reformatted with no functional changes. Quote-style normalised (single quotes), long lines wrapped, multi-line shadow / arg lists aligned, and a handful of missing spaces after type-annotation colons fixed (e.g. total_rmo_call_attempts:number → : number)',
+                    'Refreshed resources/views/design-guidelines.html with the expanded component reference (~3,800 added lines of HTML samples covering the current design system) so internal contributors have an up-to-date visual catalog',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.12',
+        date: '2026-05-09',
+        sections: [
+            {
+                title: 'Customer Support — Tickets',
+                items: [
+                    'Added a workspace-side Support page (resources/js/pages/workspaces/support/index.tsx) with a "Contact Support" modal so users can open a ticket directly from the app — captures subject, message, and source page',
+                    'Added an admin-side Support Tickets triage page (resources/js/pages/workspaces/admin/support-tickets/index.tsx) with status filters and row-click drilldown',
+                    'Backed by a new SupportTicket model + policy + StoreSupportTicketRequest + factory; routes registered in routes/workspaces.php; covered by tests/Feature/Workspaces/SupportTicketsTest.php',
+                    'Sidebar / app header / sidebar header now expose the Support entry, and Inertia shares support ticket data so the indicator stays in sync',
+                ],
+            },
+            {
+                title: 'Admin — Per-Workspace Metric Whitelist',
+                items: [
+                    'Admins can now control which metrics each workspace can see via /admin/workspaces/{slug}/metric-settings — backed by the new workspace_metric_settings table, MetricSettingPolicy, WorkspaceMetricSetting model, and a new App\\Support\\Metrics\\MetricRegistry helper',
+                    'The MetricPicker / LocationCard / CxRtsCard components honour the whitelist; metrics not enabled for a workspace are hidden in the UI rather than silently empty',
+                ],
+            },
+            {
+                title: 'Inventory — Keyword Sync & Public API',
+                items: [
+                    'Added trigger-fetch-inventory-keyword-records scheduled command + TriggerFetchInventoryKeywordRecord job to keep keyword-driven inventory data fresh',
+                    'New /api/v1/public/inventory-items endpoint (PublicApi\\InventoryItemController) for machine-to-machine reads of inventory state',
+                    'Added remaining_qty column on inventory_items (separate migration) — surfaced in the inventory items page and form dialogs so on-hand quantity is no longer derived from running totals',
+                ],
+            },
+            {
+                title: 'CSR Analytics — Search & URL-Persistent Filters',
+                items: [
+                    'Added a search input on the CSR analytics page that filters the per-CSR table by name; the search term, type toggle (POS/ERP), and pagination state are now persisted in the URL so refreshes and shared links keep the filter context',
+                    'Fixed CSR analytics pagination drift (86d2t08ae) and a CSR management update bug',
+                ],
+            },
+            {
+                title: 'Permissions & Errors',
+                items: [
+                    'Added grant-user-all-view-permissions artisan command (App\\Console\\Commands\\GrantUserAllViewPermissions) to bulk-grant every view-* permission to a user in a workspace',
+                    'Added a proper /errors/403 Inertia page with copy and a "Go back" action — middleware now renders this on workspace-permission denials instead of the generic Laravel exception page; covered by tests/Feature/ForbiddenAccessTest.php',
+                ],
+            },
+            {
+                title: 'Data Integrity & Misc Fixes',
+                items: [
+                    'Added a unique index to call_logs (new migration) to enforce one row per (workspace, user, call_date, call_time, phone_number) and prevent duplicate ingestion',
+                    'RTS Analytics — table and pagination fix (86d2t0bg9); Dashboard — crowded-filters layout fix (86d2rz9jz); Finance / Remittance row-filter bugs fixed; inventory transaction form clears state when switching from edit to create',
+                    'RMO Management — JSX structure cleanup (orphaned </div> removed) so the page parses again; minor layout adjustments',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.11',
+        date: '2026-05-08',
+        sections: [
+            {
+                title: 'CSR Daily Records — One-Pass Read Path',
+                items: [
+                    'GET /api/.../csr/daily-records now collapses the previous 7 correlated subqueries into 2 grouped scans (pancake_user_pos_daily_reports + pancake_user_rmo_daily_reports) joined via leftJoinSub — significantly fewer scans on workspaces with large operator lists',
+                    'Both rollup subqueries are now workspace-scoped, and the outer pancake_users query is constrained to operators in the current workspace via the pancake_shop_users → shops relationship — totals can no longer leak across workspaces',
+                    'Refactored to Eloquent: PancakeUserPosDailyReport::query(), PancakeUserRmoDailyReport::query(), and User::whereHas(shopUsers.shop, ...) replace the raw DB::table calls. Added shopUsers and shop relationships on the Pancake User and ShopUser models',
+                ],
+            },
+            {
+                title: 'CSR Daily Records — Sorting & RTS Rate',
+                items: [
+                    'Added rts_rate as a server-side computed column (returning / (returning + delivered) * 100, rounded to 2 decimals) so CSRs can be sorted by return rate without recomputing in JS',
+                    'Sortable columns: csr_name, total_orders, total_sales, total_returning, total_delivered, total_called, total_call_time, total_rmo_call_attempts, rts_rate. Default sort is -total_sales',
+                ],
+            },
+            {
+                title: 'sync:csr-daily-records — Writes to POS Rollup',
+                items: [
+                    'App\\Jobs\\SyncCsrDailyRecord now writes into pancake_user_pos_daily_reports keyed by pancake_user_id instead of csr_daily_records keyed by users.id — the whereNotNull(pu.user_id) filter that previously excluded Pancake operators without linked system accounts is gone, so every operator with confirmed orders is now captured',
+                    'rmo_called is no longer written from this job — that count now lives exclusively in the RMO rollup (pancake_user_rmo_daily_reports), avoiding the dual-source drift that v3.6.9 already aligned',
+                ],
+            },
+            {
+                title: 'CSR Analytics — UI Column Updates',
+                items: [
+                    'Frontend table column accessors updated to match the new API aliases (name, total_delivered, total_returning) and a new "RMO Attempts" column showing total_rmo_call_attempts per CSR',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.10',
+        date: '2026-05-07',
+        sections: [
+            {
+                title: 'CSR Daily Sync — 7-Day Backfill & Queued',
+                items: [
+                    'sync:csr-daily-records and sync:csr-rmo-daily-records are now queue-based — the per-date aggregation moved into App\\Jobs\\SyncCsrDailyRecord and App\\Jobs\\SyncCsrRmoDailyRecord, and the commands have become thin dispatchers',
+                    'Both commands now backfill the last 7 days by default (one job per day) instead of just yesterday — a transient failure on any night is automatically retried on each of the next 6 nightly runs, since the same dates keep being re-aggregated. updateOrCreate keeps it idempotent',
+                    'Added --days=N (override the trailing-day window) and kept --date=YYYY-MM-DD (single-day mode) for ad-hoc backfills. The 03:00 / 04:00 nightly schedule is unchanged',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.9',
+        date: '2026-05-07',
+        sections: [
+            {
+                title: 'Shops — Refresh Users',
+                items: [
+                    'Added a "Refresh users" action to the shop row menu that re-dispatches the FetchShopUsers job for that shop — newly added Pancake operator accounts now show up in the workspace without having to wait for the next nightly sync or refresh the whole shop',
+                ],
+            },
+            {
+                title: 'CSR Daily Records — Aligned & More Detail',
+                items: [
+                    'sync:csr-daily-records (RMO) now defines total_called the same way the POS rollup does: pancake_order_for_delivery rows where status != PENDING. Previously the RMO and POS sides counted "called" differently, which made cross-tab comparisons drift',
+                    'Added a separate total_rmo_call_attempts column to pancake_user_rmo_daily_reports — counts every matching call log per delivery row instead of collapsing to 0/1, so you can now see how many call attempts a CSR actually made versus how many deliveries they reached',
+                ],
+            },
+            {
+                title: 'CSR Performance API — Faster Reads',
+                items: [
+                    'GET /api/.../csr/daily-records now reads from the pre-aggregated daily rollup tables (csr_daily_records, pancake_user_erp_daily_reports, pancake_user_rmo_daily_reports) instead of recomputing from raw orders / deliveries on every request — same numbers, dramatically less work per page load on workspaces with large order volumes',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.8',
+        date: '2026-05-07',
+        sections: [
+            {
+                title: 'CSR Analytics — Index Coverage for Live Queries',
+                items: [
+                    'Added composite index (workspace_id, delivery_date, assignee_id) on pancake_order_for_delivery so the RMO outer query becomes a range scan and GROUP BY assignee_id has an ordered source — avoids the temp-table sort that was kicking in on workspaces with large delivery volume',
+                    'Added composite index (workspace_id, user_id, call_date, phone_number) on call_logs so the EXISTS subquery powering RMO Called resolves via a single index seek per delivery row instead of falling back to (workspace_id, user_id) plus a row-level date / phone match',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.6.7',
+        date: '2026-05-07',
+        sections: [
+            {
+                title: 'CSR Analytics — Live POS Data',
+                items: [
+                    'POS metrics (Total Sales, Orders, Delivered, Returning, RTS Rate, and the per-CSR table) now read directly from pancake_orders instead of the pancake_user_pos_daily_reports rollup — figures reflect live order activity within the selected range without waiting on the daily rollup job',
+                    'Per-CSR aggregation groups pancake_orders by confirmed_by; total_orders / total_sales use confirmed_at, delivered uses status=3 + delivered_at, returning uses status IN (4,5) + returning_at',
+                ],
+            },
+            {
+                title: 'CSR Analytics — Live RMO Called',
+                items: [
+                    'RMO Called and Total Call Time now derive directly from pancake_order_for_delivery (joined to call_logs via workspace + assignee + delivery date + rider/customer phone) instead of pancake_user_rmo_daily_reports — same aggregation logic the SyncCsrRmoDailyRecords command used, just evaluated at request time',
+                ],
+            },
+            {
+                title: 'CSR Analytics — ERP Toggle Disabled',
+                items: [
+                    'ERP option in the POS / ERP toggle is temporarily disabled (greyed out, unclickable) while the ERP data path is being reworked; POS remains the default and only selectable mode',
+                ],
+            },
+            {
+                title: 'Scheduler — Analytics Rollup Paused',
+                items: [
+                    'Hourly and back-fill analytics:rollup schedules in routes/console.php are commented out now that POS / RMO analytics no longer depend on the rollup tables — frees the queue from redundant work',
+                ],
+            },
+        ],
+    },
     {
         version: 'v3.6.6',
         date: '2026-05-07',
@@ -36,7 +248,7 @@ const changelog: ChangelogEntry[] = [
             {
                 title: 'Pancake Sync — Initial Backfill Window',
                 items: [
-                    'First-time Pancake page connect (and the Refresh button on Pages) now backfills 1 month of orders and shop customers instead of 3 months, cutting onboarding sync time and keeping queue load proportional to a typical seller\'s active window',
+                    "First-time Pancake page connect (and the Refresh button on Pages) now backfills 1 month of orders and shop customers instead of 3 months, cutting onboarding sync time and keeping queue load proportional to a typical seller's active window",
                 ],
             },
         ],
@@ -48,7 +260,7 @@ const changelog: ChangelogEntry[] = [
             {
                 title: 'Botcake — Module Toggle',
                 items: [
-                    'Added a per-workspace botcake_module_enabled flag — the Botcake nav group (Sequences + Flows) is hidden from the sidebar when the module is off, and any permission with the Botcake category is filtered out of the user\'s effective permission set',
+                    "Added a per-workspace botcake_module_enabled flag — the Botcake nav group (Sequences + Flows) is hidden from the sidebar when the module is off, and any permission with the Botcake category is filtered out of the user's effective permission set",
                 ],
             },
             {
@@ -76,7 +288,7 @@ const changelog: ChangelogEntry[] = [
             {
                 title: 'Workspace Middleware — Lookup Fallbacks',
                 items: [
-                    'CheckWorkspace now falls back to the route-bound {workspace} parameter and the user\'s session current_workspace_id when the X-Workspace-Id header is absent, so URL-scoped routes don\'t need clients to set the header explicitly',
+                    "CheckWorkspace now falls back to the route-bound {workspace} parameter and the user's session current_workspace_id when the X-Workspace-Id header is absent, so URL-scoped routes don't need clients to set the header explicitly",
                 ],
             },
         ],
@@ -158,7 +370,7 @@ const changelog: ChangelogEntry[] = [
             {
                 title: 'Pages — Plan Limits',
                 items: [
-                    "Pages list now enforces the workspace's plan page limit — the index shows an \"X/Y pages used\" indicator under the Add New Page button, the button disables once the limit is reached, and a tooltip points to upgrading the plan",
+                    'Pages list now enforces the workspace\'s plan page limit — the index shows an "X/Y pages used" indicator under the Add New Page button, the button disables once the limit is reached, and a tooltip points to upgrading the plan',
                     'Backend now blocks the Add Page flow when the limit is hit (both the create page and the store endpoint) with a clear validation message instead of letting the request through silently',
                 ],
             },
@@ -577,9 +789,7 @@ const changelog: ChangelogEntry[] = [
             },
             {
                 title: 'Finance',
-                items: [
-                    'Initial rollout of finance features (feat/finance)',
-                ],
+                items: ['Initial rollout of finance features (feat/finance)'],
             },
             {
                 title: 'Parcel Journey',
@@ -590,9 +800,7 @@ const changelog: ChangelogEntry[] = [
             },
             {
                 title: 'Internal',
-                items: [
-                    'Sentry integration added for error monitoring',
-                ],
+                items: ['Sentry integration added for error monitoring'],
             },
         ],
     },
@@ -654,7 +862,7 @@ const changelog: ChangelogEntry[] = [
             {
                 title: 'RMO Management',
                 items: [
-                    'Status picker, Assign to me, and Remove assignee are disabled unless the order\'s delivery date is today — backend validation mirrors the UI',
+                    "Status picker, Assign to me, and Remove assignee are disabled unless the order's delivery date is today — backend validation mirrors the UI",
                     'Date picker moved to the right side of the toolbar, next to the Show/Hide Statistics button',
                 ],
             },
@@ -754,9 +962,7 @@ const changelog: ChangelogEntry[] = [
         sections: [
             {
                 title: 'Fixes',
-                items: [
-                    'New CSR users now default to ACTIVE status',
-                ],
+                items: ['New CSR users now default to ACTIVE status'],
             },
         ],
     },
@@ -1048,8 +1254,7 @@ const changelog: ChangelogEntry[] = [
 const versionColors: Record<string, string> = {
     'v3.3.0':
         'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 ring-yellow-500/20',
-    'v3.1.0':
-        'bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20',
+    'v3.1.0': 'bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20',
     'v3.0.2':
         'bg-teal-500/10 text-teal-600 dark:text-teal-400 ring-teal-500/20',
     'v3.0.1':
@@ -1100,11 +1305,20 @@ export default function Changelog() {
                 {/* Header */}
                 <header className="border-b border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-                        <Link href={home().url} className="flex items-center gap-2.5">
-                            <img src="/img/logo/artemis.png" alt="Artemis" className="h-7 w-7 object-contain" />
-                            <span className="font-semibold tracking-tight text-gray-900 dark:text-white">Artemis</span>
+                        <Link
+                            href={home().url}
+                            className="flex items-center gap-2.5"
+                        >
+                            <img
+                                src="/img/logo/artemis.png"
+                                alt="Artemis"
+                                className="h-7 w-7 object-contain"
+                            />
+                            <span className="font-semibold tracking-tight text-gray-900 dark:text-white">
+                                Artemis
+                            </span>
                         </Link>
-                        <span className="font-mono text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                        <span className="font-mono text-[11px] font-semibold tracking-widest text-gray-400 uppercase dark:text-gray-500">
                             Changelog
                         </span>
                     </div>
@@ -1143,19 +1357,21 @@ export default function Changelog() {
                                 <div className="space-y-5">
                                     {entry.sections.map((section) => (
                                         <div key={section.title}>
-                                            <p className="mb-2.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                                            <p className="mb-2.5 font-mono text-[10px] font-semibold tracking-widest text-gray-400 uppercase dark:text-gray-500">
                                                 {section.title}
                                             </p>
                                             <ul className="space-y-1.5">
-                                                {section.items.map((item, i) => (
-                                                    <li
-                                                        key={i}
-                                                        className="flex items-start gap-2.5 font-mono text-[12px] text-gray-600 dark:text-gray-400"
-                                                    >
-                                                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300 dark:bg-zinc-600" />
-                                                        {item}
-                                                    </li>
-                                                ))}
+                                                {section.items.map(
+                                                    (item, i) => (
+                                                        <li
+                                                            key={i}
+                                                            className="flex items-start gap-2.5 font-mono text-[12px] text-gray-600 dark:text-gray-400"
+                                                        >
+                                                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300 dark:bg-zinc-600" />
+                                                            {item}
+                                                        </li>
+                                                    ),
+                                                )}
                                             </ul>
                                         </div>
                                     ))}
@@ -1165,7 +1381,8 @@ export default function Changelog() {
                     </div>
 
                     <p className="mt-8 text-center font-mono text-[11px] text-gray-400 dark:text-gray-600">
-                        © {new Date().getFullYear()} Artemis. All rights reserved.
+                        © {new Date().getFullYear()} Artemis. All rights
+                        reserved.
                     </p>
                 </main>
             </div>

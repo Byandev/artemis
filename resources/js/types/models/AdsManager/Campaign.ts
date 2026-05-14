@@ -1,6 +1,5 @@
 import { AdAccount } from '@/types/models/AdAccount';
 
-
 export interface Campaign {
     id: number;
     name: string;

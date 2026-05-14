@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 
 interface Item {
     id: number;
-    sku: string;   
+    sku: string;
     product_id: number;
     sales_keywords: string;
     transaction_keywords: string;
@@ -28,7 +28,7 @@ interface Item {
 interface Props {
     item: Item | null;
     workspace: Workspace;
-    onClose: () => void;                                                                                                            
+    onClose: () => void;
 }
 
 export function DeleteItemDialog({ item, workspace, onClose }: Props) {
@@ -37,15 +37,18 @@ export function DeleteItemDialog({ item, workspace, onClose }: Props) {
     const handleDelete = () => {
         if (!item) return;
 
-        router.delete(`/workspaces/${workspace.slug}/inventory/items/${item.id}`, {
-            preserveScroll: true,
-            onStart: () => setProcessing(true),
-            onSuccess: () => {
-                toast.success(`Item deleted successfully`);
-            onClose();
+        router.delete(
+            `/workspaces/${workspace.slug}/inventory/items/${item.id}`,
+            {
+                preserveScroll: true,
+                onStart: () => setProcessing(true),
+                onSuccess: () => {
+                    toast.success(`Item deleted successfully`);
+                    onClose();
+                },
+                onFinish: () => setProcessing(false),
             },
-            onFinish: () => setProcessing(false),
-        });
+        );
     };
 
     return (
@@ -60,8 +63,11 @@ export function DeleteItemDialog({ item, workspace, onClose }: Props) {
                         <span className="font-medium text-gray-900 dark:text-gray-200">
                             {item?.product?.name || 'this product'}
                         </span>{' '}
-                        on <span className="font-mono text-emerald-600 dark:text-emerald-400">{item?.transaction_keywords}</span>? 
-                        This action cannot be undone.
+                        on{' '}
+                        <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                            {item?.transaction_keywords}
+                        </span>
+                        ? This action cannot be undone.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 

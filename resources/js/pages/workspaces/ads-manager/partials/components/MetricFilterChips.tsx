@@ -21,16 +21,14 @@ export const MetricFilterChips = ({
                 <Badge
                     key={index}
                     variant="secondary"
-                    className="cursor-pointer transition-shadow hover:brightness-95 gap-2 p-2"
+                    className="cursor-pointer gap-2 p-2 transition-shadow hover:brightness-95"
                     onClick={() => onEdit(index)}
                 >
                     <span>
-                        <span className="font-medium capitalize">{filter.metric}</span>
-                        {' '}
-                        <span>
-                            {getOperatorSymbol(filter.operator)}
-                        </span>
-                        {' '}
+                        <span className="font-medium capitalize">
+                            {filter.metric}
+                        </span>{' '}
+                        <span>{getOperatorSymbol(filter.operator)}</span>{' '}
                         <span className="font-medium">{filter.value}</span>
                     </span>
                     <button
@@ -39,7 +37,7 @@ export const MetricFilterChips = ({
                             e.stopPropagation();
                             onRemove(index);
                         }}
-                        className="text-gray-400 hover:text-red-600 transition-colors ml-1"
+                        className="ml-1 text-gray-400 transition-colors hover:text-red-600"
                     >
                         <X className="h-4 w-4" />
                     </button>

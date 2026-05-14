@@ -1,6 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import {
+    InputGroup,
+    InputGroupAddon,
+    InputGroupInput,
+} from '@/components/ui/input-group';
 import { Search, XIcon } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 
 type Item = {
     id: number;
@@ -24,7 +28,7 @@ const SearchSelect: React.FC<Props> = ({ items, selected, setSelected }) => {
         }
 
         const r = items.filter((item) =>
-            item.name.toLowerCase().includes(query.trim().toLowerCase())
+            item.name.toLowerCase().includes(query.trim().toLowerCase()),
         );
 
         setResults(r.filter((item) => !selected.includes(item.id)));
@@ -43,14 +47,18 @@ const SearchSelect: React.FC<Props> = ({ items, selected, setSelected }) => {
                         <Search />
                     </InputGroupAddon>
                     <InputGroupAddon align="inline-end">
-                        {query.trim() === '' ? null : `${results.length} results`}
+                        {query.trim() === ''
+                            ? null
+                            : `${results.length} results`}
                     </InputGroupAddon>
                 </InputGroup>
 
                 {query.trim() !== '' && (
-                    <div className="absolute left-0 right-0 mt-1 z-50 bg-white dark:bg-slate-800 border rounded-md shadow-lg max-h-16 overflow-auto">
+                    <div className="absolute right-0 left-0 z-50 mt-1 max-h-16 overflow-auto rounded-md border bg-white shadow-lg dark:bg-slate-800">
                         {(() => {
-                            const filtered = results.filter((p) => !selected.includes(p.id));
+                            const filtered = results.filter(
+                                (p) => !selected.includes(p.id),
+                            );
 
                             if (filtered.length === 0) {
                                 return (
@@ -65,11 +73,14 @@ const SearchSelect: React.FC<Props> = ({ items, selected, setSelected }) => {
                                     key={item.id}
                                     className="flex items-center justify-between px-3 py-2 hover:bg-muted/50"
                                 >
-                                    <label className="flex items-center gap-2 w-full truncate">
+                                    <label className="flex w-full items-center gap-2 truncate">
                                         <span
-                                            className="truncate cursor-pointer"
+                                            className="cursor-pointer truncate"
                                             onClick={() => {
-                                                setSelected((prev) => [...prev, item.id]);
+                                                setSelected((prev) => [
+                                                    ...prev,
+                                                    item.id,
+                                                ]);
                                                 setQuery('');
                                             }}
                                         >
@@ -84,23 +95,25 @@ const SearchSelect: React.FC<Props> = ({ items, selected, setSelected }) => {
             </div>
 
             {selected.length === 0 ? (
-                <p className="text-sm text-muted-foreground mt-2 text-center py-5">
+                <p className="mt-2 py-5 text-center text-sm text-muted-foreground">
                     No filter selected.
                 </p>
             ) : (
-                <div className="mt-2 max-h-[160px] overflow-auto space-y-3">
+                <div className="mt-2 max-h-[160px] space-y-3 overflow-auto">
                     {selected.map((id) => {
                         const item = items.find((i) => i.id === id);
                         if (!item) return null;
                         return (
                             <div
                                 key={id}
-                                className="flex items-center justify-between px-2 py-1 rounded-md mb-1"
+                                className="mb-1 flex items-center justify-between rounded-md px-2 py-1"
                             >
                                 <span className="truncate">{item.name}</span>
                                 <button
                                     onClick={() =>
-                                        setSelected((prev) => prev.filter((p) => p !== id))
+                                        setSelected((prev) =>
+                                            prev.filter((p) => p !== id),
+                                        )
                                     }
                                     className="text-sm"
                                 >

@@ -1,6 +1,5 @@
 import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Workspace } from '@/types/models/Workspace';
 import { type ReactNode } from 'react';
 import { Toaster } from 'sonner'; // 1. Import the Toaster
 

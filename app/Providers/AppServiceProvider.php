@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\Workspace;
+use App\Policies\MetricSettingPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -40,7 +41,7 @@ class AppServiceProvider extends ServiceProvider
             $workspaceKey = is_object($workspace) ? ($workspace->slug ?? $workspace->id ?? 'unknown') : ($workspace ?? 'unknown');
 
             return [
-                Limit::perMinute(20)->by($request->ip() . '|' . $workspaceKey),
+                Limit::perMinute(20)->by($request->ip().'|'.$workspaceKey),
             ];
         });
 
@@ -49,11 +50,11 @@ class AppServiceProvider extends ServiceProvider
             $workspaceKey = is_object($workspace) ? ($workspace->slug ?? $workspace->id ?? 'unknown') : ($workspace ?? 'unknown');
 
             return [
-                Limit::perMinute(30)->by($request->ip() . '|' . $workspaceKey),
+                Limit::perMinute(30)->by($request->ip().'|'.$workspaceKey),
             ];
         });
 
-        Gate::policy(Workspace::class, \App\Policies\MetricSettingPolicy::class);
+        Gate::policy(Workspace::class, MetricSettingPolicy::class);
 
         Gate::before(function ($user, $ability, $params) {
             // TEMP: bypass role/permission checks in production while RBAC rollout is still on the test server.

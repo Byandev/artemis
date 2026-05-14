@@ -1,42 +1,44 @@
-import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import { send } from '@/routes/verification';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Transition } from '@headlessui/react';
 import { Form, Head, Link, usePage } from '@inertiajs/react';
 
-import DeleteUser from '@/components/delete-user';
 import HeadingSmall from '@/components/heading-small';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { edit } from '@/routes/profile';
 import { Workspace } from '@/types/models/Workspace';
 
-
-
 export default function Profile({
     mustVerifyEmail,
     status,
-    workspace
+    workspace,
 }: {
     mustVerifyEmail: boolean;
     status?: string;
-    workspace: Workspace
+    workspace?: Workspace | null;
 }) {
     const { auth } = usePage<SharedData>().props;
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: 'Profile settings',
-            href: edit({ workspace: workspace.slug }).url,
+            href: workspace
+                ? edit({ workspace: workspace.slug }).url
+                : '/settings/profile',
         },
     ];
+    const formAction = workspace
+        ? `/workspaces/${workspace.slug}/settings/profile`
+        : '/settings/profile';
 
-    return (
-        <AppLayout breadcrumbs={breadcrumbs}>
+    const content = (
+        <>
             <Head title="Profile settings" />
 
             <SettingsLayout workspace={workspace}>
@@ -47,7 +49,8 @@ export default function Profile({
                     />
 
                     <Form
-                        {...ProfileController.update.form({ workspace: workspace.slug })}
+                        action={formAction}
+                        method="patch"
                         options={{
                             preserveScroll: true,
                         }}
@@ -148,6 +151,12 @@ export default function Profile({
 
                 {/*<DeleteUser />*/}
             </SettingsLayout>
-        </AppLayout>
+        </>
     );
+
+    if (!workspace) {
+        return <AdminSidebarLayout>{content}</AdminSidebarLayout>;
+    }
+
+    return <AppLayout breadcrumbs={breadcrumbs}>{content}</AppLayout>;
 }

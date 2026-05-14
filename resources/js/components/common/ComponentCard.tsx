@@ -8,26 +8,30 @@ interface ComponentCardProps {
 }
 
 const ComponentCard: React.FC<ComponentCardProps> = ({
-                                                         title,
-                                                         children,
-                                                         className = "",
-                                                         desc = "",
-                                                     }) => {
+    title,
+    children,
+    className = '',
+    desc = '',
+}) => {
     return (
         <div
-            className={`rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900 transition-colors hover:border-black/10 dark:hover:border-white/10 ${className}`}
+            className={`rounded-[14px] border border-black/6 bg-white transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:hover:border-white/10 ${className}`}
         >
             {/* Card Header */}
-            {(title || desc) && <div className="px-6 py-5">
-                {title && <h3 className="text-base font-medium text-gray-800 dark:text-white/90">
-                    {title}
-                </h3>}
-                {desc && (
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        {desc}
-                    </p>
-                )}
-            </div>}
+            {(title || desc) && (
+                <div className="px-6 py-5">
+                    {title && (
+                        <h3 className="text-base font-medium text-gray-800 dark:text-white/90">
+                            {title}
+                        </h3>
+                    )}
+                    {desc && (
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            {desc}
+                        </p>
+                    )}
+                </div>
+            )}
 
             {/* Card Body */}
             <div className="p-4 sm:p-6">
