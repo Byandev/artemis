@@ -35,10 +35,10 @@ interface Props {
 }
 
 export function MetricSettingDialog({
-                                        open,
-                                        onOpenChange,
-                                        workspace: localWorkspace,
-                                    }: Props) {
+    open,
+    onOpenChange,
+    workspace: localWorkspace,
+}: Props) {
     const { currentWorkspace } = usePage<MetricSettingsPageProps>().props;
 
     // Always prioritize the workspace from the shared page props to ensure we have fresh DB data
@@ -182,10 +182,10 @@ export function MetricSettingDialog({
 }
 
 function Field({
-                   label,
-                   error,
-                   children,
-               }: {
+    label,
+    error,
+    children,
+}: {
     label: string;
     error?: string;
     children: React.ReactNode;
@@ -206,9 +206,9 @@ function Field({
 }
 
 function Footer({
-                    processing,
-                    onCancel,
-                }: {
+    processing,
+    onCancel,
+}: {
     processing: boolean;
     onCancel: () => void;
 }) {

@@ -1,6 +1,6 @@
+import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { ContactSupportModal } from '@/components/contact-support-modal';
-import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import { Icon } from '@/components/icon';
 import { Button } from '@/components/ui/button';
 import {
