@@ -563,7 +563,7 @@ export default function WorkspaceMembers({
 
                 <div className="space-y-5 sm:space-y-6">
                     {/* Members Table */}
-                    <ComponentCard desc="Manage workspace members and their roles">
+                    <ComponentCard>
                         <DataTable
                             columns={membersColumns}
                             enableInternalPagination={false}
