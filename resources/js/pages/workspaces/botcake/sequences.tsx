@@ -11,7 +11,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { Search } from 'lucide-react';
+import { ExternalLink, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 const parseIds = (str?: string): number[] => {
@@ -147,16 +147,27 @@ export default function Sequences({ workspace, sequences, query }: Props) {
             header: ({ column }) => (
                 <SortableHeader column={column} title="Name" />
             ),
-            cell: ({ row }) => (
-                <div>
-                    <p className="font-medium text-gray-900 dark:text-gray-100">
-                        {row.original.name}
-                    </p>
-                    <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
-                        {row.original.page?.name ?? '-'}
-                    </p>
-                </div>
-            ),
+            cell: ({ row }) => {
+                const sequence = row.original;
+                const previewUrl = `https://botcake.io/${sequence.page_id}/sequence/${sequence.id}`;
+
+                return (
+                    <div>
+                        <a
+                            href={previewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group inline-flex items-center gap-1.5 font-medium text-gray-900 hover:text-emerald-600 dark:text-gray-100 dark:hover:text-emerald-400"
+                        >
+                            {sequence.name}
+                            <ExternalLink className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+                        </a>
+                        <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                            {sequence.page?.name ?? '-'}
+                        </p>
+                    </div>
+                );
+            },
         },
         {
             accessorKey: 'total_sent',
