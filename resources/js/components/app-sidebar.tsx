@@ -76,16 +76,12 @@ export function AppSidebar() {
             icon: BookOpenIcon,
             permission: PERMISSIONS.ViewPages,
         },
-        ...(currentWorkspace.products_module_enabled
-            ? [
-                  {
-                      title: 'Products',
-                      href: `/workspaces/${slug}/products/list`,
-                      icon: Package,
-                      permission: PERMISSIONS.ViewProducts,
-                  },
-              ]
-            : []),
+        {
+            title: 'Products',
+            href: `/workspaces/${slug}/products/list`,
+            icon: Package,
+            permission: PERMISSIONS.ViewProducts,
+        },
         ...(currentWorkspace.teams_module_enabled
             ? [
                   {
