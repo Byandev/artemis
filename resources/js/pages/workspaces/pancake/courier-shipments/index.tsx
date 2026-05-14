@@ -8,11 +8,11 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import flatpickr from 'flatpickr';
-import DateOption = flatpickr.Options.DateOption;
 import { debounce, omit } from 'lodash';
 import { Search, Upload, X } from 'lucide-react';
 import moment from 'moment';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import DateOption = flatpickr.Options.DateOption;
 
 interface PancakeOrderRef {
     id: number;
@@ -74,24 +74,43 @@ interface Props {
 }
 
 const fmt = (v: number | string | null | undefined) =>
-    v == null ? '—' : Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    v == null
+        ? '—'
+        : Number(v).toLocaleString('en-PH', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+          });
 
-export default function CourierShipmentsIndex({ workspace, shipments, totals, query }: Props) {
+export default function CourierShipmentsIndex({
+    workspace,
+    shipments,
+    totals,
+    query,
+}: Props) {
     const baseUrl = `/workspaces/${workspace.slug}/pancake/courier-shipments`;
-    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? '-preferred_pickup_date'), [query?.sort]);
+    const initialSorting = useMemo(
+        () => toFrontendSort(query?.sort ?? '-preferred_pickup_date'),
+        [query?.sort],
+    );
 
     const [search, setSearch] = useState(query?.filter?.search ?? '');
     const [matched, setMatched] = useState<'' | 'true' | 'false'>(
         query?.filter?.matched === true || query?.filter?.matched === 'true'
             ? 'true'
-            : query?.filter?.matched === false || query?.filter?.matched === 'false'
+            : query?.filter?.matched === false ||
+                query?.filter?.matched === 'false'
               ? 'false'
               : '',
     );
-    const [dateFrom, setDateFrom] = useState<string>(query?.filter?.date_from ?? '');
+    const [dateFrom, setDateFrom] = useState<string>(
+        query?.filter?.date_from ?? '',
+    );
     const [dateTo, setDateTo] = useState<string>(query?.filter?.date_to ?? '');
     const defaultDate = useMemo(
-        () => (dateFrom && dateTo ? ([dateFrom, dateTo] as never as DateOption) : undefined),
+        () =>
+            dateFrom && dateTo
+                ? ([dateFrom, dateTo] as never as DateOption)
+                : undefined,
         [],
     );
 
@@ -112,7 +131,12 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
                     page: 1,
                     per_page: query?.perPage ?? shipments.per_page,
                 },
-                { preserveState: true, replace: true, preserveScroll: true, only: ['shipments', 'totals', 'query'] },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['shipments', 'totals', 'query'],
+                },
             );
         }, 400),
         [baseUrl, query?.sort, query?.perPage, shipments.per_page],
@@ -128,7 +152,10 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
         return () => reload.cancel();
     }, [search, matched, dateFrom, dateTo]);
 
-    const importForm = useForm<{ file: File | null; courier: string }>({ file: null, courier: 'jt' });
+    const importForm = useForm<{ file: File | null; courier: string }>({
+        file: null,
+        courier: 'jt',
+    });
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [importOpen, setImportOpen] = useState(false);
 
@@ -149,17 +176,23 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
         {
             accessorKey: 'preferred_pickup_date',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Pickup Date" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Pickup Date" />
+            ),
             cell: ({ row }) => (
                 <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                    {row.original.preferred_pickup_date ? row.original.preferred_pickup_date.slice(0, 10) : '—'}
+                    {row.original.preferred_pickup_date
+                        ? row.original.preferred_pickup_date.slice(0, 10)
+                        : '—'}
                 </span>
             ),
         },
         {
             accessorKey: 'waybill_no',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Waybill" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Waybill" />
+            ),
             cell: ({ row }) => (
                 <span className="font-mono text-[11px] text-gray-800 dark:text-gray-200">
                     {row.original.waybill_no}
@@ -170,7 +203,9 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
             accessorKey: 'order_number',
             enableSorting: false,
             header: () => (
-                <span className="font-mono text-[10px] uppercase tracking-wider text-gray-400">Pancake Order</span>
+                <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                    Pancake Order
+                </span>
             ),
             cell: ({ row }) => {
                 const po = row.original.pancake_order;
@@ -187,7 +222,9 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
                             #{po.order_number ?? po.id}
                         </span>
                         {po.parcel_status && (
-                            <span className="font-mono text-[10px] text-gray-500 dark:text-gray-500">{po.parcel_status}</span>
+                            <span className="font-mono text-[10px] text-gray-500 dark:text-gray-500">
+                                {po.parcel_status}
+                            </span>
                         )}
                     </div>
                 );
@@ -196,10 +233,16 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
         {
             accessorKey: 'receiver',
             enableSorting: false,
-            header: () => <span className="font-mono text-[10px] uppercase tracking-wider text-gray-400">Receiver</span>,
+            header: () => (
+                <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                    Receiver
+                </span>
+            ),
             cell: ({ row }) => (
                 <div className="flex flex-col">
-                    <span className="text-[12px] text-gray-800 dark:text-gray-200">{row.original.receiver ?? '—'}</span>
+                    <span className="text-[12px] text-gray-800 dark:text-gray-200">
+                        {row.original.receiver ?? '—'}
+                    </span>
                     <span className="font-mono text-[10px] text-gray-500 dark:text-gray-500">
                         {row.original.receiver_cellphone ?? ''}
                     </span>
@@ -209,7 +252,11 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
         {
             accessorKey: 'order_status',
             enableSorting: false,
-            header: () => <span className="font-mono text-[10px] uppercase tracking-wider text-gray-400">JT Status</span>,
+            header: () => (
+                <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                    JT Status
+                </span>
+            ),
             cell: ({ row }) => (
                 <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
                     {row.original.order_status ?? '—'}
@@ -219,7 +266,11 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
         {
             accessorKey: 'cod',
             enableSorting: false,
-            header: () => <span className="font-mono text-[10px] uppercase tracking-wider text-gray-400">COD</span>,
+            header: () => (
+                <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                    COD
+                </span>
+            ),
             cell: ({ row }) => (
                 <span className="font-mono text-[11px] text-gray-700 dark:text-gray-300">
                     ₱{fmt(row.original.cod)}
@@ -229,7 +280,9 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
         {
             accessorKey: 'cod_fee',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="COD Fee" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="COD Fee" />
+            ),
             cell: ({ row }) => (
                 <span className="font-mono text-[11px] text-gray-700 dark:text-gray-300">
                     ₱{fmt(row.original.cod_fee)}
@@ -239,7 +292,9 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
         {
             accessorKey: 'total_shipping_cost',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Total Shipping" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Total Shipping" />
+            ),
             cell: ({ row }) => (
                 <span className="font-mono text-[12px] font-semibold text-gray-800 dark:text-gray-200">
                     ₱{fmt(row.original.total_shipping_cost)}
@@ -249,7 +304,11 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
         {
             accessorKey: 'rts_reason',
             enableSorting: false,
-            header: () => <span className="font-mono text-[10px] uppercase tracking-wider text-gray-400">RTS Reason</span>,
+            header: () => (
+                <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                    RTS Reason
+                </span>
+            ),
             cell: ({ row }) => (
                 <span className="font-mono text-[10px] text-gray-500 dark:text-gray-500">
                     {row.original.rts_reason ?? '—'}
@@ -278,11 +337,13 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
                 {importOpen && (
                     <form
                         onSubmit={submitImport}
-                        className="mb-3 flex flex-col gap-2 rounded-[14px] border border-emerald-200 bg-emerald-50/40 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20 md:flex-row md:items-center"
+                        className="mb-3 flex flex-col gap-2 rounded-[14px] border border-emerald-200 bg-emerald-50/40 p-3 md:flex-row md:items-center dark:border-emerald-900/40 dark:bg-emerald-950/20"
                     >
                         <select
                             value={importForm.data.courier}
-                            onChange={(e) => importForm.setData('courier', e.target.value)}
+                            onChange={(e) =>
+                                importForm.setData('courier', e.target.value)
+                            }
                             className="h-9 rounded-[10px] border border-black/10 bg-white px-2 font-mono! text-[12px]! text-gray-800 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-100"
                         >
                             <option value="jt">J&amp;T</option>
@@ -291,22 +352,32 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
                             ref={fileInputRef}
                             type="file"
                             accept=".xlsx,.xls"
-                            onChange={(e) => importForm.setData('file', e.target.files?.[0] ?? null)}
+                            onChange={(e) =>
+                                importForm.setData(
+                                    'file',
+                                    e.target.files?.[0] ?? null,
+                                )
+                            }
                             className="h-9 flex-1 rounded-[10px] border border-black/10 bg-white px-2 font-mono! text-[12px]! text-gray-800 file:mr-3 file:rounded-md file:border-0 file:bg-stone-100 file:px-3 file:py-1 file:font-mono file:text-[11px] file:text-gray-700 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-100 dark:file:bg-zinc-800 dark:file:text-gray-300"
                         />
                         <button
                             type="submit"
-                            disabled={!importForm.data.file || importForm.processing}
+                            disabled={
+                                !importForm.data.file || importForm.processing
+                            }
                             className="h-9 rounded-[10px] bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white disabled:opacity-50"
                         >
-                            {importForm.processing ? 'Importing…' : 'Upload & Match'}
+                            {importForm.processing
+                                ? 'Importing…'
+                                : 'Upload & Match'}
                         </button>
                         <button
                             type="button"
                             onClick={() => {
                                 setImportOpen(false);
                                 importForm.reset();
-                                if (fileInputRef.current) fileInputRef.current.value = '';
+                                if (fileInputRef.current)
+                                    fileInputRef.current.value = '';
                             }}
                             className="h-9 rounded-[10px] border border-black/10 bg-white px-3 font-mono! text-[12px]! text-gray-700 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300"
                         >
@@ -316,7 +387,11 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
                 )}
 
                 <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
-                    <TotalCard label="Shipments" value={totals.count.toLocaleString('en-PH')} sub={`${totals.matched_count.toLocaleString('en-PH')} matched`} />
+                    <TotalCard
+                        label="Shipments"
+                        value={totals.count.toLocaleString('en-PH')}
+                        sub={`${totals.matched_count.toLocaleString('en-PH')} matched`}
+                    />
                     <TotalCard
                         label="Total Shipping"
                         value={`₱${fmt(totals.total_shipping_cost)}`}
@@ -327,14 +402,18 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
                         value={`₱${fmt(totals.cod_fee)}`}
                         sub={`Matched: ₱${fmt(totals.matched_cod_fee)}`}
                     />
-                    <TotalCard label="COD Collected" value={`₱${fmt(totals.cod)}`} sub={`Freight: ₱${fmt(totals.receivable_freight)}`} />
+                    <TotalCard
+                        label="COD Collected"
+                        value={`₱${fmt(totals.cod)}`}
+                        sub={`Freight: ₱${fmt(totals.receivable_freight)}`}
+                    />
                 </div>
 
                 <div className="mb-3 flex flex-col items-stretch gap-2 md:flex-row md:items-center">
                     <div className="relative w-full max-w-xs">
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
-                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 outline-none transition-all placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600"
+                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600"
                             placeholder="Search waybill, order #, receiver, phone…"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -342,7 +421,9 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
                     </div>
                     <select
                         value={matched}
-                        onChange={(e) => setMatched(e.target.value as '' | 'true' | 'false')}
+                        onChange={(e) =>
+                            setMatched(e.target.value as '' | 'true' | 'false')
+                        }
                         className="h-9 rounded-[10px] border border-black/10 bg-white px-2 font-mono! text-[12px]! text-gray-800 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-100"
                     >
                         <option value="">All shipments</option>
@@ -356,8 +437,12 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
                         defaultDate={defaultDate}
                         onChange={(dates) => {
                             if (dates.length === 2) {
-                                setDateFrom(moment(dates[0]).format('YYYY-MM-DD'));
-                                setDateTo(moment(dates[1]).format('YYYY-MM-DD'));
+                                setDateFrom(
+                                    moment(dates[0]).format('YYYY-MM-DD'),
+                                );
+                                setDateTo(
+                                    moment(dates[1]).format('YYYY-MM-DD'),
+                                );
                             } else if (dates.length === 0) {
                                 setDateFrom('');
                                 setDateTo('');
@@ -392,11 +477,23 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
                                 baseUrl,
                                 {
                                     sort: params?.sort,
-                                    filter: buildFilter(search, matched, dateFrom, dateTo),
+                                    filter: buildFilter(
+                                        search,
+                                        matched,
+                                        dateFrom,
+                                        dateTo,
+                                    ),
                                     page: params?.page ?? 1,
-                                    per_page: params?.per_page ?? query?.perPage ?? shipments.per_page,
+                                    per_page:
+                                        params?.per_page ??
+                                        query?.perPage ??
+                                        shipments.per_page,
                                 },
-                                { preserveState: true, replace: true, preserveScroll: true },
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true,
+                                },
                             );
                         }}
                     />
@@ -406,12 +503,28 @@ export default function CourierShipmentsIndex({ workspace, shipments, totals, qu
     );
 }
 
-function TotalCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function TotalCard({
+    label,
+    value,
+    sub,
+}: {
+    label: string;
+    value: string;
+    sub?: string;
+}) {
     return (
         <div className="rounded-[14px] border border-black/6 bg-white p-3 dark:border-white/6 dark:bg-zinc-900">
-            <div className="font-mono text-[10px] uppercase tracking-wider text-gray-400">{label}</div>
-            <div className="mt-1 font-mono text-[15px] font-semibold text-gray-800 dark:text-gray-100">{value}</div>
-            {sub && <div className="mt-0.5 font-mono text-[10px] text-gray-500 dark:text-gray-500">{sub}</div>}
+            <div className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                {label}
+            </div>
+            <div className="mt-1 font-mono text-[15px] font-semibold text-gray-800 dark:text-gray-100">
+                {value}
+            </div>
+            {sub && (
+                <div className="mt-0.5 font-mono text-[10px] text-gray-500 dark:text-gray-500">
+                    {sub}
+                </div>
+            )}
         </div>
     );
 }

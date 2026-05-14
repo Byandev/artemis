@@ -3,19 +3,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-} from '@/components/ui/sheet';
-import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import supportTickets from '@/routes/admin/support-tickets';
@@ -90,7 +90,10 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
         if (!selectedTicket) return;
 
         statusForm.patch(
-            supportTickets.update.url({ workspace: workspace.slug, ticket: selectedTicket.id }),
+            supportTickets.update.url({
+                workspace: workspace.slug,
+                ticket: selectedTicket.id,
+            }),
             {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -106,14 +109,20 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
     const columns: ColumnDef<SupportTicket>[] = [
         {
             accessorKey: 'reference',
-            header: ({ column }) => <SortableHeader column={column} title="Reference" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Reference" />
+            ),
             cell: ({ row }) => (
-                <span className="font-mono text-[11px] text-gray-500">{row.original.reference}</span>
+                <span className="font-mono text-[11px] text-gray-500">
+                    {row.original.reference}
+                </span>
             ),
         },
         {
             accessorKey: 'user',
-            header: ({ column }) => <SortableHeader column={column} title="Reporter" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Reporter" />
+            ),
             cell: ({ row }) => (
                 <div className="space-y-1">
                     <p className="text-[12px] font-medium text-gray-800 dark:text-gray-100">
@@ -127,12 +136,16 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
         },
         {
             accessorKey: 'category',
-            header: ({ column }) => <SortableHeader column={column} title="Category" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Category" />
+            ),
             cell: ({ row }) => CATEGORY_LABELS[row.original.category],
         },
         {
             accessorKey: 'status',
-            header: ({ column }) => <SortableHeader column={column} title="Status" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Status" />
+            ),
             cell: ({ row }) => (
                 <Badge className={STATUS_STYLES[row.original.status]}>
                     {row.original.status.replace('_', ' ')}
@@ -141,8 +154,11 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
         },
         {
             accessorKey: 'created_at',
-            header: ({ column }) => <SortableHeader column={column} title="Created" />,
-            cell: ({ row }) => new Date(row.original.created_at).toLocaleDateString(),
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Created" />
+            ),
+            cell: ({ row }) =>
+                new Date(row.original.created_at).toLocaleDateString(),
         },
     ];
 
@@ -159,21 +175,31 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
 
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                     <div className="min-w-[180px]">
-                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <Select
+                            value={statusFilter}
+                            onValueChange={setStatusFilter}
+                        >
                             <SelectTrigger className="h-9">
                                 <SelectValue placeholder="Filter by status" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All statuses</SelectItem>
                                 <SelectItem value="open">Open</SelectItem>
-                                <SelectItem value="in_progress">In progress</SelectItem>
-                                <SelectItem value="resolved">Resolved</SelectItem>
+                                <SelectItem value="in_progress">
+                                    In progress
+                                </SelectItem>
+                                <SelectItem value="resolved">
+                                    Resolved
+                                </SelectItem>
                                 <SelectItem value="closed">Closed</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
                     <div className="min-w-[200px]">
-                        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                        <Select
+                            value={categoryFilter}
+                            onValueChange={setCategoryFilter}
+                        >
                             <SelectTrigger className="h-9">
                                 <SelectValue placeholder="Filter by category" />
                             </SelectTrigger>
@@ -199,7 +225,9 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
                         onRowClick={(row) => setSelectedTicket(row)}
                         onFetch={(params) => {
                             router.get(
-                                supportTickets.index.url({ workspace: workspace.slug }),
+                                supportTickets.index.url({
+                                    workspace: workspace.slug,
+                                }),
                                 {
                                     sort: params?.sort,
                                     page: params?.page ?? 1,
@@ -207,7 +235,11 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
                                     'filter[status]': statusFilter === 'all' ? undefined : statusFilter,
                                     'filter[category]': categoryFilter === 'all' ? undefined : categoryFilter,
                                 },
-                                { preserveState: true, replace: true, preserveScroll: true },
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true,
+                                },
                             );
                         }}
                     />
@@ -228,7 +260,11 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
                     {selectedTicket && (
                         <div className="space-y-5 px-5 py-4 text-sm">
                             <div className="flex flex-wrap items-center gap-2">
-                                <Badge className={STATUS_STYLES[selectedTicket.status]}>
+                                <Badge
+                                    className={
+                                        STATUS_STYLES[selectedTicket.status]
+                                    }
+                                >
                                     {selectedTicket.status.replace('_', ' ')}
                                 </Badge>
                                 <Badge variant="outline">
@@ -299,7 +335,9 @@ export default function SupportTicketsAdminIndex({ workspace, tickets, filters, 
                                     </Button>
                                 </div>
                                 {statusForm.errors.status && (
-                                    <p className="text-xs text-red-500">{statusForm.errors.status}</p>
+                                    <p className="text-xs text-red-500">
+                                        {statusForm.errors.status}
+                                    </p>
                                 )}
                             </div>
                         </div>

@@ -35,26 +35,38 @@ class CheckWorkspace
         }
 
         if (! $workspace_id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You dont have access to this resource.',
-            ], Response::HTTP_FORBIDDEN);
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You do not have permission to view this page.',
+                ], Response::HTTP_FORBIDDEN);
+            }
+
+            abort(Response::HTTP_FORBIDDEN);
         }
 
         $workspace = Workspace::find($workspace_id);
 
         if (! $workspace) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You dont have access to this resource.',
-            ], Response::HTTP_FORBIDDEN);
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You do not have permission to view this page.',
+                ], Response::HTTP_FORBIDDEN);
+            }
+
+            abort(Response::HTTP_FORBIDDEN);
         }
 
         if (! $request->user()->isMemberOf($workspace)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You dont have access to this resource.',
-            ], Response::HTTP_FORBIDDEN);
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You do not have permission to view this page.',
+                ], Response::HTTP_FORBIDDEN);
+            }
+
+            abort(Response::HTTP_FORBIDDEN);
         }
 
         $request->merge(['workspace' => $workspace]);

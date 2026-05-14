@@ -1,8 +1,14 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { User } from '@/types/models/Pancake/User';
 import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
 import { useEffect } from 'react';
-import { User } from '@/types/models/Pancake/User';
 import { toast } from 'sonner';
 
 interface EmployeeFormDialogProps {
@@ -14,17 +20,28 @@ interface EmployeeFormDialogProps {
     onSuccess?: () => void;
 }
 
-export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenChange, employee, onSuccess}: EmployeeFormDialogProps) {
-    const { data, setData, put, post, processing, errors, reset, clearErrors } = useForm({
-        status: 'ACTIVE',
-        user_id: '',
-    });
+export function EmployeeFormDialog({
+    workspace,
+    systemUsers = [],
+    open,
+    onOpenChange,
+    employee,
+    onSuccess,
+}: EmployeeFormDialogProps) {
+    const { data, setData, put, post, processing, errors, reset, clearErrors } =
+        useForm({
+            status: 'ACTIVE',
+            user_id: '',
+        });
 
     useEffect(() => {
         if (open && employee) {
             setData({
                 status: employee.status || 'ACTIVE',
-                user_id: (employee as any).system_user?.id || (employee as any).user_id || '',
+                user_id:
+                    (employee as any).system_user?.id ||
+                    (employee as any).user_id ||
+                    '',
             });
         } else if (!open) {
             clearErrors();
@@ -33,42 +50,50 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
     }, [employee, open]);
 
     const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+        e.preventDefault();
 
-    const isEditing = !!employee; 
+        const isEditing = !!employee;
 
-    const url = isEditing
-        ? `/workspaces/${workspace.slug}/employees/${employee.id}`
-        : `/workspaces/${workspace.slug}/employees`;
+        const url = isEditing
+            ? `/workspaces/${workspace.slug}/employees/${employee.id}`
+            : `/workspaces/${workspace.slug}/employees`;
 
-    const request = isEditing ? put : post;
+        const request = isEditing ? put : post;
 
-    request(url, {
-        preserveScroll: true,
-        onSuccess: () => {
-            toast.success(isEditing ? 'Employee updated successfully' : 'Employee created successfully');
-            
-            if (!isEditing) reset();
-            onOpenChange(false);     
-            onSuccess?.();           
-        },
-        onError: () => {
-            toast.error('Failed to save employee. Please check the form.');
-        }
-    });
-};
+        request(url, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success(
+                    isEditing
+                        ? 'Employee updated successfully'
+                        : 'Employee created successfully',
+                );
+
+                if (!isEditing) reset();
+                onOpenChange(false);
+                onSuccess?.();
+            },
+            onError: () => {
+                toast.error('Failed to save employee. Please check the form.');
+            },
+        });
+    };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden border-none shadow-2xl dark:bg-zinc-900 text-left">
+            <DialogContent className="gap-0 overflow-hidden border-none p-0 text-left shadow-2xl sm:max-w-md dark:bg-zinc-900">
                 {/* Header Section */}
-                <div className="px-5 pt-5 pb-4 border-b border-black/6 dark:border-white/6 text-left">
+                <div className="border-b border-black/6 px-5 pt-5 pb-4 text-left dark:border-white/6">
                     <DialogHeader className="text-left">
-                        <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 text-left">
+                        <DialogTitle className="text-left text-[15px] font-semibold text-gray-900 dark:text-gray-100">
                             Edit Employee Settings
                         </DialogTitle>
-                        <DialogDescription className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5 text-left">
-                            Update settings for <span className="font-medium text-gray-900 dark:text-gray-200">{employee?.name}</span>.
+                        <DialogDescription className="mt-0.5 text-left text-[12px] text-gray-400 dark:text-gray-500">
+                            Update settings for{' '}
+                            <span className="font-medium text-gray-900 dark:text-gray-200">
+                                {employee?.name}
+                            </span>
+                            .
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -77,13 +102,15 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
                     <div className="space-y-5 px-5 py-4">
                         {/* System User Mapping */}
                         <div className="space-y-1.5">
-                            <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 text-left">
+                            <label className="block text-left font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                                 Assign User
                             </label>
                             <select
                                 value={data.user_id ?? ''}
-                                onChange={(e) => setData('user_id', e.target.value)}
-                                className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 outline-none transition-all focus:border-emerald-500 dark:border-white/8 dark:bg-zinc-800 dark:text-white"
+                                onChange={(e) =>
+                                    setData('user_id', e.target.value)
+                                }
+                                className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none focus:border-emerald-500 dark:border-white/8 dark:bg-zinc-800 dark:text-white"
                             >
                                 <option value="">No user assigned</option>
                                 {systemUsers?.map((user) => (
@@ -93,7 +120,7 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
                                 ))}
                             </select>
                             {errors.user_id && (
-                                <p className="font-mono text-[11px] text-red-500 mt-1 text-left">
+                                <p className="mt-1 text-left font-mono text-[11px] text-red-500">
                                     {errors.user_id}
                                 </p>
                             )}
@@ -101,19 +128,21 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
 
                         {/* Status Selection */}
                         <div className="space-y-1.5 text-left">
-                            <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 text-left">
+                            <label className="block text-left font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                                 Employee Status
                             </label>
                             <select
-                                value={data.user_id ?? ''}
-                                onChange={(e) => setData('user_id', e.target.value)}
-                                className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 outline-none transition-all focus:border-emerald-500 dark:border-white/8 dark:bg-zinc-800 dark:text-white"
+                                value={data.status ?? 'ACTIVE'}
+                                onChange={(e) =>
+                                    setData('status', e.target.value)
+                                }
+                                className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none focus:border-emerald-500 dark:border-white/8 dark:bg-zinc-800 dark:text-white"
                             >
                                 <option value="ACTIVE">ACTIVE</option>
                                 <option value="INACTIVE">INACTIVE</option>
                             </select>
                             {errors.status && (
-                                <p className="font-mono text-[11px] text-red-500 mt-1 text-left">
+                                <p className="mt-1 text-left font-mono text-[11px] text-red-500">
                                     {errors.status}
                                 </p>
                             )}
@@ -121,7 +150,7 @@ export function EmployeeFormDialog({ workspace, systemUsers = [], open, onOpenCh
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="flex items-center justify-end gap-2 border-t border-black/6 dark:border-white/6 px-5 py-3 bg-stone-50/50 dark:bg-white/2">
+                    <div className="flex items-center justify-end gap-2 border-t border-black/6 bg-stone-50/50 px-5 py-3 dark:border-white/6 dark:bg-white/2">
                         <button
                             type="button"
                             onClick={() => onOpenChange(false)}

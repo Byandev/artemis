@@ -18,7 +18,7 @@ class ProfileController extends Controller
     /**
      * Show the user's profile settings page.
      */
-    public function edit(Request $request, Workspace $workspace): Response
+    public function edit(Request $request, ?Workspace $workspace = null): Response
     {
         return Inertia::render('settings/profile', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
@@ -30,7 +30,7 @@ class ProfileController extends Controller
     /**
      * Update the user's profile settings.
      */
-    public function update(ProfileUpdateRequest $request, Workspace $workspace): RedirectResponse
+    public function update(ProfileUpdateRequest $request, ?Workspace $workspace = null): RedirectResponse
     {
         $request->user()->fill($request->validated());
         // $workspace = $request->input('workspace');
@@ -41,9 +41,13 @@ class ProfileController extends Controller
 
         $request->user()->save();
 
-        return Redirect::route('profile.edit', [
-            'workspace' => $workspace->slug,
-        ]);
+        if ($workspace) {
+            return Redirect::route('profile.edit', [
+                'workspace' => $workspace->slug,
+            ]);
+        }
+
+        return Redirect::route('account.profile.edit');
     }
 
     /**

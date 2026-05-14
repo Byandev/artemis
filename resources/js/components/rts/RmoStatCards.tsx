@@ -1,4 +1,10 @@
-import { AlertTriangleIcon, PackageCheckIcon, PhoneIcon, RotateCcwIcon, TruckIcon } from 'lucide-react';
+import {
+    AlertTriangleIcon,
+    PackageCheckIcon,
+    PhoneIcon,
+    RotateCcwIcon,
+    TruckIcon,
+} from 'lucide-react';
 
 interface StatCardProps {
     title: string;
@@ -41,11 +47,31 @@ export function RmoStatCards({
 }: RmoStatCardsProps) {
     return (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <StatCard title="Total For Delivery Today" value={total_for_delivery_today || 0} icon={TruckIcon} />
-            <StatCard title="Called" value={called_count || 0} icon={PhoneIcon} />
-            <StatCard title="Delivered" value={delivered_count || 0} icon={PackageCheckIcon} />
-            <StatCard title="Returning" value={returning_count || 0} icon={RotateCcwIcon} />
-            <StatCard title="Problematic" value={problematic_count || 0} icon={AlertTriangleIcon} />
+            <StatCard
+                title="Total For Delivery Today"
+                value={total_for_delivery_today || 0}
+                icon={TruckIcon}
+            />
+            <StatCard
+                title="Called"
+                value={called_count || 0}
+                icon={PhoneIcon}
+            />
+            <StatCard
+                title="Delivered"
+                value={delivered_count || 0}
+                icon={PackageCheckIcon}
+            />
+            <StatCard
+                title="Returning"
+                value={returning_count || 0}
+                icon={RotateCcwIcon}
+            />
+            <StatCard
+                title="Problematic"
+                value={problematic_count || 0}
+                icon={AlertTriangleIcon}
+            />
         </div>
     );
 }

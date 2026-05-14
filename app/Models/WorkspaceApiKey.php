@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Crypt;
@@ -9,6 +10,8 @@ use Illuminate\Support\Str;
 
 class WorkspaceApiKey extends Model
 {
+    use HasFactory;
+
     protected $fillable = ['workspace_id', 'name', 'key', 'key_encrypted', 'key_prefix', 'last_used_at'];
 
     protected $casts = [

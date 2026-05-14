@@ -1,9 +1,9 @@
-import { FormEventHandler, use } from 'react';
-import { Head, useForm } from '@inertiajs/react';
-import AuthLayout from '@/layouts/auth-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import AuthLayout from '@/layouts/auth-layout';
+import { Head, useForm } from '@inertiajs/react';
+import { FormEventHandler } from 'react';
 
 export default function WorkspaceCreate() {
     const { data, setData, post, processing, errors } = useForm({
@@ -17,7 +17,12 @@ export default function WorkspaceCreate() {
     };
 
     return (
-        <AuthLayout title={'Create New Workspace'} description={'Workspaces are a share environments where teams can work together.'}>
+        <AuthLayout
+            title={'Create New Workspace'}
+            description={
+                'Workspaces are a share environments where teams can work together.'
+            }
+        >
             <Head title="Create New Workspace" />
 
             <div className="space-y-6">
@@ -42,12 +47,20 @@ export default function WorkspaceCreate() {
                             autoFocus
                         />
                         {errors.name && (
-                            <p className="text-sm text-destructive">{errors.name}</p>
+                            <p className="text-destructive text-sm">
+                                {errors.name}
+                            </p>
                         )}
                     </div>
 
-                    <Button type="submit" className="w-full" disabled={processing}>
-                        {processing ? 'Creating workspace…' : 'Create workspace'}
+                    <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={processing}
+                    >
+                        {processing
+                            ? 'Creating workspace…'
+                            : 'Create workspace'}
                     </Button>
 
                     <Button

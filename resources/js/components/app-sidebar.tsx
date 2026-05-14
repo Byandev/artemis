@@ -11,38 +11,37 @@ import {
 } from '@/components/ui/sidebar';
 import { PERMISSIONS } from '@/constants/permissions';
 import { dashboard } from '@/routes';
-import workspace from '@/routes/workspace';
 import { type NavItem, User as UserType } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Link, usePage } from '@inertiajs/react';
 import {
-    LayoutDashboard,
-    Package,
-    ClipboardList,
-    ListChecks,
-    Store,
-    Users,
-    BookOpenIcon,
-    User,
-    RotateCcw,
-    BarChart2,
-    MapPin,
-    Box,
-    Layers,
-    ShoppingCart,
-    Truck,
-    Trophy,
-    Copy,
-    Check,
-    ExternalLink,
-    Wallet,
-    Landmark,
     ArrowLeftRight,
-    Send,
-    PieChart,
-    Shield,
-    MessageSquare,
+    BarChart2,
+    BookOpenIcon,
+    Box,
+    Check,
+    ClipboardList,
+    Copy,
+    ExternalLink,
+    Landmark,
+    Layers,
+    LayoutDashboard,
     LifeBuoy,
+    ListChecks,
+    MapPin,
+    MessageSquare,
+    Package,
+    PieChart,
+    RotateCcw,
+    Send,
+    Shield,
+    ShoppingCart,
+    Store,
+    Trophy,
+    Truck,
+    User,
+    Users,
+    Wallet,
 } from 'lucide-react';
 import { useState } from 'react';
 import AppLogo from './app-logo';
@@ -53,11 +52,11 @@ export function AppSidebar() {
         auth?: { user: UserType };
     };
 
-    const dashboardUrl = currentWorkspace
-        ? workspace.dashboard.url(currentWorkspace.slug)
-        : dashboard().url;
-
     const slug = currentWorkspace?.slug ?? '';
+
+    const dashboardUrl = currentWorkspace
+        ? `/workspaces/${slug}/dashboard`
+        : dashboard().url;
 
     const mainNavItems: NavItem[] = [
         {
@@ -302,11 +301,14 @@ export function AppSidebar() {
 
             <SidebarContent className="p-3">
                 <NavMain items={mainNavItems} group_label="Main" />
+                <NavMain items={adminNavItems} group_label="Admin" />
                 {/*<NavMain items={accountNavItems} group_label="Account" />*/}
                 <PublicLinks
                     workspaceSlug={currentWorkspace.slug}
                     rmoEnabled={currentWorkspace.rmo_module_enabled}
-                    leaderboardEnabled={currentWorkspace.leaderboard_module_enabled}
+                    leaderboardEnabled={
+                        currentWorkspace.leaderboard_module_enabled
+                    }
                 />
                 <div className="mt-auto">
                     <NavMain items={supportNavItems} group_label="Support" />
@@ -375,7 +377,9 @@ function PublicLinkItem({
         e.preventDefault();
         e.stopPropagation();
         const url =
-            typeof window !== 'undefined' ? window.location.origin + href : href;
+            typeof window !== 'undefined'
+                ? window.location.origin + href
+                : href;
         try {
             await navigator.clipboard?.writeText(url);
             setCopied(true);
@@ -393,7 +397,7 @@ function PublicLinkItem({
                 className={[
                     'group/public relative h-9 justify-between rounded-[10px] text-[13px]! ',
                     'text-gray-400 dark:text-gray-500',
-                    'hover:text-gray-600 dark:hover:text-gray-400 hover:bg-black/2 dark:hover:bg-white/2',
+                    'hover:bg-black/2 hover:text-gray-600 dark:hover:bg-white/2 dark:hover:text-gray-400',
                     'transition-colors',
                 ].join(' ')}
             >
@@ -413,7 +417,8 @@ function PublicLinkItem({
                             tabIndex={0}
                             onClick={copy}
                             onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') copy(e as unknown as React.MouseEvent);
+                                if (e.key === 'Enter' || e.key === ' ')
+                                    copy(e as unknown as React.MouseEvent);
                             }}
                             aria-label={copied ? 'Copied' : 'Copy link'}
                             className="flex h-5 w-5 cursor-pointer items-center justify-center rounded hover:bg-black/5 dark:hover:bg-white/10"

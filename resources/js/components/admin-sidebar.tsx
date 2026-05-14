@@ -7,16 +7,9 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import {
-    LayoutDashboard,
-    Layers,
-    Users,
-    Settings,
-    CreditCard,
-} from 'lucide-react';
+import { CreditCard, Layers } from 'lucide-react';
 import AppLogo from './app-logo';
 
 export function AdminSidebar() {
@@ -26,6 +19,7 @@ export function AdminSidebar() {
             href: '/admin/workspaces',
             icon: Layers,
         },
+
         {
             title: 'Subscription Plans',
             href: '/admin/subscription-plans',
@@ -35,7 +29,7 @@ export function AdminSidebar() {
 
     return (
         <Sidebar
-            className="bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800"
+            className="border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
             collapsible="icon"
             variant="sidebar"
         >
@@ -54,7 +48,10 @@ export function AdminSidebar() {
             </SidebarHeader>
 
             <SidebarContent className="p-3">
-                <NavMain items={adminNavItems} group_label="Platform Management" />
+                <NavMain
+                    items={adminNavItems}
+                    group_label="Platform Management"
+                />
             </SidebarContent>
         </Sidebar>
     );

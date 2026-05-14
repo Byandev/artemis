@@ -31,21 +31,9 @@ class PageController extends Controller
 {
     use AuthorizesRequests;
 
-    private function getPageLimitInfo(Workspace $workspace): array
-    {
-        $limit = $workspace->subscription?->plan?->page_limit;
-        $count = $workspace->pages()->count();
-
-        return [
-            'limit' => $limit,
-            'count' => $count,
-            'reached' => $limit !== null && $count >= $limit,
-        ];
-    }
-
     private function assertPageLimitNotReached(Workspace $workspace): void
     {
-        $info = $this->getPageLimitInfo($workspace);
+        $info = $workspace->pageLimitInfo();
 
         if ($info['reached']) {
             throw ValidationException::withMessages([
@@ -94,7 +82,7 @@ class PageController extends Controller
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
-        $pageLimitInfo = $this->getPageLimitInfo($workspace);
+        $pageLimitInfo = $workspace->pageLimitInfo();
 
         return Inertia::render('workspaces/pages/index', [
             'pages' => $pages,
@@ -114,7 +102,7 @@ class PageController extends Controller
     {
         $this->authorize(Permission::EditPages->value, $workspace);
 
-        $info = $this->getPageLimitInfo($workspace);
+        $info = $workspace->pageLimitInfo();
         if ($info['reached']) {
             return redirect()
                 ->route('workspaces.pages.index', $workspace)
@@ -180,6 +168,7 @@ class PageController extends Controller
             'infotxt_token' => $validated['infotxt_token'] ?? null,
             'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
             'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
+            'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
             'parcel_journey_enabled' => $validated['parcel_journey_enabled'] ?? false,
             'status' => $validated['status'] ?? 'active',
         ]);

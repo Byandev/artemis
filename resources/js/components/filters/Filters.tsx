@@ -1,14 +1,15 @@
-import { useState, useCallback, useMemo } from 'react';
-import { SlidersHorizontal, X } from 'lucide-react';
+import PageFilter from '@/components/filters/PageFilter';
+import ShopFilter from '@/components/filters/ShopFilter';
+import TeamFilter from '@/components/filters/TeamFilter';
+import UserFilter from '@/components/filters/UserFilter';
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { Workspace } from '@/types/models/Workspace';
-import ShopFilter from '@/components/filters/ShopFilter';
-import PageFilter from '@/components/filters/PageFilter';
-import UserFilter from '@/components/filters/UserFilter';
+import { SlidersHorizontal, X } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 
 export interface FilterValue {
     teamIds: (string | number)[];
@@ -43,8 +44,8 @@ const Filters = ({
     const [localValue, setLocalValue] = useState<FilterValue>(initialValue);
     const [hasChanges, setHasChanges] = useState(false);
 
-    const hasActiveFilters = useMemo(() =>
-        Object.values(localValue).some((arr) => arr.length > 0),
+    const hasActiveFilters = useMemo(
+        () => Object.values(localValue).some((arr) => arr.length > 0),
         [localValue],
     );
 
@@ -91,8 +92,9 @@ const Filters = ({
         [hasChanges, initialValue],
     );
 
-    const activeFilterCount = useMemo(() =>
-        Object.values(localValue).reduce((acc, arr) => acc + arr.length, 0),
+    const activeFilterCount = useMemo(
+        () =>
+            Object.values(localValue).reduce((acc, arr) => acc + arr.length, 0),
         [localValue],
     );
 
@@ -101,7 +103,7 @@ const Filters = ({
             <PopoverTrigger asChild>
                 <button
                     className={[
-                        'inline-flex h-9 shrink-0 min-w-max items-center overflow-hidden rounded-[10px] border transition-all duration-150',
+                        'inline-flex h-9 min-w-max shrink-0 items-center overflow-hidden rounded-[10px] border transition-all duration-150',
                         'bg-white dark:bg-zinc-900',
                         'shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none',
                         isOpen
@@ -182,6 +184,11 @@ const Filters = ({
                         workspace={workspace}
                         selected={localValue.shopIds}
                         onSelect={(id) => handleFilterChange('shopIds', id)}
+                    />
+                    <TeamFilter
+                        workspace={workspace}
+                        selected={localValue.teamIds}
+                        onSelect={(id) => handleFilterChange('teamIds', id)}
                     />
                     <UserFilter
                         workspace={workspace}

@@ -1,16 +1,22 @@
-import PageHeader from '@/components/common/PageHeader';
+import { Can } from '@/components/can';
 import { AddTaskDialog } from '@/components/checklist/add-task-dialog';
-import { DeleteChecklistDialog } from '@/components/checklist/delete-checklist-dialog';
 import { getChecklistColumns } from '@/components/checklist/checklist-columns';
-import { ADD_TASK_FORM_INITIAL, AddTaskForm, ChecklistItem } from '@/components/checklist/types';
+import { DeleteChecklistDialog } from '@/components/checklist/delete-checklist-dialog';
+import {
+    ADD_TASK_FORM_INITIAL,
+    AddTaskForm,
+    ChecklistItem,
+} from '@/components/checklist/types';
+import PageHeader from '@/components/common/PageHeader';
 import { DataTable } from '@/components/ui/data-table';
+import { PERMISSIONS } from '@/constants/permissions';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
 import { omit } from 'lodash';
+import { Plus } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 interface Props {
@@ -25,15 +31,23 @@ interface Props {
 }
 
 export default function ChecklistPage({ workspace, checklists, query }: Props) {
-    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
+    const initialSorting = useMemo(
+        () => toFrontendSort(query?.sort ?? null),
+        [query?.sort],
+    );
     const [addTaskOpen, setAddTaskOpen] = useState(false);
     const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
     const [editingItemId, setEditingItemId] = useState<number | null>(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [itemToDelete, setItemToDelete] = useState<ChecklistItem | null>(null);
-    const [addTaskForm, setAddTaskForm] = useState<AddTaskForm>(ADD_TASK_FORM_INITIAL);
+    const [itemToDelete, setItemToDelete] = useState<ChecklistItem | null>(
+        null,
+    );
+    const [addTaskForm, setAddTaskForm] = useState<AddTaskForm>(
+        ADD_TASK_FORM_INITIAL,
+    );
 
-    const isAddTaskValid = addTaskForm.title.trim().length > 0 && addTaskForm.target !== '';
+    const isAddTaskValid =
+        addTaskForm.title.trim().length > 0 && addTaskForm.target !== '';
 
     const resetAddTaskForm = () => setAddTaskForm(ADD_TASK_FORM_INITIAL);
 
@@ -49,16 +63,20 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
         };
 
         if (dialogMode === 'edit' && editingItemId !== null) {
-            router.put(`/workspaces/${workspace.slug}/checklist/${editingItemId}`, payload, {
-                preserveState: true,
-                preserveScroll: true,
-                onSuccess: () => {
-                    setAddTaskOpen(false);
-                    setDialogMode('add');
-                    setEditingItemId(null);
-                    resetAddTaskForm();
+            router.put(
+                `/workspaces/${workspace.slug}/checklist/${editingItemId}`,
+                payload,
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        setAddTaskOpen(false);
+                        setDialogMode('add');
+                        setEditingItemId(null);
+                        resetAddTaskForm();
+                    },
                 },
-            });
+            );
         } else {
             router.post(`/workspaces/${workspace.slug}/checklist`, payload, {
                 preserveState: true,
@@ -95,22 +113,26 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
             return;
         }
 
-        router.delete(`/workspaces/${workspace.slug}/checklist/${itemToDelete.id}`, {
-            preserveState: true,
-            preserveScroll: true,
-            onSuccess: () => {
-                setDeleteDialogOpen(false);
-                setItemToDelete(null);
+        router.delete(
+            `/workspaces/${workspace.slug}/checklist/${itemToDelete.id}`,
+            {
+                preserveState: true,
+                preserveScroll: true,
+                onSuccess: () => {
+                    setDeleteDialogOpen(false);
+                    setItemToDelete(null);
+                },
             },
-        });
+        );
     }, [itemToDelete, workspace.slug]);
 
     const columns = useMemo(
-        () => getChecklistColumns({
-            onEdit: openEdit,
-            onDelete: openDelete,
-        }),
-        [openDelete, openEdit, workspace.slug]
+        () =>
+            getChecklistColumns({
+                onEdit: openEdit,
+                onDelete: openDelete,
+            }),
+        [openDelete, openEdit, workspace.slug],
     );
 
     return (
@@ -122,19 +144,21 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                     title="Checklist"
                     description="Manage your tasks efficiently and never miss a requirement."
                 >
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setDialogMode('add');
-                            setEditingItemId(null);
-                            resetAddTaskForm();
-                            setAddTaskOpen(true);
-                        }}
-                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
-                    >
-                        <Plus className="mr-1.5 h-3.5 w-3.5" />
-                        Add Task
-                    </button>
+                    <Can permission={PERMISSIONS.EditChecklist}>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setDialogMode('add');
+                                setEditingItemId(null);
+                                resetAddTaskForm();
+                                setAddTaskOpen(true);
+                            }}
+                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
+                        >
+                            <Plus className="mr-1.5 h-3.5 w-3.5" />
+                            Add Task
+                        </button>
+                    </Can>
                 </PageHeader>
 
                 <AddTaskDialog
@@ -189,7 +213,7 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                                     replace: true,
                                     preserveScroll: true,
                                     only: ['checklists', 'query'],
-                                }
+                                },
                             );
                         }}
                     />

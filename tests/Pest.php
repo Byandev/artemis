@@ -1,31 +1,25 @@
 <?php
 
+use App\Models\User;
+use App\Models\Workspace;
+use App\Models\WorkspaceApiKey;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /*
 |--------------------------------------------------------------------------
 | Test Case
 |--------------------------------------------------------------------------
-|
-| The closure you provide to your test functions is always bound to a specific PHPUnit test
-| case class. By default, that class is "PHPUnit\Framework\TestCase". Of course, you may
-| need to change it using the "pest()" function to bind a different classes or traits.
-|
 */
 
 pest()->extend(TestCase::class)
- // ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+    ->use(RefreshDatabase::class)
     ->in('Feature');
 
 /*
 |--------------------------------------------------------------------------
 | Expectations
 |--------------------------------------------------------------------------
-|
-| When you're writing tests, you often need to check that values meet certain conditions. The
-| "expect()" function gives you access to a set of "expectations" methods that you can use
-| to assert different things. Of course, you may extend the Expectation API at any time.
-|
 */
 
 expect()->extend('toBeOne', function () {
@@ -34,16 +28,62 @@ expect()->extend('toBeOne', function () {
 
 /*
 |--------------------------------------------------------------------------
-| Functions
+| Helpers
 |--------------------------------------------------------------------------
-|
-| While Pest is very powerful out-of-the-box, you may have some testing code specific to your
-| project that you don't want to repeat in every file. Here you can also expose helpers as
-| global functions to help you to reduce the number of lines of code in your test files.
-|
 */
 
-function something()
+/**
+ * Create a workspace owned by a fresh user, plus the user attached as 'owner'.
+ *
+ * @return array{user: User, workspace: Workspace}
+ */
+function makeWorkspaceWithOwner(): array
 {
-    // ..
+    $user = User::factory()->create();
+    $workspace = Workspace::factory()->forOwner($user)->create();
+
+    return ['user' => $user, 'workspace' => $workspace];
+}
+
+/**
+ * Create a member user attached to the given workspace with the given pivot role.
+ */
+function makeWorkspaceMember(Workspace $workspace, string $role = 'member'): User
+{
+    $user = User::factory()->create();
+    $workspace->users()->attach($user->id, ['role' => $role]);
+
+    return $user;
+}
+
+/**
+ * Acting as the owner of a freshly created workspace.
+ *
+ * @return array{user: User, workspace: Workspace}
+ */
+function actingAsWorkspaceOwner(): array
+{
+    $ctx = makeWorkspaceWithOwner();
+    test()->actingAs($ctx['user']);
+
+    return $ctx;
+}
+
+/**
+ * Generate an API key for a workspace and return [model, raw_token].
+ *
+ * @return array{model: WorkspaceApiKey, raw: string}
+ */
+function makeApiKey(Workspace $workspace, ?string $name = null): array
+{
+    $generated = WorkspaceApiKey::generate();
+    $model = WorkspaceApiKey::create([
+        'workspace_id' => $workspace->id,
+        'name' => $name ?? 'Test Key',
+        'key' => $generated['key'],
+        'key_encrypted' => $generated['key_encrypted'],
+        'key_prefix' => $generated['prefix'],
+    ]);
+
+    return ['model' => $model, 'raw' => $generated['raw']];
 }

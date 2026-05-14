@@ -118,6 +118,10 @@ class WorkspaceController extends Controller
 
     public function dashboard(Request $request, Workspace $workspace)
     {
+        if ($request->user()->role === 'admin') {
+            return redirect()->route('workspaces.admin.dashboard', $workspace->slug);
+        }
+
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
@@ -130,8 +134,16 @@ class WorkspaceController extends Controller
                 'pages' => function ($query) {
                     $query->select('id', 'name', 'workspace_id')->orderBy('name');
                 },
+                'teams' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                },
                 'pageOwners:id,name',
             ]),
+            'metricSettings' => [
+                'allowed' => $workspace->allowedMetrics(),
+                'defaults' => $workspace->metricSetting?->default_metrics
+                    ?? ['totalSales', 'totalOrders', 'aov', 'rtsRate'],
+            ],
         ]);
     }
 

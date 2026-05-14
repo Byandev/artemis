@@ -11,7 +11,6 @@ import { ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { omit } from 'lodash';
 import { useEffect, useMemo, useState } from 'react';
-import RTSManagementLayout from './partials/Layout';
 import ParcelUpdateNotificationFilters from './partials/ParcelUpdateNotificationFilters';
 
 interface ParcelUpdateNotificationProps {
@@ -30,12 +29,20 @@ interface ParcelUpdateNotificationProps {
     };
 }
 
-const ParcelUpdateNotification = ({ workspace, notifications, pages, types, query }: ParcelUpdateNotificationProps) => {
+const ParcelUpdateNotification = ({
+    workspace,
+    notifications,
+    pages,
+    types,
+    query,
+}: ParcelUpdateNotificationProps) => {
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
 
-    const [pageNameSearch, setPageNameSearch] = useState(query?.filter?.page_name ?? '');
+    const [pageNameSearch, setPageNameSearch] = useState(
+        query?.filter?.page_name ?? '',
+    );
     const [typeFilter, setTypeFilter] = useState(query?.filter?.type ?? '');
 
     // Sync local state with query params when they change (e.g., from navigation/pagination)
@@ -53,7 +60,7 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                     sort: query?.sort,
                     'filter[page_name]': pageNameSearch || undefined,
                     'filter[type]': typeFilter || undefined,
-                    page: pageNameSearch ? 1 : query?.page ?? 1
+                    page: pageNameSearch ? 1 : (query?.page ?? 1),
                 },
                 {
                     preserveState: true,
@@ -76,7 +83,7 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                 sort: query?.sort,
                 'filter[page_name]': pageNameSearch || undefined,
                 'filter[type]': value || undefined,
-                page: pageNameSearch ? 1 : query?.page ?? 1
+                page: pageNameSearch ? 1 : (query?.page ?? 1),
             },
             {
                 preserveState: true,
@@ -98,88 +105,95 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                 replace: true,
                 preserveScroll: true,
                 only: ['notifications', 'query'],
-            }
+            },
         );
     };
 
-    const columns: ColumnDef<ParcelJourneyNotification>[] = useMemo(() => [
-        {
-            id: 'order.page.name',
-            accessorKey: 'order.page.name',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Page'} />
-            ),
-            cell: ({ row }) => {
-                return row.original.order?.page?.name || '-';
+    const columns: ColumnDef<ParcelJourneyNotification>[] = useMemo(
+        () => [
+            {
+                id: 'order.page.name',
+                accessorKey: 'order.page.name',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title={'Page'} />
+                ),
+                cell: ({ row }) => {
+                    return row.original.order?.page?.name || '-';
+                },
             },
-        },
-        {
-            id: 'order.page.product.name',
-            accessorKey: 'order.page.product.name',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Product'} />
-            ),
-            cell: ({ row }) => {
-                return row.original.order?.page?.product?.name || '-';
+            {
+                id: 'order.page.product.name',
+                accessorKey: 'order.page.product.name',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title={'Product'} />
+                ),
+                cell: ({ row }) => {
+                    return row.original.order?.page?.product?.name || '-';
+                },
             },
-        },
-        {
-            id: 'order.order_number',
-            accessorKey: 'order.order_number',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Orders #'} />
-            ),
-            cell: ({ row }) => {
-                return row.original.order?.order_number || '-';
+            {
+                id: 'order.order_number',
+                accessorKey: 'order.order_number',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title={'Orders #'} />
+                ),
+                cell: ({ row }) => {
+                    return row.original.order?.order_number || '-';
+                },
             },
-        },
-        {
-            id: 'type',
-            accessorKey: 'type',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Type'} />
-            ),
-            cell: ({ row }) => {
-                return (
-                    <span className="capitalize">
-                        {row.original.type}
-                    </span>
-                );
+            {
+                id: 'type',
+                accessorKey: 'type',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title={'Type'} />
+                ),
+                cell: ({ row }) => {
+                    return (
+                        <span className="capitalize">{row.original.type}</span>
+                    );
+                },
             },
-        },
-        {
-            id: 'message',
-            accessorKey: 'message',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Message'} />
-            ),
-            cell: ({ row }) => {
-                return (
-                    <div className="max-w-md truncate">
-                        {row.original.message}
-                    </div>
-                );
+            {
+                id: 'message',
+                accessorKey: 'message',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title={'Message'} />
+                ),
+                cell: ({ row }) => {
+                    return (
+                        <div className="max-w-md truncate">
+                            {row.original.message}
+                        </div>
+                    );
+                },
             },
-        },
-        {
-            id: 'created_at',
-            accessorKey: 'created_at',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Sent At'} />
-            ),
-            cell: ({ row }) => {
-                return row.original.created_at
-                    ? format(new Date(row.original.created_at), 'MMM dd, yyyy hh:mm a')
-                    : '-';
+            {
+                id: 'created_at',
+                accessorKey: 'created_at',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title={'Sent At'} />
+                ),
+                cell: ({ row }) => {
+                    return row.original.created_at
+                        ? format(
+                              new Date(row.original.created_at),
+                              'MMM dd, yyyy hh:mm a',
+                          )
+                        : '-';
+                },
             },
-        },
-    ], []);
+        ],
+        [],
+    );
 
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Parcel Update Notification`} />
-            <div className='p-4'>
-                <ComponentCard title="List of Parcel Update Notifications" className='min-h-screen'>
+            <div className="p-4">
+                <ComponentCard
+                    title="List of Parcel Update Notifications"
+                    className="min-h-screen"
+                >
                     <div>
                         <ParcelUpdateNotificationFilters
                             pageNameSearch={pageNameSearch}
@@ -199,11 +213,15 @@ const ParcelUpdateNotification = ({ workspace, notifications, pages, types, quer
                                 meta={{ ...omit(notifications, ['data']) }}
                                 onFetch={(params) => {
                                     router.get(
-                                        workspaces.rts.parcelUpdateNotification(workspace.slug),
+                                        workspaces.rts.parcelUpdateNotification(
+                                            workspace.slug,
+                                        ),
                                         {
                                             sort: params?.sort,
-                                            'filter[page_name]': pageNameSearch || undefined,
-                                            'filter[type]': typeFilter || undefined,
+                                            'filter[page_name]':
+                                                pageNameSearch || undefined,
+                                            'filter[type]':
+                                                typeFilter || undefined,
                                             page: params?.page ?? 1,
                                             per_page: params?.per_page,
                                         },

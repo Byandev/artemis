@@ -89,7 +89,24 @@ class ShopController extends Controller
 
         $shop->update(['customers_last_synced_at' => null]);
 
-        dispatch(new FetchShopCustomers($shop, 1, Carbon::now()->subMonths(3)->unix(), Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopCustomers($shop, 1, Carbon::now()->subMonth()->unix(), Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
+
+        return redirect()->route('workspaces.shops.index', $workspace);
+    }
+
+    public function refreshUsers(Request $request, Workspace $workspace, Shop $shop)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $this->authorize(Permission::RefreshShops->value, $workspace);
+
+        if ($shop->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
         dispatch(new FetchShopUsers($shop))->onQueue('pancake');
 
         return redirect()->route('workspaces.shops.index', $workspace);

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Metrics\MetricRegistry;
 use App\Support\WorkspaceMetrics;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +23,7 @@ class Workspace extends Model
         'description',
         'owner_id',
         'monthly_order_volume',
+        'max_pages',
         'inventory_module_enabled',
         'finance_module_enabled',
         'products_module_enabled',
@@ -47,6 +49,7 @@ class Workspace extends Model
         'leaderboard_module_enabled' => 'boolean',
         'botcake_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
+        'max_pages' => 'integer',
     ];
 
     protected static function boot()
@@ -201,6 +204,11 @@ class Workspace extends Model
         return $this->hasMany(Page::class);
     }
 
+    public function teams(): HasMany
+    {
+        return $this->hasMany(Team::class);
+    }
+
     public function roles()
     {
         return $this->hasMany(Role::class);
@@ -241,5 +249,52 @@ class Workspace extends Model
     public function checklists(): HasMany
     {
         return $this->hasMany(WorkspaceChecklist::class, 'workspace_id');
+    }
+
+    public function metricSetting()
+    {
+        return $this->hasOne(WorkspaceMetricSetting::class);
+    }
+
+    public function allowedMetrics(): array
+    {
+        return $this->metricSetting?->allowed_metrics
+            ?? MetricRegistry::all();
+    }
+
+    public function defaultMetrics(): array
+    {
+        return $this->metricSetting?->default_metrics
+            ?? MetricRegistry::defaults();
+    }
+
+    public function getMetricSettings(): array
+    {
+        return [
+            'allowed' => $this->allowedMetrics(),
+            'defaults' => $this->defaultMetrics(),
+        ];
+    }
+
+    public function pageLimit(): ?int
+    {
+        return $this->max_pages ?? $this->subscription?->plan?->page_limit;
+    }
+
+    public function pageLimitInfo(): array
+    {
+        $limit = $this->pageLimit();
+        $count = $this->pages()->count();
+
+        return [
+            'limit' => $limit,
+            'count' => $count,
+            'reached' => $limit !== null && $count >= $limit,
+        ];
+    }
+
+    public function hasReachedPageLimit(): bool
+    {
+        return $this->pageLimitInfo()['reached'];
     }
 }

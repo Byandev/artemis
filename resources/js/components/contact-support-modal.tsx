@@ -83,7 +83,8 @@ export function ContactSupportModal({ trigger }: ContactSupportModalProps) {
                 <DialogHeader>
                     <DialogTitle>Contact Support</DialogTitle>
                     <DialogDescription>
-                        Send a ticket to the workspace support queue. We will follow up as soon as possible.
+                        Send a ticket to the workspace support queue. We will
+                        follow up as soon as possible.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -92,14 +93,19 @@ export function ContactSupportModal({ trigger }: ContactSupportModalProps) {
                         <Label htmlFor="support-category">Category</Label>
                         <Select
                             value={form.data.category}
-                            onValueChange={(value) => form.setData('category', value)}
+                            onValueChange={(value) =>
+                                form.setData('category', value)
+                            }
                         >
                             <SelectTrigger id="support-category">
                                 <SelectValue placeholder="Select a category" />
                             </SelectTrigger>
                             <SelectContent>
                                 {CATEGORY_OPTIONS.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>
+                                    <SelectItem
+                                        key={option.value}
+                                        value={option.value}
+                                    >
                                         {option.label}
                                     </SelectItem>
                                 ))}
@@ -113,7 +119,9 @@ export function ContactSupportModal({ trigger }: ContactSupportModalProps) {
                         <Input
                             id="support-subject"
                             value={form.data.subject}
-                            onChange={(event) => form.setData('subject', event.target.value)}
+                            onChange={(event) =>
+                                form.setData('subject', event.target.value)
+                            }
                             placeholder="Short summary"
                         />
                         <InputError message={form.errors.subject} />
@@ -124,7 +132,9 @@ export function ContactSupportModal({ trigger }: ContactSupportModalProps) {
                         <Textarea
                             id="support-description"
                             value={form.data.description}
-                            onChange={(event) => form.setData('description', event.target.value)}
+                            onChange={(event) =>
+                                form.setData('description', event.target.value)
+                            }
                             placeholder="Tell us what you need help with"
                             rows={6}
                         />
@@ -139,7 +149,12 @@ export function ContactSupportModal({ trigger }: ContactSupportModalProps) {
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={form.processing || !currentWorkspace?.slug}>
+                        <Button
+                            type="submit"
+                            disabled={
+                                form.processing || !currentWorkspace?.slug
+                            }
+                        >
                             {form.processing ? 'Sending...' : 'Submit ticket'}
                         </Button>
                     </DialogFooter>

@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class CsrDailyRecord extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'workspace_id',
         'csr_id',

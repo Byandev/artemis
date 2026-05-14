@@ -1,13 +1,13 @@
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
+    DialogClose,
     DialogContent,
-    DialogHeader,
-    DialogTitle,
     DialogDescription,
     DialogFooter,
-    DialogClose
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 
 interface CityInfo {
     city: string;
@@ -32,18 +32,29 @@ export default function CityInformationDialog({
             <DialogContent className="max-w-sm">
                 <DialogHeader>
                     <DialogTitle className="text-xl font-semibold">
-                        {selectedCity?.hasData ? "📍 City Information" : "No Data Available"}
+                        {selectedCity?.hasData
+                            ? '📍 City Information'
+                            : 'No Data Available'}
                     </DialogTitle>
                     <DialogDescription>
                         {selectedCity && (
                             <div className="mt-3 space-y-2 text-base">
-                                <p><strong>🏙️ City:</strong> {selectedCity.city}</p>
-                                <p><strong>🏛️ Province:</strong> {selectedCity.province}</p>
+                                <p>
+                                    <strong>🏙️ City:</strong>{' '}
+                                    {selectedCity.city}
+                                </p>
+                                <p>
+                                    <strong>🏛️ Province:</strong>{' '}
+                                    {selectedCity.province}
+                                </p>
 
                                 {selectedCity.hasData ? (
-                                    <p><strong>📊 RTS Rate:</strong> {selectedCity.value}%</p>
+                                    <p>
+                                        <strong>📊 RTS Rate:</strong>{' '}
+                                        {selectedCity.value}%
+                                    </p>
                                 ) : (
-                                    <p className="text-red-500 font-medium">
+                                    <p className="font-medium text-red-500">
                                         No available RTS data for this area.
                                     </p>
                                 )}
