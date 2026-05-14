@@ -57,23 +57,11 @@ const CATEGORY_LABELS: Record<SupportTicket['category'], string> = {
     other: 'Other',
 };
 
-export default function SupportTicketsAdminIndex({
-    workspace,
-    tickets,
-    filters,
-    query,
-}: Props) {
-    const initialSorting = useMemo(
-        () => toFrontendSort(query?.sort ?? null),
-        [query?.sort],
-    );
-    const [statusFilter, setStatusFilter] = useState(filters?.status ?? '');
-    const [categoryFilter, setCategoryFilter] = useState(
-        filters?.category ?? '',
-    );
-    const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(
-        null,
-    );
+export default function SupportTicketsAdminIndex({ workspace, tickets, filters, query }: Props) {
+    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
+    const [statusFilter, setStatusFilter] = useState(filters?.status ?? 'all');
+    const [categoryFilter, setCategoryFilter] = useState(filters?.category ?? 'all');
+    const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
 
     const statusForm = useForm({
         status: selectedTicket?.status ?? 'open',
@@ -91,8 +79,8 @@ export default function SupportTicketsAdminIndex({
                 sort: query?.sort,
                 page: 1,
                 per_page: query?.per_page,
-                'filter[status]': statusFilter || undefined,
-                'filter[category]': categoryFilter || undefined,
+                'filter[status]': statusFilter === 'all' ? undefined : statusFilter,
+                'filter[category]': categoryFilter === 'all' ? undefined : categoryFilter,
             },
             { preserveState: true, replace: true, preserveScroll: true },
         );
@@ -174,6 +162,8 @@ export default function SupportTicketsAdminIndex({
         },
     ];
 
+    const hasStatusChange = !!selectedTicket && statusForm.data.status !== selectedTicket.status;
+
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Support Tickets`} />
@@ -193,7 +183,7 @@ export default function SupportTicketsAdminIndex({
                                 <SelectValue placeholder="Filter by status" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">All statuses</SelectItem>
+                                <SelectItem value="all">All statuses</SelectItem>
                                 <SelectItem value="open">Open</SelectItem>
                                 <SelectItem value="in_progress">
                                     In progress
@@ -214,14 +204,12 @@ export default function SupportTicketsAdminIndex({
                                 <SelectValue placeholder="Filter by category" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">All categories</SelectItem>
-                                {Object.entries(CATEGORY_LABELS).map(
-                                    ([value, label]) => (
-                                        <SelectItem key={value} value={value}>
-                                            {label}
-                                        </SelectItem>
-                                    ),
-                                )}
+                                <SelectItem value="all">All categories</SelectItem>
+                                {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                                    <SelectItem key={value} value={value}>
+                                        {label}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
@@ -244,9 +232,8 @@ export default function SupportTicketsAdminIndex({
                                     sort: params?.sort,
                                     page: params?.page ?? 1,
                                     per_page: params?.per_page,
-                                    'filter[status]': statusFilter || undefined,
-                                    'filter[category]':
-                                        categoryFilter || undefined,
+                                    'filter[status]': statusFilter === 'all' ? undefined : statusFilter,
+                                    'filter[category]': categoryFilter === 'all' ? undefined : categoryFilter,
                                 },
                                 {
                                     preserveState: true,
@@ -259,22 +246,19 @@ export default function SupportTicketsAdminIndex({
                 </div>
             </div>
 
-            <Sheet
-                open={!!selectedTicket}
-                onOpenChange={(open) => !open && setSelectedTicket(null)}
-            >
-                <SheetContent className="sm:max-w-xl">
-                    <SheetHeader>
-                        <SheetTitle>{selectedTicket?.subject}</SheetTitle>
-                        <SheetDescription>
-                            {selectedTicket
-                                ? `Ticket ${selectedTicket.reference}`
-                                : ''}
+            <Sheet open={!!selectedTicket} onOpenChange={(open) => !open && setSelectedTicket(null)}>
+                <SheetContent className="bg-white border-black/6 dark:border-white/8 dark:bg-zinc-900 sm:max-w-xl">
+                    <SheetHeader className="border-b border-black/6 px-5 py-4 text-left dark:border-white/8">
+                        <SheetTitle className="font-mono text-[14px] font-semibold tracking-wide text-gray-800 uppercase dark:text-gray-100">
+                            {selectedTicket?.subject}
+                        </SheetTitle>
+                        <SheetDescription className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                            {selectedTicket ? `Ticket ${selectedTicket.reference}` : ''}
                         </SheetDescription>
                     </SheetHeader>
 
                     {selectedTicket && (
-                        <div className="mt-6 space-y-5 text-sm">
+                        <div className="space-y-5 px-5 py-4 text-sm">
                             <div className="flex flex-wrap items-center gap-2">
                                 <Badge
                                     className={
@@ -286,97 +270,75 @@ export default function SupportTicketsAdminIndex({
                                 <Badge variant="outline">
                                     {CATEGORY_LABELS[selectedTicket.category]}
                                 </Badge>
-                                <span className="text-xs text-gray-400">
-                                    {new Date(
-                                        selectedTicket.created_at,
-                                    ).toLocaleString()}
+                                <span className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                    {new Date(selectedTicket.created_at).toLocaleString()}
                                 </span>
                             </div>
 
                             <div>
-                                <p className="text-xs tracking-wide text-gray-400 uppercase">
-                                    Reporter
-                                </p>
+                                <p className="font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Reporter</p>
                                 <p className="text-[13px] font-medium text-gray-800 dark:text-gray-100">
                                     {selectedTicket.user?.name}
                                 </p>
-                                <p className="text-[12px] text-gray-500">
-                                    {selectedTicket.user?.email}
-                                </p>
+                                <p className="text-[12px] text-gray-500 dark:text-gray-400">{selectedTicket.user?.email}</p>
                             </div>
 
                             <div>
-                                <p className="text-xs tracking-wide text-gray-400 uppercase">
-                                    Description
-                                </p>
-                                <p className="mt-1 text-[13px] whitespace-pre-wrap text-gray-700 dark:text-gray-200">
+                                <p className="font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Description</p>
+                                <p className="mt-1 whitespace-pre-wrap text-[13px] text-gray-700 dark:text-gray-200">
                                     {selectedTicket.description}
                                 </p>
                             </div>
 
                             <div>
-                                <p className="text-xs tracking-wide text-gray-400 uppercase">
-                                    Page URL
-                                </p>
-                                <p className="mt-1 text-[12px] wrap-break-word text-gray-500">
+                                <p className="font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Page URL</p>
+                                <p className="mt-1 text-[12px] text-gray-500 dark:text-gray-400 wrap-break-word">
                                     {selectedTicket.current_url ?? '—'}
                                 </p>
                             </div>
 
                             <div>
-                                <p className="text-xs tracking-wide text-gray-400 uppercase">
-                                    User agent
-                                </p>
-                                <p className="mt-1 text-[12px] wrap-break-word text-gray-500">
+                                <p className="font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">User agent</p>
+                                <p className="mt-1 text-[12px] text-gray-500 dark:text-gray-400 wrap-break-word">
                                     {selectedTicket.user_agent ?? '—'}
                                 </p>
                             </div>
 
                             <div className="space-y-2">
-                                <p className="text-xs tracking-wide text-gray-400 uppercase">
-                                    Update status
-                                </p>
-                                <Select
-                                    value={statusForm.data.status}
-                                    onValueChange={(value) =>
-                                        statusForm.setData(
-                                            'status',
-                                            value as SupportTicket['status'],
-                                        )
-                                    }
-                                >
-                                    <SelectTrigger className="h-9">
-                                        <SelectValue placeholder="Select status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="open">
-                                            Open
-                                        </SelectItem>
-                                        <SelectItem value="in_progress">
-                                            In progress
-                                        </SelectItem>
-                                        <SelectItem value="resolved">
-                                            Resolved
-                                        </SelectItem>
-                                        <SelectItem value="closed">
-                                            Closed
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <p className="font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Update status</p>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Select
+                                        value={statusForm.data.status}
+                                        onValueChange={(value) =>
+                                            statusForm.setData('status', value as SupportTicket['status'])
+                                        }
+                                    >
+                                        <SelectTrigger className="h-9 min-w-[180px] flex-1 bg-stone-50 dark:bg-zinc-800">
+                                            <SelectValue placeholder="Select status" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="open">Open</SelectItem>
+                                            <SelectItem value="in_progress">In progress</SelectItem>
+                                            <SelectItem value="resolved">Resolved</SelectItem>
+                                            <SelectItem value="closed">Closed</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <Button
+                                        type="button"
+                                        onClick={handleStatusUpdate}
+                                        disabled={!hasStatusChange || statusForm.processing}
+                                        className={hasStatusChange
+                                            ? 'h-9 bg-emerald-600 text-white hover:bg-emerald-700'
+                                            : 'h-9 bg-stone-100 text-gray-400 hover:bg-stone-100 dark:bg-zinc-800 dark:text-gray-500'}
+                                    >
+                                        {statusForm.processing ? 'Saving...' : 'Update status'}
+                                    </Button>
+                                </div>
                                 {statusForm.errors.status && (
                                     <p className="text-xs text-red-500">
                                         {statusForm.errors.status}
                                     </p>
                                 )}
-                                <Button
-                                    type="button"
-                                    onClick={handleStatusUpdate}
-                                    disabled={statusForm.processing}
-                                >
-                                    {statusForm.processing
-                                        ? 'Saving...'
-                                        : 'Update status'}
-                                </Button>
                             </div>
                         </div>
                     )}
