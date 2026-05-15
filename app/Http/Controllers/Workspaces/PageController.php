@@ -193,7 +193,7 @@ class PageController extends Controller
 
         $page->update($request->validated());
 
-        return redirect()->route('workspaces.pages.index', $workspace)->with('success', 'Page updated.');
+        return redirect()->route('workspaces.pages.index', $workspace)->with('success', 'Page updated successfully.');
     }
 
     public function refresh(Request $request, Workspace $workspace, Page $page)
@@ -220,7 +220,7 @@ class PageController extends Controller
 
         $page->deactivate();
 
-        return redirect()->route('workspaces.pages.index', $workspace);
+        return redirect()->route('workspaces.pages.index', $workspace)->with('success', 'Page archived successfully.');
     }
 
     public function restore(Request $request, Workspace $workspace, Page $page)
