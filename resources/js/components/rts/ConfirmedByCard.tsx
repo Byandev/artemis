@@ -46,7 +46,7 @@ export default function ConfirmedByCard({ workspaceSlug, queryParams }: Props) {
             .catch(() => setLoading(false));
     };
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     useEffect(() => {
         fetchPage(1, sort);
     }, [workspaceSlug, JSON.stringify(queryParams)]);

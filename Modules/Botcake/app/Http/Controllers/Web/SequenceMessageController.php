@@ -6,54 +6,54 @@ use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Modules\Botcake\Models\Flow;
+use Modules\Botcake\Http\Sorts\SequenceMessage\SuccessRateSort;
+use Modules\Botcake\Models\SequenceMessage;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
-class FlowController extends Controller
+class SequenceMessageController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
         [$mode, $from, $to] = $this->resolveModeAndRange($request);
 
-        $base = Flow::query()
-            ->whereHas('page', fn ($query) => $query->where('workspace_id', $workspace->id))
-            ->with('page:id,name');
+        $base = SequenceMessage::query()
+            ->whereHas('sequence.page', fn ($query) => $query->where('workspace_id', $workspace->id))
+            ->with(['sequence:id,name,page_id', 'sequence.page:id,name']);
 
         if ($mode === 'historical') {
-            // Replace cumulative columns with date-bounded sums from the daily
-            // stat table. Keep only non-stat Flow columns in the SELECT so the
-            // historical aliases don't collide with the table columns.
-            $base
-                ->select([
-                    'botcake_flows.id',
-                    'botcake_flows.page_id',
-                    'botcake_flows.parent_id',
-                    'botcake_flows.is_removed',
-                    'botcake_flows.name',
-                    'botcake_flows.created_at',
-                    'botcake_flows.updated_at',
-                ])
-                ->appendHistorical($from, $to);
+            $base->appendHistorical($from, $to);
+            $allowedSorts = ['name', 'sent', 'total_phone_number', 'success_rate'];
         } else {
-            $base
-                ->select('botcake_flows.*')
-                ->appendSuccessRate();
+            $base->select('botcake_sequence_messages.*')->appendSuccessRate();
+            $allowedSorts = [
+                'name',
+                'sent',
+                'total_phone_number',
+                AllowedSort::custom('success_rate', new SuccessRateSort),
+            ];
         }
 
-        $flows = QueryBuilder::for($base)
+        $messages = QueryBuilder::for($base)
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),
+                AllowedFilter::callback('sequence_ids', function ($query, $value) {
+                    $ids = $this->parseIds($value);
+                    if (! empty($ids)) {
+                        $query->whereIn('botcake_sequence_messages.sequence_id', $ids);
+                    }
+                }),
                 AllowedFilter::callback('page_ids', function ($query, $value) {
                     $ids = $this->parseIds($value);
                     if (! empty($ids)) {
-                        $query->whereIn('botcake_flows.page_id', $ids);
+                        $query->whereHas('sequence', fn ($q) => $q->whereIn('page_id', $ids));
                     }
                 }),
                 AllowedFilter::callback('shop_ids', function ($query, $value) {
                     $ids = $this->parseIds($value);
                     if (! empty($ids)) {
-                        $query->whereHas('page', fn ($q) => $q->whereIn('shop_id', $ids));
+                        $query->whereHas('sequence.page', fn ($q) => $q->whereIn('shop_id', $ids));
                     }
                 }),
                 AllowedFilter::callback('sent_min', function ($query, $value) use ($mode, $from, $to) {
@@ -63,22 +63,22 @@ class FlowController extends Controller
                     $min = (int) $value;
                     if ($mode === 'historical') {
                         $query->whereRaw(
-                            '(SELECT COALESCE(SUM(sent), 0) FROM botcake_flow_daily_stats
-                                WHERE botcake_flow_daily_stats.flow_id = botcake_flows.id
+                            '(SELECT COALESCE(SUM(sent), 0) FROM botcake_sequence_message_daily_stats
+                                WHERE botcake_sequence_message_daily_stats.sequence_message_id = botcake_sequence_messages.id
                                   AND date BETWEEN ? AND ?) >= ?',
                             [$from, $to, $min]
                         );
                     } else {
-                        $query->where('botcake_flows.sent', '>=', $min);
+                        $query->where('botcake_sequence_messages.sent', '>=', $min);
                     }
                 }),
             ])
-            ->allowedSorts(['name', 'sent', 'total_phone_number', 'success_rate'])
+            ->allowedSorts($allowedSorts)
             ->defaultSort('-sent')
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
-        return Inertia::render('workspaces/botcake/flows', [
+        return Inertia::render('workspaces/botcake/sequence-messages', [
             'workspace' => $workspace->loadMissing([
                 'shops' => function ($query) {
                     $query->select('id', 'name', 'workspace_id')->orderBy('name');
@@ -88,7 +88,7 @@ class FlowController extends Controller
                 },
                 'pageOwners:id,name',
             ]),
-            'flows' => $flows,
+            'messages' => $messages,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page', 'mode', 'from', 'to']),
                 'filter' => $request->input('filter', []),
@@ -120,7 +120,6 @@ class FlowController extends Controller
         $from = $request->input('from');
         $to = $request->input('to');
 
-        // Default historical window: last 7 days, anchored to today.
         if (! $from || ! $to) {
             $from = now()->subDays(6)->toDateString();
             $to = now()->toDateString();

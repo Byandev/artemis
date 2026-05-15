@@ -123,6 +123,11 @@ export function AppSidebar() {
                               icon: MessageSquare,
                           },
                           {
+                              title: 'Sequence Messages',
+                              href: `/workspaces/${currentWorkspace.slug}/botcake/sequence-messages`,
+                              icon: Send,
+                          },
+                          {
                               title: 'Flows',
                               href: `/workspaces/${currentWorkspace.slug}/botcake/flows`,
                               icon: ClipboardList,

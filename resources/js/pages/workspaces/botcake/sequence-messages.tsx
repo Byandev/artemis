@@ -6,7 +6,7 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { numberFormatter, percentageFormatter } from '@/lib/utils';
 import { PaginatedData } from '@/types';
-import { Sequence } from '@/types/models/Botcake/Sequence';
+import { SequenceMessage } from '@/types/models/Botcake/SequenceMessage';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
@@ -26,7 +26,7 @@ type Mode = 'overall' | 'historical';
 
 interface Props {
     workspace: Workspace;
-    sequences: PaginatedData<Sequence>;
+    messages: PaginatedData<SequenceMessage>;
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -36,6 +36,7 @@ interface Props {
         to?: string;
         filter?: {
             search?: string;
+            sequence_ids?: string;
             page_ids?: string;
             shop_ids?: string;
             sent_min?: string;
@@ -55,7 +56,11 @@ const defaultRange = (): [string, string] => {
     return [toIsoDate(from), toIsoDate(to)];
 };
 
-export default function Sequences({ workspace, sequences, query }: Props) {
+export default function SequenceMessages({
+    workspace,
+    messages,
+    query,
+}: Props) {
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
         [query?.sort],
@@ -87,10 +92,12 @@ export default function Sequences({ workspace, sequences, query }: Props) {
         overrides: Record<string, string | number | null | undefined> = {},
     ) => {
         router.get(
-            `/workspaces/${workspace.slug}/botcake/sequences`,
+            `/workspaces/${workspace.slug}/botcake/sequence-messages`,
             {
                 sort: query?.sort ?? undefined,
                 'filter[search]': searchValue || undefined,
+                'filter[sequence_ids]':
+                    query?.filter?.sequence_ids || undefined,
                 'filter[page_ids]': filter.pageIds.join(',') || undefined,
                 'filter[shop_ids]': filter.shopIds.join(',') || undefined,
                 'filter[sent_min]': sentMinValue || undefined,
@@ -104,7 +111,7 @@ export default function Sequences({ workspace, sequences, query }: Props) {
                 preserveState: true,
                 replace: true,
                 preserveScroll: true,
-                only: ['sequences', 'query'],
+                only: ['messages', 'query'],
             },
         );
     };
@@ -153,7 +160,7 @@ export default function Sequences({ workspace, sequences, query }: Props) {
         });
     };
 
-    const columns: ColumnDef<Sequence>[] = [
+    const columns: ColumnDef<SequenceMessage>[] = [
         {
             accessorKey: 'name',
             enableSorting: true,
@@ -161,8 +168,9 @@ export default function Sequences({ workspace, sequences, query }: Props) {
                 <SortableHeader column={column} title="Name" />
             ),
             cell: ({ row }) => {
-                const sequence = row.original;
-                const previewUrl = `https://botcake.io/${sequence.page_id}/sequence/${sequence.id}`;
+                const message = row.original;
+                const pageId = message.sequence?.page_id;
+                const previewUrl = `https://botcake.io/${pageId}/sequence/${message.sequence_id}/message/${message.id}/sequence_preview`;
 
                 return (
                     <div>
@@ -172,22 +180,25 @@ export default function Sequences({ workspace, sequences, query }: Props) {
                             rel="noopener noreferrer"
                             className="group inline-flex items-center gap-1.5 font-medium text-gray-900 hover:text-emerald-600 dark:text-gray-100 dark:hover:text-emerald-400"
                         >
-                            {sequence.name}
+                            {message.name}
                             <ExternalLink className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
                         </a>
                         <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
-                            {sequence.page?.name ?? '-'}
+                            {message.sequence?.name ?? '-'}
+                            {message.sequence?.page?.name
+                                ? ` · ${message.sequence.page.name}`
+                                : ''}
                         </p>
                     </div>
                 );
             },
         },
         {
-            accessorKey: 'total_sent',
+            accessorKey: 'sent',
             header: ({ column }) => (
                 <SortableHeader className="w-28" column={column} title="Sent" />
             ),
-            cell: ({ row }) => numberFormatter(row.original.total_sent),
+            cell: ({ row }) => numberFormatter(row.original.sent),
         },
         {
             accessorKey: 'total_phone_number',
@@ -215,11 +226,11 @@ export default function Sequences({ workspace, sequences, query }: Props) {
 
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - Botcake Sequences`} />
+            <Head title={`${workspace.name} - Botcake Sequence Messages`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
-                    title="Sequences"
-                    description="Schedule and manage automated message sequences"
+                    title="Sequence Messages"
+                    description="Individual messages inside each automated sequence"
                 />
 
                 <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -227,7 +238,7 @@ export default function Sequences({ workspace, sequences, query }: Props) {
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
                             className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
-                            placeholder="Search sequences…"
+                            placeholder="Search messages…"
                             value={searchValue}
                             onChange={(e) => setSearchValue(e.target.value)}
                         />
@@ -263,7 +274,7 @@ export default function Sequences({ workspace, sequences, query }: Props) {
 
                         {mode === 'historical' && (
                             <DatePicker
-                                id="sequences-date-range"
+                                id="sequence-messages-date-range"
                                 mode="range"
                                 defaultDate={
                                     [fromDate, toDate] as unknown as string
@@ -304,9 +315,9 @@ export default function Sequences({ workspace, sequences, query }: Props) {
                     <DataTable
                         columns={columns}
                         enableInternalPagination={false}
-                        data={sequences.data || []}
+                        data={messages.data || []}
                         initialSorting={initialSorting}
-                        meta={{ ...omit(sequences, ['data']) }}
+                        meta={{ ...omit(messages, ['data']) }}
                         onFetch={(params) => {
                             navigate({
                                 sort: params?.sort,
