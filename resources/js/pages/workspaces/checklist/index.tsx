@@ -1,3 +1,4 @@
+import { Can } from '@/components/can';
 import { AddTaskDialog } from '@/components/checklist/add-task-dialog';
 import { getChecklistColumns } from '@/components/checklist/checklist-columns';
 import { DeleteChecklistDialog } from '@/components/checklist/delete-checklist-dialog';
@@ -8,6 +9,7 @@ import {
 } from '@/components/checklist/types';
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable } from '@/components/ui/data-table';
+import { PERMISSIONS } from '@/constants/permissions';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -142,19 +144,21 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                     title="Checklist"
                     description="Manage your tasks efficiently and never miss a requirement."
                 >
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setDialogMode('add');
-                            setEditingItemId(null);
-                            resetAddTaskForm();
-                            setAddTaskOpen(true);
-                        }}
-                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
-                    >
-                        <Plus className="mr-1.5 h-3.5 w-3.5" />
-                        Add Task
-                    </button>
+                    <Can permission={PERMISSIONS.EditChecklist}>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setDialogMode('add');
+                                setEditingItemId(null);
+                                resetAddTaskForm();
+                                setAddTaskOpen(true);
+                            }}
+                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
+                        >
+                            <Plus className="mr-1.5 h-3.5 w-3.5" />
+                            Add Task
+                        </button>
+                    </Can>
                 </PageHeader>
 
                 <AddTaskDialog

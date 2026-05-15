@@ -168,6 +168,7 @@ class PageController extends Controller
             'infotxt_token' => $validated['infotxt_token'] ?? null,
             'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
             'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
+            'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
             'parcel_journey_enabled' => $validated['parcel_journey_enabled'] ?? false,
             'status' => $validated['status'] ?? 'active',
         ]);
@@ -193,7 +194,7 @@ class PageController extends Controller
 
         $page->update($request->validated());
 
-        return redirect()->route('workspaces.pages.index', $workspace)->with('success', 'Page updated.');
+        return redirect()->route('workspaces.pages.index', $workspace)->with('success', 'Page updated successfully.');
     }
 
     public function refresh(Request $request, Workspace $workspace, Page $page)
@@ -220,7 +221,7 @@ class PageController extends Controller
 
         $page->deactivate();
 
-        return redirect()->route('workspaces.pages.index', $workspace);
+        return redirect()->route('workspaces.pages.index', $workspace)->with('success', 'Page archived successfully.');
     }
 
     public function restore(Request $request, Workspace $workspace, Page $page)

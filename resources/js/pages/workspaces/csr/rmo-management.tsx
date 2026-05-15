@@ -21,9 +21,9 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import CsrAwareLayout from '@/layouts/csr-aware-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { currencyFormatter, percentageFormatter } from '@/lib/utils';
-import publicPage from '@/routes/public-page';
 import { PaginatedData, SharedData } from '@/types';
 import { CallLog } from '@/types/models/CallLog';
 import {
@@ -32,7 +32,7 @@ import {
 } from '@/types/models/Pancake/OrderForDelivery';
 import { User } from '@/types/models/Pancake/User';
 import { Workspace } from '@/types/models/Workspace';
-import { router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import {
@@ -51,7 +51,6 @@ import {
     X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import FormModal from './formModal';
 
 const EXPORT_COLUMNS = [
     { key: 'order_id', label: 'Order ID' },
@@ -96,6 +95,7 @@ interface Props {
     delivered_count: number;
     returning_count: number;
     problematic_count: number;
+    pancakeAccounts: { id: string; name: string }[];
 }
 
 function formatDuration(seconds: number): string {
@@ -180,6 +180,7 @@ function CallLogModal({
     label,
     workspaceSlug,
     date,
+    csrName,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -187,16 +188,16 @@ function CallLogModal({
     label: string;
     workspaceSlug: string;
     date: string;
+    csrName: string;
 }) {
     const [logs, setLogs] = useState<CallLog[]>([]);
     const [loading, setLoading] = useState(false);
-    const csrName = localStorage.getItem('user_name') ?? 'CSR';
 
     useEffect(() => {
         if (!open || !phoneNumber) return;
         setLoading(true);
         fetch(
-            `/public/workspaces/${workspaceSlug}/rts/rmo-management/call-logs?phone_number=${encodeURIComponent(phoneNumber)}&date=${date}`,
+            `/workspaces/${workspaceSlug}/csr/rmo-management/call-logs?phone_number=${encodeURIComponent(phoneNumber)}&date=${date}`,
         )
             .then((r) => r.json())
             .then((data) => setLogs(data))
@@ -318,7 +319,7 @@ function CallLogBadge({
     );
 }
 
-export default function RmoManagement({
+export default function CsrRmoManagement({
     orders,
     workspace,
     query,
@@ -328,34 +329,30 @@ export default function RmoManagement({
     delivered_count,
     returning_count,
     problematic_count,
+    pancakeAccounts,
 }: Props) {
     const { appEnv } = usePage<SharedData>().props;
     const canEditPhone = appEnv !== 'production';
 
-    const [userName, setUserName] = useState<string | false>(false);
-    const [isOpen, setIsOpen] = useState(false);
-    const [showStats, setShowStats] = useState(
-        () => localStorage.getItem('rmo_show_stats') === 'true',
+    const [activePancakeAccount, setActivePancakeAccount] = useState(
+        () => pancakeAccounts[0] ?? null,
     );
-    const [showMyAssigneeOnly, setShowMyAssigneeOnly] = useState(
-        () => localStorage.getItem('rmo_show_my_assignee_only') === 'true',
-    );
-    const [showMyConfirmeeOnly, setShowMyConfirmeeOnly] = useState(
-        () => localStorage.getItem('rmo_show_my_confirmee_only') === 'true',
-    );
-    const [pendingAssign, setPendingAssign] = useState<{
-        id: number;
-        currentStatus: string;
-    } | null>(null);
+    const userId = activePancakeAccount?.id ?? '';
+    const userName = activePancakeAccount?.name ?? '';
+
+    const rmoUrl = `/workspaces/${workspace.slug}/csr/rmo-management`;
+
+    const [showStats, setShowStats] = useState(false);
+    const [showMyAssigneeOnly, setShowMyAssigneeOnly] = useState(false);
+    const [showMyConfirmeeOnly, setShowMyConfirmeeOnly] = useState(false);
     const [callLogModal, setCallLogModal] = useState<{
         phone: string;
         label: string;
     } | null>(null);
     const [exportModalOpen, setExportModalOpen] = useState(false);
-    const [exportColumns, setExportColumns] = useState<string[]>(() => {
-        const saved = localStorage.getItem('rmo_export_columns');
-        return saved ? JSON.parse(saved) : [...ALL_COLUMN_KEYS];
-    });
+    const [exportColumns, setExportColumns] = useState<string[]>([
+        ...ALL_COLUMN_KEYS,
+    ]);
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
@@ -383,7 +380,6 @@ export default function RmoManagement({
             : [],
     );
 
-    // Use URL as source of truth for status (avoids stale closure issues with select)
     const currentStatus = useMemo(
         () =>
             Array.isArray(query?.filter?.status)
@@ -435,7 +431,7 @@ export default function RmoManagement({
             setSelectedUserIds(newUserIds);
 
             router.get(
-                publicPage.rmoManagement({ workspace }),
+                rmoUrl,
                 {
                     sort: query?.sort || undefined,
                     'filter[search]': searchValue || undefined,
@@ -460,7 +456,7 @@ export default function RmoManagement({
             );
         },
         [
-            workspace,
+            rmoUrl,
             query?.sort,
             searchValue,
             currentStatus,
@@ -504,12 +500,8 @@ export default function RmoManagement({
             page: page ?? 1,
             per_page: perPage ?? orders.per_page,
             delivery_date: deliveryDate,
-            ...(showMyAssigneeOnly && localStorage.getItem('user_id')
-                ? { assignee_id: localStorage.getItem('user_id') }
-                : {}),
-            ...(showMyConfirmeeOnly && localStorage.getItem('user_id')
-                ? { confirmee_id: localStorage.getItem('user_id') }
-                : {}),
+            ...(showMyAssigneeOnly ? { assignee_id: userId } : {}),
+            ...(showMyConfirmeeOnly ? { confirmee_id: userId } : {}),
         }),
         [
             searchValue,
@@ -522,60 +514,55 @@ export default function RmoManagement({
             showMyConfirmeeOnly,
             orders.per_page,
             deliveryDate,
+            userId,
         ],
     );
 
     const handleStatusChange = useCallback(
         (status: string) => {
-            router.get(
-                publicPage.rmoManagement({ workspace }),
-                buildAllParams(query?.sort, 1, status),
-                { preserveState: true, replace: true, preserveScroll: true },
-            );
+            router.get(rmoUrl, buildAllParams(query?.sort, 1, status), {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+            });
         },
-        [workspace, buildAllParams, query?.sort],
+        [rmoUrl, buildAllParams, query?.sort],
     );
 
     const handleParcelStatusChange = useCallback(
         (parcelStatus: string) => {
             router.get(
-                publicPage.rmoManagement({ workspace }),
+                rmoUrl,
                 buildAllParams(query?.sort, 1, undefined, parcelStatus),
                 { preserveState: true, replace: true, preserveScroll: true },
             );
         },
-        [workspace, buildAllParams, query?.sort],
+        [rmoUrl, buildAllParams, query?.sort],
     );
 
     useEffect(() => {
-        const name = localStorage.getItem('user_name');
-        if (name) setUserName(name);
-    }, []);
-
-    useEffect(() => {
         const timer = setTimeout(() => {
-            router.get(
-                publicPage.rmoManagement({ workspace }),
-                buildAllParams(query?.sort, 1),
-                { preserveState: true, replace: true, preserveScroll: true },
-            );
+            router.get(rmoUrl, buildAllParams(query?.sort, 1), {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+            });
         }, 400);
         return () => clearTimeout(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchValue]);
 
     useEffect(() => {
-        router.get(
-            publicPage.rmoManagement({ workspace }),
-            buildAllParams(query?.sort, 1),
-            { preserveState: true, replace: true, preserveScroll: true },
-        );
+        router.get(rmoUrl, buildAllParams(query?.sort, 1), {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showMyAssigneeOnly, showMyConfirmeeOnly]);
 
     const doExport = useCallback(
         (columns: string[]) => {
-            localStorage.setItem('rmo_export_columns', JSON.stringify(columns));
             const params = new URLSearchParams();
             if (searchValue) params.set('filter[search]', searchValue);
             if (currentStatus) params.set('filter[status]', currentStatus);
@@ -588,24 +575,18 @@ export default function RmoManagement({
             if (selectedUserIds.length)
                 params.set('filter[user_id]', selectedUserIds.join(','));
             params.set('delivery_date', deliveryDate);
-            if (showMyAssigneeOnly && localStorage.getItem('user_id')) {
-                params.set(
-                    'assignee_id',
-                    localStorage.getItem('user_id') ?? '',
-                );
+            if (showMyAssigneeOnly) {
+                params.set('assignee_id', userId);
             }
-            if (showMyConfirmeeOnly && localStorage.getItem('user_id')) {
-                params.set(
-                    'confirmee_id',
-                    localStorage.getItem('user_id') ?? '',
-                );
+            if (showMyConfirmeeOnly) {
+                params.set('confirmee_id', userId);
             }
             if (columns.length > 0 && columns.length < ALL_COLUMN_KEYS.length) {
                 params.set('columns', columns.join(','));
             }
 
             const qs = params.toString();
-            window.location.href = `/public/workspaces/${workspace.slug}/rts/rmo-management/export${qs ? `?${qs}` : ''}`;
+            window.location.href = `/workspaces/${workspace.slug}/csr/rmo-management/export${qs ? `?${qs}` : ''}`;
         },
         [
             workspace.slug,
@@ -618,13 +599,14 @@ export default function RmoManagement({
             showMyAssigneeOnly,
             showMyConfirmeeOnly,
             deliveryDate,
+            userId,
         ],
     );
 
     const handleDateChange = useCallback(
         (date: string) => {
             router.get(
-                publicPage.rmoManagement({ workspace }),
+                rmoUrl,
                 {
                     sort: query?.sort || undefined,
                     'filter[search]': searchValue || undefined,
@@ -643,12 +625,8 @@ export default function RmoManagement({
                     ...(selectedUserIds.length
                         ? { 'filter[user_id]': selectedUserIds.join(',') }
                         : {}),
-                    ...(showMyAssigneeOnly && localStorage.getItem('user_id')
-                        ? { assignee_id: localStorage.getItem('user_id') }
-                        : {}),
-                    ...(showMyConfirmeeOnly && localStorage.getItem('user_id')
-                        ? { confirmee_id: localStorage.getItem('user_id') }
-                        : {}),
+                    ...(showMyAssigneeOnly ? { assignee_id: userId } : {}),
+                    ...(showMyConfirmeeOnly ? { confirmee_id: userId } : {}),
                     delivery_date: date,
                     page: 1,
                     per_page: orders.per_page,
@@ -657,7 +635,7 @@ export default function RmoManagement({
             );
         },
         [
-            workspace,
+            rmoUrl,
             query?.sort,
             searchValue,
             currentStatus,
@@ -668,14 +646,15 @@ export default function RmoManagement({
             showMyAssigneeOnly,
             showMyConfirmeeOnly,
             orders.per_page,
+            userId,
         ],
     );
 
     const handleAssignUser = useCallback(
-        (id: number, userId: string) => {
+        (id: number, assigneeId: string) => {
             router.post(
-                `/public/workspaces/${workspace.slug}/rts/rmo-management/${id}/assign`,
-                { userId },
+                `/workspaces/${workspace.slug}/csr/rmo-management/${id}/assign`,
+                { userId: assigneeId },
                 { preserveScroll: true },
             );
         },
@@ -685,7 +664,7 @@ export default function RmoManagement({
     const handleRemoveAssignee = useCallback(
         (id: number) => {
             router.post(
-                `/public/workspaces/${workspace.slug}/rts/rmo-management/${id}/remove-assignee`,
+                `/workspaces/${workspace.slug}/csr/rmo-management/${id}/remove-assignee`,
                 {},
                 { preserveScroll: true },
             );
@@ -696,7 +675,7 @@ export default function RmoManagement({
     const handleChangeStatus = useCallback(
         (status: string, id: number) => {
             router.post(
-                `/public/workspaces/${workspace.slug}/rts/rmo-management/${id}`,
+                `/workspaces/${workspace.slug}/csr/rmo-management/${id}`,
                 { status },
                 { preserveScroll: true, preserveState: false },
             );
@@ -706,15 +685,10 @@ export default function RmoManagement({
 
     const handleAssignToMe = useCallback(
         (id: number) => {
-            const userId = localStorage.getItem('user_id');
-            if (userId) {
-                handleAssignUser(id, userId);
-            } else {
-                setPendingAssign({ id, currentStatus: '' });
-                setIsOpen(true);
-            }
+            if (!userId) return;
+            handleAssignUser(id, userId);
         },
-        [handleAssignUser],
+        [handleAssignUser, userId],
     );
 
     const handleUpdatePhone = useCallback(
@@ -724,23 +698,12 @@ export default function RmoManagement({
             value: string,
         ) => {
             router.post(
-                `/public/workspaces/${workspace.slug}/rts/rmo-management/${id}/update-phones`,
+                `/workspaces/${workspace.slug}/csr/rmo-management/${id}/update-phones`,
                 { [field]: value },
                 { preserveScroll: true },
             );
         },
         [workspace.slug],
-    );
-
-    const handleUserSelected = useCallback(
-        (userId: string) => {
-            setUserName(localStorage.getItem('user_name') ?? '');
-            if (pendingAssign) {
-                handleAssignUser(pendingAssign.id, userId);
-                setPendingAssign(null);
-            }
-        },
-        [pendingAssign, handleAssignUser],
     );
 
     const [copiedRider, setCopiedRider] = useState(false);
@@ -812,10 +775,7 @@ export default function RmoManagement({
                                         key={i}
                                         className="text-[12px] leading-snug font-medium text-gray-800 dark:text-gray-200"
                                     >
-                                        {item.name
-                                            .split(' ')
-                                            .map((word) => word[0])
-                                            .join('')}
+                                        {item.name}
                                     </p>
                                 ))}
                             </div>
@@ -1145,16 +1105,8 @@ export default function RmoManagement({
     );
 
     return (
-        <div className="min-h-screen overflow-x-hidden bg-stone-50 dark:bg-zinc-950">
-            <FormModal
-                open={isOpen}
-                onOpenChange={(open) => {
-                    setIsOpen(open);
-                    if (!open) setPendingAssign(null);
-                }}
-                users={users}
-                onSubmit={handleUserSelected}
-            />
+        <CsrAwareLayout>
+            <Head title={`${workspace.name} - RMO Management`} />
 
             <CallLogModal
                 open={!!callLogModal}
@@ -1165,6 +1117,7 @@ export default function RmoManagement({
                 label={callLogModal?.label ?? ''}
                 workspaceSlug={workspace.slug}
                 date={deliveryDate}
+                csrName={userName}
             />
 
             {/* Export column picker modal */}
@@ -1246,64 +1199,6 @@ export default function RmoManagement({
                 </DialogContent>
             </Dialog>
 
-            {/* Top bar */}
-            <div className="border-b border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                <div className="mx-auto flex w-full items-center justify-between px-4 py-3 md:px-6">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600">
-                            <span className="text-[11px] font-bold text-white">
-                                R
-                            </span>
-                        </div>
-                        <div className="h-4 w-px bg-black/8 dark:bg-white/8" />
-                        {/* <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
-                            {new Date().toLocaleDateString('en-US', {
-                                weekday: 'short',
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric',
-                            })}
-                        </span> */}
-                    </div>
-
-                    {userName ? (
-                        <button
-                            onClick={() => setIsOpen(true)}
-                            className="group flex items-center gap-2.5 rounded-xl border border-black/6 bg-stone-50 px-3 py-1.5 transition-all hover:border-black/12 hover:bg-white dark:border-white/6 dark:bg-zinc-800 dark:hover:border-white/12 dark:hover:bg-zinc-700"
-                        >
-                            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white">
-                                {userName
-                                    .split(' ')
-                                    .slice(0, 2)
-                                    .map((w) => w[0])
-                                    .join('')
-                                    .toUpperCase()}
-                            </span>
-                            <div className="flex flex-col items-start">
-                                <span className="font-mono text-[9px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                                    Logged in as
-                                </span>
-                                <span className="text-[12px] leading-tight font-semibold text-gray-800 dark:text-gray-100">
-                                    {userName}
-                                </span>
-                            </div>
-                            <span className="ml-1 text-[10px] font-medium text-gray-400 opacity-0 transition-opacity group-hover:opacity-100 dark:text-gray-500">
-                                Change
-                            </span>
-                        </button>
-                    ) : (
-                        <Button
-                            size="sm"
-                            onClick={() => setIsOpen(true)}
-                            className="rounded-lg bg-emerald-600 px-4 text-[12px] font-medium text-white hover:bg-emerald-700"
-                        >
-                            <UserIcon className="mr-1.5 h-3.5 w-3.5" />
-                            Set Identity
-                        </Button>
-                    )}
-                </div>
-            </div>
-
             <div className="mx-auto w-full p-4 md:p-6">
                 <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0">
@@ -1342,16 +1237,7 @@ export default function RmoManagement({
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={() =>
-                                setShowStats((prev) => {
-                                    const next = !prev;
-                                    localStorage.setItem(
-                                        'rmo_show_stats',
-                                        String(next),
-                                    );
-                                    return next;
-                                })
-                            }
+                            onClick={() => setShowStats((prev) => !prev)}
                             className="flex items-center gap-1.5 rounded-lg text-[12px]"
                         >
                             <BarChart3 className="h-3.5 w-3.5" />
@@ -1373,6 +1259,40 @@ export default function RmoManagement({
                                     handleDateChange(dateStr);
                             }}
                         />
+
+                        {pancakeAccounts.length > 1 ? (
+                            <div className="relative flex items-center">
+                                <UserIcon className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
+                                <select
+                                    value={activePancakeAccount?.id ?? ''}
+                                    onChange={(e) => {
+                                        const account = pancakeAccounts.find(
+                                            (a) => a.id === e.target.value,
+                                        );
+                                        if (account)
+                                            setActivePancakeAccount(account);
+                                    }}
+                                    className="h-8 appearance-none rounded-lg border border-black/6 bg-white py-0 pr-7 pl-8 text-[12px] font-medium text-gray-700 outline-none transition-colors hover:border-black/12 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:border-white/12 dark:focus:border-emerald-400"
+                                >
+                                    {pancakeAccounts.map((account) => (
+                                        <option
+                                            key={account.id}
+                                            value={account.id}
+                                        >
+                                            {account.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
+                            </div>
+                        ) : activePancakeAccount ? (
+                            <div className="flex h-8 items-center gap-2 rounded-lg border border-black/6 bg-white px-3 dark:border-white/6 dark:bg-zinc-800">
+                                <UserIcon className="h-3.5 w-3.5 text-emerald-500" />
+                                <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                    {activePancakeAccount.name}
+                                </span>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
 
@@ -1395,7 +1315,7 @@ export default function RmoManagement({
                             <input
                                 type="text"
                                 className="h-8 w-full rounded-lg border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! outline-none focus:border-emerald-500 dark:bg-zinc-800 dark:text-gray-300"
-                                placeholder="Search by order #, tracking code, rider, customer, or confirmed by…"
+                                placeholder="Search by order #, tracking code, rider, customer, or confirmed by..."
                                 value={searchValue}
                                 onChange={(e) => setSearchValue(e.target.value)}
                             />
@@ -1434,14 +1354,7 @@ export default function RmoManagement({
                         <button
                             type="button"
                             onClick={() =>
-                                setShowMyAssigneeOnly((prev) => {
-                                    const next = !prev;
-                                    localStorage.setItem(
-                                        'rmo_show_my_assignee_only',
-                                        String(next),
-                                    );
-                                    return next;
-                                })
+                                setShowMyAssigneeOnly((prev) => !prev)
                             }
                             className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px]! font-medium transition-all ${
                                 showMyAssigneeOnly
@@ -1478,14 +1391,7 @@ export default function RmoManagement({
                         <button
                             type="button"
                             onClick={() =>
-                                setShowMyConfirmeeOnly((prev) => {
-                                    const next = !prev;
-                                    localStorage.setItem(
-                                        'rmo_show_my_confirmee_only',
-                                        String(next),
-                                    );
-                                    return next;
-                                })
+                                setShowMyConfirmeeOnly((prev) => !prev)
                             }
                             className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px]! font-medium transition-all ${
                                 showMyConfirmeeOnly
@@ -1588,7 +1494,7 @@ export default function RmoManagement({
                         meta={{ ...omit(orders, ['data']) }}
                         onFetch={(params) => {
                             router.get(
-                                publicPage.rmoManagement({ workspace }),
+                                rmoUrl,
                                 buildAllParams(
                                     params?.sort as string | null,
                                     params?.page as number | undefined,
@@ -1606,6 +1512,6 @@ export default function RmoManagement({
                     />
                 </div>
             </div>
-        </div>
+        </CsrAwareLayout>
     );
 }

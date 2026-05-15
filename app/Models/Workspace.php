@@ -69,6 +69,18 @@ class Workspace extends Model
                 }
             }
         });
+
+        static::created(function (Workspace $workspace) {
+            $defaults = MetricRegistry::defaults();
+
+            $workspace->metricSetting()->firstOrCreate(
+                ['workspace_id' => $workspace->id],
+                [
+                    'allowed_metrics' => $defaults,
+                    'default_metrics' => $defaults,
+                ]
+            );
+        });
     }
 
     /**
@@ -204,6 +216,11 @@ class Workspace extends Model
         return $this->hasMany(Page::class);
     }
 
+    public function teams(): HasMany
+    {
+        return $this->hasMany(Team::class);
+    }
+
     public function roles()
     {
         return $this->hasMany(Role::class);
@@ -253,14 +270,17 @@ class Workspace extends Model
 
     public function allowedMetrics(): array
     {
-        return $this->metricSetting?->allowed_metrics
-            ?? MetricRegistry::all();
+        return $this->metricSetting
+            ? ($this->metricSetting->allowed_metrics ?? [])
+            : MetricRegistry::defaults();
     }
 
     public function defaultMetrics(): array
     {
-        return $this->metricSetting?->default_metrics
-            ?? MetricRegistry::defaults();
+        $allowed = $this->allowedMetrics();
+        $defaults = $this->metricSetting?->default_metrics ?? [];
+
+        return array_values(array_unique([...$defaults, ...$allowed]));
     }
 
     public function getMetricSettings(): array

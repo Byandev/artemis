@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import { Can } from '@/components/can';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     DropdownMenu,
@@ -6,8 +7,9 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import AppLayout from '@/layouts/app-layout';
+import CsrAwareLayout from '@/layouts/csr-aware-layout';
 import { toFrontendSort } from '@/lib/sort';
+import { PERMISSIONS } from '@/constants/permissions';
 import { EmployeeFormDialog } from '@/pages/workspaces/employees/components/employee-form-dialog';
 import { PaginatedData } from '@/types';
 import { User } from '@/types/models/Pancake/User';
@@ -154,14 +156,16 @@ export default function EmployeesIndex({
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-40">
-                                <DropdownMenuItem
-                                    onClick={() =>
-                                        setEditingEmployee(row.original)
-                                    }
-                                >
-                                    <Pencil className="mr-2 h-3.5 w-3.5" />
-                                    Edit Settings
-                                </DropdownMenuItem>
+                                <Can permission={PERMISSIONS.EditCsrEmployees}>
+                                    <DropdownMenuItem
+                                        onClick={() =>
+                                            setEditingEmployee(row.original)
+                                        }
+                                    >
+                                        <Pencil className="mr-2 h-3.5 w-3.5" />
+                                        Edit Settings
+                                    </DropdownMenuItem>
+                                </Can>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -172,7 +176,7 @@ export default function EmployeesIndex({
     );
 
     return (
-        <AppLayout>
+        <CsrAwareLayout>
             <Head title={`${workspace.name} - Employees`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
@@ -230,6 +234,6 @@ export default function EmployeesIndex({
                     systemUsers={systemUsers}
                 />
             </div>
-        </AppLayout>
+        </CsrAwareLayout>
     );
 }

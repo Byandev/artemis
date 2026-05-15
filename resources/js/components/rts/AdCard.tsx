@@ -26,7 +26,7 @@ export default function AdCard({ workspaceSlug, queryParams }: Props) {
     const [sort, setSort] = useState('-total_orders');
     const [view, setView] = useState<ViewMode>('table');
 
-    const fetchPage = (page: number, currentSort: string, perPage = 15) => {
+    const fetchPage = (page: number, currentSort: string, perPage = 10) => {
         setLoading(true);
         const p = buildBaseParams(queryParams);
         p.append('page', String(page));
@@ -116,7 +116,7 @@ export default function AdCard({ workspaceSlug, queryParams }: Props) {
                 </div>
                 <div className="flex items-center gap-2">
                     <RefreshButton
-                        onClick={() => fetchPage(1, sort)}
+                        onClick={() => fetchPage(1, sort, data?.per_page ?? 10)}
                         loading={loading}
                     />
                     <ViewToggle value={view} onChange={setView} />

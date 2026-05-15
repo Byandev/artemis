@@ -1,3 +1,4 @@
+import DatePicker from '@/components/ui/date-picker';
 import {
     Dialog,
     DialogContent,
@@ -8,8 +9,8 @@ import {
 import { InventoryTransaction } from '@/types/models/InventoryTransaction';
 import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
-import React, { useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
+import React, { useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 
 interface InventoryItem {
@@ -188,7 +189,10 @@ const InventoryFormDialog = ({
                                     defaultDate={data.date || undefined}
                                     onChange={(dates) => {
                                         if (dates.length) {
-                                            setData('date', format(dates[0], 'yyyy-MM-dd'));
+                                            setData(
+                                                'date',
+                                                format(dates[0], 'yyyy-MM-dd'),
+                                            );
                                         } else {
                                             setData('date', '');
                                         }
