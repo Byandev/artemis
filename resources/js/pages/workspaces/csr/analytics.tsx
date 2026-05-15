@@ -20,6 +20,9 @@ interface CsrRecord {
     delivered: number;
     returning_count: number;
     rts_rate: number;
+    rmo_confirmed: number;
+    total_assigned: number;
+    rmo_percentage: number;
     total_called: number;
     total_call_time: number;
 }
@@ -105,14 +108,14 @@ function StatCard({ title, value, loading, format: fmt }: StatCardProps) {
     );
 }
 
-export default function Analytics({ workspace }: Props) {
+export default function Analytics({ workspace, records }: Props) {
     const today = new Date();
     const [range, setRange] = useState<{ from: Date; to: Date }>({
         from: subDays(today, 6),
         to: today,
     });
     const [paginatedRecords, setPaginatedRecords] =
-        useState<PaginatedData<CsrRecord> | null>(null);
+        useState<PaginatedData<CsrRecord> | null>(records ?? null);
     const [currentType, setCurrentType] = useState('pos');
     const [sort, setSort] = useState('-total_sales');
     const [page, setPage] = useState(1);
@@ -239,6 +242,30 @@ export default function Analytics({ workspace }: Props) {
                     `${Number(row.original.rts_rate).toFixed(2)}%`,
             },
             {
+                accessorKey: 'rmo_confirmed',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RMO Confirmed" />
+                ),
+                cell: ({ row }) =>
+                    Number(row.original.rmo_confirmed).toLocaleString(),
+            },
+            {
+                accessorKey: 'total_assigned',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RMO Assigned" />
+                ),
+                cell: ({ row }) =>
+                    Number(row.original.total_assigned).toLocaleString(),
+            },
+            {
+                accessorKey: 'rmo_percentage',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RMO Percentage" />
+                ),
+                cell: ({ row }) =>
+                    `${Number(row.original.rmo_percentage).toFixed(2)}%`,
+            },
+            {
                 accessorKey: 'total_called',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="RMO Called" />
@@ -249,7 +276,7 @@ export default function Analytics({ workspace }: Props) {
             {
                 accessorKey: 'total_call_time',
                 header: ({ column }) => (
-                    <SortableHeader column={column} title="Total Call Time" />
+                    <SortableHeader column={column} title="RMO Call Time" />
                 ),
                 cell: ({ row }) => formatCallTime(row.original.total_call_time),
             },

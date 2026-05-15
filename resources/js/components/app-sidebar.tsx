@@ -102,16 +102,14 @@ export function AppSidebar() {
             icon: Package,
             permission: PERMISSIONS.ViewProducts,
         },
-        ...(currentWorkspace.teams_module_enabled
-            ? [
-                {
-                    title: 'Teams',
-                    href: `/workspaces/${slug}/teams`,
-                    icon: Users,
-                    permission: PERMISSIONS.ViewTeams,
-                },
-            ]
-            : []),
+
+        {
+            title: 'Teams',
+            href: `/workspaces/${slug}/teams`,
+            icon: Users,
+            permission: PERMISSIONS.ViewTeams,
+        },
+
         {
             title: 'Roles',
             href: `/workspaces/${slug}/roles`,
@@ -147,32 +145,30 @@ export function AppSidebar() {
                 },
             ]
             : []),
-        ...(currentWorkspace.csr_module_enabled
-            ? [
+
+        {
+            title: 'CSR',
+            icon: User,
+            anyOf: [
+                PERMISSIONS.ViewCsrManagement,
+                PERMISSIONS.ViewCsrAnalytics,
+            ],
+            items: [
                 {
-                    title: 'CSR',
+                    title: 'Management',
+                    href: `/workspaces/${slug}/csr/management`,
                     icon: User,
-                    anyOf: [
-                        PERMISSIONS.ViewCsrManagement,
-                        PERMISSIONS.ViewCsrAnalytics,
-                    ],
-                    items: [
-                        {
-                            title: 'Management',
-                            href: `/workspaces/${slug}/csr/management`,
-                            icon: User,
-                            permission: PERMISSIONS.ViewCsrManagement,
-                        },
-                        {
-                            title: 'Analytics',
-                            href: `/workspaces/${slug}/csr/analytics`,
-                            icon: BarChart2,
-                            permission: PERMISSIONS.ViewCsrAnalytics,
-                        },
-                    ],
+                    permission: PERMISSIONS.ViewCsrManagement,
                 },
-            ]
-            : []),
+                {
+                    title: 'Analytics',
+                    href: `/workspaces/${slug}/csr/analytics`,
+                    icon: BarChart2,
+                    permission: PERMISSIONS.ViewCsrAnalytics,
+                },
+            ],
+        },
+
         {
             title: 'RTS',
             icon: RotateCcw,
@@ -332,18 +328,14 @@ function PublicLinks({
     leaderboardEnabled: boolean;
 }) {
     const links = [
-        ...(rmoEnabled
-            ? [
-                {
-                    title: 'RMO Management',
-                    href: `/public/workspaces/${workspaceSlug}/rts/rmo-management`,
-                    icon: Truck,
-                },
-            ]
-            : []),
-        ...(leaderboardEnabled
-            ? [{ title: 'Leaderboards', href: '/leaderboards', icon: Trophy }]
-            : []),
+        ...([
+            {
+                title: 'RMO Management',
+                href: `/public/workspaces/${workspaceSlug}/rts/rmo-management`,
+                icon: Truck,
+            },
+        ]),
+        ...([{ title: 'Leaderboards', href: '/leaderboards', icon: Trophy }]),
     ];
 
     return (

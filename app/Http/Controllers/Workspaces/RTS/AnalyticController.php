@@ -32,6 +32,7 @@ class AnalyticController extends Controller
             'workspace' => $workspace->loadMissing([
                 'shops' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name'),
                 'pages' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name'),
+                'teams' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name'),
                 'pageOwners:id,name',
             ]),
         ]);
@@ -180,7 +181,7 @@ class AnalyticController extends Controller
     {
         $params = $request->only([
             'start_date', 'end_date', 'sort', 'per_page', 'page',
-            'search', 'type', 'filter',
+            'search', 'type', 'filter', 'page_ids', 'shop_ids', 'team_ids',
         ]);
 
         return 'rts:'.$workspace->id.':'.$group.':'.md5(json_encode($params));

@@ -18,7 +18,7 @@ class CSRController extends Controller
     private const ALLOWED_SORTS = [
         'csr_name', 'total_orders', 'total_sales',
         'delivered', 'returning_count', 'rts_rate',
-        'total_called', 'total_call_time',
+        'rmo_confirmed', 'total_assigned', 'rmo_percentage', 'total_called', 'total_call_time',
     ];
 
     private function isPos(Request $request): bool
@@ -62,6 +62,7 @@ class CSRController extends Controller
             ->groupBy('pofd.assignee_id')
             ->selectRaw('
                 pofd.assignee_id as pancake_user_id,
+                COUNT(*) as total_assigned,
                 SUM(
                     CASE WHEN EXISTS (
                         SELECT 1
@@ -145,6 +146,13 @@ class CSRController extends Controller
                 COALESCE(dr.total_sales, 0) as total_sales,
                 COALESCE(dr.delivered, 0) as delivered,
                 COALESCE(dr.returning_count, 0) as returning_count,
+                COALESCE(dr.total_orders, 0) as rmo_confirmed,
+                COALESCE(rmo.total_assigned, 0) as total_assigned,
+                CASE
+                    WHEN COALESCE(dr.total_orders, 0) > 0
+                    THEN ROUND((COALESCE(rmo.total_assigned, 0) / COALESCE(dr.total_orders, 0)) * 100, 2)
+                    ELSE 0
+                END as rmo_percentage,
                 COALESCE(rmo.total_called, 0) as total_called,
                 COALESCE(rmo.total_call_time, 0) as total_call_time,
                 CASE

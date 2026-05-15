@@ -31,7 +31,7 @@ class ForDeliveryController extends Controller
 {
     public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
     {
-        $orderForDelivery = OrderForDelivery::find($id);
+        $orderForDelivery = OrderForDelivery::where('workspace_id', $workspace->id)->find($id);
 
         if (! $orderForDelivery) {
             return redirect()->back()->with('error', 'Order not found.');
@@ -48,7 +48,7 @@ class ForDeliveryController extends Controller
 
     public function publicAssignUser(Workspace $workspace, $id, Request $request)
     {
-        $orderForDelivery = OrderForDelivery::find($id);
+        $orderForDelivery = OrderForDelivery::where('workspace_id', $workspace->id)->find($id);
 
         if (! $orderForDelivery) {
             return redirect()->back()->with('error', 'Order not found.');
@@ -73,7 +73,7 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Editing phone numbers is disabled in production.');
         }
 
-        $orderForDelivery = OrderForDelivery::find($id);
+        $orderForDelivery = OrderForDelivery::where('workspace_id', $workspace->id)->find($id);
 
         if (! $orderForDelivery) {
             return redirect()->back()->with('error', 'Order not found.');
@@ -91,7 +91,7 @@ class ForDeliveryController extends Controller
 
     public function publicRemoveAssignee(Workspace $workspace, $id)
     {
-        $orderForDelivery = OrderForDelivery::find($id);
+        $orderForDelivery = OrderForDelivery::where('workspace_id', $workspace->id)->find($id);
 
         if (! $orderForDelivery) {
             return redirect()->back()->with('error', 'Order not found.');
@@ -248,9 +248,7 @@ class ForDeliveryController extends Controller
 
         if ($request->input('assignee_id')) {
             $statsBase->where('assignee_id', $request->input('assignee_id'));
-            $totalOrdersForDeliveryTodayQuery->whereHas('order', function ($orderQuery) use ($request) {
-                $orderQuery->where('confirmed_by', $request->input('assignee_id'));
-            });
+            $totalOrdersForDeliveryTodayQuery->where('assignee_id', $request->input('assignee_id'));
         }
 
         if ($request->input('confirmee_id')) {

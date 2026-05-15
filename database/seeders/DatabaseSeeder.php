@@ -32,6 +32,7 @@ class DatabaseSeeder extends Seeder
 
         // Seed RTS analytics sample data
         $this->call(RTSAnalyticsSeeder::class);
+        $this->call(CsrAnalyticsRmoPercentageSeeder::class);
 
         // Seed Ads Manager sample data (commented out - use sync command instead)
         // $this->call(AdsManagerSeeder::class);

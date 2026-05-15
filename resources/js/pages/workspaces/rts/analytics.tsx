@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import PageHeader from '@/components/common/PageHeader';
 import DatePicker from '@/components/ui/date-picker';
-import Filters, { FilterValue } from '@/components/filters/Filters';
+import RtsAnalyticsFilters, { RtsFilterValue } from '@/components/rts/RtsAnalyticsFilters';
 import CxRtsCard from '@/components/rts/CxRtsCard';
 import DeliveryAttemptsCard from '@/components/rts/DeliveryAttemptsCard';
 import LocationCard from '@/components/rts/LocationCard';
@@ -30,8 +30,8 @@ export default function Analytics({ workspace }: Props) {
         moment().startOf('month').format('YYYY-MM-DD'),
         moment().endOf('month').format('YYYY-MM-DD'),
     ]);
-    const [filter, setFilter] = useState<FilterValue>({
-        teamIds: [], productIds: [], shopIds: [], pageIds: [], userIds: [],
+    const [filter, setFilter] = useState<RtsFilterValue>({
+        teamIds: [], shopIds: [], pageIds: [],
     });
 
     const queryParams: RtsQueryParams = useMemo(() => ({
@@ -39,6 +39,7 @@ export default function Analytics({ workspace }: Props) {
         endDate: dateRange[1],
         pageIds: filter.pageIds,
         shopIds: filter.shopIds,
+        teamIds: filter.teamIds,
     }), [dateRange, filter]);
 
     const [rtsData, setRtsData] = useState<RtsData>({
@@ -61,7 +62,7 @@ export default function Analytics({ workspace }: Props) {
                     description={`${formatDate(new Date(dateRange[0]), 'MMM d')} – ${formatDate(new Date(dateRange[1]), 'MMM d, yyyy')}`}
                     stackActionsOnMobile
                 >
-                    <Filters workspace={workspace} onChange={setFilter} />
+                    <RtsAnalyticsFilters workspace={workspace} value={filter} onChange={setFilter} />
                     <DatePicker
                         id="rts-date-range"
                         mode="range"

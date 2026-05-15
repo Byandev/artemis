@@ -57,6 +57,32 @@ const EXPORT_COLUMNS = [
 
 const ALL_COLUMN_KEYS = EXPORT_COLUMNS.map((c) => c.key);
 
+const isBrowser = typeof window !== 'undefined';
+
+const getStoredItem = (key: string) => {
+    if (!isBrowser) return null;
+
+    return window.localStorage.getItem(key);
+};
+
+const setStoredItem = (key: string, value: string) => {
+    if (!isBrowser) return;
+
+    window.localStorage.setItem(key, value);
+};
+
+const getStoredJson = <T,>(key: string, fallback: T): T => {
+    const stored = getStoredItem(key);
+
+    if (!stored) return fallback;
+
+    try {
+        return JSON.parse(stored) as T;
+    } catch {
+        return fallback;
+    }
+};
+
 interface Props {
     orders: PaginatedData<OrderForDelivery>;
     workspace: Workspace;
@@ -163,7 +189,7 @@ function CallLogModal({
 }) {
     const [logs, setLogs] = useState<CallLog[]>([]);
     const [loading, setLoading] = useState(false);
-    const csrName = localStorage.getItem('user_name') ?? 'CSR';
+    const csrName = getStoredItem('user_name') ?? 'CSR';
 
     useEffect(() => {
         if (!open || !phoneNumber) return;
@@ -282,16 +308,15 @@ export default function RmoManagement({
 
     const [userName, setUserName] = useState<string | false>(false);
     const [isOpen, setIsOpen] = useState(false);
-    const [showStats, setShowStats] = useState(() => localStorage.getItem('rmo_show_stats') === 'true');
-    const [showMyAssigneeOnly, setShowMyAssigneeOnly] = useState(() => localStorage.getItem('rmo_show_my_assignee_only') === 'true');
-    const [showMyConfirmeeOnly, setShowMyConfirmeeOnly] = useState(() => localStorage.getItem('rmo_show_my_confirmee_only') === 'true');
+    const [showStats, setShowStats] = useState(() => getStoredItem('rmo_show_stats') === 'true');
+    const [showMyAssigneeOnly, setShowMyAssigneeOnly] = useState(false);
+    const [showMyConfirmeeOnly, setShowMyConfirmeeOnly] = useState(false);
     const [pendingAssign, setPendingAssign] = useState<{ id: number; currentStatus: string } | null>(null);
     const [callLogModal, setCallLogModal] = useState<{ phone: string; label: string } | null>(null);
     const [exportModalOpen, setExportModalOpen] = useState(false);
-    const [exportColumns, setExportColumns] = useState<string[]>(() => {
-        const saved = localStorage.getItem('rmo_export_columns');
-        return saved ? JSON.parse(saved) : [...ALL_COLUMN_KEYS];
-    });
+    const [exportColumns, setExportColumns] = useState<string[]>(() =>
+        getStoredJson('rmo_export_columns', [...ALL_COLUMN_KEYS]),
+    );
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
@@ -371,24 +396,28 @@ export default function RmoManagement({
     }, [workspace, query?.sort, searchValue, currentStatus, currentParcelStatus]);
 
     const buildAllParams = useCallback(
-        (sort?: string | null, page?: number, status?: string, parcelStatus?: string, perPage?: number) => ({
-            sort: sort ?? undefined,
-            'filter[search]': searchValue || undefined,
-            ...(status !== undefined
-                ? (status ? { 'filter[status]': status } : {})
-                : (currentStatus ? { 'filter[status]': currentStatus } : {})),
-            ...(parcelStatus !== undefined
-                ? (parcelStatus ? { 'filter[parcel_status]': parcelStatus } : {})
-                : (currentParcelStatus ? { 'filter[parcel_status]': currentParcelStatus } : {})),
-            ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
-            ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
-            ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
-            page: page ?? 1,
-            per_page: perPage ?? orders.per_page,
-            delivery_date: deliveryDate,
-            ...(showMyAssigneeOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
-            ...(showMyConfirmeeOnly && localStorage.getItem('user_id') ? { confirmee_id: localStorage.getItem('user_id') } : {}),
-        }),
+        (sort?: string | null, page?: number, status?: string, parcelStatus?: string, perPage?: number) => {
+            const currentUserId = getStoredItem('user_id');
+
+            return {
+                sort: sort ?? undefined,
+                'filter[search]': searchValue || undefined,
+                ...(status !== undefined
+                    ? (status ? { 'filter[status]': status } : {})
+                    : (currentStatus ? { 'filter[status]': currentStatus } : {})),
+                ...(parcelStatus !== undefined
+                    ? (parcelStatus ? { 'filter[parcel_status]': parcelStatus } : {})
+                    : (currentParcelStatus ? { 'filter[parcel_status]': currentParcelStatus } : {})),
+                ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
+                ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
+                ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
+                page: page ?? 1,
+                per_page: perPage ?? orders.per_page,
+                delivery_date: deliveryDate,
+                ...(showMyAssigneeOnly && currentUserId ? { assignee_id: currentUserId } : {}),
+                ...(showMyConfirmeeOnly && currentUserId ? { confirmee_id: currentUserId } : {}),
+            };
+        },
         [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyAssigneeOnly, showMyConfirmeeOnly, orders.per_page, deliveryDate],
     );
 
@@ -415,7 +444,7 @@ export default function RmoManagement({
     );
 
     useEffect(() => {
-        const name = localStorage.getItem('user_name');
+        const name = getStoredItem('user_name');
         if (name) setUserName(name);
     }, []);
 
@@ -442,7 +471,7 @@ export default function RmoManagement({
 
 
     const doExport = useCallback((columns: string[]) => {
-        localStorage.setItem('rmo_export_columns', JSON.stringify(columns));
+        setStoredItem('rmo_export_columns', JSON.stringify(columns));
         const params = new URLSearchParams();
         if (searchValue) params.set('filter[search]', searchValue);
         if (currentStatus) params.set('filter[status]', currentStatus);
@@ -451,22 +480,27 @@ export default function RmoManagement({
         if (selectedShopIds.length) params.set('filter[shop_id]', selectedShopIds.join(','));
         if (selectedUserIds.length) params.set('filter[user_id]', selectedUserIds.join(','));
         params.set('delivery_date', deliveryDate);
-        if (showMyAssigneeOnly && localStorage.getItem('user_id')) {
-            params.set('assignee_id', localStorage.getItem('user_id') ?? '');
+        const currentUserId = getStoredItem('user_id');
+        if (showMyAssigneeOnly && currentUserId) {
+            params.set('assignee_id', currentUserId);
         }
-        if (showMyConfirmeeOnly && localStorage.getItem('user_id')) {
-            params.set('confirmee_id', localStorage.getItem('user_id') ?? '');
+        if (showMyConfirmeeOnly && currentUserId) {
+            params.set('confirmee_id', currentUserId);
         }
         if (columns.length > 0 && columns.length < ALL_COLUMN_KEYS.length) {
             params.set('columns', columns.join(','));
         }
 
         const qs = params.toString();
-        window.location.href = `/public/workspaces/${workspace.slug}/rts/rmo-management/export${qs ? `?${qs}` : ''}`;
+        if (isBrowser) {
+            window.location.href = `/public/workspaces/${workspace.slug}/rts/rmo-management/export${qs ? `?${qs}` : ''}`;
+        }
     }, [workspace.slug, searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyAssigneeOnly, showMyConfirmeeOnly, deliveryDate]);
 
     const handleDateChange = useCallback(
         (date: string) => {
+            const currentUserId = getStoredItem('user_id');
+
             router.get(
                 publicPage.rmoManagement({ workspace }),
                 {
@@ -477,8 +511,8 @@ export default function RmoManagement({
                     ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
                     ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
                     ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
-                    ...(showMyAssigneeOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
-                    ...(showMyConfirmeeOnly && localStorage.getItem('user_id') ? { confirmee_id: localStorage.getItem('user_id') } : {}),
+                    ...(showMyAssigneeOnly && currentUserId ? { assignee_id: currentUserId } : {}),
+                    ...(showMyConfirmeeOnly && currentUserId ? { confirmee_id: currentUserId } : {}),
                     delivery_date: date,
                     page: 1,
                     per_page: orders.per_page,
@@ -524,7 +558,7 @@ export default function RmoManagement({
 
     const handleAssignToMe = useCallback(
         (id: number) => {
-            const userId = localStorage.getItem('user_id');
+            const userId = getStoredItem('user_id');
             if (userId) {
                 handleAssignUser(id, userId);
             } else {
@@ -548,7 +582,7 @@ export default function RmoManagement({
 
     const handleUserSelected = useCallback(
         (userId: string) => {
-            setUserName(localStorage.getItem('user_name') ?? '');
+            setUserName(getStoredItem('user_name') ?? '');
             if (pendingAssign) {
                 handleAssignUser(pendingAssign.id, userId);
                 setPendingAssign(null);
@@ -575,6 +609,8 @@ export default function RmoManagement({
                 )
                 .filter(Boolean);
             if (phones.length === 0) return;
+            if (!isBrowser || !navigator.clipboard) return;
+
             navigator.clipboard.writeText(phones.join('\n')).then(() => {
                 if (type === 'rider') {
                     setCopiedRider(true);
@@ -1015,43 +1051,42 @@ export default function RmoManagement({
                             initialValue={initialFilterValue}
                         />
 
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setExportModalOpen(true)}
-                                className="flex items-center gap-1.5 rounded-lg text-[12px]"
-                            >
-                                <Download className="h-3.5 w-3.5" />
-                                Export
-                            </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setExportModalOpen(true)}
+                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                        >
+                            <Download className="h-3.5 w-3.5" />
+                            Export
+                        </Button>
 
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                    setShowStats((prev) => {
-                                        const next = !prev;
-                                        localStorage.setItem('rmo_show_stats', String(next));
-                                        return next;
-                                    })
-                                }
-                                className="flex items-center gap-1.5 rounded-lg text-[12px]"
-                            >
-                                <BarChart3 className="h-3.5 w-3.5" />
-                                {showStats ? 'Hide' : 'Show'} Statistics
-                                {showStats ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                            </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                                setShowStats((prev) => {
+                                    const next = !prev;
+                                    setStoredItem('rmo_show_stats', String(next));
+                                    return next;
+                                })
+                            }
+                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                        >
+                            <BarChart3 className="h-3.5 w-3.5" />
+                            {showStats ? 'Hide' : 'Show'} Statistics
+                            {showStats ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                        </Button>
 
-                            <DatePicker
-                                id="delivery-date"
-                                mode="single"
-                                defaultDate={deliveryDate}
-                                placeholder="Select date"
-                                onChange={(_, dateStr) => {
-                                    if (dateStr && dateStr !== deliveryDate) handleDateChange(dateStr);
-                                }}
-                            />
-                        </div>
+                        <DatePicker
+                            id="delivery-date"
+                            mode="single"
+                            defaultDate={deliveryDate}
+                            placeholder="Select date"
+                            onChange={(_, dateStr) => {
+                                if (dateStr && dateStr !== deliveryDate) handleDateChange(dateStr);
+                            }}
+                        />
                     </div>
                 </div>
 
@@ -1108,13 +1143,14 @@ export default function RmoManagement({
 
                         <button
                             type="button"
-                            onClick={() =>
-                                setShowMyAssigneeOnly((prev) => {
-                                    const next = !prev;
-                                    localStorage.setItem('rmo_show_my_assignee_only', String(next));
-                                    return next;
-                                })
-                            }
+                            onClick={() => {
+                                if (!getStoredItem('user_id')) {
+                                    setIsOpen(true);
+                                    return;
+                                }
+
+                                setShowMyAssigneeOnly((prev) => !prev);
+                            }}
                             className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px] font-medium transition-all ${
                                 showMyAssigneeOnly
                                     ? 'border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-400'
@@ -1137,13 +1173,14 @@ export default function RmoManagement({
 
                         <button
                             type="button"
-                            onClick={() =>
-                                setShowMyConfirmeeOnly((prev) => {
-                                    const next = !prev;
-                                    localStorage.setItem('rmo_show_my_confirmee_only', String(next));
-                                    return next;
-                                })
-                            }
+                            onClick={() => {
+                                if (!getStoredItem('user_id')) {
+                                    setIsOpen(true);
+                                    return;
+                                }
+
+                                setShowMyConfirmeeOnly((prev) => !prev);
+                            }}
                             className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px] font-medium transition-all ${
                                 showMyConfirmeeOnly
                                     ? 'border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-400'
@@ -1164,7 +1201,7 @@ export default function RmoManagement({
                             My Confirmee Only
                         </button>
 
-                        {window.location.hostname === 'efb.on-forge.com' && <div className="ml-auto flex items-center gap-2">
+                        {isBrowser && window.location.hostname === 'efb.on-forge.com' && <div className="ml-auto flex items-center gap-2">
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button

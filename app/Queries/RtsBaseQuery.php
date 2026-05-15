@@ -72,6 +72,9 @@ abstract class RtsBaseQuery
         $shopIds = $this->request->filled('shop_ids')
             ? (array) $this->request->input('shop_ids')
             : null;
+        $teamIds = $this->request->filled('team_ids')
+            ? (array) $this->request->input('team_ids')
+            : null;
 
         $branch = fn (string $dateColumn) => DB::table('pancake_orders')
             ->selectRaw('id AS event_order_id')
@@ -79,7 +82,8 @@ abstract class RtsBaseQuery
             ->whereIn('status', [3, 4, 5])
             ->whereBetween($dateColumn, [$start, $endInclusive])
             ->when($pageIds, fn ($q) => $q->whereIn('page_id', $pageIds))
-            ->when($shopIds, fn ($q) => $q->whereIn('shop_id', $shopIds));
+            ->when($shopIds, fn ($q) => $q->whereIn('shop_id', $shopIds))
+            ->when($teamIds, fn ($q) => $q->whereIn('page_id', $this->teamPageIdsSubquery($teamIds)));
 
         $eventIds = $branch('delivered_at')->union($branch('returning_at'));
 
@@ -95,5 +99,24 @@ abstract class RtsBaseQuery
         if ($this->request->filled('shop_ids')) {
             $this->query->whereIn('pancake_orders.shop_id', (array) $this->request->input('shop_ids'));
         }
+
+        if ($this->request->filled('team_ids')) {
+            $this->query->whereIn(
+                'pancake_orders.page_id',
+                $this->teamPageIdsSubquery((array) $this->request->input('team_ids')),
+            );
+        }
+    }
+
+    private function teamPageIdsSubquery(array $teamIds)
+    {
+        return DB::table('pages')
+            ->select('id')
+            ->where('workspace_id', $this->workspace->id)
+            ->whereIn('owner_id', function ($sub) use ($teamIds) {
+                $sub->from('team_user')
+                    ->select('user_id')
+                    ->whereIn('team_id', $teamIds);
+            });
     }
 }

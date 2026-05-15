@@ -12,6 +12,7 @@ use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Modules\Pancake\Models\User as PancakeUser;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -87,6 +88,12 @@ class CSRController extends Controller
             ->forWorkspaceRange($workspace->id, $from, $to)
             ->whereColumn('pancake_user_id', 'pancake_users.id');
 
+        $assignedSub = fn () => DB::table('pancake_order_for_delivery as pofd')
+            ->whereNotNull('pofd.assignee_id')
+            ->where('pofd.workspace_id', $workspace->id)
+            ->whereBetween('pofd.delivery_date', [$from, $to])
+            ->whereColumn('pofd.assignee_id', 'pancake_users.id');
+
         $query = PancakeUser::query()
             ->select([
                 'pancake_users.id as pancake_user_id',
@@ -96,6 +103,30 @@ class CSRController extends Controller
             ->selectSub($drSub()->selectRaw('COALESCE(SUM(total_sales), 0)'), 'total_sales')
             ->selectSub($drSub()->selectRaw('COALESCE(SUM(delivered), 0)'), 'delivered')
             ->selectSub($drSub()->selectRaw('COALESCE(SUM(`returning`), 0)'), 'returning_count')
+            ->selectSub($drSub()->selectRaw('COALESCE(SUM(total_orders), 0)'), 'rmo_confirmed')
+            ->selectSub($assignedSub()->selectRaw('COUNT(*)'), 'total_assigned')
+            ->selectSub(
+                $assignedSub()->selectRaw('
+                    CASE
+                        WHEN (
+                            SELECT COALESCE(SUM(total_orders), 0)
+                            FROM '.$drClass::query()->getModel()->getTable().'
+                            WHERE workspace_id = ?
+                              AND date BETWEEN ? AND ?
+                              AND pancake_user_id = pancake_users.id
+                        ) > 0
+                        THEN ROUND((COUNT(*) / (
+                            SELECT COALESCE(SUM(total_orders), 0)
+                            FROM '.$drClass::query()->getModel()->getTable().'
+                            WHERE workspace_id = ?
+                              AND date BETWEEN ? AND ?
+                              AND pancake_user_id = pancake_users.id
+                        )) * 100, 2)
+                        ELSE 0
+                    END
+                ', [$workspace->id, $from, $to, $workspace->id, $from, $to]),
+                'rmo_percentage'
+            )
             ->selectSub($rmoSub()->selectRaw('COALESCE(SUM(total_called), 0)'), 'total_called')
             ->selectSub($rmoSub()->selectRaw('COALESCE(SUM(total_call_time), 0)'), 'total_call_time')
             ->selectSub(
@@ -117,6 +148,9 @@ class CSRController extends Controller
                 AllowedSort::field('delivered'),
                 AllowedSort::field('returning_count'),
                 AllowedSort::field('rts_rate'),
+                AllowedSort::field('rmo_confirmed'),
+                AllowedSort::field('total_assigned'),
+                AllowedSort::field('rmo_percentage'),
                 AllowedSort::field('total_called'),
                 AllowedSort::field('total_call_time'),
             ])

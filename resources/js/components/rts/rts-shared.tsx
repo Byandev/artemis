@@ -5,8 +5,9 @@ export type ViewMode = 'table' | 'chart';
 export type RtsQueryParams = {
     startDate: string;
     endDate: string;
-    pageIds: number[];
-    shopIds: number[];
+    pageIds: (number | string)[];
+    shopIds: (number | string)[];
+    teamIds: (number | string)[];
 };
 
 export type DeliveryAttemptRow = {
@@ -162,5 +163,6 @@ export function buildBaseParams(params: RtsQueryParams): URLSearchParams {
     p.append('end_date', params.endDate);
     params.pageIds.forEach((id) => p.append('page_ids[]', String(id)));
     params.shopIds.forEach((id) => p.append('shop_ids[]', String(id)));
+    params.teamIds.forEach((id) => p.append('team_ids[]', String(id)));
     return p;
 }

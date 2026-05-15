@@ -186,16 +186,6 @@ export default function SubscriptionPlanForm({ data, setData, errors }: Props) {
                     />
                     <label htmlFor="is_active" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Active</label>
                 </div>
-                <div className="flex items-center gap-3">
-                    <input
-                        type="checkbox"
-                        id="parcel_journey_sms_enabled"
-                        checked={data.parcel_journey_sms_enabled}
-                        onChange={(e) => setData('parcel_journey_sms_enabled', e.target.checked)}
-                        className="h-4 w-4 rounded border-zinc-300 text-brand-600 focus:ring-brand-500"
-                    />
-                    <label htmlFor="parcel_journey_sms_enabled" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Parcel Journey SMS Enabled</label>
-                </div>
             </div>
         </div>
     );
