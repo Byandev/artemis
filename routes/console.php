@@ -31,3 +31,5 @@ Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
 // Schedule::command('analytics:rollup --date="3 days ago"')->dailyAt('03:00')->withoutOverlapping();
 // Schedule::command('analytics:rollup --date="4 days ago"')->dailyAt('04:00')->withoutOverlapping();
 // Schedule::command('analytics:rollup --date="5 days ago"')->dailyAt('05:00')->withoutOverlapping();
+
+Schedule::command('activitylog:clean')->daily();
