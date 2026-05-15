@@ -33,6 +33,8 @@ use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
+use App\Http\Controllers\Workspaces\Admin\ActivityLogController as WorkspaceActivityLogController;
+use App\Http\Controllers\Admin\ActivityLogController as AdminActivityLogController;
 use App\Models\SupportTicket;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
@@ -298,6 +300,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('admin.support-tickets.update')
         ->can('viewAny', [SupportTicket::class, 'workspace']);
 
+    // Activity Log (workspace admin)
+    Route::get('/workspaces/{workspace:slug}/admin/activity-log', [WorkspaceActivityLogController::class, 'index'])
+        ->name('admin.activity-log.index');
+
 });
 
 // Public invitation routes (guest or authenticated)
@@ -355,4 +361,8 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('subscription-plans.update');
         Route::delete('/subscription-plans/{subscriptionPlan}', [AdminSubscriptionPlanController::class, 'destroy'])
             ->name('subscription-plans.destroy');
+
+        // Global Activity Log (platform admin)
+        Route::get('/activity-log', [AdminActivityLogController::class, 'index'])
+            ->name('activity-log.index');
     });
