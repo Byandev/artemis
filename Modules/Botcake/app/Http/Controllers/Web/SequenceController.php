@@ -59,6 +59,26 @@ class SequenceController extends Controller
                         $query->whereHas('page', fn ($q) => $q->whereIn('shop_id', $ids));
                     }
                 }),
+                AllowedFilter::callback('sent_min', function ($query, $value) use ($mode, $from, $to) {
+                    if ($value === null || $value === '') {
+                        return;
+                    }
+                    $min = (int) $value;
+                    if ($mode === 'historical') {
+                        $query->whereRaw(
+                            '(SELECT COALESCE(SUM(sent), 0) FROM botcake_sequence_daily_stats
+                                WHERE botcake_sequence_daily_stats.sequence_id = botcake_sequences.id
+                                  AND date BETWEEN ? AND ?) >= ?',
+                            [$from, $to, $min]
+                        );
+                    } else {
+                        $query->whereRaw(
+                            '(SELECT COALESCE(SUM(sent), 0) FROM botcake_sequence_messages
+                                WHERE botcake_sequence_messages.sequence_id = botcake_sequences.id) >= ?',
+                            [$min]
+                        );
+                    }
+                }),
             ])
             ->allowedSorts($allowedSorts)
             ->defaultSort('-total_sent')

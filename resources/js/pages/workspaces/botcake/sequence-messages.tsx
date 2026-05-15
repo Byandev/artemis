@@ -39,6 +39,7 @@ interface Props {
             sequence_ids?: string;
             page_ids?: string;
             shop_ids?: string;
+            sent_min?: string;
         };
     };
 }
@@ -65,6 +66,9 @@ export default function SequenceMessages({
         [query?.sort],
     );
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [sentMinValue, setSentMinValue] = useState(
+        query?.filter?.sent_min ?? '',
+    );
 
     const initialFilterValue: FilterValue = useMemo(
         () => ({
@@ -96,6 +100,7 @@ export default function SequenceMessages({
                     query?.filter?.sequence_ids || undefined,
                 'filter[page_ids]': filter.pageIds.join(',') || undefined,
                 'filter[shop_ids]': filter.shopIds.join(',') || undefined,
+                'filter[sent_min]': sentMinValue || undefined,
                 page: query?.page ?? 1,
                 mode: mode === 'historical' ? 'historical' : undefined,
                 from: mode === 'historical' ? fromDate : undefined,
@@ -117,6 +122,14 @@ export default function SequenceMessages({
         }, 500);
         return () => clearTimeout(timer);
     }, [searchValue]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            navigate({ page: 1 });
+        }, 500);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sentMinValue]);
 
     const switchMode = (next: Mode) => {
         if (next === mode) return;
@@ -228,6 +241,18 @@ export default function SequenceMessages({
                             placeholder="Search messages…"
                             value={searchValue}
                             onChange={(e) => setSearchValue(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="relative w-32">
+                        <input
+                            type="number"
+                            min={0}
+                            inputMode="numeric"
+                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 px-3 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                            placeholder="Min sent"
+                            value={sentMinValue}
+                            onChange={(e) => setSentMinValue(e.target.value)}
                         />
                     </div>
 
