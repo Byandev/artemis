@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Workspaces;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Models\CsrSchedule;
 use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
 use App\Models\PancakeUserRmoDailyReport;
@@ -13,6 +14,7 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonPeriod;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Modules\Pancake\Models\OrderForDelivery;
 use Modules\Pancake\Models\User as PancakeUser;
@@ -28,9 +30,17 @@ class CSRController extends Controller
     {
         $authUser = $request->user();
         $now = CarbonImmutable::now();
-        $today = $now->toDateString();
-        $monthStart = $now->startOfMonth()->toDateString();
-        $trendFrom = $now->subDays(13)->toDateString(); // 14-day trend
+
+        $from = $request->input('from')
+            ? CarbonImmutable::parse($request->input('from'))
+            : $now->startOfMonth();
+        $to = $request->input('to')
+            ? CarbonImmutable::parse($request->input('to'))
+            : $now;
+
+        $today = $to->toDateString();
+        $monthStart = $from->toDateString();
+        $trendFrom = $from->toDateString();
 
         // Resolve Pancake accounts for this user in this workspace
         $pancakeAccounts = PancakeUser::where('user_id', $authUser->id)
@@ -47,7 +57,7 @@ class CSRController extends Controller
         if ($primaryPancakeId) {
             $row = OrderForDelivery::where('workspace_id', $workspace->id)
                 ->where('assignee_id', $primaryPancakeId)
-                ->whereDate('delivery_date', $today)
+                ->whereBetween('delivery_date', [$monthStart, $today])
                 ->selectRaw("
                     COUNT(*) as assigned,
                     SUM(CASE WHEN status != 'PENDING' THEN 1 ELSE 0 END) as called,
@@ -71,7 +81,7 @@ class CSRController extends Controller
         if ($primaryPancakeId) {
             $pendingOrders = OrderForDelivery::where('workspace_id', $workspace->id)
                 ->where('assignee_id', $primaryPancakeId)
-                ->whereDate('delivery_date', $today)
+                ->whereBetween('delivery_date', [$monthStart, $today])
                 ->where('status', 'PENDING')
                 ->with([
                     'order' => fn ($q) => $q->select('id', 'order_number', 'tracking_code', 'final_amount')
@@ -215,7 +225,7 @@ class CSRController extends Controller
         if ($primaryPancakeId) {
             $statusBreakdown = OrderForDelivery::where('workspace_id', $workspace->id)
                 ->where('assignee_id', $primaryPancakeId)
-                ->whereDate('delivery_date', $today)
+                ->whereBetween('delivery_date', [$monthStart, $today])
                 ->groupBy('status')
                 ->select(['status', DB::raw('COUNT(*) as count')])
                 ->orderByDesc('count')
@@ -275,6 +285,22 @@ class CSRController extends Controller
             ];
         }
 
+        // --- CSR Schedules for the date range ---
+        $csrSchedules = CsrSchedule::where('workspace_id', $workspace->id)
+            ->whereBetween('date', [$monthStart, $today])
+            ->with('pancakeUser:id,name')
+            ->orderBy('date')
+            ->get()
+            ->map(fn ($s) => [
+                'id' => $s->id,
+                'pancake_user_id' => $s->pancake_user_id,
+                'name' => $s->pancakeUser?->name ?? 'Unknown',
+                'date' => $s->date->format('Y-m-d'),
+                'shift_start' => $s->shift_start?->format('H:i'),
+                'shift_end' => $s->shift_end?->format('H:i'),
+                'notes' => $s->notes,
+            ]);
+
         return Inertia::render('workspaces/csr/dashboard', [
             'workspace' => $workspace,
             'pancakeAccounts' => $pancakeAccounts,
@@ -282,11 +308,14 @@ class CSRController extends Controller
             'pendingOrders' => $pendingOrders,
             'myMonthly' => $myMonthly,
             'topCsrs' => $topCsrs,
-            'today' => $today,
-            'monthLabel' => CarbonImmutable::now()->format('F Y'),
+            'today' => $now->toDateString(),
+            'from' => $monthStart,
+            'to' => $today,
+            'monthLabel' => $from->format('M j').' – '.$to->format('M j, Y'),
             'dailyTrend' => $dailyTrend,
             'statusBreakdown' => $statusBreakdown,
             'teamAvg' => $teamAvg,
+            'csrSchedules' => $csrSchedules,
         ]);
     }
 

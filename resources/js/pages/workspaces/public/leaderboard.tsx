@@ -15,6 +15,15 @@ interface User {
     called_count?: number;
 }
 
+interface Schedule {
+    id: number;
+    pancake_user_id: string;
+    name: string;
+    shift_start: string;
+    shift_end: string;
+    notes: string | null;
+}
+
 interface MedalIconProps {
     rank: number;
 }
@@ -26,6 +35,7 @@ interface LeaderboardCardProps {
     primaryValue: string;
     secondaryValue?: string;
     activeTab: string;
+    schedule?: Schedule;
 }
 
 interface LeaderboardEntryProps {
@@ -35,6 +45,7 @@ interface LeaderboardEntryProps {
     primaryValue: string;
     secondaryValue?: string;
     activeTab: string;
+    schedule?: Schedule;
 }
 
 const MedalIcon = ({ rank }: MedalIconProps) => {
@@ -62,8 +73,9 @@ const LeaderboardCard = ({
     primaryValue,
     secondaryValue,
     activeTab,
+    schedule,
 }: LeaderboardCardProps) => {
-    const cardHeight = rank === 1 ? 'h-60' : rank === 2 ? 'h-54' : 'h-54';
+    const cardHeight = rank === 1 ? 'h-64' : rank === 2 ? 'h-56' : 'h-52';
 
     const getLabels = () => {
         if (activeTab === 'Sales Ranking') {
@@ -108,8 +120,14 @@ const LeaderboardCard = ({
                     {name}
                 </p>
 
+                {schedule && (
+                    <p className="mt-1 text-xs text-violet-300">
+                        {schedule.shift_start} - {schedule.shift_end}
+                    </p>
+                )}
+
                 <div
-                    className={`mt-4 flex ${secondaryValue ? 'justify-center gap-8' : 'justify-center'}`}
+                    className={`mt-3 flex ${secondaryValue ? 'justify-center gap-8' : 'justify-center'}`}
                 >
                     <div className="text-center">
                         <p className="text-xs text-gray-400">
@@ -142,6 +160,7 @@ const LeaderboardEntry = ({
     primaryValue,
     secondaryValue,
     activeTab,
+    schedule,
 }: LeaderboardEntryProps) => {
     const getLabels = () => {
         if (activeTab === 'Sales Ranking') {
@@ -168,9 +187,16 @@ const LeaderboardEntry = ({
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-xs font-bold text-white shadow-lg">
                     {initials}
                 </div>
-                <span className="flex-1 text-sm text-white drop-shadow">
-                    {name}
-                </span>
+                <div className="flex-1">
+                    <span className="text-sm text-white drop-shadow">
+                        {name}
+                    </span>
+                    {schedule && (
+                        <span className="ml-2 text-xs text-violet-300">
+                            {schedule.shift_start} - {schedule.shift_end}
+                        </span>
+                    )}
+                </div>
                 <span className="text-sm font-medium text-white drop-shadow">
                     {primaryValue}
                 </span>
@@ -186,9 +212,26 @@ const LeaderboardEntry = ({
     );
 };
 
+const formatDateForDisplay = (dateStr: string): string => {
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    });
+};
+
+const getTodayString = (): string => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
+
 export default function Leaderboard() {
     const [users, setUsers] = useState<User[]>([]);
+    const [schedules, setSchedules] = useState<Schedule[]>([]);
     const [activeTab, setActiveTab] = useState('Sales Ranking');
+    const [selectedDate, setSelectedDate] = useState(getTodayString());
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -228,12 +271,15 @@ export default function Leaderboard() {
         }
     };
 
+    const getScheduleForUser = (userId: string): Schedule | undefined => {
+        return schedules.find((s) => s.pancake_user_id === userId);
+    };
+
     const handleTabClick = (tab: string): void => {
         setActiveTab(tab);
         setError(null);
     };
 
-    // Safe sorting with fallback values
     const sortedUsers: User[] = [...users].sort((a: User, b: User) => {
         if (activeTab === 'Sales Ranking') {
             return (b.sales || 0) - (a.sales || 0);
@@ -267,24 +313,30 @@ export default function Leaderboard() {
                     url = '/api/public/leaderboards/group-by-delivered';
                 }
 
-                const response = await axios.get(url);
+                const [leaderboardRes, schedulesRes] = await Promise.all([
+                    axios.get(url, { params: { date: selectedDate } }),
+                    axios.get('/api/public/leaderboards/schedules', {
+                        params: { date: selectedDate },
+                    }),
+                ]);
 
-                // Ensure we always have an array and normalize the data
-                let data = Array.isArray(response.data) ? response.data : [];
+                let data = Array.isArray(leaderboardRes.data)
+                    ? leaderboardRes.data
+                    : [];
 
-                // Normalize data to ensure consistent field names
                 data = data.map((user: any) => ({
                     id: user.id,
                     name: user.name,
-                    // For sales ranking endpoint
                     sales: user.sales || 0,
                     orders_count: user.orders_count || 0,
-                    // For called/delivered endpoints
                     assigned_order_for_delivery_count:
                         user.assigned_order_for_delivery_count || 0,
                 }));
 
                 setUsers(data);
+                setSchedules(
+                    Array.isArray(schedulesRes.data) ? schedulesRes.data : [],
+                );
             } catch (error) {
                 console.error('Error fetching data:', error);
                 setError('Failed to load leaderboard data. Please try again.');
@@ -295,13 +347,12 @@ export default function Leaderboard() {
         };
 
         fetchData();
-    }, [activeTab]);
+    }, [activeTab, selectedDate]);
 
-    // Loading State
-    if (isLoading) {
-        return (
-            <div className="relative h-screen overflow-hidden bg-violet-900">
-                <div className="absolute inset-0 flex items-center justify-center">
+    const renderContent = () => {
+        if (isLoading) {
+            return (
+                <div className="mt-20 flex items-center justify-center">
                     <div className="relative">
                         <div className="h-32 w-32 animate-spin rounded-full border-t-2 border-b-2 border-violet-400"></div>
                         <div className="absolute inset-0 flex items-center justify-center">
@@ -312,60 +363,19 @@ export default function Leaderboard() {
                         </p>
                     </div>
                 </div>
-            </div>
-        );
-    }
+            );
+        }
 
-    // Error State
-    if (error) {
-        return (
-            <div className="relative h-screen overflow-hidden bg-violet-900">
-                <div className="absolute inset-0 flex items-center justify-center">
+        if (error) {
+            return (
+                <div className="mt-20 flex items-center justify-center">
                     <div className="text-center">
                         <div className="mb-4 text-6xl">⚠️</div>
                         <p className="mb-2 text-red-400">{error}</p>
                         <button
                             onClick={() => {
                                 setError(null);
-                                setIsLoading(true);
-                                // Trigger refetch
-                                const fetchData = async () => {
-                                    try {
-                                        let url = '/api/public/leaderboards';
-                                        if (activeTab === 'Called Activity') {
-                                            url =
-                                                '/api/public/leaderboards/group-by-called';
-                                        } else if (
-                                            activeTab === 'Delivery Success'
-                                        ) {
-                                            url =
-                                                '/api/public/leaderboards/group-by-delivered';
-                                        }
-                                        const response = await axios.get(url);
-                                        let data = Array.isArray(response.data)
-                                            ? response.data
-                                            : [];
-                                        data = data.map((user: any) => ({
-                                            id: user.id,
-                                            name: user.name,
-                                            sales: user.sales || 0,
-                                            orders_count:
-                                                user.orders_count || 0,
-                                            assigned_order_for_delivery_count:
-                                                user.assigned_order_for_delivery_count ||
-                                                0,
-                                        }));
-                                        setUsers(data);
-                                    } catch (err) {
-                                        console.error(err);
-                                        setError(
-                                            'Failed to load leaderboard data. Please try again.',
-                                        );
-                                    } finally {
-                                        setIsLoading(false);
-                                    }
-                                };
-                                fetchData();
+                                setSelectedDate((d) => d);
                             }}
                             className="mt-4 rounded-full bg-violet-500 px-6 py-2 text-white transition-colors hover:bg-violet-600"
                         >
@@ -373,109 +383,146 @@ export default function Leaderboard() {
                         </button>
                     </div>
                 </div>
-            </div>
-        );
-    }
+            );
+        }
 
-    // Empty State - Now with title and tabs
-    if (users.length === 0) {
-        return (
-            <div className="relative h-screen overflow-hidden bg-violet-900">
-                {/* Background decorations - same as main view */}
-                <div className="absolute -top-20 -right-10 h-100 w-100">
-                    <div className="absolute inset-0 rounded-full bg-linear-to-bl from-violet-900 via-violet-800 to-violet-300 opacity-80 blur-3xl"></div>
-                    <div className="absolute inset-0 animate-pulse rounded-full border-2 border-white/30"></div>
-                    <div className="absolute inset-4 rounded-full border border-white/20 blur-sm"></div>
-                    <div className="absolute inset-8 rounded-full border border-white/10 blur-md"></div>
-                    <div className="absolute inset-0 rounded-full bg-linear-to-tr from-transparent via-white/20 to-white/40 blur-2xl"></div>
-                    <div className="absolute top-10 right-10 h-2 w-2 animate-ping rounded-full bg-white"></div>
-                    <div className="absolute top-20 right-20 h-1 w-1 animate-pulse rounded-full bg-white/80"></div>
-                </div>
-
-                <div className="absolute top-20 left-10 h-64 w-64">
-                    <div className="absolute inset-0 rounded-full bg-white/20 shadow-[0px_0px_80px_20px_rgba(255,255,255,0.3)] blur-2xl"></div>
-                    <div className="absolute inset-0 rounded-full border border-white/30"></div>
-                </div>
-
-                <div className="absolute -bottom-20 -left-10 h-100 w-100">
-                    <div className="absolute inset-0 rounded-full bg-linear-to-tr from-violet-900 via-violet-800 to-violet-300 opacity-80 blur-3xl"></div>
-                    <div className="absolute inset-0 animate-pulse rounded-full border-2 border-white/30"></div>
-                    <div className="absolute inset-4 rounded-full border border-white/20 blur-sm"></div>
-                    <div className="absolute inset-8 rounded-full border border-white/10 blur-md"></div>
-                    <div className="absolute inset-0 rounded-full bg-linear-to-bl from-transparent via-white/20 to-white/40 blur-2xl"></div>
-                    <div className="absolute bottom-10 left-10 h-2 w-2 animate-ping rounded-full bg-white"></div>
-                    <div className="absolute bottom-20 left-20 h-1 w-1 animate-pulse rounded-full bg-white/80"></div>
-                </div>
-
-                <div className="absolute right-0 bottom-20 h-64 w-64">
-                    <div className="absolute inset-1 rounded-full bg-white/20 shadow-white blur-2xl"></div>
-                    <div className="absolute inset-0 rounded-full border border-white/30"></div>
-                </div>
-
-                <div className="absolute inset-0 bg-linear-to-t from-violet-950/50 to-transparent"></div>
-
-                <div className="absolute top-1/4 right-1/4 h-1 w-1 animate-pulse rounded-full bg-white/50"></div>
-                <div className="absolute bottom-1/3 left-1/3 h-1 w-1 animate-pulse rounded-full bg-white/50 delay-300"></div>
-                <div className="absolute top-2/3 right-1/3 h-1 w-1 animate-pulse rounded-full bg-white/50 delay-700"></div>
-
-                <div className="relative z-10 h-full overflow-y-auto">
-                    <div className="flex flex-col items-center pt-20 pb-10">
-                        <h1 className="text-4xl font-bold text-white drop-shadow-lg">
-                            CSR Leaderboards
-                        </h1>
-
-                        <div className="mt-6 flex gap-4">
-                            {(
-                                [
-                                    'Sales Ranking',
-                                    'Called Activity',
-                                    'Delivery Success',
-                                ] as const
-                            ).map((tab: string) => (
-                                <button
-                                    key={tab}
-                                    onClick={() => handleTabClick(tab)}
-                                    className={`relative overflow-hidden rounded-full border border-white/10 px-6 py-2 text-gray-200 transition-all hover:shadow-lg hover:shadow-white/10 ${
-                                        activeTab === tab
-                                            ? 'bg-white/20 backdrop-blur-sm'
-                                            : 'hover:bg-white/5'
-                                    }`}
-                                >
-                                    <div className="absolute top-0 left-0 h-1/2 w-full bg-gradient-to-b from-white/20 to-transparent"></div>
-                                    <span className="relative z-10">{tab}</span>
-                                </button>
-                            ))}
+        if (users.length === 0) {
+            return (
+                <div className="mt-20 flex flex-col items-center justify-center">
+                    <div className="text-center">
+                        <div className="mb-6 animate-bounce text-7xl">
+                            {activeTab === 'Sales Ranking' && '💰'}
+                            {activeTab === 'Called Activity' && '📞'}
+                            {activeTab === 'Delivery Success' && '🚚'}
                         </div>
+                        <h3 className="mb-3 text-2xl font-semibold text-white">
+                            No Data Available
+                        </h3>
+                        <p className="mb-2 text-lg text-gray-300">
+                            {activeTab === 'Sales Ranking' &&
+                                `No sales have been recorded for ${formatDateForDisplay(selectedDate)}.`}
+                            {activeTab === 'Called Activity' &&
+                                `No call activity has been recorded for ${formatDateForDisplay(selectedDate)}.`}
+                            {activeTab === 'Delivery Success' &&
+                                `No deliveries have been completed for ${formatDateForDisplay(selectedDate)}.`}
+                        </p>
+                        <p className="text-sm text-gray-400">
+                            Try selecting a different date
+                        </p>
+                    </div>
 
-                        {/* Empty State Content */}
-                        <div className="mt-20 flex flex-col items-center justify-center">
-                            <div className="text-center">
-                                <div className="mb-6 animate-bounce text-7xl">
-                                    {activeTab === 'Sales Ranking' && '💰'}
-                                    {activeTab === 'Called Activity' && '📞'}
-                                    {activeTab === 'Delivery Success' && '🚚'}
-                                </div>
-                                <h3 className="mb-3 text-2xl font-semibold text-white">
-                                    No Data Available
-                                </h3>
-                                <p className="mb-2 text-lg text-gray-300">
-                                    {activeTab === 'Sales Ranking' &&
-                                        'No sales have been recorded for today.'}
-                                    {activeTab === 'Called Activity' &&
-                                        'No call activity has been recorded for today.'}
-                                    {activeTab === 'Delivery Success' &&
-                                        'No deliveries have been completed today.'}
-                                </p>
-                                <p className="text-sm text-gray-400">
-                                    Check back later for updates
-                                </p>
+                    {schedules.length > 0 && (
+                        <div className="mt-10 w-full max-w-2xl px-4">
+                            <h3 className="mb-4 text-center text-lg font-semibold text-white">
+                                Scheduled CSRs for{' '}
+                                {formatDateForDisplay(selectedDate)}
+                            </h3>
+                            <div className="space-y-2">
+                                {schedules.map((schedule) => (
+                                    <div
+                                        key={schedule.id}
+                                        className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3 backdrop-blur-sm"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-xs font-bold text-white">
+                                                {getInitials(schedule.name)}
+                                            </div>
+                                            <span className="text-sm text-white">
+                                                {schedule.name}
+                                            </span>
+                                        </div>
+                                        <span className="text-sm text-violet-300">
+                                            {schedule.shift_start} -{' '}
+                                            {schedule.shift_end}
+                                        </span>
+                                    </div>
+                                ))}
                             </div>
                         </div>
-                    </div>
+                    )}
                 </div>
-            </div>
+            );
+        }
+
+        return (
+            <>
+                {topThree.length > 0 && (
+                    <div className="flex items-end gap-4">
+                        {/* Podium order: 2nd, 1st, 3rd */}
+                        {[topThree[1], topThree[0], topThree[2]]
+                            .filter(Boolean)
+                            .map((user: User) => {
+                                const rank =
+                                    user === topThree[0]
+                                        ? 1
+                                        : user === topThree[1]
+                                          ? 2
+                                          : 3;
+
+                                return (
+                                    <LeaderboardCard
+                                        key={user.id}
+                                        rank={rank}
+                                        initials={getInitials(user.name)}
+                                        name={user.name}
+                                        primaryValue={getPrimaryValue(user)}
+                                        secondaryValue={getSecondaryValue(user)}
+                                        activeTab={activeTab}
+                                        schedule={getScheduleForUser(user.id)}
+                                    />
+                                );
+                            })}
+                    </div>
+                )}
+
+                {restOfUsers.length > 0 && (
+                    <div className="mt-8 w-full max-w-4xl space-y-2 px-4">
+                        {restOfUsers.map((user: User, index: number) => (
+                            <LeaderboardEntry
+                                key={user.id}
+                                rank={index + 4}
+                                initials={getInitials(user.name)}
+                                name={user.name}
+                                primaryValue={getPrimaryValue(user)}
+                                secondaryValue={getSecondaryValue(user)}
+                                activeTab={activeTab}
+                                schedule={getScheduleForUser(user.id)}
+                            />
+                        ))}
+                    </div>
+                )}
+
+                {schedules.length > 0 && (
+                    <div className="mt-10 w-full max-w-4xl px-4">
+                        <h3 className="mb-4 text-center text-lg font-semibold text-white/80">
+                            CSR Schedule - {formatDateForDisplay(selectedDate)}
+                        </h3>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                            {schedules.map((schedule) => (
+                                <div
+                                    key={schedule.id}
+                                    className="rounded-lg border border-white/5 bg-white/5 p-3 text-center backdrop-blur-sm"
+                                >
+                                    <p className="text-sm font-medium text-white">
+                                        {schedule.name}
+                                    </p>
+                                    <p className="text-xs text-violet-300">
+                                        {schedule.shift_start} -{' '}
+                                        {schedule.shift_end}
+                                    </p>
+                                    {schedule.notes && (
+                                        <p className="mt-1 text-xs text-gray-400">
+                                            {schedule.notes}
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </>
         );
-    }
+    };
 
     return (
         <div className="relative h-screen overflow-hidden bg-violet-900">
@@ -521,7 +568,50 @@ export default function Leaderboard() {
                         CSR Leaderboards
                     </h1>
 
-                    <div className="mt-6 flex gap-4">
+                    <div className="mt-4 flex items-center gap-3">
+                        <button
+                            onClick={() => {
+                                const d = new Date(selectedDate + 'T00:00:00');
+                                d.setDate(d.getDate() - 1);
+                                setSelectedDate(
+                                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+                                );
+                            }}
+                            className="rounded-full border border-white/10 px-3 py-1.5 text-white/80 transition-all hover:bg-white/10"
+                        >
+                            ←
+                        </button>
+                        <input
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            className="rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-sm text-white [color-scheme:dark] backdrop-blur-sm transition-all outline-none hover:bg-white/15 focus:ring-2 focus:ring-violet-400/50"
+                        />
+                        <button
+                            onClick={() => {
+                                const d = new Date(selectedDate + 'T00:00:00');
+                                d.setDate(d.getDate() + 1);
+                                setSelectedDate(
+                                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+                                );
+                            }}
+                            className="rounded-full border border-white/10 px-3 py-1.5 text-white/80 transition-all hover:bg-white/10"
+                        >
+                            →
+                        </button>
+                        {selectedDate !== getTodayString() && (
+                            <button
+                                onClick={() =>
+                                    setSelectedDate(getTodayString())
+                                }
+                                className="rounded-full border border-white/10 bg-violet-500/30 px-3 py-1.5 text-xs text-white transition-all hover:bg-violet-500/50"
+                            >
+                                Today
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="mt-4 flex gap-4">
                         {(
                             [
                                 'Sales Ranking',
@@ -544,42 +634,7 @@ export default function Leaderboard() {
                         ))}
                     </div>
 
-                    {topThree.length > 0 && (
-                        <div className="flex items-end gap-4">
-                            {topThree.map((user: User, index: number) => {
-                                const rank =
-                                    index === 0 ? 1 : index === 1 ? 2 : 3;
-
-                                return (
-                                    <LeaderboardCard
-                                        key={user.id}
-                                        rank={rank}
-                                        initials={getInitials(user.name)}
-                                        name={user.name}
-                                        primaryValue={getPrimaryValue(user)}
-                                        secondaryValue={getSecondaryValue(user)}
-                                        activeTab={activeTab}
-                                    />
-                                );
-                            })}
-                        </div>
-                    )}
-
-                    {restOfUsers.length > 0 && (
-                        <div className="mt-8 w-full max-w-4xl space-y-2 px-4">
-                            {restOfUsers.map((user: User, index: number) => (
-                                <LeaderboardEntry
-                                    key={user.id}
-                                    rank={index + 4}
-                                    initials={getInitials(user.name)}
-                                    name={user.name}
-                                    primaryValue={getPrimaryValue(user)}
-                                    secondaryValue={getSecondaryValue(user)}
-                                    activeTab={activeTab}
-                                />
-                            ))}
-                        </div>
-                    )}
+                    {renderContent()}
                 </div>
             </div>
         </div>
