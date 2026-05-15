@@ -268,6 +268,7 @@ const ParcelUpdateNotificationTemplates = ({
                 <PageHeader
                     title="Parcel Journey Templates"
                     description={`${formatDate(new Date(dateRange[0]), 'MMM d')} – ${formatDate(new Date(dateRange[1]), 'MMM d, yyyy')}`}
+                    stackActionsOnMobile
                 >
                     <DatePicker
                         id="parcel-journey-date-range"
@@ -277,7 +278,7 @@ const ParcelUpdateNotificationTemplates = ({
                     />
                 </PageHeader>
 
-                <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     {statCards(analytics).map((card) => {
                         const Icon = card.icon;
                         return (
