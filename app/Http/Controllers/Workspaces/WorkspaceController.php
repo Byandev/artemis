@@ -145,8 +145,7 @@ class WorkspaceController extends Controller
             ]),
             'metricSettings' => [
                 'allowed' => $workspace->allowedMetrics(),
-                'defaults' => $workspace->metricSetting?->default_metrics
-                    ?? ['totalSales', 'totalOrders', 'aov', 'rtsRate'],
+                'defaults' => $workspace->defaultMetrics(),
             ],
         ]);
     }

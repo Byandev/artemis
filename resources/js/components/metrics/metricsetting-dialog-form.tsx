@@ -28,6 +28,8 @@ interface MetricSettingsPageProps extends SharedData {
     currentWorkspace?: Workspace;
 }
 
+const DEFAULT_METRIC_KEYS = ['totalSales', 'totalOrders', 'aov', 'rtsRate'];
+
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -57,13 +59,12 @@ export function MetricSettingDialog({
             if (setting?.allowed_metrics) {
                 setData({
                     allowed_metrics: setting.allowed_metrics,
-                    default_metrics:
-                        setting.default_metrics || setting.allowed_metrics,
+                    default_metrics: setting.allowed_metrics,
                 });
             } else {
                 setData({
-                    allowed_metrics: [],
-                    default_metrics: [],
+                    allowed_metrics: DEFAULT_METRIC_KEYS,
+                    default_metrics: DEFAULT_METRIC_KEYS,
                 });
             }
         }
@@ -91,7 +92,11 @@ export function MetricSettingDialog({
             current.splice(index, 1);
         }
 
-        setData('allowed_metrics', current);
+        setData({
+            ...data,
+            allowed_metrics: current,
+            default_metrics: current,
+        });
     };
 
     return (
