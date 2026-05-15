@@ -15,7 +15,7 @@ use Modules\Inventory\Models\InventoryTransaction;
 
 class Workspace extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Traits\LogsActivityForWorkspace;
 
     protected $fillable = [
         'name',
