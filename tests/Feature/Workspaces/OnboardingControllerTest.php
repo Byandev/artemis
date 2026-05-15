@@ -4,9 +4,11 @@ use App\Models\Page;
 use App\Models\Shop;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
-use App\Models\User;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
+use Modules\Pancake\Jobs\FetchPageOrders;
+use Modules\Pancake\Jobs\FetchShopCustomers;
+use Modules\Pancake\Jobs\FetchShopUsers;
 
 test('onboarding page renders for new workspaces', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
@@ -56,9 +58,9 @@ test('onboarding store creates page and shop after upstream API confirms', funct
 
     expect(Page::where('id', 9999)->where('workspace_id', $workspace->id)->exists())->toBeTrue();
     expect(Shop::where('id', 555)->where('workspace_id', $workspace->id)->exists())->toBeTrue();
-    Bus::assertDispatched(\Modules\Pancake\Jobs\FetchPageOrders::class);
-    Bus::assertDispatched(\Modules\Pancake\Jobs\FetchShopCustomers::class);
-    Bus::assertDispatched(\Modules\Pancake\Jobs\FetchShopUsers::class);
+    Bus::assertDispatched(FetchPageOrders::class);
+    Bus::assertDispatched(FetchShopCustomers::class);
+    Bus::assertDispatched(FetchShopUsers::class);
 });
 
 test('onboarding store creates a free trial subscription if none exists', function () {

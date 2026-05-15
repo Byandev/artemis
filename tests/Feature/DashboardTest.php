@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -18,7 +19,7 @@ test('authenticated users without a workspace are sent to workspace setup', func
 
 test('authenticated users with a workspace are sent to that workspace dashboard', function () {
     $user = User::factory()->create();
-    $workspace = \App\Models\Workspace::factory()->forOwner($user)->create();
+    $workspace = Workspace::factory()->forOwner($user)->create();
 
     $this->actingAs($user);
 

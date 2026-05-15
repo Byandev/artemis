@@ -3,6 +3,8 @@
 use App\Models\Shop;
 use App\Models\User;
 use Illuminate\Support\Facades\Bus;
+use Modules\Pancake\Jobs\FetchShopCustomers;
+use Modules\Pancake\Jobs\FetchShopUsers;
 
 test('owner can view shops index', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
@@ -35,8 +37,8 @@ test('refresh clears customers_last_synced_at and dispatches sync jobs', functio
         ->assertRedirect();
 
     expect($shop->fresh()->customers_last_synced_at)->toBeNull();
-    Bus::assertDispatched(\Modules\Pancake\Jobs\FetchShopCustomers::class);
-    Bus::assertDispatched(\Modules\Pancake\Jobs\FetchShopUsers::class);
+    Bus::assertDispatched(FetchShopCustomers::class);
+    Bus::assertDispatched(FetchShopUsers::class);
 });
 
 test('refresh on a foreign-workspace shop returns 403', function () {
