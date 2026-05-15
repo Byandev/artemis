@@ -72,5 +72,8 @@ class AppServiceProvider extends ServiceProvider
 
             return null;
         });
+
+        // Register auth event logging subscriber
+        \Illuminate\Support\Facades\Event::subscribe(\App\Listeners\LogAuthActivity::class);
     }
 }
