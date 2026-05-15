@@ -202,6 +202,6 @@ class ParcelUpdateNotificationTemplateController extends Controller
 
         $template->update($data);
 
-        return redirect()->back();
+        return redirect()->back()->with('success', 'Parcel journey notification updated successfully.');
     }
 }
