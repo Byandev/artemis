@@ -1,10 +1,14 @@
 <?php
 
 use App\Models\Page;
+use App\Models\Shop;
 use App\Models\User;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Queue;
+use Modules\Pancake\Jobs\FetchPageOrders;
+use Modules\Pancake\Jobs\FetchShopCustomers;
+use Modules\Pancake\Jobs\FetchShopUsers;
 
 test('owner can view pages index', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
@@ -96,7 +100,7 @@ test('refresh resets sync timestamp and dispatches a job', function () {
         ->assertRedirect();
 
     expect($page->fresh()->orders_last_synced_at)->toBeNull();
-    Bus::assertDispatched(\Modules\Pancake\Jobs\FetchPageOrders::class);
+    Bus::assertDispatched(FetchPageOrders::class);
 });
 
 test('validatePosToken returns valid:true on successful upstream response', function () {
@@ -153,7 +157,7 @@ test('validatePosToken validates input fields', function () {
 });
 
 test('validatePosToken returns valid:false on connection exception', function () {
-    Http::fake(fn () => throw new \Illuminate\Http\Client\ConnectionException('timed out'));
+    Http::fake(fn () => throw new ConnectionException('timed out'));
 
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
@@ -260,10 +264,10 @@ test('store creates a page and shop after Pancake API confirms', function () {
         ->assertRedirect("/workspaces/{$workspace->slug}/pages");
 
     expect(Page::where('id', 9001)->where('workspace_id', $workspace->id)->exists())->toBeTrue();
-    expect(\App\Models\Shop::where('id', 123)->where('workspace_id', $workspace->id)->exists())->toBeTrue();
-    Bus::assertDispatched(\Modules\Pancake\Jobs\FetchPageOrders::class);
-    Bus::assertDispatched(\Modules\Pancake\Jobs\FetchShopCustomers::class);
-    Bus::assertDispatched(\Modules\Pancake\Jobs\FetchShopUsers::class);
+    expect(Shop::where('id', 123)->where('workspace_id', $workspace->id)->exists())->toBeTrue();
+    Bus::assertDispatched(FetchPageOrders::class);
+    Bus::assertDispatched(FetchShopCustomers::class);
+    Bus::assertDispatched(FetchShopUsers::class);
 });
 
 test('store rejects invalid POS token (Pancake returns failed response)', function () {
@@ -462,8 +466,8 @@ test('pages index sort by orders_last_synced_at descending puts most-recent firs
 
 test('pages index sort by shop_name uses custom sort', function () {
     ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
-    $shopZ = \App\Models\Shop::factory()->forWorkspace($w)->create(['name' => 'Zebra Shop']);
-    $shopA = \App\Models\Shop::factory()->forWorkspace($w)->create(['name' => 'Apple Shop']);
+    $shopZ = Shop::factory()->forWorkspace($w)->create(['name' => 'Zebra Shop']);
+    $shopA = Shop::factory()->forWorkspace($w)->create(['name' => 'Apple Shop']);
     Page::factory()->forShop($shopZ)->create(['name' => 'P1']);
     Page::factory()->forShop($shopA)->create(['name' => 'P2']);
 

@@ -1,5 +1,6 @@
 import PageFilter from '@/components/filters/PageFilter';
 import ShopFilter from '@/components/filters/ShopFilter';
+import TeamFilter from '@/components/filters/TeamFilter';
 import UserFilter from '@/components/filters/UserFilter';
 import {
     Popover,
@@ -183,6 +184,11 @@ const Filters = ({
                         workspace={workspace}
                         selected={localValue.shopIds}
                         onSelect={(id) => handleFilterChange('shopIds', id)}
+                    />
+                    <TeamFilter
+                        workspace={workspace}
+                        selected={localValue.teamIds}
+                        onSelect={(id) => handleFilterChange('teamIds', id)}
                     />
                     <UserFilter
                         workspace={workspace}

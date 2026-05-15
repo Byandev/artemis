@@ -1,7 +1,7 @@
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
-import AppLayout from '@/layouts/app-layout';
+import CsrAwareLayout from '@/layouts/csr-aware-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
@@ -23,6 +23,7 @@ interface CsrRecord {
     total_called: number;
     total_call_time: number;
     total_rmo_call_attempts: number;
+    total_confirmed: number;
 }
 
 interface Props {
@@ -263,9 +264,17 @@ export default function Analytics({ workspace, query }: Props) {
                     `${Number(row.original.rts_rate).toFixed(2)}%`,
             },
             {
+                accessorKey: 'total_confirmed',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RMO Confirmed" />
+                ),
+                cell: ({ row }) =>
+                    Number(row.original.total_confirmed).toLocaleString(),
+            },
+            {
                 accessorKey: 'total_called',
                 header: ({ column }) => (
-                    <SortableHeader column={column} title="Assigned RMO " />
+                    <SortableHeader column={column} title="RMO Assigned" />
                 ),
                 cell: ({ row }) =>
                     Number(row.original.total_called).toLocaleString(),
@@ -273,10 +282,7 @@ export default function Analytics({ workspace, query }: Props) {
             {
                 accessorKey: 'total_rmo_call_attempts',
                 header: ({ column }) => (
-                    <SortableHeader
-                        column={column}
-                        title="Assigned RMO Called"
-                    />
+                    <SortableHeader column={column} title="RMO Called" />
                 ),
                 cell: ({ row }) =>
                     Number(
@@ -286,10 +292,7 @@ export default function Analytics({ workspace, query }: Props) {
             {
                 accessorKey: 'total_call_time',
                 header: ({ column }) => (
-                    <SortableHeader
-                        column={column}
-                        title="Assigned RMO Call Time"
-                    />
+                    <SortableHeader column={column} title="RMO Call Time" />
                 ),
                 cell: ({ row }) => formatCallTime(row.original.total_call_time),
             },
@@ -298,7 +301,7 @@ export default function Analytics({ workspace, query }: Props) {
     );
 
     return (
-        <AppLayout>
+        <CsrAwareLayout>
             <Head title={`${workspace.name} - CSR Analytics`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
@@ -391,6 +394,6 @@ export default function Analytics({ workspace, query }: Props) {
                     />
                 </div>
             </div>
-        </AppLayout>
+        </CsrAwareLayout>
     );
 }

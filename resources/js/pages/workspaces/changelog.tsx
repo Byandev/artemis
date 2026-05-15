@@ -12,6 +12,22 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.6.15',
+        date: '2026-05-12',
+        sections: [
+            {
+                title: 'Per-Workspace Page Limit Override',
+                items: [
+                    "Added a workspaces.max_pages column (new migration) that overrides the subscription plan's page_limit on a per-workspace basis — when set it wins, when null the plan limit is used, when both are null pages are unlimited",
+                    'Centralised the resolution on the Workspace model — new pageLimit(), pageLimitInfo(), and hasReachedPageLimit() helpers so every creation site reads the same source of truth instead of duplicating the ?? chain',
+                    "PageController::store and OnboardingController::store both now throw a ValidationException with a page_limit message when the workspace is at capacity; PageController::create still redirects to index with a flash error so users can't land on the create form when full",
+                    'Onboarding page (resources/js/pages/workspaces/onboarding.tsx) now receives pageLimit/pageCount/pageLimitReached and disables the "Connect & Sync Orders" button with a tooltip + small counter ("X/Y pages used"), matching the pattern already on the pages index',
+                    'Admin — /admin/workspaces now exposes a max_pages field on the workspace edit form and shows current usage as "count / max_pages" in the listing; AdminWorkspaceController validates max_pages as nullable|integer|min:1',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.6.14',
         date: '2026-05-09',
         sections: [

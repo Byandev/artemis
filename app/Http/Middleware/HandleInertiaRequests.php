@@ -111,6 +111,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $user ? array_merge($user->toArray(), [
                     'is_super_admin' => $user->isSuperAdmin(),
                     'is_workspace_owner' => $isOwner,
+                    'is_csr' => $user && $workspaceModel ? $user->isCsrOf($workspaceModel) : false,
                     'permissions' => $permissions,
                     'can' => $can,
                 ]) : null,

@@ -1,3 +1,4 @@
+import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { ContactSupportModal } from '@/components/contact-support-modal';
 import { Icon } from '@/components/icon';
@@ -153,7 +154,7 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                         </NavigationMenu>
                     </div>
 
-                    <div className="ml-auto flex items-center gap-2">
+                    <div className="ml-auto flex min-w-0 items-center gap-1.5">
                         <ContactSupportModal
                             trigger={
                                 <Button
@@ -166,6 +167,9 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                 </Button>
                             }
                         />
+                        <div className="hidden sm:flex">
+                            <AppearanceToggleDropdown />
+                        </div>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <button className="flex h-9 max-w-full min-w-0 items-center gap-2.5 rounded-full border border-black/8 bg-stone-50 pr-3 pl-1 transition-all outline-none hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:hover:bg-zinc-700">

@@ -97,11 +97,11 @@ export default function SupportTicketsIndex({
 
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - Support`} />
+            <Head title={`${workspace.name} - Customer Support`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
-                    title="My Support Tickets"
-                    description="Track the status of your workspace support requests"
+                    title="Customer Support"
+                    description="View your workspace support requests"
                 />
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">

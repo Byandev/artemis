@@ -41,6 +41,7 @@ interface Workspace {
     slug: string;
     owner?: { name: string };
     pages_count: number;
+    max_pages: number | null;
     subscription?: Subscription | null;
     inventory_module_enabled: boolean;
     finance_module_enabled: boolean;
@@ -50,6 +51,7 @@ interface Workspace {
     csr_module_enabled: boolean;
     rmo_module_enabled: boolean;
     leaderboard_module_enabled: boolean;
+    botcake_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
 
@@ -64,6 +66,7 @@ const MODULE_FIELDS: Array<{
         | 'csr_module_enabled'
         | 'rmo_module_enabled'
         | 'leaderboard_module_enabled'
+        | 'botcake_module_enabled'
     >;
     label: string;
     description: string;
@@ -108,6 +111,11 @@ const MODULE_FIELDS: Array<{
         label: 'Leaderboards',
         description: 'Public leaderboards link',
     },
+    {
+        key: 'botcake_module_enabled',
+        label: 'Botcake',
+        description: 'Botcake sequences and flows',
+    },
 ];
 
 interface Props {
@@ -140,6 +148,9 @@ export default function Index({ workspaces, plans, filters }: Props) {
         null,
     );
     const [editingModules, setEditingModules] = useState<Workspace | null>(
+        null,
+    );
+    const [editingMaxPages, setEditingMaxPages] = useState<Workspace | null>(
         null,
     );
 
@@ -223,7 +234,11 @@ export default function Index({ workspaces, plans, filters }: Props) {
                 <div className="text-center">
                     <div className="inline-flex items-center gap-1.5 rounded-full border border-brand-100 bg-brand-50/50 px-3 py-1 text-xs font-bold text-brand-600 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-400">
                         <Files className="h-3 w-3" />
-                        {row.original.pages_count} Pages
+                        {row.original.pages_count}
+                        {row.original.max_pages !== null
+                            ? ` / ${row.original.max_pages}`
+                            : ''}{' '}
+                        Pages
                     </div>
                 </div>
             ),
@@ -274,6 +289,13 @@ export default function Index({ workspaces, plans, filters }: Props) {
                     >
                         <ArrowUpRight className="h-4 w-4" />
                     </Link>
+                    <button
+                        onClick={() => setEditingMaxPages(row.original)}
+                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                        title="Set max pages"
+                    >
+                        <Files className="h-4 w-4" />
+                    </button>
                     <button
                         onClick={() => setEditingModules(row.original)}
                         className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
@@ -378,6 +400,13 @@ export default function Index({ workspaces, plans, filters }: Props) {
                 />
             )}
 
+            {editingMaxPages && (
+                <MaxPagesModal
+                    workspace={editingMaxPages}
+                    onClose={() => setEditingMaxPages(null)}
+                />
+            )}
+
             {editingModules && (
                 <ModulesModal
                     workspace={editingModules}
@@ -385,40 +414,6 @@ export default function Index({ workspaces, plans, filters }: Props) {
                 />
             )}
         </AdminSidebarLayout>
-    );
-}
-
-function DaysLeft({ subscription }: { subscription: Subscription }) {
-    const endDate =
-        subscription.status === 'trialing'
-            ? subscription.trial_ends_at
-            : subscription.current_period_end;
-
-    if (!endDate) return <span className="text-xs text-zinc-400">—</span>;
-
-    const now = new Date();
-    const end = new Date(endDate);
-    const diffMs = end.getTime() - now.getTime();
-    const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-    if (days < 0) {
-        return (
-            <span className="text-xs font-medium text-red-500">Expired</span>
-        );
-    }
-
-    const color =
-        days <= 3
-            ? 'text-red-600 dark:text-red-400'
-            : days <= 7
-              ? 'text-yellow-600 dark:text-yellow-400'
-              : 'text-zinc-700 dark:text-zinc-300';
-
-    return (
-        <div className="flex flex-col items-center">
-            <span className={`text-sm font-bold ${color}`}>{days}</span>
-            <span className="text-[10px] text-zinc-500">days left</span>
-        </div>
     );
 }
 
@@ -544,6 +539,95 @@ function SubscriptionModal({
     );
 }
 
+function MaxPagesModal({
+    workspace,
+    onClose,
+}: {
+    workspace: Workspace;
+    onClose: () => void;
+}) {
+    const { data, setData, put, processing } = useForm({
+        max_pages: workspace.max_pages?.toString() ?? '',
+    });
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        put(`/admin/workspaces/${workspace.slug}/max-pages`, {
+            onSuccess: () => onClose(),
+            preserveScroll: true,
+        });
+    }
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            onClick={onClose}
+        >
+            <div
+                className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="mb-5 flex items-center justify-between">
+                    <div>
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                            Max Pages Limit
+                        </h3>
+                        <p className="text-sm text-zinc-500">
+                            {workspace.name}
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                            Maximum Pages
+                        </label>
+                        <input
+                            type="number"
+                            min="1"
+                            placeholder="No limit"
+                            value={data.max_pages}
+                            onChange={(e) =>
+                                setData('max_pages', e.target.value)
+                            }
+                            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-zinc-700 dark:bg-zinc-800"
+                        />
+                        <p className="mt-1 text-xs text-zinc-500">
+                            Leave empty to use the subscription plan limit
+                            instead. Currently using {workspace.pages_count}{' '}
+                            page(s).
+                        </p>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={processing}
+                            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 function ModulesModal({
     workspace,
     onClose,
@@ -560,6 +644,7 @@ function ModulesModal({
         csr_module_enabled: workspace.csr_module_enabled,
         rmo_module_enabled: workspace.rmo_module_enabled,
         leaderboard_module_enabled: workspace.leaderboard_module_enabled,
+        botcake_module_enabled: workspace.botcake_module_enabled,
     });
 
     function handleSubmit(e: React.FormEvent) {

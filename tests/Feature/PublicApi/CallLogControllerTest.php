@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\CallLog;
+use Carbon\Carbon;
 use Illuminate\Support\Str;
 
 test('sync upserts call logs scoped to the workspace', function () {
@@ -112,7 +113,7 @@ test('sync rejects empty call_logs array', function () {
 test('sync upserts on duplicate phone+date+time keys (idempotency)', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
-    $userId = (string) Illuminate\Support\Str::uuid();
+    $userId = (string) Str::uuid();
 
     $payload = [
         'user_id' => $userId,
@@ -125,28 +126,28 @@ test('sync upserts on duplicate phone+date+time keys (idempotency)', function ()
     // Same payload again — should not duplicate
     $this->postJson('/api/v1/public/call-logs/sync', $payload, ['Authorization' => 'Bearer '.$raw])->assertOk();
 
-    expect(\App\Models\CallLog::where('workspace_id', $workspace->id)->count())->toBe(1);
+    expect(CallLog::where('workspace_id', $workspace->id)->count())->toBe(1);
 });
 
 test('list filters by since timestamp (epoch ms)', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
-    $userId = (string) Illuminate\Support\Str::uuid();
+    $userId = (string) Str::uuid();
 
-    \App\Models\CallLog::factory()->create([
+    CallLog::factory()->create([
         'workspace_id' => $workspace->id,
         'user_id' => $userId,
         'call_date' => '2026-04-01',
         'call_time' => '10:00:00',
     ]);
-    \App\Models\CallLog::factory()->create([
+    CallLog::factory()->create([
         'workspace_id' => $workspace->id,
         'user_id' => $userId,
         'call_date' => '2026-04-30',
         'call_time' => '12:00:00',
     ]);
 
-    $sinceMs = (int) (\Carbon\Carbon::parse('2026-04-15')->timestamp * 1000);
+    $sinceMs = (int) (Carbon::parse('2026-04-15')->timestamp * 1000);
 
     $response = $this->getJson("/api/v1/public/call-logs/list?user_id={$userId}&since={$sinceMs}", [
         'Authorization' => 'Bearer '.$raw,

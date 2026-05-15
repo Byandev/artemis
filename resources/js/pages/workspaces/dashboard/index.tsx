@@ -1,4 +1,4 @@
-import AskDataWidget, { DashboardData } from '@/components/ai/AskDataWidget';
+import { DashboardData } from '@/components/ai/AskDataWidget';
 import ComponentCard from '@/components/common/ComponentCard';
 import PageHeader from '@/components/common/PageHeader';
 import Filters, { FilterValue } from '@/components/filters/Filters';
@@ -188,7 +188,6 @@ const Dashboard = ({ workspace, metricSettings }: Props) => {
                                 icon={card.icon}
                                 tooltipLabel={card.description}
                                 reverseTrend={card.reverse}
-                                onValueLoaded={onMetricLoaded}
                             />
                         ))}
                 </div>
@@ -208,7 +207,6 @@ const Dashboard = ({ workspace, metricSettings }: Props) => {
                         workspace={workspace}
                         filter={filter}
                         metrics={selectedMetrics}
-                        onDataLoaded={onPagesLoaded}
                     />
                 </ComponentCard>
 
@@ -218,7 +216,6 @@ const Dashboard = ({ workspace, metricSettings }: Props) => {
                         dateRange={dateRange}
                         workspace={workspace}
                         metrics={selectedMetrics}
-                        onDataLoaded={onShopsLoaded}
                     />
                 </ComponentCard>
 
@@ -228,17 +225,9 @@ const Dashboard = ({ workspace, metricSettings }: Props) => {
                         dateRange={dateRange}
                         workspace={workspace}
                         metrics={selectedMetrics}
-                        onDataLoaded={onUsersLoaded}
                     />
                 </ComponentCard>
             </div>
-
-            {/* Floating AI chat — uses data already loaded on screen */}
-            <AskDataWidget
-                workspace={workspace}
-                dateRange={dateRange}
-                data={dashboardData}
-            />
         </AppLayout>
     );
 };

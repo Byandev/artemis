@@ -7,7 +7,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import AppLayout from '@/layouts/app-layout';
+import CsrAwareLayout from '@/layouts/csr-aware-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PERMISSIONS } from '@/constants/permissions';
 import { EmployeeFormDialog } from '@/pages/workspaces/employees/components/employee-form-dialog';
@@ -176,7 +176,7 @@ export default function EmployeesIndex({
     );
 
     return (
-        <AppLayout>
+        <CsrAwareLayout>
             <Head title={`${workspace.name} - Employees`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
@@ -234,6 +234,6 @@ export default function EmployeesIndex({
                     systemUsers={systemUsers}
                 />
             </div>
-        </AppLayout>
+        </CsrAwareLayout>
     );
 }

@@ -1,4 +1,4 @@
-import { EntityFilter } from '@/components/filters/EntityFilter';
+import { FilterGroup } from '@/components/filters/FilterGroup';
 import { Team } from '@/types/models/Team';
 import { Workspace } from '@/types/models/Workspace';
 
@@ -10,13 +10,14 @@ interface Props {
 
 const TeamFilter = ({ workspace, selected, onSelect }: Props) => {
     return (
-        <EntityFilter<Team>
-            workspace={workspace}
-            endpoint={'/teams'}
-            getId={(p) => p.id}
-            getLabel={(p) => p.name}
+        <FilterGroup<Team>
+            name="Team"
+            getId={(item) => item.id}
+            getLabel={(item) => item.name}
             selected={selected}
             onSelect={onSelect}
+            options={workspace.teams ?? []}
+            searchable={false}
         />
     );
 };

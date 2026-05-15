@@ -31,6 +31,8 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
     useEffect(() => {
         if (!inputRef.current) return;
 
+        const dialogRoot = inputRef.current.closest('[data-slot="dialog-content"]');
+
         const wrappedOnChange: Hook = (dates, dateStr, instance) => {
             setSelectedDates([...dates]);
             if (typeof onChange === 'function') onChange(dates, dateStr, instance);
@@ -42,10 +44,16 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
             monthSelectorType: "static",
             dateFormat: "Y-m-d",
             defaultDate,
+            appendTo: (dialogRoot ?? document.body) as HTMLElement,
+            disableMobile: true,
             onChange: wrappedOnChange,
         });
 
         fpRef.current = Array.isArray(instance) ? instance[0] : instance;
+
+        if (fpRef.current?.calendarContainer) {
+            fpRef.current.calendarContainer.style.zIndex = '100000';
+        }
 
         return () => { fpRef.current?.destroy(); fpRef.current = null; };
     }, [mode, id, defaultDate]);
@@ -72,7 +80,7 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
                 />
 
                 {/* Icon cell */}
-                <span className="relative z-10 pointer-events-none flex items-center justify-center w-9 h-full border-r border-black/6 dark:border-white/6 bg-stone-50 dark:bg-white/[0.03] shrink-0 rounded-l-[9px]">
+                <span className="relative z-10 pointer-events-none flex items-center justify-center w-9 h-full border-r border-black/6 dark:border-white/6 bg-stone-50 dark:bg-white/3 shrink-0 rounded-l-[9px]">
                     <CalendarDays className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
                 </span>
 

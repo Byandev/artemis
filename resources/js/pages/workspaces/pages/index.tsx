@@ -1,3 +1,4 @@
+import { Can } from '@/components/can';
 import { TargetChecklistDrawer } from '@/components/checklist/target-checklist-drawer';
 import PageHeader from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PERMISSIONS } from '@/constants/permissions';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
