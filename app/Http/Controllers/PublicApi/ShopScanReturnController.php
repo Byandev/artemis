@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Pancake\Models\ReturnedOrder;
 
 class ShopScanReturnController extends Controller
 {
@@ -34,6 +35,15 @@ class ShopScanReturnController extends Controller
         $order->update([
             'parcel_status' => 'returned',
             'returned_at' => now(),
+        ]);
+
+        ReturnedOrder::create([
+            'workspace_id' => $workspace->id,
+            'order_id' => $order->id,
+            'shop_id' => $order->shop_id,
+            'tracking_code' => $order->tracking_code,
+            'order_number' => $order->order_number,
+            'scanned_at' => now(),
         ]);
 
         return response()->json([
