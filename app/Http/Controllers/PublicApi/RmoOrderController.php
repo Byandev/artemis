@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\PublicApi;
 
 use App\Http\Controllers\Controller;
+use App\Models\User as AuthUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Modules\Pancake\Models\OrderForDelivery;
-use Modules\Pancake\Models\User;
+use Modules\Pancake\Models\User as PancakeUser;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -14,15 +16,35 @@ class RmoOrderController extends Controller
 {
     public function login(Request $request): JsonResponse
     {
-        $query = User::whereRaw('LOWER(status) = ?', ['active']);
+        $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string'],
+        ]);
 
-        if ($request->filled('search')) {
-            $query->where('name', 'LIKE', "%{$request->input('search')}%");
+        $workspace = $request->attributes->get('workspace');
+
+        $user = AuthUser::where('email', $request->input('email'))->first();
+
+        if (! $user || ! Hash::check($request->input('password'), $user->password)) {
+            return response()->json(['message' => 'Invalid credentials.'], 401);
         }
 
-        $users = $query->orderBy('name')->get(['id', 'name']);
+        $pancakeUser = PancakeUser::where('user_id', $user->id)
+            ->whereHas('shops', fn ($q) => $q->where('workspace_id', $workspace->id))
+            ->whereRaw('LOWER(status) = ?', ['active'])
+            ->first(['id', 'name', 'user_id']);
 
-        return response()->json(['users' => $users]);
+        if (! $pancakeUser) {
+            return response()->json(['message' => 'No active CSR account found for this workspace.'], 403);
+        }
+
+        return response()->json([
+            'user' => [
+                'id' => $pancakeUser->id,
+                'name' => $pancakeUser->name,
+                'email' => $user->email,
+            ],
+        ]);
     }
 
     public function assignedOrders(Request $request): JsonResponse
