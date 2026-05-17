@@ -25,35 +25,47 @@ class ShopScanReturnController extends Controller
             ->first();
 
         if (! $order) {
-            return response()->json(['error' => 'Order not found.'], 404);
+            return response()->json([
+                'error' => 'Order not found.',
+            ], 404);
         }
 
-        if ($order->parcel_status === 'returned') {
-            return response()->json(['error' => 'Order is already marked as returned.'], 422);
+        if ($order->parcel_status !== 'returned') {
+
+            // Update order status
+            $order->update([
+                'parcel_status' => 'returned',
+                'returned_at' => now(),
+            ]);
+
+            // Store returned order record
+            ReturnedOrder::firstOrCreate(
+                [
+                    'workspace_id' => $workspace->id,
+                    'order_id' => $order->id,
+                ],
+                [
+                    'shop_id' => $order->shop_id,
+                    'tracking_code' => $order->tracking_code,
+                    'order_number' => $order->order_number,
+                    'scanned_at' => now(),
+                ]
+            );
+
+            return response()->json([
+                'message' => 'Order marked as returned.',
+                'order' => [
+                    'id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'tracking_code' => $order->tracking_code,
+                    'parcel_status' => $order->parcel_status,
+                    'returned_at' => $order->returned_at,
+                ],
+            ]);
         }
-
-        $order->update([
-            'parcel_status' => 'returned',
-            'returned_at' => now(),
-        ]);
-
-        ReturnedOrder::create([
-            'workspace_id' => $workspace->id,
-            'order_id' => $order->id,
-            'shop_id' => $order->shop_id,
-            'tracking_code' => $order->tracking_code,
-            'order_number' => $order->order_number,
-            'scanned_at' => now(),
-        ]);
 
         return response()->json([
-            'message' => 'Order marked as returned.',
-            'order' => [
-                'id' => $order->id,
-                'order_number' => $order->order_number,
-                'tracking_code' => $order->tracking_code,
-                'parcel_status' => 'returned',
-            ],
-        ]);
+            'error' => 'Order is already marked as returned.',
+        ], 422);
     }
 }
