@@ -74,11 +74,13 @@ export default function WorkspaceSetup({ userName }: Props) {
                             htmlFor="monthly_order_volume"
                             className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500"
                         >
-                            Monthly order volume
+                            Monthly order volume{' '}
+                            <span className="text-red-400">*</span>
                         </label>
                         <select
                             id="monthly_order_volume"
                             name="monthly_order_volume"
+                            required
                             value={data.monthly_order_volume}
                             onChange={(e) =>
                                 setData('monthly_order_volume', e.target.value)
@@ -86,7 +88,11 @@ export default function WorkspaceSetup({ userName }: Props) {
                             className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:focus:border-emerald-400"
                         >
                             {volumeOptions.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
+                                <option
+                                    key={opt.value}
+                                    value={opt.value}
+                                    disabled={opt.value === ''}
+                                >
                                     {opt.label}
                                 </option>
                             ))}
