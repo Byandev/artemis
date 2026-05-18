@@ -78,16 +78,19 @@ class OnboardingController extends Controller
             'avatar_url' => $resJson['shop']['avatar_url'] ?? null,
         ]);
 
-        // Create Page
-        $page = Page::create([
-            'id' => $validated['page_id'],
-            'workspace_id' => $workspace->id,
-            'owner_id' => $request->user()->id,
-            'shop_id' => $validated['shop_id'],
-            'name' => $validated['page_name'],
-            'pos_token' => $validated['pos_token'],
-            'status' => 'active',
-        ]);
+        // Create or update page (handles reconnecting an existing page)
+        $page = Page::withTrashed()->updateOrCreate(
+            ['id' => $validated['page_id']],
+            [
+                'workspace_id' => $workspace->id,
+                'owner_id' => $request->user()->id,
+                'shop_id' => $validated['shop_id'],
+                'name' => $validated['page_name'],
+                'pos_token' => $validated['pos_token'],
+                'status' => 'active',
+                'deleted_at' => null,
+            ]
+        );
 
         // Create free trial subscription if none exists
         if (! $workspace->subscription) {
