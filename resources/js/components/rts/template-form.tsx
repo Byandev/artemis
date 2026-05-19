@@ -26,6 +26,7 @@ interface Props {
     onOpenChange: (open: boolean) => void;
     workspace: Workspace;
     initialValue?: ParcelJourneyNotificationTemplate;
+    onUpdated?: () => void;
 }
 
 interface FormErrors {
@@ -34,6 +35,7 @@ interface FormErrors {
 
 const TemplateForm = ({
     initialValue,
+    onUpdated,
     open,
     onOpenChange,
     workspace,
@@ -75,20 +77,35 @@ const TemplateForm = ({
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (!initialValue) {
+            toast.error('Select a parcel journey template to edit.');
+            return;
+        }
+
         if (validate()) {
             put(
                 workspaces.rts.parcelJourneyNotificationTemplates.update.url({
                     workspace,
-                    template: initialValue as ParcelJourneyNotificationTemplate,
+                    template: initialValue,
                 }),
                 {
+                    preserveState: true,
+                    preserveScroll: true,
                     onSuccess: () => {
+                        toast.success(
+                            'Parcel journey template updated successfully.',
+                        );
                         setErrors({});
-                        toast.success('Parcel journey template updated successfully.');
-                        onOpenChange(false);
+                        window.setTimeout(() => {
+                            onOpenChange(false);
+                            onUpdated?.();
+                        }, 0);
                     },
-                    onError: () => {
-                        toast.error('Failed to update parcel journey template. Please check the form.');
+                    onError: (serverErrors) => {
+                        setErrors(serverErrors);
+                        toast.error(
+                            'Failed to update parcel journey template. Please check the form.',
+                        );
                     },
                 },
             );
