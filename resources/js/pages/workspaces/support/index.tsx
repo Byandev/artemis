@@ -109,6 +109,7 @@ export default function SupportTicketsIndex({
         null,
     );
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [createProcessing, setCreateProcessing] = useState(false);
     const [selectedPageValue, setSelectedPageValue] = useState('general');
     const createForm = useForm<TicketFormData>({
         category: 'question',
@@ -183,9 +184,13 @@ export default function SupportTicketsIndex({
             return 'In General';
         }
 
+        if (/^https?:\/\//i.test(selectedDestination.value)) {
+            return selectedDestination.value;
+        }
+
         return typeof window === 'undefined'
             ? selectedDestination.value
-            : `${window.location.origin}${selectedDestination.value}`;
+            : new URL(selectedDestination.value, window.location.origin).href;
     }, [selectedDestination]);
 
     const selectedPageLabel = selectedDestination?.label ?? 'In General';
@@ -234,17 +239,31 @@ export default function SupportTicketsIndex({
     const handleCreateSubmit = (event: FormEvent) => {
         event.preventDefault();
 
-        createForm
-            .transform((data) => ({
-                ...data,
+        createForm.setData({
+            ...createForm.data,
+            current_url: selectedPageUrl,
+            user_agent:
+                typeof window === 'undefined'
+                    ? createForm.data.user_agent
+                    : window.navigator.userAgent,
+        });
+
+        router.post(
+            `/workspaces/${workspace.slug}/support`,
+            {
+                ...createForm.data,
                 current_url: selectedPageUrl,
                 user_agent:
                     typeof window === 'undefined'
-                        ? data.user_agent
+                        ? createForm.data.user_agent
                         : window.navigator.userAgent,
-            }))
-            .post(`/workspaces/${workspace.slug}/support`, {
+            },
+            {
                 preserveScroll: true,
+                onStart: () => {
+                    setCreateProcessing(true);
+                    createForm.clearErrors();
+                },
                 onSuccess: () => {
                     toast.success('Support ticket submitted.');
                     createForm.reset(
@@ -257,10 +276,13 @@ export default function SupportTicketsIndex({
                     setSelectedPageValue('general');
                     setCreateDialogOpen(false);
                 },
-                onError: () => {
+                onError: (errors) => {
+                    createForm.setError(errors);
                     toast.error('Unable to submit support ticket.');
                 },
-            });
+                onFinish: () => setCreateProcessing(false),
+            },
+        );
     };
 
     const handleEditSubmit = (event: FormEvent) => {
@@ -537,11 +559,8 @@ export default function SupportTicketsIndex({
                             >
                                 Cancel
                             </Button>
-                            <Button
-                                type="submit"
-                                disabled={createForm.processing}
-                            >
-                                {createForm.processing
+                            <Button type="submit" disabled={createProcessing}>
+                                {createProcessing
                                     ? 'Sending...'
                                     : 'Submit ticket'}
                             </Button>
