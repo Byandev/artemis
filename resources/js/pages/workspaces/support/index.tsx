@@ -33,18 +33,25 @@ import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
+    SelectGroup,
     SelectItem,
+    SelectLabel,
+    SelectSeparator,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useUserPermissions } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { PaginatedData } from '@/types';
-import { Page } from '@/types/models/Page';
+import {
+    getSupportDestinations,
+    type SupportDestination,
+} from '@/lib/workspace-navigation';
+import { PaginatedData, SharedData } from '@/types';
 import { SupportTicket } from '@/types/models/SupportTicket';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import { LifeBuoy, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
@@ -54,7 +61,6 @@ import { toast } from 'sonner';
 interface Props {
     workspace: Workspace;
     tickets: PaginatedData<SupportTicket>;
-    pages: Pick<Page, 'id' | 'name' | 'facebook_url'>[];
     query?: {
         sort?: string | null;
         per_page?: number | string;
@@ -88,9 +94,10 @@ type TicketFormData = {
 export default function SupportTicketsIndex({
     workspace,
     tickets,
-    pages,
     query,
 }: Props) {
+    const { auth } = usePage<SharedData>().props;
+    const permissions = useUserPermissions();
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
         [query?.sort],
@@ -102,7 +109,7 @@ export default function SupportTicketsIndex({
         null,
     );
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
-    const [selectedPageValue, setSelectedPageValue] = useState('current');
+    const [selectedPageValue, setSelectedPageValue] = useState('general');
     const createForm = useForm<TicketFormData>({
         category: 'question',
         subject: '',
@@ -135,22 +142,94 @@ export default function SupportTicketsIndex({
     const supportTicketUrl = (ticket: SupportTicket) =>
         `/workspaces/${workspace.slug}/support/${ticket.id}`;
 
+    const supportDestinations = useMemo(
+        () =>
+            getSupportDestinations(
+                workspace,
+                permissions,
+                auth.user.can?.viewAnySupportTickets,
+            ),
+        [auth.user.can?.viewAnySupportTickets, permissions, workspace],
+    );
+
+    const groupedDestinations = useMemo(
+        () =>
+            supportDestinations.reduce<Record<string, SupportDestination[]>>(
+                (groups, destination) => {
+                    groups[destination.group] = [
+                        ...(groups[destination.group] ?? []),
+                        destination,
+                    ];
+
+                    return groups;
+                },
+                {},
+            ),
+        [supportDestinations],
+    );
+
+    const selectedDestination = useMemo(
+        () =>
+            supportDestinations.find(
+                (destination) => destination.value === selectedPageValue,
+            ),
+        [selectedPageValue, supportDestinations],
+    );
+
     const selectedPageUrl = useMemo(() => {
-        if (selectedPageValue === 'current') {
-            return typeof window === 'undefined' ? '' : window.location.href;
+        if (!selectedDestination) return 'In General';
+
+        if (selectedDestination.value === 'general') {
+            return 'In General';
         }
 
-        const selectedPage = pages.find(
-            (page) => String(page.id) === selectedPageValue,
-        );
+        return typeof window === 'undefined'
+            ? selectedDestination.value
+            : `${window.location.origin}${selectedDestination.value}`;
+    }, [selectedDestination]);
 
-        if (!selectedPage) return '';
+    const selectedPageLabel = selectedDestination?.label ?? 'In General';
 
-        return (
-            selectedPage.facebook_url ||
-            `Page: ${selectedPage.name} (#${selectedPage.id})`
-        );
-    }, [pages, selectedPageValue]);
+    useEffect(() => {
+        if (
+            !supportDestinations.some(
+                (destination) => destination.value === selectedPageValue,
+            )
+        ) {
+            setSelectedPageValue('general');
+        }
+    }, [selectedPageValue, supportDestinations]);
+
+    const formatDestinationLabel = (destination: SupportDestination) => {
+        if (destination.group === 'General') {
+            return destination.label;
+        }
+
+        return `${destination.group} - ${destination.label}`;
+    };
+
+    const pageDescription =
+        selectedPageValue === 'general'
+            ? 'Use this for general feedback, suggestions, or system-wide concerns.'
+            : `This ticket will reference ${selectedPageLabel}.`;
+
+    const renderDestinationGroup = (
+        group: string,
+        destinations: SupportDestination[],
+        index: number,
+    ) => (
+        <SelectGroup key={group}>
+            {index > 0 && <SelectSeparator />}
+            <SelectLabel className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                {group}
+            </SelectLabel>
+            {destinations.map((destination) => (
+                <SelectItem key={destination.value} value={destination.value}>
+                    {formatDestinationLabel(destination)}
+                </SelectItem>
+            ))}
+        </SelectGroup>
+    );
 
     const handleCreateSubmit = (event: FormEvent) => {
         event.preventDefault();
@@ -175,7 +254,7 @@ export default function SupportTicketsIndex({
                         'current_url',
                         'user_agent',
                     );
-                    setSelectedPageValue('current');
+                    setSelectedPageValue('general');
                     setCreateDialogOpen(false);
                 },
                 onError: () => {
@@ -352,38 +431,34 @@ export default function SupportTicketsIndex({
                     <DialogHeader>
                         <DialogTitle>Submit Support Ticket</DialogTitle>
                         <DialogDescription>
-                            Send a ticket to support and include the page you
+                            Send a ticket to support and include the area you
                             need help with.
                         </DialogDescription>
                     </DialogHeader>
 
                     <form onSubmit={handleCreateSubmit} className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="support-page">Page</Label>
+                            <Label htmlFor="support-page">Area</Label>
                             <Select
                                 value={selectedPageValue}
                                 onValueChange={setSelectedPageValue}
                             >
                                 <SelectTrigger id="support-page">
-                                    <SelectValue placeholder="Select a page" />
+                                    <SelectValue placeholder="Select an area" />
                                 </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="current">
-                                        Current support page
-                                    </SelectItem>
-                                    {pages.map((page) => (
-                                        <SelectItem
-                                            key={page.id}
-                                            value={String(page.id)}
-                                        >
-                                            {page.name}
-                                        </SelectItem>
-                                    ))}
+                                <SelectContent className="max-h-80">
+                                    {Object.entries(groupedDestinations).map(
+                                        ([group, destinations], index) =>
+                                            renderDestinationGroup(
+                                                group,
+                                                destinations,
+                                                index,
+                                            ),
+                                    )}
                                 </SelectContent>
                             </Select>
                             <p className="text-[11px] text-gray-400 dark:text-gray-500">
-                                This will be shown to support as the ticket page
-                                URL.
+                                {pageDescription}
                             </p>
                         </div>
 
