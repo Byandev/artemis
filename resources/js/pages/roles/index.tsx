@@ -32,8 +32,8 @@ import { omit } from 'lodash';
 import * as rolesRoute from '@/routes/roles';
 import clsx from 'clsx';
 import { Can } from '@/components/can';
-import { usePermission } from '@/hooks/use-permission';
-import { PERMISSIONS } from '@/constants/permissions';
+import { useAnyPermission, usePermission } from '@/hooks/use-permission';
+import { PERMISSIONS, type PermissionName } from '@/constants/permissions';
 
 interface Props {
     roles: PaginatedData<Role>;
@@ -73,9 +73,9 @@ export default function Index({ roles, workspace, query }: Props) {
     const [openFormModal, setOpenFormModal] = useState(false);
 
     const canEdit = usePermission(PERMISSIONS.EditRoles);
-    const canDelete = usePermission(PERMISSIONS.DeleteRoles);
+    const canArchive = useAnyPermission([PERMISSIONS.DeleteRoles, 'Delete Roles' as PermissionName]);
     const canManagePerms = usePermission(PERMISSIONS.ManageRolePermissions);
-    const showActions = canEdit || canDelete || canManagePerms;
+    const showActions = canEdit || canArchive || canManagePerms;
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -170,7 +170,7 @@ export default function Index({ roles, workspace, query }: Props) {
                                                 Manage Permissions
                                             </DropdownMenuItem>
                                         )}
-                                        {canDelete && (
+                                        {canArchive && (
                                             <>
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem variant="destructive" onClick={() => { setSelectedRole(row.original); setIsArchiveModalOpen(true); }}>
@@ -181,7 +181,7 @@ export default function Index({ roles, workspace, query }: Props) {
                                         )}
                                     </>
                                 ) : (
-                                    canDelete && (
+                                    canArchive && (
                                         <DropdownMenuItem onClick={() => { setSelectedRole(row.original); setIsRestoreModalOpen(true); }}>
                                             <RefreshCcw />
                                             Restore

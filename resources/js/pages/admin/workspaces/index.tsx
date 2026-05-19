@@ -42,6 +42,7 @@ interface Workspace {
     csr_module_enabled: boolean;
     rmo_module_enabled: boolean;
     leaderboard_module_enabled: boolean;
+    botcake_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
 
@@ -49,7 +50,7 @@ const MODULE_FIELDS: Array<{
     key: keyof Pick<Workspace,
         'inventory_module_enabled' | 'finance_module_enabled' | 'products_module_enabled'
         | 'teams_module_enabled' | 'checklist_module_enabled' | 'csr_module_enabled'
-        | 'rmo_module_enabled' | 'leaderboard_module_enabled'>; label: string; description: string
+        | 'rmo_module_enabled' | 'leaderboard_module_enabled' | 'botcake_module_enabled'>; label: string; description: string
 }> = [
         { key: 'products_module_enabled', label: 'Products', description: 'Product catalog and management' },
         { key: 'teams_module_enabled', label: 'Teams', description: 'Team grouping and assignments' },
@@ -59,6 +60,7 @@ const MODULE_FIELDS: Array<{
         { key: 'finance_module_enabled', label: 'Finance', description: 'Accounts, transactions, remittances' },
         { key: 'rmo_module_enabled', label: 'RMO Management', description: 'Public RMO management link' },
         { key: 'leaderboard_module_enabled', label: 'Leaderboards', description: 'Public leaderboards link' },
+        { key: 'botcake_module_enabled', label: 'Botcake', description: 'Botcake flows, sequences, and messaging analytics' },
     ];
 
 interface Props {
@@ -427,6 +429,7 @@ function ModulesModal({
         csr_module_enabled: workspace.csr_module_enabled,
         rmo_module_enabled: workspace.rmo_module_enabled,
         leaderboard_module_enabled: workspace.leaderboard_module_enabled,
+        botcake_module_enabled: workspace.botcake_module_enabled,
     });
 
     function handleSubmit(e: React.FormEvent) {

@@ -40,6 +40,7 @@ import {
     PieChart,
     Shield,
     MessageSquare,
+    LifeBuoy,
 } from 'lucide-react';
 import { useState } from 'react';
 import AppLogo from './app-logo';
@@ -48,7 +49,14 @@ import { PERMISSIONS } from '@/constants/permissions';
 
 
 export function AppSidebar() {
-    const { currentWorkspace } = usePage().props as unknown as {
+    const { auth, currentWorkspace } = usePage().props as unknown as {
+        auth: {
+            user: {
+                can: {
+                    viewAnySupportTickets: boolean;
+                };
+            };
+        };
         currentWorkspace: {
             slug: string;
             inventory_module_enabled: boolean;
