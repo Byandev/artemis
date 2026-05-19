@@ -33,10 +33,6 @@ class SupportTicketController extends Controller
         return Inertia::render('workspaces/support/index', [
             'workspace' => $workspace,
             'tickets' => $tickets,
-            'pages' => $workspace->pages()
-                ->select(['id', 'name', 'facebook_url'])
-                ->orderBy('name')
-                ->get(),
             'query' => [
                 ...$request->only(['sort', 'per_page', 'page']),
             ],
