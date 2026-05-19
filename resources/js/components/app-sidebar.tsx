@@ -43,15 +43,15 @@ export function AppSidebar() {
           ]
         : [];
 
-    const supportNavItems: NavItem[] = auth?.user?.can?.viewAnySupportTickets
-        ? adminNavItems
-        : [
-              {
-                  title: 'Customer Support',
-                  href: `/workspaces/${slug}/support`,
-                  icon: LifeBuoy,
-              },
-          ];
+    const supportNavItems: NavItem[] = [
+        {
+            title: auth?.user?.can?.viewAnySupportTickets
+                ? 'My Tickets'
+                : 'Customer Support',
+            href: `/workspaces/${slug}/support`,
+            icon: LifeBuoy,
+        },
+    ];
 
     return (
         <Sidebar
