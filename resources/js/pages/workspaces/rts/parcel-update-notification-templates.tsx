@@ -376,6 +376,7 @@ const ParcelUpdateNotificationTemplates = ({
                     }}
                     workspace={workspace}
                     initialValue={selected}
+                    onUpdated={() => setSelected(undefined)}
                 />
             </div>
         </AppLayout>
