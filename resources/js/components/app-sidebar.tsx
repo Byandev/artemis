@@ -15,6 +15,7 @@ import { type NavItem, User as UserType } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Link, usePage } from '@inertiajs/react';
 import {
+    Activity,
     ArrowLeftRight,
     BarChart2,
     BookOpenIcon,
@@ -267,8 +268,19 @@ export function AppSidebar() {
           ]
         : [];
 
+    const workspaceAdminNavItems: NavItem[] = auth?.user?.can
+        ?.viewWorkspaceActivityLog
+        ? [
+              {
+                  title: 'Activity Log',
+                  href: `/workspaces/${slug}/admin/activity-log`,
+                  icon: Activity,
+              },
+          ]
+        : [];
+
     const supportNavItems: NavItem[] = auth?.user?.can?.viewAnySupportTickets
-        ? adminNavItems
+        ? []
         : [
               {
                   title: 'Customer Support',
@@ -297,7 +309,10 @@ export function AppSidebar() {
 
             <SidebarContent className="p-3">
                 <NavMain items={mainNavItems} group_label="Main" />
-                <NavMain items={adminNavItems} group_label="Admin" />
+                <NavMain
+                    items={[...adminNavItems, ...workspaceAdminNavItems]}
+                    group_label="Admin"
+                />
                 {/*<NavMain items={accountNavItems} group_label="Account" />*/}
                 <PublicLinks
                     workspaceSlug={currentWorkspace.slug}
