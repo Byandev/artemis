@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
+use App\Http\Controllers\Admin\AdminSupportTicketController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
 use App\Http\Controllers\Workspaces\AdAccountController;
 use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
@@ -336,6 +337,11 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('workspaces.update-modules');
         Route::put('/workspaces/{workspace}/max-pages', [AdminWorkspaceController::class, 'updateMaxPages'])
             ->name('workspaces.update-max-pages');
+
+        Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])
+            ->name('support-tickets.index');
+        Route::patch('/support-tickets/{ticket}', [AdminSupportTicketController::class, 'update'])
+            ->name('support-tickets.update');
 
         // Metric Setting Controller
         Route::get('workspaces/{workspace}/metrics/edit', [MetricSettingController::class, 'edit'])
