@@ -47,9 +47,15 @@ class MetricSettingController extends Controller
             )
         );
 
+        if ($defaultMetrics === []) {
+            $defaultMetrics = array_values(
+                array_intersect(MetricRegistry::defaults(), $allowedMetrics)
+            );
+        }
+
         $dataToUpdate = [
             'allowed_metrics' => $allowedMetrics,
-            'default_metrics' => $defaultMetrics ?: $allowedMetrics,
+            'default_metrics' => $defaultMetrics,
         ];
 
         $workspace->metricSetting()->updateOrCreate(
