@@ -55,14 +55,24 @@ class HandleInertiaRequests extends Middleware
 
         $user = $request->user();
         $permissions = $this->resolvePermissions($user, $workspaceModel);
+        $currentWorkspaceProps = $workspaceModel ? array_merge($workspaceModel->toArray(), [
+            'metric_setting' => $workspaceModel->loadMissing('metricSetting')->metricSetting,
+            'metricSettings' => $workspaceModel->getMetricSettings(),
+        ]) : $currentWorkspace;
+
         $isOwner = $user && $workspaceModel
             ? $user->ownsWorkspace($workspaceModel)
             : false;
         $can = [
-            'viewAnySupportTickets' => $user && $currentWorkspace instanceof Workspace
-                ? $user->ownsWorkspace($currentWorkspace)
-                    || $user->isAdminOf($currentWorkspace)
-                    || $user->hasWorkspaceRole($currentWorkspace, 'admin')
+            'viewAnySupportTickets' => $user && $workspaceModel instanceof Workspace
+                ? $user->ownsWorkspace($workspaceModel)
+                    || $user->isAdminOf($workspaceModel)
+                    || $user->hasWorkspaceRole($workspaceModel, 'admin')
+                : false,
+            'viewWorkspaceActivityLog' => $user && $workspaceModel instanceof Workspace
+                ? $user->ownsWorkspace($workspaceModel)
+                    || $user->isAdminOf($workspaceModel)
+                    || $user->hasWorkspaceRole($workspaceModel, 'admin')
                 : false,
         ];
 
@@ -118,12 +128,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'workspaces' => $workspaces,
 
-            'currentWorkspace' => $workspaceModel ? array_merge($workspaceModel->toArray(), [
-
-                'metric_setting' => $workspaceModel->loadMissing('metricSetting')->metricSetting,
-                'metricSettings' => $workspaceModel->getMetricSettings(),
-
-            ]) : $currentWorkspace,
+            'currentWorkspace' => $currentWorkspaceProps,
 
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'ziggy' => [
