@@ -14,32 +14,11 @@ import {
     SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/hooks/use-current-url';
-import {
-    hasAnyPermission,
-    hasPermission,
-    useUserPermissions,
-} from '@/hooks/use-permission';
+import { useUserPermissions } from '@/hooks/use-permission';
+import { filterNavItems } from '@/lib/workspace-navigation';
 import type { NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
 import { ChevronDown } from 'lucide-react';
-
-function isAllowed(item: NavItem, perms: string[]): boolean {
-    if (item.permission && !hasPermission(perms, item.permission)) return false;
-    if (item.anyOf && !hasAnyPermission(perms, item.anyOf)) return false;
-    return true;
-}
-
-function filterNav(items: NavItem[], perms: string[]): NavItem[] {
-    return items
-        .filter((item) => isAllowed(item, perms))
-        .map((item) => {
-            if (!item.items?.length) return item;
-            const visibleChildren = filterNav(item.items, perms);
-            if (visibleChildren.length === 0 && !item.href) return null;
-            return { ...item, items: visibleChildren };
-        })
-        .filter((item): item is NavItem => item !== null);
-}
 
 type NavMainProps = {
     items?: NavItem[];
@@ -49,7 +28,7 @@ type NavMainProps = {
 export function NavMain({ items = [], group_label = '' }: NavMainProps) {
     const { isCurrentUrl } = useCurrentUrl();
     const perms = useUserPermissions();
-    const visibleItems = filterNav(items, perms);
+    const visibleItems = filterNavItems(items, perms);
 
     if (visibleItems.length === 0) return null;
 
