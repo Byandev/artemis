@@ -1,5 +1,31 @@
-import { router, usePage } from '@inertiajs/react';
-import React, { useState } from 'react';
+import PageHeader from '@/components/common/PageHeader';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import DatePicker from '@/components/ui/date-picker';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import AppLayout from '@/layouts/app-layout';
+import { PaginatedData } from '@/types';
+import { Workspace } from '@/types/models/Workspace';
+import { Head, router } from '@inertiajs/react';
+import { ColumnDef, SortingState } from '@tanstack/react-table';
+import flatpickr from 'flatpickr';
+import { omit } from 'lodash';
+import {
+    Activity,
+    Calendar,
+    Check,
+    RotateCcw,
+    Search,
+    SlidersHorizontal,
+    User,
+    X,
+} from 'lucide-react';
+import moment from 'moment';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import DateOption = flatpickr.Options.DateOption;
 
 const EVENT_TYPES = [
     { value: 'created', label: 'Created' },
@@ -10,182 +36,434 @@ const EVENT_TYPES = [
     { value: 'logged out', label: 'Logged Out' },
 ];
 
-export default function ActivityLogPage() {
-    const { props, url } = usePage();
-    const { activities, filters = {} } = props as any;
+interface ActivityRow {
+    id: number;
+    event: string | null;
+    description: string;
+    causer?: { id: number; name: string } | null;
+    subject?: { id: number | null; type: string } | null;
+    created_at: string;
+}
+
+interface Props {
+    workspace: Workspace;
+    activities: PaginatedData<ActivityRow>;
+    filters?: {
+        event?: string;
+        causer?: string;
+        from?: string;
+        to?: string;
+        sort?: string;
+        direction?: string;
+    };
+}
+
+export default function WorkspaceActivityLogPage({
+    workspace,
+    activities,
+    filters = {},
+}: Props) {
     const [eventType, setEventType] = useState(filters.event || '');
     const [causer, setCauser] = useState(filters.causer || '');
     const [fromDate, setFromDate] = useState(filters.from || '');
     const [toDate, setToDate] = useState(filters.to || '');
 
-    const handleFilter = (e: React.FormEvent) => {
-        e.preventDefault();
-        const params = new URLSearchParams();
-        if (eventType) params.append('event', eventType);
-        if (causer) params.append('causer', causer);
-        if (fromDate) params.append('from', fromDate);
-        if (toDate) params.append('to', toDate);
-        router.get(`${url}?${params.toString()}`);
+    const activeFilterCount = eventType ? 1 : 0;
+    const hasDateFilter = Boolean(fromDate && toDate);
+    const url = `/workspaces/${workspace.slug}/admin/activity-log`;
+
+    const datePickerDefault = useMemo(
+        () =>
+            fromDate && toDate
+                ? ([fromDate, toDate] as never as DateOption)
+                : undefined,
+        [fromDate, toDate],
+    );
+
+    const initialSorting = useMemo<SortingState>(() => {
+        if (filters.sort) {
+            return [{ id: filters.sort, desc: filters.direction === 'desc' }];
+        }
+
+        return [{ id: 'created_at', desc: true }];
+    }, [filters.sort, filters.direction]);
+
+    const columns: ColumnDef<ActivityRow>[] = [
+        {
+            accessorKey: 'created_at',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Timestamp" />
+            ),
+            cell: ({ row }) => (
+                <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
+                    <Calendar className="h-4 w-4 text-zinc-400" />
+                    {new Date(row.original.created_at).toLocaleString()}
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'event',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Event" />
+            ),
+            cell: ({ row }) => (
+                <span className="inline-flex rounded-full border border-brand-100 bg-brand-50/50 px-2.5 py-1 text-[11px] font-bold text-brand-600 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-400">
+                    {row.original.event ?? 'event'}
+                </span>
+            ),
+        },
+        {
+            id: 'causer',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="User" />
+            ),
+            cell: ({ row }) => (
+                <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-md bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                        <User className="h-3.5 w-3.5" />
+                    </div>
+                    {row.original.causer?.name ?? 'System'}
+                </div>
+            ),
+        },
+        {
+            id: 'subject',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Subject" />
+            ),
+            cell: ({ row }) =>
+                row.original.subject ? (
+                    <span className="font-mono text-xs text-zinc-500">
+                        {row.original.subject.type} #
+                        {row.original.subject.id ?? '-'}
+                    </span>
+                ) : (
+                    <span className="text-zinc-400">-</span>
+                ),
+        },
+        {
+            accessorKey: 'description',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Description" />
+            ),
+            cell: ({ row }) => (
+                <span className="text-zinc-700 dark:text-zinc-300">
+                    {row.original.description}
+                </span>
+            ),
+        },
+    ];
+
+    const applyFilters = (next: {
+        event?: string;
+        causer?: string;
+        from?: string;
+        to?: string;
+        page?: number;
+        per_page?: number;
+        sort?: string;
+    }) => {
+        const params = {
+            event: eventType || undefined,
+            causer: causer || undefined,
+            from: fromDate || undefined,
+            to: toDate || undefined,
+            per_page: activities.per_page,
+            page: undefined,
+            ...next,
+        };
+
+        router.get(
+            url,
+            Object.fromEntries(
+                Object.entries(params).filter(
+                    ([, value]) => value !== undefined && value !== '',
+                ),
+            ),
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+            },
+        );
+    };
+
+    useEffect(() => {
+        const timeout = window.setTimeout(() => {
+            if (causer !== (filters.causer || '')) {
+                applyFilters({ causer: causer || undefined, page: 1 });
+            }
+        }, 350);
+
+        return () => window.clearTimeout(timeout);
+    }, [causer]);
+
+    const handleEventChange = (value: string) => {
+        const next = value === eventType ? '' : value;
+        setEventType(next);
+        applyFilters({ event: next || undefined, page: 1 });
     };
 
     const handleClear = () => {
+        setEventType('');
+        setCauser('');
+        setFromDate('');
+        setToDate('');
         router.get(url);
     };
 
     return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold">Activity Log</h1>
-                <p className="mt-1 text-gray-600">
-                    View all activities in this workspace
-                </p>
-            </div>
+        <AppLayout>
+            <Head title={`${workspace.name} - Activity Log`} />
 
-            <div className="rounded-lg border border-gray-200 bg-white p-6">
-                <h2 className="mb-4 text-lg font-semibold">Filters</h2>
-                <form onSubmit={handleFilter} className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <div>
-                            <label className="mb-1 block text-sm font-medium text-gray-700">
-                                Event Type
-                            </label>
-                            <select
-                                value={eventType}
-                                onChange={(e) => setEventType(e.target.value)}
-                                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            >
-                                <option value="">All Events</option>
-                                {EVENT_TYPES.map((t) => (
-                                    <option key={t.value} value={t.value}>
-                                        {t.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+                <PageHeader
+                    title="Activity Log"
+                    description="Review activity recorded inside this workspace."
+                    stackActionsOnMobile
+                >
+                    <div className="inline-flex h-9 items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+                        <Activity className="h-4 w-4" />
+                        {activities.total ?? activities.data.length} records
+                    </div>
+                </PageHeader>
 
-                        <div>
-                            <label className="mb-1 block text-sm font-medium text-gray-700">
-                                Causer (User)
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="Search by name or email..."
-                                value={causer}
-                                onChange={(e) => setCauser(e.target.value)}
-                                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="mb-1 block text-sm font-medium text-gray-700">
-                                From Date
-                            </label>
-                            <input
-                                type="date"
-                                value={fromDate}
-                                onChange={(e) => setFromDate(e.target.value)}
-                                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="mb-1 block text-sm font-medium text-gray-700">
-                                To Date
-                            </label>
-                            <input
-                                type="date"
-                                value={toDate}
-                                onChange={(e) => setToDate(e.target.value)}
-                                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            />
-                        </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="relative w-full max-w-xs">
+                        <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <input
+                            type="text"
+                            placeholder="Search users..."
+                            value={causer}
+                            onChange={(event) => setCauser(event.target.value)}
+                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                        />
                     </div>
 
-                    <div className="flex gap-2">
-                        <button
-                            type="submit"
-                            className="rounded-md bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700"
+                    <div className="flex flex-wrap items-center gap-2">
+                        <ActivityFilterPopover
+                            activeFilterCount={activeFilterCount}
+                            eventType={eventType}
+                            onEventChange={handleEventChange}
+                            onClear={() => {
+                                setEventType('');
+                                applyFilters({
+                                    event: undefined,
+                                    page: 1,
+                                });
+                            }}
+                        />
+
+                        <DatePicker
+                            key={`${fromDate || 'start'}-${toDate || 'end'}`}
+                            id="workspace-activity-log-date-range"
+                            mode="range"
+                            placeholder="Date range"
+                            defaultDate={datePickerDefault}
+                            onChange={(dates) => {
+                                if (dates.length === 2) {
+                                    const from = moment(dates[0]).format(
+                                        'YYYY-MM-DD',
+                                    );
+                                    const to = moment(dates[1]).format(
+                                        'YYYY-MM-DD',
+                                    );
+                                    setFromDate(from);
+                                    setToDate(to);
+                                    applyFilters({ from, to, page: 1 });
+                                }
+                            }}
+                        />
+
+                        {(activeFilterCount > 0 || hasDateFilter || causer) && (
+                            <button
+                                type="button"
+                                onClick={handleClear}
+                                className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                            >
+                                <RotateCcw className="h-4 w-4" />
+                                Reset
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                <div className="mt-6 rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                    <DataTable
+                        columns={columns}
+                        data={activities.data || []}
+                        enableInternalPagination={false}
+                        initialSorting={initialSorting}
+                        meta={{ ...omit(activities, ['data']) }}
+                        onFetch={(params) => {
+                            applyFilters({
+                                page:
+                                    typeof params?.page === 'number'
+                                        ? params.page
+                                        : undefined,
+                                sort:
+                                    typeof params?.sort === 'string'
+                                        ? params.sort
+                                        : undefined,
+                                per_page:
+                                    typeof params?.per_page === 'number'
+                                        ? params.per_page
+                                        : undefined,
+                            });
+                        }}
+                    />
+                </div>
+            </div>
+        </AppLayout>
+    );
+}
+
+function ActivityFilterPopover({
+    activeFilterCount,
+    eventType,
+    onEventChange,
+    onClear,
+}: {
+    activeFilterCount: number;
+    eventType: string;
+    onEventChange: (value: string) => void;
+    onClear: () => void;
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+
+    return (
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
+            <PopoverTrigger asChild>
+                <button
+                    className={[
+                        'inline-flex h-9 min-w-max shrink-0 items-center overflow-hidden rounded-[10px] border transition-all duration-150',
+                        'bg-white dark:bg-zinc-900',
+                        'shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none',
+                        isOpen
+                            ? 'border-emerald-500/40 ring-2 ring-emerald-500/10 dark:border-emerald-500/30'
+                            : activeFilterCount > 0
+                              ? 'border-emerald-500/30 hover:border-emerald-500/50 dark:border-emerald-500/20 dark:hover:border-emerald-500/30'
+                              : 'border-black/8 hover:border-black/14 dark:border-white/8 dark:hover:border-white/14',
+                    ].join(' ')}
+                >
+                    <span
+                        className={[
+                            'flex h-full w-9 shrink-0 items-center justify-center rounded-l-[10px] border-r transition-colors duration-150',
+                            activeFilterCount > 0
+                                ? 'border-emerald-500/20 bg-emerald-500/[0.07] dark:border-emerald-500/15 dark:bg-emerald-500/10'
+                                : 'border-black/6 bg-stone-50 dark:border-white/6 dark:bg-white/3',
+                        ].join(' ')}
+                    >
+                        <SlidersHorizontal
+                            className={[
+                                'h-3.5 w-3.5 transition-colors duration-150',
+                                activeFilterCount > 0
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-gray-400 dark:text-gray-500',
+                            ].join(' ')}
+                        />
+                    </span>
+                    <span className="flex items-center gap-2 px-3">
+                        <span
+                            className={[
+                                'text-xs font-medium transition-colors duration-150',
+                                activeFilterCount > 0
+                                    ? 'text-gray-700 dark:text-gray-200'
+                                    : 'text-gray-500 dark:text-gray-400',
+                            ].join(' ')}
                         >
-                            Apply Filters
-                        </button>
+                            Filters
+                        </span>
+                        {activeFilterCount > 0 && (
+                            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500/[0.10] px-1 text-[10px] font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">
+                                {activeFilterCount}
+                            </span>
+                        )}
+                    </span>
+                </button>
+            </PopoverTrigger>
+
+            <PopoverContent
+                className="w-[calc(100vw-2rem)] overflow-hidden rounded-[14px] border border-black/6 bg-white p-0 shadow-[0_8px_30px_rgba(0,0,0,0.08)] sm:w-72 dark:border-white/6 dark:bg-zinc-900 dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)]"
+                align="start"
+            >
+                <div className="flex items-center justify-between border-b border-black/6 px-4 py-3 dark:border-white/6">
+                    <span className="text-[13px] font-medium text-gray-900 dark:text-gray-100">
+                        Filters
+                    </span>
+                    {activeFilterCount > 0 && (
                         <button
                             type="button"
-                            onClick={handleClear}
-                            className="rounded-md bg-gray-200 px-4 py-2 text-gray-700 transition hover:bg-gray-300"
+                            onClick={onClear}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
                         >
+                            <X className="h-3 w-3" />
                             Clear
                         </button>
-                    </div>
-                </form>
-            </div>
-
-            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead className="border-b bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                                    Timestamp
-                                </th>
-                                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                                    Event
-                                </th>
-                                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                                    User
-                                </th>
-                                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                                    Description
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                            {activities.data.map((a: any) => (
-                                <tr key={a.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 text-sm text-gray-600">
-                                        {new Date(
-                                            a.created_at,
-                                        ).toLocaleString()}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm">
-                                        <span className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800">
-                                            {a.event}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-600">
-                                        {a.causer?.name ?? 'System'}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-600">
-                                        {a.description}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    )}
                 </div>
-                {activities.data.length === 0 && (
-                    <div className="px-6 py-12 text-center text-gray-500">
-                        No activities found. Try adjusting your filters.
-                    </div>
-                )}
-            </div>
 
-            {activities.links && activities.links.length > 1 && (
-                <div className="flex justify-center gap-2">
-                    {activities.links.map((link: any, i: number) => (
-                        <button
-                            key={i}
-                            onClick={() => link.url && router.get(link.url)}
-                            disabled={!link.url}
-                            className={`rounded-md px-3 py-2 text-sm ${
-                                link.active
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                            } ${!link.url ? 'cursor-not-allowed opacity-50' : ''}`}
-                            dangerouslySetInnerHTML={{ __html: link.label }}
-                        />
-                    ))}
+                <div className="max-h-72 space-y-1 overflow-y-auto p-2">
+                    <FilterSection title="Event">
+                        {EVENT_TYPES.map((event) => (
+                            <FilterOption
+                                key={event.value}
+                                label={event.label}
+                                selected={eventType === event.value}
+                                onClick={() => onEventChange(event.value)}
+                            />
+                        ))}
+                    </FilterSection>
                 </div>
-            )}
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+function FilterSection({
+    title,
+    children,
+}: {
+    title: string;
+    children: ReactNode;
+}) {
+    return (
+        <div>
+            <div className="mb-1.5 px-2 text-[10px] font-bold tracking-[0.08em] text-zinc-400 uppercase">
+                {title}
+            </div>
+            <div className="space-y-1">{children}</div>
         </div>
+    );
+}
+
+function FilterOption({
+    label,
+    selected,
+    onClick,
+}: {
+    label: string;
+    selected: boolean;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={[
+                'flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors',
+                selected
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                    : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/70',
+            ].join(' ')}
+        >
+            <span className="truncate">{label}</span>
+            {selected && <Check className="h-3.5 w-3.5 shrink-0" />}
+        </button>
     );
 }
