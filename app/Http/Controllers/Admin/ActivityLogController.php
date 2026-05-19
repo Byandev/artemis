@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Activity;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -14,7 +15,7 @@ class ActivityLogController extends Controller
     {
         $this->authorize('viewAny', Activity::class);
 
-        $query = Activity::with(['causer', 'subject', 'workspace'])->orderByDesc('created_at');
+        $query = Activity::with(['causer', 'subject', 'workspace']);
 
         // Workspace filter
         if ($request->filled('workspace')) {
@@ -23,7 +24,7 @@ class ActivityLogController extends Controller
 
         // Event filter
         if ($request->filled('event')) {
-            $query->where('description', 'like', '%'.$request->input('event').'%');
+            $query->where('event', $request->input('event'));
         }
 
         // Causer filter - search by user name or email
@@ -44,7 +45,34 @@ class ActivityLogController extends Controller
             $query->whereDate('created_at', '<=', $request->input('to'));
         }
 
-        $activities = $query->paginate(20)->through(function ($act) {
+        $sortInput = (string) $request->input('sort', '-created_at');
+        $sortDirection = str_starts_with($sortInput, '-') ? 'desc' : 'asc';
+        $sortColumn = ltrim($sortInput, '-');
+
+        match ($sortColumn) {
+            'workspace' => $query->orderBy(
+                Workspace::select('name')
+                    ->whereColumn('workspaces.id', 'activity_log.workspace_id')
+                    ->limit(1),
+                $sortDirection
+            ),
+            'causer' => $query->orderBy(
+                User::select('name')
+                    ->whereColumn('users.id', 'activity_log.causer_id')
+                    ->where('activity_log.causer_type', User::class)
+                    ->limit(1),
+                $sortDirection
+            ),
+            'event' => $query->orderBy('event', $sortDirection),
+            'subject' => $query->orderBy('subject_type', $sortDirection),
+            'description' => $query->orderBy('description', $sortDirection),
+            default => $query->orderBy('created_at', $sortDirection),
+        };
+
+        $perPage = (int) $request->input('per_page', 20);
+        $perPage = in_array($perPage, [10, 25, 50, 100, 500], true) ? $perPage : 20;
+
+        $activities = $query->paginate($perPage)->withQueryString()->through(function ($act) {
             return [
                 'id' => $act->id,
                 'event' => $act->event,
@@ -69,6 +97,9 @@ class ActivityLogController extends Controller
                 'causer' => $request->input('causer', ''),
                 'from' => $request->input('from', ''),
                 'to' => $request->input('to', ''),
+                'per_page' => $perPage,
+                'sort' => $sortColumn,
+                'direction' => $sortDirection,
             ],
         ]);
     }
