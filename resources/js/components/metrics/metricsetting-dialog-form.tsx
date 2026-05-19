@@ -56,10 +56,17 @@ export function MetricSettingDialog({
             // Check both snake_case and camelCase to match your Middleware/Model naming
             const setting = workspace.metric_setting || workspace.metricSetting;
 
-            if (setting?.allowed_metrics) {
+            if (setting?.allowed_metrics?.length) {
+                const allowedMetrics = setting.allowed_metrics;
+                const defaultMetrics = (
+                    setting.default_metrics?.length
+                        ? setting.default_metrics
+                        : DEFAULT_METRIC_KEYS
+                ).filter((key) => allowedMetrics.includes(key));
+
                 setData({
-                    allowed_metrics: setting.allowed_metrics,
-                    default_metrics: setting.allowed_metrics,
+                    allowed_metrics: allowedMetrics,
+                    default_metrics: defaultMetrics,
                 });
             } else {
                 setData({
@@ -95,7 +102,9 @@ export function MetricSettingDialog({
         setData({
             ...data,
             allowed_metrics: current,
-            default_metrics: current,
+            default_metrics: data.default_metrics.filter((key) =>
+                current.includes(key),
+            ),
         });
     };
 
