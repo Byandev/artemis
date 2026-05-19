@@ -1,9 +1,12 @@
 import AppearanceToggleDropdown from '@/components/appearance-dropdown';
-import { register } from '@/routes';
-import { type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
+import { type SharedData } from '@/types';
 
+/**
+ * BlogLayout: The wrapper for the entire blog section.
+ * Handles Navigation, Footer, and Ambient Backgrounds.
+ */
 export default function BlogLayout({
     children,
     title,
@@ -19,12 +22,12 @@ export default function BlogLayout({
                 )}
             </Head>
 
-            <div className="relative min-h-screen overflow-hidden bg-white text-gray-900 dark:bg-zinc-950 dark:text-gray-100">
-                {/* Ambient background */}
+            <div className="relative min-h-screen overflow-x-hidden bg-white text-gray-900 dark:bg-zinc-950 dark:text-gray-100">
+                {/* Ambient background effects */}
                 <div className="pointer-events-none absolute -top-60 left-1/2 h-[700px] w-[1100px] -translate-x-1/2 bg-[radial-gradient(ellipse,rgba(16,211,161,0.07),transparent_65%)]" />
                 <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] bg-[size:60px_60px] dark:bg-[linear-gradient(rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.012)_1px,transparent_1px)]" />
 
-                {/* Nav */}
+                {/* Navbar */}
                 <nav className="sticky top-0 z-50 border-b border-gray-200/80 bg-white/80 backdrop-blur-2xl dark:border-white/6 dark:bg-zinc-950/80">
                     <div className="mx-auto flex max-w-[1200px] items-center justify-between px-5 py-4 md:px-10">
                         <Link href="/" className="flex items-center gap-3">
@@ -37,7 +40,9 @@ export default function BlogLayout({
                                 Artemis
                             </span>
                         </Link>
+                        
                         <div className="flex items-center gap-6 text-sm">
+<<<<<<< HEAD
                             <Link
                                 href="/blog"
                                 className="hidden text-[13px] font-medium text-brand-600 transition-colors hover:text-brand-500 md:block dark:text-brand-400"
@@ -57,16 +62,30 @@ export default function BlogLayout({
                                 RTS Calculator
                             </Link>
                             <div className="hidden h-4 w-px bg-gray-200 md:block dark:bg-white/10" />
+=======
+                            <Link href="/blog" className="hidden text-[13px] font-medium text-brand-600 transition-colors hover:text-brand-500 dark:text-brand-400 md:block">Blog</Link>
+                            <Link href="/#features" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">Features</Link>
+                            <Link href="/rts-calculator" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 md:block">RTS Calculator</Link>
+                            
+                            <div className="hidden h-4 w-px bg-gray-200 dark:bg-white/10 md:block" />
+                            
+>>>>>>> 0535f1b9 (frontend blogpost)
                             <AppearanceToggleDropdown />
+
                             {auth.user ? (
+<<<<<<< HEAD
                                 <Link
                                     href="/dashboard"
                                     className="inline-flex h-9 items-center rounded-lg bg-brand-500! px-5 text-[13px] font-semibold text-white shadow-sm shadow-brand-500/20 transition-all hover:bg-brand-600 hover:shadow-md hover:shadow-brand-500/25"
                                 >
+=======
+                                <Link href="/dashboard" className="inline-flex h-9 items-center rounded-lg bg-brand-500 px-5 text-[13px] font-semibold text-white shadow-sm shadow-brand-500/20 transition-all hover:bg-brand-600">
+>>>>>>> 0535f1b9 (frontend blogpost)
                                     Dashboard
                                 </Link>
                             ) : (
                                 <>
+<<<<<<< HEAD
                                     <Link
                                         href="/login"
                                         className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 md:block dark:text-gray-400 dark:hover:text-brand-400"
@@ -77,6 +96,10 @@ export default function BlogLayout({
                                         href={register()}
                                         className="inline-flex h-9 items-center rounded-lg bg-brand-500! px-5 text-[13px] font-semibold text-white shadow-sm shadow-brand-500/20 transition-all hover:bg-brand-600 hover:shadow-md hover:shadow-brand-500/25"
                                     >
+=======
+                                    <Link href="/login" className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400 md:block">Log in</Link>
+                                    <Link href="/register" className="inline-flex h-9 items-center rounded-lg bg-brand-500 px-5 text-[13px] font-semibold text-white shadow-sm shadow-brand-500/20 transition-all hover:bg-brand-600">
+>>>>>>> 0535f1b9 (frontend blogpost)
                                         Start free
                                     </Link>
                                 </>
@@ -85,7 +108,8 @@ export default function BlogLayout({
                     </div>
                 </nav>
 
-                <div className="relative">{children}</div>
+                {/* Content Area */}
+                <main className="relative">{children}</main>
 
                 {/* Footer */}
                 <footer className="border-t border-gray-200/80 dark:border-white/6">
@@ -135,6 +159,10 @@ export default function BlogLayout({
     );
 }
 
+/**
+ * BlogPost: A specialized wrapper for article content.
+ * Handles typography, metadata headers, and the CTA.
+ */
 export function BlogPost({
     title,
     date,
@@ -155,6 +183,7 @@ export function BlogPost({
                 <div className="mx-auto max-w-[720px]">
                     {/* Back link */}
                     <div className="mb-10">
+<<<<<<< HEAD
                         <Link
                             href="/blog"
                             className="inline-flex items-center gap-2 font-mono text-[11px] tracking-wider text-gray-400 uppercase transition-colors hover:text-brand-500 dark:text-gray-500"
@@ -171,6 +200,11 @@ export function BlogPost({
                                     strokeLinejoin="round"
                                     d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
                                 />
+=======
+                        <Link href="/blog" className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-gray-400 transition-colors hover:text-brand-500 dark:text-gray-500">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+>>>>>>> 0535f1b9 (frontend blogpost)
                             </svg>
                             All posts
                         </Link>
@@ -215,12 +249,25 @@ export function BlogPost({
                         </div>
                     </header>
 
+<<<<<<< HEAD
                     {/* Body */}
                     <div className="[&_strong]:font-semibold [&_strong]:text-gray-900 dark:[&_strong]:text-gray-200 [&>h2]:mt-14 [&>h2]:mb-4 [&>h2]:text-[22px] [&>h2]:font-bold [&>h2]:tracking-tight [&>h2]:text-gray-900 sm:[&>h2]:text-[26px] dark:[&>h2]:text-gray-100 [&>h3]:mt-10 [&>h3]:mb-3 [&>h3]:text-[18px] [&>h3]:font-bold [&>h3]:tracking-tight [&>h3]:text-gray-900 dark:[&>h3]:text-gray-100 [&>p]:mb-6 [&>p]:text-[16px] [&>p]:leading-[1.8] [&>p]:text-gray-600 dark:[&>p]:text-gray-400 [&>ul]:mb-6 [&>ul]:space-y-3 [&>ul]:pl-0 [&>ul>li]:relative [&>ul>li]:pl-6 [&>ul>li]:text-[16px] [&>ul>li]:leading-[1.8] [&>ul>li]:text-gray-600 [&>ul>li]:before:absolute [&>ul>li]:before:top-[11px] [&>ul>li]:before:left-0 [&>ul>li]:before:h-1.5 [&>ul>li]:before:w-1.5 [&>ul>li]:before:rounded-full [&>ul>li]:before:bg-brand-500 dark:[&>ul>li]:text-gray-400">
+=======
+                    {/* Article Body (Arbitrary Variants Typography) */}
+                    <div className="
+                        [&>p]:mb-6 [&>p]:text-[16px] [&>p]:leading-[1.8] [&>p]:text-gray-600 dark:[&>p]:text-gray-400
+                        [&>h2]:mb-4 [&>h2]:mt-14 [&>h2]:text-[22px] [&>h2]:font-bold [&>h2]:tracking-tight [&>h2]:text-gray-900 dark:[&>h2]:text-gray-100 sm:[&>h2]:text-[26px]
+                        [&>h3]:mb-3 [&>h3]:mt-10 [&>h3]:text-[18px] [&>h3]:font-bold [&>h3]:tracking-tight [&>h3]:text-gray-900 dark:[&>h3]:text-gray-100
+                        [&>ul]:mb-6 [&>ul]:space-y-3 [&>ul]:pl-0
+                        [&>ul>li]:relative [&>ul>li]:pl-6 [&>ul>li]:text-[16px] [&>ul>li]:leading-[1.8] [&>ul>li]:text-gray-600 dark:[&>ul>li]:text-gray-400
+                        [&>ul>li]:before:absolute [&>ul>li]:before:left-0 [&>ul>li]:before:top-[11px] [&>ul>li]:before:h-1.5 [&>ul>li]:before:w-1.5 [&>ul>li]:before:rounded-full [&>ul>li]:before:bg-brand-500
+                        [&_strong]:font-semibold [&_strong]:text-gray-900 dark:[&_strong]:text-gray-200
+                    ">
+>>>>>>> 0535f1b9 (frontend blogpost)
                         {children}
                     </div>
 
-                    {/* Divider */}
+                    {/* Content Divider */}
                     <div className="my-16 flex items-center gap-4">
                         <div className="h-px flex-1 bg-gray-200/80 dark:bg-white/6" />
                         <img
@@ -231,7 +278,7 @@ export function BlogPost({
                         <div className="h-px flex-1 bg-gray-200/80 dark:bg-white/6" />
                     </div>
 
-                    {/* CTA */}
+                    {/* Conversion CTA Section */}
                     <div className="relative overflow-hidden rounded-2xl border-2 border-brand-500/60 shadow-xl shadow-brand-500/5 dark:border-brand-500/40">
                         <div className="pointer-events-none absolute -top-16 -right-16 h-40 w-40 rounded-full bg-brand-500/10 blur-3xl" />
                         <div className="pointer-events-none absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-brand-400/8 blur-3xl" />
@@ -252,7 +299,7 @@ export function BlogPost({
                             <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
                                 <Link
                                     href="/register"
-                                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-500! px-6 text-[14px] font-semibold text-white shadow-lg shadow-brand-500/20 transition-all hover:-translate-y-0.5 hover:bg-brand-600 sm:w-auto"
+                                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-6 text-[14px] font-semibold text-white shadow-lg shadow-brand-500/20 transition-all hover:-translate-y-0.5 hover:bg-brand-600 sm:w-auto"
                                 >
                                     Start free trial
                                     <svg
@@ -279,8 +326,9 @@ export function BlogPost({
                         </div>
                     </div>
 
-                    {/* Back */}
+                    {/* Bottom Back Button */}
                     <div className="mt-12 text-center">
+<<<<<<< HEAD
                         <Link
                             href="/blog"
                             className="inline-flex items-center gap-2 text-[13px] font-medium text-gray-400 transition-colors hover:text-brand-500 dark:text-gray-500"
@@ -297,6 +345,11 @@ export function BlogPost({
                                     strokeLinejoin="round"
                                     d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
                                 />
+=======
+                        <Link href="/blog" className="inline-flex items-center gap-2 text-[13px] font-medium text-gray-400 transition-colors hover:text-brand-500 dark:text-gray-500">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+>>>>>>> 0535f1b9 (frontend blogpost)
                             </svg>
                             Back to all posts
                         </Link>

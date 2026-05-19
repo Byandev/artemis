@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Integrations\FacebookController;
+use App\Http\Controllers\Blog\BlogController;
+use App\Http\Controllers\Admin\BlogPostController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -56,13 +58,8 @@ Route::get('/contact', function () {
     return Inertia::render('contact');
 })->name('contact');
 
-Route::get('/blog', function () {
-    return Inertia::render('blog/index');
-})->name('blog.index');
-
-Route::get('/blog/{slug}', function (string $slug) {
-    return Inertia::render('blog/'.$slug);
-})->name('blog.show')->where('slug', '[a-z0-9\-]+');
+Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
+Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
 
 Route::get('/design-guidelines', function () {
     return view('design-guidelines');
@@ -71,6 +68,21 @@ Route::get('/design-guidelines', function () {
 Route::get('/auth/facebook/callback', [FacebookController::class, 'callback']);
 
 Route::middleware(['auth'])->group(function () {
+    
+    // Blog Admin CRUD
+    Route::resource('admin/blog-posts', BlogPostController::class)
+        ->names([
+            'index' => 'admin.blog-posts.index',
+            'create' => 'admin.blog-posts.create',
+            'store' => 'admin.blog-posts.store',
+            'edit' => 'admin.blog-posts.edit',
+            'update' => 'admin.blog-posts.update',
+            'destroy' => 'admin.blog-posts.destroy',
+        ]);
+
+    // Custom Publish/Unpublish Toggles
+    Route::post('admin/blog-posts/{blog_post}/publish', [BlogPostController::class, 'publish'])->name('admin.blog-posts.publish');
+    Route::post('admin/blog-posts/{blog_post}/unpublish', [BlogPostController::class, 'unpublish'])->name('admin.blog-posts.unpublish');
 
     Route::get('dashboard', function () {
         $user = auth()->user();

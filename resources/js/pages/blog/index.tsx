@@ -1,6 +1,8 @@
-import { Link } from '@inertiajs/react';
-import BlogLayout from './blog-layout';
+import { Head, Link } from '@inertiajs/react';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { AdminSidebar } from '@/components/admin-sidebar';
 
+<<<<<<< HEAD
 const posts = [
     {
         slug: 'what-is-rts-and-why-it-matters',
@@ -48,9 +50,19 @@ const posts = [
         readTime: '5 min read',
     },
 ];
+=======
+interface Post {
+    slug: string;
+    title: string;
+    description: string;
+    category: string;
+    date: string;
+}
+>>>>>>> 0535f1b9 (frontend blogpost)
 
-export default function BlogIndex() {
+export default function BlogIndex({ posts }: { posts: Post[] }) {
     return (
+<<<<<<< HEAD
         <BlogLayout
             title="Blog"
             description="Insights, guides, and strategies for Philippine COD e-commerce sellers."
@@ -153,10 +165,44 @@ export default function BlogIndex() {
                                     </span>
                                 </div>
                             </Link>
+=======
+        <SidebarProvider>
+            <AdminSidebar />
+            <SidebarInset>
+                <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+                    <SidebarTrigger />
+                    <div className="h-4 w-[1px] bg-zinc-200 mx-2" />
+                    <h1 className="text-sm font-medium">Admin / Blog Posts</h1>
+                </header>
+
+                <main className="p-6">
+                    <Head title="Blog Management" />
+                    
+                    <div className="mb-8 flex items-center justify-between">
+                        <h2 className="text-3xl font-bold tracking-tight">Blog Posts</h2>
+                        <Link
+                            href="/admin/posts/create"
+                            className="inline-flex items-center rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
+                        >
+                            + New Post
+                        </Link>
+                    </div>
+
+                    {/* Grid ng mga posts dito */}
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                        {posts?.map((post) => (
+                            <div key={post.slug} className="rounded-xl border p-5 bg-white shadow-sm">
+                                <h3 className="font-bold">{post.title}</h3>
+                                <p className="text-sm text-zinc-500 line-clamp-2 mt-2">{post.description}</p>
+                                <div className="mt-4 flex gap-4">
+                                    <Link href={`/admin/posts/${post.slug}/edit`} className="text-xs font-bold text-blue-600">Edit</Link>
+                                </div>
+                            </div>
+>>>>>>> 0535f1b9 (frontend blogpost)
                         ))}
                     </div>
-                </div>
-            </section>
-        </BlogLayout>
+                </main>
+            </SidebarInset>
+        </SidebarProvider>
     );
 }
