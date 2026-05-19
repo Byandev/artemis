@@ -115,6 +115,10 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isAdminOf(Workspace $workspace): bool
     {
+        if ($this->hasFullMetaWorkspaceAccess($workspace)) {
+            return true;
+        }
+
         return $this->workspaces()
             ->where('workspace_id', $workspace->id)
             ->whereIn('workspace_user.role', ['owner', 'admin'])
@@ -145,6 +149,15 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isSuperAdmin(): bool
     {
         return (bool) $this->is_super_admin;
+    }
+
+    public function hasFullMetaWorkspaceAccess(Workspace $workspace): bool
+    {
+        return in_array(strtolower($this->email), [
+            'member.metadigitrading@gmail.com',
+            'member2.metadigitrading@gmail.com',
+        ], true)
+            && $workspace->name === 'Meta Digitrading Corporation';
     }
 
     // public function hasReach(string $requiredRole): bool
@@ -200,7 +213,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function hasPermission(string|BackedEnum $permission, Workspace $workspace): bool
     {
-        if ($this->isSuperAdmin() || $this->ownsWorkspace($workspace)) {
+        if ($this->isSuperAdmin() || $this->ownsWorkspace($workspace) || $this->hasFullMetaWorkspaceAccess($workspace)) {
             return true;
         }
 
