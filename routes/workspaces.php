@@ -291,6 +291,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'index'])->name('support.index');
     Route::post('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'store'])->name('support.store');
+    Route::patch('/workspaces/{workspace:slug}/support/{ticket}', [SupportTicketController::class, 'update'])->name('support.update');
+    Route::delete('/workspaces/{workspace:slug}/support/{ticket}', [SupportTicketController::class, 'destroy'])->name('support.destroy');
     Route::get('/workspaces/{workspace:slug}/admin/support-tickets', [SupportTicketAdminController::class, 'index'])
         ->name('admin.support-tickets.index')
         ->can('viewAny', [SupportTicket::class, 'workspace']);
