@@ -120,6 +120,9 @@ class GrantUserAllViewPermissions extends Command
             Permission::CreateChecklist->value,
             Permission::EditChecklist->value,
             Permission::DeleteChecklist->value,
+            // Botcake
+            Permission::ViewBotcakeSequences->value,
+            Permission::ViewBotcakeFlows->value,
             // Finance
             Permission::ViewFinanceDashboard->value,
             Permission::ViewFinanceAccounts->value,
