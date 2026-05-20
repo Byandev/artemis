@@ -16,14 +16,14 @@ const Pagination = ({ currentPage, totalPages, onPageChange }: PaginationProps) 
         return Array.from({ length: Math.min(3, totalPages) }, (_, i) => start + i);
     }, [currentPage, totalPages]);
 
-    const navBtn = "inline-flex items-center justify-center h-8 gap-1.5 px-3 rounded-lg border text-[11px]! font-medium tracking-wide transition-all duration-150 disabled:pointer-events-none disabled:opacity-35 select-none";
+    const navBtn = "inline-flex items-center justify-center h-8 gap-1.5 px-2 sm:px-3 rounded-lg border text-[11px]! font-medium tracking-wide transition-all duration-150 disabled:pointer-events-none disabled:opacity-35 select-none";
     const navBtnActive = "border-black/10 bg-white text-gray-600 shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-gray-50 hover:border-black/15 dark:border-white/10 dark:bg-zinc-800 dark:text-gray-300 dark:shadow-none dark:hover:bg-zinc-700";
 
     const atFirst = currentPage <= 1;
     const atLast = currentPage >= totalPages;
 
     return (
-        <div className="flex items-center justify-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
             <button
                 onClick={() => onPageChange(1)}
                 disabled={atFirst}
@@ -41,7 +41,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }: PaginationProps) 
                 <span>Prev</span>
             </button>
 
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center justify-center gap-1">
                 {currentPage > 3 && (
                     <span className="flex h-8 w-8 items-center justify-center text-[11px]! text-gray-300 dark:text-gray-600">…</span>
                 )}
