@@ -22,7 +22,7 @@ class ParcelUpdateNotificationTemplateController extends Controller
 
     public function index(Workspace $workspace, Request $request)
     {
-        $this->authorize(Permission::ManageParcelJourneyTemplates->value, $workspace);
+        $this->authorize(Permission::ViewParcelJourneyTemplates->value, $workspace);
 
         if ($workspace->parcelJourneyNotificationTemplates()->count() === 0) {
             ParcelJourneyNotificationTemplate::upsert([
@@ -194,6 +194,8 @@ class ParcelUpdateNotificationTemplateController extends Controller
     public function update(Request $request, Workspace $workspace, ParcelJourneyNotificationTemplate $template)
     {
         $this->authorize(Permission::ManageParcelJourneyTemplates->value, $workspace);
+
+        abort_unless((int) $template->workspace_id === (int) $workspace->id, 404);
 
         $data = $request->validate([
             'message' => 'required|string',

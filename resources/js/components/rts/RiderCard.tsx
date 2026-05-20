@@ -51,7 +51,7 @@ export default function RiderCard({
             .catch(() => setLoading(false));
     };
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     useEffect(() => {
         fetchPage(1, sort, 10, true);
     }, [workspaceSlug, JSON.stringify(queryParams)]);

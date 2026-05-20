@@ -5,7 +5,7 @@ import workspaces from '@/routes/workspaces';
 import { User } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, BookOpen, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -40,9 +40,6 @@ export default function Create({ workspace, users }: Props) {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         post(workspaces.pages.store.url({ workspace }), {
-            onSuccess: () => {
-                toast.success('Page created successfully.');
-            },
             onError: () => {
                 toast.error('Failed to create page. Please check the form.');
             },
@@ -70,6 +67,17 @@ export default function Create({ workspace, users }: Props) {
                             Back to Pages
                         </button>
                     </PageHeader>
+
+                    <a
+                        href="https://drive.google.com/file/d/1C4s1GJbiUndoi8I5UVBkP_K2M5dVrHdY/view?usp=sharing"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mb-5 inline-flex items-center gap-2 rounded-[10px] border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 font-mono! text-[12px]! font-medium text-emerald-700 transition-colors hover:bg-emerald-500/10 dark:border-emerald-500/15 dark:bg-emerald-500/10 dark:text-emerald-300"
+                    >
+                        <BookOpen className="h-3.5 w-3.5" />
+                        Watch the setup tutorial
+                        <ExternalLink className="h-3 w-3" />
+                    </a>
 
                     <form onSubmit={handleSubmit} className="space-y-5">
                         {/* Basic Info */}

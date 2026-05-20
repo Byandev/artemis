@@ -83,9 +83,9 @@ export default function Index({ roles, workspace, query }: Props) {
     const [openFormModal, setOpenFormModal] = useState(false);
 
     const canEdit = usePermission(PERMISSIONS.EditRoles);
-    const canDelete = usePermission(PERMISSIONS.DeleteRoles);
+    const canArchive = usePermission(PERMISSIONS.DeleteRoles);
     const canManagePerms = usePermission(PERMISSIONS.ManageRolePermissions);
-    const showActions = canEdit || canDelete || canManagePerms;
+    const showActions = canEdit || canArchive || canManagePerms;
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -225,7 +225,7 @@ export default function Index({ roles, workspace, query }: Props) {
                                                       Manage Permissions
                                                   </DropdownMenuItem>
                                               )}
-                                              {canDelete && (
+                                              {canArchive && (
                                                   <>
                                                       <DropdownMenuSeparator />
                                                       <DropdownMenuItem
@@ -246,7 +246,7 @@ export default function Index({ roles, workspace, query }: Props) {
                                               )}
                                           </>
                                       ) : (
-                                          canDelete && (
+                                          canArchive && (
                                               <DropdownMenuItem
                                                   onClick={() => {
                                                       setSelectedRole(

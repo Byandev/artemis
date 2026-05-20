@@ -9,6 +9,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -90,6 +92,11 @@ export default function ItemIndex({
     const [editingItem, setEditingItem] = useState<Item | null>(null);
     const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+
+    const canCreateItems = usePermission(PERMISSIONS.CreateInventoryItems);
+    const canEditItems = usePermission(PERMISSIONS.EditInventoryItems);
+    const canDeleteItems = usePermission(PERMISSIONS.DeleteInventoryItems);
+    const canUseItemActions = canEditItems || canDeleteItems;
 
     const baseUrl = `/workspaces/${workspace.slug}/inventory/items`;
 
@@ -334,44 +341,61 @@ export default function ItemIndex({
                 );
             },
         },
-        {
-            accessorKey: 'actions',
-            header: () => (
-                <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                    Actions
-                </div>
-            ),
-            cell: ({ row }) => {
-                const item = row.original;
-                return (
-                    <div className="flex justify-center">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
-                                    <MoreHorizontal className="h-3.5 w-3.5" />
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-36">
-                                <DropdownMenuItem
-                                    onClick={() => setEditingItem(item)}
-                                >
-                                    <Pencil className="mr-2 h-3.5 w-3.5" />
-                                    Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                    className="text-red-600 focus:text-red-600 dark:text-red-400"
-                                    onClick={() => setItemToDelete(item)}
-                                >
-                                    <Trash2 className="mr-2 h-3.5 w-3.5" />
-                                    Delete
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                );
-            },
-        },
+        ...(canUseItemActions
+            ? [
+                  {
+                      id: 'actions',
+                      header: () => (
+                          <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                              Actions
+                          </div>
+                      ),
+                      cell: ({ row }) => {
+                          const item = row.original;
+                          return (
+                              <div className="flex justify-center">
+                                  <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                          <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
+                                              <MoreHorizontal className="h-3.5 w-3.5" />
+                                          </button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent
+                                          align="end"
+                                          className="w-36"
+                                      >
+                                          {canEditItems && (
+                                              <DropdownMenuItem
+                                                  onClick={() =>
+                                                      setEditingItem(item)
+                                                  }
+                                              >
+                                                  <Pencil className="mr-2 h-3.5 w-3.5" />
+                                                  Edit
+                                              </DropdownMenuItem>
+                                          )}
+                                          {canEditItems && canDeleteItems && (
+                                              <DropdownMenuSeparator />
+                                          )}
+                                          {canDeleteItems && (
+                                              <DropdownMenuItem
+                                                  className="text-red-600 focus:text-red-600 dark:text-red-400"
+                                                  onClick={() =>
+                                                      setItemToDelete(item)
+                                                  }
+                                              >
+                                                  <Trash2 className="mr-2 h-3.5 w-3.5" />
+                                                  Delete
+                                              </DropdownMenuItem>
+                                          )}
+                                      </DropdownMenuContent>
+                                  </DropdownMenu>
+                              </div>
+                          );
+                      },
+                  } as ColumnDef<Item>,
+              ]
+            : []),
     ];
 
     return (
@@ -382,12 +406,14 @@ export default function ItemIndex({
                     title="Inventory Items"
                     description="Manage your inventory items and stock levels."
                 >
-                    <button
-                        onClick={() => setCreateDialogOpen(true)}
-                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
-                    >
-                        Add Item Record
-                    </button>
+                    {canCreateItems && (
+                        <button
+                            onClick={() => setCreateDialogOpen(true)}
+                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
+                        >
+                            Add Item Record
+                        </button>
+                    )}
                 </PageHeader>
 
                 <div className="mb-3 flex items-center gap-2">
@@ -432,25 +458,29 @@ export default function ItemIndex({
                     />
                 </div>
 
-                <ItemFormDialog
-                    open={createDialogOpen || editingItem !== null}
-                    onOpenChange={(open: boolean) => {
-                        if (!open) {
-                            setCreateDialogOpen(false);
-                            setEditingItem(null);
-                        }
-                    }}
-                    // FIXED: Using "as any" to bypass strict number type mismatch
-                    item={editingItem as any}
-                    workspace={workspace}
-                    products={products}
-                />
+                {(canCreateItems || canEditItems) && (
+                    <ItemFormDialog
+                        open={createDialogOpen || editingItem !== null}
+                        onOpenChange={(open: boolean) => {
+                            if (!open) {
+                                setCreateDialogOpen(false);
+                                setEditingItem(null);
+                            }
+                        }}
+                        // FIXED: Using "as any" to bypass strict number type mismatch
+                        item={editingItem as any}
+                        workspace={workspace}
+                        products={products}
+                    />
+                )}
 
-                <DeleteItemDialog
-                    item={itemToDelete}
-                    workspace={workspace}
-                    onClose={() => setItemToDelete(null)}
-                />
+                {canDeleteItems && (
+                    <DeleteItemDialog
+                        item={itemToDelete}
+                        workspace={workspace}
+                        onClose={() => setItemToDelete(null)}
+                    />
+                )}
             </div>
         </AppLayout>
     );

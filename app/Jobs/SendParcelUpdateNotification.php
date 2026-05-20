@@ -88,6 +88,8 @@ class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
 
                 $botcake->updateCustomField($psid, $this->parcelJourneyNotification->order->page->parcel_journey_custom_field_id, $this->parcelJourneyNotification->message);
 
+                $botcake->sendFlow($psid, $this->parcelJourneyNotification->order->page->parcel_journey_flow_id);
+
                 $this->parcelJourneyNotification->update(['status' => 'sent']);
             } catch (\Exception $e) {
                 $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => $e->getMessage()]);

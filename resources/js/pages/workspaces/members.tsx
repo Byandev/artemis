@@ -54,12 +54,13 @@ import {
     CopyleftIcon,
     KeyRound,
     MoreHorizontal,
+    Search,
     Send,
     Trash2,
     UserCog,
     UserMinus,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 interface Invitation {
@@ -113,6 +114,10 @@ export default function WorkspaceMembers({
     const initialInvitationSorting = useMemo(
         () => toFrontendSort(query?.invitation_sort ?? null),
         [query?.invitation_sort],
+    );
+
+    const [searchValue, setSearchValue] = useState(
+        query?.filter?.search ?? '',
     );
 
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -262,6 +267,30 @@ export default function WorkspaceMembers({
             console.error('Failed to generate reset link:', error);
         }
     };
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            router.get(
+                `/workspaces/${workspace.slug}/members`,
+                {
+                    sort: query?.sort,
+                    page: searchValue ? 1 : (query?.page ?? 1),
+                    per_page: query?.perPage,
+                    invitation_sort: query?.invitation_sort,
+                    invitation_page: query?.invitation_page,
+                    'filter[search]': searchValue || undefined,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['members', 'query'],
+                },
+            );
+        }, 400);
+
+        return () => clearTimeout(timer);
+    }, [searchValue]);
 
     const membersColumns: ColumnDef<User>[] = [
         {
@@ -563,7 +592,19 @@ export default function WorkspaceMembers({
 
                 <div className="space-y-5 sm:space-y-6">
                     {/* Members Table */}
-                    <ComponentCard desc="Manage workspace members and their roles">
+                    <div className="mb-3 flex items-center gap-2">
+                        <div className="relative w-full max-w-xs">
+                            <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                            <input
+                                className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                                placeholder="Search member name..."
+                                value={searchValue}
+                                onChange={(e) => setSearchValue(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                         <DataTable
                             columns={membersColumns}
                             enableInternalPagination={false}
@@ -579,6 +620,8 @@ export default function WorkspaceMembers({
                                         per_page: params?.per_page,
                                         invitation_sort: query?.invitation_sort,
                                         invitation_page: query?.invitation_page,
+                                        'filter[search]':
+                                            searchValue || undefined,
                                     },
                                     {
                                         preserveState: false,
@@ -588,7 +631,7 @@ export default function WorkspaceMembers({
                                 );
                             }}
                         />
-                    </ComponentCard>
+                    </div>
 
                     {/* Pending Invitations */}
                     {pendingInvitations.data &&
