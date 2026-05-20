@@ -62,7 +62,7 @@ class CallLogController extends Controller
     public function kpi(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => ['required', 'uuid'],
+            'user_id' => ['required', 'integer'],
         ]);
 
         $workspace = $request->attributes->get('workspace');
@@ -105,7 +105,7 @@ class CallLogController extends Controller
     public function list(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => ['required', 'uuid'],
+            'user_id' => ['required', 'integer'],
             'since' => ['nullable'],
             'until' => ['nullable'],
         ]);
@@ -150,7 +150,7 @@ class CallLogController extends Controller
     public function summary(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => ['required', 'uuid'],
+            'user_id' => ['required', 'integer'],
             'since' => ['nullable'],
         ]);
 

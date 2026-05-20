@@ -15,6 +15,15 @@ interface User {
     called_count?: number;
 }
 
+interface Schedule {
+    id: number;
+    pancake_user_id: string;
+    name: string;
+    shift_start: string;
+    shift_end: string;
+    notes: string | null;
+}
+
 interface MedalIconProps {
     rank: number;
 }
@@ -26,6 +35,7 @@ interface LeaderboardCardProps {
     primaryValue: string;
     secondaryValue?: string;
     activeTab: string;
+    schedule?: Schedule;
 }
 
 interface LeaderboardEntryProps {
@@ -35,6 +45,7 @@ interface LeaderboardEntryProps {
     primaryValue: string;
     secondaryValue?: string;
     activeTab: string;
+    schedule?: Schedule;
 }
 
 const MedalIcon = ({ rank }: MedalIconProps) => {
@@ -62,6 +73,7 @@ const LeaderboardCard = ({
     primaryValue,
     secondaryValue,
     activeTab,
+    schedule,
 }: LeaderboardCardProps) => {
     const cardHeight = rank === 1 ? 'h-64' : rank === 2 ? 'h-56' : 'h-52';
 
@@ -108,8 +120,14 @@ const LeaderboardCard = ({
                     {name}
                 </p>
 
+                {schedule && (
+                    <p className="mt-1 text-xs text-violet-300">
+                        {schedule.shift_start} - {schedule.shift_end}
+                    </p>
+                )}
+
                 <div
-                    className={`mt-4 flex ${secondaryValue ? 'justify-center gap-8' : 'justify-center'}`}
+                    className={`mt-3 flex ${secondaryValue ? 'justify-center gap-8' : 'justify-center'}`}
                 >
                     <div className="text-center">
                         <p className="text-xs text-gray-400">
@@ -142,6 +160,7 @@ const LeaderboardEntry = ({
     primaryValue,
     secondaryValue,
     activeTab,
+    schedule,
 }: LeaderboardEntryProps) => {
     const getLabels = () => {
         if (activeTab === 'Sales Ranking') {
@@ -168,9 +187,16 @@ const LeaderboardEntry = ({
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-xs font-bold text-white shadow-lg">
                     {initials}
                 </div>
-                <span className="flex-1 text-sm text-white drop-shadow">
-                    {name}
-                </span>
+                <div className="flex-1">
+                    <span className="text-sm text-white drop-shadow">
+                        {name}
+                    </span>
+                    {schedule && (
+                        <span className="ml-2 text-xs text-violet-300">
+                            {schedule.shift_start} - {schedule.shift_end}
+                        </span>
+                    )}
+                </div>
                 <span className="text-sm font-medium text-white drop-shadow">
                     {primaryValue}
                 </span>
@@ -186,9 +212,26 @@ const LeaderboardEntry = ({
     );
 };
 
+const formatDateForDisplay = (dateStr: string): string => {
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    });
+};
+
+const getTodayString = (): string => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
+
 export default function Leaderboard() {
     const [users, setUsers] = useState<User[]>([]);
+    const [schedules, setSchedules] = useState<Schedule[]>([]);
     const [activeTab, setActiveTab] = useState('Sales Ranking');
+    const [selectedDate, setSelectedDate] = useState(getTodayString());
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [retryCount, setRetryCount] = useState(0);
@@ -229,12 +272,15 @@ export default function Leaderboard() {
         }
     };
 
+    const getScheduleForUser = (userId: string): Schedule | undefined => {
+        return schedules.find((s) => s.pancake_user_id === userId);
+    };
+
     const handleTabClick = (tab: string): void => {
         setActiveTab(tab);
         setError(null);
     };
 
-    // Safe sorting with fallback values
     const sortedUsers: User[] = [...users].sort((a: User, b: User) => {
         if (activeTab === 'Sales Ranking') {
             return (b.sales || 0) - (a.sales || 0);
@@ -268,24 +314,30 @@ export default function Leaderboard() {
                     url = '/api/public/leaderboards/group-by-delivered';
                 }
 
-                const response = await axios.get(url);
+                const [leaderboardRes, schedulesRes] = await Promise.all([
+                    axios.get(url, { params: { date: selectedDate } }),
+                    axios.get('/api/public/leaderboards/schedules', {
+                        params: { date: selectedDate },
+                    }),
+                ]);
 
-                // Ensure we always have an array and normalize the data
-                let data = Array.isArray(response.data) ? response.data : [];
+                let data = Array.isArray(leaderboardRes.data)
+                    ? leaderboardRes.data
+                    : [];
 
-                // Normalize data to ensure consistent field names
                 data = data.map((user: any) => ({
                     id: user.id,
                     name: user.name,
-                    // For sales ranking endpoint
                     sales: user.sales || 0,
                     orders_count: user.orders_count || 0,
-                    // For called/delivered endpoints
                     assigned_order_for_delivery_count:
                         user.assigned_order_for_delivery_count || 0,
                 }));
 
                 setUsers(data);
+                setSchedules(
+                    Array.isArray(schedulesRes.data) ? schedulesRes.data : [],
+                );
             } catch (error) {
                 console.error('Error fetching data:', error);
                 setError('Failed to load leaderboard data. Please try again.');
@@ -456,7 +508,50 @@ export default function Leaderboard() {
                         CSR Leaderboards
                     </h1>
 
-                    <div className="mt-6 flex gap-4">
+                    <div className="mt-4 flex items-center gap-3">
+                        <button
+                            onClick={() => {
+                                const d = new Date(selectedDate + 'T00:00:00');
+                                d.setDate(d.getDate() - 1);
+                                setSelectedDate(
+                                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+                                );
+                            }}
+                            className="rounded-full border border-white/10 px-3 py-1.5 text-white/80 transition-all hover:bg-white/10"
+                        >
+                            ←
+                        </button>
+                        <input
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            className="rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-sm text-white [color-scheme:dark] backdrop-blur-sm transition-all outline-none hover:bg-white/15 focus:ring-2 focus:ring-violet-400/50"
+                        />
+                        <button
+                            onClick={() => {
+                                const d = new Date(selectedDate + 'T00:00:00');
+                                d.setDate(d.getDate() + 1);
+                                setSelectedDate(
+                                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+                                );
+                            }}
+                            className="rounded-full border border-white/10 px-3 py-1.5 text-white/80 transition-all hover:bg-white/10"
+                        >
+                            →
+                        </button>
+                        {selectedDate !== getTodayString() && (
+                            <button
+                                onClick={() =>
+                                    setSelectedDate(getTodayString())
+                                }
+                                className="rounded-full border border-white/10 bg-violet-500/30 px-3 py-1.5 text-xs text-white transition-all hover:bg-violet-500/50"
+                            >
+                                Today
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="mt-4 flex gap-4">
                         {(
                             [
                                 'Sales Ranking',
