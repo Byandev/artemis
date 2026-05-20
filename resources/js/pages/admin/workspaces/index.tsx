@@ -51,6 +51,7 @@ interface Workspace {
     csr_module_enabled: boolean;
     rmo_module_enabled: boolean;
     leaderboard_module_enabled: boolean;
+    botcake_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
 
@@ -65,6 +66,7 @@ const MODULE_FIELDS: Array<{
         | 'csr_module_enabled'
         | 'rmo_module_enabled'
         | 'leaderboard_module_enabled'
+        | 'botcake_module_enabled'
     >;
     label: string;
     description: string;
@@ -108,6 +110,11 @@ const MODULE_FIELDS: Array<{
         key: 'leaderboard_module_enabled',
         label: 'Leaderboards',
         description: 'Public leaderboards link',
+    },
+    {
+        key: 'botcake_module_enabled',
+        label: 'Botcake',
+        description: 'Botcake sequences and flows',
     },
 ];
 
@@ -410,40 +417,6 @@ export default function Index({ workspaces, plans, filters }: Props) {
     );
 }
 
-function DaysLeft({ subscription }: { subscription: Subscription }) {
-    const endDate =
-        subscription.status === 'trialing'
-            ? subscription.trial_ends_at
-            : subscription.current_period_end;
-
-    if (!endDate) return <span className="text-xs text-zinc-400">—</span>;
-
-    const now = new Date();
-    const end = new Date(endDate);
-    const diffMs = end.getTime() - now.getTime();
-    const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-    if (days < 0) {
-        return (
-            <span className="text-xs font-medium text-red-500">Expired</span>
-        );
-    }
-
-    const color =
-        days <= 3
-            ? 'text-red-600 dark:text-red-400'
-            : days <= 7
-              ? 'text-yellow-600 dark:text-yellow-400'
-              : 'text-zinc-700 dark:text-zinc-300';
-
-    return (
-        <div className="flex flex-col items-center">
-            <span className={`text-sm font-bold ${color}`}>{days}</span>
-            <span className="text-[10px] text-zinc-500">days left</span>
-        </div>
-    );
-}
-
 function SubscriptionModal({
     workspace,
     plans,
@@ -628,8 +601,8 @@ function MaxPagesModal({
                         />
                         <p className="mt-1 text-xs text-zinc-500">
                             Leave empty to use the subscription plan limit
-                            instead. Currently using{' '}
-                            {workspace.pages_count} page(s).
+                            instead. Currently using {workspace.pages_count}{' '}
+                            page(s).
                         </p>
                     </div>
 
@@ -671,6 +644,7 @@ function ModulesModal({
         csr_module_enabled: workspace.csr_module_enabled,
         rmo_module_enabled: workspace.rmo_module_enabled,
         leaderboard_module_enabled: workspace.leaderboard_module_enabled,
+        botcake_module_enabled: workspace.botcake_module_enabled,
     });
 
     function handleSubmit(e: React.FormEvent) {

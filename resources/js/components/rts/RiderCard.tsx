@@ -30,7 +30,7 @@ export default function RiderCard({
     const fetchPage = (
         page: number,
         currentSort: string,
-        perPage = 15,
+        perPage = 10,
         isInitial = false,
     ) => {
         setLoading(true);
@@ -51,9 +51,8 @@ export default function RiderCard({
             .catch(() => setLoading(false));
     };
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
-        fetchPage(1, sort, true);
+        fetchPage(1, sort, 10, true);
     }, [workspaceSlug, JSON.stringify(queryParams)]);
 
     const columns: ColumnDef<RiderRow>[] = useMemo(
@@ -121,7 +120,9 @@ export default function RiderCard({
                     </p>
                 </div>
                 <RefreshButton
-                    onClick={() => fetchPage(1, sort, 15, true)}
+                    onClick={() =>
+                        fetchPage(1, sort, data?.per_page ?? 10, true)
+                    }
                     loading={loading}
                 />
             </div>

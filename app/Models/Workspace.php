@@ -70,6 +70,18 @@ class Workspace extends Model
                 }
             }
         });
+
+        static::created(function (Workspace $workspace) {
+            $defaults = MetricRegistry::defaults();
+
+            $workspace->metricSetting()->firstOrCreate(
+                ['workspace_id' => $workspace->id],
+                [
+                    'allowed_metrics' => $defaults,
+                    'default_metrics' => $defaults,
+                ]
+            );
+        });
     }
 
     /**
@@ -139,8 +151,13 @@ class Workspace extends Model
     public function hasAdmin(User $user): bool
     {
         return $this->users()
+            ->leftJoin('roles', 'workspace_user.role_id', '=', 'roles.id')
             ->where('user_id', $user->id)
-            ->whereIn('role', ['owner', 'admin'])
+            ->where(function ($query) {
+                $query
+                    ->whereIn('workspace_user.role', ['owner', 'admin'])
+                    ->orWhere('roles.name', 'admin');
+            })
             ->exists();
     }
 
@@ -207,6 +224,11 @@ class Workspace extends Model
         return $this->hasMany(Page::class);
     }
 
+    public function teams(): HasMany
+    {
+        return $this->hasMany(Team::class);
+    }
+
     public function roles()
     {
         return $this->hasMany(Role::class);
@@ -215,8 +237,13 @@ class Workspace extends Model
     public function isAdmin(User $user): bool
     {
         return $this->users()
+            ->leftJoin('roles', 'workspace_user.role_id', '=', 'roles.id')
             ->where('user_id', $user->id)
-            ->wherePivot('role', 'admin')
+            ->where(function ($query) {
+                $query
+                    ->where('workspace_user.role', 'admin')
+                    ->orWhere('roles.name', 'admin');
+            })
             ->exists();
     }
 
@@ -256,14 +283,21 @@ class Workspace extends Model
 
     public function allowedMetrics(): array
     {
-        return $this->metricSetting?->allowed_metrics
-            ?? MetricRegistry::all();
+        return $this->metricSetting
+            ? ($this->metricSetting->allowed_metrics ?? [])
+            : MetricRegistry::defaults();
     }
 
     public function defaultMetrics(): array
     {
-        return $this->metricSetting?->default_metrics
-            ?? MetricRegistry::defaults();
+        $allowed = $this->allowedMetrics();
+        $defaults = $this->metricSetting?->default_metrics ?? [];
+
+        if ($this->metricSetting) {
+            return array_values(array_intersect($defaults, $allowed));
+        }
+
+        return array_values(array_intersect(MetricRegistry::defaults(), $allowed));
     }
 
     public function getMetricSettings(): array

@@ -9,6 +9,7 @@ use App\Models\Workspace;
 use App\Services\PostHogService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class WorkspaceController extends Controller
@@ -29,13 +30,17 @@ class WorkspaceController extends Controller
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
+        abort_unless($this->canCreateWorkspace($request), 403, 'Only workspace admins can create workspaces.');
+
         return Inertia::render('workspaces/create');
     }
 
     public function store(Request $request)
     {
+        abort_unless($this->canCreateWorkspace($request), 403, 'Only workspace admins can create workspaces.');
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
@@ -125,6 +130,10 @@ class WorkspaceController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
+        if ($workspace->csr_module_enabled && $request->user()->isCsrOf($workspace)) {
+            return redirect()->route('workspaces.csr.dashboard', $workspace);
+        }
+
         return Inertia::render('workspaces/dashboard/index', [
             'workspace' => $workspace->loadMissing([
                 'shops' => function ($query) {
@@ -133,12 +142,14 @@ class WorkspaceController extends Controller
                 'pages' => function ($query) {
                     $query->select('id', 'name', 'workspace_id')->orderBy('name');
                 },
+                'teams' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                },
                 'pageOwners:id,name',
             ]),
             'metricSettings' => [
                 'allowed' => $workspace->allowedMetrics(),
-                'defaults' => $workspace->metricSetting?->default_metrics
-                    ?? ['totalSales', 'totalOrders', 'aov', 'rtsRate'],
+                'defaults' => $workspace->defaultMetrics(),
             ],
         ]);
     }
@@ -215,5 +226,28 @@ class WorkspaceController extends Controller
         return response()->json([
             'chartData' => $chartData,
         ]);
+    }
+
+    private function canCreateWorkspace(Request $request): bool
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin() || ! $user->workspaces()->exists()) {
+            return true;
+        }
+
+        return DB::table('workspace_user')
+            ->leftJoin('roles', 'workspace_user.role_id', '=', 'roles.id')
+            ->where('workspace_user.user_id', $user->id)
+            ->where(function ($query) {
+                $query
+                    ->whereIn('workspace_user.role', ['owner', 'admin'])
+                    ->orWhere('roles.name', 'admin');
+            })
+            ->exists();
     }
 }
