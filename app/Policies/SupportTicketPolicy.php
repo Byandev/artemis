@@ -20,11 +20,11 @@ class SupportTicketPolicy
 
     public function viewAny(User $user, Workspace $workspace): bool
     {
-        return $user->ownsWorkspace($workspace) || $user->isAdminOf($workspace) || $user->hasWorkspaceRole($workspace, 'admin');
+        return $user->isSuperAdmin();
     }
 
     public function update(User $user, SupportTicket $ticket): bool
     {
-        return $this->viewAny($user, $ticket->workspace);
+        return $user->isSuperAdmin();
     }
 }

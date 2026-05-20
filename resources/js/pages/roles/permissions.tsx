@@ -40,6 +40,8 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
     const canManage = usePermission(PERMISSIONS.ManageRolePermissions);
 
     const toggle = (id: number) => {
+        if (!canManage) return;
+
         setData(
             'permission_ids',
             data.permission_ids.includes(id)
@@ -49,6 +51,8 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
     };
 
     const toggleAll = (permissions: Permission[]) => {
+        if (!canManage) return;
+
         const ids = permissions.map((p) => p.id);
         const allGranted = ids.every((id) => data.permission_ids.includes(id));
         if (allGranted) {
@@ -66,6 +70,8 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (!canManage) return;
+
         put(`/workspaces/${workspace.slug}/roles/${role.id}/permissions`, {
             preserveScroll: true,
             onSuccess: () => toast.success('Permissions saved.'),
@@ -80,7 +86,11 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
             <div className="w-full space-y-6 p-4 md:p-6">
                 <PageHeader
                     title={`${role.name} — Permissions`}
-                    description="Toggle which actions this role is allowed to perform."
+                    description={
+                        canManage
+                            ? 'Toggle which actions this role is allowed to perform.'
+                            : 'View which actions this role is allowed to perform.'
+                    }
                 >
                     <button
                         type="button"
@@ -141,17 +151,35 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
                                         return (
                                             <label
                                                 key={permission.id}
-                                                className="flex cursor-pointer items-center gap-3 bg-white px-5 py-3.5 transition-colors hover:bg-stone-50 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+                                                className={[
+                                                    'flex items-center gap-3 bg-white px-5 py-3.5 transition-colors dark:bg-zinc-900',
+                                                    canManage
+                                                        ? 'cursor-pointer hover:bg-stone-50 dark:hover:bg-zinc-800'
+                                                        : 'cursor-default',
+                                                ].join(' ')}
                                             >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={checked}
-                                                    disabled={!canManage}
-                                                    onChange={() =>
-                                                        toggle(permission.id)
-                                                    }
-                                                    className="h-4 w-4 rounded border-gray-300 accent-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
-                                                />
+                                                {canManage ? (
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={checked}
+                                                        onChange={() =>
+                                                            toggle(
+                                                                permission.id,
+                                                            )
+                                                        }
+                                                        className="h-4 w-4 rounded border-gray-300 accent-emerald-600"
+                                                    />
+                                                ) : (
+                                                    <span
+                                                        className={[
+                                                            'h-4 w-4 rounded border',
+                                                            checked
+                                                                ? 'border-emerald-600 bg-emerald-600 shadow-[inset_0_0_0_3px_white] dark:shadow-[inset_0_0_0_3px_rgb(24,24,27)]'
+                                                                : 'border-gray-300 bg-white dark:border-zinc-700 dark:bg-zinc-900',
+                                                        ].join(' ')}
+                                                        aria-hidden="true"
+                                                    />
+                                                )}
                                                 <span className="font-mono text-[12px] text-gray-700 dark:text-gray-300">
                                                     {permission.name}
                                                 </span>

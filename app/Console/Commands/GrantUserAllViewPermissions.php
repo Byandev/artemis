@@ -79,6 +79,7 @@ class GrantUserAllViewPermissions extends Command
             Permission::DeleteProducts->value,
             // RTS
             Permission::ViewRtsAnalytics->value,
+            Permission::ViewParcelJourneyTemplates->value,
             Permission::ManageParcelJourneyTemplates->value,
             // CSR
             Permission::ViewCsrManagement->value,
@@ -139,6 +140,9 @@ class GrantUserAllViewPermissions extends Command
             // Pancake
             Permission::ViewCourierShipments->value,
             Permission::ImportCourierShipments->value,
+            // Botcake
+            Permission::ViewBotcakeSequences->value,
+            Permission::ViewBotcakeFlows->value,
             // Settings
             Permission::EditWorkspaceSettings->value,
             Permission::ManageApiKeys->value,

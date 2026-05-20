@@ -43,6 +43,7 @@ enum Permission: string
 
     // RTS
     case ViewRtsAnalytics = 'View RTS Analytics';
+    case ViewParcelJourneyTemplates = 'View Parcel Journey Templates';
     case ManageParcelJourneyTemplates = 'Manage Parcel Journey Templates';
 
     // CSR
@@ -93,6 +94,10 @@ enum Permission: string
     case ViewCourierShipments = 'View Courier Shipments';
     case ImportCourierShipments = 'Import Courier Shipments';
 
+    // Botcake
+    case ViewBotcakeSequences = 'View Botcake Sequences';
+    case ViewBotcakeFlows = 'View Botcake Flows';
+
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
@@ -132,6 +137,7 @@ enum Permission: string
             self::DeleteTeams => 'Teams',
 
             self::ViewRtsAnalytics,
+            self::ViewParcelJourneyTemplates,
             self::ManageParcelJourneyTemplates => 'RTS',
 
             self::ViewCsrManagement,
@@ -175,6 +181,9 @@ enum Permission: string
 
             self::ViewCourierShipments,
             self::ImportCourierShipments => 'Pancake',
+
+            self::ViewBotcakeSequences,
+            self::ViewBotcakeFlows => 'Botcake',
 
             self::EditWorkspaceSettings,
             self::ManageApiKeys => 'Settings',

@@ -1,10 +1,10 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
+use App\Http\Controllers\Admin\AdminSupportTicketController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
 use App\Http\Controllers\Workspaces\AdAccountController;
 use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
-use App\Http\Controllers\Workspaces\Admin\SupportTicketAdminController;
 use App\Http\Controllers\Workspaces\AdsManager\AdController;
 use App\Http\Controllers\Workspaces\AdsManager\AdSetController;
 use App\Http\Controllers\Workspaces\AdsManager\CampaignController;
@@ -33,7 +33,6 @@ use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
 use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
-use App\Models\SupportTicket;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Modules\Botcake\Http\Controllers\Web\FlowController;
@@ -293,12 +292,6 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'store'])->name('support.store');
     Route::patch('/workspaces/{workspace:slug}/support/{ticket}', [SupportTicketController::class, 'update'])->name('support.update');
     Route::delete('/workspaces/{workspace:slug}/support/{ticket}', [SupportTicketController::class, 'destroy'])->name('support.destroy');
-    Route::get('/workspaces/{workspace:slug}/admin/support-tickets', [SupportTicketAdminController::class, 'index'])
-        ->name('admin.support-tickets.index')
-        ->can('viewAny', [SupportTicket::class, 'workspace']);
-    Route::patch('/workspaces/{workspace:slug}/admin/support-tickets/{ticket}', [SupportTicketAdminController::class, 'update'])
-        ->name('admin.support-tickets.update')
-        ->can('viewAny', [SupportTicket::class, 'workspace']);
 
 });
 
@@ -336,6 +329,11 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('workspaces.update-modules');
         Route::put('/workspaces/{workspace}/max-pages', [AdminWorkspaceController::class, 'updateMaxPages'])
             ->name('workspaces.update-max-pages');
+
+        Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])
+            ->name('support-tickets.index');
+        Route::patch('/support-tickets/{ticket}', [AdminSupportTicketController::class, 'update'])
+            ->name('support-tickets.update');
 
         // Metric Setting Controller
         Route::get('workspaces/{workspace}/metrics/edit', [MetricSettingController::class, 'edit'])

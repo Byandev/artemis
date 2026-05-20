@@ -14,11 +14,11 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
-import { toast } from 'sonner';
+import { Head, router, usePage } from '@inertiajs/react';
 import { omit } from 'lodash';
 import { Plus } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 interface Props {
     workspace: Workspace;
@@ -31,7 +31,15 @@ interface Props {
     };
 }
 
+interface PageProps {
+    flash?: {
+        success?: string | null;
+        error?: string | null;
+    };
+}
+
 export default function ChecklistPage({ workspace, checklists, query }: Props) {
+    const { flash } = usePage().props as PageProps;
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
         [query?.sort],
@@ -52,6 +60,16 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
 
     const resetAddTaskForm = () => setAddTaskForm(ADD_TASK_FORM_INITIAL);
 
+    useEffect(() => {
+        if (flash?.success) {
+            toast.success(flash.success);
+        }
+
+        if (flash?.error) {
+            toast.error(flash.error);
+        }
+    }, [flash?.success, flash?.error]);
+
     const submitAddTask = () => {
         if (!isAddTaskValid) {
             return;
@@ -71,7 +89,6 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                     preserveState: true,
                     preserveScroll: true,
                     onSuccess: () => {
-                        toast.success('Checklist updated successfully');
                         setAddTaskOpen(false);
                         setDialogMode('add');
                         setEditingItemId(null);
@@ -87,7 +104,6 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                 preserveState: true,
                 preserveScroll: true,
                 onSuccess: () => {
-                    toast.success('Checklist created successfully');
                     setAddTaskOpen(false);
                     setDialogMode('add');
                     setEditingItemId(null);
@@ -128,7 +144,6 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                 preserveState: true,
                 preserveScroll: true,
                 onSuccess: () => {
-                    toast.success('Checklist deleted successfully');
                     setDeleteDialogOpen(false);
                     setItemToDelete(null);
                 },
@@ -220,12 +235,12 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                                 {
                                     sort: params?.sort,
                                     page: params?.page ?? 1,
+                                    per_page: params?.per_page,
                                 },
                                 {
                                     preserveState: true,
                                     replace: true,
                                     preserveScroll: true,
-                                    only: ['checklists', 'query'],
                                 },
                             );
                         }}
