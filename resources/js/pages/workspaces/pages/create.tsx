@@ -40,9 +40,6 @@ export default function Create({ workspace, users }: Props) {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         post(workspaces.pages.store.url({ workspace }), {
-            onSuccess: () => {
-                toast.success('Page created successfully.');
-            },
             onError: () => {
                 toast.error('Failed to create page. Please check the form.');
             },

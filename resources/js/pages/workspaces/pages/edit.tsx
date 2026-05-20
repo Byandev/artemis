@@ -42,9 +42,6 @@ export default function Edit({ workspace, page, users }: Props) {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         put(workspaces.pages.update.url({ workspace, page }), {
-            onSuccess: () => {
-                toast.success('Page updated successfully.');
-            },
             onError: () => {
                 toast.error('Failed to update page. Please check the form.');
             },
