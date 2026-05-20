@@ -1,10 +1,13 @@
-import React from 'react';
-import { CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { Input } from '@/components/ui/input';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { formatDate, isValidDate } from '@/lib/utils';
+import { CalendarIcon } from 'lucide-react';
 
 type Props = {
     open: boolean;
@@ -17,9 +20,20 @@ type Props = {
     setMonth: (d: Date | undefined) => void;
     value: string;
     setValue: (v: string) => void;
-}
+};
 
-const DateFilter = ({ open, setOpen, startDate, setStartDate, endDate, setEndDate, month, setMonth, value, setValue }: Props) => {
+const DateFilter = ({
+    open,
+    setOpen,
+    startDate,
+    setStartDate,
+    endDate,
+    setEndDate,
+    month,
+    setMonth,
+    value,
+    setValue,
+}: Props) => {
     return (
         <div className="flex flex-col gap-3">
             <div className="relative flex gap-2">
@@ -106,12 +120,15 @@ const DateFilter = ({ open, setOpen, startDate, setStartDate, endDate, setEndDat
                                     return;
                                 }
 
-                                const from: Date | undefined = rangeOrDate?.from;
+                                const from: Date | undefined =
+                                    rangeOrDate?.from;
                                 const to: Date | undefined = rangeOrDate?.to;
                                 setStartDate(from);
                                 setEndDate(to);
                                 if (from && to) {
-                                    setValue(`${formatDate(from)} — ${formatDate(to)}`);
+                                    setValue(
+                                        `${formatDate(from)} — ${formatDate(to)}`,
+                                    );
                                     setOpen(false);
                                 } else if (from) {
                                     setValue(formatDate(from));

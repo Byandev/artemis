@@ -1,28 +1,29 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\Hash;
-
-uses(RefreshDatabase::class);
 
 test('password update page is displayed', function () {
     $user = User::factory()->create();
+    $workspace = Workspace::factory()->forOwner($user)->create();
 
     $response = $this
         ->actingAs($user)
-        ->get(route('password.edit'));
+        ->get(route('password.edit', ['workspace' => $workspace->slug]));
 
     $response->assertStatus(200);
 });
 
 test('password can be updated', function () {
     $user = User::factory()->create();
+    $workspace = Workspace::factory()->forOwner($user)->create();
+    $editUrl = route('password.edit', ['workspace' => $workspace->slug]);
 
     $response = $this
         ->actingAs($user)
-        ->from(route('password.edit'))
-        ->put(route('password.update'), [
+        ->from($editUrl)
+        ->put(route('password.update', ['workspace' => $workspace->slug]), [
             'current_password' => 'password',
             'password' => 'new-password',
             'password_confirmation' => 'new-password',
@@ -30,18 +31,20 @@ test('password can be updated', function () {
 
     $response
         ->assertSessionHasNoErrors()
-        ->assertRedirect(route('password.edit'));
+        ->assertRedirect($editUrl);
 
     expect(Hash::check('new-password', $user->refresh()->password))->toBeTrue();
 });
 
 test('correct password must be provided to update password', function () {
     $user = User::factory()->create();
+    $workspace = Workspace::factory()->forOwner($user)->create();
+    $editUrl = route('password.edit', ['workspace' => $workspace->slug]);
 
     $response = $this
         ->actingAs($user)
-        ->from(route('password.edit'))
-        ->put(route('password.update'), [
+        ->from($editUrl)
+        ->put(route('password.update', ['workspace' => $workspace->slug]), [
             'current_password' => 'wrong-password',
             'password' => 'new-password',
             'password_confirmation' => 'new-password',
@@ -49,5 +52,5 @@ test('correct password must be provided to update password', function () {
 
     $response
         ->assertSessionHasErrors('current_password')
-        ->assertRedirect(route('password.edit'));
+        ->assertRedirect($editUrl);
 });

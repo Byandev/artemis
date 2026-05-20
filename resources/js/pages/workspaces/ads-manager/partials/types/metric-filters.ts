@@ -19,6 +19,6 @@ export const OPERATOR_OPTIONS = [
 ];
 
 export const getOperatorSymbol = (operator: string): string => {
-    const option = OPERATOR_OPTIONS.find(opt => opt.value === operator);
+    const option = OPERATOR_OPTIONS.find((opt) => opt.value === operator);
     return option?.symbol || operator;
 };

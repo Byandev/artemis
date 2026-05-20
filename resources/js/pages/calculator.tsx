@@ -1,9 +1,13 @@
-import { Head, Link } from '@inertiajs/react';
-import { useState, useMemo } from 'react';
 import { home } from '@/routes';
+import { Head, Link } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
 
 const peso = (val: number) =>
-    '₱' + val.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    '₱' +
+    val.toLocaleString('en-PH', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
 
 interface SliderProps {
     label: string;
@@ -15,14 +19,22 @@ interface SliderProps {
     format?: (v: number) => string;
 }
 
-function Slider({ label, value, min, max, step, onChange, format }: SliderProps) {
+function Slider({
+    label,
+    value,
+    min,
+    max,
+    step,
+    onChange,
+    format,
+}: SliderProps) {
     const display = format ? format(value) : value.toLocaleString();
     const pct = ((value - min) / (max - min)) * 100;
 
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between">
-                <span className="font-mono text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                <span className="font-mono text-[11px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                     {label}
                 </span>
                 <span className="font-mono text-[13px] font-semibold text-gray-800 dark:text-gray-100">
@@ -83,9 +95,15 @@ function ResultRow({ label, value, variant = 'default' }: ResultRowProps) {
     }[variant];
 
     return (
-        <div className={`flex items-center justify-between px-4 py-2.5 ${rowClass}`}>
-            <span className={`font-mono text-[12px] ${labelClass}`}>{label}</span>
-            <span className={`font-mono text-[13px] ${valueClass}`}>{value}</span>
+        <div
+            className={`flex items-center justify-between px-4 py-2.5 ${rowClass}`}
+        >
+            <span className={`font-mono text-[12px] ${labelClass}`}>
+                {label}
+            </span>
+            <span className={`font-mono text-[13px] ${valueClass}`}>
+                {value}
+            </span>
         </div>
     );
 }
@@ -111,10 +129,11 @@ export default function Calculator() {
         const adSpentTotal = adSpent * days;
         const rtsCost = grossSales * (rtsPercent / 100);
 
-        const totalCosts = shippingFee + codFee + cogTotal + adSpentTotal + rtsCost;
+        const totalCosts =
+            shippingFee + codFee + cogTotal + adSpentTotal + rtsCost;
         const grossProfit = grossSales - totalCosts;
 
-        const gencysCutProfit = grossProfit * 0.30;
+        const gencysCutProfit = grossProfit * 0.3;
         const gencysCutDelivered = deliveredOrders * pricing * 0.09;
 
         return {
@@ -132,7 +151,16 @@ export default function Calculator() {
             gencysCutDelivered,
             margin: grossSales > 0 ? (grossProfit / grossSales) * 100 : 0,
         };
-    }, [roas, pricing, cog, adSpent, days, rtsPercent, shippingAmount, codFeePercent]);
+    }, [
+        roas,
+        pricing,
+        cog,
+        adSpent,
+        days,
+        rtsPercent,
+        shippingAmount,
+        codFeePercent,
+    ]);
 
     const pct = (v: number) => v.toFixed(2) + '%';
 
@@ -165,11 +193,20 @@ export default function Calculator() {
                 {/* Header */}
                 <header className="border-b border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-                        <Link href={home().url} className="flex items-center gap-2.5">
-                            <img src="/img/logo/artemis.png" alt="Artemis" className="h-7 w-7 object-contain" />
-                            <span className="font-semibold tracking-tight text-gray-900 dark:text-white">Artemis</span>
+                        <Link
+                            href={home().url}
+                            className="flex items-center gap-2.5"
+                        >
+                            <img
+                                src="/img/logo/artemis.png"
+                                alt="Artemis"
+                                className="h-7 w-7 object-contain"
+                            />
+                            <span className="font-semibold tracking-tight text-gray-900 dark:text-white">
+                                Artemis
+                            </span>
                         </Link>
-                        <span className="font-mono text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                        <span className="font-mono text-[11px] font-semibold tracking-widest text-gray-400 uppercase dark:text-gray-500">
                             Profit Calculator
                         </span>
                     </div>
@@ -181,7 +218,8 @@ export default function Calculator() {
                             Profit Calculator
                         </h1>
                         <p className="mt-1 font-mono text-[13px] text-gray-400 dark:text-gray-500">
-                            Adjust the inputs to see your estimated profit in real time.
+                            Adjust the inputs to see your estimated profit in
+                            real time.
                         </p>
                     </div>
 
@@ -190,7 +228,7 @@ export default function Calculator() {
                         <div className="space-y-6">
                             {/* Campaign */}
                             <div className="rounded-2xl border border-black/6 bg-white p-6 dark:border-white/6 dark:bg-zinc-900">
-                                <p className="mb-5 font-mono text-[10px] font-semibold uppercase tracking-widest text-gray-300 dark:text-gray-600">
+                                <p className="mb-5 font-mono text-[10px] font-semibold tracking-widest text-gray-300 uppercase dark:text-gray-600">
                                     Campaign
                                 </p>
                                 <div className="space-y-6">
@@ -226,7 +264,7 @@ export default function Calculator() {
 
                             {/* Product */}
                             <div className="rounded-2xl border border-black/6 bg-white p-6 dark:border-white/6 dark:bg-zinc-900">
-                                <p className="mb-5 font-mono text-[10px] font-semibold uppercase tracking-widest text-gray-300 dark:text-gray-600">
+                                <p className="mb-5 font-mono text-[10px] font-semibold tracking-widest text-gray-300 uppercase dark:text-gray-600">
                                     Product
                                 </p>
                                 <div className="space-y-6">
@@ -253,7 +291,7 @@ export default function Calculator() {
 
                             {/* Logistics */}
                             <div className="rounded-2xl border border-black/6 bg-white p-6 dark:border-white/6 dark:bg-zinc-900">
-                                <p className="mb-5 font-mono text-[10px] font-semibold uppercase tracking-widest text-gray-300 dark:text-gray-600">
+                                <p className="mb-5 font-mono text-[10px] font-semibold tracking-widest text-gray-300 uppercase dark:text-gray-600">
                                     Logistics
                                 </p>
                                 <div className="space-y-6">
@@ -293,56 +331,110 @@ export default function Calculator() {
                             {/* Summary cards */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="rounded-2xl border border-black/6 bg-white p-4 dark:border-white/6 dark:bg-zinc-900">
-                                    <p className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Gross Sales</p>
-                                    <p className="mt-1 font-mono text-[20px] font-bold text-gray-900 dark:text-white">{peso(calc.grossSales)}</p>
+                                    <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                        Gross Sales
+                                    </p>
+                                    <p className="mt-1 font-mono text-[20px] font-bold text-gray-900 dark:text-white">
+                                        {peso(calc.grossSales)}
+                                    </p>
                                 </div>
-                                <div className={`rounded-2xl border p-4 ${calc.grossProfit >= 0 ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-red-500/20 bg-red-500/5'}`}>
-                                    <p className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Gross Profit</p>
-                                    <p className={`mt-1 font-mono text-[20px] font-bold ${calc.grossProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                                <div
+                                    className={`rounded-2xl border p-4 ${calc.grossProfit >= 0 ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-red-500/20 bg-red-500/5'}`}
+                                >
+                                    <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                        Gross Profit
+                                    </p>
+                                    <p
+                                        className={`mt-1 font-mono text-[20px] font-bold ${calc.grossProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}
+                                    >
                                         {peso(calc.grossProfit)}
                                     </p>
                                 </div>
                                 <div className="rounded-2xl border border-black/6 bg-white p-4 dark:border-white/6 dark:bg-zinc-900">
-                                    <p className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Orders</p>
-                                    <p className="mt-1 font-mono text-[20px] font-bold text-gray-900 dark:text-white">{Math.round(calc.orders).toLocaleString()}</p>
-                                    <p className="mt-0.5 font-mono text-[10px] text-gray-400">{Math.round(calc.deliveredOrders).toLocaleString()} delivered</p>
+                                    <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                        Orders
+                                    </p>
+                                    <p className="mt-1 font-mono text-[20px] font-bold text-gray-900 dark:text-white">
+                                        {Math.round(
+                                            calc.orders,
+                                        ).toLocaleString()}
+                                    </p>
+                                    <p className="mt-0.5 font-mono text-[10px] text-gray-400">
+                                        {Math.round(
+                                            calc.deliveredOrders,
+                                        ).toLocaleString()}{' '}
+                                        delivered
+                                    </p>
                                 </div>
                                 <div className="rounded-2xl border border-black/6 bg-white p-4 dark:border-white/6 dark:bg-zinc-900">
-                                    <p className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Profit Margin</p>
-                                    <p className={`mt-1 font-mono text-[20px] font-bold ${calc.margin >= 0 ? 'text-gray-900 dark:text-white' : 'text-red-500'}`}>
+                                    <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                        Profit Margin
+                                    </p>
+                                    <p
+                                        className={`mt-1 font-mono text-[20px] font-bold ${calc.margin >= 0 ? 'text-gray-900 dark:text-white' : 'text-red-500'}`}
+                                    >
                                         {calc.margin.toFixed(1)}%
                                     </p>
                                 </div>
                             </div>
 
                             {/* Breakdown */}
-                            <div className="rounded-2xl border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900 overflow-hidden">
+                            <div className="overflow-hidden rounded-2xl border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                                 <div className="border-b border-black/6 px-4 py-3 dark:border-white/6">
-                                    <p className="font-mono text-[10px] font-semibold uppercase tracking-widest text-gray-300 dark:text-gray-600">
+                                    <p className="font-mono text-[10px] font-semibold tracking-widest text-gray-300 uppercase dark:text-gray-600">
                                         Breakdown
                                     </p>
                                 </div>
 
-                                <ResultRow label="Gross Sales" value={peso(calc.grossSales)} />
+                                <ResultRow
+                                    label="Gross Sales"
+                                    value={peso(calc.grossSales)}
+                                />
 
                                 <div className="px-4 pt-3 pb-1">
-                                    <p className="font-mono text-[10px] font-semibold uppercase tracking-widest text-red-400/70">Costs</p>
+                                    <p className="font-mono text-[10px] font-semibold tracking-widest text-red-400/70 uppercase">
+                                        Costs
+                                    </p>
                                 </div>
-                                <ResultRow label="Shipping Fee" value={`− ${peso(calc.shippingFee)}`} variant="cost" />
-                                <ResultRow label="COD Fee" value={`− ${peso(calc.codFee)}`} variant="cost" />
-                                <ResultRow label="Cost of Goods" value={`− ${peso(calc.cogTotal)}`} variant="cost" />
-                                <ResultRow label={`Ad Spend (${days}d)`} value={`− ${peso(calc.adSpentTotal)}`} variant="cost" />
-                                <ResultRow label={`RTS Loss (${pct(rtsPercent)})`} value={`− ${peso(calc.rtsCost)}`} variant="cost" />
+                                <ResultRow
+                                    label="Shipping Fee"
+                                    value={`− ${peso(calc.shippingFee)}`}
+                                    variant="cost"
+                                />
+                                <ResultRow
+                                    label="COD Fee"
+                                    value={`− ${peso(calc.codFee)}`}
+                                    variant="cost"
+                                />
+                                <ResultRow
+                                    label="Cost of Goods"
+                                    value={`− ${peso(calc.cogTotal)}`}
+                                    variant="cost"
+                                />
+                                <ResultRow
+                                    label={`Ad Spend (${days}d)`}
+                                    value={`− ${peso(calc.adSpentTotal)}`}
+                                    variant="cost"
+                                />
+                                <ResultRow
+                                    label={`RTS Loss (${pct(rtsPercent)})`}
+                                    value={`− ${peso(calc.rtsCost)}`}
+                                    variant="cost"
+                                />
 
                                 <div className="px-4 py-3">
-                                    <ResultRow label="Gross Profit" value={peso(calc.grossProfit)} variant="profit" />
+                                    <ResultRow
+                                        label="Gross Profit"
+                                        value={peso(calc.grossProfit)}
+                                        variant="profit"
+                                    />
                                 </div>
                             </div>
 
                             {/* Gency's Cut */}
-                            <div className="rounded-2xl border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900 overflow-hidden">
+                            <div className="overflow-hidden rounded-2xl border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                                 <div className="border-b border-black/6 px-4 py-3 dark:border-white/6">
-                                    <p className="font-mono text-[10px] font-semibold uppercase tracking-widest text-gray-300 dark:text-gray-600">
+                                    <p className="font-mono text-[10px] font-semibold tracking-widest text-gray-300 uppercase dark:text-gray-600">
                                         Gency's Cut
                                     </p>
                                 </div>

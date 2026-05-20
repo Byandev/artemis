@@ -59,18 +59,22 @@ class FetchFlowStatistics implements ShouldQueue
                     $delta[$col] = max(0, $new[$col] - $old[$col]);
                 }
 
-                // Add the delta to today's row so multiple same-day runs accumulate
-                // correctly instead of overwriting earlier deltas.
-                $daily = FlowDailyStat::firstOrNew([
-                    'flow_id' => $flow->id,
-                    'date' => now()->toDateString(),
-                ]);
+                // Skip the write when nothing changed this run — avoids creating
+                // empty zero-rows on quiet days.
+                if (array_sum($delta) > 0) {
+                    // Add the delta to today's row so multiple same-day runs accumulate
+                    // correctly instead of overwriting earlier deltas.
+                    $daily = FlowDailyStat::firstOrNew([
+                        'flow_id' => $flow->id,
+                        'date' => now()->toDateString(),
+                    ]);
 
-                foreach (self::STAT_COLUMNS as $col) {
-                    $daily->{$col} = (int) ($daily->{$col} ?? 0) + $delta[$col];
+                    foreach (self::STAT_COLUMNS as $col) {
+                        $daily->{$col} = (int) ($daily->{$col} ?? 0) + $delta[$col];
+                    }
+
+                    $daily->save();
                 }
-
-                $daily->save();
             }
 
             // Always advance the flow's cumulative to the latest snapshot so the

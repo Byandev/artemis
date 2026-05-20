@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Metrics\MetricRegistry;
 use App\Support\WorkspaceMetrics;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +23,7 @@ class Workspace extends Model
         'description',
         'owner_id',
         'monthly_order_volume',
+        'max_pages',
         'inventory_module_enabled',
         'finance_module_enabled',
         'products_module_enabled',
@@ -47,6 +49,7 @@ class Workspace extends Model
         'leaderboard_module_enabled' => 'boolean',
         'botcake_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
+        'max_pages' => 'integer',
     ];
 
     protected static function boot()
@@ -61,10 +64,22 @@ class Workspace extends Model
                 $originalSlug = $workspace->slug;
                 $count = 1;
                 while (static::where('slug', $workspace->slug)->exists()) {
-                    $workspace->slug = $originalSlug . '-' . $count;
+                    $workspace->slug = $originalSlug.'-'.$count;
                     $count++;
                 }
             }
+        });
+
+        static::created(function (Workspace $workspace) {
+            $defaults = MetricRegistry::defaults();
+
+            $workspace->metricSetting()->firstOrCreate(
+                ['workspace_id' => $workspace->id],
+                [
+                    'allowed_metrics' => $defaults,
+                    'default_metrics' => $defaults,
+                ]
+            );
         });
     }
 
@@ -153,7 +168,7 @@ class Workspace extends Model
      */
     public function addMember(User $user, string $role = 'member'): void
     {
-        if (!$this->hasMember($user)) {
+        if (! $this->hasMember($user)) {
             $this->users()->attach($user->id, ['role' => $role]);
         }
     }
@@ -199,6 +214,11 @@ class Workspace extends Model
     public function pages(): HasMany|Workspace
     {
         return $this->hasMany(Page::class);
+    }
+
+    public function teams(): HasMany
+    {
+        return $this->hasMany(Team::class);
     }
 
     public function roles()
@@ -250,14 +270,17 @@ class Workspace extends Model
 
     public function allowedMetrics(): array
     {
-        return $this->metricSetting?->allowed_metrics
-            ?? \App\Support\Metrics\MetricRegistry::all();
+        return $this->metricSetting
+            ? ($this->metricSetting->allowed_metrics ?? [])
+            : MetricRegistry::defaults();
     }
 
     public function defaultMetrics(): array
     {
-        return $this->metricSetting?->default_metrics
-            ?? \App\Support\Metrics\MetricRegistry::defaults();
+        $allowed = $this->allowedMetrics();
+        $defaults = $this->metricSetting?->default_metrics ?? [];
+
+        return array_values(array_unique([...$defaults, ...$allowed]));
     }
 
     public function getMetricSettings(): array
@@ -266,5 +289,27 @@ class Workspace extends Model
             'allowed' => $this->allowedMetrics(),
             'defaults' => $this->defaultMetrics(),
         ];
+    }
+
+    public function pageLimit(): ?int
+    {
+        return $this->max_pages ?? $this->subscription?->plan?->page_limit;
+    }
+
+    public function pageLimitInfo(): array
+    {
+        $limit = $this->pageLimit();
+        $count = $this->pages()->count();
+
+        return [
+            'limit' => $limit,
+            'count' => $count,
+            'reached' => $limit !== null && $count >= $limit,
+        ];
+    }
+
+    public function hasReachedPageLimit(): bool
+    {
+        return $this->pageLimitInfo()['reached'];
     }
 }

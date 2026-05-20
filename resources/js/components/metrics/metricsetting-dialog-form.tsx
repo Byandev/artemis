@@ -4,6 +4,11 @@ import { useForm, usePage } from '@inertiajs/react';
 import React, { useEffect } from 'react';
 import { groupedMetrics, type MetricKey } from '@/types/metrics';
 
+interface MetricSetting {
+    allowed_metrics?: string[];
+    default_metrics?: string[];
+}
+
 interface Workspace {
     id: number;
     name: string;
@@ -12,6 +17,12 @@ interface Workspace {
     metric_setting?: WorkspaceMetricSetting | null;
     metricSetting?: WorkspaceMetricSetting | null;
 }
+
+interface MetricSettingsPageProps extends SharedData {
+    currentWorkspace?: Workspace;
+}
+
+const DEFAULT_METRIC_KEYS = ['totalSales', 'totalOrders', 'aov', 'rtsRate'];
 
 interface Props {
     open: boolean;
@@ -60,12 +71,12 @@ export function MetricSettingDialog({ open, onOpenChange, workspace: localWorksp
             if (setting?.allowed_metrics) {
                 setData({
                     allowed_metrics: setting.allowed_metrics,
-                    default_metrics: setting.default_metrics || setting.allowed_metrics,
+                    default_metrics: setting.allowed_metrics,
                 });
             } else {
                 setData({
-                    allowed_metrics: [],
-                    default_metrics: [],
+                    allowed_metrics: DEFAULT_METRIC_KEYS,
+                    default_metrics: DEFAULT_METRIC_KEYS,
                 });
             }
         }
@@ -202,7 +213,7 @@ export function MetricSettingDialog({ open, onOpenChange, workspace: localWorksp
 function Field({ label, error, children }: { label: string; error?: React.ReactNode; children: React.ReactNode }) {
     return (
         <div className="space-y-1.5">
-            <label className="block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            <label className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                 {label}
             </label>
             {children}
@@ -211,7 +222,13 @@ function Field({ label, error, children }: { label: string; error?: React.ReactN
     );
 }
 
-function Footer({ processing, onCancel }: { processing: boolean; onCancel: () => void }) {
+function Footer({
+    processing,
+    onCancel,
+}: {
+    processing: boolean;
+    onCancel: () => void;
+}) {
     return (
         <div className="mt-4 flex items-center justify-end gap-2 border-t border-black/6 pt-3 dark:border-white/6">
             <button

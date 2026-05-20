@@ -78,5 +78,4 @@ class MetricRegistry
     {
         return array_key_exists($key, self::KEYS);
     }
-
 }

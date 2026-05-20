@@ -1,7 +1,7 @@
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
-import AppLayout from '@/layouts/app-layout';
+import CsrAwareLayout from '@/layouts/csr-aware-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
@@ -9,8 +9,8 @@ import { Head } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { format, subDays } from 'date-fns';
-import { omit } from 'lodash';
-import { useEffect, useMemo, useState } from 'react';
+import { debounce, omit } from 'lodash';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface CsrRecord {
     csr_id: number;
@@ -22,6 +22,8 @@ interface CsrRecord {
     rts_rate: number;
     total_called: number;
     total_call_time: number;
+    total_rmo_call_attempts: number;
+    total_confirmed: number;
 }
 
 interface Props {
@@ -32,6 +34,8 @@ interface Props {
         from?: string | null;
         to?: string | null;
         page?: number | string;
+        type?: 'erp' | 'pos' | null;
+        search?: string | null;
     };
 }
 
@@ -105,18 +109,31 @@ function StatCard({ title, value, loading, format: fmt }: StatCardProps) {
     );
 }
 
-export default function Analytics({ workspace }: Props) {
+export default function Analytics({ workspace, query }: Props) {
     const today = new Date();
+    const initialType = query?.type === 'erp' ? 'erp' : 'pos';
     const [range, setRange] = useState<{ from: Date; to: Date }>({
         from: subDays(today, 6),
         to: today,
     });
     const [paginatedRecords, setPaginatedRecords] =
         useState<PaginatedData<CsrRecord> | null>(null);
-    const [currentType, setCurrentType] = useState('pos');
+    const [currentType, setCurrentType] = useState(initialType);
     const [sort, setSort] = useState('-total_sales');
     const [page, setPage] = useState(1);
     const [perPage, setPerPage] = useState(10);
+    const [searchInput, setSearchInput] = useState(query?.search ?? '');
+    const [search, setSearch] = useState(query?.search ?? '');
+
+    const debouncedSetSearch = useCallback(
+        debounce((value: string) => setSearch(value), 400),
+        [],
+    );
+
+    useEffect(() => {
+        debouncedSetSearch(searchInput);
+        return () => debouncedSetSearch.cancel();
+    }, [searchInput, debouncedSetSearch]);
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
     const toStr = format(range.to, 'yyyy-MM-dd');
@@ -166,7 +183,7 @@ export default function Analytics({ workspace }: Props) {
 
     useEffect(() => {
         setPage(1);
-    }, [range?.from, range?.to, currentType]);
+    }, [range?.from, range?.to, currentType, search]);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -179,6 +196,7 @@ export default function Analytics({ workspace }: Props) {
                     sort,
                     page,
                     per_page: perPage,
+                    'filter[search]': search || undefined,
                 },
                 signal: controller.signal,
             })
@@ -187,18 +205,26 @@ export default function Analytics({ workspace }: Props) {
                 if (!axios.isCancel(err)) console.error(err);
             });
         return () => controller.abort();
-    }, [workspace.slug, fromStr, toStr, currentType, sort, page, perPage]);
+    }, [
+        workspace.slug,
+        fromStr,
+        toStr,
+        currentType,
+        sort,
+        page,
+        perPage,
+        search,
+    ]);
 
     const initialSorting = useMemo(() => toFrontendSort(sort), [sort]);
 
     const columns = useMemo<ColumnDef<CsrRecord>[]>(
         () => [
             {
-                accessorKey: 'csr_name',
+                accessorKey: 'name',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="CSR" />
                 ),
-                cell: ({ row }) => row.original.csr_name || '-',
                 size: 220,
             },
             {
@@ -217,18 +243,18 @@ export default function Analytics({ workspace }: Props) {
                 cell: ({ row }) => peso(row.original.total_sales),
             },
             {
-                accessorKey: 'delivered',
+                accessorKey: 'total_delivered',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="Delivered" />
                 ),
-                cell: ({ row }) => peso(row.original.delivered),
+                cell: ({ row }) => peso(row.original.total_delivered),
             },
             {
-                accessorKey: 'returning_count',
+                accessorKey: 'total_returning',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="Returning" />
                 ),
-                cell: ({ row }) => peso(row.original.returning_count),
+                cell: ({ row }) => peso(row.original.total_returning),
             },
             {
                 accessorKey: 'rts_rate',
@@ -239,17 +265,35 @@ export default function Analytics({ workspace }: Props) {
                     `${Number(row.original.rts_rate).toFixed(2)}%`,
             },
             {
+                accessorKey: 'total_confirmed',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RMO Confirmed" />
+                ),
+                cell: ({ row }) =>
+                    Number(row.original.total_confirmed).toLocaleString(),
+            },
+            {
                 accessorKey: 'total_called',
                 header: ({ column }) => (
-                    <SortableHeader column={column} title="RMO Called" />
+                    <SortableHeader column={column} title="RMO Assigned" />
                 ),
                 cell: ({ row }) =>
                     Number(row.original.total_called).toLocaleString(),
             },
             {
+                accessorKey: 'total_rmo_call_attempts',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RMO Called" />
+                ),
+                cell: ({ row }) =>
+                    Number(
+                        row.original.total_rmo_call_attempts,
+                    ).toLocaleString(),
+            },
+            {
                 accessorKey: 'total_call_time',
                 header: ({ column }) => (
-                    <SortableHeader column={column} title="Total Call Time" />
+                    <SortableHeader column={column} title="RMO Call Time" />
                 ),
                 cell: ({ row }) => formatCallTime(row.original.total_call_time),
             },
@@ -258,7 +302,7 @@ export default function Analytics({ workspace }: Props) {
     );
 
     return (
-        <AppLayout>
+        <CsrAwareLayout>
             <Head title={`${workspace.name} - CSR Analytics`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
@@ -274,21 +318,23 @@ export default function Analytics({ workspace }: Props) {
                             return (
                                 <button
                                     key={value}
-                                    onClick={() =>
-                                        !isDisabled && setCurrentType(value)
-                                    }
                                     disabled={isDisabled}
-                                    title={
-                                        isDisabled
-                                            ? 'ERP is temporarily unavailable'
-                                            : undefined
-                                    }
+                                    onClick={() => {
+                                        setCurrentType(value);
+                                        const url = new URL(
+                                            window.location.href,
+                                        );
+                                        url.searchParams.set('type', value);
+                                        window.history.replaceState(
+                                            {},
+                                            '',
+                                            url.toString(),
+                                        );
+                                    }}
                                     className={`rounded-lg px-3 py-1.5 text-[12px]! font-medium transition-colors ${
-                                        isDisabled
-                                            ? 'cursor-not-allowed text-zinc-300 dark:text-zinc-600'
-                                            : isActive
-                                              ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-600 dark:text-white'
-                                              : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
+                                        isActive
+                                            ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-600 dark:text-white'
+                                            : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
                                     }`}
                                 >
                                     {label}
@@ -311,42 +357,50 @@ export default function Analytics({ workspace }: Props) {
                     />
                 </PageHeader>
 
-                <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-                    <StatCard
-                        title="Total Sales"
-                        value={salesStat.value}
-                        loading={salesStat.loading}
-                        format={peso}
-                    />
-                    <StatCard
-                        title="Total Orders"
-                        value={ordersStat.value}
-                        loading={ordersStat.loading}
-                    />
-                    <StatCard
-                        title="Total Delivered"
-                        value={deliveredStat.value}
-                        loading={deliveredStat.loading}
-                    />
-                    <StatCard
-                        title="Total Returning"
-                        value={returningStat.value}
-                        loading={returningStat.loading}
-                    />
-                    <StatCard
-                        title="RTS Rate"
-                        value={rtsStat.value}
-                        loading={rtsStat.loading}
-                        format={(n) => `${n.toFixed(2)}%`}
-                    />
-                    <StatCard
-                        title="RMO Called"
-                        value={rmoCalledStat.value}
-                        loading={rmoCalledStat.loading}
-                    />
-                </div>
+                {/*<div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Sales"*/}
+                {/*        value={salesStat.value}*/}
+                {/*        loading={salesStat.loading}*/}
+                {/*        format={peso}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Orders"*/}
+                {/*        value={ordersStat.value}*/}
+                {/*        loading={ordersStat.loading}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Delivered"*/}
+                {/*        value={deliveredStat.value}*/}
+                {/*        loading={deliveredStat.loading}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="Total Returning"*/}
+                {/*        value={returningStat.value}*/}
+                {/*        loading={returningStat.loading}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="RTS Rate"*/}
+                {/*        value={rtsStat.value}*/}
+                {/*        loading={rtsStat.loading}*/}
+                {/*        format={(n) => `${n.toFixed(2)}%`}*/}
+                {/*    />*/}
+                {/*    <StatCard*/}
+                {/*        title="RMO Called"*/}
+                {/*        value={rmoCalledStat.value}*/}
+                {/*        loading={rmoCalledStat.loading}*/}
+                {/*    />*/}
+                {/*</div>*/}
 
-                <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                <input
+                    type="text"
+                    placeholder="Search CSR..."
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm! text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500 dark:focus:border-zinc-500"
+                />
+
+                <div className="mt-2 rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         key={sort}
                         columns={columns}
@@ -373,6 +427,6 @@ export default function Analytics({ workspace }: Props) {
                     />
                 </div>
             </div>
-        </AppLayout>
+        </CsrAwareLayout>
     );
 }

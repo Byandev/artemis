@@ -9,9 +9,17 @@ interface Props {
 }
 
 const toAcronym = (name: string) =>
-    name.split(/\s+/).map((w) => w[0]?.toUpperCase() ?? '').join('');
+    name
+        .split(/\s+/)
+        .map((w) => w[0]?.toUpperCase() ?? '')
+        .join('');
 
-export default function BarChart({ categories, series, formatValue, abbreviateLabels = false }: Props) {
+export default function BarChart({
+    categories,
+    series,
+    formatValue,
+    abbreviateLabels = false,
+}: Props) {
     const columnWidth =
         categories.length > 20 ? '80%' : categories.length > 10 ? '60%' : '40%';
 

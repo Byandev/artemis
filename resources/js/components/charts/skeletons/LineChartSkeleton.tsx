@@ -1,6 +1,6 @@
 import ComponentCard from '@/components/common/ComponentCard';
 
-export default function LineChartSkeleton  () {
+export default function LineChartSkeleton() {
     return (
         <ComponentCard>
             <div className="relative h-80 w-full pb-12">

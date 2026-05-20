@@ -6,6 +6,7 @@ import { User } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Props {
     workspace: Workspace;
@@ -30,6 +31,7 @@ export default function Create({ workspace, users }: Props) {
         infotxt_user_id: '',
         pancake_token: '',
         parcel_journey_custom_field_id: '',
+        parcel_journey_flow_id: '',
         parcel_journey_enabled: false as boolean,
         owner_id: '',
         status: 'active' as 'active' | 'inactive',
@@ -37,7 +39,14 @@ export default function Create({ workspace, users }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(workspaces.pages.store.url({ workspace }));
+        post(workspaces.pages.store.url({ workspace }), {
+            onSuccess: () => {
+                toast.success('Page created successfully.');
+            },
+            onError: () => {
+                toast.error('Failed to create page. Please check the form.');
+            },
+        });
     };
 
     return (
@@ -340,31 +349,71 @@ export default function Create({ workspace, users }: Props) {
                                             <p className="mb-4 font-mono text-[10px] font-semibold tracking-widest text-gray-400 uppercase dark:text-gray-500">
                                                 Chat
                                             </p>
-                                            <div className={fieldClass}>
-                                                <label className={labelClass}>
-                                                    Custom Field ID
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    className={inputClass}
-                                                    placeholder="Enter custom field ID"
-                                                    value={
-                                                        data.parcel_journey_custom_field_id
-                                                    }
-                                                    onChange={(e) =>
-                                                        setData(
-                                                            'parcel_journey_custom_field_id',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                />
-                                                {errors.parcel_journey_custom_field_id && (
-                                                    <p className={errorClass}>
-                                                        {
-                                                            errors.parcel_journey_custom_field_id
+                                            <div className="grid gap-5 sm:grid-cols-2">
+                                                <div className={fieldClass}>
+                                                    <label
+                                                        className={labelClass}
+                                                    >
+                                                        Custom Field ID
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        className={inputClass}
+                                                        placeholder="Enter custom field ID"
+                                                        value={
+                                                            data.parcel_journey_custom_field_id
                                                         }
-                                                    </p>
-                                                )}
+                                                        onChange={(e) =>
+                                                            setData(
+                                                                'parcel_journey_custom_field_id',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                    {errors.parcel_journey_custom_field_id && (
+                                                        <p
+                                                            className={
+                                                                errorClass
+                                                            }
+                                                        >
+                                                            {
+                                                                errors.parcel_journey_custom_field_id
+                                                            }
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className={fieldClass}>
+                                                    <label
+                                                        className={labelClass}
+                                                    >
+                                                        Flow ID
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        className={inputClass}
+                                                        placeholder="Enter flow ID"
+                                                        value={
+                                                            data.parcel_journey_flow_id
+                                                        }
+                                                        onChange={(e) =>
+                                                            setData(
+                                                                'parcel_journey_flow_id',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                    {errors.parcel_journey_flow_id && (
+                                                        <p
+                                                            className={
+                                                                errorClass
+                                                            }
+                                                        >
+                                                            {
+                                                                errors.parcel_journey_flow_id
+                                                            }
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
 

@@ -1,5 +1,5 @@
-import { useForm } from '@inertiajs/react';
-import { useEffect } from 'react';
+import InputError from '@/components/input-error';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -8,10 +8,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -19,10 +17,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
-import workspaces from '@/routes/workspaces';
-import InputError from '@/components/input-error';
+import { useForm } from '@inertiajs/react';
+import { useEffect } from 'react';
 import { toast } from 'sonner';
 
 interface ProductFormDialogProps {
@@ -38,9 +37,8 @@ export function ProductFormDialog({
     onOpenChange,
     product,
     workspace,
-    onSuccess
+    onSuccess,
 }: ProductFormDialogProps) {
-
     const isEditing = !!product;
 
     const { data, setData, post, processing, errors, reset, clearErrors } =
@@ -79,14 +77,18 @@ export function ProductFormDialog({
         post(url, {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success(isEditing ? 'Product updated successfully' : 'Product created successfully');
+                toast.success(
+                    isEditing
+                        ? 'Product updated successfully'
+                        : 'Product created successfully',
+                );
                 onOpenChange(false);
                 if (!isEditing) reset();
                 onSuccess?.();
             },
             onError: () => {
                 toast.error('Failed to save product. Please check the form.');
-            }
+            },
         });
     };
 
@@ -118,12 +120,15 @@ export function ProductFormDialog({
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
                             <Label htmlFor="name">
-                                Product Name <span className="text-destructive">*</span>
+                                Product Name{' '}
+                                <span className="text-destructive">*</span>
                             </Label>
                             <Input
                                 id="name"
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
                                 placeholder="e.g., Product 1"
                             />
                             <InputError message={errors.name} />
@@ -131,13 +136,17 @@ export function ProductFormDialog({
 
                         <div className="grid gap-2">
                             <Label htmlFor="code">
-                                Product Code <span className="text-destructive">*</span>
+                                Product Code{' '}
+                                <span className="text-destructive">*</span>
                             </Label>
                             <Input
                                 id="code"
                                 value={data.code}
                                 onChange={(e) =>
-                                    setData('code', e.target.value.toUpperCase())
+                                    setData(
+                                        'code',
+                                        e.target.value.toUpperCase(),
+                                    )
                                 }
                                 placeholder="e.g., ABC"
                                 maxLength={10}
@@ -147,12 +156,15 @@ export function ProductFormDialog({
 
                         <div className="grid gap-2">
                             <Label htmlFor="category">
-                                Category <span className="text-destructive">*</span>
+                                Category{' '}
+                                <span className="text-destructive">*</span>
                             </Label>
                             <Input
                                 id="category"
                                 value={data.category}
-                                onChange={(e) => setData('category', e.target.value)}
+                                onChange={(e) =>
+                                    setData('category', e.target.value)
+                                }
                                 placeholder="e.g., Health And Wellness"
                             />
                             <InputError message={errors.category} />
@@ -160,14 +172,19 @@ export function ProductFormDialog({
 
                         <div className="grid gap-2">
                             <Label htmlFor="status">
-                                Status <span className="text-destructive">*</span>
+                                Status{' '}
+                                <span className="text-destructive">*</span>
                             </Label>
                             <Select
                                 value={data.status}
                                 onValueChange={(value) =>
                                     setData(
                                         'status',
-                                        value as 'Scaling' | 'Testing' | 'Failed' | 'Inactive'
+                                        value as
+                                            | 'Scaling'
+                                            | 'Testing'
+                                            | 'Failed'
+                                            | 'Inactive',
                                     )
                                 }
                             >
@@ -175,10 +192,18 @@ export function ProductFormDialog({
                                     <SelectValue placeholder="Select status" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Scaling">Scaling</SelectItem>
-                                    <SelectItem value="Testing">Testing</SelectItem>
-                                    <SelectItem value="Failed">Failed</SelectItem>
-                                    <SelectItem value="Inactive">Inactive</SelectItem>
+                                    <SelectItem value="Scaling">
+                                        Scaling
+                                    </SelectItem>
+                                    <SelectItem value="Testing">
+                                        Testing
+                                    </SelectItem>
+                                    <SelectItem value="Failed">
+                                        Failed
+                                    </SelectItem>
+                                    <SelectItem value="Inactive">
+                                        Inactive
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                             <InputError message={errors.status} />
@@ -189,7 +214,9 @@ export function ProductFormDialog({
                             <Textarea
                                 id="description"
                                 value={data.description}
-                                onChange={(e) => setData('description', e.target.value)}
+                                onChange={(e) =>
+                                    setData('description', e.target.value)
+                                }
                                 placeholder="Optional product description"
                                 rows={3}
                             />
@@ -210,8 +237,8 @@ export function ProductFormDialog({
                             {processing
                                 ? 'Saving...'
                                 : product
-                                    ? 'Update Product'
-                                    : 'Create Product'}
+                                  ? 'Update Product'
+                                  : 'Create Product'}
                         </Button>
                     </DialogFooter>
                 </form>

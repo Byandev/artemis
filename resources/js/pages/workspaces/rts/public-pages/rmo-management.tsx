@@ -1,17 +1,35 @@
 import Filters, { FilterValue } from '@/components/filters/Filters';
-import { authParcelStatusConfig, orderStatusConfig, ParcelStatusEntry } from '@/components/rts/rmo-config';
+import {
+    authParcelStatusConfig,
+    orderStatusConfig,
+    ParcelStatusEntry,
+} from '@/components/rts/rmo-config';
 import { RmoStatCards } from '@/components/rts/RmoStatCards';
 import { RmoStatusPicker } from '@/components/rts/RmoStatusPicker';
 import { Button } from '@/components/ui/button';
-import DatePicker from '@/components/ui/date-picker';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { currencyFormatter, percentageFormatter } from '@/lib/utils';
+import DatePicker from '@/components/ui/date-picker';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { toFrontendSort } from '@/lib/sort';
+import { currencyFormatter, percentageFormatter } from '@/lib/utils';
 import publicPage from '@/routes/public-page';
 import { PaginatedData, SharedData } from '@/types';
-import { OrderForDelivery, OrderStatus } from '@/types/models/Pancake/OrderForDelivery';
+import { CallLog } from '@/types/models/CallLog';
+import {
+    OrderForDelivery,
+    OrderStatus,
+} from '@/types/models/Pancake/OrderForDelivery';
 import { User } from '@/types/models/Pancake/User';
 import { Workspace } from '@/types/models/Workspace';
 import { router, usePage } from '@inertiajs/react';
@@ -34,8 +52,6 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FormModal from './formModal';
-import { Checkbox } from '@/components/ui/checkbox';
-import { CallLog } from '@/types/models/CallLog';
 
 const EXPORT_COLUMNS = [
     { key: 'order_id', label: 'Order ID' },
@@ -88,7 +104,15 @@ function formatDuration(seconds: number): string {
     return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
-function EditablePhone({ value, onSave, disabled = false }: { value: string; onSave: (v: string) => void; disabled?: boolean }) {
+function EditablePhone({
+    value,
+    onSave,
+    disabled = false,
+}: {
+    value: string;
+    onSave: (v: string) => void;
+    disabled?: boolean;
+}) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(value);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -118,7 +142,10 @@ function EditablePhone({ value, onSave, disabled = false }: { value: string; onS
                 onBlur={save}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter') save();
-                    if (e.key === 'Escape') { setDraft(value); setEditing(false); }
+                    if (e.key === 'Escape') {
+                        setDraft(value);
+                        setEditing(false);
+                    }
                 }}
                 className="h-6 w-28 rounded border border-emerald-300 px-1.5 text-[11px] outline-none focus:ring-1 focus:ring-emerald-400 dark:border-emerald-600 dark:bg-zinc-800 dark:text-gray-300"
             />
@@ -168,7 +195,9 @@ function CallLogModal({
     useEffect(() => {
         if (!open || !phoneNumber) return;
         setLoading(true);
-        fetch(`/public/workspaces/${workspaceSlug}/rts/rmo-management/call-logs?phone_number=${encodeURIComponent(phoneNumber)}&date=${date}`)
+        fetch(
+            `/public/workspaces/${workspaceSlug}/rts/rmo-management/call-logs?phone_number=${encodeURIComponent(phoneNumber)}&date=${date}`,
+        )
             .then((r) => r.json())
             .then((data) => setLogs(data))
             .finally(() => setLoading(false));
@@ -186,34 +215,46 @@ function CallLogModal({
                     </p>
                 </DialogHeader>
                 {loading ? (
-                    <p className="py-6 text-center text-[12px] text-gray-400">Loading...</p>
+                    <p className="py-6 text-center text-[12px] text-gray-400">
+                        Loading...
+                    </p>
                 ) : logs.length === 0 ? (
-                    <p className="py-6 text-center text-[12px] text-gray-400">No call logs found</p>
+                    <p className="py-6 text-center text-[12px] text-gray-400">
+                        No call logs found
+                    </p>
                 ) : (
                     <div className="max-h-72 overflow-y-auto">
                         <table className="w-full text-[12px]">
                             <thead>
-                                <tr className="border-b text-left text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                    <th className="pb-2 pr-3">Time</th>
-                                    <th className="pb-2 pr-3">Type</th>
-                                    <th className="pb-2 pr-3">By</th>
-                                    <th className="pb-2 pr-3 text-right">Duration</th>
+                                <tr className="border-b text-left text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                    <th className="pr-3 pb-2">Time</th>
+                                    <th className="pr-3 pb-2">Type</th>
+                                    <th className="pr-3 pb-2">By</th>
+                                    <th className="pr-3 pb-2 text-right">
+                                        Duration
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {logs.map((log) => (
-                                    <tr key={log.id} className="border-b border-black/5 dark:border-white/5">
+                                    <tr
+                                        key={log.id}
+                                        className="border-b border-black/5 dark:border-white/5"
+                                    >
                                         <td className="py-2 pr-3 font-mono text-gray-600 dark:text-gray-300">
                                             {log.call_time}
                                         </td>
                                         <td className="py-2 pr-3">
-                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                                log.type === 'outgoing'
-                                                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
-                                                    : log.type === 'incoming'
-                                                    ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
-                                                    : 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
-                                            }`}>
+                                            <span
+                                                className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                                    log.type === 'outgoing'
+                                                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
+                                                        : log.type ===
+                                                            'incoming'
+                                                          ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                                          : 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+                                                }`}
+                                            >
                                                 {log.type}
                                             </span>
                                         </td>
@@ -228,8 +269,18 @@ function CallLogModal({
                             </tbody>
                         </table>
                         <div className="mt-3 flex justify-between border-t pt-2 text-[11px] text-gray-500 dark:text-gray-400">
-                            <span>{logs.length} call{logs.length !== 1 ? 's' : ''}</span>
-                            <span>Total: {formatDuration(logs.reduce((sum, l) => sum + l.duration, 0))}</span>
+                            <span>
+                                {logs.length} call{logs.length !== 1 ? 's' : ''}
+                            </span>
+                            <span>
+                                Total:{' '}
+                                {formatDuration(
+                                    logs.reduce(
+                                        (sum, l) => sum + l.duration,
+                                        0,
+                                    ),
+                                )}
+                            </span>
                         </div>
                     </div>
                 )}
@@ -261,7 +312,8 @@ function CallLogBadge({
             className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-emerald-600 hover:underline dark:text-gray-500 dark:hover:text-emerald-400"
         >
             <PhoneCall className="h-2.5 w-2.5 shrink-0" />
-            {attempts} call{attempts !== 1 ? 's' : ''} · {formatDuration(duration)}
+            {attempts} call{attempts !== 1 ? 's' : ''} ·{' '}
+            {formatDuration(duration)}
         </button>
     );
 }
@@ -282,11 +334,23 @@ export default function RmoManagement({
 
     const [userName, setUserName] = useState<string | false>(false);
     const [isOpen, setIsOpen] = useState(false);
-    const [showStats, setShowStats] = useState(() => localStorage.getItem('rmo_show_stats') === 'true');
-    const [showMyAssigneeOnly, setShowMyAssigneeOnly] = useState(() => localStorage.getItem('rmo_show_my_assignee_only') === 'true');
-    const [showMyConfirmeeOnly, setShowMyConfirmeeOnly] = useState(() => localStorage.getItem('rmo_show_my_confirmee_only') === 'true');
-    const [pendingAssign, setPendingAssign] = useState<{ id: number; currentStatus: string } | null>(null);
-    const [callLogModal, setCallLogModal] = useState<{ phone: string; label: string } | null>(null);
+    const [showStats, setShowStats] = useState(
+        () => localStorage.getItem('rmo_show_stats') === 'true',
+    );
+    const [showMyAssigneeOnly, setShowMyAssigneeOnly] = useState(
+        () => localStorage.getItem('rmo_show_my_assignee_only') === 'true',
+    );
+    const [showMyConfirmeeOnly, setShowMyConfirmeeOnly] = useState(
+        () => localStorage.getItem('rmo_show_my_confirmee_only') === 'true',
+    );
+    const [pendingAssign, setPendingAssign] = useState<{
+        id: number;
+        currentStatus: string;
+    } | null>(null);
+    const [callLogModal, setCallLogModal] = useState<{
+        phone: string;
+        label: string;
+    } | null>(null);
     const [exportModalOpen, setExportModalOpen] = useState(false);
     const [exportColumns, setExportColumns] = useState<string[]>(() => {
         const saved = localStorage.getItem('rmo_export_columns');
@@ -297,31 +361,43 @@ export default function RmoManagement({
 
     const [selectedPageIds, setSelectedPageIds] = useState<string[]>(() =>
         query?.filter?.page_id
-            ? (Array.isArray(query.filter.page_id) ? query.filter.page_id : query.filter.page_id.split(',').filter(Boolean))
-            : []
+            ? Array.isArray(query.filter.page_id)
+                ? query.filter.page_id
+                : query.filter.page_id.split(',').filter(Boolean)
+            : [],
     );
 
     const [selectedShopIds, setSelectedShopIds] = useState<string[]>(() =>
         query?.filter?.shop_id
-            ? (Array.isArray(query.filter.shop_id) ? query.filter.shop_id : query.filter.shop_id.split(',').filter(Boolean))
-            : []
+            ? Array.isArray(query.filter.shop_id)
+                ? query.filter.shop_id
+                : query.filter.shop_id.split(',').filter(Boolean)
+            : [],
     );
 
     const [selectedUserIds, setSelectedUserIds] = useState<string[]>(() =>
         query?.filter?.user_id
-            ? (Array.isArray(query.filter.user_id) ? query.filter.user_id : query.filter.user_id.split(',').filter(Boolean))
-            : []
+            ? Array.isArray(query.filter.user_id)
+                ? query.filter.user_id
+                : query.filter.user_id.split(',').filter(Boolean)
+            : [],
     );
 
     // Use URL as source of truth for status (avoids stale closure issues with select)
-    const currentStatus = useMemo(() => Array.isArray(query?.filter?.status)
-        ? (query.filter.status[0] ?? '')
-        : (query?.filter?.status ?? ''), [query?.filter?.status]);
+    const currentStatus = useMemo(
+        () =>
+            Array.isArray(query?.filter?.status)
+                ? (query.filter.status[0] ?? '')
+                : (query?.filter?.status ?? ''),
+        [query?.filter?.status],
+    );
 
-    const currentParcelStatus = useMemo(() =>
-        Array.isArray(query?.filter?.parcel_status)
-            ? (query.filter.parcel_status[0] ?? '')
-            : (query?.filter?.parcel_status ?? ''), [query?.filter?.parcel_status]
+    const currentParcelStatus = useMemo(
+        () =>
+            Array.isArray(query?.filter?.parcel_status)
+                ? (query.filter.parcel_status[0] ?? '')
+                : (query?.filter?.parcel_status ?? ''),
+        [query?.filter?.parcel_status],
     );
 
     const todayLocal = (() => {
@@ -331,7 +407,10 @@ export default function RmoManagement({
     const deliveryDate = query?.delivery_date ?? todayLocal;
     const isToday = deliveryDate === todayLocal;
 
-    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort]);
+    const initialSorting = useMemo(
+        () => toFrontendSort(query?.sort ?? null),
+        [query?.sort],
+    );
 
     const initialFilterValue = useMemo<FilterValue>(
         () => ({
@@ -345,51 +424,105 @@ export default function RmoManagement({
         [],
     );
 
-    const handleFilterChange = useCallback((value: FilterValue) => {
-        const newPageIds = value.pageIds.map(String);
-        const newShopIds = value.shopIds.map(String);
-        const newUserIds = value.userIds.map(String);
+    const handleFilterChange = useCallback(
+        (value: FilterValue) => {
+            const newPageIds = value.pageIds.map(String);
+            const newShopIds = value.shopIds.map(String);
+            const newUserIds = value.userIds.map(String);
 
-        setSelectedPageIds(newPageIds);
-        setSelectedShopIds(newShopIds);
-        setSelectedUserIds(newUserIds);
+            setSelectedPageIds(newPageIds);
+            setSelectedShopIds(newShopIds);
+            setSelectedUserIds(newUserIds);
 
-        router.get(
-            publicPage.rmoManagement({ workspace }),
-            {
-                sort: query?.sort || undefined,
-                'filter[search]': searchValue || undefined,
-                ...(currentStatus ? { 'filter[status]': currentStatus } : {}),
-                ...(currentParcelStatus ? { 'filter[parcel_status]': currentParcelStatus } : {}),
-                ...(newPageIds.length ? { 'filter[page_id]': newPageIds.join(',') } : {}),
-                ...(newShopIds.length ? { 'filter[shop_id]': newShopIds.join(',') } : {}),
-                ...(newUserIds.length ? { 'filter[user_id]': newUserIds.join(',') } : {}),
-                page: 1,
-            },
-            { preserveState: true, replace: true, preserveScroll: true },
-        );
-    }, [workspace, query?.sort, searchValue, currentStatus, currentParcelStatus]);
+            router.get(
+                publicPage.rmoManagement({ workspace }),
+                {
+                    sort: query?.sort || undefined,
+                    'filter[search]': searchValue || undefined,
+                    ...(currentStatus
+                        ? { 'filter[status]': currentStatus }
+                        : {}),
+                    ...(currentParcelStatus
+                        ? { 'filter[parcel_status]': currentParcelStatus }
+                        : {}),
+                    ...(newPageIds.length
+                        ? { 'filter[page_id]': newPageIds.join(',') }
+                        : {}),
+                    ...(newShopIds.length
+                        ? { 'filter[shop_id]': newShopIds.join(',') }
+                        : {}),
+                    ...(newUserIds.length
+                        ? { 'filter[user_id]': newUserIds.join(',') }
+                        : {}),
+                    page: 1,
+                },
+                { preserveState: true, replace: true, preserveScroll: true },
+            );
+        },
+        [
+            workspace,
+            query?.sort,
+            searchValue,
+            currentStatus,
+            currentParcelStatus,
+        ],
+    );
 
     const buildAllParams = useCallback(
-        (sort?: string | null, page?: number, status?: string, parcelStatus?: string, perPage?: number) => ({
+        (
+            sort?: string | null,
+            page?: number,
+            status?: string,
+            parcelStatus?: string,
+            perPage?: number,
+        ) => ({
             sort: sort ?? undefined,
             'filter[search]': searchValue || undefined,
             ...(status !== undefined
-                ? (status ? { 'filter[status]': status } : {})
-                : (currentStatus ? { 'filter[status]': currentStatus } : {})),
+                ? status
+                    ? { 'filter[status]': status }
+                    : {}
+                : currentStatus
+                  ? { 'filter[status]': currentStatus }
+                  : {}),
             ...(parcelStatus !== undefined
-                ? (parcelStatus ? { 'filter[parcel_status]': parcelStatus } : {})
-                : (currentParcelStatus ? { 'filter[parcel_status]': currentParcelStatus } : {})),
-            ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
-            ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
-            ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
+                ? parcelStatus
+                    ? { 'filter[parcel_status]': parcelStatus }
+                    : {}
+                : currentParcelStatus
+                  ? { 'filter[parcel_status]': currentParcelStatus }
+                  : {}),
+            ...(selectedPageIds.length
+                ? { 'filter[page_id]': selectedPageIds.join(',') }
+                : {}),
+            ...(selectedShopIds.length
+                ? { 'filter[shop_id]': selectedShopIds.join(',') }
+                : {}),
+            ...(selectedUserIds.length
+                ? { 'filter[user_id]': selectedUserIds.join(',') }
+                : {}),
             page: page ?? 1,
             per_page: perPage ?? orders.per_page,
             delivery_date: deliveryDate,
-            ...(showMyAssigneeOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
-            ...(showMyConfirmeeOnly && localStorage.getItem('user_id') ? { confirmee_id: localStorage.getItem('user_id') } : {}),
+            ...(showMyAssigneeOnly && localStorage.getItem('user_id')
+                ? { assignee_id: localStorage.getItem('user_id') }
+                : {}),
+            ...(showMyConfirmeeOnly && localStorage.getItem('user_id')
+                ? { confirmee_id: localStorage.getItem('user_id') }
+                : {}),
         }),
-        [searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyAssigneeOnly, showMyConfirmeeOnly, orders.per_page, deliveryDate],
+        [
+            searchValue,
+            currentStatus,
+            currentParcelStatus,
+            selectedPageIds,
+            selectedShopIds,
+            selectedUserIds,
+            showMyAssigneeOnly,
+            showMyConfirmeeOnly,
+            orders.per_page,
+            deliveryDate,
+        ],
     );
 
     const handleStatusChange = useCallback(
@@ -440,30 +573,53 @@ export default function RmoManagement({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showMyAssigneeOnly, showMyConfirmeeOnly]);
 
+    const doExport = useCallback(
+        (columns: string[]) => {
+            localStorage.setItem('rmo_export_columns', JSON.stringify(columns));
+            const params = new URLSearchParams();
+            if (searchValue) params.set('filter[search]', searchValue);
+            if (currentStatus) params.set('filter[status]', currentStatus);
+            if (currentParcelStatus)
+                params.set('filter[parcel_status]', currentParcelStatus);
+            if (selectedPageIds.length)
+                params.set('filter[page_id]', selectedPageIds.join(','));
+            if (selectedShopIds.length)
+                params.set('filter[shop_id]', selectedShopIds.join(','));
+            if (selectedUserIds.length)
+                params.set('filter[user_id]', selectedUserIds.join(','));
+            params.set('delivery_date', deliveryDate);
+            if (showMyAssigneeOnly && localStorage.getItem('user_id')) {
+                params.set(
+                    'assignee_id',
+                    localStorage.getItem('user_id') ?? '',
+                );
+            }
+            if (showMyConfirmeeOnly && localStorage.getItem('user_id')) {
+                params.set(
+                    'confirmee_id',
+                    localStorage.getItem('user_id') ?? '',
+                );
+            }
+            if (columns.length > 0 && columns.length < ALL_COLUMN_KEYS.length) {
+                params.set('columns', columns.join(','));
+            }
 
-    const doExport = useCallback((columns: string[]) => {
-        localStorage.setItem('rmo_export_columns', JSON.stringify(columns));
-        const params = new URLSearchParams();
-        if (searchValue) params.set('filter[search]', searchValue);
-        if (currentStatus) params.set('filter[status]', currentStatus);
-        if (currentParcelStatus) params.set('filter[parcel_status]', currentParcelStatus);
-        if (selectedPageIds.length) params.set('filter[page_id]', selectedPageIds.join(','));
-        if (selectedShopIds.length) params.set('filter[shop_id]', selectedShopIds.join(','));
-        if (selectedUserIds.length) params.set('filter[user_id]', selectedUserIds.join(','));
-        params.set('delivery_date', deliveryDate);
-        if (showMyAssigneeOnly && localStorage.getItem('user_id')) {
-            params.set('assignee_id', localStorage.getItem('user_id') ?? '');
-        }
-        if (showMyConfirmeeOnly && localStorage.getItem('user_id')) {
-            params.set('confirmee_id', localStorage.getItem('user_id') ?? '');
-        }
-        if (columns.length > 0 && columns.length < ALL_COLUMN_KEYS.length) {
-            params.set('columns', columns.join(','));
-        }
-
-        const qs = params.toString();
-        window.location.href = `/public/workspaces/${workspace.slug}/rts/rmo-management/export${qs ? `?${qs}` : ''}`;
-    }, [workspace.slug, searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyAssigneeOnly, showMyConfirmeeOnly, deliveryDate]);
+            const qs = params.toString();
+            window.location.href = `/public/workspaces/${workspace.slug}/rts/rmo-management/export${qs ? `?${qs}` : ''}`;
+        },
+        [
+            workspace.slug,
+            searchValue,
+            currentStatus,
+            currentParcelStatus,
+            selectedPageIds,
+            selectedShopIds,
+            selectedUserIds,
+            showMyAssigneeOnly,
+            showMyConfirmeeOnly,
+            deliveryDate,
+        ],
+    );
 
     const handleDateChange = useCallback(
         (date: string) => {
@@ -472,13 +628,27 @@ export default function RmoManagement({
                 {
                     sort: query?.sort || undefined,
                     'filter[search]': searchValue || undefined,
-                    ...(currentStatus ? { 'filter[status]': currentStatus } : {}),
-                    ...(currentParcelStatus ? { 'filter[parcel_status]': currentParcelStatus } : {}),
-                    ...(selectedPageIds.length ? { 'filter[page_id]': selectedPageIds.join(',') } : {}),
-                    ...(selectedShopIds.length ? { 'filter[shop_id]': selectedShopIds.join(',') } : {}),
-                    ...(selectedUserIds.length ? { 'filter[user_id]': selectedUserIds.join(',') } : {}),
-                    ...(showMyAssigneeOnly && localStorage.getItem('user_id') ? { assignee_id: localStorage.getItem('user_id') } : {}),
-                    ...(showMyConfirmeeOnly && localStorage.getItem('user_id') ? { confirmee_id: localStorage.getItem('user_id') } : {}),
+                    ...(currentStatus
+                        ? { 'filter[status]': currentStatus }
+                        : {}),
+                    ...(currentParcelStatus
+                        ? { 'filter[parcel_status]': currentParcelStatus }
+                        : {}),
+                    ...(selectedPageIds.length
+                        ? { 'filter[page_id]': selectedPageIds.join(',') }
+                        : {}),
+                    ...(selectedShopIds.length
+                        ? { 'filter[shop_id]': selectedShopIds.join(',') }
+                        : {}),
+                    ...(selectedUserIds.length
+                        ? { 'filter[user_id]': selectedUserIds.join(',') }
+                        : {}),
+                    ...(showMyAssigneeOnly && localStorage.getItem('user_id')
+                        ? { assignee_id: localStorage.getItem('user_id') }
+                        : {}),
+                    ...(showMyConfirmeeOnly && localStorage.getItem('user_id')
+                        ? { confirmee_id: localStorage.getItem('user_id') }
+                        : {}),
                     delivery_date: date,
                     page: 1,
                     per_page: orders.per_page,
@@ -486,7 +656,19 @@ export default function RmoManagement({
                 { preserveState: true, replace: true, preserveScroll: true },
             );
         },
-        [workspace, query?.sort, searchValue, currentStatus, currentParcelStatus, selectedPageIds, selectedShopIds, selectedUserIds, showMyAssigneeOnly, showMyConfirmeeOnly, orders.per_page],
+        [
+            workspace,
+            query?.sort,
+            searchValue,
+            currentStatus,
+            currentParcelStatus,
+            selectedPageIds,
+            selectedShopIds,
+            selectedUserIds,
+            showMyAssigneeOnly,
+            showMyConfirmeeOnly,
+            orders.per_page,
+        ],
     );
 
     const handleAssignUser = useCallback(
@@ -536,7 +718,11 @@ export default function RmoManagement({
     );
 
     const handleUpdatePhone = useCallback(
-        (id: number, field: 'customer_phone' | 'rider_phone', value: string) => {
+        (
+            id: number,
+            field: 'customer_phone' | 'rider_phone',
+            value: string,
+        ) => {
             router.post(
                 `/public/workspaces/${workspace.slug}/rts/rmo-management/${id}/update-phones`,
                 { [field]: value },
@@ -561,7 +747,10 @@ export default function RmoManagement({
     const [copiedCustomer, setCopiedCustomer] = useState(false);
 
     const pendingOrders = useMemo(
-        () => (orders.data ?? []).filter((o) => o.status === 'PENDING').slice(0, 10),
+        () =>
+            (orders.data ?? [])
+                .filter((o) => o.status === 'PENDING')
+                .slice(0, 10),
         [orders.data],
     );
 
@@ -571,7 +760,9 @@ export default function RmoManagement({
                 .map((o) =>
                     type === 'rider'
                         ? o.rider_phone
-                        : o.customer_phone ?? o.order.shipping_address?.phone_number ?? '',
+                        : (o.customer_phone ??
+                          o.order.shipping_address?.phone_number ??
+                          ''),
                 )
                 .filter(Boolean);
             if (phones.length === 0) return;
@@ -591,21 +782,40 @@ export default function RmoManagement({
     const columns = useMemo<ColumnDef<OrderForDelivery>[]>(
         () => [
             {
-                accessorFn: (row) => (row.order.items ?? []).map((item) => item.name).join(', '),
+                accessorFn: (row) =>
+                    (row.order.items ?? []).map((item) => item.name).join(', '),
                 id: 'items',
                 enableSorting: false,
-                header: ({ column }) => <SortableHeader enabled={false} column={column} title="Items" />,
+                header: ({ column }) => (
+                    <SortableHeader
+                        enabled={false}
+                        column={column}
+                        title="Items"
+                    />
+                ),
                 cell: ({ row }) => {
                     const items = row.original.order.items ?? [];
                     const trackingCode = row.original.order.tracking_code;
-                    const key = (row.original.parcel_status ?? row.original.order.parcel_status ?? '').toLowerCase();
-                    const cfg = authParcelStatusConfig[key] as ParcelStatusEntry | undefined;
+                    const key = (
+                        row.original.parcel_status ??
+                        row.original.order.parcel_status ??
+                        ''
+                    ).toLowerCase();
+                    const cfg = authParcelStatusConfig[key] as
+                        | ParcelStatusEntry
+                        | undefined;
                     return (
                         <div className="space-y-1.5">
                             <div className="space-y-0.5">
                                 {items.map((item, i) => (
-                                    <p key={i} className="text-[12px] font-medium leading-snug text-gray-800 dark:text-gray-200">
-                                        {item.name}
+                                    <p
+                                        key={i}
+                                        className="text-[12px] leading-snug font-medium text-gray-800 dark:text-gray-200"
+                                    >
+                                        {item.name
+                                            .split(' ')
+                                            .map((word) => word[0])
+                                            .join('')}
                                     </p>
                                 ))}
                             </div>
@@ -618,8 +828,12 @@ export default function RmoManagement({
                             </div>
                             <div>
                                 {cfg ? (
-                                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${cfg.pill}`}>
-                                        <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+                                    <span
+                                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${cfg.pill}`}
+                                    >
+                                        <span
+                                            className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`}
+                                        />
                                         {cfg.label}
                                     </span>
                                 ) : key ? (
@@ -634,7 +848,9 @@ export default function RmoManagement({
             },
             {
                 accessorKey: 'rider_name',
-                header: ({ column }) => <SortableHeader column={column} title="Rider" />,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Rider" />
+                ),
                 cell: ({ row }) => {
                     const attempts = row.original.rider_call_logs_count ?? 0;
                     const duration = row.original.rider_call_duration ?? 0;
@@ -646,13 +862,26 @@ export default function RmoManagement({
                             </p>
                             <EditablePhone
                                 value={phone}
-                                onSave={(v) => handleUpdatePhone(row.original.id, 'rider_phone', v)}
+                                onSave={(v) =>
+                                    handleUpdatePhone(
+                                        row.original.id,
+                                        'rider_phone',
+                                        v,
+                                    )
+                                }
                                 disabled={!canEditPhone}
                             />
                             <CallLogBadge
                                 attempts={attempts}
                                 duration={duration}
-                                onClick={() => phone && setCallLogModal({ phone, label: row.original.rider_name || 'Rider' })}
+                                onClick={() =>
+                                    phone &&
+                                    setCallLogModal({
+                                        phone,
+                                        label:
+                                            row.original.rider_name || 'Rider',
+                                    })
+                                }
                             />
                         </div>
                     );
@@ -662,12 +891,15 @@ export default function RmoManagement({
                 id: 'order_shipping_address_full_name',
                 accessorKey: 'order.shipping_address.full_name',
                 enableSorting: true,
-                header: ({ column }) => <SortableHeader column={column} title="Customer" />,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Customer" />
+                ),
                 cell: ({ row }) => {
                     const addr = row.original.order.shipping_address;
                     const attempts = row.original.customer_call_logs_count ?? 0;
                     const duration = row.original.customer_call_duration ?? 0;
-                    const phone = row.original.customer_phone ?? addr?.phone_number ?? '';
+                    const phone =
+                        row.original.customer_phone ?? addr?.phone_number ?? '';
                     return (
                         <div className="space-y-1.5">
                             <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
@@ -675,24 +907,40 @@ export default function RmoManagement({
                             </p>
                             <EditablePhone
                                 value={phone}
-                                onSave={(v) => handleUpdatePhone(row.original.id, 'customer_phone', v)}
+                                onSave={(v) =>
+                                    handleUpdatePhone(
+                                        row.original.id,
+                                        'customer_phone',
+                                        v,
+                                    )
+                                }
                                 disabled={!canEditPhone}
                             />
                             <CallLogBadge
                                 attempts={attempts}
                                 duration={duration}
-                                onClick={() => phone && setCallLogModal({ phone, label: addr?.full_name || 'Customer' })}
+                                onClick={() =>
+                                    phone &&
+                                    setCallLogModal({
+                                        phone,
+                                        label: addr?.full_name || 'Customer',
+                                    })
+                                }
                             />
                             {addr?.full_address && (
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <p className="flex max-w-40 cursor-default items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
                                             <MapPin className="h-3 w-3 shrink-0" />
-                                            <span className="truncate">{addr.full_address}</span>
+                                            <span className="truncate">
+                                                {addr.full_address}
+                                            </span>
                                         </p>
                                     </TooltipTrigger>
                                     <TooltipContent side="bottom">
-                                        <p className="max-w-xs text-xs">{addr.full_address}</p>
+                                        <p className="max-w-xs text-xs">
+                                            {addr.full_address}
+                                        </p>
                                     </TooltipContent>
                                 </Tooltip>
                             )}
@@ -704,9 +952,11 @@ export default function RmoManagement({
                 id: 'order_final_amount',
                 accessorKey: 'order.final_amount',
                 enableSorting: true,
-                header: ({ column }) => <SortableHeader column={column} title="SRP" />,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="SRP" />
+                ),
                 cell: ({ row }) => (
-                    <span className="font-mono text-[12px] text-center tabular-nums text-gray-700 dark:text-gray-300">
+                    <span className="text-center font-mono text-[12px] text-gray-700 tabular-nums dark:text-gray-300">
                         {currencyFormatter(row.original.order.final_amount)}
                     </span>
                 ),
@@ -715,7 +965,9 @@ export default function RmoManagement({
                 id: 'order_delivery_attempts',
                 accessorKey: 'order.delivery_attempts',
                 enableSorting: true,
-                header: ({ column }) => <SortableHeader column={column} title="Attempts" />,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Attempts" />
+                ),
                 cell: ({ row }) => {
                     const attempts = row.original.order.delivery_attempts ?? 0;
                     const isMultiple = attempts > 1;
@@ -735,7 +987,9 @@ export default function RmoManagement({
             {
                 id: 'cx_rts_rate',
                 enableSorting: true,
-                header: ({ column }) => <SortableHeader column={column} title="Cx. RTS" />,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Cx. RTS" />
+                ),
                 cell: ({ row }) => {
                     const rate = row.original.order?.cx_rts_rate ?? null;
                     if (rate === null) {
@@ -757,11 +1011,16 @@ export default function RmoManagement({
             },
             {
                 id: 'order_shipping_address_city_order_summary_rts_rate',
-                accessorKey: 'order.shipping_address.city_order_summary.rts_rate',
+                accessorKey:
+                    'order.shipping_address.city_order_summary.rts_rate',
                 enableSorting: true,
-                header: ({ column }) => <SortableHeader column={column} title="Loc. RTS" />,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Loc. RTS" />
+                ),
                 cell: ({ row }) => {
-                    const rate = row.original.order?.shipping_address?.city_order_summary?.rts_rate ?? 0;
+                    const rate =
+                        row.original.order?.shipping_address?.city_order_summary
+                            ?.rts_rate ?? 0;
                     const isHigh = rate >= 0.4;
                     return (
                         <span
@@ -775,7 +1034,9 @@ export default function RmoManagement({
             {
                 id: 'rider_rts_rate',
                 enableSorting: true,
-                header: ({ column }) => <SortableHeader column={column} title="Rider RTS" />,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Rider RTS" />
+                ),
                 cell: ({ row }) => {
                     const rate = row.original.rider_rts_rate ?? null;
                     if (rate === null) {
@@ -788,7 +1049,7 @@ export default function RmoManagement({
                     const isHigh = rate >= 0.4;
                     return (
                         <span
-                            className={`text-center  text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}
+                            className={`text-center text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}
                         >
                             {percentageFormatter(rate)}
                         </span>
@@ -799,17 +1060,29 @@ export default function RmoManagement({
                 id: 'conferrer_name',
                 accessorKey: 'conferrer.name',
                 enableSorting: true,
-                header: ({ column }) => <SortableHeader column={column} title="Confirmed By" />,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Confirmed By" />
+                ),
                 cell: ({ row }) => (
                     <span className="text-[12px] text-gray-600 dark:text-gray-400">
-                        {row.original.conferrer?.name ?? <span className="italic text-gray-300 dark:text-gray-600">—</span>}
+                        {row.original.conferrer?.name ?? (
+                            <span className="text-gray-300 italic dark:text-gray-600">
+                                —
+                            </span>
+                        )}
                     </span>
                 ),
             },
             {
                 accessorKey: 'assignee.name',
                 enableSorting: false,
-                header: ({ column }) => <SortableHeader enabled={false} column={column} title="Assignee" />,
+                header: ({ column }) => (
+                    <SortableHeader
+                        enabled={false}
+                        column={column}
+                        title="Assignee"
+                    />
+                ),
                 cell: ({ row }) => {
                     const assignee = row.original.assignee;
                     const id = row.original.id;
@@ -819,7 +1092,7 @@ export default function RmoManagement({
                             <button
                                 onClick={() => handleAssignToMe(id)}
                                 disabled={!isToday}
-                                className="flex items-center gap-1.5 rounded-lg border border-dashed border-black/10 dark:border-white/10 px-2.5 py-1 text-[11px] font-medium text-gray-400 dark:text-gray-500 transition-all hover:border-emerald-300 dark:hover:border-emerald-500/40 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-black/10 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:disabled:hover:border-white/10 dark:disabled:hover:bg-transparent dark:disabled:hover:text-gray-500"
+                                className="flex items-center gap-1.5 rounded-lg border border-dashed border-black/10 px-2.5 py-1 text-[11px] font-medium text-gray-400 transition-all hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-black/10 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:border-white/10 dark:text-gray-500 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400 dark:disabled:hover:border-white/10 dark:disabled:hover:bg-transparent dark:disabled:hover:text-gray-500"
                             >
                                 <UserPlus className="h-3 w-3" />
                                 Assign to me
@@ -835,7 +1108,7 @@ export default function RmoManagement({
                             {isToday && (
                                 <button
                                     onClick={() => handleRemoveAssignee(id)}
-                                    className="invisible flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-300 transition-colors hover:bg-red-50 hover:text-red-400 dark:text-gray-600 dark:hover:bg-red-500/10 dark:hover:text-red-400 group-hover:visible"
+                                    className="invisible flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-300 transition-colors group-hover:visible hover:bg-red-50 hover:text-red-400 dark:text-gray-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
                                 >
                                     <X className="h-3 w-3" />
                                 </button>
@@ -847,17 +1120,28 @@ export default function RmoManagement({
             {
                 accessorKey: 'status',
                 enableSorting: true,
-                header: ({ column }) => <SortableHeader column={column} title="Status" />,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Status" />
+                ),
                 cell: ({ row }) => (
                     <RmoStatusPicker
                         currentStatus={row.original.status as OrderStatus}
-                        onChangeStatus={(status) => handleChangeStatus(status, row.original.id)}
+                        onChangeStatus={(status) =>
+                            handleChangeStatus(status, row.original.id)
+                        }
                         disabled={!isToday}
                     />
                 ),
             },
         ],
-        [handleAssignToMe, handleRemoveAssignee, handleChangeStatus, handleUpdatePhone, isToday, canEditPhone],
+        [
+            handleAssignToMe,
+            handleRemoveAssignee,
+            handleChangeStatus,
+            handleUpdatePhone,
+            isToday,
+            canEditPhone,
+        ],
     );
 
     return (
@@ -874,7 +1158,9 @@ export default function RmoManagement({
 
             <CallLogModal
                 open={!!callLogModal}
-                onOpenChange={(open) => { if (!open) setCallLogModal(null); }}
+                onOpenChange={(open) => {
+                    if (!open) setCallLogModal(null);
+                }}
                 phoneNumber={callLogModal?.phone ?? ''}
                 label={callLogModal?.label ?? ''}
                 workspaceSlug={workspace.slug}
@@ -885,37 +1171,50 @@ export default function RmoManagement({
             <Dialog open={exportModalOpen} onOpenChange={setExportModalOpen}>
                 <DialogContent className="max-w-sm">
                     <DialogHeader>
-                        <DialogTitle className="text-sm font-semibold">Export Columns</DialogTitle>
+                        <DialogTitle className="text-sm font-semibold">
+                            Export Columns
+                        </DialogTitle>
                         <p className="text-[11px] text-gray-400 dark:text-gray-500">
                             Select which columns to include in the export.
                         </p>
                     </DialogHeader>
-                    <div className="space-y-1.5 max-h-72 overflow-y-auto py-2">
+                    <div className="max-h-72 space-y-1.5 overflow-y-auto py-2">
                         {EXPORT_COLUMNS.map((col) => (
-                            <label key={col.key} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-stone-50 dark:hover:bg-zinc-800">
+                            <label
+                                key={col.key}
+                                className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-stone-50 dark:hover:bg-zinc-800"
+                            >
                                 <Checkbox
                                     checked={exportColumns.includes(col.key)}
                                     onCheckedChange={(checked) => {
                                         setExportColumns((prev) =>
                                             checked
                                                 ? [...prev, col.key]
-                                                : prev.filter((k) => k !== col.key),
+                                                : prev.filter(
+                                                      (k) => k !== col.key,
+                                                  ),
                                         );
                                     }}
                                 />
-                                <span className="text-[12px] text-gray-700 dark:text-gray-300">{col.label}</span>
+                                <span className="text-[12px] text-gray-700 dark:text-gray-300">
+                                    {col.label}
+                                </span>
                             </label>
                         ))}
                     </div>
                     <div className="flex items-center justify-between border-t pt-3 dark:border-white/6">
                         <div className="flex items-center gap-2">
                             <button
-                                onClick={() => setExportColumns([...ALL_COLUMN_KEYS])}
+                                onClick={() =>
+                                    setExportColumns([...ALL_COLUMN_KEYS])
+                                }
                                 className="text-[11px] font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
                             >
                                 Select all
                             </button>
-                            <span className="text-gray-300 dark:text-gray-600">|</span>
+                            <span className="text-gray-300 dark:text-gray-600">
+                                |
+                            </span>
                             <button
                                 onClick={() => setExportColumns([])}
                                 className="text-[11px] font-medium text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
@@ -952,7 +1251,9 @@ export default function RmoManagement({
                 <div className="mx-auto flex w-full items-center justify-between px-4 py-3 md:px-6">
                     <div className="flex items-center gap-3">
                         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600">
-                            <span className="text-[11px] font-bold text-white">R</span>
+                            <span className="text-[11px] font-bold text-white">
+                                R
+                            </span>
                         </div>
                         <div className="h-4 w-px bg-black/8 dark:bg-white/8" />
                         {/* <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
@@ -971,7 +1272,12 @@ export default function RmoManagement({
                             className="group flex items-center gap-2.5 rounded-xl border border-black/6 bg-stone-50 px-3 py-1.5 transition-all hover:border-black/12 hover:bg-white dark:border-white/6 dark:bg-zinc-800 dark:hover:border-white/12 dark:hover:bg-zinc-700"
                         >
                             <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white">
-                                {userName.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
+                                {userName
+                                    .split(' ')
+                                    .slice(0, 2)
+                                    .map((w) => w[0])
+                                    .join('')
+                                    .toUpperCase()}
                             </span>
                             <div className="flex flex-col items-start">
                                 <span className="font-mono text-[9px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
@@ -1005,7 +1311,15 @@ export default function RmoManagement({
                             RMO Management
                         </h1>
                         <p className="mt-0.5 text-[13px] text-gray-400 dark:text-gray-500">
-                            Delivery tracking for assigned orders on {new Date(deliveryDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            Delivery tracking for assigned orders on{' '}
+                            {new Date(deliveryDate).toLocaleDateString(
+                                'en-US',
+                                {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                },
+                            )}
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1015,43 +1329,50 @@ export default function RmoManagement({
                             initialValue={initialFilterValue}
                         />
 
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setExportModalOpen(true)}
-                                className="flex items-center gap-1.5 rounded-lg text-[12px]"
-                            >
-                                <Download className="h-3.5 w-3.5" />
-                                Export
-                            </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setExportModalOpen(true)}
+                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                        >
+                            <Download className="h-3.5 w-3.5" />
+                            Export
+                        </Button>
 
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                    setShowStats((prev) => {
-                                        const next = !prev;
-                                        localStorage.setItem('rmo_show_stats', String(next));
-                                        return next;
-                                    })
-                                }
-                                className="flex items-center gap-1.5 rounded-lg text-[12px]"
-                            >
-                                <BarChart3 className="h-3.5 w-3.5" />
-                                {showStats ? 'Hide' : 'Show'} Statistics
-                                {showStats ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                            </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                                setShowStats((prev) => {
+                                    const next = !prev;
+                                    localStorage.setItem(
+                                        'rmo_show_stats',
+                                        String(next),
+                                    );
+                                    return next;
+                                })
+                            }
+                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                        >
+                            <BarChart3 className="h-3.5 w-3.5" />
+                            {showStats ? 'Hide' : 'Show'} Statistics
+                            {showStats ? (
+                                <ChevronUp className="h-3.5 w-3.5" />
+                            ) : (
+                                <ChevronDown className="h-3.5 w-3.5" />
+                            )}
+                        </Button>
 
-                            <DatePicker
-                                id="delivery-date"
-                                mode="single"
-                                defaultDate={deliveryDate}
-                                placeholder="Select date"
-                                onChange={(_, dateStr) => {
-                                    if (dateStr && dateStr !== deliveryDate) handleDateChange(dateStr);
-                                }}
-                            />
-                        </div>
+                        <DatePicker
+                            id="delivery-date"
+                            mode="single"
+                            defaultDate={deliveryDate}
+                            placeholder="Select date"
+                            onChange={(_, dateStr) => {
+                                if (dateStr && dateStr !== deliveryDate)
+                                    handleDateChange(dateStr);
+                            }}
+                        />
                     </div>
                 </div>
 
@@ -1095,15 +1416,19 @@ export default function RmoManagement({
 
                         <select
                             value={currentParcelStatus}
-                            onChange={(e) => handleParcelStatusChange(e.target.value)}
+                            onChange={(e) =>
+                                handleParcelStatusChange(e.target.value)
+                            }
                             className="h-8 rounded-lg border border-black/6 bg-stone-100 px-2 text-[12px]! text-gray-700 outline-none focus:border-emerald-500 dark:bg-zinc-800 dark:text-gray-300"
                         >
                             <option value="">All Parcel Statuses</option>
-                            {Object.entries(authParcelStatusConfig).map(([key, config]) => (
-                                <option key={key} value={key}>
-                                    {config.label}
-                                </option>
-                            ))}
+                            {Object.entries(authParcelStatusConfig).map(
+                                ([key, config]) => (
+                                    <option key={key} value={key}>
+                                        {config.label}
+                                    </option>
+                                ),
+                            )}
                         </select>
 
                         <button
@@ -1111,24 +1436,39 @@ export default function RmoManagement({
                             onClick={() =>
                                 setShowMyAssigneeOnly((prev) => {
                                     const next = !prev;
-                                    localStorage.setItem('rmo_show_my_assignee_only', String(next));
+                                    localStorage.setItem(
+                                        'rmo_show_my_assignee_only',
+                                        String(next),
+                                    );
                                     return next;
                                 })
                             }
-                            className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px] font-medium transition-all ${
+                            className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px]! font-medium transition-all ${
                                 showMyAssigneeOnly
                                     ? 'border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-400'
                                     : 'border-black/6 bg-stone-100 text-gray-500 hover:border-black/12 hover:text-gray-700 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:text-gray-200'
                             }`}
                         >
-                            <span className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded border ${
-                                showMyAssigneeOnly
-                                    ? 'border-emerald-500 bg-emerald-500 dark:border-emerald-400 dark:bg-emerald-400'
-                                    : 'border-gray-300 dark:border-gray-600'
-                            }`}>
+                            <span
+                                className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded border ${
+                                    showMyAssigneeOnly
+                                        ? 'border-emerald-500 bg-emerald-500 dark:border-emerald-400 dark:bg-emerald-400'
+                                        : 'border-gray-300 dark:border-gray-600'
+                                }`}
+                            >
                                 {showMyAssigneeOnly && (
-                                    <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    <svg
+                                        className="h-2.5 w-2.5 text-white"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={3}
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M5 13l4 4L19 7"
+                                        />
                                     </svg>
                                 )}
                             </span>
@@ -1140,67 +1480,102 @@ export default function RmoManagement({
                             onClick={() =>
                                 setShowMyConfirmeeOnly((prev) => {
                                     const next = !prev;
-                                    localStorage.setItem('rmo_show_my_confirmee_only', String(next));
+                                    localStorage.setItem(
+                                        'rmo_show_my_confirmee_only',
+                                        String(next),
+                                    );
                                     return next;
                                 })
                             }
-                            className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px] font-medium transition-all ${
+                            className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px]! font-medium transition-all ${
                                 showMyConfirmeeOnly
                                     ? 'border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-400'
                                     : 'border-black/6 bg-stone-100 text-gray-500 hover:border-black/12 hover:text-gray-700 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:text-gray-200'
                             }`}
                         >
-                            <span className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded border ${
-                                showMyConfirmeeOnly
-                                    ? 'border-emerald-500 bg-emerald-500 dark:border-emerald-400 dark:bg-emerald-400'
-                                    : 'border-gray-300 dark:border-gray-600'
-                            }`}>
+                            <span
+                                className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded border ${
+                                    showMyConfirmeeOnly
+                                        ? 'border-emerald-500 bg-emerald-500 dark:border-emerald-400 dark:bg-emerald-400'
+                                        : 'border-gray-300 dark:border-gray-600'
+                                }`}
+                            >
                                 {showMyConfirmeeOnly && (
-                                    <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    <svg
+                                        className="h-2.5 w-2.5 text-white"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={3}
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M5 13l4 4L19 7"
+                                        />
                                     </svg>
                                 )}
                             </span>
                             My Confirmee Only
                         </button>
 
-                        {window.location.hostname === 'efb.on-forge.com' && <div className="ml-auto flex items-center gap-2">
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={pendingOrders.length === 0}
-                                        onClick={() => copyPendingPhones('rider')}
-                                        className="flex items-center gap-1.5 rounded-lg text-[12px]"
-                                    >
-                                        <ClipboardCopy className="h-3.5 w-3.5" />
-                                        {copiedRider ? 'Copied!' : 'Copy Rider Phones'}
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom">
-                                    <p className="text-xs">Copy rider phone numbers from top 10 pending orders</p>
-                                </TooltipContent>
-                            </Tooltip>
+                        {window.location.hostname === 'efb.on-forge.com' && (
+                            <div className="ml-auto flex items-center gap-2">
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={
+                                                pendingOrders.length === 0
+                                            }
+                                            onClick={() =>
+                                                copyPendingPhones('rider')
+                                            }
+                                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                                        >
+                                            <ClipboardCopy className="h-3.5 w-3.5" />
+                                            {copiedRider
+                                                ? 'Copied!'
+                                                : 'Copy Rider Phones'}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom">
+                                        <p className="text-xs">
+                                            Copy rider phone numbers from top 10
+                                            pending orders
+                                        </p>
+                                    </TooltipContent>
+                                </Tooltip>
 
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={pendingOrders.length === 0}
-                                        onClick={() => copyPendingPhones('customer')}
-                                        className="flex items-center gap-1.5 rounded-lg text-[12px]"
-                                    >
-                                        <ClipboardCopy className="h-3.5 w-3.5" />
-                                        {copiedCustomer ? 'Copied!' : 'Copy CX Phones'}
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom">
-                                    <p className="text-xs">Copy customer phone numbers from top 10 pending orders</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </div>}
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={
+                                                pendingOrders.length === 0
+                                            }
+                                            onClick={() =>
+                                                copyPendingPhones('customer')
+                                            }
+                                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                                        >
+                                            <ClipboardCopy className="h-3.5 w-3.5" />
+                                            {copiedCustomer
+                                                ? 'Copied!'
+                                                : 'Copy CX Phones'}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom">
+                                        <p className="text-xs">
+                                            Copy customer phone numbers from top
+                                            10 pending orders
+                                        </p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -1221,7 +1596,11 @@ export default function RmoManagement({
                                     undefined,
                                     params?.per_page as number | undefined,
                                 ),
-                                { preserveState: true, replace: true, preserveScroll: true },
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true,
+                                },
                             );
                         }}
                     />

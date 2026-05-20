@@ -1,9 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
 import { Workspace } from '@/types/models/Workspace';
-import {
-    Sparkles, Send, X, Loader2, ChevronDown, ChevronRight, RotateCcw,
-} from 'lucide-react';
 import axios from 'axios';
+import {
+    ChevronDown,
+    ChevronRight,
+    Loader2,
+    RotateCcw,
+    Send,
+    Sparkles,
+    X,
+} from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 
 export interface AskWidgetSection {
     key: string;
@@ -44,14 +50,14 @@ export default function AskWidget({
     headerIconClass,
     headerIconTextClass,
 }: Props) {
-    const [open, setOpen]         = useState(false);
-    const [section, setSection]   = useState<string | null>(null);
+    const [open, setOpen] = useState(false);
+    const [section, setSection] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
-    const [input, setInput]       = useState('');
-    const [loading, setLoading]   = useState(false);
+    const [input, setInput] = useState('');
+    const [loading, setLoading] = useState(false);
     const [changing, setChanging] = useState(false);
-    const bottomRef               = useRef<HTMLDivElement>(null);
-    const inputRef                = useRef<HTMLInputElement>(null);
+    const bottomRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -66,20 +72,27 @@ export default function AskWidget({
         if (!text || loading || !forSection) return;
 
         setChanging(false);
-        setMessages(prev => [...prev, { role: 'user', text }]);
+        setMessages((prev) => [...prev, { role: 'user', text }]);
         setInput('');
         setLoading(true);
 
         try {
-            const sectionLabel = sections.find(s => s.key === forSection)?.label ?? forSection;
+            const sectionLabel =
+                sections.find((s) => s.key === forSection)?.label ?? forSection;
             const res = await axios.post(`/workspaces/${workspace.slug}/ask`, {
-                section:  sectionLabel,
+                section: sectionLabel,
                 question: text,
-                data:     getSectionData(forSection),
+                data: getSectionData(forSection),
             });
-            setMessages(prev => [...prev, { role: 'ai', text: res.data.answer }]);
+            setMessages((prev) => [
+                ...prev,
+                { role: 'ai', text: res.data.answer },
+            ]);
         } catch {
-            setMessages(prev => [...prev, { role: 'ai', text: 'Something went wrong. Please try again.' }]);
+            setMessages((prev) => [
+                ...prev,
+                { role: 'ai', text: 'Something went wrong. Please try again.' },
+            ]);
         } finally {
             setLoading(false);
         }
@@ -97,19 +110,22 @@ export default function AskWidget({
         setChanging(false);
     };
 
-    const activeSection = sections.find(s => s.key === section);
-    const aiCount = messages.filter(m => m.role === 'ai').length;
+    const activeSection = sections.find((s) => s.key === section);
+    const aiCount = messages.filter((m) => m.role === 'ai').length;
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+        <div className="fixed right-6 bottom-6 z-50 flex flex-col items-end gap-3">
             {open && (
                 <div className="flex h-[540px] w-[360px] flex-col overflow-hidden rounded-2xl border border-black/8 bg-white shadow-2xl shadow-black/12 dark:border-white/8 dark:bg-zinc-900">
-
                     {/* Header */}
                     <div className="flex items-center justify-between border-b border-black/6 px-4 py-3 dark:border-white/6">
                         <div className="flex items-center gap-2">
-                            <div className={`flex h-6 w-6 items-center justify-center rounded-lg ${headerIconClass}`}>
-                                <Sparkles className={`h-3.5 w-3.5 ${headerIconTextClass}`} />
+                            <div
+                                className={`flex h-6 w-6 items-center justify-center rounded-lg ${headerIconClass}`}
+                            >
+                                <Sparkles
+                                    className={`h-3.5 w-3.5 ${headerIconTextClass}`}
+                                />
                             </div>
                             <span className="font-mono text-[12px] font-semibold text-gray-700 dark:text-gray-200">
                                 {title}
@@ -144,7 +160,7 @@ export default function AskWidget({
                                 {dateRange[0]} to {dateRange[1]}
                             </p>
                             <div className="grid grid-cols-2 gap-2">
-                                {sections.map(s => {
+                                {sections.map((s) => {
                                     const Icon = s.icon;
                                     return (
                                         <button
@@ -152,7 +168,9 @@ export default function AskWidget({
                                             onClick={() => pickSection(s.key)}
                                             className="group flex flex-col gap-2.5 rounded-xl border border-black/5 p-3.5 text-left transition-all hover:border-brand-500/20 hover:bg-brand-500/5 hover:shadow-sm dark:border-white/5 dark:hover:border-brand-500/20 dark:hover:bg-brand-500/5"
                                         >
-                                            <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${s.color}`}>
+                                            <div
+                                                className={`flex h-8 w-8 items-center justify-center rounded-lg ${s.color}`}
+                                            >
                                                 <Icon className="h-4 w-4" />
                                             </div>
                                             <div>
@@ -175,30 +193,46 @@ export default function AskWidget({
                     {section && (
                         <>
                             <div className="flex-1 space-y-3 overflow-y-auto p-4">
-                                {messages.length === 0 && !loading && activeSection && (
-                                    <div className="space-y-2">
-                                        <p className="font-mono text-[10px] text-gray-300 dark:text-gray-600">Suggested</p>
-                                        {[activeSection.defaultQuestion, secondSuggestedQuestion].map((q, i) => (
-                                            <button
-                                                key={i}
-                                                onClick={() => ask(q)}
-                                                className="w-full rounded-xl border border-black/5 px-3 py-2.5 text-left transition-colors hover:border-brand-500/20 hover:bg-brand-500/5 dark:border-white/5 dark:hover:border-brand-500/20 dark:hover:bg-brand-500/5"
-                                            >
-                                                <p className="font-mono text-[11px] leading-relaxed text-gray-500 dark:text-gray-400">{q}</p>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
+                                {messages.length === 0 &&
+                                    !loading &&
+                                    activeSection && (
+                                        <div className="space-y-2">
+                                            <p className="font-mono text-[10px] text-gray-300 dark:text-gray-600">
+                                                Suggested
+                                            </p>
+                                            {[
+                                                activeSection.defaultQuestion,
+                                                secondSuggestedQuestion,
+                                            ].map((q, i) => (
+                                                <button
+                                                    key={i}
+                                                    onClick={() => ask(q)}
+                                                    className="w-full rounded-xl border border-black/5 px-3 py-2.5 text-left transition-colors hover:border-brand-500/20 hover:bg-brand-500/5 dark:border-white/5 dark:hover:border-brand-500/20 dark:hover:bg-brand-500/5"
+                                                >
+                                                    <p className="font-mono text-[11px] leading-relaxed text-gray-500 dark:text-gray-400">
+                                                        {q}
+                                                    </p>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
 
                                 {messages.map((m, i) => (
-                                    <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                    <div
+                                        key={i}
+                                        className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}
+                                    >
                                         {m.role === 'user' ? (
                                             <div className="max-w-[80%] rounded-2xl rounded-tr-sm bg-brand-500/10 px-3 py-2">
-                                                <p className="font-mono text-[11px] text-brand-700 dark:text-brand-400">{m.text}</p>
+                                                <p className="font-mono text-[11px] text-brand-700 dark:text-brand-400">
+                                                    {m.text}
+                                                </p>
                                             </div>
                                         ) : (
                                             <div className="max-w-[95%] rounded-2xl rounded-tl-sm bg-gray-50 px-3 py-2.5 dark:bg-zinc-800">
-                                                <p className="font-mono text-[11px] leading-relaxed text-gray-600 dark:text-gray-400">{m.text}</p>
+                                                <p className="font-mono text-[11px] leading-relaxed text-gray-600 dark:text-gray-400">
+                                                    {m.text}
+                                                </p>
                                             </div>
                                         )}
                                     </div>
@@ -224,14 +258,19 @@ export default function AskWidget({
                                     <div className="mb-2 flex items-center">
                                         {changing ? (
                                             <div className="flex flex-wrap gap-1">
-                                                {sections.map(s => {
+                                                {sections.map((s) => {
                                                     const Icon = s.icon;
                                                     return (
                                                         <button
                                                             key={s.key}
-                                                            onClick={() => pickSection(s.key)}
+                                                            onClick={() =>
+                                                                pickSection(
+                                                                    s.key,
+                                                                )
+                                                            }
                                                             className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[10px] font-medium transition-colors ${
-                                                                section === s.key
+                                                                section ===
+                                                                s.key
                                                                     ? 'bg-brand-500/10 text-brand-700 dark:text-brand-400'
                                                                     : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-zinc-800 dark:text-gray-400 dark:hover:bg-zinc-700'
                                                             }`}
@@ -244,14 +283,18 @@ export default function AskWidget({
                                             </div>
                                         ) : (
                                             <div className="flex items-center gap-1.5">
-                                                <div className={`flex h-4 w-4 items-center justify-center rounded ${activeSection.color}`}>
+                                                <div
+                                                    className={`flex h-4 w-4 items-center justify-center rounded ${activeSection.color}`}
+                                                >
                                                     <activeSection.icon className="h-2.5 w-2.5" />
                                                 </div>
                                                 <span className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
                                                     {activeSection.label}
                                                 </span>
                                                 <button
-                                                    onClick={() => setChanging(true)}
+                                                    onClick={() =>
+                                                        setChanging(true)
+                                                    }
                                                     className="font-mono! text-[10px]! text-gray-300 underline underline-offset-2 transition-colors hover:text-brand-500 dark:text-gray-600 dark:hover:text-brand-500"
                                                 >
                                                     change
@@ -266,8 +309,14 @@ export default function AskWidget({
                                         ref={inputRef}
                                         type="text"
                                         value={input}
-                                        onChange={e => setInput(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && !e.shiftKey && ask(input)}
+                                        onChange={(e) =>
+                                            setInput(e.target.value)
+                                        }
+                                        onKeyDown={(e) =>
+                                            e.key === 'Enter' &&
+                                            !e.shiftKey &&
+                                            ask(input)
+                                        }
                                         placeholder={`Ask about ${activeSection?.label ?? 'your data'}…`}
                                         disabled={loading}
                                         className="flex-1 bg-transparent font-mono! text-[11px]! text-gray-700 placeholder-gray-300 outline-none disabled:opacity-50 dark:text-gray-300 dark:placeholder-gray-600"
@@ -275,12 +324,13 @@ export default function AskWidget({
                                     <button
                                         onClick={() => ask(input)}
                                         disabled={!input.trim() || loading}
-                                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-white transition-colors disabled:opacity-30 hover:bg-brand-600"
+                                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-white transition-colors hover:bg-brand-600 disabled:opacity-30"
                                     >
-                                        {loading
-                                            ? <Loader2 className="h-3 w-3 animate-spin" />
-                                            : <Send className="h-3 w-3" />
-                                        }
+                                        {loading ? (
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                            <Send className="h-3 w-3" />
+                                        )}
                                     </button>
                                 </div>
                             </div>
@@ -290,15 +340,16 @@ export default function AskWidget({
             )}
 
             <button
-                onClick={() => setOpen(o => !o)}
+                onClick={() => setOpen((o) => !o)}
                 className={`relative flex h-12 w-12 items-center justify-center rounded-full text-white shadow-lg transition-all hover:scale-105 ${fabClass}`}
             >
-                {open
-                    ? <ChevronDown className="h-5 w-5" />
-                    : <Sparkles className="h-5 w-5" />
-                }
+                {open ? (
+                    <ChevronDown className="h-5 w-5" />
+                ) : (
+                    <Sparkles className="h-5 w-5" />
+                )}
                 {!open && aiCount > 0 && (
-                    <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-gray-800 font-mono text-[9px] font-bold text-white dark:bg-white dark:text-gray-900">
+                    <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-gray-800 font-mono text-[9px] font-bold text-white dark:bg-white dark:text-gray-900">
                         {aiCount}
                     </span>
                 )}

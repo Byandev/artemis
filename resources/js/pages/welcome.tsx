@@ -7,17 +7,36 @@ import { useState } from 'react';
 const features = [
     {
         icon: (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+            <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            >
                 <path d="M3 17l6-6 4 4 8-8" />
                 <path d="M14 7h7v7" />
             </svg>
         ),
         title: 'Sales Analytics',
-        description: 'Track revenue, orders, AOV, and repeat purchase rate across all your pages and shops — in one unified view.',
+        description:
+            'Track revenue, orders, AOV, and repeat purchase rate across all your pages and shops — in one unified view.',
     },
     {
         icon: (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+            <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            >
                 <rect x="1" y="3" width="15" height="13" rx="1" />
                 <path d="M16 8h4l3 3v5h-7V8z" />
                 <circle cx="5.5" cy="18.5" r="2.5" />
@@ -25,56 +44,117 @@ const features = [
             </svg>
         ),
         title: 'Delivery Analytics',
-        description: 'Monitor delivery outcomes, attempt counts, and customer RTS scores in real time. Spot risky buyers before you ship.',
+        description:
+            'Monitor delivery outcomes, attempt counts, and customer RTS scores in real time. Spot risky buyers before you ship.',
     },
     {
         icon: (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+            <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            >
                 <path d="M9 14L4 9l5-5" />
                 <path d="M4 9h11a5 5 0 015 5v2" />
             </svg>
         ),
         title: 'RTS Analytics',
-        description: 'Deep-dive into return-to-sender rates by page, shop, user, and city heatmap. Find the exact source of your losses.',
+        description:
+            'Deep-dive into return-to-sender rates by page, shop, user, and city heatmap. Find the exact source of your losses.',
     },
     {
         icon: (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+            <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            >
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
                 <circle cx="12" cy="10" r="3" />
             </svg>
         ),
         title: 'Parcel Journey',
-        description: 'Per-order timeline from confirmation to final delivery — every status, every rider, every customer notification logged.',
+        description:
+            'Per-order timeline from confirmation to final delivery — every status, every rider, every customer notification logged.',
     },
     {
         icon: (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+            <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            >
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 6v6l4 2" />
             </svg>
         ),
         title: 'Operations Insights',
-        description: 'Fulfillment lead times — confirmed to shipped, shipped to delivered, and every bottleneck in between.',
+        description:
+            'Fulfillment lead times — confirmed to shipped, shipped to delivered, and every bottleneck in between.',
     },
     {
         icon: (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+            <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            >
                 <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
                 <circle cx="9" cy="7" r="4" />
                 <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
             </svg>
         ),
         title: 'Role-based Access',
-        description: 'Multi-workspace support with team permissions and granular access control. Your CS team sees only what they need.',
+        description:
+            'Multi-workspace support with team permissions and granular access control. Your CS team sees only what they need.',
     },
 ];
 
 const steps = [
-    { num: '01 / SIGN UP', title: 'Create your workspace', description: 'Enter your business name and a few basics. No credit card, no lengthy forms.' },
-    { num: '02 / CONNECT', title: 'Connect Pancake', description: 'Link your Pancake POS page — we pull your orders, customers, and delivery data automatically.' },
-    { num: '03 / SEE', title: 'Your first insight', description: 'Within minutes, see your real RTS rate, lost profit, and highest-risk zones.' },
-    { num: '04 / ACT', title: 'Move the number', description: 'Turn on notifications, follow our recommendations, and watch RTS drop month over month.' },
+    {
+        num: '01 / SIGN UP',
+        title: 'Create your workspace',
+        description:
+            'Enter your business name and a few basics. No credit card, no lengthy forms.',
+    },
+    {
+        num: '02 / CONNECT',
+        title: 'Connect Pancake',
+        description:
+            'Link your Pancake POS page — we pull your orders, customers, and delivery data automatically.',
+    },
+    {
+        num: '03 / SEE',
+        title: 'Your first insight',
+        description:
+            'Within minutes, see your real RTS rate, lost profit, and highest-risk zones.',
+    },
+    {
+        num: '04 / ACT',
+        title: 'Move the number',
+        description:
+            'Turn on notifications, follow our recommendations, and watch RTS drop month over month.',
+    },
 ];
 
 const faqs = [
@@ -84,19 +164,19 @@ const faqs = [
     },
     {
         q: 'Does Artemis really reduce RTS? By how much?',
-        a: 'On average, our sellers see a 10% relative reduction in RTS within 90 days — but results vary by product, audience, and courier. We don\'t promise a specific endpoint. What we do is give you the visibility and tools to move the number in the right direction.',
+        a: "On average, our sellers see a 10% relative reduction in RTS within 90 days — but results vary by product, audience, and courier. We don't promise a specific endpoint. What we do is give you the visibility and tools to move the number in the right direction.",
     },
     {
-        q: 'What if I don\'t know my profit margin?',
-        a: 'Totally fine — most sellers don\'t track it formally. During onboarding we\'ll ask for your average monthly expenses and auto-compute margin from your sales data. Or you can pick your product category and we\'ll use industry averages.',
+        q: "What if I don't know my profit margin?",
+        a: "Totally fine — most sellers don't track it formally. During onboarding we'll ask for your average monthly expenses and auto-compute margin from your sales data. Or you can pick your product category and we'll use industry averages.",
     },
     {
         q: 'Do I need anything other than Pancake POS?',
-        a: 'Nope. If you\'re running your COD business on Pancake, that\'s all we need. We pull orders, delivery statuses, and customer data directly from your Pancake pages.',
+        a: "Nope. If you're running your COD business on Pancake, that's all we need. We pull orders, delivery statuses, and customer data directly from your Pancake pages.",
     },
     {
         q: 'Is my customer data safe?',
-        a: 'Yes. We\'re Data Privacy Act (RA 10173) compliant, store data encrypted at rest, and never share your numbers with anyone else. Your dashboard is your dashboard.',
+        a: "Yes. We're Data Privacy Act (RA 10173) compliant, store data encrypted at rest, and never share your numbers with anyone else. Your dashboard is your dashboard.",
     },
     {
         q: 'What do I get with the free trial?',
@@ -107,17 +187,19 @@ const faqs = [
 function FaqItem({ q, a }: { q: string; a: string }) {
     const [open, setOpen] = useState(false);
     return (
-        <div className="border-b border-gray-200 dark:border-white/8 py-6">
+        <div className="border-b border-gray-200 py-6 dark:border-white/8">
             <button
                 onClick={() => setOpen(!open)}
                 className="flex w-full items-center justify-between gap-5 text-left"
             >
-                <span className="text-lg font-semibold text-gray-900 dark:text-gray-100 md:text-xl">{q}</span>
+                <span className="text-lg font-semibold text-gray-900 md:text-xl dark:text-gray-100">
+                    {q}
+                </span>
                 <span
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border font-mono text-base transition-all duration-200 ${
                         open
                             ? 'rotate-45 border-brand-500 bg-brand-500 text-white'
-                            : 'border-gray-300 dark:border-white/15 text-gray-400 dark:text-gray-500'
+                            : 'border-gray-300 text-gray-400 dark:border-white/15 dark:text-gray-500'
                     }`}
                 >
                     +
@@ -136,7 +218,7 @@ export default function Welcome() {
     const { auth } = usePage<SharedData>().props;
 
     const ctaHref = auth.user ? dashboard() : register();
-    const ctaLabel = auth.user ? 'Go to Dashboard' : 'Get started — it\'s free';
+    const ctaLabel = auth.user ? 'Go to Dashboard' : "Get started — it's free";
 
     return (
         <>
@@ -233,10 +315,14 @@ export default function Welcome() {
                         </h1>
 
                         <p className="mx-auto mb-4 max-w-xl text-base leading-relaxed text-gray-500 sm:text-lg md:text-xl dark:text-gray-400">
-                            Artemis is the <span className="font-semibold text-brand-500">1st</span> analytics & automation platform for
-                            Philippine COD e-commerce. Track every metric that
-                            matters, cut return-to-sender rates, and keep every
-                            customer informed.
+                            Artemis is the{' '}
+                            <span className="font-semibold text-brand-500">
+                                1st
+                            </span>{' '}
+                            analytics & automation platform for Philippine COD
+                            e-commerce. Track every metric that matters, cut
+                            return-to-sender rates, and keep every customer
+                            informed.
                         </p>
 
                         <p className="mb-12 font-mono text-xs tracking-[0.15em] text-gray-400 uppercase dark:text-gray-600">

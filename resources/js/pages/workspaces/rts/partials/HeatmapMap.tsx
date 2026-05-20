@@ -1,4 +1,3 @@
-import 'maplibre-gl/dist/maplibre-gl.css';
 import {
     ComposableMap,
     createCoordinates,
@@ -6,8 +5,9 @@ import {
     Geography,
     ZoomableGroup,
 } from '@vnedyalk0v/react19-simple-maps';
-import { useCallback, useEffect, useState } from 'react';
 import _ from 'lodash';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { useCallback, useEffect, useState } from 'react';
 import CityInformationDialog from './CityInformationDialog';
 
 export interface HeatPoint {
@@ -74,7 +74,9 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
     const findPartialMatch = useCallback(
         (normalizedCity: string, normalizedProvince: string) => {
             return mappingData.find((m) => {
-                const mappedCity = normalizePancakeName(m.pancake_district_name);
+                const mappedCity = normalizePancakeName(
+                    m.pancake_district_name,
+                );
                 const mappedProvince = normalizePancakeName(
                     m.pancake_province_name,
                 );
@@ -95,7 +97,9 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
                         normalizedProvince.replace(/^metro\s+/, ''),
                         `metro ${normalizedProvince}`,
                     ];
-                    provinceMatches = variants.some((v) => v === mappedProvince);
+                    provinceMatches = variants.some(
+                        (v) => v === mappedProvince,
+                    );
                 }
 
                 return cityMatches && provinceMatches;
@@ -120,7 +124,9 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
             }
 
             const normalizedCity = normalizePancakeName(point.city_name);
-            const normalizedProvince = normalizePancakeName(point.province_name);
+            const normalizedProvince = normalizePancakeName(
+                point.province_name,
+            );
 
             if (!normalizedCity || !normalizedProvince) {
                 console.log('Invalid point:', point);
@@ -130,9 +136,9 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
             let mapping = mappingData.find(
                 (m) =>
                     normalizePancakeName(m.pancake_province_name) ===
-                    normalizedProvince &&
+                        normalizedProvince &&
                     normalizePancakeName(m.pancake_district_name) ===
-                    normalizedCity,
+                        normalizedCity,
             );
 
             if (!mapping) {
@@ -211,7 +217,10 @@ export default function HeatmapMap({ points }: HeatmapMapProps) {
                                     const province =
                                         geo?.properties?.NAME_1 ?? '';
                                     const color = getFillColor(city, province);
-                                    const cityData = getCityData(city, province);
+                                    const cityData = getCityData(
+                                        city,
+                                        province,
+                                    );
 
                                     return (
                                         <Geography

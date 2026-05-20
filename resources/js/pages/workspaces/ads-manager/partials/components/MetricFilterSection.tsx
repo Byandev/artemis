@@ -38,7 +38,7 @@ export const MetricFilterSection = ({
     if (selectedMetrics.length === 0) return null;
 
     return (
-        <div className="border-t border-gray-200 pt-3 space-y-3">
+        <div className="space-y-3 border-t border-gray-200 pt-3">
             {editingIndex !== null ? (
                 <MetricFilterForm
                     formState={formState}
@@ -56,7 +56,7 @@ export const MetricFilterSection = ({
                     onClick={onOpenForm}
                     className="h-8"
                 >
-                    <Plus className="h-3.5 w-3.5 mr-2" />
+                    <Plus className="mr-2 h-3.5 w-3.5" />
                     Add Filter
                 </Button>
             ) : (
