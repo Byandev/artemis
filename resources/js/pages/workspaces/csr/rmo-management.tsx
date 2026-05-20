@@ -95,7 +95,6 @@ interface Props {
     delivered_count: number;
     returning_count: number;
     problematic_count: number;
-    pancakeAccounts: { id: string; name: string }[];
 }
 
 function formatDuration(seconds: number): string {
@@ -329,16 +328,12 @@ export default function CsrRmoManagement({
     delivered_count,
     returning_count,
     problematic_count,
-    pancakeAccounts,
 }: Props) {
-    const { appEnv } = usePage<SharedData>().props;
+    const { appEnv, auth } = usePage<SharedData>().props;
     const canEditPhone = appEnv !== 'production';
 
-    const [activePancakeAccount, setActivePancakeAccount] = useState(
-        () => pancakeAccounts[0] ?? null,
-    );
-    const userId = activePancakeAccount?.id ?? '';
-    const userName = activePancakeAccount?.name ?? '';
+    const userId = String(auth.user.id);
+    const userName = auth.user.name;
 
     const rmoUrl = `/workspaces/${workspace.slug}/csr/rmo-management`;
 
@@ -455,13 +450,7 @@ export default function CsrRmoManagement({
                 { preserveState: true, replace: true, preserveScroll: true },
             );
         },
-        [
-            rmoUrl,
-            query?.sort,
-            searchValue,
-            currentStatus,
-            currentParcelStatus,
-        ],
+        [rmoUrl, query?.sort, searchValue, currentStatus, currentParcelStatus],
     );
 
     const buildAllParams = useCallback(
@@ -1260,39 +1249,12 @@ export default function CsrRmoManagement({
                             }}
                         />
 
-                        {pancakeAccounts.length > 1 ? (
-                            <div className="relative flex items-center">
-                                <UserIcon className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
-                                <select
-                                    value={activePancakeAccount?.id ?? ''}
-                                    onChange={(e) => {
-                                        const account = pancakeAccounts.find(
-                                            (a) => a.id === e.target.value,
-                                        );
-                                        if (account)
-                                            setActivePancakeAccount(account);
-                                    }}
-                                    className="h-8 appearance-none rounded-lg border border-black/6 bg-white py-0 pr-7 pl-8 text-[12px] font-medium text-gray-700 outline-none transition-colors hover:border-black/12 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:border-white/12 dark:focus:border-emerald-400"
-                                >
-                                    {pancakeAccounts.map((account) => (
-                                        <option
-                                            key={account.id}
-                                            value={account.id}
-                                        >
-                                            {account.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
-                            </div>
-                        ) : activePancakeAccount ? (
-                            <div className="flex h-8 items-center gap-2 rounded-lg border border-black/6 bg-white px-3 dark:border-white/6 dark:bg-zinc-800">
-                                <UserIcon className="h-3.5 w-3.5 text-emerald-500" />
-                                <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
-                                    {activePancakeAccount.name}
-                                </span>
-                            </div>
-                        ) : null}
+                        <div className="flex h-8 items-center gap-2 rounded-lg border border-black/6 bg-white px-3 dark:border-white/6 dark:bg-zinc-800">
+                            <UserIcon className="h-3.5 w-3.5 text-emerald-500" />
+                            <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                {userName}
+                            </span>
+                        </div>
                     </div>
                 </div>
 
