@@ -43,6 +43,7 @@ enum Permission: string
 
     // RTS
     case ViewRtsAnalytics = 'View RTS Analytics';
+    case ViewParcelJourneyTemplates = 'View Parcel Journey Templates';
     case ManageParcelJourneyTemplates = 'Manage Parcel Journey Templates';
 
     // CSR
@@ -128,6 +129,7 @@ enum Permission: string
             self::DeleteTeams => 'Teams',
 
             self::ViewRtsAnalytics,
+            self::ViewParcelJourneyTemplates,
             self::ManageParcelJourneyTemplates => 'RTS',
 
             self::ViewCsrManagement,

@@ -159,6 +159,7 @@ export function AppSidebar() {
             icon: RotateCcw,
             anyOf: [
                 PERMISSIONS.ViewRtsAnalytics,
+                PERMISSIONS.ViewParcelJourneyTemplates,
                 PERMISSIONS.ManageParcelJourneyTemplates,
             ],
             items: [
@@ -172,7 +173,10 @@ export function AppSidebar() {
                     title: 'Parcel Journey',
                     href: `/workspaces/${slug}/rts/parcel-journeys`,
                     icon: MapPin,
-                    permission: PERMISSIONS.ManageParcelJourneyTemplates,
+                    anyOf: [
+                        PERMISSIONS.ViewParcelJourneyTemplates,
+                        PERMISSIONS.ManageParcelJourneyTemplates,
+                    ],
                 },
             ],
         },

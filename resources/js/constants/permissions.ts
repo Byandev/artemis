@@ -38,6 +38,7 @@ export const PERMISSIONS = {
 
     // RTS
     ViewRtsAnalytics: 'View RTS Analytics',
+    ViewParcelJourneyTemplates: 'View Parcel Journey Templates',
     ManageParcelJourneyTemplates: 'Manage Parcel Journey Templates',
 
     // CSR
