@@ -132,6 +132,8 @@ export default function PurchasedOrderIndex({
     );
     const canManagePurchasedOrders =
         canEditPurchasedOrders || canDeletePurchasedOrders;
+    const canUsePurchasedOrderActions =
+        canCreatePurchasedOrders || canManagePurchasedOrders;
 
     const buildFilter = (search: string, range: string[]) => ({
         search: search || undefined,
@@ -388,20 +390,22 @@ export default function PurchasedOrderIndex({
                     title="Purchased Orders"
                     description="Manage your inventory purchased orders."
                 >
-                    <a
-                        href={`${baseUrl}/export?${new URLSearchParams(
-                            Object.entries({
-                                'filter[search]': searchValue || '',
-                                'filter[start_date]': dateRange[0] || '',
-                                'filter[end_date]': dateRange[1] || '',
-                                sort: query?.sort ?? '',
-                            }).filter(([, v]) => v !== ''),
-                        ).toString()}`}
-                        className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-zinc-800"
-                    >
-                        <Download className="h-3.5 w-3.5" />
-                        Export
-                    </a>
+                    {canUsePurchasedOrderActions && (
+                        <a
+                            href={`${baseUrl}/export?${new URLSearchParams(
+                                Object.entries({
+                                    'filter[search]': searchValue || '',
+                                    'filter[start_date]': dateRange[0] || '',
+                                    'filter[end_date]': dateRange[1] || '',
+                                    sort: query?.sort ?? '',
+                                }).filter(([, v]) => v !== ''),
+                            ).toString()}`}
+                            className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-zinc-800"
+                        >
+                            <Download className="h-3.5 w-3.5" />
+                            Export
+                        </a>
+                    )}
                     {canCreatePurchasedOrders && (
                         <button
                             onClick={() => router.get(`${baseUrl}/create`)}
