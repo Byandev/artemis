@@ -79,6 +79,7 @@ class GrantUserAllViewPermissions extends Command
             Permission::DeleteProducts->value,
             // RTS
             Permission::ViewRtsAnalytics->value,
+            Permission::ViewParcelJourneyTemplates->value,
             Permission::ManageParcelJourneyTemplates->value,
             // CSR
             Permission::ViewCsrManagement->value,
