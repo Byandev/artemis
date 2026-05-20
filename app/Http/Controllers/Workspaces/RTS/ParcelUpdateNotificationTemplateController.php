@@ -22,7 +22,7 @@ class ParcelUpdateNotificationTemplateController extends Controller
 
     public function index(Workspace $workspace, Request $request)
     {
-        $this->authorize(Permission::ManageParcelJourneyTemplates->value, $workspace);
+        $this->authorize(Permission::ViewParcelJourneyTemplates->value, $workspace);
 
         if ($workspace->parcelJourneyNotificationTemplates()->count() === 0) {
             ParcelJourneyNotificationTemplate::upsert([
