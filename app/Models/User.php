@@ -114,9 +114,18 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isAdminOf(Workspace $workspace): bool
     {
+        if ($this->ownsWorkspace($workspace)) {
+            return true;
+        }
+
         return $this->workspaces()
-            ->where('workspace_id', $workspace->id)
-            ->whereIn('workspace_user.role', ['owner', 'admin'])
+            ->leftJoin('roles', 'workspace_user.role_id', '=', 'roles.id')
+            ->where('workspace_user.workspace_id', $workspace->id)
+            ->where(function ($query) {
+                $query
+                    ->whereIn('workspace_user.role', ['owner', 'admin'])
+                    ->orWhere('roles.name', 'admin');
+            })
             ->exists();
     }
 
@@ -199,7 +208,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function hasPermission(string|BackedEnum $permission, Workspace $workspace): bool
     {
-        if ($this->isSuperAdmin() || $this->ownsWorkspace($workspace)) {
+        if ($this->isSuperAdmin() || $this->ownsWorkspace($workspace) || $this->isAdminOf($workspace)) {
             return true;
         }
 

@@ -137,6 +137,9 @@ class GrantUserAllViewPermissions extends Command
             // Pancake
             Permission::ViewCourierShipments->value,
             Permission::ImportCourierShipments->value,
+            // Botcake
+            Permission::ViewBotcakeSequences->value,
+            Permission::ViewBotcakeFlows->value,
             // Settings
             Permission::EditWorkspaceSettings->value,
             Permission::ManageApiKeys->value,

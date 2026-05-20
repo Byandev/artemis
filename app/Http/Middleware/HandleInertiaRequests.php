@@ -58,6 +58,9 @@ class HandleInertiaRequests extends Middleware
         $isOwner = $user && $workspaceModel
             ? $user->ownsWorkspace($workspaceModel)
             : false;
+        $isWorkspaceAdmin = $user && $workspaceModel
+            ? $user->isAdminOf($workspaceModel)
+            : false;
         $can = [
             'viewAnySupportTickets' => false,
         ];
@@ -112,6 +115,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $user ? array_merge($user->toArray(), [
                     'is_super_admin' => $user->isSuperAdmin(),
                     'is_workspace_owner' => $isOwner,
+                    'is_workspace_admin' => $isWorkspaceAdmin,
                     'is_csr' => $user && $workspaceModel ? $user->isCsrOf($workspaceModel) : false,
                     'permissions' => $permissions,
                     'can' => $can,
@@ -165,7 +169,7 @@ class HandleInertiaRequests extends Middleware
             return [];
         }
 
-        if ($user->ownsWorkspace($workspace)) {
+        if ($user->ownsWorkspace($workspace) || $user->isAdminOf($workspace)) {
             return ['*'];
         }
 
