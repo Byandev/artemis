@@ -83,9 +83,9 @@ export default function Index({ roles, workspace, query }: Props) {
     const [openFormModal, setOpenFormModal] = useState(false);
 
     const canEdit = usePermission(PERMISSIONS.EditRoles);
-    const canDelete = usePermission(PERMISSIONS.DeleteRoles);
+    const canArchive = useAnyPermission([PERMISSIONS.DeleteRoles, 'Delete Roles' as PermissionName]);
     const canManagePerms = usePermission(PERMISSIONS.ManageRolePermissions);
-    const showActions = canEdit || canDelete || canManagePerms;
+    const showActions = canEdit || canArchive || canManagePerms;
 
     useEffect(() => {
         const timer = setTimeout(() => {
