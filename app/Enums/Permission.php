@@ -94,10 +94,6 @@ enum Permission: string
     case ViewCourierShipments = 'View Courier Shipments';
     case ImportCourierShipments = 'Import Courier Shipments';
 
-    // Botcake
-    case ViewBotcakeSequences = 'View Botcake Sequences';
-    case ViewBotcakeFlows = 'View Botcake Flows';
-
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
@@ -161,9 +157,6 @@ enum Permission: string
             self::CreateChecklist,
             self::EditChecklist,
             self::DeleteChecklist => 'Checklist',
-
-            self::ViewBotcakeSequences,
-            self::ViewBotcakeFlows => 'Botcake',
 
             self::ViewFinanceDashboard,
             self::ViewFinanceAccounts,
