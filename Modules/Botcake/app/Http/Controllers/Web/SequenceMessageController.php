@@ -2,67 +2,58 @@
 
 namespace Modules\Botcake\Http\Controllers\Web;
 
-use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Modules\Botcake\Http\Sorts\Sequence\SuccessRateSort;
-use Modules\Botcake\Http\Sorts\Sequence\TotalPhoneNumberSort;
-use Modules\Botcake\Http\Sorts\Sequence\TotalSentSort;
-use Modules\Botcake\Models\Sequence;
+use Modules\Botcake\Http\Sorts\SequenceMessage\SuccessRateSort;
+use Modules\Botcake\Models\SequenceMessage;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
-class SequenceController extends Controller
+class SequenceMessageController extends Controller
 {
-    use AuthorizesRequests;
-
     public function index(Request $request, Workspace $workspace)
     {
-        $this->authorize(Permission::ViewBotcakeSequences->value, $workspace);
-
         [$mode, $from, $to] = $this->resolveModeAndRange($request);
 
-        $base = Sequence::query()
-            ->whereHas('page', fn ($query) => $query->where('workspace_id', $workspace->id))
-            ->with('page:id,name');
+        $base = SequenceMessage::query()
+            ->whereHas('sequence.page', fn ($query) => $query->where('workspace_id', $workspace->id))
+            ->with(['sequence:id,name,page_id', 'sequence.page:id,name']);
 
         if ($mode === 'historical') {
             $base->appendHistorical($from, $to);
-
-            // In historical mode the aliased subselects can be sorted on
-            // directly by their alias name — no custom Sort classes needed.
-            $allowedSorts = ['name', 'total_sent', 'total_phone_number', 'success_rate'];
+            $allowedSorts = ['name', 'sent', 'total_phone_number', 'success_rate'];
         } else {
-            $base
-                ->appendTotalSent()
-                ->appendTotalPhoneNumber()
-                ->appendSuccessRate();
-
+            $base->select('botcake_sequence_messages.*')->appendSuccessRate();
             $allowedSorts = [
                 'name',
-                AllowedSort::custom('total_sent', new TotalSentSort),
-                AllowedSort::custom('total_phone_number', new TotalPhoneNumberSort),
+                'sent',
+                'total_phone_number',
                 AllowedSort::custom('success_rate', new SuccessRateSort),
             ];
         }
 
-        $sequences = QueryBuilder::for($base)
+        $messages = QueryBuilder::for($base)
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),
+                AllowedFilter::callback('sequence_ids', function ($query, $value) {
+                    $ids = $this->parseIds($value);
+                    if (! empty($ids)) {
+                        $query->whereIn('botcake_sequence_messages.sequence_id', $ids);
+                    }
+                }),
                 AllowedFilter::callback('page_ids', function ($query, $value) {
                     $ids = $this->parseIds($value);
                     if (! empty($ids)) {
-                        $query->whereIn('botcake_sequences.page_id', $ids);
+                        $query->whereHas('sequence', fn ($q) => $q->whereIn('page_id', $ids));
                     }
                 }),
                 AllowedFilter::callback('shop_ids', function ($query, $value) {
                     $ids = $this->parseIds($value);
                     if (! empty($ids)) {
-                        $query->whereHas('page', fn ($q) => $q->whereIn('shop_id', $ids));
+                        $query->whereHas('sequence.page', fn ($q) => $q->whereIn('shop_id', $ids));
                     }
                 }),
                 AllowedFilter::callback('sent_min', function ($query, $value) use ($mode, $from, $to) {
@@ -72,26 +63,22 @@ class SequenceController extends Controller
                     $min = (int) $value;
                     if ($mode === 'historical') {
                         $query->whereRaw(
-                            '(SELECT COALESCE(SUM(sent), 0) FROM botcake_sequence_daily_stats
-                                WHERE botcake_sequence_daily_stats.sequence_id = botcake_sequences.id
+                            '(SELECT COALESCE(SUM(sent), 0) FROM botcake_sequence_message_daily_stats
+                                WHERE botcake_sequence_message_daily_stats.sequence_message_id = botcake_sequence_messages.id
                                   AND date BETWEEN ? AND ?) >= ?',
                             [$from, $to, $min]
                         );
                     } else {
-                        $query->whereRaw(
-                            '(SELECT COALESCE(SUM(sent), 0) FROM botcake_sequence_messages
-                                WHERE botcake_sequence_messages.sequence_id = botcake_sequences.id) >= ?',
-                            [$min]
-                        );
+                        $query->where('botcake_sequence_messages.sent', '>=', $min);
                     }
                 }),
             ])
             ->allowedSorts($allowedSorts)
-            ->defaultSort('-total_sent')
+            ->defaultSort('-sent')
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
-        return Inertia::render('workspaces/botcake/sequences', [
+        return Inertia::render('workspaces/botcake/sequence-messages', [
             'workspace' => $workspace->loadMissing([
                 'shops' => function ($query) {
                     $query->select('id', 'name', 'workspace_id')->orderBy('name');
@@ -101,7 +88,7 @@ class SequenceController extends Controller
                 },
                 'pageOwners:id,name',
             ]),
-            'sequences' => $sequences,
+            'messages' => $messages,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page', 'mode', 'from', 'to']),
                 'filter' => $request->input('filter', []),

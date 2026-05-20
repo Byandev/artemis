@@ -62,6 +62,22 @@ class FlowController extends Controller
                         $query->whereHas('page', fn ($q) => $q->whereIn('shop_id', $ids));
                     }
                 }),
+                AllowedFilter::callback('sent_min', function ($query, $value) use ($mode, $from, $to) {
+                    if ($value === null || $value === '') {
+                        return;
+                    }
+                    $min = (int) $value;
+                    if ($mode === 'historical') {
+                        $query->whereRaw(
+                            '(SELECT COALESCE(SUM(sent), 0) FROM botcake_flow_daily_stats
+                                WHERE botcake_flow_daily_stats.flow_id = botcake_flows.id
+                                  AND date BETWEEN ? AND ?) >= ?',
+                            [$from, $to, $min]
+                        );
+                    } else {
+                        $query->where('botcake_flows.sent', '>=', $min);
+                    }
+                }),
             ])
             ->allowedSorts(['name', 'sent', 'total_phone_number', 'success_rate'])
             ->defaultSort('-sent')

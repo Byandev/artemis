@@ -126,6 +126,11 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewBotcakeSequences,
                           },
                           {
+                              title: 'Sequence Messages',
+                              href: `/workspaces/${currentWorkspace.slug}/botcake/sequence-messages`,
+                              icon: Send,
+                          },
+                          {
                               title: 'Flows',
                               href: `/workspaces/${currentWorkspace.slug}/botcake/flows`,
                               icon: ClipboardList,

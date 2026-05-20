@@ -1,133 +1,131 @@
 # Artemis Pricing
 
+> **The analytics layer for Pancake sellers.**
+> Know which products, pages, and customers are actually making you money — in real time, in one dashboard.
+
 ## Plans
 
-| | Free Trial | Starter | Growth | Scale | Enterprise |
-|---|---|---|---|---|---|
-| **Price** | ₱0 (30 days) | ₱2,999/mo | ₱5,999/mo | ₱14,999/mo | Custom |
-| **Orders** | Up to 10,000/mo | Up to 3,000/mo | Up to 10,000/mo | Up to 30,000/mo | Unlimited |
-| **Pages** | 1 page | Up to 5 | Up to 25 | Up to 100 | Unlimited |
-| **Data retention** | 6 months | 3 months | 6 months | 12 months | Custom |
-| **Analytics** | Advanced | Basic | Advanced | Advanced | Advanced |
-| **Parcel Journey + SMS** | ✅ Included | ✅ Included | ✅ Included | ✅ Included | ✅ Included |
-| **Support** | Priority chat | Chat | Priority chat | Dedicated | Dedicated + SLA |
+| Feature | **Solo**         | **Pro**                   | **Business**                       |
+|---|------------------|---------------------------|------------------------------------|
+| **Price** | ₱2,999/mo        | ₱5,999/mo                 | ₱10,999/mo                         |
+| **For** | New / side shops | Established 1-brand shops | Multi-brand / agencies             |
+| **Orders/mo** | Up to 3,000      | Up to 10,000              | Up to 30,000                       |
+| **Analytics** | Basic            | Advanced                  | Advanced                           |
+| **Botcake analytics** | —                | ✅ Included                | ✅ Included                         |
+| **Parcel Journey** | ✅ Included       | ✅ Included                | ✅ Included                         |
+| **Data history** | 3 months         | 6 months                  | 12 months                          |
+| **Support** | Email            | Priority chat             | Dedicated CSM                      |
 
-Billing is **monthly, manual**: bank transfer / GCash / Maya. No automatic subscriptions, no card on file, no payment processor fees.
+**14-day free trial of Pro** — up to 3,000 orders, 1 page only, no card required.
 
-## Metrics tiers
+Billing: monthly, via bank transfer / GCash / Maya. No card on file.
 
-### Basic — included in Starter (12 metrics)
+## Enterprise — self-hosted
 
-The metrics every seller needs to run their shop.
+For shops above 30,000 orders/mo, agencies running multiple brands at scale, or sellers with data-residency / compliance requirements who want to run Artemis on their own infrastructure.
 
-| Group | Metric |
+| | Enterprise |
 |---|---|
-| **Revenue & Volume** | Total Sales, Total Orders, AOV, Unique Customers, New Customer Count |
-| **Delivery Outcomes** | Delivered Amount, Returned Amount, Entered Returning Amount, RTS Rate, For Delivery Count, For Delivery Amount |
-| **Fulfillment Lead Time** | Ave. Confirmed → Delivered (end-to-end summary) |
+| **Setup fee** | ₱34,999 one-time |
+| **Monthly support** | ₱1,499/mo |
+| **Infrastructure** | Customer-provided server / cloud |
+| **Orders/mo** | Unlimited |
+| **Pages** | Unlimited |
+| **Analytics** | Everything in Business + custom dashboards |
+| **Data history** | Unlimited (subject to your storage) |
+| **Support** | Dedicated channel, business-hours SLA |
+| **Updates** | Deployed by Artemis on an agreed cadence |
 
-### Advanced — Growth, Scale, Enterprise only (16 metrics)
+**Setup fee covers:** initial deployment on your infrastructure, data migration from Pancake, custom dashboard configuration, team training.
 
-The analytics that drive smarter decisions and justify upgrading.
+**Monthly support covers:** bug fixes, security patches, minor updates and new features, technical support during business hours.
 
-| Group | Metric |
-|---|---|
-| **Customer Quality & Retention** | Repeat Order Ratio, Repeat Customer Ratio, Repeat Unique Customers, Time to First Order, Average Lifetime Value, 30/60/90-Day Retention Rate |
-| **Revenue & Volume** | All Customer Conversion Rate |
-| **Delivery Quality Signals** | Delivered Avg Customer RTS, Returned Avg Customer RTS, Delivered Avg Delivery Attempts, Returned Avg Delivery Attempts |
-| **Fulfillment Lead Time** | Ave. Confirmed → Shipped, Ave. Confirmed → 1st Delivery, Ave. Shipped → 1st Delivery, Ave. Shipped → Delivered, Ave. Returning → Returned |
+**Not included in monthly support:** major features and custom feature requests — quoted separately on a project basis.
 
-## ROI Context
+**You provide:** server / cloud infrastructure (we'll advise on specs), SSL cert + domain, your own SMS provider for Parcel Journey.
 
-A seller at 30% RTS loses approximately ₱352 per failed parcel (ad spend + forward shipping + packaging + damage + unrealized profit).
+**Typical infrastructure cost:** ~₱12,000/mo for a starter server, scaling with your data volume. We'll help you size it during setup.
 
-| Plan | Orders | RTS parcels (at 30%) | Monthly RTS bleed | Artemis cost | Break-even RTS reduction |
-|---|---|---|---|---|---|
-| Starter | 3,000 | 900 | ₱316,800 | ₱2,999 | 0.95% |
-| Growth | 10,000 | 3,000 | ₱1,056,000 | ₱5,999 | 0.57% |
-| Scale | 30,000 | 9,000 | ₱3,168,000 | ₱14,999 | 0.47% |
+## What you get
 
-Artemis pays for itself if the seller reduces RTS by less than 1%.
+**Core dashboards (every plan)**
+Total Sales · Total Orders · AOV · Unique & New Customers · Delivered / Returned amounts · RTS Rate · For Delivery volume · Confirmed → Delivered lead time
 
-## Realistic Monthly Revenue Projections
+**Parcel Journey (every plan)**
+Automated parcel status notifications to customers. Connect your own SMS provider (Infotxt, Semaphore, etc.) — you pay your provider directly, no markup from us.
 
-Assumptions:
-- PH COD SaaS niche, launching with Pancake POS sellers as target
-- Free trial conversion rate: 15–25% (industry avg for freemium B2B SaaS)
-- Customer mix: 65% Starter, 25% Growth, 10% Scale
-- Churn: ~8%/mo early, improving to ~5%/mo as product matures
-- All revenue is from subscription only (parcel journey + SMS bundled, no add-on revenue)
+**Advanced analytics (Pro and Business)**
+Repeat Order & Customer Ratio · Customer LTV · Time to First Order · 30 / 60 / 90-day Retention · All-customer Conversion Rate · Delivery quality signals (customer RTS history, delivery attempts) · Full fulfillment lead times (Confirmed → Shipped → 1st Delivery → Delivered → Returned)
 
-### Month 1–3 (Launch)
+**Botcake analytics (Pro and Business)**
+Flow performance · Sequence performance (sent, phone captures, success rate) · Per-message breakdown inside each sequence · Historical date-range comparisons · Direct deep-links into Botcake for any flow, sequence, or message
 
-Cold start. Free trials, early adopters, word of mouth in COD seller communities.
+**Cross-page rollups & exports (Business)**
+Multi-brand consolidated dashboards · Scheduled CSV/Sheets exports · Read-only API access
 
-| | Paying customers | Mix (S/G/Sc) | Total MRR |
-|---|---|---|---|
-| Month 1 | 5 | 3 / 1 / 1 | ₱29,995 |
-| Month 2 | 12 | 8 / 3 / 1 | ₱56,988 |
-| Month 3 | 25 | 16 / 6 / 3 | ₱128,975 |
+## Why sellers buy
 
-Breakdown at 25 customers (Month 3):
-- 16 Starter × ₱2,999 = ₱47,984
-- 6 Growth × ₱5,999 = ₱35,994
-- 3 Scale × ₱14,999 = ₱44,997
-- **Total: ₱128,975**
+You can't fix what you can't see. Most Pancake sellers operate on gut and aggregate Facebook ad numbers — and end up surprised by which products lose money, which pages have toxic RTS, and which customers actually come back.
 
-### Month 4–6 (Traction)
+A few of the questions Artemis answers in one click:
 
-Referrals kicking in, case studies published, COD seller groups aware.
+- Which 20% of products drive 80% of profit (and which silently lose money to RTS)?
+- Which pages have a returning-customer base — and which are pure paid traffic?
+- What's our true cost per delivered order after RTS, ad spend, and packaging?
+- Is our average delivery time getting worse?
 
-| | Paying customers | Mix (S/G/Sc) | Total MRR |
-|---|---|---|---|
-| Month 4 | 40 | 26 / 10 / 4 | ₱197,960 |
-| Month 5 | 60 | 39 / 15 / 6 | ₱296,940 |
-| Month 6 | 80 | 52 / 20 / 8 | ₱395,920 |
-
-Breakdown at 80 customers (Month 6):
-- 52 Starter × ₱2,999 = ₱155,948
-- 20 Growth × ₱5,999 = ₱119,980
-- 8 Scale × ₱14,999 = ₱119,992
-- **Total: ₱395,920**
-
-### Month 7–12 (Growth)
-
-Product-market fit confirmed. Expanding outreach, possibly adding more integrations.
-
-| | Paying customers | Mix (S/G/Sc) | Total MRR |
-|---|---|---|---|
-| Month 7 | 100 | 65 / 25 / 10 | ₱494,900 |
-| Month 9 | 150 | 97 / 38 / 15 | ₱743,850 |
-| Month 12 | 250 | 162 / 63 / 25 | ₱1,238,750 |
-
-### Year 1 Summary
-
-| Metric | Conservative | Moderate | Optimistic |
-|---|---|---|---|
-| Paying customers (Month 12) | 120 | 250 | 400 |
-| MRR (Month 12) | ₱593,880 | ₱1,238,750 | ₱1,979,600 |
-| ARR run rate (Month 12) | ₱7.1M | ₱14.9M | ₱23.8M |
-| Total Year 1 revenue | ₱3.8M | ₱7.9M | ₱12.7M |
-
-### Revenue per customer (blended avg)
-
-| Metric | Value |
-|---|---|
-| Avg revenue per customer | **₱4,949/mo** (weighted by 65/25/10 mix) |
-
-### Key milestones
-
-- **Break-even (1-person operation):** ~6 paying customers (~₱30k MRR) — covers infra (~$200), domain, developer (~$300), tooling
-- **First hire:** ~25 customers (~₱129k MRR) — enough to bring on support/CS
-- **Sustainable business:** ~80 customers (~₱396k MRR) — small team, healthy margins
-- **Serious SaaS:** ~250+ customers (~₱1.24M+ MRR) — ₱15M+ ARR, real business
+**Use case — RTS reduction.** At ~30% RTS, a seller doing 10,000 orders/mo bleeds ~₱1M/mo on failed parcels (ad spend + shipping + packaging). Pro pays for itself if Artemis helps reduce RTS by less than 0.6%.
 
 ## Notes
 
-- **Billing model**: monthly, manual. Customer pays via bank transfer / GCash / Maya. No automated card-on-file subscriptions, no payment processor fees, no auto-renewal.
-- **Free trial**: 30 days, capped at 500 orders, 1 page only, Basic analytics, parcel journey + SMS included. No credit card required.
-- **Page limits**: enforced per plan (5 / 25 / 100). Above plan cap → upgrade prompt.
-- **Order overage**: hard cap with upgrade prompt at 80% / 100% of monthly limit. No per-order overage billing.
-- **Parcel Journey + SMS**: bundled into every paid plan. SMS provider cost absorbed by Artemis. Code-side cap on SMS triggers per parcel lifecycle protects margin.
-- **Above 30,000 orders/mo**: Enterprise tier — contact sales.
-- **Annual / multi-month discount**: not offered initially. Reconsider once monthly model proves itself.
+- **Billing**: monthly, manual. Bank transfer, GCash, or Maya. No automated card-on-file, no payment processor fees. Annual upfront with 2 months free will be offered once we cross 100 paying customers.
+- **Trial**: 14 days of Pro features, up to 3,000 orders, 1 page only. No card. Trial expires automatically — no auto-charge.
+- **Order limit**: hard cap at 80% / 100% with upgrade prompt. No per-order overage billing.
+- **Page limit**: enforced per plan (1 / 5 / unlimited).
+- **Parcel Journey**: included in every plan. Customers connect their own SMS provider (Infotxt, Semaphore, etc.) — Artemis triggers the messages, the seller pays the provider directly. No SMS markup from us, no per-SMS limits on our side.
+
+---
+
+## Internal — Year 1 projections
+
+Assumptions (revised for analytics positioning):
+
+- Buyer is more sophisticated than RTS-first version: skews toward established shops
+- Trial → paid conversion: **10%** (no card, B2B SaaS realistic)
+- Customer mix: **40% Solo / 40% Pro / 20% Business** (was 65/25/10 — pivot draws larger shops)
+- Blended ARPU: **₱5,799/mo** (40% × ₱2,999 + 40% × ₱5,999 + 20% × ₱10,999)
+- Churn: 8%/mo months 1–6, improving to 5%/mo by month 12 (applied below)
+- Acquisition channel: Pancake seller communities + direct outreach. CAC estimate: ₱300–500/customer for first 100, rising as we exhaust warm channels.
+
+### Customer growth (with churn applied)
+
+| Month | Gross adds | Churn losses | Net customers | MRR |
+|---|---|---|---|---|
+| Month 1 | 6 | 0 | 6 | ₱35k |
+| Month 3 | 12 | 2 | 24 | ₱139k |
+| Month 6 | 22 | 5 | 75 | ₱435k |
+| Month 9 | 26 | 7 | 135 | ₱783k |
+| Month 12 | 28 | 9 | 200 | ₱1,160k |
+
+### Year 1 scenarios
+
+| Scenario | Customers (M12) | MRR (M12) | ARR run-rate | Y1 revenue |
+|---|---|---|---|---|
+| Conservative | 120 | ₱696k | ₱8.4M | ₱4.5M |
+| Moderate | 200 | ₱1,160k | ₱13.9M | ₱7.4M |
+| Optimistic | 320 | ₱1,856k | ₱22.3M | ₱11.8M |
+
+### Milestones
+
+- **Break-even (solo founder):** ~6 customers (~₱35k MRR) — covers infra + tooling
+- **First hire (CS / admin):** ~25 customers (~₱145k MRR)
+- **Sustainable 2-person team:** ~75 customers (~₱435k MRR)
+- **Serious SaaS:** 200+ customers (~₱1.16M+ MRR, ₱13.9M+ ARR)
+
+### What still needs to be answered
+
+1. **CAC by channel** — Pancake group outreach vs paid ads vs referral. Without this the projection is a wish.
+2. **Pro price elasticity** — ₱5,999 is the inflection tier; test ±₱1,000 with cohorts once we have 30+ Pro customers.
+3. **Annual plan trigger** — at customer #100, introduce annual (12mo prepaid = 2 free months) to reduce churn and front-load cash.
+4. **Onboarding friction from BYO SMS** — measure how many trial users actually finish wiring up their own SMS provider; if drop-off is high, offer a paid "we'll set it up" onboarding service.
+5. **Enterprise pipeline** — projections above are SaaS-only. Each Enterprise deal adds ₱34,999 setup + ₱1,499/mo. Two Enterprise closes in year 1 = ₱70k one-time + ₱36k/yr recurring. Don't bake into the model until the first deal closes.
