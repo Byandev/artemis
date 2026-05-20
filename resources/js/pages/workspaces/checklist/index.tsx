@@ -235,12 +235,12 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                                 {
                                     sort: params?.sort,
                                     page: params?.page ?? 1,
+                                    per_page: params?.per_page,
                                 },
                                 {
                                     preserveState: true,
                                     replace: true,
                                     preserveScroll: true,
-                                    only: ['checklists', 'query'],
                                 },
                             );
                         }}

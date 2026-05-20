@@ -2,12 +2,11 @@
 
 use App\Models\CallLog;
 use Carbon\Carbon;
-use Illuminate\Support\Str;
 
 test('sync upserts call logs scoped to the workspace', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
-    $userId = (string) Str::uuid();
+    $userId = fake()->unique()->numberBetween(1, 999999);
 
     $payload = [
         'user_id' => $userId,
@@ -50,8 +49,8 @@ test('list returns only the requested user logs in the workspace', function () {
     ['workspace' => $workspaceB] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspaceA);
 
-    $userId = (string) Str::uuid();
-    $otherUser = (string) Str::uuid();
+    $userId = fake()->unique()->numberBetween(1, 999999);
+    $otherUser = fake()->unique()->numberBetween(1, 999999);
 
     CallLog::factory()->create(['workspace_id' => $workspaceA->id, 'user_id' => $userId, 'phone_number' => '+1']);
     CallLog::factory()->create(['workspace_id' => $workspaceA->id, 'user_id' => $userId, 'phone_number' => '+2']);
@@ -68,7 +67,7 @@ test('list returns only the requested user logs in the workspace', function () {
 test('summary aggregates per phone number', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
-    $userId = (string) Str::uuid();
+    $userId = fake()->unique()->numberBetween(1, 999999);
 
     CallLog::factory()->create(['workspace_id' => $workspace->id, 'user_id' => $userId, 'phone_number' => '+1', 'duration' => 30]);
     CallLog::factory()->create(['workspace_id' => $workspace->id, 'user_id' => $userId, 'phone_number' => '+1', 'duration' => 70]);
@@ -113,7 +112,7 @@ test('sync rejects empty call_logs array', function () {
 test('sync upserts on duplicate phone+date+time keys (idempotency)', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
-    $userId = (string) Str::uuid();
+    $userId = fake()->unique()->numberBetween(1, 999999);
 
     $payload = [
         'user_id' => $userId,
@@ -132,7 +131,7 @@ test('sync upserts on duplicate phone+date+time keys (idempotency)', function ()
 test('list filters by since timestamp (epoch ms)', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
-    $userId = (string) Str::uuid();
+    $userId = fake()->unique()->numberBetween(1, 999999);
 
     CallLog::factory()->create([
         'workspace_id' => $workspace->id,
@@ -156,18 +155,18 @@ test('list filters by since timestamp (epoch ms)', function () {
     expect($response->json('total'))->toBe(1);
 });
 
-test('list validates user_id must be a UUID', function () {
+test('list validates user_id must be an integer', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
 
-    $this->getJson('/api/v1/public/call-logs/list?user_id=not-a-uuid', [
+    $this->getJson('/api/v1/public/call-logs/list?user_id=not-an-integer', [
         'Authorization' => 'Bearer '.$raw,
     ])
         ->assertStatus(422)
         ->assertJsonValidationErrors(['user_id']);
 });
 
-test('summary validates user_id must be a UUID', function () {
+test('summary validates user_id must be an integer', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
 
@@ -178,7 +177,7 @@ test('summary validates user_id must be a UUID', function () {
         ->assertJsonValidationErrors(['user_id']);
 });
 
-test('kpi validates user_id must be a UUID', function () {
+test('kpi validates user_id must be an integer', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
 

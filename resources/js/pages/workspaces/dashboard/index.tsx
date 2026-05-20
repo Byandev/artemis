@@ -107,9 +107,8 @@ const Dashboard = ({ workspace, metricSettings }: Props) => {
             const validCurrent = current.filter((key) =>
                 availableMetricKeys.includes(key),
             );
-            const next = Array.from(
-                new Set([...validCurrent, ...defaultMetricKeys]),
-            );
+            // Preserve user selections; only use defaults if user hasn't selected any metrics
+            const next = validCurrent.length > 0 ? validCurrent : defaultMetricKeys;
             const changed =
                 next.length !== current.length ||
                 next.some((key, index) => key !== current[index]);

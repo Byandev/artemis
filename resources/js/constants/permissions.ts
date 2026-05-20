@@ -38,6 +38,7 @@ export const PERMISSIONS = {
 
     // RTS
     ViewRtsAnalytics: 'View RTS Analytics',
+    ViewParcelJourneyTemplates: 'View Parcel Journey Templates',
     ManageParcelJourneyTemplates: 'Manage Parcel Journey Templates',
 
     // CSR
@@ -79,6 +80,10 @@ export const PERMISSIONS = {
     CreateFinanceRemittances: 'Create Finance Remittances',
     EditFinanceRemittances: 'Edit Finance Remittances',
     DeleteFinanceRemittances: 'Delete Finance Remittances',
+
+    // Botcake
+    ViewBotcakeSequences: 'View Botcake Sequences',
+    ViewBotcakeFlows: 'View Botcake Flows',
 
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',

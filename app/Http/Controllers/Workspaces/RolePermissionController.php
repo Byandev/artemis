@@ -15,9 +15,13 @@ class RolePermissionController extends Controller
 {
     use AuthorizesRequests;
 
-    public function edit(Workspace $workspace, Role $role)
+    public function edit(Request $request, Workspace $workspace, Role $role)
     {
-        $this->authorize(PermissionEnum::ManageRolePermissions->value, $workspace);
+        abort_unless(
+            $request->user()->hasPermission(PermissionEnum::ViewRoles, $workspace)
+                || $request->user()->hasPermission(PermissionEnum::ManageRolePermissions, $workspace),
+            403
+        );
 
         $disabled = $this->disabledCategoriesFor($workspace);
 
@@ -79,6 +83,7 @@ class RolePermissionController extends Controller
             $workspace->teams_module_enabled ? null : 'Teams',
             $workspace->checklist_module_enabled ? null : 'Checklist',
             $workspace->csr_module_enabled ? null : 'CSR',
+            $workspace->botcake_module_enabled ? null : 'Botcake',
         ]));
     }
 }

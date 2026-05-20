@@ -10,6 +10,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { PERMISSIONS } from '@/constants/permissions';
+import { useAnyPermission } from '@/hooks/use-permission';
 import { dashboard } from '@/routes';
 import { type NavItem, User as UserType } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
@@ -113,16 +114,22 @@ export function AppSidebar() {
                   {
                       title: 'Botcake',
                       icon: MessageSquare,
+                      anyOf: [
+                          PERMISSIONS.ViewBotcakeSequences,
+                          PERMISSIONS.ViewBotcakeFlows,
+                      ],
                       items: [
                           {
                               title: 'Sequences',
                               href: `/workspaces/${currentWorkspace.slug}/botcake/sequences`,
                               icon: MessageSquare,
+                              permission: PERMISSIONS.ViewBotcakeSequences,
                           },
                           {
                               title: 'Flows',
                               href: `/workspaces/${currentWorkspace.slug}/botcake/flows`,
                               icon: ClipboardList,
+                              permission: PERMISSIONS.ViewBotcakeFlows,
                           },
                       ],
                   },
@@ -159,6 +166,7 @@ export function AppSidebar() {
             icon: RotateCcw,
             anyOf: [
                 PERMISSIONS.ViewRtsAnalytics,
+                PERMISSIONS.ViewParcelJourneyTemplates,
                 PERMISSIONS.ManageParcelJourneyTemplates,
             ],
             items: [
@@ -172,7 +180,10 @@ export function AppSidebar() {
                     title: 'Parcel Journey',
                     href: `/workspaces/${slug}/rts/parcel-journeys`,
                     icon: MapPin,
-                    permission: PERMISSIONS.ManageParcelJourneyTemplates,
+                    anyOf: [
+                        PERMISSIONS.ViewParcelJourneyTemplates,
+                        PERMISSIONS.ManageParcelJourneyTemplates,
+                    ],
                 },
             ],
         },
@@ -267,15 +278,13 @@ export function AppSidebar() {
           ]
         : [];
 
-    const supportNavItems: NavItem[] = auth?.user?.can?.viewAnySupportTickets
-        ? adminNavItems
-        : [
-              {
-                  title: 'Customer Support',
-                  href: `/workspaces/${slug}/support`,
-                  icon: LifeBuoy,
-              },
-          ];
+    const supportNavItems: NavItem[] = [
+        {
+            title: 'Customer Support',
+            href: `/workspaces/${slug}/support`,
+            icon: LifeBuoy,
+        },
+    ];
 
     return (
         <Sidebar
@@ -327,8 +336,16 @@ function PublicLinks({
     rmoEnabled: boolean;
     leaderboardEnabled: boolean;
 }) {
+    const canViewRmoLink = useAnyPermission([
+        PERMISSIONS.ViewRtsAnalytics,
+        PERMISSIONS.ViewCsrManagement,
+    ]);
+    const canViewLeaderboardLink = useAnyPermission(
+        PERMISSIONS.ViewCsrAnalytics,
+    );
+
     const links = [
-        ...(rmoEnabled
+        ...(rmoEnabled && canViewRmoLink
             ? [
                   {
                       title: 'RMO Management',
@@ -337,7 +354,7 @@ function PublicLinks({
                   },
               ]
             : []),
-        ...(leaderboardEnabled
+        ...(leaderboardEnabled && canViewLeaderboardLink
             ? [{ title: 'Leaderboards', href: '/leaderboards', icon: Trophy }]
             : []),
     ];

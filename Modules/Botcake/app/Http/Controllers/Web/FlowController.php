@@ -2,8 +2,10 @@
 
 namespace Modules\Botcake\Http\Controllers\Web;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Botcake\Models\Flow;
@@ -12,8 +14,12 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class FlowController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
+        $this->authorize(Permission::ViewBotcakeFlows->value, $workspace);
+
         [$mode, $from, $to] = $this->resolveModeAndRange($request);
 
         $base = Flow::query()

@@ -3,8 +3,8 @@
 use App\Models\Order;
 use App\Models\Page;
 use App\Models\Shop;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 function makeRmoContext(): array
 {
@@ -12,7 +12,7 @@ function makeRmoContext(): array
     ['raw' => $raw] = makeApiKey($workspace);
     $page = Page::factory()->forWorkspace($workspace)->create();
     $shop = Shop::factory()->forWorkspace($workspace)->create();
-    $userId = (string) Str::uuid();
+    $userId = User::factory()->create()->id;
 
     return ['workspace' => $workspace, 'raw' => $raw, 'page' => $page, 'shop' => $shop, 'userId' => $userId];
 }
@@ -43,7 +43,7 @@ test('assignedOrders returns deliveries for the given user_id and today', functi
     $ctx = makeRmoContext();
     seedDelivery($ctx);
     seedDelivery($ctx, ['delivery_date' => now()->subDay()->toDateString()]); // not today
-    $otherUser = (string) Str::uuid();
+    $otherUser = User::factory()->create()->id;
     seedDelivery($ctx, ['assignee_id' => $otherUser]); // different user
 
     $response = $this->getJson("/api/v1/public/rmo-orders?user_id={$ctx['userId']}", [
@@ -53,14 +53,14 @@ test('assignedOrders returns deliveries for the given user_id and today', functi
     expect($response->json('total'))->toBe(1);
 });
 
-test('assignedOrders requires user_id and validates UUID', function () {
+test('assignedOrders requires user_id and validates integer', function () {
     $ctx = makeRmoContext();
 
     $this->getJson('/api/v1/public/rmo-orders', ['Authorization' => 'Bearer '.$ctx['raw']])
         ->assertStatus(422)
         ->assertJsonValidationErrors('user_id');
 
-    $this->getJson('/api/v1/public/rmo-orders?user_id=not-a-uuid', ['Authorization' => 'Bearer '.$ctx['raw']])
+    $this->getJson('/api/v1/public/rmo-orders?user_id=not-an-integer', ['Authorization' => 'Bearer '.$ctx['raw']])
         ->assertStatus(422)
         ->assertJsonValidationErrors('user_id');
 });
@@ -139,6 +139,5 @@ test('per_page caps results', function () {
 });
 
 test('rejects unauthenticated request', function () {
-    $userId = (string) Str::uuid();
-    $this->getJson("/api/v1/public/rmo-orders?user_id={$userId}")->assertStatus(401);
+    $this->getJson('/api/v1/public/rmo-orders?user_id=1')->assertStatus(401);
 });

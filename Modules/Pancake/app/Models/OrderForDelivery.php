@@ -5,6 +5,7 @@ namespace Modules\Pancake\Models;
 use App\Models\CallLog;
 use App\Models\Page;
 use App\Models\Shop;
+use App\Models\User as AppUser;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -37,7 +38,7 @@ class OrderForDelivery extends Model
 
     public function assignee(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'assignee_id');
+        return $this->belongsTo(AppUser::class, 'assignee_id');
     }
 
     public function customerCallLogs(): HasMany
