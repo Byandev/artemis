@@ -16,7 +16,7 @@ import workspaces from '@/routes/workspaces';
 import { PaginatedData } from '@/types';
 import { Page } from '@/types/models/Page';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { omit } from 'lodash';
@@ -28,6 +28,7 @@ import {
     Search,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 interface PagesProps {
     workspace: Workspace;
@@ -43,6 +44,13 @@ interface PagesProps {
     pageLimit?: number | null;
     pageCount?: number;
     pageLimitReached?: boolean;
+}
+
+interface PageProps {
+    flash?: {
+        success?: string | null;
+        error?: string | null;
+    };
 }
 
 const StatusBadge = ({ status }: { status: 'active' | 'inactive' }) => {
@@ -118,6 +126,7 @@ const Pages = ({
     pageCount,
     pageLimitReached,
 }: PagesProps) => {
+    const { flash } = usePage().props as PageProps;
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
@@ -127,6 +136,16 @@ const Pages = ({
     const [selectedPage, setSelectedPage] = useState<Page | null>(null);
 
     const [processing, setProcessing] = useState(false);
+
+    useEffect(() => {
+        if (flash?.success) {
+            toast.success(flash.success);
+        }
+
+        if (flash?.error) {
+            toast.error(flash.error);
+        }
+    }, [flash?.success, flash?.error]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -163,7 +182,9 @@ const Pages = ({
             workspaces.pages.refresh.url({ workspace, page }),
             {},
             {
-                onSuccess: () => alert('Refresh Started'),
+                preserveScroll: true,
+                onSuccess: () => toast.success('Refresh started.'),
+                onError: () => toast.error('Failed to refresh page.'),
                 onFinish: () => setProcessing(false),
             },
         );

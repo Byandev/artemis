@@ -195,6 +195,8 @@ class ParcelUpdateNotificationTemplateController extends Controller
     {
         $this->authorize(Permission::ManageParcelJourneyTemplates->value, $workspace);
 
+        abort_unless((int) $template->workspace_id === (int) $workspace->id, 404);
+
         $data = $request->validate([
             'message' => 'required|string',
             'is_enabled' => 'required|boolean',

@@ -15,10 +15,10 @@ import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
-import { toast } from 'sonner';
 import { omit } from 'lodash';
 import { Plus } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 interface Props {
     workspace: Workspace;
@@ -220,12 +220,12 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                                 {
                                     sort: params?.sort,
                                     page: params?.page ?? 1,
+                                    per_page: params?.per_page,
                                 },
                                 {
                                     preserveState: true,
                                     replace: true,
                                     preserveScroll: true,
-                                    only: ['checklists', 'query'],
                                 },
                             );
                         }}

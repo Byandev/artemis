@@ -280,7 +280,11 @@ class Workspace extends Model
         $allowed = $this->allowedMetrics();
         $defaults = $this->metricSetting?->default_metrics ?? [];
 
-        return array_values(array_unique([...$defaults, ...$allowed]));
+        if ($this->metricSetting) {
+            return array_values(array_intersect($defaults, $allowed));
+        }
+
+        return array_values(array_intersect(MetricRegistry::defaults(), $allowed));
     }
 
     public function getMetricSettings(): array
