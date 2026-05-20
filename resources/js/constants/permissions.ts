@@ -65,10 +65,6 @@ export const PERMISSIONS = {
     EditChecklist: 'Edit Checklist',
     DeleteChecklist: 'Delete Checklist',
 
-    // Botcake
-    ViewBotcakeSequences: 'View Botcake Sequences',
-    ViewBotcakeFlows: 'View Botcake Flows',
-
     // Finance
     ViewFinanceDashboard: 'View Finance Dashboard',
     ViewFinanceAccounts: 'View Finance Accounts',

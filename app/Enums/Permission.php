@@ -70,10 +70,6 @@ enum Permission: string
     case EditChecklist = 'Edit Checklist';
     case DeleteChecklist = 'Delete Checklist';
 
-    // Botcake
-    case ViewBotcakeSequences = 'View Botcake Sequences';
-    case ViewBotcakeFlows = 'View Botcake Flows';
-
     // Finance
     case ViewFinanceDashboard = 'View Finance Dashboard';
     case ViewFinanceAccounts = 'View Finance Accounts';
@@ -155,9 +151,6 @@ enum Permission: string
             self::CreateChecklist,
             self::EditChecklist,
             self::DeleteChecklist => 'Checklist',
-
-            self::ViewBotcakeSequences,
-            self::ViewBotcakeFlows => 'Botcake',
 
             self::ViewFinanceDashboard,
             self::ViewFinanceAccounts,

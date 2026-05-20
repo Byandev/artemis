@@ -79,7 +79,6 @@ class RolePermissionController extends Controller
             $workspace->teams_module_enabled ? null : 'Teams',
             $workspace->checklist_module_enabled ? null : 'Checklist',
             $workspace->csr_module_enabled ? null : 'CSR',
-            $workspace->botcake_module_enabled ? null : 'Botcake',
         ]));
     }
 }
