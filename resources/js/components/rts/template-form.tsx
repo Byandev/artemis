@@ -19,6 +19,7 @@ import {
     useRef,
     useState,
 } from 'react';
+import { toast } from 'sonner';
 
 interface Props {
     open: boolean;
@@ -83,7 +84,11 @@ const TemplateForm = ({
                 {
                     onSuccess: () => {
                         setErrors({});
+                        toast.success('Parcel journey template updated successfully.');
                         onOpenChange(false);
+                    },
+                    onError: () => {
+                        toast.error('Failed to update parcel journey template. Please check the form.');
                     },
                 },
             );

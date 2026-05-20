@@ -59,11 +59,7 @@ class HandleInertiaRequests extends Middleware
             ? $user->ownsWorkspace($workspaceModel)
             : false;
         $can = [
-            'viewAnySupportTickets' => $user && $currentWorkspace instanceof Workspace
-                ? $user->ownsWorkspace($currentWorkspace)
-                    || $user->isAdminOf($currentWorkspace)
-                    || $user->hasWorkspaceRole($currentWorkspace, 'admin')
-                : false,
+            'viewAnySupportTickets' => false,
         ];
 
         // Show syncing modal when any page has no orders_last_synced_at

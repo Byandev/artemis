@@ -234,6 +234,7 @@ export default function Leaderboard() {
     const [selectedDate, setSelectedDate] = useState(getTodayString());
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [retryCount, setRetryCount] = useState(0);
 
     const getInitials = (name: string): string => {
         return name
@@ -347,7 +348,7 @@ export default function Leaderboard() {
         };
 
         fetchData();
-    }, [activeTab, selectedDate]);
+    }, [activeTab, retryCount]);
 
     const renderContent = () => {
         if (isLoading) {
@@ -375,7 +376,7 @@ export default function Leaderboard() {
                         <button
                             onClick={() => {
                                 setError(null);
-                                setSelectedDate((d) => d);
+                                setRetryCount((c) => c + 1);
                             }}
                             className="mt-4 rounded-full bg-violet-500 px-6 py-2 text-white transition-colors hover:bg-violet-600"
                         >
@@ -400,46 +401,16 @@ export default function Leaderboard() {
                         </h3>
                         <p className="mb-2 text-lg text-gray-300">
                             {activeTab === 'Sales Ranking' &&
-                                `No sales have been recorded for ${formatDateForDisplay(selectedDate)}.`}
+                                'No sales have been recorded for today.'}
                             {activeTab === 'Called Activity' &&
-                                `No call activity has been recorded for ${formatDateForDisplay(selectedDate)}.`}
+                                'No call activity has been recorded for today.'}
                             {activeTab === 'Delivery Success' &&
-                                `No deliveries have been completed for ${formatDateForDisplay(selectedDate)}.`}
+                                'No deliveries have been completed today.'}
                         </p>
                         <p className="text-sm text-gray-400">
-                            Try selecting a different date
+                            Check back later for updates
                         </p>
                     </div>
-
-                    {schedules.length > 0 && (
-                        <div className="mt-10 w-full max-w-2xl px-4">
-                            <h3 className="mb-4 text-center text-lg font-semibold text-white">
-                                Scheduled CSRs for{' '}
-                                {formatDateForDisplay(selectedDate)}
-                            </h3>
-                            <div className="space-y-2">
-                                {schedules.map((schedule) => (
-                                    <div
-                                        key={schedule.id}
-                                        className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3 backdrop-blur-sm"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-xs font-bold text-white">
-                                                {getInitials(schedule.name)}
-                                            </div>
-                                            <span className="text-sm text-white">
-                                                {schedule.name}
-                                            </span>
-                                        </div>
-                                        <span className="text-sm text-violet-300">
-                                            {schedule.shift_start} -{' '}
-                                            {schedule.shift_end}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
             );
         }
@@ -468,7 +439,6 @@ export default function Leaderboard() {
                                         primaryValue={getPrimaryValue(user)}
                                         secondaryValue={getSecondaryValue(user)}
                                         activeTab={activeTab}
-                                        schedule={getScheduleForUser(user.id)}
                                     />
                                 );
                             })}
@@ -486,38 +456,8 @@ export default function Leaderboard() {
                                 primaryValue={getPrimaryValue(user)}
                                 secondaryValue={getSecondaryValue(user)}
                                 activeTab={activeTab}
-                                schedule={getScheduleForUser(user.id)}
                             />
                         ))}
-                    </div>
-                )}
-
-                {schedules.length > 0 && (
-                    <div className="mt-10 w-full max-w-4xl px-4">
-                        <h3 className="mb-4 text-center text-lg font-semibold text-white/80">
-                            CSR Schedule - {formatDateForDisplay(selectedDate)}
-                        </h3>
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                            {schedules.map((schedule) => (
-                                <div
-                                    key={schedule.id}
-                                    className="rounded-lg border border-white/5 bg-white/5 p-3 text-center backdrop-blur-sm"
-                                >
-                                    <p className="text-sm font-medium text-white">
-                                        {schedule.name}
-                                    </p>
-                                    <p className="text-xs text-violet-300">
-                                        {schedule.shift_start} -{' '}
-                                        {schedule.shift_end}
-                                    </p>
-                                    {schedule.notes && (
-                                        <p className="mt-1 text-xs text-gray-400">
-                                            {schedule.notes}
-                                        </p>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
                     </div>
                 )}
             </>
