@@ -51,7 +51,6 @@ export default function RiderCard({
             .catch(() => setLoading(false));
     };
 
-     
     useEffect(() => {
         fetchPage(1, sort, 10, true);
     }, [workspaceSlug, JSON.stringify(queryParams)]);

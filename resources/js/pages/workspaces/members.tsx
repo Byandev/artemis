@@ -116,9 +116,7 @@ export default function WorkspaceMembers({
         [query?.invitation_sort],
     );
 
-    const [searchValue, setSearchValue] = useState(
-        query?.filter?.search ?? '',
-    );
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<User | null>(null);

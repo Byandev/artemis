@@ -43,7 +43,6 @@ export default function AdCard({ workspaceSlug, queryParams }: Props) {
             .catch(() => setLoading(false));
     };
 
-     
     useEffect(() => {
         fetchPage(1, sort);
     }, [workspaceSlug, JSON.stringify(queryParams)]);

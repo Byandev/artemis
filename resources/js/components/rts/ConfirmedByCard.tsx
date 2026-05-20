@@ -46,7 +46,6 @@ export default function ConfirmedByCard({ workspaceSlug, queryParams }: Props) {
             .catch(() => setLoading(false));
     };
 
-     
     useEffect(() => {
         fetchPage(1, sort);
     }, [workspaceSlug, JSON.stringify(queryParams)]);

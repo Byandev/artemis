@@ -28,7 +28,7 @@ export function CsrSidebar() {
             href: `/workspaces/${slug}/csr/dashboard`,
             icon: LayoutDashboard,
         },
-{
+        {
             title: 'RMO Management',
             href: `/workspaces/${slug}/csr/rmo-management`,
             icon: Truck,
@@ -48,7 +48,7 @@ export function CsrSidebar() {
                     '--sidebar-border': 'rgba(167, 243, 208, 0.08)',
                 } as React.CSSProperties
             }
-            className="dark:[--sidebar:#022c22] dark:[--sidebar-foreground:#a7f3d0] dark:[--sidebar-accent:rgba(16,211,161,0.10)] dark:[--sidebar-accent-foreground:#ffffff] dark:[--sidebar-border:rgba(167,243,208,0.08)]"
+            className="dark:[--sidebar-accent-foreground:#ffffff] dark:[--sidebar-accent:rgba(16,211,161,0.10)] dark:[--sidebar-border:rgba(167,243,208,0.08)] dark:[--sidebar-foreground:#a7f3d0] dark:[--sidebar:#022c22]"
         >
             <SidebarHeader>
                 <SidebarMenu>

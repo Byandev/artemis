@@ -9,8 +9,8 @@ import {
 import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
-import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 interface InventoryItem {
@@ -127,7 +127,7 @@ export function ItemFormDialog({
                                 : 'Add a new item to your workspace inventory.'}
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogClose className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/6 dark:hover:text-gray-300">
+                    <DialogClose className="absolute top-4 right-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/6 dark:hover:text-gray-300">
                         <X className="h-4 w-4" />
                         <span className="sr-only">Close</span>
                     </DialogClose>
