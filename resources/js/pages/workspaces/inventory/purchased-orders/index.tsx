@@ -9,6 +9,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -119,6 +121,17 @@ export default function PurchasedOrderIndex({
         query?.filter?.start_date ?? '',
         query?.filter?.end_date ?? '',
     ]);
+    const canCreatePurchasedOrders = usePermission(
+        PERMISSIONS.CreatePurchasedOrders,
+    );
+    const canEditPurchasedOrders = usePermission(
+        PERMISSIONS.EditPurchasedOrders,
+    );
+    const canDeletePurchasedOrders = usePermission(
+        PERMISSIONS.DeletePurchasedOrders,
+    );
+    const canManagePurchasedOrders =
+        canEditPurchasedOrders || canDeletePurchasedOrders;
 
     const buildFilter = (search: string, range: string[]) => ({
         search: search || undefined,
@@ -160,183 +173,212 @@ export default function PurchasedOrderIndex({
         return () => performQuery.cancel();
     }, [searchValue, dateRange]);
 
-    const columns: ColumnDef<PurchasedOrder>[] = [
-        {
-            accessorKey: 'issue_date',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Issue Date" />
+    const columns = useMemo<ColumnDef<PurchasedOrder>[]>(
+        () =>
+            [
+                {
+                    accessorKey: 'issue_date',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader column={column} title="Issue Date" />
+                    ),
+                    cell: ({ row }) => (
+                        <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                            {row.original.issue_date
+                                ? row.original.issue_date.slice(0, 10)
+                                : '—'}
+                        </span>
+                    ),
+                },
+                {
+                    accessorKey: 'delivery_no',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader column={column} title="Delivery No." />
+                    ),
+                    cell: ({ row }) => (
+                        <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                            {row.original.delivery_no || '—'}
+                        </span>
+                    ),
+                },
+                {
+                    accessorKey: 'cust_po_no',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader column={column} title="Cust PO No." />
+                    ),
+                    cell: ({ row }) => (
+                        <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                            {row.original.cust_po_no || '—'}
+                        </span>
+                    ),
+                },
+                {
+                    accessorKey: 'control_no',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader column={column} title="Control No." />
+                    ),
+                    cell: ({ row }) => (
+                        <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                            {row.original.control_no || '—'}
+                        </span>
+                    ),
+                },
+                {
+                    id: 'subtotal',
+                    enableSorting: false,
+                    header: () => (
+                        <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                            Subtotal
+                        </span>
+                    ),
+                    cell: ({ row }) => {
+                        const subtotal =
+                            Number(row.original.total_amount) -
+                            Number(row.original.delivery_fee);
+                        return (
+                            <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                                ₱
+                                {subtotal.toLocaleString('en-PH', {
+                                    minimumFractionDigits: 2,
+                                })}
+                            </span>
+                        );
+                    },
+                },
+                {
+                    accessorKey: 'delivery_fee',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader column={column} title="Delivery Fee" />
+                    ),
+                    cell: ({ row }) => (
+                        <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                            ₱
+                            {Number(row.original.delivery_fee).toLocaleString(
+                                'en-PH',
+                                {
+                                    minimumFractionDigits: 2,
+                                },
+                            )}
+                        </span>
+                    ),
+                },
+                {
+                    accessorKey: 'total_amount',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader column={column} title="Total Amount" />
+                    ),
+                    cell: ({ row }) => (
+                        <span className="font-mono text-[12px] font-semibold text-gray-800 dark:text-gray-200">
+                            ₱
+                            {Number(row.original.total_amount).toLocaleString(
+                                'en-PH',
+                                {
+                                    minimumFractionDigits: 2,
+                                },
+                            )}
+                        </span>
+                    ),
+                },
+                {
+                    accessorKey: 'status',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader column={column} title="Status" />
+                    ),
+                    cell: ({ row }) => {
+                        const s = STATUSES[row.original.status] ?? STATUSES[1];
+                        return (
+                            <span
+                                className={`inline-flex items-center rounded-full px-2.5 py-1 font-mono text-[11px] font-medium ${s.color}`}
+                            >
+                                {s.label}
+                            </span>
+                        );
+                    },
+                },
+                {
+                    accessorKey: 'items',
+                    enableSorting: false,
+                    header: () => (
+                        <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                            Items
+                        </span>
+                    ),
+                    cell: ({ row }) => (
+                        <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-400">
+                            {row.original.items.length}
+                        </span>
+                    ),
+                },
+                {
+                    id: 'actions',
+                    header: () => (
+                        <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                            Actions
+                        </div>
+                    ),
+                    cell: ({ row }) => {
+                        const order = row.original;
+                        return (
+                            <div className="flex justify-center">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
+                                            <MoreHorizontal className="h-3.5 w-3.5" />
+                                        </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                        align="end"
+                                        className="w-36"
+                                    >
+                                        {canEditPurchasedOrders && (
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    router.get(
+                                                        `${baseUrl}/${order.id}/edit`,
+                                                    )
+                                                }
+                                            >
+                                                <Pencil className="mr-2 h-3.5 w-3.5" />
+                                                Edit
+                                            </DropdownMenuItem>
+                                        )}
+                                        {canEditPurchasedOrders &&
+                                            canDeletePurchasedOrders && (
+                                                <DropdownMenuSeparator />
+                                            )}
+                                        {canDeletePurchasedOrders && (
+                                            <DropdownMenuItem
+                                                className="text-red-600 focus:text-red-600 dark:text-red-400"
+                                                onClick={() =>
+                                                    setDeletingOrder(order)
+                                                }
+                                            >
+                                                <Trash2 className="mr-2 h-3.5 w-3.5" />
+                                                Delete
+                                            </DropdownMenuItem>
+                                        )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                        );
+                    },
+                },
+            ].filter(
+                (column) => canManagePurchasedOrders || column.id !== 'actions',
             ),
-            cell: ({ row }) => (
-                <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                    {row.original.issue_date
-                        ? row.original.issue_date.slice(0, 10)
-                        : '—'}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'delivery_no',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Delivery No." />
-            ),
-            cell: ({ row }) => (
-                <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                    {row.original.delivery_no || '—'}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'cust_po_no',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Cust PO No." />
-            ),
-            cell: ({ row }) => (
-                <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                    {row.original.cust_po_no || '—'}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'control_no',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Control No." />
-            ),
-            cell: ({ row }) => (
-                <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                    {row.original.control_no || '—'}
-                </span>
-            ),
-        },
-        {
-            id: 'subtotal',
-            enableSorting: false,
-            header: () => (
-                <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
-                    Subtotal
-                </span>
-            ),
-            cell: ({ row }) => {
-                const subtotal =
-                    Number(row.original.total_amount) -
-                    Number(row.original.delivery_fee);
-                return (
-                    <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                        ₱
-                        {subtotal.toLocaleString('en-PH', {
-                            minimumFractionDigits: 2,
-                        })}
-                    </span>
-                );
-            },
-        },
-        {
-            accessorKey: 'delivery_fee',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Delivery Fee" />
-            ),
-            cell: ({ row }) => (
-                <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                    ₱
-                    {Number(row.original.delivery_fee).toLocaleString('en-PH', {
-                        minimumFractionDigits: 2,
-                    })}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'total_amount',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Total Amount" />
-            ),
-            cell: ({ row }) => (
-                <span className="font-mono text-[12px] font-semibold text-gray-800 dark:text-gray-200">
-                    ₱
-                    {Number(row.original.total_amount).toLocaleString('en-PH', {
-                        minimumFractionDigits: 2,
-                    })}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'status',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Status" />
-            ),
-            cell: ({ row }) => {
-                const s = STATUSES[row.original.status] ?? STATUSES[1];
-                return (
-                    <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-1 font-mono text-[11px] font-medium ${s.color}`}
-                    >
-                        {s.label}
-                    </span>
-                );
-            },
-        },
-        {
-            accessorKey: 'items',
-            enableSorting: false,
-            header: () => (
-                <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
-                    Items
-                </span>
-            ),
-            cell: ({ row }) => (
-                <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-400">
-                    {row.original.items.length}
-                </span>
-            ),
-        },
-        {
-            id: 'actions',
-            header: () => (
-                <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                    Actions
-                </div>
-            ),
-            cell: ({ row }) => {
-                const order = row.original;
-                return (
-                    <div className="flex justify-center">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
-                                    <MoreHorizontal className="h-3.5 w-3.5" />
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-36">
-                                <DropdownMenuItem
-                                    onClick={() =>
-                                        router.get(
-                                            `${baseUrl}/${order.id}/edit`,
-                                        )
-                                    }
-                                >
-                                    <Pencil className="mr-2 h-3.5 w-3.5" />
-                                    Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                    className="text-red-600 focus:text-red-600 dark:text-red-400"
-                                    onClick={() => setDeletingOrder(order)}
-                                >
-                                    <Trash2 className="mr-2 h-3.5 w-3.5" />
-                                    Delete
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                );
-            },
-        },
-    ];
+        [
+            baseUrl,
+            canDeletePurchasedOrders,
+            canEditPurchasedOrders,
+            canManagePurchasedOrders,
+        ],
+    );
 
     return (
         <AppLayout>
@@ -360,12 +402,14 @@ export default function PurchasedOrderIndex({
                         <Download className="h-3.5 w-3.5" />
                         Export
                     </a>
-                    <button
-                        onClick={() => router.get(`${baseUrl}/create`)}
-                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
-                    >
-                        Add Order
-                    </button>
+                    {canCreatePurchasedOrders && (
+                        <button
+                            onClick={() => router.get(`${baseUrl}/create`)}
+                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
+                        >
+                            Add Order
+                        </button>
+                    )}
                 </PageHeader>
 
                 <div className="mb-3 flex flex-col items-stretch gap-2 md:flex-row md:items-center">
