@@ -80,6 +80,10 @@ export const PERMISSIONS = {
     EditFinanceRemittances: 'Edit Finance Remittances',
     DeleteFinanceRemittances: 'Delete Finance Remittances',
 
+    // Botcake
+    ViewBotcakeSequences: 'View Botcake Sequences',
+    ViewBotcakeFlows: 'View Botcake Flows',
+
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',
     ManageApiKeys: 'Manage API Keys',
