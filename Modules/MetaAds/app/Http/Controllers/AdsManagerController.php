@@ -125,21 +125,59 @@ class AdsManagerController extends Controller
         ];
     }
 
+    /**
+     * Full list of meta_ads_insights metric columns we aggregate. Adding a new
+     * metric here surfaces it to all three Ads Manager pages automatically.
+     */
+    private const INSIGHTS_METRICS = [
+        // Delivery & Traffic
+        'spend', 'impressions', 'reach', 'clicks',
+        'link_clicks', 'outbound_clicks', 'estimated_ad_recallers',
+        'page_photo_views',
+        // Video
+        'video_3sec_views', 'video_thruplay_views',
+        'video_p25_views', 'video_p50_views', 'video_p75_views', 'video_p100_views',
+        // Engagement
+        'page_engagement', 'page_engagement_value',
+        'page_likes', 'page_likes_value', 'photo_views_value',
+        'post_engagement', 'post_engagement_value',
+        'post_comments', 'post_comments_value',
+        'post_shares', 'post_shares_value',
+        'post_saves', 'post_saves_value',
+        'post_reactions', 'post_reactions_value',
+        // Messaging
+        'messaging_first_replies', 'messaging_first_replies_value',
+        'messaging_conversations_started', 'messaging_conversations_started_value',
+        // Commerce & Leads
+        'initiate_checkout', 'initiate_checkout_value',
+        'conversions', 'purchases', 'purchase_value',
+        'on_facebook_leads', 'on_facebook_leads_value',
+        'leads', 'lead_value',
+    ];
+
     private function insightsSubquery(string $entityColumn, string $since, string $until)
     {
+        $selects = [$entityColumn];
+        foreach (self::INSIGHTS_METRICS as $col) {
+            $selects[] = DB::raw("SUM({$col}) AS {$col}");
+        }
+
         return DB::table('meta_ads_insights')
             ->whereBetween('date', [$since, $until])
-            ->select(
-                $entityColumn,
-                DB::raw('SUM(spend) AS spend'),
-                DB::raw('SUM(impressions) AS impressions'),
-                DB::raw('SUM(reach) AS reach'),
-                DB::raw('SUM(clicks) AS clicks'),
-                DB::raw('SUM(link_clicks) AS link_clicks'),
-                DB::raw('SUM(purchases) AS purchases'),
-                DB::raw('SUM(purchase_value) AS purchase_value'),
-            )
+            ->select($selects)
             ->groupBy($entityColumn);
+    }
+
+    /**
+     * COALESCE expressions for every aggregated metric — folded into the main
+     * Eloquent select so missing-insight rows return 0 instead of null.
+     */
+    private function metricSelects(): array
+    {
+        return array_map(
+            fn (string $col) => DB::raw("COALESCE(i.{$col}, 0) AS {$col}"),
+            self::INSIGHTS_METRICS,
+        );
     }
 
     private function campaigns(Request $request, $accountIds, string $since, string $until): array
@@ -149,7 +187,7 @@ class AdsManagerController extends Controller
         $base = Campaign::query()
             ->whereIn('meta_ads_account_id', $accountIds)
             ->leftJoinSub($insights, 'i', 'i.meta_ads_campaign_id', '=', 'meta_ads_campaigns.id')
-            ->select(
+            ->select(array_merge([
                 'meta_ads_campaigns.id',
                 'meta_ads_campaigns.name',
                 'meta_ads_campaigns.status',
@@ -162,14 +200,7 @@ class AdsManagerController extends Controller
                 'meta_ads_campaigns.start_time',
                 'meta_ads_campaigns.stop_time',
                 'meta_ads_campaigns.updated_time',
-                DB::raw('COALESCE(i.spend, 0) AS spend'),
-                DB::raw('COALESCE(i.impressions, 0) AS impressions'),
-                DB::raw('COALESCE(i.reach, 0) AS reach'),
-                DB::raw('COALESCE(i.clicks, 0) AS clicks'),
-                DB::raw('COALESCE(i.link_clicks, 0) AS link_clicks'),
-                DB::raw('COALESCE(i.purchases, 0) AS purchases'),
-                DB::raw('COALESCE(i.purchase_value, 0) AS purchase_value'),
-            );
+            ], $this->metricSelects()));
 
         $rows = QueryBuilder::for($base)
             ->allowedFilters([
@@ -177,7 +208,7 @@ class AdsManagerController extends Controller
                 AllowedFilter::exact('status'),
                 AllowedFilter::exact('effective_status'),
             ])
-            ->allowedSorts(['name', 'status', 'effective_status', 'daily_budget', 'spend', 'impressions', 'reach', 'purchases', 'updated_time'])
+            ->allowedSorts(array_merge(['name', 'status', 'effective_status', 'daily_budget', 'updated_time'], self::INSIGHTS_METRICS))
             ->defaultSort('-spend')
             ->paginate($request->integer('per_page', 25))
             ->withQueryString();
@@ -194,7 +225,7 @@ class AdsManagerController extends Controller
             ->when($campaignId, fn ($q) => $q->where('meta_ads_sets.meta_ads_campaign_id', $campaignId))
             ->leftJoin('meta_ads_campaigns', 'meta_ads_campaigns.id', '=', 'meta_ads_sets.meta_ads_campaign_id')
             ->leftJoinSub($insights, 'i', 'i.meta_ads_set_id', '=', 'meta_ads_sets.id')
-            ->select(
+            ->select(array_merge([
                 'meta_ads_sets.id',
                 'meta_ads_sets.name',
                 'meta_ads_sets.status',
@@ -208,15 +239,8 @@ class AdsManagerController extends Controller
                 'meta_ads_sets.end_time',
                 'meta_ads_sets.updated_time',
                 'meta_ads_sets.meta_ads_campaign_id',
-                'meta_ads_campaigns.name AS campaign_name',
-                DB::raw('COALESCE(i.spend, 0) AS spend'),
-                DB::raw('COALESCE(i.impressions, 0) AS impressions'),
-                DB::raw('COALESCE(i.reach, 0) AS reach'),
-                DB::raw('COALESCE(i.clicks, 0) AS clicks'),
-                DB::raw('COALESCE(i.link_clicks, 0) AS link_clicks'),
-                DB::raw('COALESCE(i.purchases, 0) AS purchases'),
-                DB::raw('COALESCE(i.purchase_value, 0) AS purchase_value'),
-            );
+                DB::raw('meta_ads_campaigns.name AS campaign_name'),
+            ], $this->metricSelects()));
 
         $rows = QueryBuilder::for($base)
             ->allowedFilters([
@@ -224,7 +248,7 @@ class AdsManagerController extends Controller
                 AllowedFilter::exact('status', 'meta_ads_sets.status'),
                 AllowedFilter::exact('effective_status', 'meta_ads_sets.effective_status'),
             ])
-            ->allowedSorts(['name', 'status', 'effective_status', 'daily_budget', 'spend', 'impressions', 'reach', 'purchases', 'updated_time'])
+            ->allowedSorts(array_merge(['name', 'status', 'effective_status', 'daily_budget', 'updated_time'], self::INSIGHTS_METRICS))
             ->defaultSort('-spend')
             ->paginate($request->integer('per_page', 25))
             ->withQueryString();
@@ -244,7 +268,7 @@ class AdsManagerController extends Controller
             ->leftJoin('meta_ads_sets', 'meta_ads_sets.id', '=', 'meta_ads_ads.meta_ads_set_id')
             ->leftJoin('meta_ads_creatives', 'meta_ads_creatives.id', '=', 'meta_ads_ads.meta_ads_creative_id')
             ->leftJoinSub($insights, 'i', 'i.meta_ads_ad_id', '=', 'meta_ads_ads.id')
-            ->select(
+            ->select(array_merge([
                 'meta_ads_ads.id',
                 'meta_ads_ads.name',
                 'meta_ads_ads.status',
@@ -254,18 +278,11 @@ class AdsManagerController extends Controller
                 'meta_ads_ads.meta_ads_campaign_id',
                 'meta_ads_ads.meta_ads_set_id',
                 'meta_ads_ads.meta_ads_creative_id',
-                'meta_ads_campaigns.name AS campaign_name',
-                'meta_ads_sets.name AS ad_set_name',
-                'meta_ads_creatives.thumbnail_url AS thumbnail_url',
-                'meta_ads_creatives.image_url AS image_url',
-                DB::raw('COALESCE(i.spend, 0) AS spend'),
-                DB::raw('COALESCE(i.impressions, 0) AS impressions'),
-                DB::raw('COALESCE(i.reach, 0) AS reach'),
-                DB::raw('COALESCE(i.clicks, 0) AS clicks'),
-                DB::raw('COALESCE(i.link_clicks, 0) AS link_clicks'),
-                DB::raw('COALESCE(i.purchases, 0) AS purchases'),
-                DB::raw('COALESCE(i.purchase_value, 0) AS purchase_value'),
-            );
+                DB::raw('meta_ads_campaigns.name AS campaign_name'),
+                DB::raw('meta_ads_sets.name AS ad_set_name'),
+                DB::raw('meta_ads_creatives.thumbnail_url AS thumbnail_url'),
+                DB::raw('meta_ads_creatives.image_url AS image_url'),
+            ], $this->metricSelects()));
 
         $rows = QueryBuilder::for($base)
             ->allowedFilters([
@@ -273,7 +290,7 @@ class AdsManagerController extends Controller
                 AllowedFilter::exact('status', 'meta_ads_ads.status'),
                 AllowedFilter::exact('effective_status', 'meta_ads_ads.effective_status'),
             ])
-            ->allowedSorts(['name', 'status', 'effective_status', 'spend', 'impressions', 'reach', 'purchases', 'updated_time'])
+            ->allowedSorts(array_merge(['name', 'status', 'effective_status', 'updated_time'], self::INSIGHTS_METRICS))
             ->defaultSort('-spend')
             ->paginate($request->integer('per_page', 25))
             ->withQueryString();

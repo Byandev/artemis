@@ -12,7 +12,6 @@ use Modules\MetaAds\Jobs\Concerns\SerializesPerAdAccount;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\Insight;
 use Modules\MetaAds\Models\SyncRun;
-use RuntimeException;
 use Throwable;
 
 class SyncInsights implements ShouldQueue
@@ -103,13 +102,7 @@ class SyncInsights implements ShouldQueue
         );
 
         try {
-            $metaUser = $this->adAccount->metaUsers()->first();
-
-            if (! $metaUser) {
-                throw new RuntimeException("No MetaUser linked to AdAccount {$this->adAccount->id}");
-            }
-
-            $client = $metaUser->graphClient();
+            $client = $this->adAccount->graphClient();
 
             $fields = implode(',', [
                 'ad_id', 'adset_id', 'campaign_id', 'date_start', 'date_stop',

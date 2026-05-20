@@ -13,7 +13,6 @@ use Modules\MetaAds\Jobs\Concerns\SerializesPerAdAccount;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\Campaign;
 use Modules\MetaAds\Models\SyncRun;
-use RuntimeException;
 use Throwable;
 
 class SyncCampaigns implements ShouldQueue
@@ -37,13 +36,7 @@ class SyncCampaigns implements ShouldQueue
         );
 
         try {
-            $metaUser = $this->adAccount->metaUsers()->first();
-
-            if (! $metaUser) {
-                throw new RuntimeException("No MetaUser linked to AdAccount {$this->adAccount->id}");
-            }
-
-            $client = $metaUser->graphClient();
+            $client = $this->adAccount->graphClient();
 
             $fields = 'id,name,objective,status,effective_status,buying_type,bid_strategy,daily_budget,lifetime_budget,start_time,stop_time,created_time,updated_time';
 

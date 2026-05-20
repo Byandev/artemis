@@ -1,21 +1,20 @@
-import PageHeader from '@/components/common/PageHeader'
-import { Button } from '@/components/ui/button'
-import { DataTable, SortableHeader } from '@/components/ui/data-table'
+import PageHeader from '@/components/common/PageHeader';
+import { Button } from '@/components/ui/button';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import AppLayout from '@/layouts/app-layout'
-import { toFrontendSort } from '@/lib/sort'
-import { PaginatedData } from '@/types'
-import { Workspace } from '@/types/models/Workspace'
-import { Head, router } from '@inertiajs/react'
-import { ColumnDef } from '@tanstack/react-table'
-import { omit } from 'lodash'
+} from '@/components/ui/dropdown-menu';
+import AppLayout from '@/layouts/app-layout';
+import { toFrontendSort } from '@/lib/sort';
+import { PaginatedData } from '@/types';
+import { Workspace } from '@/types/models/Workspace';
+import { Head, router } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
+import { omit } from 'lodash';
 import {
-    Activity,
     Database,
     Facebook,
     Mail,
@@ -23,38 +22,38 @@ import {
     RefreshCw,
     Search,
     User as UserIcon,
-} from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface MetaUser {
-    id: number
-    name: string
-    email: string | null
-    token_expires_at: string | null
-    last_synced_at: string | null
-    ad_accounts_count: number
+    id: number;
+    name: string;
+    email: string | null;
+    token_expires_at: string | null;
+    last_synced_at: string | null;
+    ad_accounts_count: number;
 }
 
 interface Props {
-    workspace: Workspace
-    metaUsers: PaginatedData<MetaUser>
-    totalAdAccounts: number
+    workspace: Workspace;
+    metaUsers: PaginatedData<MetaUser>;
+    totalAdAccounts: number;
     query?: {
-        sort?: string | null
-        perPage?: number | string
-        page?: number | string
-        filter?: { search?: string }
-    }
+        sort?: string | null;
+        perPage?: number | string;
+        page?: number | string;
+        filter?: { search?: string };
+    };
 }
 
 function formatRelative(ts: string | null) {
-    if (!ts) return 'Never'
-    const d = new Date(ts)
-    const diff = (Date.now() - d.getTime()) / 1000
-    if (diff < 60) return `${Math.round(diff)}s ago`
-    if (diff < 3600) return `${Math.round(diff / 60)}m ago`
-    if (diff < 86400) return `${Math.round(diff / 3600)}h ago`
-    return `${Math.round(diff / 86400)}d ago`
+    if (!ts) return 'Never';
+    const d = new Date(ts);
+    const diff = (Date.now() - d.getTime()) / 1000;
+    if (diff < 60) return `${Math.round(diff)}s ago`;
+    if (diff < 3600) return `${Math.round(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.round(diff / 3600)}h ago`;
+    return `${Math.round(diff / 86400)}d ago`;
 }
 
 function StatCard({
@@ -62,15 +61,15 @@ function StatCard({
     value,
     icon: Icon,
 }: {
-    label: string
-    value: string | number
-    icon: typeof UserIcon
+    label: string;
+    value: string | number;
+    icon: typeof UserIcon;
 }) {
     return (
         <div className="rounded-[14px] border border-black/6 bg-white p-5 transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:hover:border-white/10">
             <div className="flex items-start justify-between">
                 <div>
-                    <p className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                         {label}
                     </p>
                     <p className="mt-2 text-2xl font-semibold tracking-tight text-gray-700 dark:text-gray-200">
@@ -82,15 +81,23 @@ function StatCard({
                 </div>
             </div>
         </div>
-    )
+    );
 }
 
-export default function MetaFbAccounts({ workspace, metaUsers, totalAdAccounts, query }: Props) {
-    const connectUrl = `/workspaces/${workspace.slug}/integrations/meta/connect`
-    const indexUrl = `/workspaces/${workspace.slug}/integrations/meta`
+export default function MetaFbAccounts({
+    workspace,
+    metaUsers,
+    totalAdAccounts,
+    query,
+}: Props) {
+    const connectUrl = `/workspaces/${workspace.slug}/integrations/meta/connect`;
+    const indexUrl = `/workspaces/${workspace.slug}/integrations/meta`;
 
-    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort])
-    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '')
+    const initialSorting = useMemo(
+        () => toFrontendSort(query?.sort ?? null),
+        [query?.sort],
+    );
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
     useEffect(() => {
         const t = setTimeout(() => {
@@ -102,25 +109,32 @@ export default function MetaFbAccounts({ workspace, metaUsers, totalAdAccounts, 
                     page: searchValue ? 1 : (query?.page ?? 1),
                     per_page: query?.perPage ?? metaUsers.per_page,
                 },
-                { preserveState: true, replace: true, preserveScroll: true, only: ['metaUsers'] },
-            )
-        }, 400)
-        return () => clearTimeout(t)
-    }, [searchValue]) // eslint-disable-line react-hooks/exhaustive-deps
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['metaUsers'],
+                },
+            );
+        }, 400);
+        return () => clearTimeout(t);
+    }, [searchValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const sync = (metaUserId: number) => {
         router.post(
             `${indexUrl}/users/${metaUserId}/sync-ad-accounts`,
             {},
             { preserveScroll: true },
-        )
-    }
+        );
+    };
 
     const columns: ColumnDef<MetaUser>[] = [
         {
             accessorKey: 'name',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Name" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Name" />
+            ),
             cell: ({ row }) => (
                 <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-100 dark:bg-zinc-800">
@@ -140,7 +154,9 @@ export default function MetaFbAccounts({ workspace, metaUsers, totalAdAccounts, 
         {
             accessorKey: 'email',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Email" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Email" />
+            ),
             cell: ({ row }) =>
                 row.original.email ? (
                     <span className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
@@ -154,7 +170,9 @@ export default function MetaFbAccounts({ workspace, metaUsers, totalAdAccounts, 
         {
             accessorKey: 'ad_accounts_count',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Ad Accounts" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Ad Accounts" />
+            ),
             cell: ({ row }) => (
                 <span className="font-mono text-[12px] text-gray-700 dark:text-gray-300">
                     {row.original.ad_accounts_count}
@@ -164,7 +182,9 @@ export default function MetaFbAccounts({ workspace, metaUsers, totalAdAccounts, 
         {
             accessorKey: 'last_synced_at',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Last Synced" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Last Synced" />
+            ),
             cell: ({ row }) => (
                 <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
                     {formatRelative(row.original.last_synced_at)}
@@ -174,11 +194,15 @@ export default function MetaFbAccounts({ workspace, metaUsers, totalAdAccounts, 
         {
             accessorKey: 'token_expires_at',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Token Expires" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Token Expires" />
+            ),
             cell: ({ row }) =>
                 row.original.token_expires_at ? (
                     <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
-                        {new Date(row.original.token_expires_at).toLocaleDateString()}
+                        {new Date(
+                            row.original.token_expires_at,
+                        ).toLocaleDateString()}
                     </span>
                 ) : (
                     <span className="text-gray-300 dark:text-gray-600">—</span>
@@ -195,7 +219,9 @@ export default function MetaFbAccounts({ workspace, metaUsers, totalAdAccounts, 
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => sync(row.original.id)}>
+                            <DropdownMenuItem
+                                onClick={() => sync(row.original.id)}
+                            >
                                 <RefreshCw />
                                 Sync ad accounts
                             </DropdownMenuItem>
@@ -204,13 +230,14 @@ export default function MetaFbAccounts({ workspace, metaUsers, totalAdAccounts, 
                 </div>
             ),
         },
-    ]
+    ];
 
-    const lastSynced = metaUsers.data
-        .map((u) => u.last_synced_at)
-        .filter(Boolean)
-        .sort()
-        .reverse()[0] ?? null
+    const lastSynced =
+        metaUsers.data
+            .map((u) => u.last_synced_at)
+            .filter(Boolean)
+            .sort()
+            .reverse()[0] ?? null;
 
     return (
         <AppLayout>
@@ -221,8 +248,11 @@ export default function MetaFbAccounts({ workspace, metaUsers, totalAdAccounts, 
                     title="FB Account"
                     description="Facebook users that have authorized this workspace to access their ad accounts."
                 >
-                    <Button asChild className="bg-emerald-600 text-white hover:bg-emerald-700">
-                        <a className={'text-sm font-mono!'} href={connectUrl}>
+                    <Button
+                        asChild
+                        className="bg-emerald-600 text-white hover:bg-emerald-700"
+                    >
+                        <a className={'font-mono! text-sm'} href={connectUrl}>
                             <Facebook className="mr-2 h-4 w-4" />
                             Connect Meta Account
                         </a>
@@ -230,9 +260,21 @@ export default function MetaFbAccounts({ workspace, metaUsers, totalAdAccounts, 
                 </PageHeader>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <StatCard label="Connected Users" value={metaUsers.total} icon={UserIcon} />
-                    <StatCard label="Ad Accounts" value={totalAdAccounts} icon={Database} />
-                    <StatCard label="Last Synced" value={formatRelative(lastSynced)} icon={RefreshCw} />
+                    <StatCard
+                        label="Connected Users"
+                        value={metaUsers.total}
+                        icon={UserIcon}
+                    />
+                    <StatCard
+                        label="Ad Accounts"
+                        value={totalAdAccounts}
+                        icon={Database}
+                    />
+                    <StatCard
+                        label="Last Synced"
+                        value={formatRelative(lastSynced)}
+                        icon={RefreshCw}
+                    />
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -261,14 +303,21 @@ export default function MetaFbAccounts({ workspace, metaUsers, totalAdAccounts, 
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
                                     page: params?.page ?? 1,
-                                    per_page: params?.per_page ?? query?.perPage ?? metaUsers.per_page,
+                                    per_page:
+                                        params?.per_page ??
+                                        query?.perPage ??
+                                        metaUsers.per_page,
                                 },
-                                { preserveState: true, replace: true, preserveScroll: true },
-                            )
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true,
+                                },
+                            );
                         }}
                     />
                 </div>
             </div>
         </AppLayout>
-    )
+    );
 }

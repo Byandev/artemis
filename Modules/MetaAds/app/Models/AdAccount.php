@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\MetaAds\Services\MetaGraphClient;
+use RuntimeException;
 
 class AdAccount extends Model
 {
@@ -18,11 +20,31 @@ class AdAccount extends Model
 
     protected $casts = [
         'last_synced_at' => 'datetime',
+        'uses_system_user' => 'boolean',
     ];
 
     public function graphAccountId(): string
     {
         return 'act_'.$this->id;
+    }
+
+    public function graphClient(): MetaGraphClient
+    {
+        if ($this->uses_system_user) {
+            $token = config('metaads.system_user_token');
+            if (! $token) {
+                throw new RuntimeException("AdAccount {$this->id} is flagged uses_system_user but META_ADS_SYSTEM_USER_TOKEN is not set");
+            }
+
+            return new MetaGraphClient($token);
+        }
+
+        $metaUser = $this->metaUsers()->first();
+        if (! $metaUser) {
+            throw new RuntimeException("No MetaUser linked to AdAccount {$this->id}");
+        }
+
+        return $metaUser->graphClient();
     }
 
     public function metaUsers(): BelongsToMany

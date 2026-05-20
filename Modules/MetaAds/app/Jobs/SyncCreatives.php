@@ -13,7 +13,6 @@ use Modules\MetaAds\Jobs\Concerns\SerializesPerAdAccount;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\Creative;
 use Modules\MetaAds\Models\SyncRun;
-use RuntimeException;
 use Throwable;
 
 class SyncCreatives implements ShouldQueue
@@ -35,13 +34,7 @@ class SyncCreatives implements ShouldQueue
         );
 
         try {
-            $metaUser = $this->adAccount->metaUsers()->first();
-
-            if (! $metaUser) {
-                throw new RuntimeException("No MetaUser linked to AdAccount {$this->adAccount->id}");
-            }
-
-            $client = $metaUser->graphClient();
+            $client = $this->adAccount->graphClient();
 
             $fields = 'id,name,title,body,object_type,call_to_action_type,image_url,image_hash,video_id,thumbnail_url,object_story_spec,effective_object_story_id,instagram_permalink_url,status';
 

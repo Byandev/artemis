@@ -4,7 +4,6 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
 import { ContactSupportModal } from '@/components/contact-support-modal';
 import SubscriptionExpiredModal from '@/components/subscription-expired-modal';
-import SyncingDataModal from '@/components/syncing-data-modal';
 import { Button } from '@/components/ui/button';
 import { usePage } from '@inertiajs/react';
 import { LifeBuoy } from 'lucide-react';

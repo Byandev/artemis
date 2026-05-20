@@ -16,18 +16,19 @@ import { useEffect, useMemo, useState } from 'react';
 import {
     AdsManagerTabs,
     ColumnVisibilityMenu,
+    INSIGHTS_OPTIONS,
+    InsightsMetrics,
     StatusLabel,
     StatusToggle,
     adsManagerUrl,
+    buildInsightsColumns,
     formatBudget,
-    formatInt,
-    formatMoney,
     useColumnVisibility,
 } from './_shared';
 
 import DateOption = flatpickr.Options.DateOption;
 
-interface AdSetRow {
+interface AdSetRow extends InsightsMetrics {
     id: number;
     name: string;
     status: string | null;
@@ -37,13 +38,6 @@ interface AdSetRow {
     lifetime_budget: number | string | null;
     meta_ads_campaign_id: number;
     campaign_name: string | null;
-    spend: number | string;
-    impressions: number;
-    reach: number;
-    clicks: number;
-    link_clicks: number;
-    purchases: number;
-    purchase_value: number | string;
 }
 
 interface Props {
@@ -125,14 +119,15 @@ export default function MetaAdsAdSets({
     };
 
     const COLUMN_OPTIONS = [
-        { id: 'toggle', label: 'Status Toggle' },
-        { id: 'name', label: 'Ad Set', required: true },
-        { id: 'optimization_goal', label: 'Optimization' },
-        { id: 'daily_budget', label: 'Budget' },
-        { id: 'purchases', label: 'Results' },
-        { id: 'reach', label: 'Reach' },
-        { id: 'impressions', label: 'Impressions' },
-        { id: 'spend', label: 'Amount Spent' },
+        { id: 'toggle', label: 'Status Toggle', category: 'General' },
+        { id: 'name', label: 'Ad Set', category: 'General', required: true },
+        {
+            id: 'optimization_goal',
+            label: 'Optimization',
+            category: 'General',
+        },
+        { id: 'daily_budget', label: 'Budget', category: 'General' },
+        ...INSIGHTS_OPTIONS,
     ];
     const [columnVisibility, setColumnVisibility] = useColumnVisibility(
         'meta-ads-cols:ad-sets',
@@ -215,59 +210,7 @@ export default function MetaAdsAdSets({
                 );
             },
         },
-        {
-            accessorKey: 'purchases',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Results" />
-            ),
-            cell: ({ row }) => (
-                <div className="flex flex-col items-end text-right">
-                    <span className="font-mono text-[12px] font-medium text-gray-700 dark:text-gray-300">
-                        {formatInt(row.original.purchases)}
-                    </span>
-                    <span className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                        Purchases
-                    </span>
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'reach',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Reach" />
-            ),
-            cell: ({ row }) => (
-                <span className="text-right font-mono text-[12px] text-gray-700 dark:text-gray-300">
-                    {formatInt(row.original.reach)}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'impressions',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Impressions" />
-            ),
-            cell: ({ row }) => (
-                <span className="text-right font-mono text-[12px] text-gray-700 dark:text-gray-300">
-                    {formatInt(row.original.impressions)}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'spend',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Amount Spent" />
-            ),
-            cell: ({ row }) => (
-                <span className="text-right font-mono text-[12px] font-medium text-gray-800 dark:text-gray-200">
-                    {formatMoney(row.original.spend)}
-                </span>
-            ),
-        },
+        ...buildInsightsColumns<AdSetRow>(),
     ];
 
     return (

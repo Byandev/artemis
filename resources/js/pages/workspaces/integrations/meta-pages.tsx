@@ -1,14 +1,14 @@
-import PageHeader from '@/components/common/PageHeader'
-import { Button } from '@/components/ui/button'
-import { DataTable, SortableHeader } from '@/components/ui/data-table'
-import AppLayout from '@/layouts/app-layout'
-import { toFrontendSort } from '@/lib/sort'
-import { currencyFormatter } from '@/lib/utils'
-import { PaginatedData } from '@/types'
-import { Workspace } from '@/types/models/Workspace'
-import { Head, router } from '@inertiajs/react'
-import { ColumnDef } from '@tanstack/react-table'
-import { omit } from 'lodash'
+import PageHeader from '@/components/common/PageHeader';
+import { Button } from '@/components/ui/button';
+import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import AppLayout from '@/layouts/app-layout';
+import { toFrontendSort } from '@/lib/sort';
+import { currencyFormatter } from '@/lib/utils';
+import { PaginatedData } from '@/types';
+import { Workspace } from '@/types/models/Workspace';
+import { Head, router } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
+import { omit } from 'lodash';
 import {
     Activity,
     BookOpenIcon,
@@ -17,36 +17,36 @@ import {
     Facebook,
     Search,
     Wallet,
-} from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface PageRow {
-    id: number
-    name: string | null
-    facebook_url: string | null
-    shop_id: number | null
-    owner_id: number | null
-    orders_last_synced_at: string | null
-    daily_budget: number | string
-    lifetime_budget: number | string
-    ad_sets_count: number
+    id: number;
+    name: string | null;
+    facebook_url: string | null;
+    shop_id: number | null;
+    owner_id: number | null;
+    orders_last_synced_at: string | null;
+    daily_budget: number | string;
+    lifetime_budget: number | string;
+    ad_sets_count: number;
 }
 
 interface Props {
-    workspace: Workspace
-    pages: PaginatedData<PageRow>
+    workspace: Workspace;
+    pages: PaginatedData<PageRow>;
     query?: {
-        sort?: string | null
-        perPage?: number | string
-        page?: number | string
-        filter?: { search?: string }
-    }
+        sort?: string | null;
+        perPage?: number | string;
+        page?: number | string;
+        filter?: { search?: string };
+    };
 }
 
 function formatMoney(value: number | string | null | undefined) {
-    const n = typeof value === 'string' ? parseFloat(value) : (value ?? 0)
-    if (!n) return '—'
-    return currencyFormatter(n)
+    const n = typeof value === 'string' ? parseFloat(value) : (value ?? 0);
+    if (!n) return '—';
+    return currencyFormatter(n);
 }
 
 function StatCard({
@@ -54,15 +54,15 @@ function StatCard({
     value,
     icon: Icon,
 }: {
-    label: string
-    value: string | number
-    icon: typeof Database
+    label: string;
+    value: string | number;
+    icon: typeof Database;
 }) {
     return (
         <div className="rounded-[14px] border border-black/6 bg-white p-5 transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:hover:border-white/10">
             <div className="flex items-start justify-between">
                 <div>
-                    <p className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                         {label}
                     </p>
                     <p className="mt-2 text-2xl font-semibold tracking-tight text-gray-700 dark:text-gray-200">
@@ -74,14 +74,17 @@ function StatCard({
                 </div>
             </div>
         </div>
-    )
+    );
 }
 
 export default function MetaPages({ workspace, pages, query }: Props) {
-    const indexUrl = `/workspaces/${workspace.slug}/integrations/meta/pages`
+    const indexUrl = `/workspaces/${workspace.slug}/integrations/meta/pages`;
 
-    const initialSorting = useMemo(() => toFrontendSort(query?.sort ?? null), [query?.sort])
-    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '')
+    const initialSorting = useMemo(
+        () => toFrontendSort(query?.sort ?? null),
+        [query?.sort],
+    );
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
     useEffect(() => {
         const t = setTimeout(() => {
@@ -93,23 +96,30 @@ export default function MetaPages({ workspace, pages, query }: Props) {
                     page: searchValue ? 1 : (query?.page ?? 1),
                     per_page: query?.perPage ?? pages.per_page,
                 },
-                { preserveState: true, replace: true, preserveScroll: true, only: ['pages'] },
-            )
-        }, 400)
-        return () => clearTimeout(t)
-    }, [searchValue]) // eslint-disable-line react-hooks/exhaustive-deps
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['pages'],
+                },
+            );
+        }, 400);
+        return () => clearTimeout(t);
+    }, [searchValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const totalDailyBudget = pages.data.reduce(
         (sum, p) => sum + parseFloat(String(p.daily_budget || 0)),
         0,
-    )
-    const pagesWithAds = pages.data.filter((p) => p.ad_sets_count > 0).length
+    );
+    const pagesWithAds = pages.data.filter((p) => p.ad_sets_count > 0).length;
 
     const columns: ColumnDef<PageRow>[] = [
         {
             accessorKey: 'id',
             enableSorting: false,
-            header: ({ column }) => <SortableHeader column={column} title="ID" enabled={false} />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="ID" enabled={false} />
+            ),
             cell: ({ row }) => (
                 <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
                     {row.original.id}
@@ -119,7 +129,9 @@ export default function MetaPages({ workspace, pages, query }: Props) {
         {
             accessorKey: 'name',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Page" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Page" />
+            ),
             cell: ({ row }) => (
                 <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-100 dark:bg-zinc-800">
@@ -128,7 +140,9 @@ export default function MetaPages({ workspace, pages, query }: Props) {
                     <div className="flex flex-col gap-0.5">
                         <span className="text-[12px] font-medium text-gray-700 dark:text-gray-200">
                             {row.original.name ?? (
-                                <span className="text-gray-300 italic dark:text-gray-600">Unnamed</span>
+                                <span className="text-gray-300 italic dark:text-gray-600">
+                                    Unnamed
+                                </span>
                             )}
                         </span>
                         {row.original.facebook_url && (
@@ -149,7 +163,9 @@ export default function MetaPages({ workspace, pages, query }: Props) {
         {
             accessorKey: 'ad_sets_count',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Ad Sets" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Ad Sets" />
+            ),
             cell: ({ row }) => (
                 <span className="font-mono text-[12px] text-gray-700 dark:text-gray-300">
                     {row.original.ad_sets_count}
@@ -159,7 +175,9 @@ export default function MetaPages({ workspace, pages, query }: Props) {
         {
             accessorKey: 'daily_budget',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Daily Budget" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Daily Budget" />
+            ),
             cell: ({ row }) => (
                 <span className="font-mono text-[12px] font-medium text-gray-700 dark:text-gray-300">
                     {formatMoney(row.original.daily_budget)}
@@ -169,14 +187,16 @@ export default function MetaPages({ workspace, pages, query }: Props) {
         {
             accessorKey: 'lifetime_budget',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Lifetime Budget" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Lifetime Budget" />
+            ),
             cell: ({ row }) => (
                 <span className="font-mono text-[12px] text-gray-500 dark:text-gray-400">
                     {formatMoney(row.original.lifetime_budget)}
                 </span>
             ),
         },
-    ]
+    ];
 
     return (
         <AppLayout>
@@ -188,13 +208,17 @@ export default function MetaPages({ workspace, pages, query }: Props) {
                     description="Workspace pages with current rolled-up Meta ad budget across the ad sets that touch each page."
                 >
                     <Button variant="outline" size="sm" asChild>
-                        <a href={`/workspaces/${workspace.slug}/integrations/meta/ad-accounts`}>
+                        <a
+                            href={`/workspaces/${workspace.slug}/integrations/meta/ad-accounts`}
+                        >
                             <Database className="mr-2 h-4 w-4" />
                             Ad Accounts
                         </a>
                     </Button>
                     <Button variant="outline" size="sm" asChild>
-                        <a href={`/workspaces/${workspace.slug}/integrations/meta/health`}>
+                        <a
+                            href={`/workspaces/${workspace.slug}/integrations/meta/health`}
+                        >
                             <Activity className="mr-2 h-4 w-4" />
                             Sync Health
                         </a>
@@ -202,8 +226,16 @@ export default function MetaPages({ workspace, pages, query }: Props) {
                 </PageHeader>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <StatCard label="Total Pages" value={pages.total} icon={BookOpenIcon} />
-                    <StatCard label="Pages with active ads" value={pagesWithAds} icon={Facebook} />
+                    <StatCard
+                        label="Total Pages"
+                        value={pages.total}
+                        icon={BookOpenIcon}
+                    />
+                    <StatCard
+                        label="Pages with active ads"
+                        value={pagesWithAds}
+                        icon={Facebook}
+                    />
                     <StatCard
                         label="Total daily budget (this page)"
                         value={formatMoney(totalDailyBudget)}
@@ -237,14 +269,21 @@ export default function MetaPages({ workspace, pages, query }: Props) {
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
                                     page: params?.page ?? 1,
-                                    per_page: params?.per_page ?? query?.perPage ?? pages.per_page,
+                                    per_page:
+                                        params?.per_page ??
+                                        query?.perPage ??
+                                        pages.per_page,
                                 },
-                                { preserveState: true, replace: true, preserveScroll: true },
-                            )
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true,
+                                },
+                            );
                         }}
                     />
                 </div>
             </div>
         </AppLayout>
-    )
+    );
 }

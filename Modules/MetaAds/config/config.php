@@ -9,6 +9,13 @@ return [
     'graph_version' => env('META_ADS_GRAPH_VERSION', 'v25.0'),
     'graph_base_url' => env('META_ADS_GRAPH_BASE_URL', 'https://graph.facebook.com'),
 
+    // Long-lived Business Manager system-user token used for BM-owned ad accounts.
+    // After a workspace user OAuths and syncs their ad accounts, run
+    // `metaads:discover-system-accounts` to flag any of those accounts that are
+    // also visible to the BM as uses_system_user=true — future per-account sync
+    // jobs will then route through this token instead of the OAuth user token.
+    'system_user_token' => env('META_ADS_SYSTEM_USER_TOKEN'),
+
     'insights_backfill_days' => (int) env('META_ADS_INSIGHTS_BACKFILL_DAYS', 90),
 
     'page_size' => (int) env('META_ADS_PAGE_SIZE', 100),

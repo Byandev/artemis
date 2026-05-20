@@ -4,7 +4,6 @@ namespace Modules\MetaAds\Console\Commands;
 
 use Illuminate\Console\Command;
 use Modules\MetaAds\Jobs\SyncAdSets;
-use Modules\MetaAds\Jobs\SyncCampaigns;
 use Modules\MetaAds\Models\AdAccount;
 
 class SyncAdSetsCommand extends Command
