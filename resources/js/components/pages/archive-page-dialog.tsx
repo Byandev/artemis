@@ -13,6 +13,7 @@ import { Page } from '@/types/models/Page';
 import { Workspace } from '@/types/models/Workspace';
 import { router } from '@inertiajs/react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 interface ArchivePageDialogProps {
     page: Page | null;
@@ -35,7 +36,13 @@ export function ArchivePageDialog({
             workspaces.pages.archive.url({ workspace, page }),
             {},
             {
-                onSuccess: () => onClose(),
+                onSuccess: () => {
+                    toast.success('Page archived successfully.');
+                    onClose();
+                },
+                onError: () => {
+                    toast.error('Failed to archive page. Please try again.');
+                },
                 onFinish: () => setProcessing(false),
             },
         );
