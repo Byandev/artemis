@@ -2,10 +2,8 @@
 
 namespace Modules\Botcake\Http\Controllers\Web;
 
-use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Botcake\Http\Sorts\Sequence\SuccessRateSort;
@@ -18,12 +16,8 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class SequenceController extends Controller
 {
-    use AuthorizesRequests;
-
     public function index(Request $request, Workspace $workspace)
     {
-        $this->authorize(Permission::ViewBotcakeSequences->value, $workspace);
-
         [$mode, $from, $to] = $this->resolveModeAndRange($request);
 
         $base = Sequence::query()

@@ -113,22 +113,16 @@ export function AppSidebar() {
                   {
                       title: 'Botcake',
                       icon: MessageSquare,
-                      anyOf: [
-                          PERMISSIONS.ViewBotcakeSequences,
-                          PERMISSIONS.ViewBotcakeFlows,
-                      ],
                       items: [
                           {
                               title: 'Sequences',
                               href: `/workspaces/${currentWorkspace.slug}/botcake/sequences`,
                               icon: MessageSquare,
-                              permission: PERMISSIONS.ViewBotcakeSequences,
                           },
                           {
                               title: 'Flows',
                               href: `/workspaces/${currentWorkspace.slug}/botcake/flows`,
                               icon: ClipboardList,
-                              permission: PERMISSIONS.ViewBotcakeFlows,
                           },
                       ],
                   },
