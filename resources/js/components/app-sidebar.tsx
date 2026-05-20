@@ -16,12 +16,33 @@ import { type NavItem, User as UserType } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Link, usePage } from '@inertiajs/react';
 import {
+    ArrowLeftRight,
+    BarChart2,
+    BookOpenIcon,
+    Box,
     Check,
+    ClipboardList,
     Copy,
     ExternalLink,
+    Landmark,
+    Layers,
+    LayoutDashboard,
     LifeBuoy,
+    ListChecks,
+    MapPin,
+    MessageSquare,
+    Package,
+    PieChart,
+    RotateCcw,
+    Send,
+    Shield,
+    ShoppingCart,
+    Store,
     Trophy,
     Truck,
+    User,
+    Users,
+    Wallet,
 } from 'lucide-react';
 import { useState } from 'react';
 import AppLogo from './app-logo';
@@ -33,7 +54,6 @@ export function AppSidebar() {
     };
 
     const slug = currentWorkspace?.slug ?? '';
-    const mainNavItems = getWorkspaceMainNavItems(currentWorkspace);
 
     const dashboardUrl = currentWorkspace
         ? `/workspaces/${slug}/dashboard`
@@ -65,13 +85,13 @@ export function AppSidebar() {
         },
         ...(currentWorkspace.teams_module_enabled
             ? [
-                  {
-                      title: 'Teams',
-                      href: `/workspaces/${slug}/teams`,
-                      icon: Users,
-                      permission: PERMISSIONS.ViewTeams,
-                  },
-              ]
+                {
+                    title: 'Teams',
+                    href: `/workspaces/${slug}/teams`,
+                    icon: Users,
+                    permission: PERMISSIONS.ViewTeams,
+                },
+            ]
             : []),
         {
             title: 'Roles',
@@ -81,70 +101,70 @@ export function AppSidebar() {
         },
         ...(currentWorkspace.checklist_module_enabled
             ? [
-                  {
-                      title: 'Checklist',
-                      href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/checklist`,
-                      icon: ListChecks,
-                      permission: PERMISSIONS.ViewChecklist,
-                  },
-              ]
+                {
+                    title: 'Checklist',
+                    href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/checklist`,
+                    icon: ListChecks,
+                    permission: PERMISSIONS.ViewChecklist,
+                },
+            ]
             : []),
         ...(currentWorkspace.botcake_module_enabled
             ? [
-                  {
-                      title: 'Botcake',
-                      icon: MessageSquare,
-                      anyOf: [
-                          PERMISSIONS.ViewBotcakeSequences,
-                          PERMISSIONS.ViewBotcakeFlows,
-                      ],
-                      items: [
-                          {
-                              title: 'Sequences',
-                              href: `/workspaces/${currentWorkspace.slug}/botcake/sequences`,
-                              icon: MessageSquare,
-                              permission: PERMISSIONS.ViewBotcakeSequences,
-                          },
-                          {
-                              title: 'Sequence Messages',
-                              href: `/workspaces/${currentWorkspace.slug}/botcake/sequence-messages`,
-                              icon: Send,
-                          },
-                          {
-                              title: 'Flows',
-                              href: `/workspaces/${currentWorkspace.slug}/botcake/flows`,
-                              icon: ClipboardList,
-                              permission: PERMISSIONS.ViewBotcakeFlows,
-                          },
-                      ],
-                  },
-              ]
+                {
+                    title: 'Botcake',
+                    icon: MessageSquare,
+                    anyOf: [
+                        PERMISSIONS.ViewBotcakeSequences,
+                        PERMISSIONS.ViewBotcakeFlows,
+                    ],
+                    items: [
+                        {
+                            title: 'Sequences',
+                            href: `/workspaces/${currentWorkspace.slug}/botcake/sequences`,
+                            icon: MessageSquare,
+                            permission: PERMISSIONS.ViewBotcakeSequences,
+                        },
+                        {
+                            title: 'Sequence Messages',
+                            href: `/workspaces/${currentWorkspace.slug}/botcake/sequence-messages`,
+                            icon: Send,
+                        },
+                        {
+                            title: 'Flows',
+                            href: `/workspaces/${currentWorkspace.slug}/botcake/flows`,
+                            icon: ClipboardList,
+                            permission: PERMISSIONS.ViewBotcakeFlows,
+                        },
+                    ],
+                },
+            ]
             : []),
         ...(currentWorkspace.csr_module_enabled
             ? [
-                  {
-                      title: 'CSR',
-                      icon: User,
-                      anyOf: [
-                          PERMISSIONS.ViewCsrManagement,
-                          PERMISSIONS.ViewCsrAnalytics,
-                      ],
-                      items: [
-                          {
-                              title: 'Management',
-                              href: `/workspaces/${slug}/csr/management`,
-                              icon: User,
-                              permission: PERMISSIONS.ViewCsrManagement,
-                          },
-                          {
-                              title: 'Analytics',
-                              href: `/workspaces/${slug}/csr/analytics`,
-                              icon: BarChart2,
-                              permission: PERMISSIONS.ViewCsrAnalytics,
-                          },
-                      ],
-                  },
-              ]
+                {
+                    title: 'CSR',
+                    icon: User,
+                    anyOf: [
+                        PERMISSIONS.ViewCsrManagement,
+                        PERMISSIONS.ViewCsrAnalytics,
+                    ],
+                    items: [
+                        {
+                            title: 'Management',
+                            href: `/workspaces/${slug}/csr/management`,
+                            icon: User,
+                            permission: PERMISSIONS.ViewCsrManagement,
+                        },
+                        {
+                            title: 'Analytics',
+                            href: `/workspaces/${slug}/csr/analytics`,
+                            icon: BarChart2,
+                            permission: PERMISSIONS.ViewCsrAnalytics,
+                        },
+                    ],
+                },
+            ]
             : []),
         {
             title: 'RTS',
@@ -174,93 +194,93 @@ export function AppSidebar() {
         },
         ...(currentWorkspace.inventory_module_enabled
             ? [
-                  {
-                      title: 'Inventory',
-                      icon: Box,
-                      anyOf: [
-                          PERMISSIONS.ViewInventoryItems,
-                          PERMISSIONS.ViewTransactionLogs,
-                          PERMISSIONS.ViewPurchasedOrders,
-                      ],
-                      items: [
-                          {
-                              title: 'Inventory Items',
-                              href: `/workspaces/${slug}/inventory/items`,
-                              icon: Layers,
-                              permission: PERMISSIONS.ViewInventoryItems,
-                          },
-                          {
-                              title: 'Transaction Logs',
-                              href: `/workspaces/${slug}/inventory/transactions`,
-                              icon: ClipboardList,
-                              permission: PERMISSIONS.ViewTransactionLogs,
-                          },
-                          {
-                              title: 'Purchased Orders',
-                              href: `/workspaces/${slug}/inventory/purchased-orders`,
-                              icon: ShoppingCart,
-                              permission: PERMISSIONS.ViewPurchasedOrders,
-                          },
-                      ],
-                  },
-              ]
+                {
+                    title: 'Inventory',
+                    icon: Box,
+                    anyOf: [
+                        PERMISSIONS.ViewInventoryItems,
+                        PERMISSIONS.ViewTransactionLogs,
+                        PERMISSIONS.ViewPurchasedOrders,
+                    ],
+                    items: [
+                        {
+                            title: 'Inventory Items',
+                            href: `/workspaces/${slug}/inventory/items`,
+                            icon: Layers,
+                            permission: PERMISSIONS.ViewInventoryItems,
+                        },
+                        {
+                            title: 'Transaction Logs',
+                            href: `/workspaces/${slug}/inventory/transactions`,
+                            icon: ClipboardList,
+                            permission: PERMISSIONS.ViewTransactionLogs,
+                        },
+                        {
+                            title: 'Purchased Orders',
+                            href: `/workspaces/${slug}/inventory/purchased-orders`,
+                            icon: ShoppingCart,
+                            permission: PERMISSIONS.ViewPurchasedOrders,
+                        },
+                    ],
+                },
+            ]
             : []),
         ...(currentWorkspace.finance_module_enabled
             ? [
-                  {
-                      title: 'Finance',
-                      icon: Wallet,
-                      anyOf: [
-                          PERMISSIONS.ViewFinanceDashboard,
-                          PERMISSIONS.ViewFinanceAccounts,
-                          PERMISSIONS.ViewFinanceTransactions,
-                          PERMISSIONS.ViewFinanceRemittances,
-                      ],
-                      items: [
-                          {
-                              title: 'Live Cashflow',
-                              href: `/workspaces/${currentWorkspace.slug}/finance/dashboard`,
-                              icon: LayoutDashboard,
-                              permission: PERMISSIONS.ViewFinanceDashboard,
-                          },
-                          {
-                              title: 'Dashboard',
-                              href: `/workspaces/${currentWorkspace.slug}/finance/expenses`,
-                              icon: PieChart,
-                              permission: PERMISSIONS.ViewFinanceDashboard,
-                          },
-                          {
-                              title: 'Accounts',
-                              href: `/workspaces/${currentWorkspace.slug}/finance/accounts`,
-                              icon: Landmark,
-                              permission: PERMISSIONS.ViewFinanceAccounts,
-                          },
-                          {
-                              title: 'Transactions',
-                              href: `/workspaces/${currentWorkspace.slug}/finance/transactions`,
-                              icon: ArrowLeftRight,
-                              permission: PERMISSIONS.ViewFinanceTransactions,
-                          },
-                          {
-                              title: 'Remittances',
-                              href: `/workspaces/${currentWorkspace.slug}/finance/remittances`,
-                              icon: Send,
-                              permission: PERMISSIONS.ViewFinanceRemittances,
-                          },
-                      ],
-                  },
-              ]
+                {
+                    title: 'Finance',
+                    icon: Wallet,
+                    anyOf: [
+                        PERMISSIONS.ViewFinanceDashboard,
+                        PERMISSIONS.ViewFinanceAccounts,
+                        PERMISSIONS.ViewFinanceTransactions,
+                        PERMISSIONS.ViewFinanceRemittances,
+                    ],
+                    items: [
+                        {
+                            title: 'Live Cashflow',
+                            href: `/workspaces/${currentWorkspace.slug}/finance/dashboard`,
+                            icon: LayoutDashboard,
+                            permission: PERMISSIONS.ViewFinanceDashboard,
+                        },
+                        {
+                            title: 'Dashboard',
+                            href: `/workspaces/${currentWorkspace.slug}/finance/expenses`,
+                            icon: PieChart,
+                            permission: PERMISSIONS.ViewFinanceDashboard,
+                        },
+                        {
+                            title: 'Accounts',
+                            href: `/workspaces/${currentWorkspace.slug}/finance/accounts`,
+                            icon: Landmark,
+                            permission: PERMISSIONS.ViewFinanceAccounts,
+                        },
+                        {
+                            title: 'Transactions',
+                            href: `/workspaces/${currentWorkspace.slug}/finance/transactions`,
+                            icon: ArrowLeftRight,
+                            permission: PERMISSIONS.ViewFinanceTransactions,
+                        },
+                        {
+                            title: 'Remittances',
+                            href: `/workspaces/${currentWorkspace.slug}/finance/remittances`,
+                            icon: Send,
+                            permission: PERMISSIONS.ViewFinanceRemittances,
+                        },
+                    ],
+                },
+            ]
             : []),
     ];
 
     const adminNavItems: NavItem[] = auth?.user?.can?.viewAnySupportTickets
         ? [
-              {
-                  title: 'Support Tickets',
-                  href: `/workspaces/${slug}/admin/support-tickets`,
-                  icon: LifeBuoy,
-              },
-          ]
+            {
+                title: 'Support Tickets',
+                href: `/workspaces/${slug}/admin/support-tickets`,
+                icon: LifeBuoy,
+            },
+        ]
         : [];
 
     const supportNavItems: NavItem[] = [
@@ -281,13 +301,7 @@ export function AppSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link
-                                href={
-                                    slug
-                                        ? `/workspaces/${slug}/dashboard`
-                                        : '/dashboard'
-                                }
-                            >
+                            <Link href={dashboard().url}>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
@@ -319,10 +333,10 @@ export function AppSidebar() {
 }
 
 function PublicLinks({
-    workspaceSlug,
-    rmoEnabled,
-    leaderboardEnabled,
-}: {
+                         workspaceSlug,
+                         rmoEnabled,
+                         leaderboardEnabled,
+                     }: {
     workspaceSlug: string;
     rmoEnabled: boolean;
     leaderboardEnabled: boolean;
@@ -338,12 +352,12 @@ function PublicLinks({
     const links = [
         ...(rmoEnabled && canViewRmoLink
             ? [
-                  {
-                      title: 'RMO Management',
-                      href: `/public/workspaces/${workspaceSlug}/rts/rmo-management`,
-                      icon: Truck,
-                  },
-              ]
+                {
+                    title: 'RMO Management',
+                    href: `/public/workspaces/${workspaceSlug}/rts/rmo-management`,
+                    icon: Truck,
+                },
+            ]
             : []),
         ...(leaderboardEnabled && canViewLeaderboardLink
             ? [{ title: 'Leaderboards', href: '/leaderboards', icon: Trophy }]
@@ -367,10 +381,10 @@ function PublicLinks({
 }
 
 function PublicLinkItem({
-    title,
-    href,
-    icon: Icon,
-}: {
+                            title,
+                            href,
+                            icon: Icon,
+                        }: {
     title: string;
     href: string;
     icon: typeof Truck;
