@@ -1,6 +1,6 @@
-import { usePage } from '@inertiajs/react';
-import type { SharedData } from '@/types';
 import type { PermissionName } from '@/constants/permissions';
+import type { SharedData } from '@/types';
+import { usePage } from '@inertiajs/react';
 
 export type PermissionInput = PermissionName | PermissionName[];
 
@@ -13,14 +13,20 @@ export function useUserPermissions(): string[] {
     return auth?.user?.permissions ?? [];
 }
 
-export function hasPermission(perms: string[], required: PermissionInput): boolean {
+export function hasPermission(
+    perms: string[],
+    required: PermissionInput,
+): boolean {
     if (perms.includes('*')) return true;
     const needed = normalize(required);
     if (needed.length === 0) return true;
     return needed.every((p) => perms.includes(p));
 }
 
-export function hasAnyPermission(perms: string[], required: PermissionInput): boolean {
+export function hasAnyPermission(
+    perms: string[],
+    required: PermissionInput,
+): boolean {
     if (perms.includes('*')) return true;
     const needed = normalize(required);
     if (needed.length === 0) return true;

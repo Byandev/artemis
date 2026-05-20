@@ -93,28 +93,28 @@ export type CityRow = {
 };
 
 export const PRICE_LABELS: Record<string, string> = {
-    '0-250':     '₱0 – ₱250',
-    '251-500':   '₱251 – ₱500',
-    '501-750':   '₱501 – ₱750',
-    '751-1000':  '₱751 – ₱1,000',
+    '0-250': '₱0 – ₱250',
+    '251-500': '₱251 – ₱500',
+    '501-750': '₱501 – ₱750',
+    '751-1000': '₱751 – ₱1,000',
     '1001-1500': '₱1,001 – ₱1,500',
     '1501-2000': '₱1,501 – ₱2,000',
     '2001-3000': '₱2,001 – ₱3,000',
     '3001-5000': '₱3,001 – ₱5,000',
-    '5000+':     '₱5,000+',
+    '5000+': '₱5,000+',
 };
 
 export const CX_RTS_LABELS: Record<string, string> = {
     no_report: 'No Report',
-    '0-10':   '0 – 10%',
-    '11-20':  '11 – 20%',
-    '21-30':  '21 – 30%',
-    '31-40':  '31 – 40%',
-    '41-50':  '41 – 50%',
-    '51-60':  '51 – 60%',
-    '61-70':  '61 – 70%',
-    '71-80':  '71 – 80%',
-    '81-90':  '81 – 90%',
+    '0-10': '0 – 10%',
+    '11-20': '11 – 20%',
+    '21-30': '21 – 30%',
+    '31-40': '31 – 40%',
+    '41-50': '41 – 50%',
+    '51-60': '51 – 60%',
+    '61-70': '61 – 70%',
+    '71-80': '71 – 80%',
+    '81-90': '81 – 90%',
     '91-100': '91 – 100%',
 };
 
@@ -129,7 +129,13 @@ export const RtsCell = ({ value }: { value: number }) => (
     <span className={rtsColor(value)}>{value}%</span>
 );
 
-export const RefreshButton = ({ onClick, loading }: { onClick: () => void; loading?: boolean }) => (
+export const RefreshButton = ({
+    onClick,
+    loading,
+}: {
+    onClick: () => void;
+    loading?: boolean;
+}) => (
     <button
         onClick={onClick}
         disabled={loading}
@@ -140,7 +146,13 @@ export const RefreshButton = ({ onClick, loading }: { onClick: () => void; loadi
     </button>
 );
 
-export const ViewToggle = ({ value, onChange }: { value: ViewMode; onChange: (v: ViewMode) => void }) => (
+export const ViewToggle = ({
+    value,
+    onChange,
+}: {
+    value: ViewMode;
+    onChange: (v: ViewMode) => void;
+}) => (
     <div className="flex overflow-hidden rounded-lg border border-black/8 dark:border-white/8">
         <button
             onClick={() => onChange('table')}

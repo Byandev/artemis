@@ -99,6 +99,10 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isMemberOf(Workspace $workspace): bool
     {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         return DB::table('workspace_user')
             ->where('user_id', $this->id)
             ->where('workspace_id', $workspace->id)
@@ -162,6 +166,34 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Check if the user's role in the given workspace only has CSR-category permissions.
+     * Owners, super admins, and users without a role are never considered CSR-only.
+     */
+    public function isCsrOf(Workspace $workspace): bool
+    {
+        if ($this->isSuperAdmin() || $this->ownsWorkspace($workspace)) {
+            return false;
+        }
+
+        $roleId = DB::table('workspace_user')
+            ->where('user_id', $this->id)
+            ->where('workspace_id', $workspace->id)
+            ->value('role_id');
+
+        if (! $roleId) {
+            return false;
+        }
+
+        $categories = DB::table('role_permissions')
+            ->join('permissions', 'role_permissions.permission_id', '=', 'permissions.id')
+            ->where('role_permissions.role_id', $roleId)
+            ->pluck('permissions.category')
+            ->unique();
+
+        return $categories->isNotEmpty() && $categories->every(fn ($cat) => $cat === 'CSR');
+    }
+
+    /**
      * FIXED: This method now uses DB::table to avoid triggering the
      * Gate::before infinite loop which caused the 502/Timeout.
      */
@@ -179,7 +211,7 @@ class User extends Authenticatable implements MustVerifyEmail
             ->where('workspace_id', $workspace->id)
             ->value('role_id');
 
-        if (!$roleId) {
+        if (! $roleId) {
             return false;
         }
 

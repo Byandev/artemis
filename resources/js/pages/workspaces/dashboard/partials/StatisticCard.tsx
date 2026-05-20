@@ -30,14 +30,14 @@ export interface Props {
 type AnalyticsResponse = Record<string, number>;
 
 function CardSkeleton({
-                          label,
-                          icon: Icon,
-                      }: {
+    label,
+    icon: Icon,
+}: {
     label: string;
     icon?: LucideIcon | null;
 }) {
     return (
-        <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900 p-[18px]">
+        <div className="rounded-[14px] border border-black/6 bg-white p-[18px] dark:border-white/6 dark:bg-zinc-900">
             <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
                     <div>
@@ -66,17 +66,17 @@ function CardSkeleton({
 }
 
 const StatisticCard = ({
-                           metric,
-                           label,
-                           workspace,
-                           dateRange,
-                           filter,
-                           formatter,
-                           icon: Icon,
-                           tooltipLabel,
-                           reverseTrend = false,
-                           onValueLoaded,
-                       }: Props) => {
+    metric,
+    label,
+    workspace,
+    dateRange,
+    filter,
+    formatter,
+    icon: Icon,
+    tooltipLabel,
+    reverseTrend = false,
+    onValueLoaded,
+}: Props) => {
     const [currentValue, setCurrentValue] = useState(0);
     const [previousValue, setPreviousValue] = useState(0);
 
@@ -142,14 +142,20 @@ const StatisticCard = ({
                 });
 
                 const [currentRes, previousRes] = await Promise.all([
-                    axios.get<AnalyticsResponse>('/api/v1/workspace/analytics', axiosOpts(
-                        period.start.format('YYYY-MM-DD'),
-                        period.end.format('YYYY-MM-DD'),
-                    )),
-                    axios.get<AnalyticsResponse>('/api/v1/workspace/analytics', axiosOpts(
-                        period.prevStart.format('YYYY-MM-DD'),
-                        period.prevEnd.format('YYYY-MM-DD'),
-                    )),
+                    axios.get<AnalyticsResponse>(
+                        '/api/v1/workspace/analytics',
+                        axiosOpts(
+                            period.start.format('YYYY-MM-DD'),
+                            period.end.format('YYYY-MM-DD'),
+                        ),
+                    ),
+                    axios.get<AnalyticsResponse>(
+                        '/api/v1/workspace/analytics',
+                        axiosOpts(
+                            period.prevStart.format('YYYY-MM-DD'),
+                            period.prevEnd.format('YYYY-MM-DD'),
+                        ),
+                    ),
                 ]);
 
                 if (controller.signal.aborted) return;
@@ -178,9 +184,7 @@ const StatisticCard = ({
     const comparison = useMemo(() => {
         const hasPreviousData = previousValue > 0;
         const difference = currentValue - previousValue;
-        const percent = hasPreviousData
-            ? (difference / previousValue)
-            : 0;
+        const percent = hasPreviousData ? difference / previousValue : 0;
 
         const isPositive = difference > 0;
         const isNegative = difference < 0;
@@ -189,8 +193,8 @@ const StatisticCard = ({
         const TrendIcon = isPositive
             ? TrendingUp
             : isNegative
-                ? TrendingDown
-                : Minus;
+              ? TrendingDown
+              : Minus;
 
         const isGood = reverseTrend ? isNegative : isPositive;
         const isBad = reverseTrend ? isPositive : isNegative;
@@ -198,8 +202,8 @@ const StatisticCard = ({
         const trendClasses = isGood
             ? 'text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-950/30'
             : isBad
-                ? 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950/30'
-                : 'text-gray-500 bg-gray-50 dark:text-gray-400 dark:bg-gray-800';
+              ? 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950/30'
+              : 'text-gray-500 bg-gray-50 dark:text-gray-400 dark:bg-gray-800';
 
         return {
             hasPreviousData,
@@ -224,8 +228,8 @@ const StatisticCard = ({
             const status = comparison.isNeutral
                 ? 'unchanged'
                 : comparison.isGood
-                    ? 'improving'
-                    : 'worsening';
+                  ? 'improving'
+                  : 'worsening';
 
             return `${label} is ${status} by ${percentageFormatter(comparison.percent)} compared to the previous ${period.days}-day period. Current: ${formatter(currentValue)}. Previous: ${formatter(previousValue)}.`;
         }
@@ -249,7 +253,7 @@ const StatisticCard = ({
     }
 
     return (
-        <div className="rounded-[14px] border border-black/6 dark:border-white/6 bg-white dark:bg-zinc-900 p-[18px]">
+        <div className="rounded-[14px] border border-black/6 bg-white p-[18px] dark:border-white/6 dark:bg-zinc-900">
             <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
                     <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
@@ -284,7 +288,7 @@ const StatisticCard = ({
             </div>
 
             <div className="mt-3 flex flex-row justify-between">
-                <h4 className="text-[22px] font-semibold font-mono tracking-tight tabular-nums text-gray-900 dark:text-gray-100">
+                <h4 className="font-mono text-[22px] font-semibold tracking-tight text-gray-900 tabular-nums dark:text-gray-100">
                     {formatter(currentValue)}
                 </h4>
 

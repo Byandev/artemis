@@ -1,7 +1,3 @@
-import { useState } from 'react';
-import { router } from '@inertiajs/react';
-import { Page } from '@/types/models/Page';
-import { Workspace } from '@/types/models/Workspace';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -13,6 +9,11 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import workspaces from '@/routes/workspaces';
+import { Page } from '@/types/models/Page';
+import { Workspace } from '@/types/models/Workspace';
+import { router } from '@inertiajs/react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 interface ArchivePageDialogProps {
     page: Page | null;
@@ -20,7 +21,11 @@ interface ArchivePageDialogProps {
     onClose: () => void;
 }
 
-export function ArchivePageDialog({ page, workspace, onClose }: ArchivePageDialogProps) {
+export function ArchivePageDialog({
+    page,
+    workspace,
+    onClose,
+}: ArchivePageDialogProps) {
     const [processing, setProcessing] = useState(false);
 
     const handleArchive = () => {
@@ -31,9 +36,15 @@ export function ArchivePageDialog({ page, workspace, onClose }: ArchivePageDialo
             workspaces.pages.archive.url({ workspace, page }),
             {},
             {
-                onSuccess: () => onClose(),
+                onSuccess: () => {
+                    toast.success('Page archived successfully.');
+                    onClose();
+                },
+                onError: () => {
+                    toast.error('Failed to archive page. Please try again.');
+                },
                 onFinish: () => setProcessing(false),
-            }
+            },
         );
     };
 
@@ -43,13 +54,18 @@ export function ArchivePageDialog({ page, workspace, onClose }: ArchivePageDialo
                 <AlertDialogHeader>
                     <AlertDialogTitle>Archive Page</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Are you sure you want to archive "{page?.name}"?
-                        You can restore it later from the Archived tab.
+                        Are you sure you want to archive "{page?.name}"? You can
+                        restore it later from the Archived tab.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel disabled={processing}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleArchive} disabled={processing}>
+                    <AlertDialogCancel disabled={processing}>
+                        Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={handleArchive}
+                        disabled={processing}
+                    >
                         {processing ? 'Archiving...' : 'Archive'}
                     </AlertDialogAction>
                 </AlertDialogFooter>

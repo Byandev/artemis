@@ -15,8 +15,6 @@ use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
-
-
 class InventoryItemController extends Controller
 {
     use AuthorizesRequests;
@@ -61,6 +59,7 @@ class InventoryItemController extends Controller
                 AllowedSort::field('product_name', 'products.name'),
                 'lead_time',
                 'unfulfilled_count',
+                'remaining_qty',
                 'three_days_average',
                 'current_stocks',
                 'waiting_for_delivery_stocks',
@@ -126,12 +125,12 @@ class InventoryItemController extends Controller
         $request->validate([
             'product_id' => 'required|exists:products,id',
             'sku' => [
-                'required', 
-                'string', 
-                'max:255', 
+                'required',
+                'string',
+                'max:255',
                 Rule::unique('inventory_items')
-                    ->where('workspace_id', $workspace->id) 
-                    ->ignore($item->id)                     
+                    ->where('workspace_id', $workspace->id)
+                    ->ignore($item->id),
             ],
             'sales_keywords' => 'nullable|string',
             'transaction_keywords' => 'nullable|string',
@@ -152,7 +151,6 @@ class InventoryItemController extends Controller
         return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
             ->with('success', 'Inventory Items record updated.');
     }
-
 
     public function destroy(Workspace $workspace, InventoryItem $item)
     {

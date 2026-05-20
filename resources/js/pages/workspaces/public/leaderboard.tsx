@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useEffect, useState } from 'react';
 
 interface User {
     id: string;
@@ -63,7 +63,7 @@ const LeaderboardCard = ({
     secondaryValue,
     activeTab,
 }: LeaderboardCardProps) => {
-    const cardHeight = rank === 1 ? 'h-60' : rank === 2 ? 'h-54' : 'h-54';
+    const cardHeight = rank === 1 ? 'h-64' : rank === 2 ? 'h-56' : 'h-52';
 
     const getLabels = () => {
         if (activeTab === 'Sales Ranking') {
@@ -191,6 +191,7 @@ export default function Leaderboard() {
     const [activeTab, setActiveTab] = useState('Sales Ranking');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [retryCount, setRetryCount] = useState(0);
 
     const getInitials = (name: string): string => {
         return name
@@ -295,13 +296,12 @@ export default function Leaderboard() {
         };
 
         fetchData();
-    }, [activeTab]);
+    }, [activeTab, retryCount]);
 
-    // Loading State
-    if (isLoading) {
-        return (
-            <div className="relative h-screen overflow-hidden bg-violet-900">
-                <div className="absolute inset-0 flex items-center justify-center">
+    const renderContent = () => {
+        if (isLoading) {
+            return (
+                <div className="mt-20 flex items-center justify-center">
                     <div className="relative">
                         <div className="h-32 w-32 animate-spin rounded-full border-t-2 border-b-2 border-violet-400"></div>
                         <div className="absolute inset-0 flex items-center justify-center">
@@ -312,60 +312,19 @@ export default function Leaderboard() {
                         </p>
                     </div>
                 </div>
-            </div>
-        );
-    }
+            );
+        }
 
-    // Error State
-    if (error) {
-        return (
-            <div className="relative h-screen overflow-hidden bg-violet-900">
-                <div className="absolute inset-0 flex items-center justify-center">
+        if (error) {
+            return (
+                <div className="mt-20 flex items-center justify-center">
                     <div className="text-center">
                         <div className="mb-4 text-6xl">⚠️</div>
                         <p className="mb-2 text-red-400">{error}</p>
                         <button
                             onClick={() => {
                                 setError(null);
-                                setIsLoading(true);
-                                // Trigger refetch
-                                const fetchData = async () => {
-                                    try {
-                                        let url = '/api/public/leaderboards';
-                                        if (activeTab === 'Called Activity') {
-                                            url =
-                                                '/api/public/leaderboards/group-by-called';
-                                        } else if (
-                                            activeTab === 'Delivery Success'
-                                        ) {
-                                            url =
-                                                '/api/public/leaderboards/group-by-delivered';
-                                        }
-                                        const response = await axios.get(url);
-                                        let data = Array.isArray(response.data)
-                                            ? response.data
-                                            : [];
-                                        data = data.map((user: any) => ({
-                                            id: user.id,
-                                            name: user.name,
-                                            sales: user.sales || 0,
-                                            orders_count:
-                                                user.orders_count || 0,
-                                            assigned_order_for_delivery_count:
-                                                user.assigned_order_for_delivery_count ||
-                                                0,
-                                        }));
-                                        setUsers(data);
-                                    } catch (err) {
-                                        console.error(err);
-                                        setError(
-                                            'Failed to load leaderboard data. Please try again.',
-                                        );
-                                    } finally {
-                                        setIsLoading(false);
-                                    }
-                                };
-                                fetchData();
+                                setRetryCount((c) => c + 1);
                             }}
                             className="mt-4 rounded-full bg-violet-500 px-6 py-2 text-white transition-colors hover:bg-violet-600"
                         >
@@ -373,109 +332,85 @@ export default function Leaderboard() {
                         </button>
                     </div>
                 </div>
-            </div>
-        );
-    }
+            );
+        }
 
-    // Empty State - Now with title and tabs
-    if (users.length === 0) {
-        return (
-            <div className="relative h-screen overflow-hidden bg-violet-900">
-                {/* Background decorations - same as main view */}
-                <div className="absolute -top-20 -right-10 h-100 w-100">
-                    <div className="absolute inset-0 rounded-full bg-linear-to-bl from-violet-900 via-violet-800 to-violet-300 opacity-80 blur-3xl"></div>
-                    <div className="absolute inset-0 animate-pulse rounded-full border-2 border-white/30"></div>
-                    <div className="absolute inset-4 rounded-full border border-white/20 blur-sm"></div>
-                    <div className="absolute inset-8 rounded-full border border-white/10 blur-md"></div>
-                    <div className="absolute inset-0 rounded-full bg-linear-to-tr from-transparent via-white/20 to-white/40 blur-2xl"></div>
-                    <div className="absolute top-10 right-10 h-2 w-2 animate-ping rounded-full bg-white"></div>
-                    <div className="absolute top-20 right-20 h-1 w-1 animate-pulse rounded-full bg-white/80"></div>
-                </div>
-
-                <div className="absolute top-20 left-10 h-64 w-64">
-                    <div className="absolute inset-0 rounded-full bg-white/20 shadow-[0px_0px_80px_20px_rgba(255,255,255,0.3)] blur-2xl"></div>
-                    <div className="absolute inset-0 rounded-full border border-white/30"></div>
-                </div>
-
-                <div className="absolute -bottom-20 -left-10 h-100 w-100">
-                    <div className="absolute inset-0 rounded-full bg-linear-to-tr from-violet-900 via-violet-800 to-violet-300 opacity-80 blur-3xl"></div>
-                    <div className="absolute inset-0 animate-pulse rounded-full border-2 border-white/30"></div>
-                    <div className="absolute inset-4 rounded-full border border-white/20 blur-sm"></div>
-                    <div className="absolute inset-8 rounded-full border border-white/10 blur-md"></div>
-                    <div className="absolute inset-0 rounded-full bg-linear-to-bl from-transparent via-white/20 to-white/40 blur-2xl"></div>
-                    <div className="absolute bottom-10 left-10 h-2 w-2 animate-ping rounded-full bg-white"></div>
-                    <div className="absolute bottom-20 left-20 h-1 w-1 animate-pulse rounded-full bg-white/80"></div>
-                </div>
-
-                <div className="absolute right-0 bottom-20 h-64 w-64">
-                    <div className="absolute inset-1 rounded-full bg-white/20 shadow-white blur-2xl"></div>
-                    <div className="absolute inset-0 rounded-full border border-white/30"></div>
-                </div>
-
-                <div className="absolute inset-0 bg-linear-to-t from-violet-950/50 to-transparent"></div>
-
-                <div className="absolute top-1/4 right-1/4 h-1 w-1 animate-pulse rounded-full bg-white/50"></div>
-                <div className="absolute bottom-1/3 left-1/3 h-1 w-1 animate-pulse rounded-full bg-white/50 delay-300"></div>
-                <div className="absolute top-2/3 right-1/3 h-1 w-1 animate-pulse rounded-full bg-white/50 delay-700"></div>
-
-                <div className="relative z-10 h-full overflow-y-auto">
-                    <div className="flex flex-col items-center pt-20 pb-10">
-                        <h1 className="text-4xl font-bold text-white drop-shadow-lg">
-                            CSR Leaderboards
-                        </h1>
-
-                        <div className="mt-6 flex gap-4">
-                            {(
-                                [
-                                    'Sales Ranking',
-                                    'Called Activity',
-                                    'Delivery Success',
-                                ] as const
-                            ).map((tab: string) => (
-                                <button
-                                    key={tab}
-                                    onClick={() => handleTabClick(tab)}
-                                    className={`relative overflow-hidden rounded-full border border-white/10 px-6 py-2 text-gray-200 transition-all hover:shadow-lg hover:shadow-white/10 ${
-                                        activeTab === tab
-                                            ? 'bg-white/20 backdrop-blur-sm'
-                                            : 'hover:bg-white/5'
-                                    }`}
-                                >
-                                    <div className="absolute top-0 left-0 h-1/2 w-full bg-gradient-to-b from-white/20 to-transparent"></div>
-                                    <span className="relative z-10">{tab}</span>
-                                </button>
-                            ))}
+        if (users.length === 0) {
+            return (
+                <div className="mt-20 flex flex-col items-center justify-center">
+                    <div className="text-center">
+                        <div className="mb-6 animate-bounce text-7xl">
+                            {activeTab === 'Sales Ranking' && '💰'}
+                            {activeTab === 'Called Activity' && '📞'}
+                            {activeTab === 'Delivery Success' && '🚚'}
                         </div>
-
-                        {/* Empty State Content */}
-                        <div className="mt-20 flex flex-col items-center justify-center">
-                            <div className="text-center">
-                                <div className="mb-6 animate-bounce text-7xl">
-                                    {activeTab === 'Sales Ranking' && '💰'}
-                                    {activeTab === 'Called Activity' && '📞'}
-                                    {activeTab === 'Delivery Success' && '🚚'}
-                                </div>
-                                <h3 className="mb-3 text-2xl font-semibold text-white">
-                                    No Data Available
-                                </h3>
-                                <p className="mb-2 text-lg text-gray-300">
-                                    {activeTab === 'Sales Ranking' &&
-                                        'No sales have been recorded for today.'}
-                                    {activeTab === 'Called Activity' &&
-                                        'No call activity has been recorded for today.'}
-                                    {activeTab === 'Delivery Success' &&
-                                        'No deliveries have been completed today.'}
-                                </p>
-                                <p className="text-sm text-gray-400">
-                                    Check back later for updates
-                                </p>
-                            </div>
-                        </div>
+                        <h3 className="mb-3 text-2xl font-semibold text-white">
+                            No Data Available
+                        </h3>
+                        <p className="mb-2 text-lg text-gray-300">
+                            {activeTab === 'Sales Ranking' &&
+                                'No sales have been recorded for today.'}
+                            {activeTab === 'Called Activity' &&
+                                'No call activity has been recorded for today.'}
+                            {activeTab === 'Delivery Success' &&
+                                'No deliveries have been completed today.'}
+                        </p>
+                        <p className="text-sm text-gray-400">
+                            Check back later for updates
+                        </p>
                     </div>
                 </div>
-            </div>
+            );
+        }
+
+        return (
+            <>
+                {topThree.length > 0 && (
+                    <div className="flex items-end gap-4">
+                        {/* Podium order: 2nd, 1st, 3rd */}
+                        {[topThree[1], topThree[0], topThree[2]]
+                            .filter(Boolean)
+                            .map((user: User) => {
+                                const rank =
+                                    user === topThree[0]
+                                        ? 1
+                                        : user === topThree[1]
+                                          ? 2
+                                          : 3;
+
+                                return (
+                                    <LeaderboardCard
+                                        key={user.id}
+                                        rank={rank}
+                                        initials={getInitials(user.name)}
+                                        name={user.name}
+                                        primaryValue={getPrimaryValue(user)}
+                                        secondaryValue={getSecondaryValue(user)}
+                                        activeTab={activeTab}
+                                    />
+                                );
+                            })}
+                    </div>
+                )}
+
+                {restOfUsers.length > 0 && (
+                    <div className="mt-8 w-full max-w-4xl space-y-2 px-4">
+                        {restOfUsers.map((user: User, index: number) => (
+                            <LeaderboardEntry
+                                key={user.id}
+                                rank={index + 4}
+                                initials={getInitials(user.name)}
+                                name={user.name}
+                                primaryValue={getPrimaryValue(user)}
+                                secondaryValue={getSecondaryValue(user)}
+                                activeTab={activeTab}
+                            />
+                        ))}
+                    </div>
+                )}
+            </>
         );
-    }
+    };
 
     return (
         <div className="relative h-screen overflow-hidden bg-violet-900">
@@ -544,44 +479,9 @@ export default function Leaderboard() {
                         ))}
                     </div>
 
-                    {topThree.length > 0 && (
-                        <div className="flex items-end gap-4">
-                            {topThree.map((user: User, index: number) => {
-                                const rank =
-                                    index === 0 ? 1 : index === 1 ? 2 : 3;
-
-                                return (
-                                    <LeaderboardCard
-                                        key={user.id}
-                                        rank={rank}
-                                        initials={getInitials(user.name)}
-                                        name={user.name}
-                                        primaryValue={getPrimaryValue(user)}
-                                        secondaryValue={getSecondaryValue(user)}
-                                        activeTab={activeTab}
-                                    />
-                                );
-                            })}
-                        </div>
-                    )}
-
-                    {restOfUsers.length > 0 && (
-                        <div className="mt-8 w-full max-w-4xl space-y-2 px-4">
-                            {restOfUsers.map((user: User, index: number) => (
-                                <LeaderboardEntry
-                                    key={user.id}
-                                    rank={index + 4}
-                                    initials={getInitials(user.name)}
-                                    name={user.name}
-                                    primaryValue={getPrimaryValue(user)}
-                                    secondaryValue={getSecondaryValue(user)}
-                                    activeTab={activeTab}
-                                />
-                            ))}
-                        </div>
-                    )}
+                    {renderContent()}
                 </div>
             </div>
         </div>
     );
-}       
+}

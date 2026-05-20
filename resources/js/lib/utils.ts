@@ -1,17 +1,18 @@
-import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-import { format, differenceInDays } from 'date-fns';
-import { type DateRange } from 'react-day-picker';
 import { InertiaLinkProps } from '@inertiajs/react';
+import { type ClassValue, clsx } from 'clsx';
+import { format } from 'date-fns';
+import { type DateRange } from 'react-day-picker';
+import { twMerge } from 'tailwind-merge';
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
 function compactNumber(value: number): string | null {
-    if (value >= 1_000_000_000) return `${+(value / 1_000_000_000).toFixed(2)}B`;
-    if (value >= 1_000_000)     return `${+(value / 1_000_000).toFixed(2)}M`;
-    if (value >= 10_000)        return `${+(value / 1_000).toFixed(1)}K`;
+    if (value >= 1_000_000_000)
+        return `${+(value / 1_000_000_000).toFixed(2)}B`;
+    if (value >= 1_000_000) return `${+(value / 1_000_000).toFixed(2)}M`;
+    if (value >= 10_000) return `${+(value / 1_000).toFixed(1)}K`;
     return null;
 }
 
@@ -23,7 +24,7 @@ function compactNumber(value: number): string | null {
  */
 export function numberFormatter(
     value: number,
-    options?: Intl.NumberFormatOptions
+    options?: Intl.NumberFormatOptions,
 ): string {
     const compact = compactNumber(value);
     if (compact) return compact;
@@ -42,7 +43,7 @@ export function numberFormatter(
  */
 export function percentageFormatter(
     value: number,
-    options?: Intl.NumberFormatOptions
+    options?: Intl.NumberFormatOptions,
 ): string {
     const percent = value * 100;
     const compact = compactNumber(percent);
@@ -63,7 +64,7 @@ export function percentageFormatter(
  */
 export function currencyFormatter(
     value: number,
-    options?: Intl.NumberFormatOptions
+    options?: Intl.NumberFormatOptions,
 ): string {
     const compact = compactNumber(value);
     if (compact) return `₱${compact}`;
@@ -84,7 +85,7 @@ export function currencyFormatter(
  */
 export function getDateRangeDescription(
     dateRange: DateRange | undefined,
-    fallback: string = 'Last 30 days'
+    fallback: string = 'Last 30 days',
 ): string {
     if (dateRange?.from && dateRange?.to) {
         return `${format(dateRange.from, 'MMM d, yyyy')} - ${format(dateRange.to, 'MMM d, yyyy')}`;
@@ -96,15 +97,18 @@ export function getDateRangeDescription(
     return fallback;
 }
 
-
 /**
  * Resolve an Inertia/URL string to a pathname.
  * If `url` is empty, returns the current `window.location.pathname` when available.
  * This centralizes the try/new URL parsing used across components.
  */
 export function extractPathFromUrl(url?: string | null): string {
-    if (!url) return typeof window !== 'undefined' ? window.location.pathname : '/';
-    const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+    if (!url)
+        return typeof window !== 'undefined' ? window.location.pathname : '/';
+    const base =
+        typeof window !== 'undefined'
+            ? window.location.origin
+            : 'http://localhost';
     try {
         return new URL(url, base).pathname;
     } catch {
@@ -112,39 +116,37 @@ export function extractPathFromUrl(url?: string | null): string {
     }
 }
 
-
 export function formatDate(date: Date | undefined) {
     if (!date) {
-        return ""
+        return '';
     }
 
-    return date.toLocaleDateString("en-US", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-    })
+    return date.toLocaleDateString('en-US', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+    });
 }
 
 export function isValidDate(date: Date | undefined) {
     if (!date) {
-        return false
+        return false;
     }
-    return !isNaN(date.getTime())
+    return !isNaN(date.getTime());
 }
 
-
-export function formatCompactCurrency(value: number){
+export function formatCompactCurrency(value: number) {
     const n = Number(value) || 0;
     const abs = Math.abs(n);
 
     const fmt = (v: number, suffix: string) => {
         // show 1 decimal only when needed (e.g., 1.2M), but 1M stays 1M
         const rounded = v % 1 === 0 ? v.toFixed(0) : v.toFixed(1);
-        return `${n < 0 ? "-" : ""}${rounded}${suffix}`;
+        return `${n < 0 ? '-' : ''}${rounded}${suffix}`;
     };
 
-    if (abs >= 1_000_000) return `₱ ${fmt(abs / 1_000_000, "M")}`;
-    if (abs >= 1_000)     return `₱ ${fmt(abs / 1_000_000, "M")}`;
+    if (abs >= 1_000_000) return `₱ ${fmt(abs / 1_000_000, 'M')}`;
+    if (abs >= 1_000) return `₱ ${fmt(abs / 1_000_000, 'M')}`;
 
     return `₱ ${n}`;
 }

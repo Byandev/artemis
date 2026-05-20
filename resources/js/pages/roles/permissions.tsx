@@ -1,12 +1,12 @@
-import AppLayout from '@/layouts/app-layout';
 import PageHeader from '@/components/common/PageHeader';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Workspace } from '@/types/models/Workspace';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
+import AppLayout from '@/layouts/app-layout';
 import { Role } from '@/types/models/Role';
+import { Workspace } from '@/types/models/Workspace';
+import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
-import { usePermission } from '@/hooks/use-permission';
-import { PERMISSIONS } from '@/constants/permissions';
 
 interface Permission {
     id: number;
@@ -31,17 +31,20 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
         .filter((p) => p.granted)
         .map((p) => p.id);
 
-    const { data, setData, put, processing } = useForm<{ permission_ids: number[] }>({
+    const { data, setData, put, processing } = useForm<{
+        permission_ids: number[];
+    }>({
         permission_ids: initialIds,
     });
 
     const canManage = usePermission(PERMISSIONS.ManageRolePermissions);
 
     const toggle = (id: number) => {
-        setData('permission_ids',
+        setData(
+            'permission_ids',
             data.permission_ids.includes(id)
                 ? data.permission_ids.filter((i) => i !== id)
-                : [...data.permission_ids, id]
+                : [...data.permission_ids, id],
         );
     };
 
@@ -49,9 +52,14 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
         const ids = permissions.map((p) => p.id);
         const allGranted = ids.every((id) => data.permission_ids.includes(id));
         if (allGranted) {
-            setData('permission_ids', data.permission_ids.filter((id) => !ids.includes(id)));
+            setData(
+                'permission_ids',
+                data.permission_ids.filter((id) => !ids.includes(id)),
+            );
         } else {
-            const merged = Array.from(new Set([...data.permission_ids, ...ids]));
+            const merged = Array.from(
+                new Set([...data.permission_ids, ...ids]),
+            );
             setData('permission_ids', merged);
         }
     };
@@ -76,7 +84,9 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
                 >
                     <button
                         type="button"
-                        onClick={() => router.get(`/workspaces/${workspace.slug}/roles`)}
+                        onClick={() =>
+                            router.get(`/workspaces/${workspace.slug}/roles`)
+                        }
                         className="flex h-8 items-center gap-2 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300"
                     >
                         <ArrowLeft className="h-3.5 w-3.5" />
@@ -87,10 +97,10 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {groups.map((group) => {
                         const allChecked = group.permissions.every((p) =>
-                            data.permission_ids.includes(p.id)
+                            data.permission_ids.includes(p.id),
                         );
                         const someChecked = group.permissions.some((p) =>
-                            data.permission_ids.includes(p.id)
+                            data.permission_ids.includes(p.id),
                         );
 
                         return (
@@ -102,25 +112,32 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
                                 <div className="flex items-center justify-between border-b border-black/6 px-5 py-3 dark:border-white/6">
                                     <div className="flex items-center gap-2">
                                         <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                                        <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                        <span className="font-mono text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400">
                                             {group.category}
                                         </span>
                                     </div>
                                     {canManage && (
                                         <button
                                             type="button"
-                                            onClick={() => toggleAll(group.permissions)}
+                                            onClick={() =>
+                                                toggleAll(group.permissions)
+                                            }
                                             className="font-mono! text-[11px]! text-emerald-600 hover:underline dark:text-emerald-400"
                                         >
-                                            {allChecked ? 'Deselect all' : 'Select all'}
+                                            {allChecked
+                                                ? 'Deselect all'
+                                                : 'Select all'}
                                         </button>
                                     )}
                                 </div>
 
                                 {/* Permissions grid */}
-                                <div className="grid grid-cols-1 gap-px bg-black/4 dark:bg-white/4 sm:grid-cols-2 lg:grid-cols-3">
+                                <div className="grid grid-cols-1 gap-px bg-black/4 sm:grid-cols-2 lg:grid-cols-3 dark:bg-white/4">
                                     {group.permissions.map((permission) => {
-                                        const checked = data.permission_ids.includes(permission.id);
+                                        const checked =
+                                            data.permission_ids.includes(
+                                                permission.id,
+                                            );
                                         return (
                                             <label
                                                 key={permission.id}
@@ -130,7 +147,9 @@ export default function RolePermissions({ workspace, role, groups }: Props) {
                                                     type="checkbox"
                                                     checked={checked}
                                                     disabled={!canManage}
-                                                    onChange={() => toggle(permission.id)}
+                                                    onChange={() =>
+                                                        toggle(permission.id)
+                                                    }
                                                     className="h-4 w-4 rounded border-gray-300 accent-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
                                                 />
                                                 <span className="font-mono text-[12px] text-gray-700 dark:text-gray-300">

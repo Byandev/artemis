@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Page;
 use App\Models\Shop;
@@ -17,6 +18,7 @@ class ChecklistProgressController extends Controller
     public function index(Request $request, Workspace $workspace, string $target, int $targetId): JsonResponse
     {
         $this->authorizeWorkspaceMembership($request, $workspace);
+        $this->authorize(Permission::ViewChecklist->value, $workspace);
 
         [$targetName, $targetModel, $targetType] = $this->resolveTarget($workspace, $target, $targetId);
 
@@ -59,6 +61,7 @@ class ChecklistProgressController extends Controller
     {
         $user = $request->user();
         $this->authorizeWorkspaceMembership($request, $workspace);
+        $this->authorize(Permission::EditChecklist->value, $workspace);
 
         [$targetName, $targetModel, $targetType] = $this->resolveTarget($workspace, $target, $targetId);
 
@@ -91,6 +94,7 @@ class ChecklistProgressController extends Controller
     public function destroy(Request $request, Workspace $workspace, string $target, int $targetId): JsonResponse
     {
         $this->authorizeWorkspaceMembership($request, $workspace);
+        $this->authorize(Permission::EditChecklist->value, $workspace);
 
         [$targetName, $targetModel, $targetType] = $this->resolveTarget($workspace, $target, $targetId);
 

@@ -4,9 +4,14 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { groupedMetrics, MetricConfig, metricConfigs, MetricKey } from '@/types/metrics';
+import {
+    groupedMetrics,
+    MetricConfig,
+    metricConfigs,
+    MetricKey,
+} from '@/types/metrics';
 import { ChartNoAxesColumn } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Props {
     initialValue: MetricKey[];
@@ -14,19 +19,49 @@ interface Props {
     metrics?: MetricConfig[];
 }
 
-const MetricPicker = ({ initialValue = [], onChange }: Props) => {
+const MetricPicker = ({ initialValue = [], onChange, metrics }: Props) => {
     const [isOpen, setIsOpen] = useState(false);
     const [localValue, setLocalValue] = useState<MetricKey[]>(initialValue);
 
-    const handleApply = useCallback(() => {
-        onChange(localValue);
-        setIsOpen(false);
-    }, [localValue, onChange]);
+    const availableMetrics = metrics ?? metricConfigs;
+    const metricKeySignature = availableMetrics
+        .map((metric) => metric.key)
+        .join('|');
 
     const allMetricKeys = useMemo<MetricKey[]>(
-        () => metricConfigs.map((m) => m.key),
-        [],
+        () =>
+            metricKeySignature
+                ? (metricKeySignature.split('|') as MetricKey[])
+                : [],
+        [metricKeySignature],
     );
+
+    const allMetricKeySet = useMemo(
+        () => new Set<MetricKey>(allMetricKeys),
+        [allMetricKeys],
+    );
+
+    const visibleGroups = useMemo(
+        () =>
+            groupedMetrics
+                .map((group) => ({
+                    ...group,
+                    metrics: group.metrics.filter((metric) =>
+                        allMetricKeySet.has(metric.key),
+                    ),
+                }))
+                .filter((group) => group.metrics.length > 0),
+        [allMetricKeySet],
+    );
+
+    useEffect(() => {
+        setLocalValue(initialValue.filter((key) => allMetricKeySet.has(key)));
+    }, [allMetricKeySet, initialValue, metricKeySignature]);
+
+    const handleApply = useCallback(() => {
+        onChange(localValue.filter((key) => allMetricKeySet.has(key)));
+        setIsOpen(false);
+    }, [allMetricKeySet, localValue, onChange]);
 
     const handleSelectAll = useCallback(
         () => setLocalValue(allMetricKeys),
@@ -35,18 +70,23 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
 
     const handleClear = useCallback(() => setLocalValue([]), []);
 
-    const activeCount = useMemo(() => localValue.length, [localValue]);
-    const allSelected = activeCount === allMetricKeys.length;
+    const activeCount = useMemo(
+        () => localValue.filter((key) => allMetricKeySet.has(key)).length,
+        [allMetricKeySet, localValue],
+    );
+    const allSelected =
+        allMetricKeys.length > 0 && activeCount === allMetricKeys.length;
 
     const MIN_REQUIRED = 2;
-    const canApply = activeCount >= MIN_REQUIRED;
+    const minimumRequired = Math.min(MIN_REQUIRED, allMetricKeys.length);
+    const canApply = activeCount >= minimumRequired;
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
                 <button
                     className={[
-                        'group/picker inline-flex h-9 shrink-0 min-w-max items-center overflow-hidden rounded-[10px] border transition-all duration-200',
+                        'group/picker inline-flex h-9 min-w-max shrink-0 items-center overflow-hidden rounded-[10px] border transition-all duration-200',
                         'bg-gradient-to-b from-white to-stone-50 dark:from-zinc-900 dark:to-zinc-950',
                         'shadow-[0_1px_2px_rgba(16,24,40,0.06),0_1px_3px_rgba(16,24,40,0.10),inset_0_1px_0_rgba(255,255,255,0.5)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.04)]',
                         'hover:-translate-y-px hover:shadow-[0_2px_4px_rgba(16,24,40,0.08),0_4px_10px_rgba(16,24,40,0.10),inset_0_1px_0_rgba(255,255,255,0.5)]',
@@ -54,8 +94,8 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
                         isOpen
                             ? 'border-emerald-500/50 ring-2 ring-emerald-500/15 dark:border-emerald-500/40'
                             : activeCount > 0
-                                ? 'border-emerald-500/40 hover:border-emerald-500/60 dark:border-emerald-500/30 dark:hover:border-emerald-500/40'
-                                : 'border-black/[0.08] hover:border-black/[0.16] dark:border-white/[0.08] dark:hover:border-white/[0.16]',
+                              ? 'border-emerald-500/40 hover:border-emerald-500/60 dark:border-emerald-500/30 dark:hover:border-emerald-500/40'
+                              : 'border-black/[0.08] hover:border-black/[0.16] dark:border-white/[0.08] dark:hover:border-white/[0.16]',
                     ].join(' ')}
                 >
                     {/* Icon cell */}
@@ -137,7 +177,7 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
 
                 {/* Metric groups */}
                 <div className="max-h-72 overflow-y-auto p-2">
-                    {groupedMetrics.map((g) => (
+                    {visibleGroups.map((g) => (
                         <div key={g.key} className="mb-1">
                             <p className="px-2 py-1.5 font-mono text-[10px] font-medium tracking-wider text-gray-300 uppercase dark:text-gray-600">
                                 {g.label}
@@ -164,10 +204,10 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
                                                     setLocalValue((prev) =>
                                                         prev.includes(m.key)
                                                             ? prev.filter(
-                                                                (item) =>
-                                                                    item !==
-                                                                    m.key,
-                                                            )
+                                                                  (item) =>
+                                                                      item !==
+                                                                      m.key,
+                                                              )
                                                             : [...prev, m.key],
                                                     )
                                                 }
@@ -195,7 +235,8 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
                 <div className="border-t border-black/6 px-4 py-3 dark:border-white/6">
                     {!canApply && (
                         <p className="mb-2 text-[11px] text-amber-600 dark:text-amber-400">
-                            Select at least {MIN_REQUIRED} metrics to continue.
+                            Select at least {minimumRequired} metrics to
+                            continue.
                         </p>
                     )}
                     <div className="flex gap-2">

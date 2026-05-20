@@ -2,10 +2,13 @@
 
 namespace Modules\Pancake\Models;
 
+use App\Models\Shop;
 use App\Models\User as SystemUser;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Model
 {
@@ -18,6 +21,16 @@ class User extends Model
     public function systemUser(): BelongsTo
     {
         return $this->belongsTo(SystemUser::class, 'user_id');
+    }
+
+    public function shopUsers(): HasMany
+    {
+        return $this->hasMany(ShopUser::class, 'user_id');
+    }
+
+    public function shops(): BelongsToMany
+    {
+        return $this->belongsToMany(Shop::class, 'pancake_shop_users', 'user_id', 'shop_id');
     }
 
     public function orders()

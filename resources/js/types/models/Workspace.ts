@@ -1,3 +1,4 @@
+import { User } from '@/types';
 import { Page } from '@/types/models/Page';
 import { Shop } from '@/types/models/Shop';
 import { Team } from '@/types/models/Team';

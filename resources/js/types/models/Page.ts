@@ -1,6 +1,6 @@
-import { Shop } from '@/types/models/Shop';
 import { User } from '@/types';
 import { Product } from '@/types/models/Product';
+import { Shop } from '@/types/models/Shop';
 
 export interface Page {
     id: number;

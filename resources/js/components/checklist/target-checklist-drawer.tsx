@@ -1,3 +1,4 @@
+import { Can } from '@/components/can';
 import { ChecklistProgressItem } from '@/components/checklist/types';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -8,6 +9,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { PERMISSIONS } from '@/constants/permissions';
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
 import { formatDistanceToNow } from 'date-fns';
@@ -55,7 +57,9 @@ export function TargetChecklistDrawer({
             setLoading(true);
 
             try {
-                const res = await axios.get(`/workspaces/${workspace.slug}/checklist/progress/${target}/${targetId}`);
+                const res = await axios.get(
+                    `/workspaces/${workspace.slug}/checklist/progress/${target}/${targetId}`,
+                );
                 if (active) {
                     setItems(res.data.items ?? []);
                 }
@@ -78,7 +82,10 @@ export function TargetChecklistDrawer({
         };
     }, [open, targetId, target, workspace.slug]);
 
-    const handleToggle = async (item: ChecklistProgressItem, checked: boolean) => {
+    const handleToggle = async (
+        item: ChecklistProgressItem,
+        checked: boolean,
+    ) => {
         if (!targetId || savingId !== null) {
             return;
         }
@@ -108,20 +115,26 @@ export function TargetChecklistDrawer({
                     checked_by_name: undefined,
                     checked_at: undefined,
                 };
-            })
+            }),
         );
 
         try {
             if (checked) {
-                await axios.post(`/workspaces/${workspace.slug}/checklist/progress/${target}/${targetId}`, {
-                    checklist_id: item.id,
-                });
-            } else {
-                await axios.delete(`/workspaces/${workspace.slug}/checklist/progress/${target}/${targetId}`, {
-                    data: {
+                await axios.post(
+                    `/workspaces/${workspace.slug}/checklist/progress/${target}/${targetId}`,
+                    {
                         checklist_id: item.id,
                     },
-                });
+                );
+            } else {
+                await axios.delete(
+                    `/workspaces/${workspace.slug}/checklist/progress/${target}/${targetId}`,
+                    {
+                        data: {
+                            checklist_id: item.id,
+                        },
+                    },
+                );
             }
         } catch {
             setItems(previousItems);
@@ -141,28 +154,34 @@ export function TargetChecklistDrawer({
             return `Checked by ${checkedBy}`;
         }
 
-        const checkedAt = formatDistanceToNow(new Date(item.checked_at), { addSuffix: true });
+        const checkedAt = formatDistanceToNow(new Date(item.checked_at), {
+            addSuffix: true,
+        });
 
         return `Checked by ${checkedBy} · ${checkedAt}`;
     };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[86vh] overflow-hidden gap-0 rounded-xl border border-black/8 p-0 sm:max-w-2xl dark:border-white/8">
+            <DialogContent className="max-h-[86vh] gap-0 overflow-hidden rounded-xl border border-black/8 p-0 sm:max-w-2xl dark:border-white/8">
                 <DialogHeader className="border-b border-black/6 px-5 py-3 text-left dark:border-white/8">
-                    <DialogTitle className="font-mono text-[16px] uppercase tracking-wide text-gray-800 dark:text-gray-100">
+                    <DialogTitle className="font-mono text-[16px] tracking-wide text-gray-800 uppercase dark:text-gray-100">
                         {targetName ? `${targetName} Checklist` : 'Checklist'}
                     </DialogTitle>
                     <DialogDescription className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
-                        Review and mark completion for {target === 'shop' ? 'shop' : 'page'} requirements.
+                        Review and mark completion for{' '}
+                        {target === 'shop' ? 'shop' : 'page'} requirements.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="border-b border-black/6 px-5 py-3 dark:border-white/8">
                     <div className="mb-2 flex items-center justify-between">
-                        <p className="font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Progress</p>
-                        <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                            {progress.completed}/{progress.total} ({progress.percent}%)
+                        <p className="font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                            Progress
+                        </p>
+                        <p className="font-mono text-[10px] tracking-wider text-gray-500 uppercase dark:text-gray-400">
+                            {progress.completed}/{progress.total} (
+                            {progress.percent}%)
                         </p>
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-500/15">
@@ -194,25 +213,40 @@ export function TargetChecklistDrawer({
                                         className="rounded-lg border border-black/6 bg-white p-3 dark:border-white/8 dark:bg-zinc-900"
                                     >
                                         <div className="flex items-start gap-3">
-                                            <Checkbox
-                                                checked={item.is_completed}
-                                                disabled={savingId !== null}
-                                                onCheckedChange={(next) => handleToggle(item, Boolean(next))}
-                                                className="mt-0.5"
-                                            />
+                                            <Can
+                                                permission={
+                                                    PERMISSIONS.EditChecklist
+                                                }
+                                            >
+                                                <Checkbox
+                                                    checked={item.is_completed}
+                                                    disabled={savingId !== null}
+                                                    onCheckedChange={(next) =>
+                                                        handleToggle(
+                                                            item,
+                                                            Boolean(next),
+                                                        )
+                                                    }
+                                                    className="mt-0.5"
+                                                />
+                                            </Can>
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <p className="font-mono text-[12px] font-medium text-gray-800 dark:text-gray-100">
                                                         {item.title}
                                                     </p>
-                                                    {item.required && <Badge variant="secondary">Required</Badge>}
+                                                    {item.required && (
+                                                        <Badge variant="secondary">
+                                                            Required
+                                                        </Badge>
+                                                    )}
                                                 </div>
                                                 {checkedMeta ? (
-                                                    <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                                                    <p className="mt-1 font-mono text-[10px] tracking-wider text-emerald-700 uppercase dark:text-emerald-400">
                                                         {checkedMeta}
                                                     </p>
                                                 ) : (
-                                                    <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                                    <p className="mt-1 font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
                                                         Pending
                                                     </p>
                                                 )}
