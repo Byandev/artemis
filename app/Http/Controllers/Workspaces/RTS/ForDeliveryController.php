@@ -303,11 +303,6 @@ class ForDeliveryController extends Controller
         $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
         $authUser = $request->user();
 
-        // Resolve Pancake users linked to the authenticated system user, scoped to this workspace
-        $pancakeAccounts = User::where('user_id', $authUser->id)
-            ->whereHas('shops', fn ($q) => $q->where('workspace_id', $workspace->id))
-            ->get();
-
         $baseQuery = OrderForDelivery::where('workspace_id', $workspace->id);
 
         if ($request->input('assignee_id')) {
@@ -484,7 +479,6 @@ class ForDeliveryController extends Controller
             'delivered_count' => (int) ($statusBreakdown->delivered ?? 0),
             'returning_count' => (int) ($statusBreakdown->returning_count ?? 0),
             'problematic_count' => (int) ($statusBreakdown->problematic ?? 0),
-            'pancakeAccounts' => $pancakeAccounts,
         ]);
     }
 

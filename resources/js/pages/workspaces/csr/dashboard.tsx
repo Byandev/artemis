@@ -7,26 +7,24 @@ import {
     ChartTooltip,
     ChartTooltipContent,
 } from '@/components/ui/chart';
+import DatePicker from '@/components/ui/date-picker';
 import CsrLayout from '@/layouts/csr-layout';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
+import type flatpickr from 'flatpickr';
+import type { LucideIcon } from 'lucide-react';
 import {
     ArrowDown,
     ArrowRight,
     ArrowUp,
-    BarChart2,
     Clock,
     Minus,
     Package,
-    Phone,
     PhoneCall,
     RotateCcw,
-    ShoppingCart,
-    TrendingUp,
-    Trophy,
     Truck,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import moment from 'moment';
 import {
     Area,
     AreaChart,
@@ -40,6 +38,7 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
+import DateOption = flatpickr.Options.DateOption;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -84,6 +83,16 @@ interface StatusBreakdownEntry {
     count: number;
 }
 
+interface CsrScheduleEntry {
+    id: number;
+    pancake_user_id: string;
+    name: string;
+    date: string;
+    shift_start: string;
+    shift_end: string;
+    notes: string | null;
+}
+
 interface MonthlyPerf {
     total_orders: number;
     total_sales: number;
@@ -108,10 +117,13 @@ interface Props {
     myMonthly: MonthlyPerf;
     topCsrs: TopCsr[];
     today: string;
+    from: string;
+    to: string;
     monthLabel: string;
     dailyTrend: DailyTrendEntry[];
     statusBreakdown: StatusBreakdownEntry[];
     teamAvg: MonthlyPerf;
+    csrSchedules: CsrScheduleEntry[];
 }
 
 // ---------------------------------------------------------------------------
@@ -184,11 +196,13 @@ function StatCard({
     value,
     icon: Icon,
     subtext,
+    accent,
 }: {
     title: string;
     value: string | number;
     icon: LucideIcon;
     subtext?: string;
+    accent?: string;
 }) {
     return (
         <div className="rounded-[14px] border border-black/6 bg-white p-[18px] dark:border-white/6 dark:bg-zinc-900">
@@ -196,7 +210,9 @@ function StatCard({
                 <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
                     {title}
                 </p>
-                <div className="rounded-lg bg-stone-100 p-2 dark:bg-zinc-800">
+                <div
+                    className={`rounded-lg p-2 ${accent ?? 'bg-stone-100 dark:bg-zinc-800'}`}
+                >
                     <Icon className="h-5 w-5 text-gray-700 dark:text-white/90" />
                 </div>
             </div>
@@ -355,14 +371,30 @@ export default function CsrDashboard({
     myMonthly,
     topCsrs,
     today,
+    from,
+    to,
     monthLabel,
     dailyTrend,
     statusBreakdown,
     teamAvg,
+    csrSchedules,
 }: Props) {
     const slug = workspace.slug;
     const hasAccount = pancakeAccounts.length > 0;
     const totalToday = myTodayStats.assigned;
+
+    const navigateToRange = (newFrom: string, newTo: string) => {
+        router.get(
+            `/workspaces/${slug}/csr/dashboard`,
+            { from: newFrom, to: newTo },
+            { preserveState: true, preserveScroll: true },
+        );
+    };
+
+    const todayStr = today;
+    const nowDate = new Date(todayStr + 'T00:00:00');
+    const defaultFrom = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}-01`;
+    const isDefault = from === defaultFrom && to === todayStr;
 
     return (
         <CsrLayout>
@@ -375,53 +407,157 @@ export default function CsrDashboard({
                             ? `Welcome back, ${pancakeAccounts[0].name}`
                             : 'CSR Dashboard'
                     }
-                />
+                    stackActionsOnMobile
+                >
+                    <div className="flex items-center gap-1.5">
+                        <DatePicker
+                            id="csr-dashboard-date-range"
+                            mode="range"
+                            defaultDate={[from, to] as never as DateOption}
+                            onChange={(dates) => {
+                                if (dates.length === 2) {
+                                    navigateToRange(
+                                        moment(dates[0]).format('YYYY-MM-DD'),
+                                        moment(dates[1]).format('YYYY-MM-DD'),
+                                    );
+                                }
+                            }}
+                        />
+                        {!isDefault && (
+                            <button
+                                onClick={() =>
+                                    navigateToRange(defaultFrom, todayStr)
+                                }
+                                className="h-9 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+                            >
+                                This Month
+                            </button>
+                        )}
+                    </div>
+                </PageHeader>
 
-                {/* ── Row 1: Today's Stats ─────────────────────────────── */}
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-4 lg:grid-cols-5">
-                    <StatCard
-                        title="Assigned"
-                        value={totalToday}
-                        icon={Package}
-                        subtext="Total for delivery"
-                    />
-                    <StatCard
-                        title="Pending"
-                        value={myTodayStats.pending}
-                        icon={Clock}
-                        subtext={
-                            totalToday > 0
-                                ? `${((myTodayStats.pending / totalToday) * 100).toFixed(0)}% remaining`
-                                : undefined
-                        }
-                    />
-                    <StatCard
-                        title="Called"
-                        value={myTodayStats.called}
-                        icon={PhoneCall}
-                        subtext={
-                            totalToday > 0
-                                ? `${((myTodayStats.called / totalToday) * 100).toFixed(0)}% contacted`
-                                : undefined
-                        }
-                    />
-                    <StatCard
-                        title="Delivered"
-                        value={myTodayStats.delivered}
-                        icon={Truck}
-                    />
-                    <StatCard
-                        title="Returning"
-                        value={myTodayStats.returning}
-                        icon={RotateCcw}
-                    />
+                {/* ── Row 1: Stats + Schedule side by side ──────────────── */}
+                <div className="grid gap-4 lg:grid-cols-3">
+                    <div className="grid grid-cols-2 gap-2 md:gap-3 lg:col-span-2 lg:grid-cols-3">
+                        <StatCard
+                            title="Assigned"
+                            value={totalToday}
+                            icon={Package}
+                            subtext="Total for delivery"
+                            accent="bg-blue-50 dark:bg-blue-950/30"
+                        />
+                        <StatCard
+                            title="Pending"
+                            value={myTodayStats.pending}
+                            icon={Clock}
+                            accent="bg-amber-50 dark:bg-amber-950/30"
+                            subtext={
+                                totalToday > 0
+                                    ? `${((myTodayStats.pending / totalToday) * 100).toFixed(0)}% remaining`
+                                    : undefined
+                            }
+                        />
+                        <StatCard
+                            title="Called"
+                            value={myTodayStats.called}
+                            icon={PhoneCall}
+                            accent="bg-violet-50 dark:bg-violet-950/30"
+                            subtext={
+                                totalToday > 0
+                                    ? `${((myTodayStats.called / totalToday) * 100).toFixed(0)}% contacted`
+                                    : undefined
+                            }
+                        />
+                        <StatCard
+                            title="Delivered"
+                            value={myTodayStats.delivered}
+                            icon={Truck}
+                            accent="bg-emerald-50 dark:bg-emerald-950/30"
+                        />
+                        <StatCard
+                            title="Returning"
+                            value={myTodayStats.returning}
+                            icon={RotateCcw}
+                            accent="bg-orange-50 dark:bg-orange-950/30"
+                        />
+                        <StatCard
+                            title="Progress"
+                            value={
+                                totalToday > 0
+                                    ? `${(((totalToday - myTodayStats.pending) / totalToday) * 100).toFixed(0)}%`
+                                    : '—'
+                            }
+                            icon={Truck}
+                            subtext={
+                                totalToday > 0
+                                    ? `${totalToday - myTodayStats.pending} of ${totalToday} done`
+                                    : undefined
+                            }
+                            accent="bg-teal-50 dark:bg-teal-950/30"
+                        />
+                    </div>
+
+                    {/* CSR Schedule */}
+                    <SectionCard
+                        title="CSR Schedule"
+                        desc={`${csrSchedules.length} shift${csrSchedules.length !== 1 ? 's' : ''}`}
+                    >
+                        {csrSchedules.length === 0 ? (
+                            <EmptyState message="No schedules for this period." />
+                        ) : (
+                            <div className="max-h-[280px] overflow-y-auto">
+                                <table className="w-full">
+                                    <tbody>
+                                        {csrSchedules.map((s) => {
+                                            const isMine =
+                                                hasAccount &&
+                                                pancakeAccounts.some(
+                                                    (a) =>
+                                                        a.id ===
+                                                        s.pancake_user_id,
+                                                );
+                                            return (
+                                                <tr
+                                                    key={s.id}
+                                                    className={`border-t border-black/4 dark:border-white/4 ${isMine ? 'bg-emerald-50/50 dark:bg-emerald-500/5' : ''}`}
+                                                >
+                                                    <td className="px-5 py-2.5">
+                                                        <p className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                                            {s.name}
+                                                            {isMine && (
+                                                                <span className="ml-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+                                                                    (You)
+                                                                </span>
+                                                            )}
+                                                        </p>
+                                                        {s.notes && (
+                                                            <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                                                                {s.notes}
+                                                            </p>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-5 py-2.5 text-right text-[11px] text-gray-500 dark:text-gray-400">
+                                                        {shortDate(s.date)}
+                                                    </td>
+                                                    <td className="px-5 py-2.5 text-right font-mono text-[11px] text-gray-500 tabular-nums dark:text-gray-400">
+                                                        {s.shift_start} –{' '}
+                                                        {s.shift_end}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </SectionCard>
                 </div>
 
                 {/* ── Row 2: Sales & Orders Trend + Status Breakdown ───── */}
                 <div className="mt-6 grid gap-4 lg:grid-cols-3">
                     <SectionCard
                         title="Sales & Orders"
-                        desc="Last 14 days performance"
+                        desc={monthLabel}
                         className="lg:col-span-2"
                     >
                         {dailyTrend.length === 0 ? (
@@ -537,9 +673,9 @@ export default function CsrDashboard({
                         )}
                     </SectionCard>
 
-                    <SectionCard title="Status Breakdown" desc="Today's orders">
+                    <SectionCard title="Status Breakdown" desc="Order statuses">
                         {statusBreakdown.length === 0 ? (
-                            <EmptyState message="No orders today." />
+                            <EmptyState message="No orders for this date." />
                         ) : (
                             <div className="p-4 sm:p-6">
                                 <ChartContainer
@@ -599,7 +735,7 @@ export default function CsrDashboard({
                                                     {entry.status}
                                                 </span>
                                             </div>
-                                            <span className="font-mono text-[11px] font-semibold tabular-nums text-gray-800 dark:text-gray-200">
+                                            <span className="font-mono text-[11px] font-semibold text-gray-800 tabular-nums dark:text-gray-200">
                                                 {entry.count}
                                             </span>
                                         </div>
@@ -614,7 +750,7 @@ export default function CsrDashboard({
                 <div className="mt-6 grid gap-4 lg:grid-cols-2">
                     <SectionCard
                         title="Delivered vs Returning"
-                        desc="Last 14 days"
+                        desc={monthLabel}
                     >
                         {dailyTrend.length === 0 ? (
                             <EmptyState message="No data available." />
@@ -843,10 +979,7 @@ export default function CsrDashboard({
                         </div>
                     </SectionCard>
 
-                    <SectionCard
-                        title="Call Activity"
-                        desc="Last 14 days"
-                    >
+                    <SectionCard title="Call Activity" desc={monthLabel}>
                         {dailyTrend.length === 0 ? (
                             <EmptyState message="No call data available." />
                         ) : (
@@ -896,18 +1029,18 @@ export default function CsrDashboard({
                     </SectionCard>
                 </div>
 
-                {/* ── Row 5: Pending Orders ─────────────────────────────── */}
-                <div className="mt-6">
+                {/* ── Row 5: Pending Orders + Team Leaderboard ───────────── */}
+                <div className="mt-6 mb-6 grid gap-4 lg:grid-cols-2">
                     <SectionCard
                         title="My Pending Orders"
-                        desc="Orders awaiting action today"
+                        desc="Orders awaiting action"
                         action={{
                             label: 'Open RMO',
                             href: `/workspaces/${slug}/csr/rmo-management`,
                         }}
                     >
                         {pendingOrders.length === 0 ? (
-                            <EmptyState message="No pending orders assigned to you today." />
+                            <EmptyState message="No pending orders assigned to you." />
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full">
@@ -953,10 +1086,8 @@ export default function CsrDashboard({
                                                 <td className="px-6 py-2.5 text-[12px] text-gray-600 dark:text-gray-400">
                                                     {o.rider_name ?? '—'}
                                                 </td>
-                                                <td className="px-6 py-2.5 text-right font-mono text-[12px] tabular-nums text-gray-600 dark:text-gray-400">
-                                                    {peso(
-                                                        o.order.final_amount,
-                                                    )}
+                                                <td className="px-6 py-2.5 text-right font-mono text-[12px] text-gray-600 tabular-nums dark:text-gray-400">
+                                                    {peso(o.order.final_amount)}
                                                 </td>
                                             </tr>
                                         ))}
@@ -965,13 +1096,10 @@ export default function CsrDashboard({
                             </div>
                         )}
                     </SectionCard>
-                </div>
 
-                {/* ── Row 6: Team Leaderboard ───────────────────────────── */}
-                <div className="mt-6 mb-6">
                     <SectionCard
                         title={`Team Leaderboard — ${monthLabel}`}
-                        desc="Top performing CSRs this month"
+                        desc="Top performing CSRs"
                         action={{
                             label: 'View Analytics',
                             href: `/workspaces/${slug}/csr/analytics`,
@@ -995,13 +1123,7 @@ export default function CsrDashboard({
                                                 Sales
                                             </th>
                                             <th className="px-6 py-2.5 text-right">
-                                                Delivered
-                                            </th>
-                                            <th className="px-6 py-2.5 text-right">
-                                                Returning
-                                            </th>
-                                            <th className="px-6 py-2.5 text-right">
-                                                RTS Rate
+                                                RTS
                                             </th>
                                         </tr>
                                     </thead>
@@ -1042,27 +1164,17 @@ export default function CsrDashboard({
                                                             </span>
                                                         )}
                                                     </td>
-                                                    <td className="px-6 py-3 text-right text-[12px] tabular-nums text-gray-600 dark:text-gray-400">
+                                                    <td className="px-6 py-3 text-right text-[12px] text-gray-600 tabular-nums dark:text-gray-400">
                                                         {Number(
                                                             csr.total_orders,
                                                         ).toLocaleString()}
                                                     </td>
-                                                    <td className="px-6 py-3 text-right text-[12px] tabular-nums text-gray-600 dark:text-gray-400">
+                                                    <td className="px-6 py-3 text-right text-[12px] text-gray-600 tabular-nums dark:text-gray-400">
                                                         {peso(
                                                             Number(
                                                                 csr.total_sales,
                                                             ),
                                                         )}
-                                                    </td>
-                                                    <td className="px-6 py-3 text-right text-[12px] tabular-nums text-gray-600 dark:text-gray-400">
-                                                        {Number(
-                                                            csr.delivered,
-                                                        ).toLocaleString()}
-                                                    </td>
-                                                    <td className="px-6 py-3 text-right text-[12px] tabular-nums text-gray-600 dark:text-gray-400">
-                                                        {Number(
-                                                            csr.returning_count,
-                                                        ).toLocaleString()}
                                                     </td>
                                                     <td className="px-6 py-3 text-right text-[12px] font-medium tabular-nums">
                                                         <span

@@ -15,6 +15,7 @@ import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
+import { toast } from 'sonner';
 import { omit } from 'lodash';
 import { Plus } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -70,10 +71,14 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                     preserveState: true,
                     preserveScroll: true,
                     onSuccess: () => {
+                        toast.success('Checklist updated successfully');
                         setAddTaskOpen(false);
                         setDialogMode('add');
                         setEditingItemId(null);
                         resetAddTaskForm();
+                    },
+                    onError: () => {
+                        toast.error('Failed to update checklist');
                     },
                 },
             );
@@ -82,10 +87,14 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                 preserveState: true,
                 preserveScroll: true,
                 onSuccess: () => {
+                    toast.success('Checklist created successfully');
                     setAddTaskOpen(false);
                     setDialogMode('add');
                     setEditingItemId(null);
                     resetAddTaskForm();
+                },
+                onError: () => {
+                    toast.error('Failed to create checklist');
                 },
             });
         }
@@ -119,8 +128,12 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                 preserveState: true,
                 preserveScroll: true,
                 onSuccess: () => {
+                    toast.success('Checklist deleted successfully');
                     setDeleteDialogOpen(false);
                     setItemToDelete(null);
+                },
+                onError: () => {
+                    toast.error('Failed to delete checklist');
                 },
             },
         );

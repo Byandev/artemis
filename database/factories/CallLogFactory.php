@@ -3,9 +3,9 @@
 namespace Database\Factories;
 
 use App\Models\CallLog;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Str;
 
 /**
  * @extends Factory<CallLog>
@@ -20,7 +20,7 @@ class CallLogFactory extends Factory
 
         return [
             'workspace_id' => Workspace::factory(),
-            'user_id' => (string) Str::uuid(),
+            'user_id' => User::factory(),
             'phone_number' => fake()->phoneNumber(),
             'type' => fake()->randomElement(['outgoing', 'incoming', 'missed']),
             'duration' => fake()->numberBetween(0, 600),
