@@ -11,7 +11,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { PERMISSIONS } from '@/constants/permissions';
-import { useAnyPermission, usePermission } from '@/hooks/use-permission';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import * as rolesRoute from '@/routes/roles';
@@ -225,7 +225,7 @@ export default function Index({ roles, workspace, query }: Props) {
                                                       Manage Permissions
                                                   </DropdownMenuItem>
                                               )}
-                                              {canDelete && (
+                                              {canArchive && (
                                                   <>
                                                       <DropdownMenuSeparator />
                                                       <DropdownMenuItem
@@ -246,7 +246,7 @@ export default function Index({ roles, workspace, query }: Props) {
                                               )}
                                           </>
                                       ) : (
-                                          canDelete && (
+                                          canArchive && (
                                               <DropdownMenuItem
                                                   onClick={() => {
                                                       setSelectedRole(
