@@ -68,10 +68,17 @@ export function MetricSettingDialog({ open, onOpenChange, workspace: localWorksp
         if (open && workspace) {
             const setting = workspace.metric_setting || workspace.metricSetting;
 
-            if (setting?.allowed_metrics) {
+            if (setting?.allowed_metrics?.length) {
+                const allowedMetrics = setting.allowed_metrics;
+                const defaultMetrics = (
+                    setting.default_metrics?.length
+                        ? setting.default_metrics
+                        : DEFAULT_METRIC_KEYS
+                ).filter((key) => allowedMetrics.includes(key));
+
                 setData({
-                    allowed_metrics: setting.allowed_metrics,
-                    default_metrics: setting.allowed_metrics,
+                    allowed_metrics: allowedMetrics,
+                    default_metrics: defaultMetrics,
                 });
             } else {
                 setData({
@@ -105,7 +112,9 @@ export function MetricSettingDialog({ open, onOpenChange, workspace: localWorksp
         current.splice(index, 1);
         setData({
             allowed_metrics: current,
-            default_metrics: data.default_metrics.filter((metricKey) => metricKey !== key),
+            default_metrics: data.default_metrics.filter((key) =>
+                current.includes(key),
+            ),
         });
     };
 
