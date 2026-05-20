@@ -11,7 +11,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { PERMISSIONS } from '@/constants/permissions';
-import { usePermission } from '@/hooks/use-permission';
+import { useAnyPermission, usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import * as rolesRoute from '@/routes/roles';
@@ -83,7 +83,7 @@ export default function Index({ roles, workspace, query }: Props) {
     const [openFormModal, setOpenFormModal] = useState(false);
 
     const canEdit = usePermission(PERMISSIONS.EditRoles);
-    const canArchive = useAnyPermission([PERMISSIONS.DeleteRoles, 'Delete Roles' as PermissionName]);
+    const canArchive = usePermission(PERMISSIONS.DeleteRoles);
     const canManagePerms = usePermission(PERMISSIONS.ManageRolePermissions);
     const showActions = canEdit || canArchive || canManagePerms;
 
