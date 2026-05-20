@@ -150,8 +150,13 @@ class Workspace extends Model
     public function hasAdmin(User $user): bool
     {
         return $this->users()
+            ->leftJoin('roles', 'workspace_user.role_id', '=', 'roles.id')
             ->where('user_id', $user->id)
-            ->whereIn('role', ['owner', 'admin'])
+            ->where(function ($query) {
+                $query
+                    ->whereIn('workspace_user.role', ['owner', 'admin'])
+                    ->orWhere('roles.name', 'admin');
+            })
             ->exists();
     }
 
@@ -229,8 +234,13 @@ class Workspace extends Model
     public function isAdmin(User $user): bool
     {
         return $this->users()
+            ->leftJoin('roles', 'workspace_user.role_id', '=', 'roles.id')
             ->where('user_id', $user->id)
-            ->wherePivot('role', 'admin')
+            ->where(function ($query) {
+                $query
+                    ->where('workspace_user.role', 'admin')
+                    ->orWhere('roles.name', 'admin');
+            })
             ->exists();
     }
 
