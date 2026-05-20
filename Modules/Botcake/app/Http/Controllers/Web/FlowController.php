@@ -2,8 +2,10 @@
 
 namespace Modules\Botcake\Http\Controllers\Web;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Botcake\Models\Flow;
@@ -12,8 +14,12 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class FlowController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
+        $this->authorize(Permission::ViewBotcakeFlows->value, $workspace);
+
         [$mode, $from, $to] = $this->resolveModeAndRange($request);
 
         $base = Flow::query()
@@ -54,6 +60,22 @@ class FlowController extends Controller
                     $ids = $this->parseIds($value);
                     if (! empty($ids)) {
                         $query->whereHas('page', fn ($q) => $q->whereIn('shop_id', $ids));
+                    }
+                }),
+                AllowedFilter::callback('sent_min', function ($query, $value) use ($mode, $from, $to) {
+                    if ($value === null || $value === '') {
+                        return;
+                    }
+                    $min = (int) $value;
+                    if ($mode === 'historical') {
+                        $query->whereRaw(
+                            '(SELECT COALESCE(SUM(sent), 0) FROM botcake_flow_daily_stats
+                                WHERE botcake_flow_daily_stats.flow_id = botcake_flows.id
+                                  AND date BETWEEN ? AND ?) >= ?',
+                            [$from, $to, $min]
+                        );
+                    } else {
+                        $query->where('botcake_flows.sent', '>=', $min);
                     }
                 }),
             ])

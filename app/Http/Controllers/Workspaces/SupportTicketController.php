@@ -8,6 +8,7 @@ use App\Models\SupportTicket;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -62,5 +63,45 @@ class SupportTicketController extends Controller
         return redirect()
             ->route('support.index', $workspace)
             ->with('success', 'Support request submitted.');
+    }
+
+    public function update(Request $request, Workspace $workspace, SupportTicket $ticket)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        if ((int) $ticket->workspace_id !== (int) $workspace->id || (int) $ticket->user_id !== (int) $request->user()->id) {
+            abort(403, 'You can only update your own support tickets.');
+        }
+
+        $validated = $request->validate([
+            'category' => ['required', Rule::in(SupportTicket::CATEGORIES)],
+            'subject' => ['required', 'string', 'max:255'],
+            'description' => ['required', 'string'],
+        ]);
+
+        $ticket->update($validated);
+
+        return redirect()
+            ->route('support.index', $workspace)
+            ->with('success', 'Support request updated.');
+    }
+
+    public function destroy(Request $request, Workspace $workspace, SupportTicket $ticket)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        if ((int) $ticket->workspace_id !== (int) $workspace->id || (int) $ticket->user_id !== (int) $request->user()->id) {
+            abort(403, 'You can only delete your own support tickets.');
+        }
+
+        $ticket->delete();
+
+        return redirect()
+            ->route('support.index', $workspace)
+            ->with('success', 'Support request deleted.');
     }
 }

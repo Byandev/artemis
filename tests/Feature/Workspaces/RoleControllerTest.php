@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Role;
-use App\Models\User;
 
 test('owner can view roles index', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
