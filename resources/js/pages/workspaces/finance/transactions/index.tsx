@@ -26,6 +26,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { MultiSelect } from '@/components/ui/multi-select';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -76,8 +77,8 @@ interface Props {
             search?: string;
             type?: 'in' | 'out';
             account_id?: string | number;
-            transaction_type?: string;
-            sub_category?: string;
+            transaction_type?: string | string[];
+            sub_category?: string | string[];
             missing_type?: string | boolean;
             expenses_missing_sub?: string | boolean;
             date_from?: string;
@@ -116,11 +117,19 @@ export default function TransactionsIndex({
             ? String(query.filter.account_id)
             : '',
     );
-    const [txnTypeFilter, setTxnTypeFilter] = useState<string>(
-        query?.filter?.transaction_type ?? '',
+    const [txnTypeFilter, setTxnTypeFilter] = useState<string[]>(
+        query?.filter?.transaction_type
+            ? Array.isArray(query.filter.transaction_type)
+                ? query.filter.transaction_type
+                : [query.filter.transaction_type]
+            : [],
     );
-    const [subCategoryFilter, setSubCategoryFilter] = useState<string>(
-        query?.filter?.sub_category ?? '',
+    const [subCategoryFilter, setSubCategoryFilter] = useState<string[]>(
+        query?.filter?.sub_category
+            ? Array.isArray(query.filter.sub_category)
+                ? query.filter.sub_category
+                : [query.filter.sub_category]
+            : [],
     );
     const boolish = (v: string | boolean | undefined) =>
         v === true || v === '1' || v === 'true';
@@ -162,10 +171,12 @@ export default function TransactionsIndex({
         if (search) params.set('filter[search]', search);
         if (typeFilter) params.set('filter[type]', typeFilter);
         if (accountFilter) params.set('filter[account_id]', accountFilter);
-        if (txnTypeFilter)
-            params.set('filter[transaction_type]', txnTypeFilter);
-        if (subCategoryFilter)
-            params.set('filter[sub_category]', subCategoryFilter);
+        txnTypeFilter.forEach((v) =>
+            params.append('filter[transaction_type][]', v),
+        );
+        subCategoryFilter.forEach((v) =>
+            params.append('filter[sub_category][]', v),
+        );
         if (missingType) params.set('filter[missing_type]', '1');
         if (expensesMissingSub) params.set('filter[expenses_missing_sub]', '1');
         const qs = params.toString();
@@ -230,8 +241,8 @@ export default function TransactionsIndex({
                 s: string,
                 t: '' | 'in' | 'out',
                 a: string,
-                tt: string,
-                sc: string,
+                tt: string[],
+                sc: string[],
                 mt: boolean,
                 ems: boolean,
                 df: string | undefined,
@@ -244,8 +255,8 @@ export default function TransactionsIndex({
                         'filter[search]': s || undefined,
                         'filter[type]': t || undefined,
                         'filter[account_id]': a || undefined,
-                        'filter[transaction_type]': tt || undefined,
-                        'filter[sub_category]': sc || undefined,
+                        'filter[transaction_type]': tt.length ? tt : undefined,
+                        'filter[sub_category]': sc.length ? sc : undefined,
                         'filter[missing_type]': mt ? 1 : undefined,
                         'filter[expenses_missing_sub]': ems ? 1 : undefined,
                         'filter[date_from]': df || undefined,
@@ -588,30 +599,22 @@ export default function TransactionsIndex({
                             </option>
                         ))}
                     </select>
-                    <select
-                        value={txnTypeFilter}
-                        onChange={(e) => setTxnTypeFilter(e.target.value)}
-                        className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-2.5 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
-                    >
-                        <option value="">All txn types</option>
-                        {TRANSACTION_TYPES.map((t) => (
-                            <option key={t.value} value={t.value}>
-                                {t.label}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        value={subCategoryFilter}
-                        onChange={(e) => setSubCategoryFilter(e.target.value)}
-                        className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-2.5 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
-                    >
-                        <option value="">All sub categories</option>
-                        {SUB_CATEGORIES.map((s) => (
-                            <option key={s.value} value={s.value}>
-                                {s.label}
-                            </option>
-                        ))}
-                    </select>
+                    <MultiSelect
+                        options={TRANSACTION_TYPES}
+                        selected={txnTypeFilter}
+                        onChange={setTxnTypeFilter}
+                        placeholder="All txn types"
+                        className="w-44"
+                        compact
+                    />
+                    <MultiSelect
+                        options={SUB_CATEGORIES}
+                        selected={subCategoryFilter}
+                        onChange={setSubCategoryFilter}
+                        placeholder="All sub categories"
+                        className="w-48"
+                        compact
+                    />
                     <div className="inline-flex h-9 overflow-hidden rounded-[10px] border border-black/6 bg-stone-100 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
                         {(
                             [
@@ -745,9 +748,13 @@ export default function TransactionsIndex({
                                     'filter[account_id]':
                                         accountFilter || undefined,
                                     'filter[transaction_type]':
-                                        txnTypeFilter || undefined,
+                                        txnTypeFilter.length
+                                            ? txnTypeFilter
+                                            : undefined,
                                     'filter[sub_category]':
-                                        subCategoryFilter || undefined,
+                                        subCategoryFilter.length
+                                            ? subCategoryFilter
+                                            : undefined,
                                     'filter[missing_type]': missingType
                                         ? 1
                                         : undefined,
