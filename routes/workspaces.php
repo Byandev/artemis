@@ -16,6 +16,7 @@ use App\Http\Controllers\Workspaces\CSRController;
 use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\OnboardingController;
 use App\Http\Controllers\Workspaces\PageController;
+use App\Http\Controllers\Workspaces\PageDailyBudgetRecordController;
 use App\Http\Controllers\Workspaces\Product\AnalyticsController;
 use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\RoleController;
@@ -135,6 +136,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace}/pages/{page}/refresh', [PageController::class, 'refresh'])->name('workspaces.pages.refresh');
     Route::post('/workspaces/{workspace}/pages/{page}/archive', [PageController::class, 'archive'])->name('workspaces.pages.archive');
     Route::post('/workspaces/{workspace}/pages/{page}/restore', [PageController::class, 'restore'])->name('workspaces.pages.restore');
+
+    // Page Daily Budget Records
+    Route::get('/workspaces/{workspace}/page-daily-budget-records', [PageDailyBudgetRecordController::class, 'index'])->name('workspaces.page-daily-budget-records.index');
+    Route::post('/workspaces/{workspace}/page-daily-budget-records', [PageDailyBudgetRecordController::class, 'store'])->name('workspaces.page-daily-budget-records.store');
+    Route::put('/workspaces/{workspace}/page-daily-budget-records/{pageDailyBudgetRecord}', [PageDailyBudgetRecordController::class, 'update'])->name('workspaces.page-daily-budget-records.update');
+    Route::delete('/workspaces/{workspace}/page-daily-budget-records/{pageDailyBudgetRecord}', [PageDailyBudgetRecordController::class, 'destroy'])->name('workspaces.page-daily-budget-records.destroy');
 
     Route::get('/workspaces/{workspace}/shops', [ShopController::class, 'index'])->name('workspaces.shops.index');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh', [ShopController::class, 'refresh'])->name('workspaces.shops.refresh');

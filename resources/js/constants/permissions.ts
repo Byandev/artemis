@@ -85,9 +85,11 @@ export const PERMISSIONS = {
     EditFinanceRemittances: 'Edit Finance Remittances',
     DeleteFinanceRemittances: 'Delete Finance Remittances',
 
-    // Botcake
-    ViewBotcakeSequences: 'View Botcake Sequences',
-    ViewBotcakeFlows: 'View Botcake Flows',
+    // Page Daily Budget Records
+    ViewPageDailyBudgetRecords: 'View Page Daily Budget Records',
+    CreatePageDailyBudgetRecords: 'Create Page Daily Budget Records',
+    EditPageDailyBudgetRecords: 'Edit Page Daily Budget Records',
+    DeletePageDailyBudgetRecords: 'Delete Page Daily Budget Records',
 
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',

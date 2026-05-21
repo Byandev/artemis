@@ -94,6 +94,12 @@ enum Permission: string
     case ViewCourierShipments = 'View Courier Shipments';
     case ImportCourierShipments = 'Import Courier Shipments';
 
+    // Page Daily Budget Records
+    case ViewPageDailyBudgetRecords = 'View Page Daily Budget Records';
+    case CreatePageDailyBudgetRecords = 'Create Page Daily Budget Records';
+    case EditPageDailyBudgetRecords = 'Edit Page Daily Budget Records';
+    case DeletePageDailyBudgetRecords = 'Delete Page Daily Budget Records';
+
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
@@ -177,6 +183,11 @@ enum Permission: string
 
             self::ViewBotcakeSequences,
             self::ViewBotcakeFlows => 'Botcake',
+
+            self::ViewPageDailyBudgetRecords,
+            self::CreatePageDailyBudgetRecords,
+            self::EditPageDailyBudgetRecords,
+            self::DeletePageDailyBudgetRecords => 'Page Daily Budget Records',
 
             self::EditWorkspaceSettings,
             self::ManageApiKeys => 'Settings',
