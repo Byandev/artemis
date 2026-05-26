@@ -26,5 +26,5 @@ export interface Page {
     shop?: Shop;
     owner?: User;
     product?: Product;
-    current_budget?: number;
+    current_budget?: number | string | null;
 }

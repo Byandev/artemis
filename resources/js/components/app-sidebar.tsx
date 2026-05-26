@@ -27,7 +27,6 @@ import {
     Landmark,
     Layers,
     LayoutDashboard,
-    DollarSign,
     LifeBuoy,
     ListChecks,
     MapPin,
@@ -74,25 +73,9 @@ export function AppSidebar() {
         },
         {
             title: 'Pages',
+            href: `/workspaces/${slug}/pages`,
             icon: BookOpenIcon,
-            anyOf: [
-                PERMISSIONS.ViewPages,
-                PERMISSIONS.ViewPageDailyBudgetRecords,
-            ],
-            items: [
-                {
-                    title: 'Page Management',
-                    href: `/workspaces/${slug}/pages`,
-                    icon: BookOpenIcon,
-                    permission: PERMISSIONS.ViewPages,
-                },
-                {
-                    title: 'Page Budget',
-                    href: `/workspaces/${slug}/page-daily-budget-records`,
-                    icon: DollarSign,
-                    permission: PERMISSIONS.ViewPageDailyBudgetRecords,
-                },
-            ],
+            permission: PERMISSIONS.ViewPages,
         },
         {
             title: 'Products',

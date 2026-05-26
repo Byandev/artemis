@@ -10,6 +10,7 @@ use App\Http\Sorts\Page\OwnerNameSort;
 use App\Http\Sorts\Page\ShopNameSort;
 use App\Http\Sorts\PendingRequiredChecklistsSort;
 use App\Models\Page;
+use App\Models\PageDailyBudgetRecord;
 use App\Models\Shop;
 use App\Models\Workspace;
 use App\Services\PostHogService;
@@ -62,7 +63,16 @@ class PageController extends Controller
 
         $baseQuery = Page::where('pages.workspace_id', $workspace->id)
             ->select('pages.*')
-            ->selectSub($pendingChecklistsSub, 'pending_required_checklists_count');
+            ->selectSub($pendingChecklistsSub, 'pending_required_checklists_count')
+            ->selectSub(
+                PageDailyBudgetRecord::query()
+                    ->select('budget')
+                    ->whereColumn('page_daily_budget_records.page_id', 'pages.id')
+                    ->where('page_daily_budget_records.workspace_id', $workspace->id)
+                    ->whereDate('date', now()->toDateString())
+                    ->limit(1),
+                'current_budget'
+            );
 
         $pages = QueryBuilder::for($baseQuery)
             ->allowedFilters([
@@ -195,6 +205,32 @@ class PageController extends Controller
         $page->update($request->validated());
 
         return redirect()->route('workspaces.pages.index', $workspace)->with('success', 'Page updated successfully.');
+    }
+
+    public function updateBudget(Request $request, Workspace $workspace, Page $page)
+    {
+        $this->authorize(Permission::EditPageDailyBudgetRecords->value, $workspace);
+
+        if ($page->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'budget' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        PageDailyBudgetRecord::updateOrCreate(
+            [
+                'workspace_id' => $workspace->id,
+                'page_id' => $page->id,
+                'date' => now()->toDateString(),
+            ],
+            ['budget' => $validated['budget']]
+        );
+
+        return redirect()
+            ->route('workspaces.pages.index', $workspace)
+            ->with('success', 'Page budget updated successfully.');
     }
 
     public function refresh(Request $request, Workspace $workspace, Page $page)
