@@ -207,11 +207,10 @@ export default function Index({ workspaces, plans, filters }: Props) {
         },
         {
             id: 'owner',
-            enableSorting: false,
-            header: () => (
-                <div className="text-[11px] font-bold tracking-wider text-zinc-500 uppercase">
-                    Primary Owner
-                </div>
+            accessorFn: (row) => row.owner?.name || 'Platform Admin',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Primary Owner" />
             ),
             cell: ({ row }) => (
                 <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
@@ -245,11 +244,14 @@ export default function Index({ workspaces, plans, filters }: Props) {
         },
         {
             id: 'subscription',
-            enableSorting: false,
-            header: () => (
-                <div className="text-center text-[11px] font-bold tracking-wider text-zinc-500 uppercase">
-                    Subscription
-                </div>
+            accessorFn: (row) => row.subscription?.plan.name || 'No plan',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Subscription"
+                    className="justify-center"
+                />
             ),
             cell: ({ row }) => (
                 <div className="text-center">
