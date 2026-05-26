@@ -154,6 +154,20 @@ export default function Index({ workspaces, plans, filters }: Props) {
         null,
     );
 
+    // Auto-open subscription modal for workspaces with past_due or expired status
+    useEffect(() => {
+        if (!editingWorkspace && workspaces.data) {
+            const pastDueOrExpiredWorkspace = workspaces.data.find(
+                (ws) =>
+                    ws.subscription?.status === 'past_due' ||
+                    ws.subscription?.status === 'expired',
+            );
+            if (pastDueOrExpiredWorkspace) {
+                setEditingWorkspace(pastDueOrExpiredWorkspace);
+            }
+        }
+    }, [workspaces.data, editingWorkspace]);
+
     const initialSorting = useMemo(() => {
         if (filters.sort) {
             return [{ id: filters.sort, desc: filters.direction === 'desc' }];
