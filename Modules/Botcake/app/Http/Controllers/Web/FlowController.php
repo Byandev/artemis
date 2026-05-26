@@ -62,6 +62,12 @@ class FlowController extends Controller
                         $query->whereHas('page', fn ($q) => $q->whereIn('shop_id', $ids));
                     }
                 }),
+                AllowedFilter::callback('team_ids', function ($query, $value) {
+                    $ids = $this->parseIds($value);
+                    if (! empty($ids)) {
+                        $query->whereHas('page.owner.teams', fn ($q) => $q->whereIn('teams.id', $ids));
+                    }
+                }),
                 AllowedFilter::callback('sent_min', function ($query, $value) use ($mode, $from, $to) {
                     if ($value === null || $value === '') {
                         return;
@@ -90,6 +96,9 @@ class FlowController extends Controller
                     $query->select('id', 'name', 'workspace_id')->orderBy('name');
                 },
                 'pages' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                },
+                'teams' => function ($query) {
                     $query->select('id', 'name', 'workspace_id')->orderBy('name');
                 },
                 'pageOwners:id,name',
