@@ -15,19 +15,37 @@ class AdminWorkspaceController extends Controller
 {
     public function index(Request $request)
     {
+        $sort = $request->input('sort');
+        $direction = $request->direction === 'asc' ? 'asc' : 'desc';
+
+        $workspaces = Workspace::query()
+            ->select('workspaces.*')
+            // LOAD RELATIONSHIP HERE: so we see the currently allowed metrics
+            ->with(['owner:id,name', 'subscription.plan', 'metricSetting'])
+            ->withCount('pages')
+            ->when($request->search, function ($query, $search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('workspaces.name', 'like', "%{$search}%")
+                        ->orWhere('workspaces.slug', 'like', "%{$search}%");
+                });
+            });
+
+        match ($sort) {
+            'owner' => $workspaces
+                ->leftJoin('users', 'workspaces.owner_id', '=', 'users.id')
+                ->orderBy('users.name', $direction)
+                ->orderBy('workspaces.name'),
+            'subscription' => $workspaces
+                ->leftJoin('subscriptions', 'workspaces.id', '=', 'subscriptions.workspace_id')
+                ->leftJoin('subscription_plans', 'subscriptions.subscription_plan_id', '=', 'subscription_plans.id')
+                ->orderBy('subscription_plans.name', $direction)
+                ->orderBy('workspaces.name'),
+            'name', 'slug', 'created_at', 'pages_count' => $workspaces->orderBy($sort, $direction),
+            default => $workspaces->orderBy('workspaces.created_at', 'desc'),
+        };
+
         return Inertia::render('admin/workspaces/index', [
-            'workspaces' => Workspace::query()
-                // LOAD RELATIONSHIP HERE: so we see the currently allowed metrics
-                ->with(['owner:id,name', 'subscription.plan', 'metricSetting'])
-                ->withCount('pages')
-                ->when($request->search, function ($query, $search) {
-                    $query->where('name', 'like', "%{$search}%")
-                        ->orWhere('slug', 'like', "%{$search}%");
-                })
-                ->orderBy(
-                    in_array($request->sort, ['name', 'slug', 'created_at', 'pages_count']) ? $request->sort : 'created_at',
-                    $request->direction === 'asc' ? 'asc' : 'desc'
-                )
+            'workspaces' => $workspaces
                 ->paginate((int) $request->input('per_page', 15))
                 ->withQueryString(),
 
