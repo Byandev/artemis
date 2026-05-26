@@ -17,11 +17,6 @@ class AdminWorkspaceController extends Controller
 {
     public function index(Request $request)
     {
-
-        if ($request->input('direction') === 'desc' && $request->filled('sort')) {
-            $request->merge(['sort' => '-' . $request->input('sort')]);
-        }
-        
         $baseQuery = Workspace::query()
             ->select('workspaces.*')
             ->with(['owner:id,name', 'subscription.plan', 'metricSetting'])
