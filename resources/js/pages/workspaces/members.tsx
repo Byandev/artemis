@@ -51,8 +51,8 @@ import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { omit } from 'lodash';
 import {
-    CopyleftIcon,
     KeyRound,
+    Link,
     MoreHorizontal,
     Search,
     Send,
@@ -129,6 +129,7 @@ export default function WorkspaceMembers({
     const [invitationToRevoke, setInvitationToRevoke] =
         useState<Invitation | null>(null);
     const [copiedMemberId, setCopiedMemberId] = useState<number | null>(null);
+    const [manualInviteUrl, setManualInviteUrl] = useState<string | null>(null);
 
     const inviteForm = useForm({
         email: '',
@@ -193,17 +194,11 @@ export default function WorkspaceMembers({
         });
     };
 
-    const copyInviteUrl = async (invitation: Invitation) => {
-        try {
-            const domain = window.location.origin;
+    const showInviteUrl = (invitation: Invitation) => {
+        const domain = window.location.origin;
+        const inviteUrl = `${domain}/workspaces/invitations/${invitation.token}/accept`;
 
-            await navigator.clipboard.writeText(
-                `${domain}/workspaces/invitations/${invitation.token}/accept`,
-            );
-            alert('Copied!');
-        } catch (error) {
-            console.error('Failed to copy:', error);
-        }
+        setManualInviteUrl(inviteUrl);
     };
 
     const handleRemoveMember = () => {
@@ -479,12 +474,11 @@ export default function WorkspaceMembers({
 
                                       <DropdownMenuItem
                                           onClick={() =>
-                                              copyInviteUrl(invitation)
+                                              showInviteUrl(invitation)
                                           }
-                                          className="text-destructive focus:text-destructive"
                                       >
-                                          <CopyleftIcon className="mr-2 h-4 w-4" />
-                                          Copy
+                                          <Link className="mr-2 h-4 w-4" />
+                                          Show invitation link
                                       </DropdownMenuItem>
                                   </DropdownMenuContent>
                               </DropdownMenu>
@@ -600,6 +594,39 @@ export default function WorkspaceMembers({
                         </DialogContent>
                     </Dialog>
                 </PageHeader>
+
+                <Dialog
+                    open={!!manualInviteUrl}
+                    onOpenChange={(open) => {
+                        if (!open) setManualInviteUrl(null);
+                    }}
+                >
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Invitation link</DialogTitle>
+                            <DialogDescription>
+                                Select and copy this link manually.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <Input
+                                readOnly
+                                value={manualInviteUrl ?? ''}
+                                onFocus={(event) =>
+                                    event.currentTarget.select()
+                                }
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                onClick={() => setManualInviteUrl(null)}
+                            >
+                                Done
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 <div className="space-y-5 sm:space-y-6">
                     {/* Members Table */}

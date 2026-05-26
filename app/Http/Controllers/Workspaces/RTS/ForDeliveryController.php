@@ -63,9 +63,9 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Please select a user before assigning.');
         }
 
-        $orderForDelivery->update(['assignee_id' => $request->userId]);
+        $orderForDelivery->update($this->assigneePayload($request, $workspace, $request->userId));
 
-        return redirect()->back()->with('success', 'Assignee updated successfully'.$request->userId);
+        return redirect()->back()->with('success', 'Assignee updated successfully');
     }
 
     public function publicUpdatePhones(Workspace $workspace, $id, Request $request)
@@ -102,7 +102,10 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Assignee can only be removed for orders scheduled for delivery today.');
         }
 
-        $orderForDelivery->update(['assignee_id' => null]);
+        $orderForDelivery->update([
+            'assignee_id' => null,
+            'assignee_user_id' => null,
+        ]);
 
         return redirect()->back()->with('success', 'Assignee removed successfully');
     }
@@ -113,9 +116,7 @@ class ForDeliveryController extends Controller
 
         $baseQuery = OrderForDelivery::where('workspace_id', $workspace->id);
 
-        if ($request->input('assignee_id')) {
-            $baseQuery->where('assignee_id', $request->input('assignee_id'));
-        }
+        $this->applyAssigneeFilter($baseQuery, $request);
 
         if ($request->input('confirmee_id')) {
             $baseQuery->where('conferrer_id', $request->input('confirmee_id'));
@@ -155,6 +156,9 @@ class ForDeliveryController extends Controller
                     $query->select(['id', 'name']);
                 },
                 'assignee' => function ($query) {
+                    $query->select(['id', 'name']);
+                },
+                'pancakeAssignee' => function ($query) {
                     $query->select(['id', 'name']);
                 },
                 'page' => function ($query) {
@@ -248,10 +252,8 @@ class ForDeliveryController extends Controller
         $totalOrdersForDeliveryTodayQuery = (clone $statsBase);
 
         if ($request->input('assignee_id')) {
-            $statsBase->where('assignee_id', $request->input('assignee_id'));
-            $totalOrdersForDeliveryTodayQuery->whereHas('order', function ($orderQuery) use ($request) {
-                $orderQuery->where('confirmed_by', $request->input('assignee_id'));
-            });
+            $this->applyAssigneeFilter($statsBase, $request);
+            $this->applyAssigneeFilter($totalOrdersForDeliveryTodayQuery, $request);
         }
 
         if ($request->input('confirmee_id')) {
@@ -277,6 +279,10 @@ class ForDeliveryController extends Controller
         $totalReturning = (int) ($statusBreakdown->returning_count ?? 0);
         $totalProblematic = (int) ($statusBreakdown->problematic ?? 0);
 
+        $items->getCollection()->each(function ($item) {
+            $item->setRelation('assignee', $item->pancakeAssignee ?? $item->assignee);
+        });
+
         $users = User::get();
 
         $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id', 'pageOwners:id,name']);
@@ -301,13 +307,10 @@ class ForDeliveryController extends Controller
     public function csrRmoManagement(Request $request, Workspace $workspace)
     {
         $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
-        $authUser = $request->user();
 
         $baseQuery = OrderForDelivery::where('workspace_id', $workspace->id);
 
-        if ($request->input('assignee_id')) {
-            $baseQuery->where('assignee_id', $request->input('assignee_id'));
-        }
+        $this->applyAssigneeFilter($baseQuery, $request);
 
         if ($request->input('confirmee_id')) {
             $baseQuery->where('conferrer_id', $request->input('confirmee_id'));
@@ -439,10 +442,8 @@ class ForDeliveryController extends Controller
         $totalOrdersForDeliveryTodayQuery = (clone $statsBase);
 
         if ($request->input('assignee_id')) {
-            $statsBase->where('assignee_id', $request->input('assignee_id'));
-            $totalOrdersForDeliveryTodayQuery->whereHas('order', function ($orderQuery) use ($request) {
-                $orderQuery->where('confirmed_by', $request->input('assignee_id'));
-            });
+            $this->applyAssigneeFilter($statsBase, $request);
+            $this->applyAssigneeFilter($totalOrdersForDeliveryTodayQuery, $request);
         }
 
         if ($request->input('confirmee_id')) {
@@ -488,9 +489,7 @@ class ForDeliveryController extends Controller
 
         $baseQuery = OrderForDelivery::where('workspace_id', $workspace->id);
 
-        if ($request->input('assignee_id')) {
-            $baseQuery->where('assignee_id', $request->input('assignee_id'));
-        }
+        $this->applyAssigneeFilter($baseQuery, $request);
 
         if ($request->input('confirmee_id')) {
             $baseQuery->where('conferrer_id', $request->input('confirmee_id'));
@@ -521,6 +520,7 @@ class ForDeliveryController extends Controller
                 },
                 'conferrer:id,name',
                 'assignee:id,name',
+                'pancakeAssignee:id,name',
             ])
             ->allowedFilters([
                 AllowedFilter::callback('page_id', function ($query, $value) {
@@ -572,7 +572,10 @@ class ForDeliveryController extends Controller
 
         $filename = 'rmo-management-'.$deliveryDate.'-'.now()->format('His').'.xlsx';
 
-        return Excel::download(new RmoManagementExport($query, $columns), $filename);
+        return Excel::download(
+            new RmoManagementExport($query, $columns, $this->isPublicRmoRequest($request)),
+            $filename
+        );
     }
 
     public function myAssignedCount(Request $request, Workspace $workspace)
@@ -584,7 +587,7 @@ class ForDeliveryController extends Controller
         }
 
         $row = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->where('assignee_id', $userId)
+            ->where('assignee_user_id', $userId)
             ->whereDate('delivery_date', now())
             ->selectRaw("
                 COUNT(*) as total,
@@ -616,5 +619,46 @@ class ForDeliveryController extends Controller
             ->get(['id', 'user_id', 'phone_number', 'type', 'duration', 'call_date', 'call_time']);
 
         return response()->json($logs);
+    }
+
+    private function isPublicRmoRequest(Request $request): bool
+    {
+        return $request->routeIs('public-page.rmo-management.*')
+            || $request->routeIs('public-page.rmo-management');
+    }
+
+    private function applyAssigneeFilter($query, Request $request): void
+    {
+        if (! $request->input('assignee_id')) {
+            return;
+        }
+
+        $query->where(
+            $this->isPublicRmoRequest($request) ? 'assignee_id' : 'assignee_user_id',
+            $request->input('assignee_id')
+        );
+    }
+
+    private function assigneePayload(Request $request, Workspace $workspace, int|string $userId): array
+    {
+        if ($this->isPublicRmoRequest($request)) {
+            $pancakeUser = User::whereKey($userId)
+                ->whereHas('shops', fn ($query) => $query->where('workspace_id', $workspace->id))
+                ->first();
+
+            return [
+                'assignee_id' => $userId,
+                'assignee_user_id' => $pancakeUser?->user_id,
+            ];
+        }
+
+        $pancakeUserId = User::where('user_id', $userId)
+            ->whereHas('shops', fn ($query) => $query->where('workspace_id', $workspace->id))
+            ->value('id');
+
+        return [
+            'assignee_id' => $pancakeUserId,
+            'assignee_user_id' => $userId,
+        ];
     }
 }
