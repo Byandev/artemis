@@ -232,7 +232,7 @@ const Pages = ({
 
     const openBudgetDialog = (page: Page) => {
         setBudgetPage(page);
-        budgetForm.setData('budget', String(page.current_budget ?? 0));
+        budgetForm.setData('budget', String(page.latest_budget?.budget ?? 0));
         budgetForm.clearErrors();
     };
 
@@ -282,18 +282,31 @@ const Pages = ({
             cell: ({ row }) => row.original.owner?.name || '-',
         },
         {
-            accessorKey: 'current_budget',
+            accessorKey: 'latest_budget',
             header: ({ column }) => (
                 <SortableHeader
                     column={column}
-                    title={'Current Budget'}
+                    title={'Budget'}
                     enabled={false}
                 />
             ),
-            cell: ({ row }) =>
-                currencyFormatter.format(
-                    Number(row.original.current_budget ?? 0),
-                ),
+            cell: ({ row }) => {
+                const latestBudget = row.original.latest_budget;
+                return (
+                    <div className="flex flex-col gap-0.5">
+                        <span>
+                            {currencyFormatter.format(
+                                Number(latestBudget?.budget ?? 0),
+                            )}
+                        </span>
+                        {latestBudget?.date && (
+                            <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                                {new Date(latestBudget.date).toLocaleDateString()}
+                            </span>
+                        )}
+                    </div>
+                );
+            },
         },
         {
             accessorKey: 'orders_last_synced_at',
@@ -485,6 +498,14 @@ const Pages = ({
                                 <InputError
                                     message={budgetForm.errors.budget}
                                 />
+                                {budgetPage?.latest_budget?.date && (
+                                    <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                                        Last set on{' '}
+                                        {new Date(
+                                            budgetPage.latest_budget.date,
+                                        ).toLocaleDateString()}
+                                    </p>
+                                )}
                             </div>
                             <DialogFooter>
                                 <Button

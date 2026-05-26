@@ -63,16 +63,7 @@ class PageController extends Controller
 
         $baseQuery = Page::where('pages.workspace_id', $workspace->id)
             ->select('pages.*')
-            ->selectSub($pendingChecklistsSub, 'pending_required_checklists_count')
-            ->selectSub(
-                PageDailyBudgetRecord::query()
-                    ->select('budget')
-                    ->whereColumn('page_daily_budget_records.page_id', 'pages.id')
-                    ->where('page_daily_budget_records.workspace_id', $workspace->id)
-                    ->whereDate('date', now()->toDateString())
-                    ->limit(1),
-                'current_budget'
-            );
+            ->selectSub($pendingChecklistsSub, 'pending_required_checklists_count');
 
         $pages = QueryBuilder::for($baseQuery)
             ->allowedFilters([
@@ -88,7 +79,7 @@ class PageController extends Controller
                 'parcel_journey_enabled',
                 AllowedSort::custom('pending_required_checklists_count', new PendingRequiredChecklistsSort),
             ])
-            ->with(['shop', 'owner'])
+            ->with(['shop', 'owner', 'latestBudget'])
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 

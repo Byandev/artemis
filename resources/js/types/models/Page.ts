@@ -26,5 +26,9 @@ export interface Page {
     shop?: Shop;
     owner?: User;
     product?: Product;
-    current_budget?: number | string | null;
+    latest_budget?: {
+        budget: number | string | null;
+        date: string;
+        updated_at: string;
+    } | null;
 }
