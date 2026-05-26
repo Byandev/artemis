@@ -10,8 +10,8 @@ use App\Support\Metrics\MetricRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
-use Spatie\QueryBuilder\QueryBuilder;
 use Spatie\QueryBuilder\AllowedSort;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class AdminWorkspaceController extends Controller
 {
@@ -47,7 +47,7 @@ class AdminWorkspaceController extends Controller
                 }),
             ]);
 
-        if (!$request->has('sort')) {
+        if (! $request->has('sort')) {
             $workspaces->orderBy('workspaces.created_at', 'desc');
         }
 
