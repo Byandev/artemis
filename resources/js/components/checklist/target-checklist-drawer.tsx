@@ -69,7 +69,9 @@ export function TargetChecklistDrawer({
                         ? error.response?.data?.message
                         : null;
 
-                    toast.error(message || 'Unable to load checklist progress.');
+                    toast.error(
+                        message || 'Unable to load checklist progress.',
+                    );
                     setItems([]);
                 }
             } finally {

@@ -301,7 +301,9 @@ const Pages = ({
                         </span>
                         {latestBudget?.date && (
                             <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                                {new Date(latestBudget.date).toLocaleDateString()}
+                                {new Date(
+                                    latestBudget.date,
+                                ).toLocaleDateString()}
                             </span>
                         )}
                     </div>

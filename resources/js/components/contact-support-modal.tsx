@@ -180,7 +180,7 @@ export function ContactSupportSideTab() {
                         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20 transition-colors group-hover:bg-emerald-500 group-hover:text-white dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-400/20 dark:group-hover:bg-emerald-400 dark:group-hover:text-zinc-950">
                             <LifeBuoy className="h-3.5 w-3.5" />
                         </span>
-                        <span className="whitespace-nowrap font-mono! text-[11px]! font-medium opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+                        <span className="font-mono! text-[11px]! font-medium whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
                             Support
                         </span>
                     </span>
