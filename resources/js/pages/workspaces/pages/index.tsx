@@ -1,13 +1,24 @@
 import { TargetChecklistDrawer } from '@/components/checklist/target-checklist-drawer';
 import PageHeader from '@/components/common/PageHeader';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -16,7 +27,7 @@ import workspaces from '@/routes/workspaces';
 import { PaginatedData } from '@/types';
 import { Page } from '@/types/models/Page';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { omit } from 'lodash';
@@ -26,8 +37,9 @@ import {
     MoreHorizontal,
     RefreshCw,
     Search,
+    Wallet,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 interface PagesProps {
@@ -118,6 +130,13 @@ const ChecklistsBadge = ({ pending }: { pending: number }) => {
     );
 };
 
+const currencyFormatter = new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'PHP',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+});
+
 const Pages = ({
     pages,
     workspace,
@@ -134,14 +153,24 @@ const Pages = ({
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [checklistDrawerOpen, setChecklistDrawerOpen] = useState(false);
     const [selectedPage, setSelectedPage] = useState<Page | null>(null);
+    const [budgetPage, setBudgetPage] = useState<Page | null>(null);
 
     const [processing, setProcessing] = useState(false);
+    const budgetForm = useForm({
+        budget: '0',
+    });
     const canCreatePages = usePermission(PERMISSIONS.CreatePages);
     const canEditPages = usePermission(PERMISSIONS.EditPages);
+    const canEditPageBudget = usePermission(
+        PERMISSIONS.EditPageDailyBudgetRecords,
+    );
     const canRefreshPages = usePermission(PERMISSIONS.RefreshPages);
     const canViewChecklist = usePermission(PERMISSIONS.ViewChecklist);
     const canUsePageActions =
-        canViewChecklist || canEditPages || canRefreshPages;
+        canViewChecklist ||
+        canEditPages ||
+        canRefreshPages ||
+        canEditPageBudget;
 
     useEffect(() => {
         if (flash?.success) {
@@ -201,6 +230,35 @@ const Pages = ({
         setChecklistDrawerOpen(true);
     };
 
+    const openBudgetDialog = (page: Page) => {
+        setBudgetPage(page);
+        budgetForm.setData('budget', String(page.latest_budget?.budget ?? 0));
+        budgetForm.clearErrors();
+    };
+
+    const closeBudgetDialog = () => {
+        setBudgetPage(null);
+        budgetForm.reset();
+        budgetForm.clearErrors();
+    };
+
+    const updateBudget = (e: FormEvent) => {
+        e.preventDefault();
+        if (!budgetPage) return;
+
+        budgetForm.put(
+            `/workspaces/${workspace.slug}/pages/${budgetPage.id}/budget`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Page budget updated.');
+                    closeBudgetDialog();
+                },
+                onError: () => toast.error('Failed to update page budget.'),
+            },
+        );
+    };
+
     const columns: ColumnDef<Page>[] = [
         {
             accessorKey: 'name',
@@ -223,13 +281,33 @@ const Pages = ({
             ),
             cell: ({ row }) => row.original.owner?.name || '-',
         },
-        // {
-        //     accessorKey: 'current_budget',
-        //     header: ({ column }) => (
-        //         <SortableHeader column={column} title={'Current Budget'} enabled={false} />
-        //     ),
-        //     cell: ({ row }) => currencyFormatter(row.original.current_budget ?? 0),
-        // },
+        {
+            accessorKey: 'latest_budget',
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title={'Budget'}
+                    enabled={false}
+                />
+            ),
+            cell: ({ row }) => {
+                const latestBudget = row.original.latest_budget;
+                return (
+                    <div className="flex flex-col gap-0.5">
+                        <span>
+                            {currencyFormatter.format(
+                                Number(latestBudget?.budget ?? 0),
+                            )}
+                        </span>
+                        {latestBudget?.date && (
+                            <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                                {new Date(latestBudget.date).toLocaleDateString()}
+                            </span>
+                        )}
+                    </div>
+                );
+            },
+        },
         {
             accessorKey: 'orders_last_synced_at',
             header: ({ column }) => (
@@ -311,6 +389,16 @@ const Pages = ({
                                               Edit
                                           </DropdownMenuItem>
                                       )}
+                                      {canEditPageBudget && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  openBudgetDialog(page)
+                                              }
+                                          >
+                                              <Wallet />
+                                              Update Budget
+                                          </DropdownMenuItem>
+                                      )}
                                       {canRefreshPages && (
                                           <DropdownMenuItem
                                               onClick={() => refresh(page)}
@@ -376,6 +464,69 @@ const Pages = ({
                         </div>
                     )}
                 </PageHeader>
+
+                <Dialog
+                    open={!!budgetPage}
+                    onOpenChange={(open) => {
+                        if (!open) closeBudgetDialog();
+                    }}
+                >
+                    <DialogContent>
+                        <form onSubmit={updateBudget}>
+                            <DialogHeader>
+                                <DialogTitle>Update Budget</DialogTitle>
+                                <DialogDescription>
+                                    Set today&apos;s budget for{' '}
+                                    {budgetPage?.name}.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-2 py-4">
+                                <Label htmlFor="page-budget">Budget</Label>
+                                <Input
+                                    id="page-budget"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={budgetForm.data.budget}
+                                    onChange={(event) =>
+                                        budgetForm.setData(
+                                            'budget',
+                                            event.target.value,
+                                        )
+                                    }
+                                />
+                                <InputError
+                                    message={budgetForm.errors.budget}
+                                />
+                                {budgetPage?.latest_budget?.date && (
+                                    <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                                        Last set on{' '}
+                                        {new Date(
+                                            budgetPage.latest_budget.date,
+                                        ).toLocaleDateString()}
+                                    </p>
+                                )}
+                            </div>
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={closeBudgetDialog}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={budgetForm.processing}
+                                >
+                                    {budgetForm.processing
+                                        ? 'Saving...'
+                                        : 'Save Budget'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
 
                 <div className="mb-3 flex items-center gap-2">
                     <div className="relative w-full max-w-xs">
