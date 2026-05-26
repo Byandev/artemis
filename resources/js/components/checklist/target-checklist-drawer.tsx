@@ -63,9 +63,13 @@ export function TargetChecklistDrawer({
                 if (active) {
                     setItems(res.data.items ?? []);
                 }
-            } catch {
+            } catch (error) {
                 if (active) {
-                    toast.error('Unable to load checklist progress.');
+                    const message = axios.isAxiosError(error)
+                        ? error.response?.data?.message
+                        : null;
+
+                    toast.error(message || 'Unable to load checklist progress.');
                     setItems([]);
                 }
             } finally {
