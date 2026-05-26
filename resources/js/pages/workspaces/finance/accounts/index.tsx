@@ -12,6 +12,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -19,13 +21,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import {
-    ExternalLink,
-    MoreHorizontal,
-    Pencil,
-    Search,
-    Trash2,
-} from 'lucide-react';
+import { MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Account extends FinanceAccount {
@@ -59,6 +55,10 @@ export default function AccountsIndex({ workspace, accounts, query }: Props) {
     const [search, setSearch] = useState(query?.filter?.search ?? '');
 
     const baseUrl = `/workspaces/${workspace.slug}/finance/accounts`;
+    const canCreateAccounts = usePermission(PERMISSIONS.CreateFinanceAccounts);
+    const canEditAccounts = usePermission(PERMISSIONS.EditFinanceAccounts);
+    const canDeleteAccounts = usePermission(PERMISSIONS.DeleteFinanceAccounts);
+    const showActions = canEditAccounts || canDeleteAccounts;
 
     const performQuery = useCallback(
         debounce((s: string) => {
@@ -160,45 +160,58 @@ export default function AccountsIndex({ workspace, accounts, query }: Props) {
                 </div>
             ),
         },
-        {
-            id: 'actions',
-            header: () => (
-                <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                    Actions
-                </div>
-            ),
-            cell: ({ row }) => (
-                <div className="flex justify-center">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500">
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
-                            <DropdownMenuItem asChild>
-                                <Link href={`${baseUrl}/${row.original.id}`}>
-                                    <ExternalLink className="mr-2 h-3.5 w-3.5" />{' '}
-                                    View Ledger
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => setEditing(row.original)}
-                            >
-                                <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                className="text-red-600 focus:text-red-600 dark:text-red-400"
-                                onClick={() => setToDelete(row.original)}
-                            >
-                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            ),
-        },
+        ...(showActions
+            ? [
+                  {
+                      id: 'actions',
+                      header: () => (
+                          <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                              Actions
+                          </div>
+                      ),
+                      cell: ({ row }) => (
+                          <div className="flex justify-center">
+                              <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                      <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500">
+                                          <MoreHorizontal className="h-3.5 w-3.5" />
+                                      </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                      align="end"
+                                      className="w-36"
+                                  >
+                                      {canEditAccounts && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  setEditing(row.original)
+                                              }
+                                          >
+                                              <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
+                                              Edit
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canEditAccounts && canDeleteAccounts && (
+                                          <DropdownMenuSeparator />
+                                      )}
+                                      {canDeleteAccounts && (
+                                          <DropdownMenuItem
+                                              className="text-red-600 focus:text-red-600 dark:text-red-400"
+                                              onClick={() =>
+                                                  setToDelete(row.original)
+                                              }
+                                          >
+                                              <Trash2 className="mr-2 h-3.5 w-3.5" />{' '}
+                                              Delete
+                                          </DropdownMenuItem>
+                                      )}
+                                  </DropdownMenuContent>
+                              </DropdownMenu>
+                          </div>
+                      ),
+                  } as ColumnDef<Account>,
+              ]
+            : []),
     ];
 
     return (
@@ -209,12 +222,14 @@ export default function AccountsIndex({ workspace, accounts, query }: Props) {
                     title="Accounts"
                     description="Manage finance accounts and view current balances."
                 >
-                    <button
-                        onClick={() => setCreateOpen(true)}
-                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
-                    >
-                        Add Account
-                    </button>
+                    {canCreateAccounts && (
+                        <button
+                            onClick={() => setCreateOpen(true)}
+                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
+                        >
+                            Add Account
+                        </button>
+                    )}
                 </PageHeader>
 
                 <div className="mb-3 flex items-center gap-2">
@@ -255,25 +270,29 @@ export default function AccountsIndex({ workspace, accounts, query }: Props) {
                     />
                 </div>
 
-                <AccountFormDialog
-                    open={createOpen || editing !== null}
-                    onOpenChange={(o) => {
-                        if (!o) {
-                            setCreateOpen(false);
-                            setEditing(null);
-                        }
-                    }}
-                    account={editing}
-                    workspaceSlug={workspace.slug}
-                />
-                <FinanceDeleteDialog
-                    open={!!toDelete}
-                    onClose={() => setToDelete(null)}
-                    title="Delete Account?"
-                    description={`Delete "${toDelete?.name}" and all its transactions? This cannot be undone.`}
-                    url={toDelete ? `${baseUrl}/${toDelete.id}` : ''}
-                    successMessage="Account deleted"
-                />
+                {(canCreateAccounts || canEditAccounts) && (
+                    <AccountFormDialog
+                        open={createOpen || editing !== null}
+                        onOpenChange={(o) => {
+                            if (!o) {
+                                setCreateOpen(false);
+                                setEditing(null);
+                            }
+                        }}
+                        account={editing}
+                        workspaceSlug={workspace.slug}
+                    />
+                )}
+                {canDeleteAccounts && (
+                    <FinanceDeleteDialog
+                        open={!!toDelete}
+                        onClose={() => setToDelete(null)}
+                        title="Delete Account?"
+                        description={`Delete "${toDelete?.name}" and all its transactions? This cannot be undone.`}
+                        url={toDelete ? `${baseUrl}/${toDelete.id}` : ''}
+                        successMessage="Account deleted"
+                    />
+                )}
             </div>
         </AppLayout>
     );

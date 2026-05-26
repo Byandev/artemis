@@ -54,7 +54,7 @@ class RmoOrderController extends Controller
 
         $orders = QueryBuilder::for(OrderForDelivery::class)
             ->where('workspace_id', $workspace->id)
-            ->where('assignee_id', $request->input('user_id'))
+            ->where('assignee_user_id', $request->input('user_id'))
             ->whereDate('delivery_date', now())
             ->allowedFilters([
                 AllowedFilter::callback('page_id', function ($query, $value) {

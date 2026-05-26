@@ -29,8 +29,11 @@ class RmoManagementExport implements FromQuery, WithHeadings, WithMapping
 
     private array $columns;
 
-    public function __construct(private QueryBuilder $query, array $columns = [])
-    {
+    public function __construct(
+        private QueryBuilder $query,
+        array $columns = [],
+        private bool $preferPancakeAssignee = false
+    ) {
         $this->columns = ! empty($columns)
             ? array_intersect($columns, array_keys(self::AVAILABLE_COLUMNS))
             : array_keys(self::AVAILABLE_COLUMNS);
@@ -66,7 +69,9 @@ class RmoManagementExport implements FromQuery, WithHeadings, WithMapping
             'cx_rts' => $order?->cx_rts_rate,
             'location_rts' => $address?->cityOrderSummary?->rts_rate,
             'updated_status' => $row->status,
-            'csr' => $row->assignee?->name,
+            'csr' => $this->preferPancakeAssignee
+                ? ($row->pancakeAssignee?->name ?? $row->assignee?->name)
+                : ($row->assignee?->name ?? $row->pancakeAssignee?->name),
         ];
 
         return array_map(fn ($key) => $allValues[$key] ?? null, $this->columns);

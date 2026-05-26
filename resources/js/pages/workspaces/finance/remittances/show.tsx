@@ -19,6 +19,8 @@ import {
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -113,8 +115,20 @@ export default function RemittanceShow({
     const showUrl = `${base}/remittances/${remittance.id}`;
     const [clearOpen, setClearOpen] = useState(false);
     const [clearing, setClearing] = useState(false);
+    const canCreateRemittances = usePermission(
+        PERMISSIONS.CreateFinanceRemittances,
+    );
+    const canEditRemittances = usePermission(
+        PERMISSIONS.EditFinanceRemittances,
+    );
+    const canDeleteRemittances = usePermission(
+        PERMISSIONS.DeleteFinanceRemittances,
+    );
+    const canViewAccounts = usePermission(PERMISSIONS.ViewFinanceAccounts);
 
     const performClearAll = () => {
+        if (!canDeleteRemittances) return;
+
         setClearing(true);
         router.delete(`${showUrl}/items`, {
             preserveScroll: true,
@@ -341,44 +355,51 @@ export default function RemittanceShow({
                     description={`${remittance.courier} · ${String(remittance.billing_date_from).slice(0, 10)} → ${String(remittance.billing_date_to).slice(0, 10)}`}
                 >
                     <div className="flex items-center gap-2">
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".xlsx,.xls,.csv"
-                            className="hidden"
-                            onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                setImporting(true);
-                                router.post(
-                                    `${base}/remittances/${remittance.id}/import-items`,
-                                    { file },
-                                    {
-                                        forceFormData: true,
-                                        onFinish: () => {
-                                            setImporting(false);
-                                            if (fileInputRef.current)
-                                                fileInputRef.current.value = '';
+                        {canCreateRemittances && (
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".xlsx,.xls,.csv"
+                                className="hidden"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    setImporting(true);
+                                    router.post(
+                                        `${base}/remittances/${remittance.id}/import-items`,
+                                        { file },
+                                        {
+                                            forceFormData: true,
+                                            onFinish: () => {
+                                                setImporting(false);
+                                                if (fileInputRef.current)
+                                                    fileInputRef.current.value =
+                                                        '';
+                                            },
                                         },
-                                    },
-                                );
-                            }}
-                        />
-                        <button
-                            onClick={() => setEditOpen(true)}
-                            className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
-                        >
-                            <Pencil className="h-3.5 w-3.5" /> Edit
-                        </button>
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={importing}
-                            className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 hover:bg-stone-50 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
-                        >
-                            <Upload className="h-3.5 w-3.5" />
-                            {importing ? 'Importing...' : 'Import CSV'}
-                        </button>
-                        {items.total > 0 && (
+                                    );
+                                }}
+                            />
+                        )}
+                        {canEditRemittances && (
+                            <button
+                                onClick={() => setEditOpen(true)}
+                                className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
+                            >
+                                <Pencil className="h-3.5 w-3.5" /> Edit
+                            </button>
+                        )}
+                        {canCreateRemittances && (
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={importing}
+                                className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 hover:bg-stone-50 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
+                            >
+                                <Upload className="h-3.5 w-3.5" />
+                                {importing ? 'Importing...' : 'Import CSV'}
+                            </button>
+                        )}
+                        {canDeleteRemittances && items.total > 0 && (
                             <button
                                 onClick={() => setClearOpen(true)}
                                 className="flex h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3.5 font-mono! text-[12px]! font-medium text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:bg-zinc-800 dark:text-red-400 dark:hover:bg-red-500/10"
@@ -456,7 +477,8 @@ export default function RemittanceShow({
                                     </span>
                                 </Meta>
                                 <Meta label="Linked Transaction">
-                                    {remittance.transaction ? (
+                                    {remittance.transaction &&
+                                    canViewAccounts ? (
                                         <Link
                                             href={`${base}/accounts/${remittance.transaction.account?.id}`}
                                             className="text-emerald-600 hover:underline"
@@ -469,6 +491,16 @@ export default function RemittanceShow({
                                                 remittance.transaction.amount,
                                             )}
                                         </Link>
+                                    ) : remittance.transaction ? (
+                                        <span className="text-gray-700 dark:text-gray-200">
+                                            #{remittance.transaction.id} ·{' '}
+                                            {remittance.transaction.account
+                                                ?.name ?? '—'}{' '}
+                                            ·{' '}
+                                            {peso(
+                                                remittance.transaction.amount,
+                                            )}
+                                        </span>
                                     ) : (
                                         <span className="text-gray-400">
                                             Not yet linked
@@ -533,48 +565,52 @@ export default function RemittanceShow({
                     </div>
                 </div>
 
-                <RemittanceFormDialog
-                    open={editOpen}
-                    onOpenChange={setEditOpen}
-                    remittance={remittance}
-                    workspaceSlug={workspace.slug}
-                    transactions={transactions}
-                />
+                {canEditRemittances && (
+                    <RemittanceFormDialog
+                        open={editOpen}
+                        onOpenChange={setEditOpen}
+                        remittance={remittance}
+                        workspaceSlug={workspace.slug}
+                        transactions={transactions}
+                    />
+                )}
 
-                <AlertDialog open={clearOpen} onOpenChange={setClearOpen}>
-                    <AlertDialogContent className="max-w-[400px] border-none shadow-2xl dark:bg-zinc-900">
-                        <AlertDialogHeader>
-                            <AlertDialogTitle className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
-                                Delete all {items.total} items?
-                            </AlertDialogTitle>
-                            <AlertDialogDescription className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
-                                This will permanently delete every item attached
-                                to this remittance. This action cannot be
-                                undone.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter className="mt-4 gap-2">
-                            <AlertDialogCancel
-                                disabled={clearing}
-                                className="h-9 rounded-lg border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
-                            >
-                                Cancel
-                            </AlertDialogCancel>
-                            <AlertDialogAction
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    performClearAll();
-                                }}
-                                disabled={clearing}
-                                className="h-9 rounded-lg bg-red-600 px-4 font-mono! text-[12px]! font-medium text-white hover:bg-red-700 disabled:opacity-50"
-                            >
-                                {clearing
-                                    ? 'Deleting...'
-                                    : 'Confirm Delete All'}
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                {canDeleteRemittances && (
+                    <AlertDialog open={clearOpen} onOpenChange={setClearOpen}>
+                        <AlertDialogContent className="max-w-[400px] border-none shadow-2xl dark:bg-zinc-900">
+                            <AlertDialogHeader>
+                                <AlertDialogTitle className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
+                                    Delete all {items.total} items?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                                    This will permanently delete every item
+                                    attached to this remittance. This action
+                                    cannot be undone.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="mt-4 gap-2">
+                                <AlertDialogCancel
+                                    disabled={clearing}
+                                    className="h-9 rounded-lg border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+                                >
+                                    Cancel
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        performClearAll();
+                                    }}
+                                    disabled={clearing}
+                                    className="h-9 rounded-lg bg-red-600 px-4 font-mono! text-[12px]! font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                                >
+                                    {clearing
+                                        ? 'Deleting...'
+                                        : 'Confirm Delete All'}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                )}
             </div>
         </AppLayout>
     );
