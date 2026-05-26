@@ -32,7 +32,7 @@ function seedDelivery(array $ctx, array $overrides = []): int
         'status' => 'In Transit',
         'rider_name' => 'Rider',
         'rider_phone' => '+1',
-        'assignee_id' => $ctx['userId'],
+        'assignee_user_id' => $ctx['userId'],
         'delivery_date' => now()->toDateString(),
         'created_at' => now(),
         'updated_at' => now(),
@@ -44,7 +44,7 @@ test('assignedOrders returns deliveries for the given user_id and today', functi
     seedDelivery($ctx);
     seedDelivery($ctx, ['delivery_date' => now()->subDay()->toDateString()]); // not today
     $otherUser = User::factory()->create()->id;
-    seedDelivery($ctx, ['assignee_id' => $otherUser]); // different user
+    seedDelivery($ctx, ['assignee_user_id' => $otherUser]); // different user
 
     $response = $this->getJson("/api/v1/public/rmo-orders?user_id={$ctx['userId']}", [
         'Authorization' => 'Bearer '.$ctx['raw'],

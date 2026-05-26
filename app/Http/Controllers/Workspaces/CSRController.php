@@ -54,7 +54,7 @@ class CSRController extends Controller
 
         // --- Section 1: My RMO Stats Today ---
         $row = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->where('assignee_id', $authUser->id)
+            ->where('assignee_user_id', $authUser->id)
             ->whereBetween('delivery_date', [$monthStart, $today])
             ->selectRaw("
                 COUNT(*) as assigned,
@@ -75,7 +75,7 @@ class CSRController extends Controller
 
         // --- Section 2: My Pending Orders (top 5) ---
         $pendingOrders = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->where('assignee_id', $authUser->id)
+            ->where('assignee_user_id', $authUser->id)
             ->whereBetween('delivery_date', [$monthStart, $today])
             ->where('status', 'PENDING')
             ->with([
@@ -216,7 +216,7 @@ class CSRController extends Controller
 
         // --- Section 7: Today's Order Status Breakdown ---
         $statusBreakdown = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->where('assignee_id', $authUser->id)
+            ->where('assignee_user_id', $authUser->id)
             ->whereBetween('delivery_date', [$monthStart, $today])
             ->groupBy('status')
             ->select(['status', DB::raw('COUNT(*) as count')])
