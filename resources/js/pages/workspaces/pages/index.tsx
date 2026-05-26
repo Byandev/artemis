@@ -1,4 +1,3 @@
-import { Can } from '@/components/can';
 import { TargetChecklistDrawer } from '@/components/checklist/target-checklist-drawer';
 import PageHeader from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
@@ -136,6 +136,12 @@ const Pages = ({
     const [selectedPage, setSelectedPage] = useState<Page | null>(null);
 
     const [processing, setProcessing] = useState(false);
+    const canCreatePages = usePermission(PERMISSIONS.CreatePages);
+    const canEditPages = usePermission(PERMISSIONS.EditPages);
+    const canRefreshPages = usePermission(PERMISSIONS.RefreshPages);
+    const canViewChecklist = usePermission(PERMISSIONS.ViewChecklist);
+    const canUsePageActions =
+        canViewChecklist || canEditPages || canRefreshPages;
 
     useEffect(() => {
         if (flash?.success) {
@@ -269,45 +275,66 @@ const Pages = ({
                 />
             ),
         },
-        {
-            id: 'actions',
-            cell: ({ row }) => {
-                const page = row.original;
+        ...(canUsePageActions
+            ? [
+                  {
+                      id: 'actions',
+                      cell: ({ row }) => {
+                          const page = row.original;
 
-                return (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44">
-                            <Can permission={PERMISSIONS.ViewChecklist}>
-                                <DropdownMenuItem
-                                    onClick={() => openChecklist(page)}
-                                >
-                                    <ListChecks />
-                                    View Checklist
-                                </DropdownMenuItem>
-                            </Can>
-                            <DropdownMenuItem onClick={() => handleEdit(page)}>
-                                <Edit />
-                                Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => refresh(page)}
-                                disabled={processing}
-                            >
-                                <RefreshCw
-                                    className={processing ? 'animate-spin' : ''}
-                                />
-                                {processing ? 'Refreshing…' : 'Refresh Orders'}
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                );
-            },
-        },
+                          return (
+                              <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                      <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
+                                          <MoreHorizontal className="h-3.5 w-3.5" />
+                                      </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                      align="end"
+                                      className="w-44"
+                                  >
+                                      {canViewChecklist && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  openChecklist(page)
+                                              }
+                                          >
+                                              <ListChecks />
+                                              View Checklist
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canEditPages && (
+                                          <DropdownMenuItem
+                                              onClick={() => handleEdit(page)}
+                                          >
+                                              <Edit />
+                                              Edit
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canRefreshPages && (
+                                          <DropdownMenuItem
+                                              onClick={() => refresh(page)}
+                                              disabled={processing}
+                                          >
+                                              <RefreshCw
+                                                  className={
+                                                      processing
+                                                          ? 'animate-spin'
+                                                          : ''
+                                                  }
+                                              />
+                                              {processing
+                                                  ? 'Refreshing…'
+                                                  : 'Refresh Orders'}
+                                          </DropdownMenuItem>
+                                      )}
+                                  </DropdownMenuContent>
+                              </DropdownMenu>
+                          );
+                      },
+                  } as ColumnDef<Page>,
+              ]
+            : []),
     ];
 
     return (
@@ -318,33 +345,36 @@ const Pages = ({
                     title="Pages"
                     description="Manage your shop pages and their connected stores"
                 >
-                    <div className="flex flex-col items-end gap-1">
-                        <Button
-                            size="sm"
-                            onClick={handleCreate}
-                            disabled={pageLimitReached}
-                            title={
-                                pageLimitReached
-                                    ? `Page limit reached (${pageCount}/${pageLimit}). Upgrade your plan to add more.`
-                                    : undefined
-                            }
-                        >
-                            Add New Page
-                        </Button>
-                        {pageLimit != null && (
-                            <span
-                                className={clsx(
-                                    'font-mono text-[10px] tracking-wider uppercase',
+                    {canCreatePages && (
+                        <div className="flex flex-col items-end gap-1">
+                            <Button
+                                size="sm"
+                                onClick={handleCreate}
+                                disabled={pageLimitReached}
+                                title={
                                     pageLimitReached
-                                        ? 'text-amber-600 dark:text-amber-400'
-                                        : 'text-gray-400 dark:text-gray-500',
-                                )}
+                                        ? `Page limit reached (${pageCount}/${pageLimit}). Upgrade your plan to add more.`
+                                        : undefined
+                                }
                             >
-                                {pageCount ?? 0}/{pageLimit} pages used
-                                {pageLimitReached && ' · upgrade to add more'}
-                            </span>
-                        )}
-                    </div>
+                                Add New Page
+                            </Button>
+                            {pageLimit != null && (
+                                <span
+                                    className={clsx(
+                                        'font-mono text-[10px] tracking-wider uppercase',
+                                        pageLimitReached
+                                            ? 'text-amber-600 dark:text-amber-400'
+                                            : 'text-gray-400 dark:text-gray-500',
+                                    )}
+                                >
+                                    {pageCount ?? 0}/{pageLimit} pages used
+                                    {pageLimitReached &&
+                                        ' · upgrade to add more'}
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </PageHeader>
 
                 <div className="mb-3 flex items-center gap-2">
@@ -386,20 +416,22 @@ const Pages = ({
                     />
                 </div>
 
-                <TargetChecklistDrawer
-                    open={checklistDrawerOpen}
-                    onOpenChange={(open) => {
-                        setChecklistDrawerOpen(open);
-                        if (!open) {
-                            setSelectedPage(null);
-                            router.reload({ only: ['pages'] });
-                        }
-                    }}
-                    workspace={workspace}
-                    target="page"
-                    targetId={selectedPage?.id ?? null}
-                    targetName={selectedPage?.name ?? ''}
-                />
+                {canViewChecklist && (
+                    <TargetChecklistDrawer
+                        open={checklistDrawerOpen}
+                        onOpenChange={(open) => {
+                            setChecklistDrawerOpen(open);
+                            if (!open) {
+                                setSelectedPage(null);
+                                router.reload({ only: ['pages'] });
+                            }
+                        }}
+                        workspace={workspace}
+                        target="page"
+                        targetId={selectedPage?.id ?? null}
+                        targetName={selectedPage?.name ?? ''}
+                    />
+                )}
             </div>
         </AppLayout>
     );

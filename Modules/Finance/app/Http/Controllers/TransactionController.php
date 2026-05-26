@@ -53,8 +53,8 @@ class TransactionController extends Controller
                 })),
                 AllowedFilter::exact('account_id'),
                 AllowedFilter::exact('type'),
-                AllowedFilter::exact('transaction_type'),
-                AllowedFilter::exact('sub_category'),
+                AllowedFilter::callback('transaction_type', fn ($q, $v) => is_array($v) ? $q->whereIn('transaction_type', $v) : $q->where('transaction_type', $v)),
+                AllowedFilter::callback('sub_category', fn ($q, $v) => is_array($v) ? $q->whereIn('sub_category', $v) : $q->where('sub_category', $v)),
                 AllowedFilter::callback('missing_type', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN) ? $q->whereNull('transaction_type') : $q),
                 AllowedFilter::callback('expenses_missing_sub', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN)
                     ? $q->where('transaction_type', 'expenses')->whereNull('sub_category')
@@ -255,8 +255,8 @@ class TransactionController extends Controller
                 })),
                 AllowedFilter::exact('account_id'),
                 AllowedFilter::exact('type'),
-                AllowedFilter::exact('transaction_type'),
-                AllowedFilter::exact('sub_category'),
+                AllowedFilter::callback('transaction_type', fn ($q, $v) => is_array($v) ? $q->whereIn('transaction_type', $v) : $q->where('transaction_type', $v)),
+                AllowedFilter::callback('sub_category', fn ($q, $v) => is_array($v) ? $q->whereIn('sub_category', $v) : $q->where('sub_category', $v)),
                 AllowedFilter::callback('missing_type', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN) ? $q->whereNull('transaction_type') : $q),
                 AllowedFilter::callback('expenses_missing_sub', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN)
                     ? $q->where('transaction_type', 'expenses')->whereNull('sub_category')

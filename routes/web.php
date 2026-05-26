@@ -85,6 +85,10 @@ Route::middleware(['auth'])->group(function () {
             ?? $user->workspaces()->first();
 
         if ($workspace) {
+            if ($user->isCsrOf($workspace)) {
+                return redirect()->route('workspaces.csr.dashboard', $workspace->slug);
+            }
+
             return redirect()->route('workspace.dashboard', $workspace->slug);
         }
 

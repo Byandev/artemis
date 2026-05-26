@@ -1,4 +1,3 @@
-import { Can } from '@/components/can';
 import PageHeader from '@/components/common/PageHeader';
 import { DeleteTeamDialog } from '@/components/teams/delete-team-dialog';
 import { TeamFormDialog } from '@/components/teams/team-form-dialog';
@@ -57,6 +56,7 @@ export default function TeamsIndex({
     const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
+    const canCreateTeams = usePermission(PERMISSIONS.CreateTeams);
     const canEditTeams = usePermission(PERMISSIONS.EditTeams);
     const canDeleteTeams = usePermission(PERMISSIONS.DeleteTeams);
     const showActions = canEditTeams || canDeleteTeams;
@@ -186,14 +186,14 @@ export default function TeamsIndex({
                     title="Teams"
                     description="Organize members into teams for better collaboration"
                 >
-                    <Can permission={PERMISSIONS.CreateTeams}>
+                    {canCreateTeams && (
                         <button
                             onClick={() => setCreateDialogOpen(true)}
                             className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
                         >
                             Create Team
                         </button>
-                    </Can>
+                    )}
                 </PageHeader>
 
                 <div className="mb-3 flex items-center gap-2">
@@ -234,24 +234,28 @@ export default function TeamsIndex({
                     />
                 </div>
 
-                <TeamFormDialog
-                    open={createDialogOpen || editingTeam !== null}
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setCreateDialogOpen(false);
-                            setEditingTeam(null);
-                        }
-                    }}
-                    team={editingTeam}
-                    workspace={workspace}
-                    workspaceMembers={workspaceMembers}
-                />
+                {(canCreateTeams || canEditTeams) && (
+                    <TeamFormDialog
+                        open={createDialogOpen || editingTeam !== null}
+                        onOpenChange={(open) => {
+                            if (!open) {
+                                setCreateDialogOpen(false);
+                                setEditingTeam(null);
+                            }
+                        }}
+                        team={editingTeam}
+                        workspace={workspace}
+                        workspaceMembers={workspaceMembers}
+                    />
+                )}
 
-                <DeleteTeamDialog
-                    team={teamToDelete}
-                    workspace={workspace}
-                    onClose={() => setTeamToDelete(null)}
-                />
+                {canDeleteTeams && (
+                    <DeleteTeamDialog
+                        team={teamToDelete}
+                        workspace={workspace}
+                        onClose={() => setTeamToDelete(null)}
+                    />
+                )}
             </div>
         </AppLayout>
     );

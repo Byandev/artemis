@@ -142,7 +142,7 @@ const WorkspaceSwitcher = () => {
                                         className="flex w-full cursor-pointer items-center gap-2.5 rounded-[8px] px-2 py-2 text-[13px] text-gray-500 transition-colors hover:bg-black/[0.03] hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.04] dark:hover:text-gray-200"
                                     >
                                         <Users className="h-3.5 w-3.5 shrink-0" />
-                                        Manage members
+                                        View Members
                                     </Link>
                                 </DropdownMenuItem>
                             )}

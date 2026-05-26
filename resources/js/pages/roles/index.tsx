@@ -1,4 +1,3 @@
-import { Can } from '@/components/can';
 import PageHeader from '@/components/common/PageHeader';
 import RoleFormDialog from '@/components/roles/role-form-dialog';
 import { Button } from '@/components/ui/button';
@@ -82,6 +81,7 @@ export default function Index({ roles, workspace, query }: Props) {
     const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
     const [openFormModal, setOpenFormModal] = useState(false);
 
+    const canCreate = usePermission(PERMISSIONS.CreateRoles);
     const canEdit = usePermission(PERMISSIONS.EditRoles);
     const canArchive = usePermission(PERMISSIONS.DeleteRoles);
     const canManagePerms = usePermission(PERMISSIONS.ManageRolePermissions);
@@ -276,22 +276,24 @@ export default function Index({ roles, workspace, query }: Props) {
             <Head title="Roles Management" />
             <Toaster position="top-right" richColors />
 
-            <RoleFormDialog
-                workspace={workspace}
-                open={openFormModal}
-                onOpenChange={(open) => {
-                    setOpenFormModal(open);
-                    if (!open) setSelectedRole(undefined);
-                }}
-                role={selectedRole}
-            />
+            {(canCreate || canEdit) && (
+                <RoleFormDialog
+                    workspace={workspace}
+                    open={openFormModal}
+                    onOpenChange={(open) => {
+                        setOpenFormModal(open);
+                        if (!open) setSelectedRole(undefined);
+                    }}
+                    role={selectedRole}
+                />
+            )}
 
             <div className="w-full space-y-6 p-4 md:p-6">
                 <PageHeader
                     title="Role Management"
                     description="Define and manage access levels for your workspace"
                 >
-                    <Can permission={PERMISSIONS.CreateRoles}>
+                    {canCreate && (
                         <button
                             onClick={() => {
                                 setSelectedRole(undefined);
@@ -301,7 +303,7 @@ export default function Index({ roles, workspace, query }: Props) {
                         >
                             Add New Role
                         </button>
-                    </Can>
+                    )}
                 </PageHeader>
 
                 <div className="mb-3 flex items-center gap-2">
@@ -348,7 +350,7 @@ export default function Index({ roles, workspace, query }: Props) {
             </div>
 
             {/* Archive Modal */}
-            {isArchiveModalOpen && (
+            {canArchive && isArchiveModalOpen && (
                 <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
                     <div
                         className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px]"
@@ -397,7 +399,7 @@ export default function Index({ roles, workspace, query }: Props) {
             )}
 
             {/* Restore Modal */}
-            {isRestoreModalOpen && (
+            {canArchive && isRestoreModalOpen && (
                 <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
                     <div
                         className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px]"
