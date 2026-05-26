@@ -10,39 +10,59 @@ use App\Support\Metrics\MetricRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
+use Spatie\QueryBuilder\QueryBuilder;
+use Spatie\QueryBuilder\AllowedSort;
 
 class AdminWorkspaceController extends Controller
 {
     public function index(Request $request)
     {
-        $sort = $request->input('sort');
-        $direction = $request->direction === 'asc' ? 'asc' : 'desc';
 
-        $workspaces = Workspace::query()
+        if ($request->input('direction') === 'desc' && $request->filled('sort')) {
+            $request->merge(['sort' => '-' . $request->input('sort')]);
+        }
+        
+        $baseQuery = Workspace::query()
             ->select('workspaces.*')
-            // LOAD RELATIONSHIP HERE: so we see the currently allowed metrics
             ->with(['owner:id,name', 'subscription.plan', 'metricSetting'])
-            ->withCount('pages')
-            ->when($request->search, function ($query, $search) {
-                $query->where(function ($query) use ($search) {
-                    $query->where('workspaces.name', 'like', "%{$search}%")
-                        ->orWhere('workspaces.slug', 'like', "%{$search}%");
-                });
-            });
+            ->withCount('pages');
 
-        match ($sort) {
-            'owner' => $workspaces
-                ->leftJoin('users', 'workspaces.owner_id', '=', 'users.id')
-                ->orderBy('users.name', $direction)
-                ->orderBy('workspaces.name'),
-            'subscription' => $workspaces
-                ->leftJoin('subscriptions', 'workspaces.id', '=', 'subscriptions.workspace_id')
-                ->leftJoin('subscription_plans', 'subscriptions.subscription_plan_id', '=', 'subscription_plans.id')
-                ->orderBy('subscription_plans.name', $direction)
-                ->orderBy('workspaces.name'),
-            'name', 'slug', 'created_at', 'pages_count' => $workspaces->orderBy($sort, $direction),
-            default => $workspaces->orderBy('workspaces.created_at', 'desc'),
-        };
+        $workspaces = QueryBuilder::for($baseQuery)
+            ->allowedFilters([
+            ])
+            ->allowedSorts([
+                'name',
+                'slug',
+                'created_at',
+                'pages_count',
+
+                AllowedSort::callback('owner', function ($query, bool $descending) {
+                    $direction = $descending ? 'desc' : 'asc';
+                    $query->leftJoin('users', 'workspaces.owner_id', '=', 'users.id')
+                        ->orderBy('users.name', $direction)
+                        ->orderBy('workspaces.name');
+                }),
+
+                AllowedSort::callback('subscription', function ($query, bool $descending) {
+                    $direction = $descending ? 'desc' : 'asc';
+                    $query->leftJoin('subscriptions', 'workspaces.id', '=', 'subscriptions.workspace_id')
+                        ->leftJoin('subscription_plans', 'subscriptions.subscription_plan_id', '=', 'subscription_plans.id')
+                        ->orderBy('subscription_plans.name', $direction)
+                        ->orderBy('workspaces.name');
+                }),
+            ]);
+
+        if (!$request->has('sort')) {
+            $workspaces->orderBy('workspaces.created_at', 'desc');
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $workspaces->where(function ($query) use ($search) {
+                $query->where('workspaces.name', 'like', "%{$search}%")
+                    ->orWhere('workspaces.slug', 'like', "%{$search}%");
+            });
+        }
 
         return Inertia::render('admin/workspaces/index', [
             'workspaces' => $workspaces
@@ -50,10 +70,7 @@ class AdminWorkspaceController extends Controller
                 ->withQueryString(),
 
             'plans' => SubscriptionPlan::where('is_active', true)->orderBy('sort_order')->get(),
-
-            // KEEP THIS: This provides the labels and groups for the checkboxes in the modal
             'metricConfigs' => MetricRegistry::configs(),
-
             'filters' => $request->only(['search', 'sort', 'direction']),
         ]);
     }
