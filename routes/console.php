@@ -8,6 +8,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('subscriptions:expire-trials')->dailyAt('00:05');
+Schedule::command('tasks:generate-recurring')->dailyAt('00:10')->withoutOverlapping();
 Schedule::command('trigger-fetch-page-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
 // Schedule::command('trigger-fetch-ads-data')->hourlyAt(30);

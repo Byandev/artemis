@@ -166,6 +166,33 @@ class TaskController extends Controller
         return redirect()->back()->with('success', 'Task status updated.');
     }
 
+    public function updateAllStatuses(Request $request, Workspace $workspace, Task $task)
+    {
+        $this->ensureWorkspaceAccess($request, $workspace);
+        $this->ensureTaskBelongsToWorkspace($task, $workspace);
+
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['todo', 'in_progress', 'done'])],
+            'user_ids' => ['required', 'array', 'min:1'],
+            'user_ids.*' => [
+                'integer',
+                Rule::exists('task_assignees', 'user_id')
+                    ->where('task_id', $task->id),
+            ],
+        ]);
+
+        $task->assignees()
+            ->newPivotStatement()
+            ->where('task_id', $task->id)
+            ->whereIn('user_id', $validated['user_ids'])
+            ->update([
+                'status' => $validated['status'],
+                'updated_at' => now(),
+            ]);
+
+        return redirect()->back()->with('success', 'Selected assignees updated.');
+    }
+
     public function update(Request $request, Workspace $workspace, Task $task)
     {
         $this->ensureWorkspaceAccess($request, $workspace);
@@ -228,6 +255,16 @@ class TaskController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Comment added.');
+    }
+
+    public function destroy(Request $request, Workspace $workspace, Task $task)
+    {
+        $this->ensureWorkspaceAccess($request, $workspace);
+        $this->ensureTaskBelongsToWorkspace($task, $workspace);
+
+        $task->delete();
+
+        return redirect()->back()->with('success', 'Task deleted successfully.');
     }
 
     private function ensureTaskBelongsToWorkspace(Task $task, Workspace $workspace): void

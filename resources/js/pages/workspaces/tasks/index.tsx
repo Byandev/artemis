@@ -1,5 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
 import { TaskCreateDialog } from '@/components/tasks/task-create-dialog';
+import { TaskDeleteDialog } from '@/components/tasks/task-delete-dialog';
 import { TaskDetailsDrawer } from '@/components/tasks/task-details-drawer';
 import { TaskList } from '@/components/tasks/task-list';
 import { TaskToolbar } from '@/components/tasks/task-toolbar';
@@ -55,13 +56,16 @@ export default function TasksIndex({
     const [taskForm, setTaskForm] = useState<TaskFormState>(EMPTY_TASK_FORM);
     const [comments, setComments] = useState<Record<number, string>>({});
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+    const [deletingTaskId, setDeletingTaskId] = useState<number | null>(null);
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [statusFilter, setStatusFilter] = useState<TaskFilter>(
         query?.filter?.status ?? 'all',
     );
     const [isCreating, setIsCreating] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const groupedTasks = useMemo(
         () =>
@@ -92,6 +96,11 @@ export default function TasksIndex({
     const editingTask = useMemo(
         () => tasks.find((task) => task.id === editingTaskId) ?? null,
         [editingTaskId, tasks],
+    );
+
+    const deletingTask = useMemo(
+        () => tasks.find((task) => task.id === deletingTaskId) ?? null,
+        [deletingTaskId, tasks],
     );
 
     const totalTasks =
@@ -238,6 +247,21 @@ export default function TasksIndex({
         );
     };
 
+    const updateSelectedStatuses = (
+        taskId: number,
+        status: TaskStatus,
+        userIds: number[],
+    ) => {
+        router.patch(
+            `/workspaces/${workspace.slug}/tasks/${taskId}/status/all`,
+            { status, user_ids: userIds },
+            {
+                preserveScroll: true,
+                onError: () => toast.error('Unable to update assignees.'),
+            },
+        );
+    };
+
     const submitComment = (taskId: number) => {
         const body = comments[taskId]?.trim();
 
@@ -253,6 +277,36 @@ export default function TasksIndex({
                 onSuccess: () =>
                     setComments((current) => ({ ...current, [taskId]: '' })),
                 onError: () => toast.error('Unable to add comment.'),
+            },
+        );
+    };
+
+    const deleteTask = () => {
+        if (!deletingTask) {
+            return;
+        }
+
+        setIsDeleting(true);
+
+        router.delete(
+            `/workspaces/${workspace.slug}/tasks/${deletingTask.id}`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    if (selectedTaskId === deletingTask.id) {
+                        setSelectedTaskId(null);
+                    }
+
+                    if (editingTaskId === deletingTask.id) {
+                        setEditingTaskId(null);
+                        resetTaskForm();
+                    }
+
+                    setDeleteDialogOpen(false);
+                    setDeletingTaskId(null);
+                },
+                onError: () => toast.error('Unable to delete task.'),
+                onFinish: () => setIsDeleting(false),
             },
         );
     };
@@ -306,6 +360,20 @@ export default function TasksIndex({
                     workspaceMembers={workspaceMembers}
                 />
 
+                <TaskDeleteDialog
+                    isDeleting={isDeleting}
+                    onConfirm={deleteTask}
+                    onOpenChange={(open) => {
+                        setDeleteDialogOpen(open);
+
+                        if (!open) {
+                            setDeletingTaskId(null);
+                        }
+                    }}
+                    open={deleteDialogOpen}
+                    task={deletingTask}
+                />
+
                 <TaskToolbar
                     searchValue={searchValue}
                     statusCounts={taskStatusCounts}
@@ -346,6 +414,14 @@ export default function TasksIndex({
                         setTaskForm(taskToForm(selectedTask));
                         setEditingTaskId(selectedTask.id);
                     }}
+                    onDelete={() => {
+                        if (!selectedTask) {
+                            return;
+                        }
+
+                        setDeletingTaskId(selectedTask.id);
+                        setDeleteDialogOpen(true);
+                    }}
                     onOpenChange={(open) => {
                         if (!open) {
                             setSelectedTaskId(null);
@@ -359,6 +435,15 @@ export default function TasksIndex({
                     onUpdateStatus={(userId, status) => {
                         if (selectedTask) {
                             updateStatus(selectedTask.id, userId, status);
+                        }
+                    }}
+                    onUpdateSelectedStatuses={(status, userIds) => {
+                        if (selectedTask) {
+                            updateSelectedStatuses(
+                                selectedTask.id,
+                                status,
+                                userIds,
+                            );
                         }
                     }}
                     open={selectedTask !== null}

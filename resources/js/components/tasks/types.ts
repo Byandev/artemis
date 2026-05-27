@@ -25,6 +25,7 @@ export interface Task {
     due_date: string | null;
     recurrence: TaskRecurrence;
     recurring_until: string | null;
+    recurring_from_task_id: number | null;
     created_at: string;
     creator: Pick<User, 'id' | 'name' | 'email'> | null;
     assignees: TaskAssignee[];

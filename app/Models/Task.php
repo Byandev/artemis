@@ -17,6 +17,7 @@ class Task extends Model
         'due_date',
         'recurrence',
         'recurring_until',
+        'recurring_from_task_id',
     ];
 
     protected $casts = [
@@ -32,6 +33,16 @@ class Task extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function recurringFrom(): BelongsTo
+    {
+        return $this->belongsTo(Task::class, 'recurring_from_task_id');
+    }
+
+    public function recurringChildren(): HasMany
+    {
+        return $this->hasMany(Task::class, 'recurring_from_task_id');
     }
 
     public function assignees(): BelongsToMany

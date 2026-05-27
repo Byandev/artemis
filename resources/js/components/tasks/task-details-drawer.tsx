@@ -1,3 +1,4 @@
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
     Sheet,
@@ -12,8 +13,11 @@ import {
     Pencil,
     Repeat2,
     Send,
+    Trash2,
+    UserCheck,
     UsersRound,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import {
     formatDate,
     formatTimestamp,
@@ -28,8 +32,10 @@ import { Task, TaskStatus } from './types';
 interface TaskDetailsDrawerProps {
     commentValue: string;
     onCommentChange: (value: string) => void;
+    onDelete: () => void;
     onEdit: () => void;
     onOpenChange: (open: boolean) => void;
+    onUpdateSelectedStatuses: (status: TaskStatus, userIds: number[]) => void;
     onSubmitComment: () => void;
     onUpdateStatus: (userId: number, status: TaskStatus) => void;
     open: boolean;
@@ -40,14 +46,52 @@ interface TaskDetailsDrawerProps {
 export function TaskDetailsDrawer({
     commentValue,
     onCommentChange,
+    onDelete,
     onEdit,
     onOpenChange,
+    onUpdateSelectedStatuses,
     onSubmitComment,
     onUpdateStatus,
     open,
     task,
     taskStatus,
 }: TaskDetailsDrawerProps) {
+    const [bulkStatus, setBulkStatus] = useState<TaskStatus>('todo');
+    const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<number[]>(
+        [],
+    );
+
+    useEffect(() => {
+        setSelectedAssigneeIds([]);
+    }, [task?.id]);
+
+    const allAssigneesSelected =
+        (task?.assignees.length ?? 0) > 0 &&
+        (task?.assignees.every((assignee) =>
+            selectedAssigneeIds.includes(assignee.id),
+        ) ??
+            false);
+
+    const toggleAssigneeSelection = (assigneeId: number) => {
+        setSelectedAssigneeIds((current) =>
+            current.includes(assigneeId)
+                ? current.filter((id) => id !== assigneeId)
+                : [...current, assigneeId],
+        );
+    };
+
+    const toggleAllAssignees = () => {
+        if (!task) {
+            return;
+        }
+
+        setSelectedAssigneeIds(
+            allAssigneesSelected
+                ? []
+                : task.assignees.map((assignee) => assignee.id),
+        );
+    };
+
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="w-full border-black/6 bg-white p-0 sm:max-w-2xl dark:border-white/8 dark:bg-zinc-900">
@@ -79,6 +123,14 @@ export function TaskDetailsDrawer({
                                     >
                                         <Pencil className="h-3 w-3" />
                                         Edit
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={onDelete}
+                                        className="inline-flex h-6 items-center gap-1 rounded-md bg-rose-50 px-2 font-mono text-[11px] font-medium text-rose-600 transition-colors hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-950/70"
+                                    >
+                                        <Trash2 className="h-3 w-3" />
+                                        Delete
                                     </button>
                                 </div>
                                 <SheetTitle className="text-[18px] leading-6 font-semibold text-gray-900 dark:text-gray-100">
@@ -180,8 +232,74 @@ export function TaskDetailsDrawer({
                                 </section>
 
                                 <section className="rounded-xl bg-stone-50/80 p-4 dark:bg-zinc-950/70">
-                                    <div className="mb-2 font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                                        Assignees
+                                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                            <div className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                                Assignees
+                                            </div>
+                                            {task.assignees.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={toggleAllAssignees}
+                                                    className="mt-1 font-mono text-[11px] text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                                                >
+                                                    {allAssigneesSelected
+                                                        ? 'Clear selection'
+                                                        : 'Select all'}
+                                                </button>
+                                            )}
+                                        </div>
+                                        {task.assignees.length > 0 && (
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="font-mono text-[11px] text-gray-400">
+                                                    {selectedAssigneeIds.length}{' '}
+                                                    selected
+                                                </span>
+                                                <select
+                                                    value={bulkStatus}
+                                                    onChange={(event) =>
+                                                        setBulkStatus(
+                                                            event.target
+                                                                .value as TaskStatus,
+                                                        )
+                                                    }
+                                                    className="h-8 rounded-lg border border-black/6 bg-white px-2 font-mono text-[11px] text-gray-600 transition-colors outline-none focus:border-emerald-500 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-300"
+                                                    aria-label="Bulk assignee status"
+                                                >
+                                                    {STATUS_OPTIONS.map(
+                                                        (option) => (
+                                                            <option
+                                                                key={
+                                                                    option.value
+                                                                }
+                                                                value={
+                                                                    option.value
+                                                                }
+                                                            >
+                                                                {option.label}
+                                                            </option>
+                                                        ),
+                                                    )}
+                                                </select>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        onUpdateSelectedStatuses(
+                                                            bulkStatus,
+                                                            selectedAssigneeIds,
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        selectedAssigneeIds.length ===
+                                                        0
+                                                    }
+                                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 font-mono text-[11px] font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-45"
+                                                >
+                                                    <UserCheck className="h-3.5 w-3.5" />
+                                                    Apply selected
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="divide-y divide-black/5 dark:divide-white/5">
                                         {task.assignees.map((assignee) => (
@@ -190,6 +308,18 @@ export function TaskDetailsDrawer({
                                                 className="flex items-center justify-between gap-3 py-2"
                                             >
                                                 <div className="flex min-w-0 items-center gap-2">
+                                                    <Checkbox
+                                                        checked={selectedAssigneeIds.includes(
+                                                            assignee.id,
+                                                        )}
+                                                        onCheckedChange={() =>
+                                                            toggleAssigneeSelection(
+                                                                assignee.id,
+                                                            )
+                                                        }
+                                                        className="border-black/12 data-[state=checked]:border-emerald-600 data-[state=checked]:bg-emerald-600 dark:border-white/12"
+                                                        aria-label={`Select ${assignee.name}`}
+                                                    />
                                                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white font-mono text-[11px] font-semibold text-gray-500 dark:bg-zinc-900 dark:text-gray-300">
                                                         {assignee.name
                                                             .charAt(0)
