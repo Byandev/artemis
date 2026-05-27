@@ -106,7 +106,9 @@ class TaskController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
-            'due_date' => ['nullable', 'date'],
+            'recurrence' => ['required', Rule::in(['none', 'daily', 'weekly', 'monthly'])],
+            'due_date' => ['nullable', 'required_unless:recurrence,none', 'date'],
+            'recurring_until' => ['nullable', 'date', 'after_or_equal:due_date'],
             'assignees' => ['array'],
             'assignees.*' => [
                 'integer',
@@ -120,6 +122,10 @@ class TaskController extends Controller
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'due_date' => $validated['due_date'] ?? null,
+            'recurrence' => $validated['recurrence'],
+            'recurring_until' => $validated['recurrence'] === 'none'
+                ? null
+                : ($validated['recurring_until'] ?? null),
         ]);
 
         $assigneeIds = collect($validated['assignees'] ?? [])
@@ -168,7 +174,9 @@ class TaskController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
-            'due_date' => ['nullable', 'date'],
+            'recurrence' => ['required', Rule::in(['none', 'daily', 'weekly', 'monthly'])],
+            'due_date' => ['nullable', 'required_unless:recurrence,none', 'date'],
+            'recurring_until' => ['nullable', 'date', 'after_or_equal:due_date'],
             'assignees' => ['array'],
             'assignees.*' => [
                 'integer',
@@ -181,6 +189,10 @@ class TaskController extends Controller
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'due_date' => $validated['due_date'] ?? null,
+            'recurrence' => $validated['recurrence'],
+            'recurring_until' => $validated['recurrence'] === 'none'
+                ? null
+                : ($validated['recurring_until'] ?? null),
         ]);
 
         $existingStatuses = $task->assignees()

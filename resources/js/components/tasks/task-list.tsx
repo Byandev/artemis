@@ -1,7 +1,14 @@
-import { CalendarDays, MessageSquareText, Plus, Search } from 'lucide-react';
+import {
+    CalendarDays,
+    MessageSquareText,
+    Plus,
+    Repeat2,
+    Search,
+} from 'lucide-react';
 import {
     formatDate,
     isOverdue,
+    RECURRENCE_LABELS,
     statusAccentStyles,
     statusDotStyles,
     statusHeaderStyles,
@@ -132,6 +139,18 @@ export function TaskList({
                                                         <p className="mt-1 line-clamp-1 pl-4 text-[12px] text-gray-500 dark:text-gray-400">
                                                             {task.description}
                                                         </p>
+                                                    )}
+                                                    {task.recurrence !==
+                                                        'none' && (
+                                                        <span className="mt-2 ml-4 inline-flex h-5 items-center gap-1 rounded-full bg-sky-50 px-2 font-mono text-[10px] font-medium text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                                                            <Repeat2 className="h-3 w-3" />
+                                                            {
+                                                                RECURRENCE_LABELS[
+                                                                    task
+                                                                        .recurrence
+                                                                ]
+                                                            }
+                                                        </span>
                                                     )}
                                                 </div>
 

@@ -39,6 +39,8 @@ const EMPTY_TASK_FORM: TaskFormState = {
     name: '',
     description: '',
     dueDate: '',
+    recurrence: 'none',
+    recurringUntil: '',
     assignees: [],
 };
 
@@ -134,12 +136,21 @@ export default function TasksIndex({
         name: task.name,
         description: task.description ?? '',
         dueDate: task.due_date ? task.due_date.slice(0, 10) : '',
+        recurrence: task.recurrence ?? 'none',
+        recurringUntil: task.recurring_until
+            ? task.recurring_until.slice(0, 10)
+            : '',
         assignees: task.assignees.map((assignee) => assignee.id),
     });
 
     const createTask = () => {
         if (taskForm.name.trim().length === 0) {
             toast.error('Task name is required.');
+            return;
+        }
+
+        if (taskForm.recurrence !== 'none' && !taskForm.dueDate) {
+            toast.error('Due date is required for recurring tasks.');
             return;
         }
 
@@ -151,6 +162,11 @@ export default function TasksIndex({
                 name: taskForm.name.trim(),
                 description: taskForm.description.trim() || null,
                 due_date: taskForm.dueDate || null,
+                recurrence: taskForm.recurrence,
+                recurring_until:
+                    taskForm.recurrence === 'none'
+                        ? null
+                        : taskForm.recurringUntil || null,
                 assignees: taskForm.assignees,
             },
             {
@@ -175,6 +191,11 @@ export default function TasksIndex({
             return;
         }
 
+        if (taskForm.recurrence !== 'none' && !taskForm.dueDate) {
+            toast.error('Due date is required for recurring tasks.');
+            return;
+        }
+
         setIsCreating(true);
 
         router.put(
@@ -183,6 +204,11 @@ export default function TasksIndex({
                 name: taskForm.name.trim(),
                 description: taskForm.description.trim() || null,
                 due_date: taskForm.dueDate || null,
+                recurrence: taskForm.recurrence,
+                recurring_until:
+                    taskForm.recurrence === 'none'
+                        ? null
+                        : taskForm.recurringUntil || null,
                 assignees: taskForm.assignees,
             },
             {

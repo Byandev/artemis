@@ -1,11 +1,18 @@
 import { CheckCircle2, Circle, Clock3 } from 'lucide-react';
-import { Task, TaskStatus } from './types';
+import { Task, TaskRecurrence, TaskStatus } from './types';
 
 export const STATUS_OPTIONS: { label: string; value: TaskStatus }[] = [
     { label: 'To do', value: 'todo' },
     { label: 'In progress', value: 'in_progress' },
     { label: 'Done', value: 'done' },
 ];
+
+export const RECURRENCE_LABELS: Record<TaskRecurrence, string> = {
+    none: 'No repeat',
+    daily: 'Daily',
+    weekly: 'Weekly',
+    monthly: 'Monthly',
+};
 
 export const statusStyles: Record<TaskStatus, string> = {
     todo: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',

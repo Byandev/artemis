@@ -15,10 +15,13 @@ class Task extends Model
         'name',
         'description',
         'due_date',
+        'recurrence',
+        'recurring_until',
     ];
 
     protected $casts = [
         'due_date' => 'datetime',
+        'recurring_until' => 'date',
     ];
 
     public function workspace(): BelongsTo

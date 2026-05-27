@@ -6,11 +6,19 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
-import { CalendarDays, Circle, Pencil, Send, UsersRound } from 'lucide-react';
+import {
+    CalendarDays,
+    Circle,
+    Pencil,
+    Repeat2,
+    Send,
+    UsersRound,
+} from 'lucide-react';
 import {
     formatDate,
     formatTimestamp,
     isOverdue,
+    RECURRENCE_LABELS,
     STATUS_OPTIONS,
     statusHeaderStyles,
     statusStyles,
@@ -88,7 +96,7 @@ export function TaskDetailsDrawer({
                                     <div className="mb-3 font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                                         Properties
                                     </div>
-                                    <div className="grid gap-x-6 gap-y-4 sm:grid-cols-3">
+                                    <div className="grid gap-x-6 gap-y-4 sm:grid-cols-4">
                                         <div>
                                             <div className="mb-1 flex items-center gap-1.5 font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                                                 <Circle className="h-3.5 w-3.5" />
@@ -130,6 +138,28 @@ export function TaskDetailsDrawer({
                                             <p className="font-mono text-[12px] text-gray-700 dark:text-gray-300">
                                                 {task.assignees.length} total
                                             </p>
+                                        </div>
+                                        <div>
+                                            <div className="mb-1 flex items-center gap-1.5 font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                                <Repeat2 className="h-3.5 w-3.5" />
+                                                Repeat
+                                            </div>
+                                            <p className="font-mono text-[12px] text-gray-700 dark:text-gray-300">
+                                                {
+                                                    RECURRENCE_LABELS[
+                                                        task.recurrence
+                                                    ]
+                                                }
+                                            </p>
+                                            {task.recurrence !== 'none' &&
+                                                task.recurring_until && (
+                                                    <p className="mt-0.5 font-mono text-[11px] text-gray-400">
+                                                        Until{' '}
+                                                        {formatDate(
+                                                            task.recurring_until,
+                                                        )}
+                                                    </p>
+                                                )}
                                         </div>
                                     </div>
                                 </section>

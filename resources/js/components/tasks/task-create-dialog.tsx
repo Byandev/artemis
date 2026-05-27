@@ -13,13 +13,23 @@ import { Textarea } from '@/components/ui/textarea';
 import { X } from 'lucide-react';
 import { useMemo } from 'react';
 import Select, { MultiValue, StylesConfig } from 'react-select';
-import { TaskFormState, WorkspaceMember } from './types';
+import { TaskFormState, TaskRecurrence, WorkspaceMember } from './types';
 
 interface AssigneeOption {
     label: string;
     value: number;
     email: string;
 }
+
+const RECURRENCE_OPTIONS: Array<{
+    label: string;
+    value: TaskRecurrence;
+}> = [
+    { label: 'Does not repeat', value: 'none' },
+    { label: 'Daily', value: 'daily' },
+    { label: 'Weekly', value: 'weekly' },
+    { label: 'Monthly', value: 'monthly' },
+];
 
 interface TaskCreateDialogProps {
     form: TaskFormState;
@@ -202,20 +212,81 @@ export function TaskCreateDialog({
                         />
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                            <Label className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                Due Date
+                            </Label>
+                            <Input
+                                type="date"
+                                value={form.dueDate}
+                                onClick={(event) => {
+                                    event.currentTarget.showPicker?.();
+                                }}
+                                onChange={(event) =>
+                                    onChange({
+                                        ...form,
+                                        dueDate: event.target.value,
+                                    })
+                                }
+                                className="h-10 cursor-pointer rounded-lg border-black/6 bg-stone-100 font-mono! text-[12px]! [color-scheme:light] focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/20 dark:border-white/8 dark:bg-zinc-800 dark:[color-scheme:dark] dark:focus-visible:border-emerald-400 dark:focus-visible:ring-emerald-400/20"
+                            />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                Repeat
+                            </Label>
+                            <select
+                                value={form.recurrence}
+                                onChange={(event) => {
+                                    const recurrence = event.target
+                                        .value as TaskRecurrence;
+
+                                    onChange({
+                                        ...form,
+                                        recurrence,
+                                        recurringUntil:
+                                            recurrence === 'none'
+                                                ? ''
+                                                : form.recurringUntil,
+                                    });
+                                }}
+                                className="flex h-10 w-full rounded-lg border border-black/6 bg-stone-100 px-3 font-mono text-[12px] text-gray-700 transition-all outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/20"
+                            >
+                                {RECURRENCE_OPTIONS.map((option) => (
+                                    <option
+                                        key={option.value}
+                                        value={option.value}
+                                    >
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div
+                        className={
+                            form.recurrence === 'none'
+                                ? 'hidden'
+                                : 'space-y-1.5'
+                        }
+                    >
                         <Label className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                            Due Date
+                            Repeat Until
                         </Label>
                         <Input
                             type="date"
-                            value={form.dueDate}
+                            value={form.recurringUntil}
+                            min={form.dueDate || undefined}
                             onClick={(event) => {
                                 event.currentTarget.showPicker?.();
                             }}
                             onChange={(event) =>
                                 onChange({
                                     ...form,
-                                    dueDate: event.target.value,
+                                    recurringUntil: event.target.value,
                                 })
                             }
                             className="h-10 cursor-pointer rounded-lg border-black/6 bg-stone-100 font-mono! text-[12px]! [color-scheme:light] focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/20 dark:border-white/8 dark:bg-zinc-800 dark:[color-scheme:dark] dark:focus-visible:border-emerald-400 dark:focus-visible:ring-emerald-400/20"

@@ -3,6 +3,7 @@ import { Workspace } from '@/types/models/Workspace';
 
 export type TaskStatus = 'todo' | 'in_progress' | 'done';
 export type TaskFilter = 'all' | TaskStatus;
+export type TaskRecurrence = 'none' | 'daily' | 'weekly' | 'monthly';
 
 export interface TaskComment {
     id: number;
@@ -22,6 +23,8 @@ export interface Task {
     name: string;
     description: string | null;
     due_date: string | null;
+    recurrence: TaskRecurrence;
+    recurring_until: string | null;
     created_at: string;
     creator: Pick<User, 'id' | 'name' | 'email'> | null;
     assignees: TaskAssignee[];
@@ -32,6 +35,8 @@ export interface TaskFormState {
     name: string;
     description: string;
     dueDate: string;
+    recurrence: TaskRecurrence;
+    recurringUntil: string;
     assignees: number[];
 }
 
