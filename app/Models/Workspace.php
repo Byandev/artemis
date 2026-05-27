@@ -226,6 +226,11 @@ class Workspace extends Model
         return $this->hasMany(Team::class);
     }
 
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
     public function roles()
     {
         return $this->hasMany(Role::class);
