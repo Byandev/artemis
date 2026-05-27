@@ -11,21 +11,21 @@ class RoleSeeder extends Seeder
     {
         $roles = [
             [
-                'role' => 'admin', // This is the identifier/slug
+                'name' => 'admin',
                 'description' => 'Full access to all workspace settings and members.',
             ],
             [
-                'role' => 'editor',
+                'name' => 'editor',
                 'description' => 'Can edit content but cannot manage workspace settings.',
             ],
             [
-                'role' => 'member',
+                'name' => 'member',
                 'description' => 'Standard access to workspace features.',
             ],
         ];
 
         foreach ($roles as $role) {
-            Role::updateOrCreate(['role' => $role['role']], $role);
+            Role::updateOrCreate(['name' => $role['name']], $role);
         }
     }
 }

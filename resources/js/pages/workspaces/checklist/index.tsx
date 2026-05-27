@@ -14,10 +14,11 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { omit } from 'lodash';
 import { Plus } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 interface Props {
     workspace: Workspace;
@@ -30,7 +31,15 @@ interface Props {
     };
 }
 
+interface PageProps {
+    flash?: {
+        success?: string | null;
+        error?: string | null;
+    };
+}
+
 export default function ChecklistPage({ workspace, checklists, query }: Props) {
+    const { flash } = usePage().props as PageProps;
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
         [query?.sort],
@@ -50,6 +59,16 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
         addTaskForm.title.trim().length > 0 && addTaskForm.target !== '';
 
     const resetAddTaskForm = () => setAddTaskForm(ADD_TASK_FORM_INITIAL);
+
+    useEffect(() => {
+        if (flash?.success) {
+            toast.success(flash.success);
+        }
+
+        if (flash?.error) {
+            toast.error(flash.error);
+        }
+    }, [flash?.success, flash?.error]);
 
     const submitAddTask = () => {
         if (!isAddTaskValid) {
@@ -75,6 +94,9 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                         setEditingItemId(null);
                         resetAddTaskForm();
                     },
+                    onError: () => {
+                        toast.error('Failed to update checklist');
+                    },
                 },
             );
         } else {
@@ -86,6 +108,9 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                     setDialogMode('add');
                     setEditingItemId(null);
                     resetAddTaskForm();
+                },
+                onError: () => {
+                    toast.error('Failed to create checklist');
                 },
             });
         }
@@ -121,6 +146,9 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                 onSuccess: () => {
                     setDeleteDialogOpen(false);
                     setItemToDelete(null);
+                },
+                onError: () => {
+                    toast.error('Failed to delete checklist');
                 },
             },
         );
@@ -207,12 +235,12 @@ export default function ChecklistPage({ workspace, checklists, query }: Props) {
                                 {
                                     sort: params?.sort,
                                     page: params?.page ?? 1,
+                                    per_page: params?.per_page,
                                 },
                                 {
                                     preserveState: true,
                                     replace: true,
                                     preserveScroll: true,
-                                    only: ['checklists', 'query'],
                                 },
                             );
                         }}

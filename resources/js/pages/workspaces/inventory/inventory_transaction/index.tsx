@@ -16,6 +16,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { InventoryTransaction } from '@/types/models/InventoryTransaction';
@@ -80,6 +82,17 @@ export default function Index({
         InventoryTransaction | undefined
     >(undefined);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const canCreateTransactionLogs = usePermission(
+        PERMISSIONS.CreateTransactionLogs,
+    );
+    const canEditTransactionLogs = usePermission(
+        PERMISSIONS.EditTransactionLogs,
+    );
+    const canDeleteTransactionLogs = usePermission(
+        PERMISSIONS.DeleteTransactionLogs,
+    );
+    const canManageTransactionLogs =
+        canEditTransactionLogs || canDeleteTransactionLogs;
 
     const buildFilter = (search: string, range: string[]) => ({
         search: search || undefined,
@@ -140,204 +153,244 @@ export default function Index({
         );
     };
 
-    const columns: ColumnDef<InventoryTransaction>[] = [
-        {
-            id: 'inventory_item',
-            accessorFn: (row) => row.inventory_item?.sku,
-            enableSorting: false,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Inventory Item" />
-            ),
-            cell: ({ row }) => {
-                const item = row.original.inventory_item;
-                return (
-                    <div className="flex h-10 items-center">
-                        {item ? (
-                            <div className="flex flex-col gap-0.5">
-                                <span className="font-mono text-[11px] font-medium text-gray-600 dark:text-gray-400">
-                                    {item.sku}
-                                </span>
-                                {item.product && (
-                                    <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                                        {item.product.name}
+    const columns = useMemo<ColumnDef<InventoryTransaction>[]>(
+        () =>
+            [
+                {
+                    id: 'inventory_item',
+                    accessorFn: (row) => row.inventory_item?.sku,
+                    enableSorting: false,
+                    header: ({ column }) => (
+                        <SortableHeader
+                            column={column}
+                            title="Inventory Item"
+                        />
+                    ),
+                    cell: ({ row }) => {
+                        const item = row.original.inventory_item;
+                        return (
+                            <div className="flex h-10 items-center">
+                                {item ? (
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="font-mono text-[11px] font-medium text-gray-600 dark:text-gray-400">
+                                            {item.sku}
+                                        </span>
+                                        {item.product && (
+                                            <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                                                {item.product.name}
+                                            </span>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <span className="text-[12px] text-gray-400">
+                                        —
                                     </span>
                                 )}
                             </div>
-                        ) : (
-                            <span className="text-[12px] text-gray-400">—</span>
-                        )}
-                    </div>
-                );
-            },
-        },
-        {
-            accessorKey: 'date',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Date" />
-            ),
-            cell: ({ row }) => (
-                <div className="flex h-10 items-center justify-center">
-                    <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
-                        {moment(row.original.date).format('DD MMM YYYY')}
-                    </span>
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'ref_no',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Reference No." />
-            ),
-            cell: ({ row }) => (
-                <div className="flex h-10 items-center justify-center">
-                    <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                        {row.original.ref_no || (
-                            <span className="italic opacity-50">
-                                No Reference
+                        );
+                    },
+                },
+                {
+                    accessorKey: 'date',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader column={column} title="Date" />
+                    ),
+                    cell: ({ row }) => (
+                        <div className="flex h-10 items-center justify-center">
+                            <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                {moment(row.original.date).format(
+                                    'DD MMM YYYY',
+                                )}
                             </span>
-                        )}
-                    </p>
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'po_qty_in',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="PO Quantity In" />
-            ),
-            cell: ({ row }) => (
-                <div className="flex h-10 items-center justify-center">
-                    <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                        {row.original.po_qty_in || 0}
-                    </p>
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'po_qty_out',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="PO Quantity Out" />
-            ),
-            cell: ({ row }) => (
-                <div className="flex h-10 items-center justify-center">
-                    <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                        {row.original.po_qty_out || 0}
-                    </p>
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'rts_goods_in',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="RTS Goods In" />
-            ),
-            cell: ({ row }) => (
-                <div className="flex h-10 items-center justify-center">
-                    <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                        {row.original.rts_goods_in || 0}
-                    </p>
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'rts_goods_out',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="RTS Goods Out" />
-            ),
-            cell: ({ row }) => (
-                <div className="flex h-10 items-center justify-center">
-                    <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                        {row.original.rts_goods_out || 0}
-                    </p>
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'rts_bad',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="RTS Bad" />
-            ),
-            cell: ({ row }) => (
-                <div className="flex h-10 items-center justify-center">
-                    <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                        {row.original.rts_bad || 0}
-                    </p>
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'lost',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Lost" />
-            ),
-            cell: ({ row }) => (
-                <div className="flex h-10 items-center justify-center">
-                    <p className="text-[12px] text-orange-500 dark:text-orange-400">
-                        {row.original.lost || 0}
-                    </p>
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'remaining_qty',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Remaining Quantity" />
-            ),
-            cell: ({ row }) => (
-                <div className="flex h-10 items-center justify-center">
-                    <p
-                        className={`text-[12px] font-bold ${row.original.remaining_qty < 0 ? 'text-red-500' : 'text-emerald-600'}`}
-                    >
-                        {row.original.remaining_qty ?? 0}
-                    </p>
-                </div>
-            ),
-        },
-        {
-            id: 'actions',
-            header: () => (
-                <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                    Actions
-                </div>
-            ),
-            cell: ({ row }) => (
-                <div className="flex h-10 items-center justify-center">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="center" className="w-36">
-                            <DropdownMenuItem
-                                onClick={() => handleEdit(row.original)}
+                        </div>
+                    ),
+                },
+                {
+                    accessorKey: 'ref_no',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader column={column} title="Reference No." />
+                    ),
+                    cell: ({ row }) => (
+                        <div className="flex h-10 items-center justify-center">
+                            <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                                {row.original.ref_no || (
+                                    <span className="italic opacity-50">
+                                        No Reference
+                                    </span>
+                                )}
+                            </p>
+                        </div>
+                    ),
+                },
+                {
+                    accessorKey: 'po_qty_in',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader
+                            column={column}
+                            title="PO Quantity In"
+                        />
+                    ),
+                    cell: ({ row }) => (
+                        <div className="flex h-10 items-center justify-center">
+                            <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                                {row.original.po_qty_in || 0}
+                            </p>
+                        </div>
+                    ),
+                },
+                {
+                    accessorKey: 'po_qty_out',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader
+                            column={column}
+                            title="PO Quantity Out"
+                        />
+                    ),
+                    cell: ({ row }) => (
+                        <div className="flex h-10 items-center justify-center">
+                            <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                                {row.original.po_qty_out || 0}
+                            </p>
+                        </div>
+                    ),
+                },
+                {
+                    accessorKey: 'rts_goods_in',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader column={column} title="RTS Goods In" />
+                    ),
+                    cell: ({ row }) => (
+                        <div className="flex h-10 items-center justify-center">
+                            <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                                {row.original.rts_goods_in || 0}
+                            </p>
+                        </div>
+                    ),
+                },
+                {
+                    accessorKey: 'rts_goods_out',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader column={column} title="RTS Goods Out" />
+                    ),
+                    cell: ({ row }) => (
+                        <div className="flex h-10 items-center justify-center">
+                            <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                                {row.original.rts_goods_out || 0}
+                            </p>
+                        </div>
+                    ),
+                },
+                {
+                    accessorKey: 'rts_bad',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader column={column} title="RTS Bad" />
+                    ),
+                    cell: ({ row }) => (
+                        <div className="flex h-10 items-center justify-center">
+                            <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                                {row.original.rts_bad || 0}
+                            </p>
+                        </div>
+                    ),
+                },
+                {
+                    accessorKey: 'lost',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader column={column} title="Lost" />
+                    ),
+                    cell: ({ row }) => (
+                        <div className="flex h-10 items-center justify-center">
+                            <p className="text-[12px] text-orange-500 dark:text-orange-400">
+                                {row.original.lost || 0}
+                            </p>
+                        </div>
+                    ),
+                },
+                {
+                    accessorKey: 'remaining_qty',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader
+                            column={column}
+                            title="Remaining Quantity"
+                        />
+                    ),
+                    cell: ({ row }) => (
+                        <div className="flex h-10 items-center justify-center">
+                            <p
+                                className={`text-[12px] font-bold ${row.original.remaining_qty < 0 ? 'text-red-500' : 'text-emerald-600'}`}
                             >
-                                <Edit className="mr-2 h-3.5 w-3.5" />
-                                Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                variant="destructive"
-                                onClick={() => confirmDelete(row.original)}
-                            >
-                                <Trash2 className="mr-2 h-3.5 w-3.5" />
-                                Delete
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
+                                {row.original.remaining_qty ?? 0}
+                            </p>
+                        </div>
+                    ),
+                },
+                {
+                    id: 'actions',
+                    header: () => (
+                        <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                            Actions
+                        </div>
+                    ),
+                    cell: ({ row }) => (
+                        <div className="flex h-10 items-center justify-center">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
+                                        <MoreHorizontal className="h-3.5 w-3.5" />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                    align="center"
+                                    className="w-36"
+                                >
+                                    {canEditTransactionLogs && (
+                                        <DropdownMenuItem
+                                            onClick={() =>
+                                                handleEdit(row.original)
+                                            }
+                                        >
+                                            <Edit className="mr-2 h-3.5 w-3.5" />
+                                            Edit
+                                        </DropdownMenuItem>
+                                    )}
+                                    {canEditTransactionLogs &&
+                                        canDeleteTransactionLogs && (
+                                            <DropdownMenuSeparator />
+                                        )}
+                                    {canDeleteTransactionLogs && (
+                                        <DropdownMenuItem
+                                            variant="destructive"
+                                            onClick={() =>
+                                                confirmDelete(row.original)
+                                            }
+                                        >
+                                            <Trash2 className="mr-2 h-3.5 w-3.5" />
+                                            Delete
+                                        </DropdownMenuItem>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    ),
+                },
+            ].filter(
+                (column) => canManageTransactionLogs || column.id !== 'actions',
             ),
-        },
-    ];
+        [
+            canDeleteTransactionLogs,
+            canEditTransactionLogs,
+            canManageTransactionLogs,
+        ],
+    );
 
     return (
         <AppLayout>
@@ -401,15 +454,17 @@ export default function Index({
                     title="Transaction Logs"
                     description="Manage your inventory transactions"
                 >
-                    <button
-                        onClick={() => {
-                            setSelectedInventory(undefined);
-                            setOpenFormModal(true);
-                        }}
-                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
-                    >
-                        Record new Transaction
-                    </button>
+                    {canCreateTransactionLogs && (
+                        <button
+                            onClick={() => {
+                                setSelectedInventory(undefined);
+                                setOpenFormModal(true);
+                            }}
+                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
+                        >
+                            Record new Transaction
+                        </button>
+                    )}
                 </PageHeader>
 
                 <div className="mb-3 flex flex-col items-stretch gap-2 md:flex-row md:items-center">

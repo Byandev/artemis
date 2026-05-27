@@ -45,6 +45,8 @@ export interface User {
     updated_at: string;
     is_super_admin?: boolean;
     is_workspace_owner?: boolean;
+    is_workspace_admin?: boolean;
+    is_csr?: boolean;
     permissions?: (PermissionName | '*')[];
     can?: {
         viewAnySupportTickets?: boolean;

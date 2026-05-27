@@ -32,7 +32,7 @@ import { Inbox } from 'lucide-react';
 import { toBackendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { TriangleDownIcon, TriangleUpIcon } from '@radix-ui/react-icons';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
@@ -48,16 +48,16 @@ interface DataTableProps<TData, TValue> {
 }
 
 export function DataTable<TData, TValue>({
-    columns,
-    data,
-    onFetch,
-    initialSorting,
-    meta,
-    rowSelection,
-    onRowSelectionChange,
-    getRowId,
-    onRowClick,
-}: DataTableProps<TData, TValue>) {
+                                             columns,
+                                             data,
+                                             onFetch,
+                                             initialSorting,
+                                             meta,
+                                             rowSelection,
+                                             onRowSelectionChange,
+                                             getRowId,
+                                             onRowClick,
+                                         }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
 
     const hasPaginationMeta = Boolean(
@@ -73,14 +73,6 @@ export function DataTable<TData, TValue>({
         pageIndex: meta?.current_page ? meta.current_page - 1 : 0,
         pageSize: meta?.per_page ?? 10
     }), [meta?.current_page, meta?.per_page])
-
-    const [perPage, setPerPage] = useState<number>(footerMeta?.per_page ?? 10)
-
-    useEffect(() => {
-        if (typeof footerMeta?.per_page === 'number') {
-            setPerPage(footerMeta.per_page)
-        }
-    }, [footerMeta?.per_page])
 
     const table = useReactTable({
         data,
@@ -109,15 +101,6 @@ export function DataTable<TData, TValue>({
         manualSorting: true,
     })
 
-
-    const perPageOptions = useMemo(() => {
-        const base = [10, 25, 50, 100, 500];
-        const current = perPage ?? footerMeta?.per_page;
-        if (!current || base.includes(current)) {
-            return base;
-        }
-        return [...base, current].sort((a, b) => a - b);
-    }, [footerMeta?.per_page, perPage]);
 
     return (
         <>
@@ -189,29 +172,17 @@ export function DataTable<TData, TValue>({
                                     Rows
                                 </span>
                                 <Select
-                                    value={String(perPage)}
+                                    value={String(footerMeta?.per_page ?? 10)}
                                     onValueChange={(val) => {
-                                        const next = Number(val)
-                                        setPerPage(next)
-                                        if (onFetch) {
-                                            onFetch({
-                                                per_page: next,
-                                                page: 1,
-                                                sort: toBackendSort(sorting),
-                                            })
-                                        }
+                                        if (onFetch) onFetch({ per_page: Number(val), page: 1, sort: toBackendSort(sorting) })
                                     }}
                                 >
-                                    <SelectTrigger className="h-7 w-[72px] rounded-lg border border-black/6 bg-stone-50 px-2.5 font-mono text-[11px] text-gray-700 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200">
+                                    <SelectTrigger className="h-7 w-[72px] rounded-lg border border-black/6 bg-stone-50 px-2.5 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent className="min-w-[72px]">
-                                        {perPageOptions.map((n) => (
-                                            <SelectItem
-                                                key={n}
-                                                value={String(n)}
-                                                className="font-mono text-[11px]"
-                                            >
+                                        {[10, 25, 50, 100, 500].map((n) => (
+                                            <SelectItem key={n} value={String(n)} className="font-mono! text-[11px]!">
                                                 {n}
                                             </SelectItem>
                                         ))}

@@ -146,6 +146,6 @@ test('a different workspace cannot read another workspace records via store/upse
         'total_orders' => 1, 'total_sales' => 200, 'returning' => 0, 'delivered' => 1, 'rts_rate' => 0,
     ], ['Authorization' => 'Bearer '.$rawB])->assertStatus(201);
 
-    expect(\App\Models\PancakeUserErpDailyReport::where('workspace_id', $a['workspace']->id)->count())->toBe(1);
-    expect(\App\Models\PancakeUserErpDailyReport::where('workspace_id', $b['workspace']->id)->count())->toBe(1);
+    expect(PancakeUserErpDailyReport::where('workspace_id', $a['workspace']->id)->count())->toBe(1);
+    expect(PancakeUserErpDailyReport::where('workspace_id', $b['workspace']->id)->count())->toBe(1);
 });

@@ -48,7 +48,7 @@ const posthogToken = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN;
 const posthogDisabled =
     String(import.meta.env.VITE_POSTHOG_DISABLED ?? '').toLowerCase() ===
     'true';
-let posthogReady = false;
+const posthogReady = false;
 
 if (posthogToken && !posthogDisabled) {
     posthog.init(posthogToken, {

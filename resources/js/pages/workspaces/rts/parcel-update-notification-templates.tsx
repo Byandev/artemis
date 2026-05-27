@@ -3,6 +3,8 @@ import TemplateForm from '@/components/rts/template-form';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
@@ -92,6 +94,9 @@ const ParcelUpdateNotificationTemplates = ({
     const [selected, setSelected] = useState<
         ParcelJourneyNotificationTemplate | undefined
     >(undefined);
+    const canManageTemplates = usePermission(
+        PERMISSIONS.ManageParcelJourneyTemplates,
+    );
 
     const [dateRange, setDateRange] = useState([
         query?.start_date ?? moment().startOf('month').format('YYYY-MM-DD'),
@@ -122,76 +127,82 @@ const ParcelUpdateNotificationTemplates = ({
         );
     };
 
-    const templateColumns: ColumnDef<ParcelJourneyNotificationTemplate>[] = [
-        {
-            accessorKey: 'type',
-            header: 'Type',
-            cell: ({ row }) => (
-                <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
-                    {startCase(row.original.type)}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'activity',
-            header: 'Activity',
-            cell: ({ row }) => (
-                <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-400">
-                    {startCase(row.original.activity)}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'receiver',
-            header: 'Receiver',
-            cell: ({ row }) => (
-                <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-400">
-                    {startCase(row.original.receiver)}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'message',
-            header: 'Message',
-            cell: ({ row }) => (
-                <div className="max-w-3xl truncate font-mono text-[11px] text-gray-500 dark:text-gray-400">
-                    {row.original.message}
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'is_enabled',
-            header: 'Status',
-            cell: ({ row }) =>
-                row.original.is_enabled ? (
-                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-medium text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
-                        Enabled
-                    </span>
-                ) : (
-                    <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] font-medium text-gray-500 dark:bg-zinc-800 dark:text-gray-400">
-                        Disabled
-                    </span>
-                ),
-        },
-        {
-            id: 'actions',
-            cell: ({ row }) => (
-                <div className="flex justify-end">
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                            setSelected(row.original);
-                            setOpenForm(true);
-                        }}
-                        className="h-7 cursor-pointer font-mono! text-[11px]!"
-                    >
-                        Edit
-                    </Button>
-                </div>
-            ),
-        },
-    ];
+    const templateColumns = useMemo<
+        ColumnDef<ParcelJourneyNotificationTemplate>[]
+    >(
+        () =>
+            [
+                {
+                    accessorKey: 'type',
+                    header: 'Type',
+                    cell: ({ row }) => (
+                        <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
+                            {startCase(row.original.type)}
+                        </span>
+                    ),
+                },
+                {
+                    accessorKey: 'activity',
+                    header: 'Activity',
+                    cell: ({ row }) => (
+                        <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-400">
+                            {startCase(row.original.activity)}
+                        </span>
+                    ),
+                },
+                {
+                    accessorKey: 'receiver',
+                    header: 'Receiver',
+                    cell: ({ row }) => (
+                        <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-400">
+                            {startCase(row.original.receiver)}
+                        </span>
+                    ),
+                },
+                {
+                    accessorKey: 'message',
+                    header: 'Message',
+                    cell: ({ row }) => (
+                        <div className="max-w-3xl truncate font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                            {row.original.message}
+                        </div>
+                    ),
+                },
+                {
+                    accessorKey: 'is_enabled',
+                    header: 'Status',
+                    cell: ({ row }) =>
+                        row.original.is_enabled ? (
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-medium text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
+                                Enabled
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] font-medium text-gray-500 dark:bg-zinc-800 dark:text-gray-400">
+                                Disabled
+                            </span>
+                        ),
+                },
+                {
+                    id: 'actions',
+                    cell: ({ row }) => (
+                        <div className="flex justify-end">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                    setSelected(row.original);
+                                    setOpenForm(true);
+                                }}
+                                className="h-7 cursor-pointer font-mono! text-[11px]!"
+                            >
+                                Edit
+                            </Button>
+                        </div>
+                    ),
+                },
+            ].filter((column) => canManageTemplates || column.id !== 'actions'),
+        [canManageTemplates],
+    );
 
     const pageStatsColumns = useMemo<ColumnDef<PageStat>[]>(
         () => [
@@ -369,15 +380,17 @@ const ParcelUpdateNotificationTemplates = ({
                     />
                 </div>
 
-                <TemplateForm
-                    open={openForm}
-                    onOpenChange={(open) => {
-                        setOpenForm(open);
-                        if (!open) setSelected(undefined);
-                    }}
-                    workspace={workspace}
-                    initialValue={selected}
-                />
+                {canManageTemplates && (
+                    <TemplateForm
+                        open={openForm}
+                        onOpenChange={(open) => {
+                            setOpenForm(open);
+                            if (!open) setSelected(undefined);
+                        }}
+                        workspace={workspace}
+                        initialValue={selected}
+                    />
+                )}
             </div>
         </AppLayout>
     );
