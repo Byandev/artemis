@@ -39,6 +39,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Botcake\Http\Controllers\Web\FlowController;
 use Modules\Botcake\Http\Controllers\Web\SequenceController;
 use Modules\Botcake\Http\Controllers\Web\SequenceMessageController;
+use Modules\Creatives\Http\Controllers\CreativesController;
 use Modules\Finance\Http\Controllers\AccountController as FinanceAccountController;
 use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardController;
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
@@ -296,6 +297,16 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/remittances/{remittance}/items', [FinanceRemittanceController::class, 'clearItems'])->name('remittances.items.clear');
         Route::put('/remittances/{remittance}', [FinanceRemittanceController::class, 'update'])->name('remittances.update');
         Route::delete('/remittances/{remittance}', [FinanceRemittanceController::class, 'destroy'])->name('remittances.destroy');
+    });
+
+    Route::prefix('/workspaces/{workspace:slug}/creatives')->name('workspaces.creatives.')->group(function () {
+        Route::get('/', [CreativesController::class, 'index'])->name('index');
+        Route::post('/', [CreativesController::class, 'store'])->name('store');
+        Route::put('/{creative}', [CreativesController::class, 'update'])->name('update');
+        Route::delete('/{creative}', [CreativesController::class, 'destroy'])->name('destroy');
+        Route::post('/{creative}/reviews', [CreativesController::class, 'addReview'])->name('reviews.store');
+        Route::put('/{creative}/reviews/{review}', [CreativesController::class, 'updateReview'])->name('reviews.update');
+        Route::put('/{creative}/ads-campaign', [CreativesController::class, 'updateAdsCampaign'])->name('ads-campaign.update');
     });
 
     Route::get('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'index'])->name('support.index');

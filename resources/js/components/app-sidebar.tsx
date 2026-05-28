@@ -37,6 +37,7 @@ import {
     Send,
     Shield,
     ShoppingCart,
+    Sparkles,
     Store,
     Trophy,
     Truck,
@@ -222,6 +223,16 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewPurchasedOrders,
                           },
                       ],
+                  },
+              ]
+            : []),
+        ...(currentWorkspace.creatives_module_enabled
+            ? [
+                  {
+                      title: 'Creatives',
+                      href: `/workspaces/${slug}/creatives`,
+                      icon: Sparkles,
+                      permission: PERMISSIONS.ViewCreatives,
                   },
               ]
             : []),

@@ -52,6 +52,7 @@ interface Workspace {
     rmo_module_enabled: boolean;
     leaderboard_module_enabled: boolean;
     botcake_module_enabled: boolean;
+    creatives_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
 
@@ -67,6 +68,7 @@ const MODULE_FIELDS: Array<{
         | 'rmo_module_enabled'
         | 'leaderboard_module_enabled'
         | 'botcake_module_enabled'
+        | 'creatives_module_enabled'
     >;
     label: string;
     description: string;
@@ -115,6 +117,11 @@ const MODULE_FIELDS: Array<{
         key: 'botcake_module_enabled',
         label: 'Botcake',
         description: 'Botcake sequences and flows',
+    },
+    {
+        key: 'creatives_module_enabled',
+        label: 'Creatives',
+        description: 'Creative tracker with review and ads campaign status',
     },
 ];
 
@@ -661,6 +668,7 @@ function ModulesModal({
         rmo_module_enabled: workspace.rmo_module_enabled,
         leaderboard_module_enabled: workspace.leaderboard_module_enabled,
         botcake_module_enabled: workspace.botcake_module_enabled,
+        creatives_module_enabled: workspace.creatives_module_enabled,
     });
 
     function handleSubmit(e: React.FormEvent) {
