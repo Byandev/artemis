@@ -59,7 +59,8 @@ export default function TeamsIndex({
     const canCreateTeams = usePermission(PERMISSIONS.CreateTeams);
     const canEditTeams = usePermission(PERMISSIONS.EditTeams);
     const canDeleteTeams = usePermission(PERMISSIONS.DeleteTeams);
-    const showActions = canEditTeams || canDeleteTeams;
+    const canManageSchedule = usePermission(PERMISSIONS.ManageSchedule);
+    const showActions = canManageSchedule || canEditTeams || canDeleteTeams;
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -136,14 +137,16 @@ export default function TeamsIndex({
                                           align="end"
                                           className="w-36"
                                       >
-                                          <DropdownMenuItem asChild>
-                                              <Link
-                                                  href={`/workspaces/${workspace.slug}/teams/${team.id}/schedule`}
-                                              >
-                                                  <Calendar />
-                                                  Schedule
-                                              </Link>
-                                          </DropdownMenuItem>
+                                          {canManageSchedule && (
+                                              <DropdownMenuItem asChild>
+                                                  <Link
+                                                      href={`/workspaces/${workspace.slug}/teams/${team.id}/schedule`}
+                                                  >
+                                                      <Calendar />
+                                                      Schedule
+                                                  </Link>
+                                              </DropdownMenuItem>
+                                          )}
                                           {canEditTeams && (
                                               <DropdownMenuItem
                                                   onClick={() =>

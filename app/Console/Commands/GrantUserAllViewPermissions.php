@@ -102,6 +102,7 @@ class GrantUserAllViewPermissions extends Command
             Permission::CreateTeams->value,
             Permission::EditTeams->value,
             Permission::DeleteTeams->value,
+            Permission::ManageSchedule->value,
             // Inventory
             Permission::ViewInventoryItems->value,
             Permission::CreateInventoryItems->value,
