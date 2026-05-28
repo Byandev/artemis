@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Http\Controllers\Workspaces;
+namespace Modules\TaskManagement\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\Task;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Modules\TaskManagement\Models\Task;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -276,6 +276,10 @@ class TaskController extends Controller
 
     private function ensureWorkspaceAccess(Request $request, Workspace $workspace): void
     {
+        if (! $workspace->task_management_module_enabled) {
+            abort(403, 'Task Management is not enabled for this workspace.');
+        }
+
         $user = $request->user();
 
         if (! $user->isMemberOf($workspace) && ! $user->ownsWorkspace($workspace)) {

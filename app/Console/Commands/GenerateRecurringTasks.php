@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Task;
+use Modules\TaskManagement\Models\Task;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;

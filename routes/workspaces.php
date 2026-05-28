@@ -27,7 +27,6 @@ use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\ShopController;
 use App\Http\Controllers\Workspaces\SupportTicketController;
-use App\Http\Controllers\Workspaces\TaskController;
 use App\Http\Controllers\Workspaces\TeamController;
 use App\Http\Controllers\Workspaces\TeamScheduleController;
 use App\Http\Controllers\Workspaces\WorkspaceApiKeyController;
@@ -163,14 +162,6 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/workspaces/{workspace}/products/{product}', [ProductController::class, 'update'])->name('workspaces.products.update');
     Route::delete('/workspaces/{workspace}/products/{product}', [ProductController::class, 'destroy'])->name('workspaces.products.destroy');
 
-    // Task Routes
-    Route::get('/workspaces/{workspace}/tasks', [TaskController::class, 'index'])->name('workspaces.tasks.index');
-    Route::post('/workspaces/{workspace}/tasks', [TaskController::class, 'store'])->name('workspaces.tasks.store');
-    Route::put('/workspaces/{workspace}/tasks/{task}', [TaskController::class, 'update'])->name('workspaces.tasks.update');
-    Route::delete('/workspaces/{workspace}/tasks/{task}', [TaskController::class, 'destroy'])->name('workspaces.tasks.destroy');
-    Route::patch('/workspaces/{workspace}/tasks/{task}/status', [TaskController::class, 'updateStatus'])->name('workspaces.tasks.status');
-    Route::patch('/workspaces/{workspace}/tasks/{task}/status/all', [TaskController::class, 'updateAllStatuses'])->name('workspaces.tasks.status.all');
-    Route::post('/workspaces/{workspace}/tasks/{task}/comments', [TaskController::class, 'storeComment'])->name('workspaces.tasks.comments.store');
     // RTS routes
     // Redirect to analytics by default for navigation item active state
     Route::get('/workspaces/{workspace}/rts', function (Workspace $workspace) {

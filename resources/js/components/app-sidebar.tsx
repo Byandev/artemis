@@ -83,11 +83,15 @@ export function AppSidebar() {
             icon: Package,
             permission: PERMISSIONS.ViewProducts,
         },
-        {
-            title: 'Tasks',
-            href: `/workspaces/${slug}/tasks`,
-            icon: Package,
-        },
+        ...(currentWorkspace.task_management_module_enabled
+            ? [
+                  {
+                      title: 'Tasks',
+                      href: `/workspaces/${slug}/tasks`,
+                      icon: ClipboardList,
+                  },
+              ]
+            : []),
         ...(currentWorkspace.teams_module_enabled
             ? [
                   {

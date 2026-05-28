@@ -17,6 +17,7 @@ export interface Workspace {
     rmo_module_enabled: boolean;
     leaderboard_module_enabled: boolean;
     botcake_module_enabled: boolean;
+    task_management_module_enabled: boolean;
     created_at: string;
     updated_at: string;
 
