@@ -1,0 +1,11 @@
+{
+    "name": "Creatives",
+    "alias": "creatives",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Creatives\\Providers\\CreativesServiceProvider"
+    ],
+    "files": []
+}

@@ -80,6 +80,12 @@ export const PERMISSIONS = {
     EditFinanceRemittances: 'Edit Finance Remittances',
     DeleteFinanceRemittances: 'Delete Finance Remittances',
 
+    // Creatives
+    ViewCreatives: 'View Creatives',
+    CreateCreatives: 'Create Creatives',
+    EditCreatives: 'Edit Creatives',
+    DeleteCreatives: 'Delete Creatives',
+
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',
     ManageApiKeys: 'Manage API Keys',
