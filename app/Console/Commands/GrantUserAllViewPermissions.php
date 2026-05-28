@@ -122,6 +122,7 @@ class GrantUserAllViewPermissions extends Command
             Permission::DeleteChecklist->value,
             // Botcake
             Permission::ViewBotcakeSequences->value,
+            Permission::ViewBotcakeSequenceMessages->value,
             Permission::ViewBotcakeFlows->value,
             // Finance
             Permission::ViewFinanceDashboard->value,
@@ -142,6 +143,7 @@ class GrantUserAllViewPermissions extends Command
             Permission::ImportCourierShipments->value,
             // Botcake
             Permission::ViewBotcakeSequences->value,
+            Permission::ViewBotcakeSequenceMessages->value,
             Permission::ViewBotcakeFlows->value,
             // Settings
             Permission::EditWorkspaceSettings->value,

@@ -68,6 +68,7 @@ export const PERMISSIONS = {
 
     // Botcake
     ViewBotcakeSequences: 'View Botcake Sequences',
+    ViewBotcakeSequenceMessages: 'View Botcake Sequence Messages',
     ViewBotcakeFlows: 'View Botcake Flows',
 
     // Finance

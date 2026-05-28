@@ -28,6 +28,8 @@ class WorkspaceFactory extends Factory
             'slug' => Str::slug($name).'-'.fake()->unique()->randomNumber(4),
             'description' => fake()->optional()->sentence(),
             'owner_id' => User::factory(),
+            'teams_module_enabled' => true,
+            'botcake_module_enabled' => true,
         ];
     }
 

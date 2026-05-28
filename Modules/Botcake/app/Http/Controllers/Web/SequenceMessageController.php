@@ -2,6 +2,7 @@
 
 namespace Modules\Botcake\Http\Controllers\Web;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
@@ -16,6 +17,11 @@ class SequenceMessageController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
+        $this->authorize(
+            Permission::ViewBotcakeSequenceMessages->value,
+            $workspace,
+        );
+
         [$mode, $from, $to] = $this->resolveModeAndRange($request);
 
         $base = SequenceMessage::query()

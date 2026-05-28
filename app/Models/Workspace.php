@@ -57,6 +57,15 @@ class Workspace extends Model
         parent::boot();
 
         static::creating(function ($workspace) {
+            foreach ([
+                'teams_module_enabled',
+                'botcake_module_enabled',
+            ] as $moduleFlag) {
+                if ($workspace->{$moduleFlag} === null) {
+                    $workspace->{$moduleFlag} = true;
+                }
+            }
+
             if (empty($workspace->slug)) {
                 $workspace->slug = Str::slug($workspace->name);
 
