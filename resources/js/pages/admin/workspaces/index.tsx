@@ -51,6 +51,7 @@ interface Workspace {
     csr_module_enabled: boolean;
     rmo_module_enabled: boolean;
     leaderboard_module_enabled: boolean;
+    creatives_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
 
@@ -65,6 +66,7 @@ const MODULE_FIELDS: Array<{
         | 'csr_module_enabled'
         | 'rmo_module_enabled'
         | 'leaderboard_module_enabled'
+        | 'creatives_module_enabled'
     >;
     label: string;
     description: string;
@@ -108,6 +110,11 @@ const MODULE_FIELDS: Array<{
         key: 'leaderboard_module_enabled',
         label: 'Leaderboards',
         description: 'Public leaderboards link',
+    },
+    {
+        key: 'creatives_module_enabled',
+        label: 'Creatives',
+        description: 'Creative tracker with review and ads campaign status',
     },
 ];
 
@@ -671,6 +678,7 @@ function ModulesModal({
         csr_module_enabled: workspace.csr_module_enabled,
         rmo_module_enabled: workspace.rmo_module_enabled,
         leaderboard_module_enabled: workspace.leaderboard_module_enabled,
+        creatives_module_enabled: workspace.creatives_module_enabled,
     });
 
     function handleSubmit(e: React.FormEvent) {
