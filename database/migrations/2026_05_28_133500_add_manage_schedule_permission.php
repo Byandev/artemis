@@ -15,32 +15,6 @@ return new class extends Migration
                 'updated_at' => now(),
             ],
         );
-
-        $permissionId = DB::table('permissions')
-            ->where('name', 'Manage Schedule')
-            ->value('id');
-
-        if (! $permissionId) {
-            return;
-        }
-
-        $roleIds = DB::table('roles')
-            ->leftJoin('role_permissions', 'roles.id', '=', 'role_permissions.role_id')
-            ->leftJoin('permissions', 'role_permissions.permission_id', '=', 'permissions.id')
-            ->where(function ($query) {
-                $query
-                    ->whereIn('roles.name', ['admin', 'owner'])
-                    ->orWhere('permissions.name', 'Edit Teams');
-            })
-            ->distinct()
-            ->pluck('roles.id');
-
-        foreach ($roleIds as $roleId) {
-            DB::table('role_permissions')->updateOrInsert([
-                'role_id' => $roleId,
-                'permission_id' => $permissionId,
-            ]);
-        }
     }
 
     public function down(): void
