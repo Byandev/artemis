@@ -73,6 +73,7 @@ enum Permission: string
 
     // Botcake
     case ViewBotcakeSequences = 'View Botcake Sequences';
+    case ViewBotcakeSequenceMessages = 'View Botcake Sequence Messages';
     case ViewBotcakeFlows = 'View Botcake Flows';
 
     // Finance
@@ -182,6 +183,7 @@ enum Permission: string
             self::ImportCourierShipments => 'Pancake',
 
             self::ViewBotcakeSequences,
+            self::ViewBotcakeSequenceMessages,
             self::ViewBotcakeFlows => 'Botcake',
 
             self::ViewPageDailyBudgetRecords,
