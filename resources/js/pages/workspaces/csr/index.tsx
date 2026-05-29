@@ -1,5 +1,5 @@
-import PageHeader from '@/components/common/PageHeader';
 import { Can } from '@/components/can';
+import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     DropdownMenu,
@@ -7,9 +7,9 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PERMISSIONS } from '@/constants/permissions';
 import CsrAwareLayout from '@/layouts/csr-aware-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { PERMISSIONS } from '@/constants/permissions';
 import { EmployeeFormDialog } from '@/pages/workspaces/employees/components/employee-form-dialog';
 import { PaginatedData } from '@/types';
 import { User } from '@/types/models/Pancake/User';
@@ -156,7 +156,10 @@ export default function EmployeesIndex({
                                         <MoreHorizontal className="h-3.5 w-3.5" />
                                     </button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuContent
+                                    align="end"
+                                    className="w-40"
+                                >
                                     <DropdownMenuItem
                                         onClick={() =>
                                             setEditingEmployee(row.original)

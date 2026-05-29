@@ -191,7 +191,7 @@ export default function TeamSchedule({
     schedules: serverSchedules,
     weekStart,
 }: Props) {
-    const canEdit = usePermission(PERMISSIONS.EditTeams);
+    const canManageSchedule = usePermission(PERMISSIONS.ManageSchedule);
     const weekDates = useMemo(() => getWeekDates(weekStart), [weekStart]);
     const today = todayStr();
 
@@ -311,7 +311,7 @@ export default function TeamSchedule({
                         <ArrowLeft className="h-3.5 w-3.5" />
                         Back
                     </Link>
-                    <Can permission={PERMISSIONS.EditTeams}>
+                    <Can permission={PERMISSIONS.ManageSchedule}>
                         <button
                             onClick={handleSave}
                             disabled={saving || !hasChanges}
@@ -428,7 +428,7 @@ export default function TeamSchedule({
                                             </th>
                                         );
                                     })}
-                                    {canEdit && (
+                                    {canManageSchedule && (
                                         <th className="w-14 border-b border-l border-black/6 px-2 py-2 dark:border-white/6" />
                                     )}
                                 </tr>
@@ -494,7 +494,7 @@ export default function TeamSchedule({
                                         })}
 
                                         {/* Edit button */}
-                                        {canEdit && (
+                                        {canManageSchedule && (
                                             <td className="border-l border-black/6 px-2 py-2 text-center dark:border-white/6">
                                                 <button
                                                     type="button"

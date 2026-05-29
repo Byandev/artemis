@@ -51,8 +51,8 @@ import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { omit } from 'lodash';
 import {
-    CopyleftIcon,
     KeyRound,
+    Link,
     MoreHorizontal,
     Search,
     Send,
@@ -107,6 +107,9 @@ export default function WorkspaceMembers({
     const canRemoveMembers = isOwner || canRemoveMembersPerm;
     const canResetPassword = usePermission(PERMISSIONS.ResetMemberPassword);
     const canInvite = usePermission(PERMISSIONS.InviteMembers);
+    const canUseMemberActions =
+        canEditMembers || canRemoveMembers || canResetPassword;
+    const canUseInvitationActions = isAdmin || canInvite;
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
         [query?.sort],
@@ -116,9 +119,7 @@ export default function WorkspaceMembers({
         [query?.invitation_sort],
     );
 
-    const [searchValue, setSearchValue] = useState(
-        query?.filter?.search ?? '',
-    );
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
@@ -128,6 +129,7 @@ export default function WorkspaceMembers({
     const [invitationToRevoke, setInvitationToRevoke] =
         useState<Invitation | null>(null);
     const [copiedMemberId, setCopiedMemberId] = useState<number | null>(null);
+    const [manualInviteUrl, setManualInviteUrl] = useState<string | null>(null);
 
     const inviteForm = useForm({
         email: '',
@@ -192,17 +194,11 @@ export default function WorkspaceMembers({
         });
     };
 
-    const copyInviteUrl = async (invitation: Invitation) => {
-        try {
-            const domain = window.location.origin;
+    const showInviteUrl = (invitation: Invitation) => {
+        const domain = window.location.origin;
+        const inviteUrl = `${domain}/workspaces/invitations/${invitation.token}/accept`;
 
-            await navigator.clipboard.writeText(
-                `${domain}/workspaces/invitations/${invitation.token}/accept`,
-            );
-            alert('Copied!');
-        } catch (error) {
-            console.error('Failed to copy:', error);
-        }
+        setManualInviteUrl(inviteUrl);
     };
 
     const handleRemoveMember = () => {
@@ -333,67 +329,71 @@ export default function WorkspaceMembers({
                 ).toLocaleDateString();
             },
         },
-        {
-            id: 'actions',
-            cell: ({ row }) => {
-                const member = row.original;
+        ...(canUseMemberActions
+            ? [
+                  {
+                      id: 'actions',
+                      cell: ({ row }) => {
+                          const member = row.original;
 
-                if (member.id === workspace.owner_id) return null;
-                if (!canEditMembers && !canRemoveMembers && !canResetPassword)
-                    return null;
+                          if (member.id === workspace.owner_id) return null;
 
-                return (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            {canEditMembers && (
-                                <DropdownMenuItem
-                                    onClick={() => {
-                                        setMemberToUpdateRole(member);
-                                        updateRoleForm.setData(
-                                            'role_id',
-                                            member.pivot?.role_id?.toString() ??
-                                                '',
-                                        );
-                                    }}
-                                >
-                                    <UserCog className="mr-2 h-4 w-4" />
-                                    Change Role
-                                </DropdownMenuItem>
-                            )}
-                            {canResetPassword && (
-                                <DropdownMenuItem
-                                    onClick={() => copyResetPasswordUrl(member)}
-                                >
-                                    <KeyRound className="mr-2 h-4 w-4" />
-                                    {copiedMemberId === member.id
-                                        ? 'Copied!'
-                                        : 'Copy Reset Link'}
-                                </DropdownMenuItem>
-                            )}
-                            {canRemoveMembers && (
-                                <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                        onClick={() =>
-                                            setMemberToRemove(member)
-                                        }
-                                        className="text-destructive focus:text-destructive"
-                                    >
-                                        <UserMinus className="mr-2 h-4 w-4" />
-                                        Remove
-                                    </DropdownMenuItem>
-                                </>
-                            )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                );
-            },
-        },
+                          return (
+                              <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm">
+                                          <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                      {canEditMembers && (
+                                          <DropdownMenuItem
+                                              onClick={() => {
+                                                  setMemberToUpdateRole(member);
+                                                  updateRoleForm.setData(
+                                                      'role_id',
+                                                      member.pivot?.role_id?.toString() ??
+                                                          '',
+                                                  );
+                                              }}
+                                          >
+                                              <UserCog className="mr-2 h-4 w-4" />
+                                              Change Role
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canResetPassword && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  copyResetPasswordUrl(member)
+                                              }
+                                          >
+                                              <KeyRound className="mr-2 h-4 w-4" />
+                                              {copiedMemberId === member.id
+                                                  ? 'Copied!'
+                                                  : 'Copy Reset Link'}
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canRemoveMembers && (
+                                          <>
+                                              <DropdownMenuSeparator />
+                                              <DropdownMenuItem
+                                                  onClick={() =>
+                                                      setMemberToRemove(member)
+                                                  }
+                                                  className="text-destructive focus:text-destructive"
+                                              >
+                                                  <UserMinus className="mr-2 h-4 w-4" />
+                                                  Remove
+                                              </DropdownMenuItem>
+                                          </>
+                                      )}
+                                  </DropdownMenuContent>
+                              </DropdownMenu>
+                          );
+                      },
+                  } as ColumnDef<User>,
+              ]
+            : []),
     ];
 
     const invitationsColumns: ColumnDef<Invitation>[] = [
@@ -436,52 +436,57 @@ export default function WorkspaceMembers({
                 return new Date(row.original.expires_at).toLocaleDateString();
             },
         },
-        {
-            id: 'actions',
-            cell: ({ row }) => {
-                const invitation = row.original;
+        ...(canUseInvitationActions
+            ? [
+                  {
+                      id: 'actions',
+                      cell: ({ row }) => {
+                          const invitation = row.original;
 
-                if (!isAdmin && !canInvite) return null;
+                          return (
+                              <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm">
+                                          <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                      <DropdownMenuItem
+                                          onClick={() =>
+                                              handleResendInvitation(
+                                                  invitation.id,
+                                              )
+                                          }
+                                      >
+                                          <Send className="mr-2 h-4 w-4" />
+                                          Resend
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                          onClick={() =>
+                                              setInvitationToRevoke(invitation)
+                                          }
+                                          className="text-destructive focus:text-destructive"
+                                      >
+                                          <Trash2 className="mr-2 h-4 w-4" />
+                                          Revoke
+                                      </DropdownMenuItem>
 
-                return (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                                onClick={() =>
-                                    handleResendInvitation(invitation.id)
-                                }
-                            >
-                                <Send className="mr-2 h-4 w-4" />
-                                Resend
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onClick={() =>
-                                    setInvitationToRevoke(invitation)
-                                }
-                                className="text-destructive focus:text-destructive"
-                            >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Revoke
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem
-                                onClick={() => copyInviteUrl(invitation)}
-                                className="text-destructive focus:text-destructive"
-                            >
-                                <CopyleftIcon className="mr-2 h-4 w-4" />
-                                Copy
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                );
-            },
-        },
+                                      <DropdownMenuItem
+                                          onClick={() =>
+                                              showInviteUrl(invitation)
+                                          }
+                                      >
+                                          <Link className="mr-2 h-4 w-4" />
+                                          Show invitation link
+                                      </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                              </DropdownMenu>
+                          );
+                      },
+                  } as ColumnDef<Invitation>,
+              ]
+            : []),
     ];
 
     return (
@@ -589,6 +594,39 @@ export default function WorkspaceMembers({
                         </DialogContent>
                     </Dialog>
                 </PageHeader>
+
+                <Dialog
+                    open={!!manualInviteUrl}
+                    onOpenChange={(open) => {
+                        if (!open) setManualInviteUrl(null);
+                    }}
+                >
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Invitation link</DialogTitle>
+                            <DialogDescription>
+                                Select and copy this link manually.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <Input
+                                readOnly
+                                value={manualInviteUrl ?? ''}
+                                onFocus={(event) =>
+                                    event.currentTarget.select()
+                                }
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                onClick={() => setManualInviteUrl(null)}
+                            >
+                                Done
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 <div className="space-y-5 sm:space-y-6">
                     {/* Members Table */}

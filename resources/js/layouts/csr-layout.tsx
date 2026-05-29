@@ -1,7 +1,8 @@
-import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import AppLogo from '@/components/app-logo';
 import AppLogoIcon from '@/components/app-logo-icon';
+import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import { Icon } from '@/components/icon';
+import SubscriptionExpiredModal from '@/components/subscription-expired-modal';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -24,7 +25,6 @@ import {
 import { UserMenuContent } from '@/components/user-menu-content';
 import { useInitials } from '@/hooks/use-initials';
 import { cn } from '@/lib/utils';
-import SubscriptionExpiredModal from '@/components/subscription-expired-modal';
 import { type NavItem, type SharedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Link, usePage } from '@inertiajs/react';
@@ -168,10 +168,7 @@ export default function CsrLayout({ children }: CsrLayoutProps) {
                                     </span>
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                                className="w-56"
-                                align="end"
-                            >
+                            <DropdownMenuContent className="w-56" align="end">
                                 <UserMenuContent user={auth.user} />
                             </DropdownMenuContent>
                         </DropdownMenu>

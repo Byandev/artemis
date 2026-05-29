@@ -11,8 +11,8 @@ import { InventoryTransaction } from '@/types/models/InventoryTransaction';
 import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
 import { format } from 'date-fns';
-import React, { useEffect, useMemo } from 'react';
 import { X } from 'lucide-react';
+import React, { useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 
 interface InventoryItem {
@@ -143,7 +143,7 @@ const InventoryFormDialog = ({
                                 : 'Add a new entry to the inventory transaction log'}
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogClose className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/6 dark:hover:text-gray-300">
+                    <DialogClose className="absolute top-4 right-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/6 dark:hover:text-gray-300">
                         <X className="h-4 w-4" />
                         <span className="sr-only">Close</span>
                     </DialogClose>
