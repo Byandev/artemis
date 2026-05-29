@@ -29,6 +29,8 @@ class SyncInsightsCommand extends Command
 
         if ($id = $this->argument('ad_account')) {
             $query->whereKey($id);
+        } else {
+            $query->where('active_sync', true);
         }
 
         $accounts = $query->get();

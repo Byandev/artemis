@@ -6,6 +6,7 @@ import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import axios from 'axios';
 import clsx from 'clsx';
 import { omit } from 'lodash';
 import {
@@ -27,6 +28,7 @@ interface AdAccount {
     account_status: number | null;
     last_synced_at: string | null;
     uses_system_user: boolean;
+    active_sync: boolean;
     meta_users?: { id: number; name: string }[];
 }
 
@@ -38,6 +40,7 @@ interface Props {
         perPage?: number | string;
         page?: number | string;
         filter?: { search?: string };
+        showAll?: boolean;
     };
 }
 
@@ -164,27 +167,59 @@ export default function MetaAdAccounts({
         [query?.sort],
     );
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [showAll, setShowAll] = useState(query?.showAll ?? false);
+    const [syncToggles, setSyncToggles] = useState<Record<number, boolean>>(
+        () => Object.fromEntries(adAccounts.data.map((a) => [a.id, a.active_sync])),
+    );
 
     useEffect(() => {
-        const t = setTimeout(() => {
-            router.get(
-                indexUrl,
-                {
-                    sort: query?.sort,
-                    'filter[search]': searchValue || undefined,
-                    page: searchValue ? 1 : (query?.page ?? 1),
-                    per_page: query?.perPage ?? adAccounts.per_page,
-                },
-                {
-                    preserveState: true,
-                    replace: true,
-                    preserveScroll: true,
-                    only: ['adAccounts'],
-                },
-            );
-        }, 400);
+        setSyncToggles(
+            Object.fromEntries(adAccounts.data.map((a) => [a.id, a.active_sync])),
+        );
+    }, [adAccounts.data]);
+
+    const toggleSync = (adAccount: AdAccount) => {
+        const next = !syncToggles[adAccount.id];
+        setSyncToggles((prev) => ({ ...prev, [adAccount.id]: next }));
+        axios
+            .patch(
+                `/workspaces/${workspace.slug}/integrations/meta/ad-accounts/${adAccount.id}/toggle-sync`,
+            )
+            .catch(() => {
+                setSyncToggles((prev) => ({ ...prev, [adAccount.id]: !next }));
+            });
+    };
+
+    const navigate = (overrides: Record<string, unknown> = {}) => {
+        router.get(
+            indexUrl,
+            {
+                sort: query?.sort,
+                'filter[search]': searchValue || undefined,
+                show_all: showAll ? 1 : undefined,
+                page: 1,
+                per_page: query?.perPage ?? adAccounts.per_page,
+                ...overrides,
+            },
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['adAccounts', 'query'],
+            },
+        );
+    };
+
+    useEffect(() => {
+        const t = setTimeout(() => navigate({ page: searchValue ? 1 : (query?.page ?? 1) }), 400);
         return () => clearTimeout(t);
     }, [searchValue]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const handleShowAllToggle = () => {
+        const next = !showAll;
+        setShowAll(next);
+        navigate({ show_all: next ? 1 : undefined, page: 1 });
+    };
 
     const activeCount = adAccounts.data.filter(
         (a) => a.account_status === 1,
@@ -300,6 +335,36 @@ export default function MetaAdAccounts({
                 </span>
             ),
         },
+        {
+            id: 'active_sync',
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Sync" enabled={false} />
+            ),
+            cell: ({ row }) => {
+                const enabled = syncToggles[row.original.id] ?? row.original.active_sync;
+                return (
+                    <button
+                        type="button"
+                        role="switch"
+                        aria-checked={enabled}
+                        onClick={() => toggleSync(row.original)}
+                        className={clsx(
+                            'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
+                            enabled
+                                ? 'bg-emerald-500'
+                                : 'bg-stone-200 dark:bg-zinc-700',
+                        )}
+                    >
+                        <span
+                            className={clsx(
+                                'pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform',
+                                enabled ? 'translate-x-4' : 'translate-x-0.5',
+                            )}
+                        />
+                    </button>
+                );
+            },
+        },
     ];
 
     return (
@@ -341,6 +406,19 @@ export default function MetaAdAccounts({
                             className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                         />
                     </div>
+
+                    <button
+                        type="button"
+                        onClick={handleShowAllToggle}
+                        className={clsx(
+                            'flex h-9 items-center gap-1.5 rounded-[10px] border px-3 font-mono text-[11px] transition-colors',
+                            showAll
+                                ? 'border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                : 'border-black/6 bg-stone-100 text-gray-500 hover:border-black/10 hover:text-gray-700 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:border-white/10 dark:hover:text-gray-200',
+                        )}
+                    >
+                        {showAll ? 'Showing all' : 'Active sync only'}
+                    </button>
                 </div>
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -350,23 +428,14 @@ export default function MetaAdAccounts({
                         initialSorting={initialSorting}
                         meta={{ ...omit(adAccounts, ['data']) }}
                         onFetch={(params) => {
-                            router.get(
-                                indexUrl,
-                                {
-                                    sort: params?.sort,
-                                    'filter[search]': searchValue || undefined,
-                                    page: params?.page ?? 1,
-                                    per_page:
-                                        params?.per_page ??
-                                        query?.perPage ??
-                                        adAccounts.per_page,
-                                },
-                                {
-                                    preserveState: true,
-                                    replace: true,
-                                    preserveScroll: true,
-                                },
-                            );
+                            navigate({
+                                sort: params?.sort,
+                                page: params?.page ?? 1,
+                                per_page:
+                                    params?.per_page ??
+                                    query?.perPage ??
+                                    adAccounts.per_page,
+                            });
                         }}
                     />
                 </div>

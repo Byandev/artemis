@@ -26,7 +26,7 @@ class SyncAllCommand extends Command
     public function handle(): int
     {
         $metaUsers = MetaUser::all();
-        $accounts = AdAccount::all();
+        $accounts = AdAccount::where('active_sync', true)->get();
 
         if ($metaUsers->isEmpty() && $accounts->isEmpty()) {
             $this->warn('Nothing to sync — no MetaUsers or AdAccounts.');

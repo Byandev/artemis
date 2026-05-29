@@ -55,11 +55,14 @@ class IntegrationsController extends Controller
     {
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
+        $showAll = $request->boolean('show_all');
+
         $base = AdAccount::forWorkspace($workspace)
             ->with(['metaUsers' => function ($q) use ($workspace) {
                 $q->whereHas('workspaces', fn ($w) => $w->where('workspaces.id', $workspace->id))
                     ->select('meta_ads_users.id', 'meta_ads_users.name');
-            }]);
+            }])
+            ->when(! $showAll, fn ($q) => $q->where('active_sync', true));
 
         $accounts = QueryBuilder::for($base)
             ->allowedFilters([
@@ -80,6 +83,7 @@ class IntegrationsController extends Controller
                 ...$request->only(['sort', 'page']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
+                'showAll' => $showAll,
             ],
         ]);
     }

@@ -21,6 +21,7 @@ class AdAccount extends Model
     protected $casts = [
         'last_synced_at' => 'datetime',
         'uses_system_user' => 'boolean',
+        'active_sync' => 'boolean',
     ];
 
     public function graphAccountId(): string
