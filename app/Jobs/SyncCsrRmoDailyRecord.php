@@ -36,6 +36,7 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
                 SUM(CASE WHEN status != 'PENDING' THEN 1 ELSE 0 END) AS total_called
             ");
 
+
         // total_rmo_call_attempts / totaaddl_call_time: per (workspace, user), count and sum call_logs
         // whose phone_number matches any customer_phone or rider_phone from that user's deliveries
         // on the date. Each call_log is counted once even if multiple deliveries share the same phone.
@@ -55,6 +56,16 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
                 cl.user_id AS pancake_user_id,
                 COUNT(*) AS total_calls,
                 COALESCE(SUM(cl.duration), 0) AS total_duration
+            ');
+
+        $confirmedAgg = DB::table('pancake_order_for_delivery')
+            ->whereNotNull('conferrer_id')
+            ->where('delivery_date', $date)
+            ->groupBy('workspace_id', 'conferrer_id')
+            ->selectRaw('
+                workspace_id,
+                conferrer_id AS pancake_user_id,
+                COUNT(*) AS total_confirmed
             ');
 
         // Union the (workspace, user) keys from assignedAgg and confirmedAgg so that a user
