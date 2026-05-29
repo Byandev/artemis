@@ -35,6 +35,7 @@ export const PERMISSIONS = {
     CreateTeams: 'Create Teams',
     EditTeams: 'Edit Teams',
     DeleteTeams: 'Delete Teams',
+    ManageSchedule: 'Manage Schedule',
 
     // RTS
     ViewRtsAnalytics: 'View RTS Analytics',

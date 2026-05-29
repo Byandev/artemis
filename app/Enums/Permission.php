@@ -40,6 +40,7 @@ enum Permission: string
     case CreateTeams = 'Create Teams';
     case EditTeams = 'Edit Teams';
     case DeleteTeams = 'Delete Teams';
+    case ManageSchedule = 'Manage Schedule';
 
     // RTS
     case ViewRtsAnalytics = 'View RTS Analytics';
@@ -137,7 +138,8 @@ enum Permission: string
             self::ViewTeams,
             self::CreateTeams,
             self::EditTeams,
-            self::DeleteTeams => 'Teams',
+            self::DeleteTeams,
+            self::ManageSchedule => 'Teams',
 
             self::ViewRtsAnalytics,
             self::ViewParcelJourneyTemplates,
