@@ -48,16 +48,16 @@ interface DataTableProps<TData, TValue> {
 }
 
 export function DataTable<TData, TValue>({
-    columns,
-    data,
-    onFetch,
-    initialSorting,
-    meta,
-    rowSelection,
-    onRowSelectionChange,
-    getRowId,
-    onRowClick,
-}: DataTableProps<TData, TValue>) {
+                                             columns,
+                                             data,
+                                             onFetch,
+                                             initialSorting,
+                                             meta,
+                                             rowSelection,
+                                             onRowSelectionChange,
+                                             getRowId,
+                                             onRowClick,
+                                         }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
 
     const hasPaginationMeta = Boolean(

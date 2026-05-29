@@ -22,6 +22,7 @@ import { Textarea } from '@/components/ui/textarea';
 import support from '@/routes/support';
 import { SharedData } from '@/types';
 import { useForm, usePage } from '@inertiajs/react';
+import { LifeBuoy } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -161,5 +162,30 @@ export function ContactSupportModal({ trigger }: ContactSupportModalProps) {
                 </form>
             </DialogContent>
         </Dialog>
+    );
+}
+
+export function ContactSupportSideTab() {
+    return (
+        <ContactSupportModal
+            trigger={
+                <Button
+                    type="button"
+                    variant="ghost"
+                    className="group fixed right-0 bottom-5 z-50 h-10 w-10 justify-start overflow-hidden rounded-l-[10px] rounded-r-none border border-r-0 border-emerald-500/20 bg-white/95 px-0 text-gray-600 shadow-[0_4px_18px_rgba(0,0,0,0.10)] backdrop-blur transition-[width,border-color,background-color,color] duration-200 hover:w-32 hover:border-emerald-500/35 hover:bg-white hover:text-emerald-700 focus-visible:w-32 focus-visible:border-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/15 focus-visible:ring-offset-2 dark:border-emerald-400/20 dark:bg-zinc-900/95 dark:text-gray-300 dark:shadow-[0_4px_18px_rgba(0,0,0,0.35)] dark:hover:border-emerald-400/35 dark:hover:bg-zinc-900 dark:hover:text-emerald-300"
+                    aria-label="Contact support"
+                    title="Contact support"
+                >
+                    <span className="flex min-w-32 items-center gap-2 pl-2">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20 transition-colors group-hover:bg-emerald-500 group-hover:text-white dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-400/20 dark:group-hover:bg-emerald-400 dark:group-hover:text-zinc-950">
+                            <LifeBuoy className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="font-mono! text-[11px]! font-medium whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+                            Support
+                        </span>
+                    </span>
+                </Button>
+            }
+        />
     );
 }

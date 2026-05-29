@@ -62,7 +62,7 @@ class CallLogController extends Controller
     public function kpi(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => ['required', 'uuid'],
+            'user_id' => ['required', 'integer'],
         ]);
 
         $workspace = $request->attributes->get('workspace');
@@ -70,7 +70,7 @@ class CallLogController extends Controller
         $date = $request->input('date', now()->toDateString());
 
         $deliveries = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->where('assignee_id', $request->input('user_id'))
+            ->where('assignee_user_id', $request->input('user_id'))
             ->whereDate('delivery_date', $date)
             ->withCount(['customerCallLogs', 'riderCallLogs'])
             ->get();
@@ -105,7 +105,7 @@ class CallLogController extends Controller
     public function list(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => ['required', 'uuid'],
+            'user_id' => ['required', 'integer'],
             'since' => ['nullable'],
             'until' => ['nullable'],
         ]);
@@ -150,7 +150,7 @@ class CallLogController extends Controller
     public function summary(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => ['required', 'uuid'],
+            'user_id' => ['required', 'integer'],
             'since' => ['nullable'],
         ]);
 

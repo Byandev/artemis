@@ -15,8 +15,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('pancake_customers', function (Blueprint $table) {
-
-        });
+        Schema::table('pancake_customers', function (Blueprint $table) {});
     }
 };

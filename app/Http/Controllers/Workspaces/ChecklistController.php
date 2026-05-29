@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Workspaces;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\Checklist\TargetSort;
+use App\Http\Sorts\Checklist\TitleNaturalSort;
 use App\Models\Workspace;
 use App\Models\WorkspaceChecklist;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -25,14 +26,16 @@ class ChecklistController extends Controller
 
         $this->authorize(Permission::ViewChecklist->value, $workspace);
 
+        $perPage = $request->integer('per_page', 10);
+
         $checklists = QueryBuilder::for(WorkspaceChecklist::query()->where('workspace_id', $workspace->id))
             ->allowedSorts([
-                'title',
+                AllowedSort::custom('title', new TitleNaturalSort),
                 AllowedSort::custom('target', new TargetSort),
                 'required',
                 'created_at',
             ])
-            ->paginate(10)
+            ->paginate($perPage)
             ->withQueryString();
 
         return Inertia::render('workspaces/checklist/index', [
@@ -40,6 +43,7 @@ class ChecklistController extends Controller
             'checklists' => $checklists,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
+                'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
         ]);

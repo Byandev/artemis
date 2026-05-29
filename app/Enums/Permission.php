@@ -43,6 +43,7 @@ enum Permission: string
 
     // RTS
     case ViewRtsAnalytics = 'View RTS Analytics';
+    case ViewParcelJourneyTemplates = 'View Parcel Journey Templates';
     case ManageParcelJourneyTemplates = 'Manage Parcel Journey Templates';
 
     // CSR
@@ -70,6 +71,10 @@ enum Permission: string
     case EditChecklist = 'Edit Checklist';
     case DeleteChecklist = 'Delete Checklist';
 
+    // Botcake
+    case ViewBotcakeSequences = 'View Botcake Sequences';
+    case ViewBotcakeFlows = 'View Botcake Flows';
+
     // Finance
     case ViewFinanceDashboard = 'View Finance Dashboard';
     case ViewFinanceAccounts = 'View Finance Accounts';
@@ -88,6 +93,12 @@ enum Permission: string
     // Pancake
     case ViewCourierShipments = 'View Courier Shipments';
     case ImportCourierShipments = 'Import Courier Shipments';
+
+    // Page Daily Budget Records
+    case ViewPageDailyBudgetRecords = 'View Page Daily Budget Records';
+    case CreatePageDailyBudgetRecords = 'Create Page Daily Budget Records';
+    case EditPageDailyBudgetRecords = 'Edit Page Daily Budget Records';
+    case DeletePageDailyBudgetRecords = 'Delete Page Daily Budget Records';
 
     // Creatives
     case ViewCreatives = 'View Creatives';
@@ -134,6 +145,7 @@ enum Permission: string
             self::DeleteTeams => 'Teams',
 
             self::ViewRtsAnalytics,
+            self::ViewParcelJourneyTemplates,
             self::ManageParcelJourneyTemplates => 'RTS',
 
             self::ViewCsrManagement,
@@ -174,6 +186,14 @@ enum Permission: string
 
             self::ViewCourierShipments,
             self::ImportCourierShipments => 'Pancake',
+
+            self::ViewBotcakeSequences,
+            self::ViewBotcakeFlows => 'Botcake',
+
+            self::ViewPageDailyBudgetRecords,
+            self::CreatePageDailyBudgetRecords,
+            self::EditPageDailyBudgetRecords,
+            self::DeletePageDailyBudgetRecords => 'Page Daily Budget Records',
 
             self::ViewCreatives,
             self::CreateCreatives,

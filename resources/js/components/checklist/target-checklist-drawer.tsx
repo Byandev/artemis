@@ -1,3 +1,4 @@
+import { Can } from '@/components/can';
 import { ChecklistProgressItem } from '@/components/checklist/types';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -8,6 +9,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { PERMISSIONS } from '@/constants/permissions';
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
 import { formatDistanceToNow } from 'date-fns';
@@ -61,9 +63,15 @@ export function TargetChecklistDrawer({
                 if (active) {
                     setItems(res.data.items ?? []);
                 }
-            } catch {
+            } catch (error) {
                 if (active) {
-                    toast.error('Unable to load checklist progress.');
+                    const message = axios.isAxiosError(error)
+                        ? error.response?.data?.message
+                        : null;
+
+                    toast.error(
+                        message || 'Unable to load checklist progress.',
+                    );
                     setItems([]);
                 }
             } finally {
@@ -211,17 +219,23 @@ export function TargetChecklistDrawer({
                                         className="rounded-lg border border-black/6 bg-white p-3 dark:border-white/8 dark:bg-zinc-900"
                                     >
                                         <div className="flex items-start gap-3">
-                                            <Checkbox
-                                                checked={item.is_completed}
-                                                disabled={savingId !== null}
-                                                onCheckedChange={(next) =>
-                                                    handleToggle(
-                                                        item,
-                                                        Boolean(next),
-                                                    )
+                                            <Can
+                                                permission={
+                                                    PERMISSIONS.EditChecklist
                                                 }
-                                                className="mt-0.5"
-                                            />
+                                            >
+                                                <Checkbox
+                                                    checked={item.is_completed}
+                                                    disabled={savingId !== null}
+                                                    onCheckedChange={(next) =>
+                                                        handleToggle(
+                                                            item,
+                                                            Boolean(next),
+                                                        )
+                                                    }
+                                                    className="mt-0.5"
+                                                />
+                                            </Can>
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <p className="font-mono text-[12px] font-medium text-gray-800 dark:text-gray-100">

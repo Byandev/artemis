@@ -8,6 +8,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
@@ -72,6 +74,9 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
     const [checklistDrawerOpen, setChecklistDrawerOpen] = useState(false);
     const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
     const { post, processing } = useForm({});
+    const canRefreshShops = usePermission(PERMISSIONS.RefreshShops);
+    const canViewChecklist = usePermission(PERMISSIONS.ViewChecklist);
+    const canUseShopActions = canRefreshShops || canViewChecklist;
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -151,48 +156,62 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                 />
             ),
         },
-        {
-            id: 'actions',
-            cell: ({ row }) => {
-                const shop = row.original;
+        ...(canUseShopActions
+            ? [
+                  {
+                      id: 'actions',
+                      cell: ({ row }) => {
+                          const shop = row.original;
 
-                return (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                                onClick={() => openChecklist(shop)}
-                            >
-                                <ListChecks className="mr-2 h-4 w-4" />
-                                View Checklist
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => refresh(shop)}
-                                disabled={processing}
-                            >
-                                <RefreshCw
-                                    className={`mr-2 h-4 w-4 ${processing ? 'animate-spin' : ''}`}
-                                />
-                                {processing
-                                    ? 'Refreshing...'
-                                    : 'Refresh customers'}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => refreshUsers(shop)}
-                                disabled={processing}
-                            >
-                                <Users className="mr-2 h-4 w-4" />
-                                Refresh users
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                );
-            },
-        },
+                          return (
+                              <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm">
+                                          <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                      {canViewChecklist && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  openChecklist(shop)
+                                              }
+                                          >
+                                              <ListChecks className="mr-2 h-4 w-4" />
+                                              View Checklist
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canRefreshShops && (
+                                          <>
+                                              <DropdownMenuItem
+                                                  onClick={() => refresh(shop)}
+                                                  disabled={processing}
+                                              >
+                                                  <RefreshCw
+                                                      className={`mr-2 h-4 w-4 ${processing ? 'animate-spin' : ''}`}
+                                                  />
+                                                  {processing
+                                                      ? 'Refreshing...'
+                                                      : 'Refresh customers'}
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem
+                                                  onClick={() =>
+                                                      refreshUsers(shop)
+                                                  }
+                                                  disabled={processing}
+                                              >
+                                                  <Users className="mr-2 h-4 w-4" />
+                                                  Refresh users
+                                              </DropdownMenuItem>
+                                          </>
+                                      )}
+                                  </DropdownMenuContent>
+                              </DropdownMenu>
+                          );
+                      },
+                  } as ColumnDef<Shop>,
+              ]
+            : []),
     ];
 
     return (
@@ -242,20 +261,22 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                     />
                 </div>
 
-                <TargetChecklistDrawer
-                    open={checklistDrawerOpen}
-                    onOpenChange={(open) => {
-                        setChecklistDrawerOpen(open);
-                        if (!open) {
-                            setSelectedShop(null);
-                            router.reload({ only: ['pages'] });
-                        }
-                    }}
-                    workspace={workspace}
-                    target="shop"
-                    targetId={selectedShop?.id ?? null}
-                    targetName={selectedShop?.name ?? ''}
-                />
+                {canViewChecklist && (
+                    <TargetChecklistDrawer
+                        open={checklistDrawerOpen}
+                        onOpenChange={(open) => {
+                            setChecklistDrawerOpen(open);
+                            if (!open) {
+                                setSelectedShop(null);
+                                router.reload({ only: ['pages'] });
+                            }
+                        }}
+                        workspace={workspace}
+                        target="shop"
+                        targetId={selectedShop?.id ?? null}
+                        targetName={selectedShop?.name ?? ''}
+                    />
+                )}
             </div>
         </AppLayout>
     );

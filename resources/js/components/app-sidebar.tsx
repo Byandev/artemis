@@ -10,6 +10,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { PERMISSIONS } from '@/constants/permissions';
+import { useAnyPermission } from '@/hooks/use-permission';
 import { dashboard } from '@/routes';
 import { type NavItem, User as UserType } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
@@ -77,16 +78,12 @@ export function AppSidebar() {
             icon: BookOpenIcon,
             permission: PERMISSIONS.ViewPages,
         },
-        ...(currentWorkspace.products_module_enabled
-            ? [
-                  {
-                      title: 'Products',
-                      href: `/workspaces/${slug}/products/list`,
-                      icon: Package,
-                      permission: PERMISSIONS.ViewProducts,
-                  },
-              ]
-            : []),
+        {
+            title: 'Products',
+            href: `/workspaces/${slug}/products/list`,
+            icon: Package,
+            permission: PERMISSIONS.ViewProducts,
+        },
         ...(currentWorkspace.teams_module_enabled
             ? [
                   {
@@ -109,6 +106,7 @@ export function AppSidebar() {
                       title: 'Checklist',
                       href: `/workspaces/${(currentWorkspace as { slug: string }).slug}/checklist`,
                       icon: ListChecks,
+                      permission: PERMISSIONS.ViewChecklist,
                   },
               ]
             : []),
@@ -117,11 +115,16 @@ export function AppSidebar() {
                   {
                       title: 'Botcake',
                       icon: MessageSquare,
+                      anyOf: [
+                          PERMISSIONS.ViewBotcakeSequences,
+                          PERMISSIONS.ViewBotcakeFlows,
+                      ],
                       items: [
                           {
                               title: 'Sequences',
                               href: `/workspaces/${currentWorkspace.slug}/botcake/sequences`,
                               icon: MessageSquare,
+                              permission: PERMISSIONS.ViewBotcakeSequences,
                           },
                           {
                               title: 'Sequence Messages',
@@ -132,6 +135,7 @@ export function AppSidebar() {
                               title: 'Flows',
                               href: `/workspaces/${currentWorkspace.slug}/botcake/flows`,
                               icon: ClipboardList,
+                              permission: PERMISSIONS.ViewBotcakeFlows,
                           },
                       ],
                   },
@@ -168,6 +172,7 @@ export function AppSidebar() {
             icon: RotateCcw,
             anyOf: [
                 PERMISSIONS.ViewRtsAnalytics,
+                PERMISSIONS.ViewParcelJourneyTemplates,
                 PERMISSIONS.ManageParcelJourneyTemplates,
             ],
             items: [
@@ -181,7 +186,10 @@ export function AppSidebar() {
                     title: 'Parcel Journey',
                     href: `/workspaces/${slug}/rts/parcel-journeys`,
                     icon: MapPin,
-                    permission: PERMISSIONS.ManageParcelJourneyTemplates,
+                    anyOf: [
+                        PERMISSIONS.ViewParcelJourneyTemplates,
+                        PERMISSIONS.ManageParcelJourneyTemplates,
+                    ],
                 },
             ],
         },
@@ -286,6 +294,14 @@ export function AppSidebar() {
           ]
         : [];
 
+    const supportNavItems: NavItem[] = [
+        {
+            title: 'Customer Support',
+            href: `/workspaces/${slug}/support`,
+            icon: LifeBuoy,
+        },
+    ];
+
     return (
         <Sidebar
             className="bg-white dark:bg-zinc-900"
@@ -306,7 +322,7 @@ export function AppSidebar() {
 
             <SidebarContent className="p-3">
                 <NavMain items={mainNavItems} group_label="Main" />
-                {/*<NavMain items={adminNavItems} group_label="Admin" />*/}
+                <NavMain items={adminNavItems} group_label="Admin" />
                 {/*<NavMain items={accountNavItems} group_label="Account" />*/}
                 <PublicLinks
                     workspaceSlug={currentWorkspace.slug}
@@ -315,6 +331,9 @@ export function AppSidebar() {
                         currentWorkspace.leaderboard_module_enabled
                     }
                 />
+                <div className="mt-auto">
+                    <NavMain items={supportNavItems} group_label="Support" />
+                </div>
             </SidebarContent>
 
             {/*<SidebarFooter>*/}
@@ -333,8 +352,16 @@ function PublicLinks({
     rmoEnabled: boolean;
     leaderboardEnabled: boolean;
 }) {
+    const canViewRmoLink = useAnyPermission([
+        PERMISSIONS.ViewRtsAnalytics,
+        PERMISSIONS.ViewCsrManagement,
+    ]);
+    const canViewLeaderboardLink = useAnyPermission(
+        PERMISSIONS.ViewCsrAnalytics,
+    );
+
     const links = [
-        ...(rmoEnabled
+        ...(rmoEnabled && canViewRmoLink
             ? [
                   {
                       title: 'RMO Management',
@@ -343,13 +370,15 @@ function PublicLinks({
                   },
               ]
             : []),
-        ...(leaderboardEnabled
+        ...(leaderboardEnabled && canViewLeaderboardLink
             ? [{ title: 'Leaderboards', href: '/leaderboards', icon: Trophy }]
             : []),
     ];
 
+    if (links.length === 0) return null;
+
     return (
-        <SidebarGroup className="mt-auto">
+        <SidebarGroup>
             <SidebarGroupLabel className="mb-2 px-3.5 font-mono text-[10px] font-medium tracking-[0.08em] text-gray-300 uppercase dark:text-gray-600">
                 Public Links
             </SidebarGroupLabel>

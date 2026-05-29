@@ -1,4 +1,5 @@
 import { User } from '@/types';
+import { Workspace } from '@/types/models/Workspace';
 
 export interface SupportTicket {
     id: number;
@@ -14,4 +15,5 @@ export interface SupportTicket {
     created_at: string;
     updated_at: string;
     user?: User;
+    workspace?: Workspace;
 }

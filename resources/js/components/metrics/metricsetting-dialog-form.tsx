@@ -1,3 +1,4 @@
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -5,17 +6,29 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { metricConfigs } from '@/types/metrics';
+import { groupedMetrics, type MetricKey } from '@/types/metrics';
 import { useForm, usePage } from '@inertiajs/react';
 import React, { useEffect } from 'react';
-import { useRoute } from 'ziggy-js';
+
+interface MetricSetting {
+    allowed_metrics?: string[];
+    default_metrics?: string[];
+}
 
 interface Workspace {
     id: number;
     name: string;
     slug: string;
     metric_settings?: { metric_key: string }[];
+    metric_setting?: WorkspaceMetricSetting | null;
+    metricSetting?: WorkspaceMetricSetting | null;
 }
+
+interface MetricSettingsPageProps extends SharedData {
+    currentWorkspace?: Workspace;
+}
+
+const DEFAULT_METRIC_KEYS = ['totalSales', 'totalOrders', 'aov', 'rtsRate'];
 
 interface Props {
     open: boolean;
@@ -23,45 +36,69 @@ interface Props {
     workspace: Workspace | null;
 }
 
+interface WorkspaceMetricSetting {
+    allowed_metrics?: MetricKey[];
+    default_metrics?: MetricKey[];
+}
+
+interface PageProps {
+    currentWorkspace?: Workspace | null;
+}
+
 export function MetricSettingDialog({
     open,
     onOpenChange,
     workspace: localWorkspace,
 }: Props) {
-    const { props } = usePage();
-    const ziggy = (props as any).ziggy;
+    const { props } = usePage<PageProps>();
 
-    // Always prioritize the workspace from the shared page props to ensure we have fresh DB data
-    const workspace = (props as any).currentWorkspace || localWorkspace;
-
-    const route = useRoute(ziggy);
+    // Admin workspace management edits the row workspace, not the user's current workspace.
+    const workspace = localWorkspace || props.currentWorkspace;
 
     const { data, setData, put, processing, errors } = useForm({
-        allowed_metrics: [] as string[],
-        default_metrics: [] as string[],
+        allowed_metrics: [] as MetricKey[],
+        default_metrics: [] as MetricKey[],
     });
 
     useEffect(() => {
-        if (open && workspace) {
-            // Check both snake_case and camelCase to match your Middleware/Model naming
-            const setting =
-                (workspace as any).metric_setting ||
-                (workspace as any).metricSetting;
+        if (!open) return;
 
-            if (setting?.allowed_metrics) {
+        const previousOverflow = document.body.style.overflow;
+        const previousDocumentOverflow =
+            document.documentElement.style.overflow;
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            document.documentElement.style.overflow = previousDocumentOverflow;
+        };
+    }, [open]);
+
+    useEffect(() => {
+        if (open && workspace) {
+            const setting = workspace.metric_setting || workspace.metricSetting;
+
+            if (setting?.allowed_metrics?.length) {
+                const allowedMetrics = setting.allowed_metrics;
+                const defaultMetrics = (
+                    setting.default_metrics?.length
+                        ? setting.default_metrics
+                        : DEFAULT_METRIC_KEYS
+                ).filter((key) => allowedMetrics.includes(key));
+
                 setData({
-                    allowed_metrics: setting.allowed_metrics,
-                    default_metrics:
-                        setting.default_metrics || setting.allowed_metrics,
+                    allowed_metrics: allowedMetrics,
+                    default_metrics: defaultMetrics,
                 });
             } else {
                 setData({
-                    allowed_metrics: [],
-                    default_metrics: [],
+                    allowed_metrics: DEFAULT_METRIC_KEYS,
+                    default_metrics: DEFAULT_METRIC_KEYS,
                 });
             }
         }
-    }, [open, workspace]);
+    }, [open, setData, workspace]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -69,31 +106,52 @@ export function MetricSettingDialog({
 
         put(`/admin/workspaces/${workspace.slug}/metrics`, {
             preserveScroll: true,
-            onSuccess: () => {
-                // The onOpenChange(false) will close the modal,
-                // and the 'back()' redirect from Laravel will refresh the page props.
-                onOpenChange(false);
-            },
+            onSuccess: () => onOpenChange(false),
         });
     };
 
-    const toggleMetric = (key: string) => {
+    const toggleMetric = (key: MetricKey) => {
         const current = [...data.allowed_metrics];
         const index = current.indexOf(key);
 
         if (index === -1) {
             current.push(key);
-        } else {
-            current.splice(index, 1);
+            setData('allowed_metrics', current);
+            return;
         }
 
-        setData('allowed_metrics', current);
+        current.splice(index, 1);
+        setData({
+            allowed_metrics: current,
+            default_metrics: data.default_metrics.filter((key) =>
+                current.includes(key),
+            ),
+        });
+    };
+
+    const setGroupMetrics = (keys: MetricKey[], enabled: boolean) => {
+        if (enabled) {
+            setData(
+                'allowed_metrics',
+                Array.from(new Set([...data.allowed_metrics, ...keys])),
+            );
+            return;
+        }
+
+        setData({
+            allowed_metrics: data.allowed_metrics.filter(
+                (key) => !keys.includes(key),
+            ),
+            default_metrics: data.default_metrics.filter(
+                (key) => !keys.includes(key),
+            ),
+        });
     };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="gap-0 overflow-hidden border-none p-0 shadow-2xl sm:max-w-md dark:bg-zinc-900">
-                <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
+            <DialogContent className="mx-auto h-auto w-full max-w-7xl gap-0 border-none p-6 shadow-2xl sm:max-w-7xl dark:bg-zinc-900">
+                <div className="mb-4 border-b border-black/6 pr-8 pb-3 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
                             Workspace Metrics
@@ -106,35 +164,93 @@ export function MetricSettingDialog({
                 </div>
 
                 <form onSubmit={handleSubmit}>
-                    <div className="max-h-[60vh] space-y-4 overflow-y-auto px-5 py-4">
+                    <div>
                         <Field
                             label="Allowed Metrics"
                             error={errors.allowed_metrics}
                         >
-                            <div className="grid gap-2">
-                                {metricConfigs.map((metric) => (
-                                    <label
-                                        key={metric.key}
-                                        className="flex cursor-pointer items-center gap-3 rounded-xl border border-black/5 bg-stone-50/50 p-3 transition-colors hover:bg-stone-100/50 dark:border-white/5 dark:bg-white/2"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            // Check against the current form state
-                                            checked={data.allowed_metrics.includes(
-                                                metric.key,
-                                            )}
-                                            onChange={() =>
-                                                toggleMetric(metric.key)
-                                            }
-                                            className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                                        />
-                                        <div className="flex flex-col">
-                                            <span className="text-[13px] font-medium text-gray-800 dark:text-gray-200">
-                                                {metric.name}
-                                            </span>
-                                        </div>
-                                    </label>
-                                ))}
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                                {groupedMetrics.map((group) => {
+                                    const metricKeys = group.metrics.map(
+                                        (metric) => metric.key,
+                                    );
+                                    const selectedCount = metricKeys.filter(
+                                        (key) =>
+                                            data.allowed_metrics.includes(key),
+                                    ).length;
+                                    const allSelected =
+                                        selectedCount === metricKeys.length;
+
+                                    return (
+                                        <section
+                                            key={group.key}
+                                            className="rounded-lg border border-black/6 bg-stone-50/50 dark:border-white/6 dark:bg-white/2"
+                                        >
+                                            <div className="flex items-start justify-between gap-2 border-b border-black/6 px-2.5 py-2 dark:border-white/6">
+                                                <div>
+                                                    <h3 className="text-[11px] leading-4 font-semibold text-gray-800 dark:text-gray-100">
+                                                        {group.label}
+                                                    </h3>
+                                                    <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                                        {selectedCount} of{' '}
+                                                        {metricKeys.length}{' '}
+                                                        enabled
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setGroupMetrics(
+                                                            metricKeys,
+                                                            !allSelected,
+                                                        )
+                                                    }
+                                                    className="shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-medium text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+                                                >
+                                                    {allSelected
+                                                        ? 'Clear'
+                                                        : 'Select all'}
+                                                </button>
+                                            </div>
+
+                                            <div className="grid gap-1.5 p-2">
+                                                {group.metrics.map((metric) => {
+                                                    const checked =
+                                                        data.allowed_metrics.includes(
+                                                            metric.key,
+                                                        );
+
+                                                    return (
+                                                        <label
+                                                            key={metric.key}
+                                                            className={[
+                                                                'flex cursor-pointer items-center gap-1.5 rounded-md border px-1.5 py-1 transition-colors',
+                                                                checked
+                                                                    ? 'border-emerald-500/20 bg-emerald-500/10 dark:border-emerald-500/20 dark:bg-emerald-500/10'
+                                                                    : 'border-transparent hover:bg-white dark:hover:bg-white/5',
+                                                            ].join(' ')}
+                                                        >
+                                                            <Checkbox
+                                                                checked={
+                                                                    checked
+                                                                }
+                                                                onCheckedChange={() =>
+                                                                    toggleMetric(
+                                                                        metric.key,
+                                                                    )
+                                                                }
+                                                                className="size-3.5 border-black/20 data-[state=checked]:border-emerald-600 data-[state=checked]:bg-emerald-600 data-[state=checked]:text-white dark:border-white/20 dark:data-[state=checked]:border-emerald-500 dark:data-[state=checked]:bg-emerald-500"
+                                                            />
+                                                            <span className="text-[10px] leading-[14px] font-medium text-gray-700 dark:text-gray-300">
+                                                                {metric.name}
+                                                            </span>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        </section>
+                                    );
+                                })}
                             </div>
                         </Field>
                     </div>
@@ -155,7 +271,7 @@ function Field({
     children,
 }: {
     label: string;
-    error?: any;
+    error?: React.ReactNode;
     children: React.ReactNode;
 }) {
     return (
@@ -181,18 +297,18 @@ function Footer({
     onCancel: () => void;
 }) {
     return (
-        <div className="flex items-center justify-end gap-2 border-t border-black/6 bg-stone-50/50 px-5 py-3 dark:border-white/6 dark:bg-white/2">
+        <div className="mt-4 flex items-center justify-end gap-2 border-t border-black/6 pt-3 dark:border-white/6">
             <button
                 type="button"
                 onClick={onCancel}
-                className="flex h-9 items-center rounded-lg border border-black/8 bg-white px-4 font-mono text-[12px] font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300"
+                className="flex h-8 items-center rounded-lg border border-black/8 bg-white px-3.5 font-mono text-[11px] font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300"
             >
                 Cancel
             </button>
             <button
                 type="submit"
                 disabled={processing}
-                className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono text-[12px] font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
+                className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono text-[11px] font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
             >
                 {processing ? 'Saving...' : 'Save Changes'}
             </button>
