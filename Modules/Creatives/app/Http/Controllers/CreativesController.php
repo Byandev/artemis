@@ -4,6 +4,7 @@ namespace Modules\Creatives\Http\Controllers;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -46,8 +47,18 @@ class CreativesController extends Controller
                     });
                 }),
                 AllowedFilter::exact('format'),
+                AllowedFilter::exact('creator_id'),
                 AllowedFilter::callback('review_status', function ($query, $value) {
                     $query->whereHas('latestReview', fn ($q) => $q->where('status', $value));
+                }),
+                AllowedFilter::callback('ads_status', function ($query, $value) {
+                    $query->whereHas('latestAdsCampaign', fn ($q) => $q->where('ads_status', $value));
+                }),
+                AllowedFilter::callback('date_from', function ($query, $value) {
+                    $query->where('creative_date', '>=', $value);
+                }),
+                AllowedFilter::callback('date_to', function ($query, $value) {
+                    $query->where('creative_date', '<=', $value);
                 }),
             ])
             ->allowedSorts([
@@ -55,15 +66,29 @@ class CreativesController extends Controller
                 AllowedSort::field('creative_date'),
                 AllowedSort::field('format'),
                 AllowedSort::field('created_at'),
+                AllowedSort::callback('creator', function ($query, bool $descending) {
+                    $query->orderBy(
+                        User::select('name')->whereColumn('users.id', 'creatives.creator_id'),
+                        $descending ? 'desc' : 'asc'
+                    );
+                }),
             ])
             ->defaultSort('-creative_date', '-id')
             ->paginate($request->integer('per_page', 25))
             ->withQueryString()
             ->through(fn ($c) => $this->formatCreative($c));
 
+        $creatorIds = Creative::where('workspace_id', $workspace->id)
+            ->whereNotNull('creator_id')
+            ->distinct()
+            ->pluck('creator_id');
+
+        $creators = User::whereIn('id', $creatorIds)->select('id', 'name')->orderBy('name')->get();
+
         return Inertia::render('workspaces/creatives/index', [
             'workspace' => $workspace,
             'creatives' => $creatives,
+            'creators' => $creators,
             'query' => [
                 ...$request->only(['sort', 'page']),
                 'per_page' => $request->integer('per_page', 25),
@@ -77,7 +102,8 @@ class CreativesController extends Controller
         $this->guard($request, $workspace);
         $this->authorize(Permission::CreateCreatives->value, $workspace);
 
-        $data = $request->safe()->except('picture_file');
+        $adsManagerLink = $request->safe()->only('ads_manager_link')['ads_manager_link'] ?? null;
+        $data = $request->safe()->except('picture_file', 'ads_manager_link');
 
         if ($request->hasFile('picture_file')) {
             $path = $request->file('picture_file')->store("creatives/{$workspace->id}", 'public');
@@ -90,11 +116,13 @@ class CreativesController extends Controller
             'creator_id' => $request->user()->id,
         ]);
 
-        CreativeReview::create([
-            'creative_id' => $creative->id,
-            'reviewer_id' => $request->user()->id,
-            'status' => 'waiting_for_submission',
-        ]);
+        if ($adsManagerLink) {
+            AdsCampaign::create([
+                'creative_id' => $creative->id,
+                'ads_status' => 'pending',
+                'ads_manager_link' => $adsManagerLink,
+            ]);
+        }
 
         return back();
     }
@@ -104,7 +132,9 @@ class CreativesController extends Controller
         $this->guard($request, $workspace, $creative);
         $this->authorize(Permission::EditCreatives->value, $workspace);
 
-        $data = $request->safe()->except('picture_file');
+        $hasAdsManagerLink = $request->exists('ads_manager_link');
+        $adsManagerLink = $request->safe()->only('ads_manager_link')['ads_manager_link'] ?? null;
+        $data = $request->safe()->except('picture_file', 'ads_manager_link');
 
         if ($request->hasFile('picture_file')) {
             $this->deleteStoredFile($creative->picture_url);
@@ -113,6 +143,20 @@ class CreativesController extends Controller
         }
 
         $creative->update($data);
+
+        if (! $hasAdsManagerLink) {
+            return back();
+        }
+
+        if ($creative->latestAdsCampaign) {
+            $creative->latestAdsCampaign->update(['ads_manager_link' => $adsManagerLink]);
+        } elseif ($adsManagerLink) {
+            AdsCampaign::create([
+                'creative_id' => $creative->id,
+                'ads_status' => 'pending',
+                'ads_manager_link' => $adsManagerLink,
+            ]);
+        }
 
         return back();
     }
