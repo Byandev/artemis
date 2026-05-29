@@ -14,6 +14,7 @@ import {
     Facebook,
     RefreshCw,
     Search,
+    Star,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -25,6 +26,7 @@ interface AdAccount {
     country_code: string | null;
     account_status: number | null;
     last_synced_at: string | null;
+    uses_system_user: boolean;
     meta_users?: { id: number; name: string }[];
 }
 
@@ -203,8 +205,11 @@ export default function MetaAdAccounts({
             ),
             cell: ({ row }) => (
                 <div className="flex flex-col gap-0.5">
-                    <span className="text-[12px] font-medium text-gray-700 dark:text-gray-200">
+                    <span className="flex items-center gap-1 text-[12px] font-medium text-gray-700 dark:text-gray-200">
                         {row.original.name}
+                        {row.original.uses_system_user && (
+                            <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />
+                        )}
                     </span>
                     {row.original.business_name && (
                         <span className="text-[11px] text-gray-400 dark:text-gray-500">
