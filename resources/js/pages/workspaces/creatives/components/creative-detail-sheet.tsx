@@ -12,15 +12,13 @@ import { useForm } from '@inertiajs/react';
 import { Clapperboard, ExternalLink, FileImage, MessageSquare, Pencil, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
-    ADS_STATUS_LABELS,
-    AdsStatus,
     Creative,
     REVIEW_AVATAR_BG,
     REVIEW_STATUS_LABELS,
     Review,
     ReviewStatus,
 } from '../types';
-import { AdsBadge, FormatBadge, InitialAvatar, ReviewBadge } from './atoms';
+import { FormatBadge, InitialAvatar, ReviewBadge } from './atoms';
 
 // ─── Review Comment ────────────────────────────────────────────────────────────
 
@@ -155,81 +153,6 @@ function ReviewsTab({ creative, workspace, currentUserId, canEdit }: { creative:
     );
 }
 
-// ─── Ads Tab ───────────────────────────────────────────────────────────────────
-
-function AdsTab({ creative, workspace, canEdit }: { creative: Creative; workspace: Workspace; canEdit: boolean }) {
-    const [editingRemarks, setEditingRemarks] = useState(false);
-    const { data, setData, put, processing, reset } = useForm({
-        ads_status: creative.ads_campaign?.ads_status ?? ('pending' as AdsStatus),
-        ads_manager_link: creative.ads_campaign?.ads_manager_link ?? '',
-        remarks: creative.ads_campaign?.remarks ?? '',
-    });
-
-    const camp = creative.ads_campaign;
-
-    const submitRemarks = (e: React.FormEvent) => {
-        e.preventDefault();
-        put(`/workspaces/${workspace.slug}/creatives/${creative.id}/ads-campaign`, {
-            onSuccess: () => { reset(); setEditingRemarks(false); },
-        });
-    };
-
-    if (!camp) {
-        return (
-            <div className="rounded-[14px] border border-dashed border-black/8 p-6 text-center dark:border-white/8">
-                <p className="font-mono text-[11px] text-gray-400 dark:text-gray-600">No campaign linked yet</p>
-                <p className="mt-1 font-mono text-[10px] text-gray-300 dark:text-gray-700">Add an Ads Manager link when editing this creative</p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-            <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 dark:border-white/5">
-                <p className="font-mono text-[10px] font-medium uppercase tracking-widest text-gray-400 dark:text-gray-600">Campaign</p>
-                <AdsBadge status={camp.ads_status} />
-            </div>
-            {camp.ads_manager_link && (
-                <div className="border-b border-black/5 px-4 py-3 dark:border-white/5">
-                    <p className="mb-2 font-mono text-[9px] font-medium uppercase tracking-widest text-gray-400 dark:text-gray-600">Ads Manager</p>
-                    <a href={camp.ads_manager_link} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 font-mono text-[11px] font-medium text-emerald-600 transition-colors hover:bg-emerald-100 dark:bg-emerald-500/[0.10] dark:text-emerald-400 dark:hover:bg-emerald-500/[0.18]">
-                        Open in Ads Manager <ExternalLink className="h-3 w-3" />
-                    </a>
-                </div>
-            )}
-            <div className="px-4 py-3">
-                <p className="mb-2 font-mono text-[9px] font-medium uppercase tracking-widest text-gray-400 dark:text-gray-600">Remarks</p>
-                {editingRemarks ? (
-                    <form onSubmit={submitRemarks} className="space-y-2">
-                        <textarea value={data.remarks} onChange={(e) => setData('remarks', e.target.value)} rows={3} autoFocus placeholder="Campaign notes, budget info, targeting details..."
-                            className="w-full resize-none rounded-[8px] border border-black/8 bg-stone-50 p-2.5 font-mono! text-[12px]! text-gray-800 outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600" />
-                        <div className="flex gap-2">
-                            <button type="submit" disabled={processing} className="flex h-7 items-center rounded-lg bg-emerald-600 px-3 font-mono! text-[11px]! font-medium text-white hover:bg-emerald-700 disabled:opacity-50">Save</button>
-                            <button type="button" onClick={() => { reset(); setEditingRemarks(false); }} className="flex h-7 items-center gap-1 rounded-lg px-2 font-mono! text-[11px]! text-gray-500 transition-colors hover:bg-stone-100 dark:text-gray-400 dark:hover:bg-zinc-800">
-                                <X className="h-3 w-3" /> Cancel
-                            </button>
-                        </div>
-                    </form>
-                ) : (
-                    <div>
-                        {camp.remarks
-                            ? <p className="whitespace-pre-wrap rounded-[8px] bg-stone-50 px-3 py-2.5 font-mono text-[12px] leading-relaxed text-gray-500 dark:bg-zinc-800/60 dark:text-gray-400">{camp.remarks}</p>
-                            : <p className="font-mono text-[11px] italic text-gray-300 dark:text-gray-700">No remarks yet</p>
-                        }
-                        {canEdit && (
-                            <button onClick={() => setEditingRemarks(true)} className="mt-2.5 inline-flex items-center gap-1.5 font-mono text-[11px] text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400">
-                                <Pencil className="h-3 w-3" />
-                                {camp.remarks ? 'Edit remark' : 'Add remark'}
-                            </button>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
-
 // ─── Detail Sheet ──────────────────────────────────────────────────────────────
 
 export function CreativeDetailSheet({
@@ -261,7 +184,6 @@ export function CreativeDetailSheet({
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
                                 <div className="absolute bottom-3 left-4 flex flex-wrap items-center gap-1.5">
                                     {creative.latest_review && <ReviewBadge status={creative.latest_review.status} />}
-                                    {creative.ads_campaign && <AdsBadge status={creative.ads_campaign.ads_status} />}
                                 </div>
                             </div>
                         )}
@@ -281,7 +203,6 @@ export function CreativeDetailSheet({
                                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                                     <FormatBadge format={creative.format} />
                                     {!hasHero && creative.latest_review && <ReviewBadge status={creative.latest_review.status} />}
-                                    {!hasHero && creative.ads_campaign && <AdsBadge status={creative.ads_campaign.ads_status} />}
                                 </div>
                                 <div className="mt-2 flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-600">
                                     {creative.creator && (
@@ -302,7 +223,7 @@ export function CreativeDetailSheet({
                         </div>
                         <div className="border-b border-black/6 px-5 dark:border-white/6">
                             <TabsList className="h-auto gap-0 rounded-none bg-transparent p-0">
-                                {(['details', 'reviews', 'ads'] as const).map((tab) => (
+                                {(['details', 'reviews'] as const).map((tab) => (
                                     <TabsTrigger key={tab} value={tab}
                                         className="relative h-9 rounded-none border-b-2 border-transparent px-3 font-mono text-[12px] font-medium capitalize text-gray-400 transition-none data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-600 dark:text-gray-600 dark:data-[state=active]:text-emerald-400">
                                         {tab}
@@ -388,10 +309,6 @@ export function CreativeDetailSheet({
 
                     <TabsContent value="reviews" className="flex-1 overflow-y-auto px-5 py-5">
                         <ReviewsTab creative={creative} workspace={workspace} currentUserId={currentUserId} canEdit={canEdit} />
-                    </TabsContent>
-
-                    <TabsContent value="ads" className="flex-1 overflow-y-auto px-5 py-5">
-                        <AdsTab creative={creative} workspace={workspace} canEdit={canEdit} />
                     </TabsContent>
                 </Tabs>
             </SheetContent>

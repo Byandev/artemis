@@ -40,14 +40,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CreativeDetailSheet } from './components/creative-detail-sheet';
 import { CreativeFormDialog } from './components/creative-form-dialog';
 import { AdsBadge, FormatBadge, ReviewBadge } from './components/atoms';
-import {
-    ADS_BADGE,
-    ADS_STATUS_LABELS,
-    AdsStatus,
-    Creative,
-    PageProps,
-    REVIEW_STATUS_LABELS,
-} from './types';
+import { ADS_BADGE, ADS_STATUS_LABELS, AdsStatus, Creative, PageProps, REVIEW_STATUS_LABELS } from './types';
 
 export default function CreativesIndex({ workspace, creatives, creators, query }: PageProps) {
     const { auth } = usePage<SharedData>().props;
@@ -162,29 +155,24 @@ export default function CreativesIndex({ workspace, creatives, creators, query }
             ),
         },
         {
-            accessorKey: 'ads_campaign',
+            accessorKey: 'ads_status',
             enableSorting: false,
             header: () => <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600">Ads</span>,
             cell: ({ row }) => {
                 const c = row.original;
-                if (!c.ads_campaign) return <span className="font-mono text-[11px] text-gray-300 dark:text-gray-700">—</span>;
                 return (
                     <div onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <button className="inline-flex cursor-pointer items-center gap-0.5 rounded transition-opacity hover:opacity-70">
-                                    <AdsBadge status={c.ads_campaign.ads_status} />
+                                    <AdsBadge status={c.ads_status} />
                                     <ChevronDown className="h-3 w-3 text-gray-400" />
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="start">
                                 {(Object.entries(ADS_STATUS_LABELS) as [AdsStatus, string][]).map(([v, l]) => (
                                     <DropdownMenuItem key={v} className="font-mono text-[12px]"
-                                        onClick={() => router.put(`${baseUrl}/${c.id}/ads-campaign`, {
-                                            ads_status: v,
-                                            ads_manager_link: c.ads_campaign?.ads_manager_link ?? null,
-                                            remarks: c.ads_campaign?.remarks ?? null,
-                                        }, { preserveScroll: true })}>
+                                        onClick={() => router.put(`${baseUrl}/${c.id}`, { ads_status: v }, { preserveScroll: true })}>
                                         {l}
                                     </DropdownMenuItem>
                                 ))}

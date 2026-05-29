@@ -14,7 +14,6 @@ use Inertia\Inertia;
 use Modules\Creatives\Http\Requests\StoreCreativeRequest;
 use Modules\Creatives\Http\Requests\StoreReviewRequest;
 use Modules\Creatives\Http\Requests\UpdateCreativeRequest;
-use Modules\Creatives\Models\AdsCampaign;
 use Modules\Creatives\Models\Creative;
 use Modules\Creatives\Models\CreativeReview;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -35,7 +34,6 @@ class CreativesController extends Controller
                 ->with([
                     'creator:id,name',
                     'reviews' => fn ($q) => $q->with('reviewer:id,name')->oldest(),
-                    'latestAdsCampaign',
                 ])
         )
             ->allowedFilters([
@@ -50,9 +48,6 @@ class CreativesController extends Controller
                 AllowedFilter::exact('creator_id'),
                 AllowedFilter::callback('review_status', function ($query, $value) {
                     $query->whereHas('latestReview', fn ($q) => $q->where('status', $value));
-                }),
-                AllowedFilter::callback('ads_status', function ($query, $value) {
-                    $query->whereHas('latestAdsCampaign', fn ($q) => $q->where('ads_status', $value));
                 }),
                 AllowedFilter::callback('date_from', function ($query, $value) {
                     $query->where('creative_date', '>=', $value);
@@ -102,27 +97,18 @@ class CreativesController extends Controller
         $this->guard($request, $workspace);
         $this->authorize(Permission::CreateCreatives->value, $workspace);
 
-        $adsManagerLink = $request->safe()->only('ads_manager_link')['ads_manager_link'] ?? null;
-        $data = $request->safe()->except('picture_file', 'ads_manager_link');
+        $data = $request->safe()->except('picture_file');
 
         if ($request->hasFile('picture_file')) {
             $path = $request->file('picture_file')->store("creatives/{$workspace->id}", 'public');
             $data['picture_url'] = Storage::url($path);
         }
 
-        $creative = Creative::create([
+        Creative::create([
             ...$data,
             'workspace_id' => $workspace->id,
             'creator_id' => $request->user()->id,
         ]);
-
-        if ($adsManagerLink) {
-            AdsCampaign::create([
-                'creative_id' => $creative->id,
-                'ads_status' => 'pending',
-                'ads_manager_link' => $adsManagerLink,
-            ]);
-        }
 
         return back();
     }
@@ -132,9 +118,7 @@ class CreativesController extends Controller
         $this->guard($request, $workspace, $creative);
         $this->authorize(Permission::EditCreatives->value, $workspace);
 
-        $hasAdsManagerLink = $request->exists('ads_manager_link');
-        $adsManagerLink = $request->safe()->only('ads_manager_link')['ads_manager_link'] ?? null;
-        $data = $request->safe()->except('picture_file', 'ads_manager_link');
+        $data = $request->safe()->except('picture_file');
 
         if ($request->hasFile('picture_file')) {
             $this->deleteStoredFile($creative->picture_url);
@@ -143,20 +127,6 @@ class CreativesController extends Controller
         }
 
         $creative->update($data);
-
-        if (! $hasAdsManagerLink) {
-            return back();
-        }
-
-        if ($creative->latestAdsCampaign) {
-            $creative->latestAdsCampaign->update(['ads_manager_link' => $adsManagerLink]);
-        } elseif ($adsManagerLink) {
-            AdsCampaign::create([
-                'creative_id' => $creative->id,
-                'ads_status' => 'pending',
-                'ads_manager_link' => $adsManagerLink,
-            ]);
-        }
 
         return back();
     }
@@ -199,31 +169,6 @@ class CreativesController extends Controller
         }
 
         $review->update($request->validated());
-
-        return back();
-    }
-
-    public function updateAdsCampaign(Request $request, Workspace $workspace, Creative $creative)
-    {
-        $this->guard($request, $workspace, $creative);
-        $this->authorize(Permission::EditCreatives->value, $workspace);
-
-        $validated = $request->validate([
-            'ads_status' => ['required', Rule::in(['pending', 'running', 'kill', 'skill'])],
-            'ads_manager_link' => ['nullable', 'string', 'max:2048'],
-            'remarks' => ['nullable', 'string', 'max:2000'],
-        ]);
-
-        $campaign = $creative->latestAdsCampaign;
-
-        if ($campaign) {
-            $campaign->update($validated);
-        } else {
-            AdsCampaign::create([
-                'creative_id' => $creative->id,
-                ...$validated,
-            ]);
-        }
 
         return back();
     }
@@ -272,6 +217,9 @@ class CreativesController extends Controller
             'script' => $c->script,
             'picture_url' => $c->picture_url,
             'reference_link' => $c->reference_link,
+            'ads_status' => $c->ads_status,
+            'ads_manager_link' => $c->ads_manager_link,
+            'ads_remarks' => $c->ads_remarks,
             'caption' => $c->caption,
             'headline' => $c->headline,
             'notes' => $c->notes,
@@ -281,12 +229,6 @@ class CreativesController extends Controller
             'latest_review' => $latestReview ? [
                 'status' => $latestReview->status,
                 'feedback' => $latestReview->feedback,
-            ] : null,
-            'ads_campaign' => $c->latestAdsCampaign ? [
-                'id' => $c->latestAdsCampaign->id,
-                'ads_status' => $c->latestAdsCampaign->ads_status,
-                'ads_manager_link' => $c->latestAdsCampaign->ads_manager_link,
-                'remarks' => $c->latestAdsCampaign->remarks,
             ] : null,
         ];
     }

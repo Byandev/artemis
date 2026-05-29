@@ -8,8 +8,6 @@ export type ReviewStatus =
     | 'approved'
     | 'for_reapproval';
 
-export type AdsStatus = 'pending' | 'running' | 'kill' | 'skill';
-
 export interface Review {
     id: number;
     status: ReviewStatus;
@@ -27,6 +25,9 @@ export interface Creative {
     script: string | null;
     picture_url: string | null;
     reference_link: string | null;
+    ads_status: AdsStatus;
+    ads_manager_link: string | null;
+    ads_remarks: string | null;
     caption: string | null;
     headline: string | null;
     notes: string | null;
@@ -34,7 +35,6 @@ export interface Creative {
     reviews: Review[];
     review_count: number;
     latest_review: { status: ReviewStatus; feedback: string | null } | null;
-    ads_campaign: { id: number; ads_status: AdsStatus; ads_manager_link: string | null; remarks: string | null } | null;
 }
 
 export interface Creator {
@@ -61,6 +61,22 @@ export interface PageProps {
     };
 }
 
+export type AdsStatus = 'pending' | 'running' | 'kill' | 'skill';
+
+export const ADS_STATUS_LABELS: Record<AdsStatus, string> = {
+    pending: 'Pending',
+    running: 'Running',
+    kill: 'Kill',
+    skill: 'Skill',
+};
+
+export const ADS_BADGE: Record<AdsStatus, string> = {
+    pending: 'bg-stone-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400',
+    running: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/[0.12] dark:text-emerald-400',
+    kill: 'bg-red-50 text-red-600 dark:bg-red-500/[0.12] dark:text-red-400',
+    skill: 'bg-orange-50 text-orange-600 dark:bg-orange-500/[0.12] dark:text-orange-400',
+};
+
 export const REVIEW_STATUS_LABELS: Record<ReviewStatus, string> = {
     waiting_for_submission: 'Waiting',
     for_approval: 'For Approval',
@@ -85,16 +101,3 @@ export const REVIEW_AVATAR_BG: Record<ReviewStatus, string> = {
     for_reapproval: 'bg-purple-50 text-purple-600 dark:bg-purple-500/[0.15] dark:text-purple-400',
 };
 
-export const ADS_STATUS_LABELS: Record<AdsStatus, string> = {
-    pending: 'Pending',
-    running: 'Running',
-    kill: 'Kill',
-    skill: 'Skill',
-};
-
-export const ADS_BADGE: Record<AdsStatus, string> = {
-    pending: 'bg-stone-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400',
-    running: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/[0.12] dark:text-emerald-400',
-    kill: 'bg-red-50 text-red-600 dark:bg-red-500/[0.12] dark:text-red-400',
-    skill: 'bg-orange-50 text-orange-600 dark:bg-orange-500/[0.12] dark:text-orange-400',
-};

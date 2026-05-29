@@ -82,10 +82,12 @@ type FormData = {
     picture_file: File | null;
     picture_url: string;
     reference_link: string;
-    ads_manager_link: string;
     caption: string;
     headline: string;
     notes: string;
+    ads_status: 'pending' | 'running' | 'kill' | 'skill';
+    ads_manager_link: string;
+    ads_remarks: string;
 };
 
 export function CreativeFormDialog({
@@ -109,10 +111,12 @@ export function CreativeFormDialog({
         picture_file: null,
         picture_url: creative?.picture_url ?? '',
         reference_link: creative?.reference_link ?? '',
-        ads_manager_link: creative?.ads_campaign?.ads_manager_link ?? '',
         caption: creative?.caption ?? '',
         headline: creative?.headline ?? '',
         notes: creative?.notes ?? '',
+        ads_status: creative?.ads_status ?? 'pending',
+        ads_manager_link: creative?.ads_manager_link ?? '',
+        ads_remarks: creative?.ads_remarks ?? '',
     });
 
     const submit = (e: React.FormEvent) => {
@@ -217,10 +221,35 @@ export function CreativeFormDialog({
                                         <label htmlFor="cf-ref" className={fl}>Reference Link</label>
                                         <input id="cf-ref" className={fi} value={data.reference_link} onChange={(e) => setData('reference_link', e.target.value)} placeholder="https://..." />
                                     </div>
+                                </div>
+                            </section>
+
+                            {/* Campaign */}
+                            <section className="space-y-3">
+                                <p className={fl}>Campaign</p>
+                                <div className="space-y-3">
+                                    <div className="space-y-1.5">
+                                        <label className={fl}>Ads Status</label>
+                                        <Select value={data.ads_status} onValueChange={(v) => setData('ads_status', v as FormData['ads_status'])}>
+                                            <SelectTrigger className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="pending" className="font-mono text-[12px]">Pending</SelectItem>
+                                                <SelectItem value="running" className="font-mono text-[12px]">Running</SelectItem>
+                                                <SelectItem value="kill" className="font-mono text-[12px]">Kill</SelectItem>
+                                                <SelectItem value="skill" className="font-mono text-[12px]">Skill</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                     <div className="space-y-1.5">
                                         <label htmlFor="cf-ads-manager" className={fl}>Ads Manager Link</label>
                                         <input id="cf-ads-manager" className={fi} value={data.ads_manager_link} onChange={(e) => setData('ads_manager_link', e.target.value)} placeholder="https://business.facebook.com/adsmanager/..." />
                                         {errors.ads_manager_link && <p className={fe}>{errors.ads_manager_link}</p>}
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label htmlFor="cf-ads-remarks" className={fl}>Remarks</label>
+                                        <textarea id="cf-ads-remarks" className={ft} rows={2} value={data.ads_remarks} onChange={(e) => setData('ads_remarks', e.target.value)} placeholder="Campaign notes, budget info, targeting details..." />
                                     </div>
                                 </div>
                             </section>

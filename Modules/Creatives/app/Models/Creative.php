@@ -37,14 +37,4 @@ class Creative extends Model
     {
         return $this->hasOne(CreativeReview::class)->latestOfMany();
     }
-
-    public function adsCampaigns(): HasMany
-    {
-        return $this->hasMany(AdsCampaign::class);
-    }
-
-    public function latestAdsCampaign(): HasOne
-    {
-        return $this->hasOne(AdsCampaign::class)->latestOfMany();
-    }
 }
