@@ -8,10 +8,22 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { router } from '@inertiajs/react';
 import { ColumnDef, VisibilityState } from '@tanstack/react-table';
 import clsx from 'clsx';
-import { Columns3 } from 'lucide-react';
+import { Check, ChevronDown, Columns3, Filter, Plus, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export function StatusToggle({
@@ -1102,6 +1114,13 @@ export function ColumnVisibilityMenu({
     value,
     onChange,
 }: ColumnVisibilityMenuProps) {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
+
+    useEffect(() => {
+        if (!open) setSearch('');
+    }, [open]);
+
     const isVisible = (opt: ColumnOption) =>
         value[opt.id] !== undefined
             ? value[opt.id] !== false
@@ -1116,9 +1135,10 @@ export function ColumnVisibilityMenu({
         onChange(cleared);
     };
 
-    // Preserve declaration order across categories while grouping for render.
+    const q = search.toLowerCase();
     const grouped: { category: string; opts: ColumnOption[] }[] = [];
     for (const opt of options) {
+        if (q && !opt.label.toLowerCase().includes(q)) continue;
         const cat = opt.category ?? 'General';
         const existing = grouped.find((g) => g.category === cat);
         if (existing) existing.opts.push(opt);
@@ -1126,7 +1146,7 @@ export function ColumnVisibilityMenu({
     }
 
     return (
-        <DropdownMenu>
+        <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild>
                 <Button
                     variant="outline"
@@ -1142,52 +1162,71 @@ export function ColumnVisibilityMenu({
             </DropdownMenuTrigger>
             <DropdownMenuContent
                 align="end"
-                className="max-h-[70vh] w-72 overflow-y-auto font-mono text-[12px]"
+                className="flex w-72 flex-col p-0 font-mono text-[12px]"
             >
-                <DropdownMenuLabel className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
-                    Toggle Columns
-                </DropdownMenuLabel>
-                {grouped.map((g, idx) => (
-                    <div key={g.category}>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel className="px-2 pt-2 pb-1 font-mono text-[9px] tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
-                            {g.category}
-                        </DropdownMenuLabel>
-                        {g.opts.map((opt) => {
-                            const checked = isVisible(opt);
-                            return (
-                                <DropdownMenuCheckboxItem
-                                    key={opt.id}
-                                    checked={checked}
-                                    disabled={opt.required}
-                                    onCheckedChange={(next) =>
-                                        onChange({
-                                            ...value,
-                                            [opt.id]: !!next,
-                                        })
-                                    }
-                                    onSelect={(e) => e.preventDefault()}
-                                >
-                                    {opt.label}
-                                    {opt.required && (
-                                        <span className="ml-auto text-[10px] text-gray-300 dark:text-gray-600">
-                                            locked
-                                        </span>
-                                    )}
-                                </DropdownMenuCheckboxItem>
-                            );
-                        })}
-                        {idx === grouped.length - 1 && (
-                            <DropdownMenuSeparator />
-                        )}
+                {/* Sticky search */}
+                <div className="border-b border-black/6 p-2 dark:border-white/6">
+                    <div className="relative">
+                        <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3 w-3 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <input
+                            type="text"
+                            placeholder="Search columns..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            className="h-7 w-full rounded-md border border-black/6 bg-stone-50 pr-2 pl-7 font-mono text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
+                        />
                     </div>
-                ))}
-                <button
-                    onClick={reset}
-                    className="w-full px-2 py-1.5 text-left text-[11px] text-gray-500 hover:bg-stone-100 dark:text-gray-400 dark:hover:bg-zinc-800"
-                >
-                    Reset to default
-                </button>
+                </div>
+
+                {/* Scrollable list */}
+                <div className="max-h-[55vh] overflow-y-auto">
+                    {grouped.length === 0 && (
+                        <p className="py-4 text-center text-[11px] text-gray-400 dark:text-gray-500">
+                            No columns match.
+                        </p>
+                    )}
+                    {grouped.map((g, idx) => (
+                        <div key={g.category}>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel className="px-2 pt-2 pb-1 font-mono text-[9px] tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
+                                {g.category}
+                            </DropdownMenuLabel>
+                            {g.opts.map((opt) => {
+                                const checked = isVisible(opt);
+                                return (
+                                    <DropdownMenuCheckboxItem
+                                        key={opt.id}
+                                        checked={checked}
+                                        disabled={opt.required}
+                                        onCheckedChange={(next) =>
+                                            onChange({ ...value, [opt.id]: !!next })
+                                        }
+                                        onSelect={(e) => e.preventDefault()}
+                                    >
+                                        {opt.label}
+                                        {opt.required && (
+                                            <span className="ml-auto text-[10px] text-gray-300 dark:text-gray-600">
+                                                locked
+                                            </span>
+                                        )}
+                                    </DropdownMenuCheckboxItem>
+                                );
+                            })}
+                            {idx === grouped.length - 1 && <DropdownMenuSeparator />}
+                        </div>
+                    ))}
+                </div>
+
+                {/* Footer */}
+                <div className="border-t border-black/6 dark:border-white/6">
+                    <button
+                        onClick={reset}
+                        className="w-full px-2 py-1.5 text-left text-[11px] text-gray-500 hover:bg-stone-100 dark:text-gray-400 dark:hover:bg-zinc-800"
+                    >
+                        Reset to default
+                    </button>
+                </div>
             </DropdownMenuContent>
         </DropdownMenu>
     );
@@ -1251,5 +1290,327 @@ export function AdsManagerTabs({
                 })}
             </div>
         </div>
+    );
+}
+
+/* ───────────────────── Insight filters ──────────────────── */
+
+export type MetricFilterOp = 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'range';
+
+export interface MetricFilter {
+    id: string; // client-only key for React
+    field: string;
+    op: MetricFilterOp;
+    value: string;
+    value2: string; // only used when op === 'range'
+}
+
+const OP_LABELS: Record<MetricFilterOp, string> = {
+    gt: '> Greater than',
+    gte: '≥ Greater than or equal',
+    lt: '< Less than',
+    lte: '≤ Less than or equal',
+    eq: '= Equal',
+    range: '↔ Between',
+};
+
+const FILTERABLE_METRICS = METRIC_SPECS;
+
+export function serializeMetricFilters(filters: MetricFilter[]): string | undefined {
+    const clean = filters
+        .filter((f) => f.field && f.op && f.value !== '')
+        .filter((f) => f.op !== 'range' || f.value2 !== '')
+        .map(({ field, op, value, value2 }) =>
+            op === 'range' ? { field, op, value, value2 } : { field, op, value },
+        );
+    return clean.length ? JSON.stringify(clean) : undefined;
+}
+
+export function deserializeMetricFilters(raw: unknown): MetricFilter[] {
+    if (!Array.isArray(raw) || raw.length === 0) return [];
+    return raw.map((f: Record<string, string>) => ({
+        id: crypto.randomUUID(),
+        field: f.field ?? '',
+        op: (f.op as MetricFilterOp) ?? 'gt',
+        value: String(f.value ?? ''),
+        value2: String(f.value2 ?? ''),
+    }));
+}
+
+function newFilter(): MetricFilter {
+    return { id: crypto.randomUUID(), field: 'spend', op: 'gt', value: '', value2: '' };
+}
+
+interface MetricComboboxProps {
+    value: string;
+    onValueChange: (v: string) => void;
+    grouped: { category: string; specs: typeof FILTERABLE_METRICS }[];
+}
+
+function MetricCombobox({ value, onValueChange, grouped }: MetricComboboxProps) {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
+
+    useEffect(() => {
+        if (!open) setSearch('');
+    }, [open]);
+
+    const q = search.toLowerCase();
+    const filtered = grouped
+        .map((g) => ({
+            ...g,
+            specs: g.specs.filter(
+                (s) => !q || s.label.toLowerCase().includes(q),
+            ),
+        }))
+        .filter((g) => g.specs.length > 0);
+
+    const selectedLabel =
+        FILTERABLE_METRICS.find((s) => s.id === value)?.label ?? value;
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <button
+                    type="button"
+                    className="flex h-8 w-44 items-center justify-between gap-1 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono text-[11px] text-gray-700 transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:border-white/10"
+                >
+                    <span className="truncate">{selectedLabel}</span>
+                    <ChevronDown className="h-3 w-3 shrink-0 text-gray-400" />
+                </button>
+            </PopoverTrigger>
+            <PopoverContent
+                align="start"
+                className="w-64 p-0 font-mono text-[11px]"
+            >
+                {/* Search */}
+                <div className="border-b border-black/6 p-2 dark:border-white/6">
+                    <div className="relative">
+                        <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3 w-3 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <input
+                            type="text"
+                            placeholder="Search metric..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            autoFocus
+                            className="h-7 w-full rounded-md border border-black/6 bg-stone-50 pr-2 pl-7 font-mono text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
+                        />
+                    </div>
+                </div>
+
+                {/* List */}
+                <div className="max-h-64 overflow-y-auto">
+                    {filtered.length === 0 && (
+                        <p className="py-4 text-center text-[11px] text-gray-400 dark:text-gray-500">
+                            No metrics match.
+                        </p>
+                    )}
+                    {filtered.map((g) => (
+                        <div key={g.category}>
+                            <div className="px-2 pt-2 pb-1 text-[9px] tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
+                                {g.category}
+                            </div>
+                            {g.specs.map((s) => (
+                                <button
+                                    key={s.id}
+                                    type="button"
+                                    onClick={() => {
+                                        onValueChange(s.id);
+                                        setOpen(false);
+                                    }}
+                                    className="flex w-full items-center justify-between px-2 py-1.5 text-left text-[11px] text-gray-700 transition-colors hover:bg-stone-100 dark:text-gray-300 dark:hover:bg-zinc-700"
+                                >
+                                    {s.label}
+                                    {s.id === value && (
+                                        <Check className="h-3 w-3 text-emerald-500" />
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+interface InsightFilterBuilderProps {
+    filters: MetricFilter[];
+    onChange: (filters: MetricFilter[]) => void;
+}
+
+export function InsightFilterBuilder({ filters, onChange }: InsightFilterBuilderProps) {
+    const [open, setOpen] = useState(false);
+    const [draft, setDraft] = useState<MetricFilter[]>(filters);
+
+    // Sync draft from committed filters whenever the dropdown opens.
+    useEffect(() => {
+        if (open) setDraft(filters);
+    }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const update = (id: string, patch: Partial<MetricFilter>) =>
+        setDraft((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+    const remove = (id: string) =>
+        setDraft((prev) => prev.filter((f) => f.id !== id));
+    const add = () => setDraft((prev) => [...prev, newFilter()]);
+
+    const apply = () => {
+        onChange(draft);
+        setOpen(false);
+    };
+    const cancel = () => {
+        setDraft(filters);
+        setOpen(false);
+    };
+
+    const grouped: { category: string; specs: typeof FILTERABLE_METRICS }[] = [];
+    for (const spec of FILTERABLE_METRICS) {
+        const cat = spec.category;
+        const g = grouped.find((x) => x.category === cat);
+        if (g) g.specs.push(spec);
+        else grouped.push({ category: cat, specs: [spec] });
+    }
+
+    const activeCount = filters.filter(
+        (f) => f.field && f.op && f.value !== '' && (f.op !== 'range' || f.value2 !== ''),
+    ).length;
+
+    return (
+        <DropdownMenu open={open} onOpenChange={setOpen}>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className={clsx(
+                        'h-9 gap-1.5 font-mono! text-[12px]!',
+                        activeCount > 0 &&
+                            'border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400',
+                    )}
+                >
+                    <Filter className="h-3.5 w-3.5" />
+                    Filters
+                    {activeCount > 0 && (
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white">
+                            {activeCount}
+                        </span>
+                    )}
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+                align="end"
+                className="w-[520px] p-3 font-mono text-[12px]"
+                onCloseAutoFocus={(e) => e.preventDefault()}
+            >
+                <DropdownMenuLabel className="mb-2 font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                    Metric Filters
+                </DropdownMenuLabel>
+
+                {draft.length === 0 && (
+                    <p className="py-2 text-center text-[11px] text-gray-400 dark:text-gray-500">
+                        No filters. Click + Add Filter to start.
+                    </p>
+                )}
+
+                <div className="space-y-2">
+                    {draft.map((f) => (
+                        <div key={f.id} className="flex items-center gap-1.5">
+                            {/* Field */}
+                            <MetricCombobox
+                                value={f.field}
+                                onValueChange={(v) => update(f.id, { field: v })}
+                                grouped={grouped}
+                            />
+
+                            {/* Operator */}
+                            <Select
+                                value={f.op}
+                                onValueChange={(v) => update(f.id, { op: v as MetricFilterOp })}
+                            >
+                                <SelectTrigger className="h-8 w-44 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="font-mono text-[11px]">
+                                    {(Object.entries(OP_LABELS) as [MetricFilterOp, string][]).map(
+                                        ([op, label]) => (
+                                            <SelectItem key={op} value={op}>
+                                                {label}
+                                            </SelectItem>
+                                        ),
+                                    )}
+                                </SelectContent>
+                            </Select>
+
+                            {/* Value(s) */}
+                            {f.op === 'range' ? (
+                                <div className="flex items-center gap-1">
+                                    <input
+                                        type="number"
+                                        placeholder="Min"
+                                        value={f.value}
+                                        onChange={(e) => update(f.id, { value: e.target.value })}
+                                        className="h-8 w-20 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800"
+                                    />
+                                    <span className="text-gray-400">–</span>
+                                    <input
+                                        type="number"
+                                        placeholder="Max"
+                                        value={f.value2}
+                                        onChange={(e) => update(f.id, { value2: e.target.value })}
+                                        className="h-8 w-20 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800"
+                                    />
+                                </div>
+                            ) : (
+                                <input
+                                    type="number"
+                                    placeholder="Value"
+                                    value={f.value}
+                                    onChange={(e) => update(f.id, { value: e.target.value })}
+                                    className="h-8 w-24 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800"
+                                />
+                            )}
+
+                            {/* Remove */}
+                            <button
+                                type="button"
+                                onClick={() => remove(f.id)}
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
+                            >
+                                <X className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+
+                <DropdownMenuSeparator className="my-2" />
+
+                <button
+                    type="button"
+                    onClick={add}
+                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+                >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Filter
+                </button>
+
+                <DropdownMenuSeparator className="my-2" />
+
+                <div className="flex items-center justify-end gap-2">
+                    <button
+                        type="button"
+                        onClick={cancel}
+                        className="h-8 rounded-lg border border-black/6 px-3 text-[11px] text-gray-500 transition-colors hover:border-black/12 hover:text-gray-700 dark:border-white/6 dark:text-gray-400 dark:hover:border-white/12 dark:hover:text-gray-200"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={apply}
+                        className="h-8 rounded-lg bg-emerald-500 px-3 text-[11px] font-medium text-white transition-colors hover:bg-emerald-600"
+                    >
+                        Apply
+                    </button>
+                </div>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }

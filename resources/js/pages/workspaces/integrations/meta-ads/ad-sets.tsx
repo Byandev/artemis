@@ -16,13 +16,17 @@ import { useEffect, useMemo, useState } from 'react';
 import {
     AdsManagerTabs,
     ColumnVisibilityMenu,
+    InsightFilterBuilder,
     INSIGHTS_OPTIONS,
     InsightsMetrics,
+    MetricFilter,
     StatusLabel,
     StatusToggle,
     adsManagerUrl,
     buildInsightsColumns,
+    deserializeMetricFilters,
     formatBudget,
+    serializeMetricFilters,
     useColumnVisibility,
 } from './_shared';
 
@@ -53,6 +57,7 @@ interface Props {
         since?: string;
         until?: string;
         filter?: { search?: string };
+        metricFilters?: unknown[];
     };
 }
 
@@ -69,30 +74,49 @@ export default function MetaAdsAdSets({
         [query?.sort],
     );
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(
+        () => deserializeMetricFilters(query?.metricFilters),
+    );
+
+    const navigate = (overrides: Record<string, unknown> = {}) =>
+        router.get(
+            indexUrl,
+            {
+                campaign: query?.campaign,
+                since: dateRange.since,
+                until: dateRange.until,
+                sort: query?.sort,
+                'filter[search]': searchValue || undefined,
+                metric_filters: serializeMetricFilters(metricFilters),
+                page: 1,
+                per_page: query?.perPage ?? rows.per_page,
+                ...overrides,
+            },
+            { preserveState: true, replace: true, preserveScroll: true, only: ['rows', 'query'] },
+        );
 
     useEffect(() => {
-        const t = setTimeout(() => {
-            router.get(
-                indexUrl,
-                {
-                    campaign: query?.campaign,
-                    since: dateRange.since,
-                    until: dateRange.until,
-                    sort: query?.sort,
-                    'filter[search]': searchValue || undefined,
-                    page: searchValue ? 1 : (query?.page ?? 1),
-                    per_page: query?.perPage ?? rows.per_page,
-                },
-                {
-                    preserveState: true,
-                    replace: true,
-                    preserveScroll: true,
-                    only: ['rows'],
-                },
-            );
-        }, 400);
+        const t = setTimeout(() => navigate({ page: searchValue ? 1 : (query?.page ?? 1) }), 400);
         return () => clearTimeout(t);
     }, [searchValue]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const handleMetricFiltersChange = (next: MetricFilter[]) => {
+        setMetricFilters(next);
+        router.get(
+            indexUrl,
+            {
+                campaign: query?.campaign,
+                since: dateRange.since,
+                until: dateRange.until,
+                sort: query?.sort,
+                'filter[search]': searchValue || undefined,
+                metric_filters: serializeMetricFilters(next),
+                page: 1,
+                per_page: query?.perPage ?? rows.per_page,
+            },
+            { preserveState: true, replace: true, preserveScroll: true, only: ['rows', 'query'] },
+        );
+    };
 
     const setDateRange = (since: string, until: string) => {
         router.get(
@@ -308,6 +332,10 @@ export default function MetaAdsAdSets({
                                 Back
                             </Button>
                         )}
+                        <InsightFilterBuilder
+                            filters={metricFilters}
+                            onChange={handleMetricFiltersChange}
+                        />
                         <ColumnVisibilityMenu
                             options={COLUMN_OPTIONS}
                             value={columnVisibility}
@@ -327,28 +355,11 @@ export default function MetaAdsAdSets({
                         meta={{ ...omit(rows, ['data']) }}
                         columnVisibility={columnVisibility}
                         onColumnVisibilityChange={setColumnVisibility}
-                        onFetch={(params) => {
-                            router.get(
-                                indexUrl,
-                                {
-                                    campaign: query?.campaign,
-                                    since: dateRange.since,
-                                    until: dateRange.until,
-                                    sort: params?.sort,
-                                    'filter[search]': searchValue || undefined,
-                                    page: params?.page ?? 1,
-                                    per_page:
-                                        params?.per_page ??
-                                        query?.perPage ??
-                                        rows.per_page,
-                                },
-                                {
-                                    preserveState: true,
-                                    replace: true,
-                                    preserveScroll: true,
-                                },
-                            );
-                        }}
+                        onFetch={(params) => navigate({
+                            sort: params?.sort,
+                            page: params?.page ?? 1,
+                            per_page: params?.per_page ?? query?.perPage ?? rows.per_page,
+                        })}
                     />
                 </div>
             </div>
