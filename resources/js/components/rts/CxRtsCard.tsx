@@ -103,23 +103,23 @@ export default function CxRtsCard({
                         }))}
                     />
                 ) : (
-                    <div className="max-w-full overflow-x-auto custom-scrollbar">
-                        <table className="min-w-[520px] w-full text-[12px]">
+                    <div className="custom-scrollbar max-w-full overflow-x-auto">
+                        <table className="w-full min-w-[520px] text-[12px]">
                             <thead>
                                 <tr className="border-b border-black/6 dark:border-white/6">
-                                    <th className="px-4 py-3 text-left font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600 whitespace-nowrap">
+                                    <th className="px-4 py-3 text-left font-mono text-[10px] tracking-wider whitespace-nowrap text-gray-300 uppercase dark:text-gray-600">
                                         Cx. RTS Bucket
                                     </th>
-                                    <th className="px-4 py-3 text-right font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600 whitespace-nowrap">
+                                    <th className="px-4 py-3 text-right font-mono text-[10px] tracking-wider whitespace-nowrap text-gray-300 uppercase dark:text-gray-600">
                                         Total Orders
                                     </th>
-                                    <th className="px-4 py-3 text-right font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600 whitespace-nowrap">
+                                    <th className="px-4 py-3 text-right font-mono text-[10px] tracking-wider whitespace-nowrap text-gray-300 uppercase dark:text-gray-600">
                                         Delivered
                                     </th>
-                                    <th className="px-4 py-3 text-right font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600 whitespace-nowrap">
+                                    <th className="px-4 py-3 text-right font-mono text-[10px] tracking-wider whitespace-nowrap text-gray-300 uppercase dark:text-gray-600">
                                         Returned
                                     </th>
-                                    <th className="px-4 py-3 text-right font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600 whitespace-nowrap">
+                                    <th className="px-4 py-3 text-right font-mono text-[10px] tracking-wider whitespace-nowrap text-gray-300 uppercase dark:text-gray-600">
                                         RTS Rate
                                     </th>
                                 </tr>
@@ -130,17 +130,17 @@ export default function CxRtsCard({
                                         key={row.cx_rts_bucket}
                                         className="border-b border-black/4 last:border-0 dark:border-white/4"
                                     >
-                                        <td className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                        <td className="px-4 py-3 font-medium whitespace-nowrap text-gray-700 dark:text-gray-300">
                                             {CX_RTS_LABELS[row.cx_rts_bucket] ??
                                                 row.cx_rts_bucket}
                                         </td>
-                                        <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                        <td className="px-4 py-3 text-right whitespace-nowrap text-gray-600 dark:text-gray-400">
                                             {row.total_orders}
                                         </td>
-                                        <td className="px-4 py-3 text-right text-green-600 dark:text-green-400 whitespace-nowrap">
+                                        <td className="px-4 py-3 text-right whitespace-nowrap text-green-600 dark:text-green-400">
                                             {row.delivered_count}
                                         </td>
-                                        <td className="px-4 py-3 text-right text-red-500 whitespace-nowrap">
+                                        <td className="px-4 py-3 text-right whitespace-nowrap text-red-500">
                                             {row.returned_count}
                                         </td>
                                         <td className="px-4 py-3 text-right whitespace-nowrap">
