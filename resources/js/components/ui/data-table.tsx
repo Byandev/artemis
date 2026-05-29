@@ -60,6 +60,8 @@ export function DataTable<TData, TValue>({
                                              onRowSelectionChange,
                                              getRowId,
                                              onRowClick,
+                                             columnVisibility,
+                                             onColumnVisibilityChange
                                          }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
 
