@@ -13,6 +13,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -23,7 +25,6 @@ import flatpickr from 'flatpickr';
 import { debounce, omit } from 'lodash';
 import {
     AlertTriangle,
-    ExternalLink,
     MoreHorizontal,
     Pencil,
     Search,
@@ -114,6 +115,16 @@ export default function RemittancesIndex({
     };
 
     const baseUrl = `/workspaces/${workspace.slug}/finance/remittances`;
+    const canCreateRemittances = usePermission(
+        PERMISSIONS.CreateFinanceRemittances,
+    );
+    const canEditRemittances = usePermission(
+        PERMISSIONS.EditFinanceRemittances,
+    );
+    const canDeleteRemittances = usePermission(
+        PERMISSIONS.DeleteFinanceRemittances,
+    );
+    const showActions = canEditRemittances || canDeleteRemittances;
 
     const performQuery = useCallback(
         debounce(
@@ -289,45 +300,59 @@ export default function RemittancesIndex({
                 </div>
             ),
         },
-        {
-            id: 'actions',
-            header: () => (
-                <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase">
-                    Actions
-                </div>
-            ),
-            cell: ({ row }) => (
-                <div className="flex justify-center">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800">
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-36">
-                            <DropdownMenuItem asChild>
-                                <Link href={`${baseUrl}/${row.original.id}`}>
-                                    <ExternalLink className="mr-2 h-3.5 w-3.5" />{' '}
-                                    View
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => setEditing(row.original)}
-                            >
-                                <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                className="text-red-600 focus:text-red-600"
-                                onClick={() => setToDelete(row.original)}
-                            >
-                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            ),
-        },
+        ...(showActions
+            ? [
+                  {
+                      id: 'actions',
+                      header: () => (
+                          <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase">
+                              Actions
+                          </div>
+                      ),
+                      cell: ({ row }) => (
+                          <div className="flex justify-center">
+                              <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                      <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800">
+                                          <MoreHorizontal className="h-3.5 w-3.5" />
+                                      </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                      align="end"
+                                      className="w-36"
+                                  >
+                                      {canEditRemittances && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  setEditing(row.original)
+                                              }
+                                          >
+                                              <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
+                                              Edit
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canEditRemittances &&
+                                          canDeleteRemittances && (
+                                              <DropdownMenuSeparator />
+                                          )}
+                                      {canDeleteRemittances && (
+                                          <DropdownMenuItem
+                                              className="text-red-600 focus:text-red-600"
+                                              onClick={() =>
+                                                  setToDelete(row.original)
+                                              }
+                                          >
+                                              <Trash2 className="mr-2 h-3.5 w-3.5" />{' '}
+                                              Delete
+                                          </DropdownMenuItem>
+                                      )}
+                                  </DropdownMenuContent>
+                              </DropdownMenu>
+                          </div>
+                      ),
+                  } as ColumnDef<Row>,
+              ]
+            : []),
     ];
 
     const toggleUnreconciled = () => {
@@ -354,45 +379,48 @@ export default function RemittancesIndex({
                     title="Remittances"
                     description="Courier SOA (Statement of Account) records."
                 >
-                    <div className="flex items-center gap-2">
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".xlsx,.xls,.csv"
-                            className="hidden"
-                            onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                setImporting(true);
-                                router.post(
-                                    `${baseUrl}/import`,
-                                    { file },
-                                    {
-                                        forceFormData: true,
-                                        onFinish: () => {
-                                            setImporting(false);
-                                            if (fileInputRef.current)
-                                                fileInputRef.current.value = '';
+                    {canCreateRemittances && (
+                        <div className="flex items-center gap-2">
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".xlsx,.xls,.csv"
+                                className="hidden"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    setImporting(true);
+                                    router.post(
+                                        `${baseUrl}/import`,
+                                        { file },
+                                        {
+                                            forceFormData: true,
+                                            onFinish: () => {
+                                                setImporting(false);
+                                                if (fileInputRef.current)
+                                                    fileInputRef.current.value =
+                                                        '';
+                                            },
                                         },
-                                    },
-                                );
-                            }}
-                        />
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={importing}
-                            className="flex h-8 items-center gap-1.5 rounded-lg border border-black/6 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-600 hover:bg-stone-50 disabled:opacity-50 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
-                        >
-                            <Upload className="h-3.5 w-3.5" />
-                            {importing ? 'Importing...' : 'Import CSV'}
-                        </button>
-                        <button
-                            onClick={() => setCreateOpen(true)}
-                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white hover:bg-emerald-700"
-                        >
-                            Add Remittance
-                        </button>
-                    </div>
+                                    );
+                                }}
+                            />
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={importing}
+                                className="flex h-8 items-center gap-1.5 rounded-lg border border-black/6 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-600 hover:bg-stone-50 disabled:opacity-50 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-300"
+                            >
+                                <Upload className="h-3.5 w-3.5" />
+                                {importing ? 'Importing...' : 'Import CSV'}
+                            </button>
+                            <button
+                                onClick={() => setCreateOpen(true)}
+                                className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white hover:bg-emerald-700"
+                            >
+                                Add Remittance
+                            </button>
+                        </div>
+                    )}
                 </PageHeader>
 
                 {unreconciledCount > 0 && (
@@ -458,26 +486,30 @@ export default function RemittancesIndex({
                     />
                 </div>
 
-                <RemittanceFormDialog
-                    open={createOpen || editing !== null}
-                    onOpenChange={(o) => {
-                        if (!o) {
-                            setCreateOpen(false);
-                            setEditing(null);
-                        }
-                    }}
-                    remittance={editing}
-                    workspaceSlug={workspace.slug}
-                    transactions={transactions}
-                />
-                <FinanceDeleteDialog
-                    open={!!toDelete}
-                    onClose={() => setToDelete(null)}
-                    title="Delete Remittance?"
-                    description={`Delete SOA ${toDelete?.soa_number ?? ''}?`}
-                    url={toDelete ? `${baseUrl}/${toDelete.id}` : ''}
-                    successMessage="Remittance deleted"
-                />
+                {(canCreateRemittances || canEditRemittances) && (
+                    <RemittanceFormDialog
+                        open={createOpen || editing !== null}
+                        onOpenChange={(o) => {
+                            if (!o) {
+                                setCreateOpen(false);
+                                setEditing(null);
+                            }
+                        }}
+                        remittance={editing}
+                        workspaceSlug={workspace.slug}
+                        transactions={transactions}
+                    />
+                )}
+                {canDeleteRemittances && (
+                    <FinanceDeleteDialog
+                        open={!!toDelete}
+                        onClose={() => setToDelete(null)}
+                        title="Delete Remittance?"
+                        description={`Delete SOA ${toDelete?.soa_number ?? ''}?`}
+                        url={toDelete ? `${baseUrl}/${toDelete.id}` : ''}
+                        successMessage="Remittance deleted"
+                    />
+                )}
             </div>
         </AppLayout>
     );

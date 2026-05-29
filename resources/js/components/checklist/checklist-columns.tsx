@@ -51,9 +51,11 @@ export function getChecklistColumns({
         },
         {
             accessorKey: 'required',
-            header: () => <div className="text-center">Required</div>,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Required" />
+            ),
             cell: ({ row }) => (
-                <div className="flex justify-center">
+                <div className="flex">
                     <span
                         className={[
                             'inline-flex min-w-14 justify-center rounded-2xl px-2 py-0.5 text-[11px] font-medium',

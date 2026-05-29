@@ -26,6 +26,9 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { MultiSelect } from '@/components/ui/multi-select';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -76,8 +79,8 @@ interface Props {
             search?: string;
             type?: 'in' | 'out';
             account_id?: string | number;
-            transaction_type?: string;
-            sub_category?: string;
+            transaction_type?: string | string[];
+            sub_category?: string | string[];
             missing_type?: string | boolean;
             expenses_missing_sub?: string | boolean;
             date_from?: string;
@@ -116,11 +119,19 @@ export default function TransactionsIndex({
             ? String(query.filter.account_id)
             : '',
     );
-    const [txnTypeFilter, setTxnTypeFilter] = useState<string>(
-        query?.filter?.transaction_type ?? '',
+    const [txnTypeFilter, setTxnTypeFilter] = useState<string[]>(
+        query?.filter?.transaction_type
+            ? Array.isArray(query.filter.transaction_type)
+                ? query.filter.transaction_type
+                : [query.filter.transaction_type]
+            : [],
     );
-    const [subCategoryFilter, setSubCategoryFilter] = useState<string>(
-        query?.filter?.sub_category ?? '',
+    const [subCategoryFilter, setSubCategoryFilter] = useState<string[]>(
+        query?.filter?.sub_category
+            ? Array.isArray(query.filter.sub_category)
+                ? query.filter.sub_category
+                : [query.filter.sub_category]
+            : [],
     );
     const boolish = (v: string | boolean | undefined) =>
         v === true || v === '1' || v === 'true';
@@ -156,16 +167,33 @@ export default function TransactionsIndex({
     const [bulkProcessing, setBulkProcessing] = useState(false);
 
     const baseUrl = `/workspaces/${workspace.slug}/finance/transactions`;
+    const canCreateTransactions = usePermission(
+        PERMISSIONS.CreateFinanceTransactions,
+    );
+    const canEditTransactions = usePermission(
+        PERMISSIONS.EditFinanceTransactions,
+    );
+    const canDeleteTransactions = usePermission(
+        PERMISSIONS.DeleteFinanceTransactions,
+    );
+    const canUseTransactionActions =
+        canEditTransactions || canDeleteTransactions;
+    const canExportTransactions =
+        canCreateTransactions || canEditTransactions || canDeleteTransactions;
 
     const handleExport = () => {
+        if (!canExportTransactions) return;
+
         const params = new URLSearchParams();
         if (search) params.set('filter[search]', search);
         if (typeFilter) params.set('filter[type]', typeFilter);
         if (accountFilter) params.set('filter[account_id]', accountFilter);
-        if (txnTypeFilter)
-            params.set('filter[transaction_type]', txnTypeFilter);
-        if (subCategoryFilter)
-            params.set('filter[sub_category]', subCategoryFilter);
+        txnTypeFilter.forEach((v) =>
+            params.append('filter[transaction_type][]', v),
+        );
+        subCategoryFilter.forEach((v) =>
+            params.append('filter[sub_category][]', v),
+        );
         if (missingType) params.set('filter[missing_type]', '1');
         if (expensesMissingSub) params.set('filter[expenses_missing_sub]', '1');
         const qs = params.toString();
@@ -183,7 +211,7 @@ export default function TransactionsIndex({
     }, [transactions.data]);
 
     const applyBulkType = () => {
-        if (!selectedCount) return;
+        if (!canEditTransactions || !selectedCount) return;
         setBulkProcessing(true);
         router.put(
             `${baseUrl}/bulk-update-type`,
@@ -204,7 +232,7 @@ export default function TransactionsIndex({
     };
 
     const applyBulkSubCategory = () => {
-        if (!selectedCount) return;
+        if (!canEditTransactions || !selectedCount) return;
         setBulkProcessing(true);
         router.put(
             `${baseUrl}/bulk-update-sub-category`,
@@ -230,8 +258,8 @@ export default function TransactionsIndex({
                 s: string,
                 t: '' | 'in' | 'out',
                 a: string,
-                tt: string,
-                sc: string,
+                tt: string[],
+                sc: string[],
                 mt: boolean,
                 ems: boolean,
                 df: string | undefined,
@@ -244,8 +272,8 @@ export default function TransactionsIndex({
                         'filter[search]': s || undefined,
                         'filter[type]': t || undefined,
                         'filter[account_id]': a || undefined,
-                        'filter[transaction_type]': tt || undefined,
-                        'filter[sub_category]': sc || undefined,
+                        'filter[transaction_type]': tt.length ? tt : undefined,
+                        'filter[sub_category]': sc.length ? sc : undefined,
                         'filter[missing_type]': mt ? 1 : undefined,
                         'filter[expenses_missing_sub]': ems ? 1 : undefined,
                         'filter[date_from]': df || undefined,
@@ -292,39 +320,47 @@ export default function TransactionsIndex({
     ]);
 
     const columns: ColumnDef<Row>[] = [
-        {
-            id: 'select',
-            enableSorting: false,
-            header: ({ table }) => (
-                <div className="flex h-5 items-center justify-center">
-                    <Checkbox
-                        checked={
-                            table.getRowModel().rows.length > 0 &&
-                            table
-                                .getRowModel()
-                                .rows.every((r) => r.getIsSelected())
-                        }
-                        onCheckedChange={(value) => {
-                            const next: RowSelectionState = { ...rowSelection };
-                            table.getRowModel().rows.forEach((r) => {
-                                next[r.id] = !!value;
-                            });
-                            setRowSelection(next);
-                        }}
-                        aria-label="Select all"
-                    />
-                </div>
-            ),
-            cell: ({ row }) => (
-                <div className="flex h-5 items-center justify-center">
-                    <Checkbox
-                        checked={row.getIsSelected()}
-                        onCheckedChange={(value) => row.toggleSelected(!!value)}
-                        aria-label="Select row"
-                    />
-                </div>
-            ),
-        },
+        ...(canEditTransactions
+            ? [
+                  {
+                      id: 'select',
+                      enableSorting: false,
+                      header: ({ table }) => (
+                          <div className="flex h-5 items-center justify-center">
+                              <Checkbox
+                                  checked={
+                                      table.getRowModel().rows.length > 0 &&
+                                      table
+                                          .getRowModel()
+                                          .rows.every((r) => r.getIsSelected())
+                                  }
+                                  onCheckedChange={(value) => {
+                                      const next: RowSelectionState = {
+                                          ...rowSelection,
+                                      };
+                                      table.getRowModel().rows.forEach((r) => {
+                                          next[r.id] = !!value;
+                                      });
+                                      setRowSelection(next);
+                                  }}
+                                  aria-label="Select all"
+                              />
+                          </div>
+                      ),
+                      cell: ({ row }) => (
+                          <div className="flex h-5 items-center justify-center">
+                              <Checkbox
+                                  checked={row.getIsSelected()}
+                                  onCheckedChange={(value) =>
+                                      row.toggleSelected(!!value)
+                                  }
+                                  aria-label="Select row"
+                              />
+                          </div>
+                      ),
+                  } as ColumnDef<Row>,
+              ]
+            : []),
         {
             accessorKey: 'date',
             enableSorting: true,
@@ -480,56 +516,82 @@ export default function TransactionsIndex({
                 );
             },
         },
-        {
-            id: 'actions',
-            header: () => (
-                <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase">
-                    Actions
-                </div>
-            ),
-            cell: ({ row }) => (
-                <div className="flex justify-center">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800">
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-36">
-                            <DropdownMenuItem
-                                onClick={() =>
-                                    setEditing({
-                                        id: row.original.id,
-                                        account_id: row.original.account_id,
-                                        date: String(row.original.date).slice(
-                                            0,
-                                            10,
-                                        ),
-                                        description: row.original.description,
-                                        type: row.original.type,
-                                        transaction_type:
-                                            row.original.transaction_type,
-                                        amount: row.original.amount,
-                                        position: row.original.position,
-                                        sub_category: row.original.sub_category,
-                                        notes: row.original.notes,
-                                    })
-                                }
-                            >
-                                <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                className="text-red-600 focus:text-red-600"
-                                onClick={() => setToDelete(row.original)}
-                            >
-                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            ),
-        },
+        ...(canUseTransactionActions
+            ? [
+                  {
+                      id: 'actions',
+                      header: () => (
+                          <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase">
+                              Actions
+                          </div>
+                      ),
+                      cell: ({ row }) => (
+                          <div className="flex justify-center">
+                              <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                      <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800">
+                                          <MoreHorizontal className="h-3.5 w-3.5" />
+                                      </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                      align="end"
+                                      className="w-36"
+                                  >
+                                      {canEditTransactions && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  setEditing({
+                                                      id: row.original.id,
+                                                      account_id:
+                                                          row.original
+                                                              .account_id,
+                                                      date: String(
+                                                          row.original.date,
+                                                      ).slice(0, 10),
+                                                      description:
+                                                          row.original
+                                                              .description,
+                                                      type: row.original.type,
+                                                      transaction_type:
+                                                          row.original
+                                                              .transaction_type,
+                                                      amount: row.original
+                                                          .amount,
+                                                      position:
+                                                          row.original.position,
+                                                      sub_category:
+                                                          row.original
+                                                              .sub_category,
+                                                      notes: row.original.notes,
+                                                  })
+                                              }
+                                          >
+                                              <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
+                                              Edit
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canEditTransactions &&
+                                          canDeleteTransactions && (
+                                              <DropdownMenuSeparator />
+                                          )}
+                                      {canDeleteTransactions && (
+                                          <DropdownMenuItem
+                                              className="text-red-600 focus:text-red-600"
+                                              onClick={() =>
+                                                  setToDelete(row.original)
+                                              }
+                                          >
+                                              <Trash2 className="mr-2 h-3.5 w-3.5" />{' '}
+                                              Delete
+                                          </DropdownMenuItem>
+                                      )}
+                                  </DropdownMenuContent>
+                              </DropdownMenu>
+                          </div>
+                      ),
+                  } as ColumnDef<Row>,
+              ]
+            : []),
     ];
 
     return (
@@ -540,24 +602,30 @@ export default function TransactionsIndex({
                     title="Transactions"
                     description="Ledger entries across all accounts."
                 >
-                    <button
-                        onClick={handleExport}
-                        className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
-                    >
-                        <Download className="h-3.5 w-3.5" /> Export CSV
-                    </button>
-                    <button
-                        onClick={() => setImportOpen(true)}
-                        className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
-                    >
-                        <Upload className="h-3.5 w-3.5" /> Import CSV
-                    </button>
-                    <button
-                        onClick={() => setCreateOpen(true)}
-                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white hover:bg-emerald-700"
-                    >
-                        Add Transaction
-                    </button>
+                    {canExportTransactions && (
+                        <button
+                            onClick={handleExport}
+                            className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
+                        >
+                            <Download className="h-3.5 w-3.5" /> Export CSV
+                        </button>
+                    )}
+                    {canCreateTransactions && (
+                        <>
+                            <button
+                                onClick={() => setImportOpen(true)}
+                                className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
+                            >
+                                <Upload className="h-3.5 w-3.5" /> Import CSV
+                            </button>
+                            <button
+                                onClick={() => setCreateOpen(true)}
+                                className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white hover:bg-emerald-700"
+                            >
+                                Add Transaction
+                            </button>
+                        </>
+                    )}
                 </PageHeader>
 
                 <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -588,30 +656,22 @@ export default function TransactionsIndex({
                             </option>
                         ))}
                     </select>
-                    <select
-                        value={txnTypeFilter}
-                        onChange={(e) => setTxnTypeFilter(e.target.value)}
-                        className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-2.5 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
-                    >
-                        <option value="">All txn types</option>
-                        {TRANSACTION_TYPES.map((t) => (
-                            <option key={t.value} value={t.value}>
-                                {t.label}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        value={subCategoryFilter}
-                        onChange={(e) => setSubCategoryFilter(e.target.value)}
-                        className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-2.5 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
-                    >
-                        <option value="">All sub categories</option>
-                        {SUB_CATEGORIES.map((s) => (
-                            <option key={s.value} value={s.value}>
-                                {s.label}
-                            </option>
-                        ))}
-                    </select>
+                    <MultiSelect
+                        options={TRANSACTION_TYPES}
+                        selected={txnTypeFilter}
+                        onChange={setTxnTypeFilter}
+                        placeholder="All txn types"
+                        className="w-44"
+                        compact
+                    />
+                    <MultiSelect
+                        options={SUB_CATEGORIES}
+                        selected={subCategoryFilter}
+                        onChange={setSubCategoryFilter}
+                        placeholder="All sub categories"
+                        className="w-48"
+                        compact
+                    />
                     <div className="inline-flex h-9 overflow-hidden rounded-[10px] border border-black/6 bg-stone-100 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
                         {(
                             [
@@ -659,7 +719,7 @@ export default function TransactionsIndex({
                     </button>
                 </div>
 
-                {selectedCount > 0 && (
+                {canEditTransactions && selectedCount > 0 && (
                     <div className="mb-3 flex flex-wrap items-center gap-2 rounded-[10px] border border-emerald-200 bg-emerald-50/60 px-3 py-2 dark:border-emerald-500/20 dark:bg-emerald-500/10">
                         <span className="font-mono text-[11px] text-emerald-700 dark:text-emerald-300">
                             {selectedCount} selected
@@ -745,9 +805,13 @@ export default function TransactionsIndex({
                                     'filter[account_id]':
                                         accountFilter || undefined,
                                     'filter[transaction_type]':
-                                        txnTypeFilter || undefined,
+                                        txnTypeFilter.length
+                                            ? txnTypeFilter
+                                            : undefined,
                                     'filter[sub_category]':
-                                        subCategoryFilter || undefined,
+                                        subCategoryFilter.length
+                                            ? subCategoryFilter
+                                            : undefined,
                                     'filter[missing_type]': missingType
                                         ? 1
                                         : undefined,
@@ -777,32 +841,38 @@ export default function TransactionsIndex({
                     </li>
                 </ul>
 
-                <TransactionFormDialog
-                    open={createOpen || editing !== null}
-                    onOpenChange={(o) => {
-                        if (!o) {
-                            setCreateOpen(false);
-                            setEditing(null);
-                        }
-                    }}
-                    transaction={editing}
-                    accounts={accounts}
-                    workspaceSlug={workspace.slug}
-                />
-                <ImportTransactionsDialog
-                    open={importOpen}
-                    onOpenChange={setImportOpen}
-                    workspaceSlug={workspace.slug}
-                    accounts={accounts}
-                />
-                <FinanceDeleteDialog
-                    open={!!toDelete}
-                    onClose={() => setToDelete(null)}
-                    title="Delete Transaction?"
-                    description="Remove this ledger entry?"
-                    url={toDelete ? `${baseUrl}/${toDelete.id}` : ''}
-                    successMessage="Transaction deleted"
-                />
+                {(canCreateTransactions || canEditTransactions) && (
+                    <TransactionFormDialog
+                        open={createOpen || editing !== null}
+                        onOpenChange={(o) => {
+                            if (!o) {
+                                setCreateOpen(false);
+                                setEditing(null);
+                            }
+                        }}
+                        transaction={editing}
+                        accounts={accounts}
+                        workspaceSlug={workspace.slug}
+                    />
+                )}
+                {canCreateTransactions && (
+                    <ImportTransactionsDialog
+                        open={importOpen}
+                        onOpenChange={setImportOpen}
+                        workspaceSlug={workspace.slug}
+                        accounts={accounts}
+                    />
+                )}
+                {canDeleteTransactions && (
+                    <FinanceDeleteDialog
+                        open={!!toDelete}
+                        onClose={() => setToDelete(null)}
+                        title="Delete Transaction?"
+                        description="Remove this ledger entry?"
+                        url={toDelete ? `${baseUrl}/${toDelete.id}` : ''}
+                        successMessage="Transaction deleted"
+                    />
+                )}
             </div>
         </AppLayout>
     );

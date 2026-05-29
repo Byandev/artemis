@@ -10,11 +10,14 @@ use App\Models\Workspace;
 use App\Models\WorkspaceChecklist;
 use App\Models\WorkspaceChecklistCompletion;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ChecklistProgressController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace, string $target, int $targetId): JsonResponse
     {
         $this->authorizeWorkspaceMembership($request, $workspace);

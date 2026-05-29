@@ -1,22 +1,33 @@
-import { Can } from '@/components/can';
 import { TargetChecklistDrawer } from '@/components/checklist/target-checklist-drawer';
 import PageHeader from '@/components/common/PageHeader';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
 import { PaginatedData } from '@/types';
 import { Page } from '@/types/models/Page';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { omit } from 'lodash';
@@ -26,8 +37,9 @@ import {
     MoreHorizontal,
     RefreshCw,
     Search,
+    Wallet,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 interface PagesProps {
@@ -118,6 +130,13 @@ const ChecklistsBadge = ({ pending }: { pending: number }) => {
     );
 };
 
+const currencyFormatter = new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'PHP',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+});
+
 const Pages = ({
     pages,
     workspace,
@@ -134,8 +153,24 @@ const Pages = ({
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [checklistDrawerOpen, setChecklistDrawerOpen] = useState(false);
     const [selectedPage, setSelectedPage] = useState<Page | null>(null);
+    const [budgetPage, setBudgetPage] = useState<Page | null>(null);
 
     const [processing, setProcessing] = useState(false);
+    const budgetForm = useForm({
+        budget: '0',
+    });
+    const canCreatePages = usePermission(PERMISSIONS.CreatePages);
+    const canEditPages = usePermission(PERMISSIONS.EditPages);
+    const canEditPageBudget = usePermission(
+        PERMISSIONS.EditPageDailyBudgetRecords,
+    );
+    const canRefreshPages = usePermission(PERMISSIONS.RefreshPages);
+    const canViewChecklist = usePermission(PERMISSIONS.ViewChecklist);
+    const canUsePageActions =
+        canViewChecklist ||
+        canEditPages ||
+        canRefreshPages ||
+        canEditPageBudget;
 
     useEffect(() => {
         if (flash?.success) {
@@ -195,6 +230,35 @@ const Pages = ({
         setChecklistDrawerOpen(true);
     };
 
+    const openBudgetDialog = (page: Page) => {
+        setBudgetPage(page);
+        budgetForm.setData('budget', String(page.latest_budget?.budget ?? 0));
+        budgetForm.clearErrors();
+    };
+
+    const closeBudgetDialog = () => {
+        setBudgetPage(null);
+        budgetForm.reset();
+        budgetForm.clearErrors();
+    };
+
+    const updateBudget = (e: FormEvent) => {
+        e.preventDefault();
+        if (!budgetPage) return;
+
+        budgetForm.put(
+            `/workspaces/${workspace.slug}/pages/${budgetPage.id}/budget`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Page budget updated.');
+                    closeBudgetDialog();
+                },
+                onError: () => toast.error('Failed to update page budget.'),
+            },
+        );
+    };
+
     const columns: ColumnDef<Page>[] = [
         {
             accessorKey: 'name',
@@ -217,13 +281,35 @@ const Pages = ({
             ),
             cell: ({ row }) => row.original.owner?.name || '-',
         },
-        // {
-        //     accessorKey: 'current_budget',
-        //     header: ({ column }) => (
-        //         <SortableHeader column={column} title={'Current Budget'} enabled={false} />
-        //     ),
-        //     cell: ({ row }) => currencyFormatter(row.original.current_budget ?? 0),
-        // },
+        {
+            accessorKey: 'latest_budget',
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title={'Budget'}
+                    enabled={false}
+                />
+            ),
+            cell: ({ row }) => {
+                const latestBudget = row.original.latest_budget;
+                return (
+                    <div className="flex flex-col gap-0.5">
+                        <span>
+                            {currencyFormatter.format(
+                                Number(latestBudget?.budget ?? 0),
+                            )}
+                        </span>
+                        {latestBudget?.date && (
+                            <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                                {new Date(
+                                    latestBudget.date,
+                                ).toLocaleDateString()}
+                            </span>
+                        )}
+                    </div>
+                );
+            },
+        },
         {
             accessorKey: 'orders_last_synced_at',
             header: ({ column }) => (
@@ -269,45 +355,76 @@ const Pages = ({
                 />
             ),
         },
-        {
-            id: 'actions',
-            cell: ({ row }) => {
-                const page = row.original;
+        ...(canUsePageActions
+            ? [
+                  {
+                      id: 'actions',
+                      cell: ({ row }) => {
+                          const page = row.original;
 
-                return (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44">
-                            <Can permission={PERMISSIONS.ViewChecklist}>
-                                <DropdownMenuItem
-                                    onClick={() => openChecklist(page)}
-                                >
-                                    <ListChecks />
-                                    View Checklist
-                                </DropdownMenuItem>
-                            </Can>
-                            <DropdownMenuItem onClick={() => handleEdit(page)}>
-                                <Edit />
-                                Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => refresh(page)}
-                                disabled={processing}
-                            >
-                                <RefreshCw
-                                    className={processing ? 'animate-spin' : ''}
-                                />
-                                {processing ? 'Refreshing…' : 'Refresh Orders'}
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                );
-            },
-        },
+                          return (
+                              <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                      <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
+                                          <MoreHorizontal className="h-3.5 w-3.5" />
+                                      </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                      align="end"
+                                      className="w-44"
+                                  >
+                                      {canViewChecklist && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  openChecklist(page)
+                                              }
+                                          >
+                                              <ListChecks />
+                                              View Checklist
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canEditPages && (
+                                          <DropdownMenuItem
+                                              onClick={() => handleEdit(page)}
+                                          >
+                                              <Edit />
+                                              Edit
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canEditPageBudget && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  openBudgetDialog(page)
+                                              }
+                                          >
+                                              <Wallet />
+                                              Update Budget
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canRefreshPages && (
+                                          <DropdownMenuItem
+                                              onClick={() => refresh(page)}
+                                              disabled={processing}
+                                          >
+                                              <RefreshCw
+                                                  className={
+                                                      processing
+                                                          ? 'animate-spin'
+                                                          : ''
+                                                  }
+                                              />
+                                              {processing
+                                                  ? 'Refreshing…'
+                                                  : 'Refresh Orders'}
+                                          </DropdownMenuItem>
+                                      )}
+                                  </DropdownMenuContent>
+                              </DropdownMenu>
+                          );
+                      },
+                  } as ColumnDef<Page>,
+              ]
+            : []),
     ];
 
     return (
@@ -318,34 +435,100 @@ const Pages = ({
                     title="Pages"
                     description="Manage your shop pages and their connected stores"
                 >
-                    <div className="flex flex-col items-end gap-1">
-                        <Button
-                            size="sm"
-                            onClick={handleCreate}
-                            disabled={pageLimitReached}
-                            title={
-                                pageLimitReached
-                                    ? `Page limit reached (${pageCount}/${pageLimit}). Upgrade your plan to add more.`
-                                    : undefined
-                            }
-                        >
-                            Add New Page
-                        </Button>
-                        {pageLimit != null && (
-                            <span
-                                className={clsx(
-                                    'font-mono text-[10px] tracking-wider uppercase',
+                    {canCreatePages && (
+                        <div className="flex flex-col items-end gap-1">
+                            <Button
+                                size="sm"
+                                onClick={handleCreate}
+                                disabled={pageLimitReached}
+                                title={
                                     pageLimitReached
-                                        ? 'text-amber-600 dark:text-amber-400'
-                                        : 'text-gray-400 dark:text-gray-500',
-                                )}
+                                        ? `Page limit reached (${pageCount}/${pageLimit}). Upgrade your plan to add more.`
+                                        : undefined
+                                }
                             >
-                                {pageCount ?? 0}/{pageLimit} pages used
-                                {pageLimitReached && ' · upgrade to add more'}
-                            </span>
-                        )}
-                    </div>
+                                Add New Page
+                            </Button>
+                            {pageLimit != null && (
+                                <span
+                                    className={clsx(
+                                        'font-mono text-[10px] tracking-wider uppercase',
+                                        pageLimitReached
+                                            ? 'text-amber-600 dark:text-amber-400'
+                                            : 'text-gray-400 dark:text-gray-500',
+                                    )}
+                                >
+                                    {pageCount ?? 0}/{pageLimit} pages used
+                                    {pageLimitReached &&
+                                        ' · upgrade to add more'}
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </PageHeader>
+
+                <Dialog
+                    open={!!budgetPage}
+                    onOpenChange={(open) => {
+                        if (!open) closeBudgetDialog();
+                    }}
+                >
+                    <DialogContent>
+                        <form onSubmit={updateBudget}>
+                            <DialogHeader>
+                                <DialogTitle>Update Budget</DialogTitle>
+                                <DialogDescription>
+                                    Set today&apos;s budget for{' '}
+                                    {budgetPage?.name}.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-2 py-4">
+                                <Label htmlFor="page-budget">Budget</Label>
+                                <Input
+                                    id="page-budget"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={budgetForm.data.budget}
+                                    onChange={(event) =>
+                                        budgetForm.setData(
+                                            'budget',
+                                            event.target.value,
+                                        )
+                                    }
+                                />
+                                <InputError
+                                    message={budgetForm.errors.budget}
+                                />
+                                {budgetPage?.latest_budget?.date && (
+                                    <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                                        Last set on{' '}
+                                        {new Date(
+                                            budgetPage.latest_budget.date,
+                                        ).toLocaleDateString()}
+                                    </p>
+                                )}
+                            </div>
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={closeBudgetDialog}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={budgetForm.processing}
+                                >
+                                    {budgetForm.processing
+                                        ? 'Saving...'
+                                        : 'Save Budget'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
 
                 <div className="mb-3 flex items-center gap-2">
                     <div className="relative w-full max-w-xs">
@@ -386,20 +569,22 @@ const Pages = ({
                     />
                 </div>
 
-                <TargetChecklistDrawer
-                    open={checklistDrawerOpen}
-                    onOpenChange={(open) => {
-                        setChecklistDrawerOpen(open);
-                        if (!open) {
-                            setSelectedPage(null);
-                            router.reload({ only: ['pages'] });
-                        }
-                    }}
-                    workspace={workspace}
-                    target="page"
-                    targetId={selectedPage?.id ?? null}
-                    targetName={selectedPage?.name ?? ''}
-                />
+                {canViewChecklist && (
+                    <TargetChecklistDrawer
+                        open={checklistDrawerOpen}
+                        onOpenChange={(open) => {
+                            setChecklistDrawerOpen(open);
+                            if (!open) {
+                                setSelectedPage(null);
+                                router.reload({ only: ['pages'] });
+                            }
+                        }}
+                        workspace={workspace}
+                        target="page"
+                        targetId={selectedPage?.id ?? null}
+                        targetName={selectedPage?.name ?? ''}
+                    />
+                )}
             </div>
         </AppLayout>
     );

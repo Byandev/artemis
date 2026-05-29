@@ -14,12 +14,12 @@ import { omit } from 'lodash';
 import { ExternalLink, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-const parseIds = (str?: string): number[] => {
+const parseIds = (str?: string): string[] => {
     if (!str) return [];
     return str
         .split(',')
-        .map((s) => Number(s.trim()))
-        .filter((n) => Number.isFinite(n) && n > 0);
+        .map((s) => s.trim())
+        .filter((s) => Number.isFinite(Number(s)) && Number(s) > 0);
 };
 
 type Mode = 'overall' | 'historical';
@@ -38,6 +38,7 @@ interface Props {
             search?: string;
             page_ids?: string;
             shop_ids?: string;
+            team_ids?: string;
             sent_min?: string;
         };
     };
@@ -67,7 +68,7 @@ export default function Sequences({ workspace, sequences, query }: Props) {
 
     const initialFilterValue: FilterValue = useMemo(
         () => ({
-            teamIds: [],
+            teamIds: parseIds(query?.filter?.team_ids),
             productIds: [],
             shopIds: parseIds(query?.filter?.shop_ids),
             pageIds: parseIds(query?.filter?.page_ids),
@@ -93,6 +94,7 @@ export default function Sequences({ workspace, sequences, query }: Props) {
                 'filter[search]': searchValue || undefined,
                 'filter[page_ids]': filter.pageIds.join(',') || undefined,
                 'filter[shop_ids]': filter.shopIds.join(',') || undefined,
+                'filter[team_ids]': filter.teamIds.join(',') || undefined,
                 'filter[sent_min]': sentMinValue || undefined,
                 page: query?.page ?? 1,
                 mode: mode === 'historical' ? 'historical' : undefined,
@@ -256,6 +258,8 @@ export default function Sequences({ workspace, sequences, query }: Props) {
                                         value.pageIds.join(',') || undefined,
                                     'filter[shop_ids]':
                                         value.shopIds.join(',') || undefined,
+                                    'filter[team_ids]':
+                                        value.teamIds.join(',') || undefined,
                                     page: 1,
                                 });
                             }}

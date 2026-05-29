@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Page;
+use App\Models\PageDailyBudgetRecord;
 use App\Models\Shop;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
@@ -44,6 +45,26 @@ test('owner can update a page', function () {
         ->assertRedirect();
 
     expect($page->fresh()->name)->toBe('Renamed Page');
+});
+
+test('owner can update today page budget from pages index', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = Page::factory()->forWorkspace($workspace)->forOwner($owner)->create();
+
+    $this->actingAs($owner)
+        ->from("/workspaces/{$workspace->slug}/pages")
+        ->put("/workspaces/{$workspace->slug}/pages/{$page->id}/budget", [
+            'budget' => '1234.50',
+        ])
+        ->assertRedirect("/workspaces/{$workspace->slug}/pages");
+
+    $record = PageDailyBudgetRecord::where('workspace_id', $workspace->id)
+        ->where('page_id', $page->id)
+        ->whereDate('date', now()->toDateString())
+        ->first();
+
+    expect($record)->not->toBeNull()
+        ->and((float) $record->budget)->toBe(1234.50);
 });
 
 test('cannot update a page from a different workspace', function () {

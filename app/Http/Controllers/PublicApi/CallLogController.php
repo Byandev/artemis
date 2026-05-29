@@ -70,7 +70,7 @@ class CallLogController extends Controller
         $date = $request->input('date', now()->toDateString());
 
         $deliveries = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->where('assignee_id', $request->input('user_id'))
+            ->where('assignee_user_id', $request->input('user_id'))
             ->whereDate('delivery_date', $date)
             ->withCount(['customerCallLogs', 'riderCallLogs'])
             ->get();
