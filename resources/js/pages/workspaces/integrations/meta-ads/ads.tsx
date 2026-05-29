@@ -131,8 +131,10 @@ export default function MetaAdsAds({
         { id: 'name', label: 'Ad', category: 'General', required: true },
         ...INSIGHTS_OPTIONS,
     ];
-    const [columnVisibility, setColumnVisibility] =
-        useColumnVisibility('meta-ads-cols:ads');
+    const [columnVisibility, setColumnVisibility] = useColumnVisibility(
+        'meta-ads-cols:ads',
+        Object.fromEntries(COLUMN_OPTIONS.map((o) => [o.id, !o.hiddenByDefault])),
+    );
 
     const columns: ColumnDef<AdRow>[] = [
         {

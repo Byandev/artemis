@@ -49,9 +49,11 @@ class SyncInsightsCommand extends Command
         $totalJobs = $accounts->count() * count($dates);
         $this->info("Dispatching {$totalJobs} jobs ({$accounts->count()} accounts × ".count($dates)." days: {$since->toDateString()} → {$until->toDateString()})");
 
+        $i = 0;
         foreach ($accounts as $account) {
             foreach ($dates as $date) {
-                SyncInsights::dispatch($account, $date);
+                SyncInsights::dispatch($account, $date)->delay(now()->addSeconds($i * 10));
+                $i++;
             }
         }
 

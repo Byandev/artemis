@@ -1056,10 +1056,16 @@ export function useColumnVisibility(
         if (typeof window === 'undefined') return defaults;
         try {
             const raw = window.localStorage.getItem(storageKey);
-            return raw ? { ...defaults, ...JSON.parse(raw) } : defaults;
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Object.keys(parsed).length > 0) {
+                    return { ...defaults, ...parsed };
+                }
+            }
         } catch {
-            return defaults;
+            /* ignore */
         }
+        return defaults;
     });
 
     useEffect(() => {

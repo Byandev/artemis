@@ -131,6 +131,7 @@ export default function MetaAdsAdSets({
     ];
     const [columnVisibility, setColumnVisibility] = useColumnVisibility(
         'meta-ads-cols:ad-sets',
+        Object.fromEntries(COLUMN_OPTIONS.map((o) => [o.id, !o.hiddenByDefault])),
     );
 
     const columns: ColumnDef<AdSetRow>[] = [

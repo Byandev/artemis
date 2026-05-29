@@ -110,6 +110,7 @@ export default function MetaAdsCampaigns({
     ];
     const [columnVisibility, setColumnVisibility] = useColumnVisibility(
         'meta-ads-cols:campaigns',
+        Object.fromEntries(COLUMN_OPTIONS.map((o) => [o.id, !o.hiddenByDefault])),
     );
 
     const columns: ColumnDef<CampaignRow>[] = [

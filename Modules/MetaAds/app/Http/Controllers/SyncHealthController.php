@@ -20,6 +20,7 @@ class SyncHealthController extends Controller
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
         $accounts = AdAccount::forWorkspace($workspace)
+            ->where('active_sync', true)
             ->select('id', 'name', 'business_name', 'last_synced_at')
             ->orderBy('name')
             ->get();

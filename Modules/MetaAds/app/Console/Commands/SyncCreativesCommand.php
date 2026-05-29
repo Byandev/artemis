@@ -30,10 +30,10 @@ class SyncCreativesCommand extends Command
             return self::SUCCESS;
         }
 
-        foreach ($accounts as $account) {
+        foreach ($accounts as $index => $account) {
             $this->info("Dispatching creatives sync for AdAccount #{$account->id}");
 
-            SyncCreatives::dispatch($account);
+            SyncCreatives::dispatch($account)->delay(now()->addSeconds($index * 10));
         }
 
         return self::SUCCESS;
