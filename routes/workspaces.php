@@ -22,6 +22,7 @@ use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\RoleController;
 use App\Http\Controllers\Workspaces\RolePermissionController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
+use App\Http\Controllers\Workspaces\CSR\RmoManagementController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
@@ -210,13 +211,14 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/csr/analytics', [CSRController::class, 'analytics'])->name('workspaces.csr.analytics');
 
     // CSR RMO Management (authenticated)
-    Route::get('/workspaces/{workspace}/csr/rmo-management', [ForDeliveryController::class, 'csrRmoManagement'])->name('workspaces.csr.rmo-management');
-    Route::get('/workspaces/{workspace}/csr/rmo-management/export', [ForDeliveryController::class, 'publicExport'])->name('workspaces.csr.rmo-management.export');
-    Route::post('/workspaces/{workspace}/csr/rmo-management/{id}', [ForDeliveryController::class, 'publicUpdateStatus'])->name('workspaces.csr.rmo-management.updateStatus');
-    Route::post('/workspaces/{workspace}/csr/rmo-management/{id}/assign', [ForDeliveryController::class, 'publicAssignUser'])->name('workspaces.csr.rmo-management.assign');
-    Route::post('/workspaces/{workspace}/csr/rmo-management/{id}/remove-assignee', [ForDeliveryController::class, 'publicRemoveAssignee'])->name('workspaces.csr.rmo-management.removeAssignee');
-    Route::post('/workspaces/{workspace}/csr/rmo-management/{id}/update-phones', [ForDeliveryController::class, 'publicUpdatePhones'])->name('workspaces.csr.rmo-management.updatePhones');
-    Route::get('/workspaces/{workspace}/csr/rmo-management/call-logs', [ForDeliveryController::class, 'callLogs'])->name('workspaces.csr.rmo-management.callLogs');
+    Route::get('/workspaces/{workspace}/csr/rmo-management', [RmoManagementController::class, 'index'])->name('workspaces.csr.rmo-management');
+    Route::get('/workspaces/{workspace}/csr/rmo-management/export', [RmoManagementController::class, 'export'])->name('workspaces.csr.rmo-management.export');
+    Route::post('/workspaces/{workspace}/csr/rmo-management/{id}', [RmoManagementController::class, 'updateStatus'])->name('workspaces.csr.rmo-management.updateStatus');
+    Route::post('/workspaces/{workspace}/csr/rmo-management/{id}/assign', [RmoManagementController::class, 'assignUser'])->name('workspaces.csr.rmo-management.assign');
+    Route::post('/workspaces/{workspace}/csr/rmo-management/{id}/remove-assignee', [RmoManagementController::class, 'removeAssignee'])->name('workspaces.csr.rmo-management.removeAssignee');
+    Route::post('/workspaces/{workspace}/csr/rmo-management/{id}/update-phones', [RmoManagementController::class, 'updatePhones'])->name('workspaces.csr.rmo-management.updatePhones');
+    Route::get('/workspaces/{workspace}/csr/rmo-management/call-logs', [RmoManagementController::class, 'callLogs'])->name('workspaces.csr.rmo-management.callLogs');
+    Route::get('/workspaces/{workspace}/csr/rmo-management/my-assigned-count', [RmoManagementController::class, 'myAssignedCount'])->name('workspaces.csr.rmo-management.myAssignedCount');
 
     // Checklist routes
     Route::get('/workspaces/{workspace}/checklist', [ChecklistController::class, 'index'])->name('workspaces.checklist.index');

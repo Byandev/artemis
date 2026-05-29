@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Workspaces\RTS;
+namespace App\Http\Controllers\Workspaces\CSR;
 
 use App\Exports\RmoManagementExport;
 use App\Http\Controllers\Controller;
@@ -28,95 +28,17 @@ use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
-class ForDeliveryController extends Controller
+class RmoManagementController extends Controller
 {
-    public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
-    {
-        $orderForDelivery = OrderForDelivery::find($id);
-
-        if (! $orderForDelivery) {
-            return redirect()->back()->with('error', 'Order not found.');
-        }
-
-        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
-            return redirect()->back()->with('error', 'Status can only be updated for orders scheduled for delivery today.');
-        }
-
-        $orderForDelivery->update(['status' => $request->status]);
-
-        return redirect()->back()->with('success', 'Status updated successfully');
-    }
-
-    public function publicAssignUser(Workspace $workspace, $id, Request $request)
-    {
-        $orderForDelivery = OrderForDelivery::find($id);
-
-        if (! $orderForDelivery) {
-            return redirect()->back()->with('error', 'Order not found.');
-        }
-
-        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
-            return redirect()->back()->with('error', 'Assignee can only be updated for orders scheduled for delivery today.');
-        }
-
-        if (! $request->userId) {
-            return redirect()->back()->with('error', 'Please select a user before assigning.');
-        }
-
-        $orderForDelivery->update($this->assigneePayload($request, $workspace, $request->userId));
-
-        return redirect()->back()->with('success', 'Assignee updated successfully');
-    }
-
-    public function publicUpdatePhones(Workspace $workspace, $id, Request $request)
-    {
-        if (app()->environment('production')) {
-            return redirect()->back()->with('error', 'Editing phone numbers is disabled in production.');
-        }
-
-        $orderForDelivery = OrderForDelivery::find($id);
-
-        if (! $orderForDelivery) {
-            return redirect()->back()->with('error', 'Order not found.');
-        }
-
-        $data = $request->validate([
-            'customer_phone' => ['nullable', 'string'],
-            'rider_phone' => ['nullable', 'string'],
-        ]);
-
-        $orderForDelivery->update($data);
-
-        return redirect()->back()->with('success', 'Phone numbers updated successfully');
-    }
-
-    public function publicRemoveAssignee(Workspace $workspace, $id)
-    {
-        $orderForDelivery = OrderForDelivery::find($id);
-
-        if (! $orderForDelivery) {
-            return redirect()->back()->with('error', 'Order not found.');
-        }
-
-        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
-            return redirect()->back()->with('error', 'Assignee can only be removed for orders scheduled for delivery today.');
-        }
-
-        $orderForDelivery->update([
-            'assignee_id' => null,
-            'assignee_user_id' => null,
-        ]);
-
-        return redirect()->back()->with('success', 'Assignee removed successfully');
-    }
-
-    public function public(Request $request, Workspace $workspace)
+    public function index(Request $request, Workspace $workspace)
     {
         $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
 
         $baseQuery = OrderForDelivery::where('workspace_id', $workspace->id);
 
-        $this->applyAssigneeFilter($baseQuery, $request);
+        if ($request->input('assignee_id')) {
+            $baseQuery->where('assignee_user_id', $request->input('assignee_id'));
+        }
 
         if ($request->input('confirmee_id')) {
             $baseQuery->where('conferrer_id', $request->input('confirmee_id'));
@@ -156,9 +78,6 @@ class ForDeliveryController extends Controller
                     $query->select(['id', 'name']);
                 },
                 'assignee' => function ($query) {
-                    $query->select(['id', 'name']);
-                },
-                'pancakeAssignee' => function ($query) {
                     $query->select(['id', 'name']);
                 },
                 'page' => function ($query) {
@@ -224,7 +143,6 @@ class ForDeliveryController extends Controller
             ->whereDate('delivery_date', $deliveryDate)
             ->paginate($request->input('per_page', 100));
 
-        // Build a base query for stats that respects page/shop/assignee filters
         $statsBase = OrderForDelivery::where('workspace_id', $workspace->id)
             ->whereDate('delivery_date', $deliveryDate);
 
@@ -252,8 +170,8 @@ class ForDeliveryController extends Controller
         $totalOrdersForDeliveryTodayQuery = (clone $statsBase);
 
         if ($request->input('assignee_id')) {
-            $this->applyAssigneeFilter($statsBase, $request);
-            $this->applyAssigneeFilter($totalOrdersForDeliveryTodayQuery, $request);
+            $statsBase->where('assignee_user_id', $request->input('assignee_id'));
+            $totalOrdersForDeliveryTodayQuery->where('assignee_user_id', $request->input('assignee_id'));
         }
 
         if ($request->input('confirmee_id')) {
@@ -261,10 +179,8 @@ class ForDeliveryController extends Controller
             $totalOrdersForDeliveryTodayQuery->where('conferrer_id', $request->input('confirmee_id'));
         }
 
-        // Total uses its own base (optionally filtered via whereHas on confirmed_by)
         $totalOrdersForDeliveryToday = $totalOrdersForDeliveryTodayQuery->count();
 
-        // The other 4 stats share $statsBase — roll them into a single aggregate query
         $statusBreakdown = $statsBase
             ->selectRaw("
                 SUM(CASE WHEN status != 'PENDING' THEN 1 ELSE 0 END) as called,
@@ -274,20 +190,11 @@ class ForDeliveryController extends Controller
             ")
             ->first();
 
-        $totalCalled = (int) ($statusBreakdown->called ?? 0);
-        $totalDelivered = (int) ($statusBreakdown->delivered ?? 0);
-        $totalReturning = (int) ($statusBreakdown->returning_count ?? 0);
-        $totalProblematic = (int) ($statusBreakdown->problematic ?? 0);
-
-        $items->getCollection()->each(function ($item) {
-            $item->setRelation('assignee', $item->pancakeAssignee ?? $item->assignee);
-        });
-
         $users = User::get();
 
         $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id', 'pageOwners:id,name']);
 
-        return Inertia::render('workspaces/rts/public-pages/rmo-management', [
+        return Inertia::render('workspaces/csr/rmo-management', [
             'orders' => $items,
             'workspace' => $workspace,
             'query' => [
@@ -297,20 +204,109 @@ class ForDeliveryController extends Controller
             ],
             'users' => $users,
             'total_for_delivery_today' => $totalOrdersForDeliveryToday,
-            'called_count' => $totalCalled,
-            'delivered_count' => $totalDelivered,
-            'returning_count' => $totalReturning,
-            'problematic_count' => $totalProblematic,
+            'called_count' => (int) ($statusBreakdown->called ?? 0),
+            'delivered_count' => (int) ($statusBreakdown->delivered ?? 0),
+            'returning_count' => (int) ($statusBreakdown->returning_count ?? 0),
+            'problematic_count' => (int) ($statusBreakdown->problematic ?? 0),
         ]);
     }
 
-    public function publicExport(Request $request, Workspace $workspace)
+    public function updateStatus(Workspace $workspace, $id, Request $request)
+    {
+        $orderForDelivery = OrderForDelivery::find($id);
+
+        if (! $orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+            return redirect()->back()->with('error', 'Status can only be updated for orders scheduled for delivery today.');
+        }
+
+        $orderForDelivery->update(['status' => $request->status]);
+
+        return redirect()->back()->with('success', 'Status updated successfully');
+    }
+
+    public function assignUser(Workspace $workspace, $id, Request $request)
+    {
+        $orderForDelivery = OrderForDelivery::find($id);
+
+        if (! $orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+            return redirect()->back()->with('error', 'Assignee can only be updated for orders scheduled for delivery today.');
+        }
+
+        if (! $request->userId) {
+            return redirect()->back()->with('error', 'Please select a user before assigning.');
+        }
+
+        $pancakeUserId = User::where('user_id', $request->userId)
+            ->whereHas('shops', fn ($query) => $query->where('workspace_id', $workspace->id))
+            ->value('id');
+
+        $orderForDelivery->update([
+            'assignee_id' => $pancakeUserId,
+            'assignee_user_id' => $request->userId,
+        ]);
+
+        return redirect()->back()->with('success', 'Assignee updated successfully');
+    }
+
+    public function removeAssignee(Workspace $workspace, $id)
+    {
+        $orderForDelivery = OrderForDelivery::find($id);
+
+        if (! $orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
+            return redirect()->back()->with('error', 'Assignee can only be removed for orders scheduled for delivery today.');
+        }
+
+        $orderForDelivery->update([
+            'assignee_id' => null,
+            'assignee_user_id' => null,
+        ]);
+
+        return redirect()->back()->with('success', 'Assignee removed successfully');
+    }
+
+    public function updatePhones(Workspace $workspace, $id, Request $request)
+    {
+        if (app()->environment('production')) {
+            return redirect()->back()->with('error', 'Editing phone numbers is disabled in production.');
+        }
+
+        $orderForDelivery = OrderForDelivery::find($id);
+
+        if (! $orderForDelivery) {
+            return redirect()->back()->with('error', 'Order not found.');
+        }
+
+        $data = $request->validate([
+            'customer_phone' => ['nullable', 'string'],
+            'rider_phone' => ['nullable', 'string'],
+        ]);
+
+        $orderForDelivery->update($data);
+
+        return redirect()->back()->with('success', 'Phone numbers updated successfully');
+    }
+
+    public function export(Request $request, Workspace $workspace)
     {
         $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
 
         $baseQuery = OrderForDelivery::where('workspace_id', $workspace->id);
 
-        $this->applyAssigneeFilter($baseQuery, $request);
+        if ($request->input('assignee_id')) {
+            $baseQuery->where('assignee_user_id', $request->input('assignee_id'));
+        }
 
         if ($request->input('confirmee_id')) {
             $baseQuery->where('conferrer_id', $request->input('confirmee_id'));
@@ -394,7 +390,7 @@ class ForDeliveryController extends Controller
         $filename = 'rmo-management-'.$deliveryDate.'-'.now()->format('His').'.xlsx';
 
         return Excel::download(
-            new RmoManagementExport($query, $columns, $this->isPublicRmoRequest($request)),
+            new RmoManagementExport($query, $columns, false),
             $filename
         );
     }
@@ -440,46 +436,5 @@ class ForDeliveryController extends Controller
             ->get(['id', 'user_id', 'phone_number', 'type', 'duration', 'call_date', 'call_time']);
 
         return response()->json($logs);
-    }
-
-    private function isPublicRmoRequest(Request $request): bool
-    {
-        return $request->routeIs('public-page.rmo-management.*')
-            || $request->routeIs('public-page.rmo-management');
-    }
-
-    private function applyAssigneeFilter($query, Request $request): void
-    {
-        if (! $request->input('assignee_id')) {
-            return;
-        }
-
-        $query->where(
-            $this->isPublicRmoRequest($request) ? 'assignee_id' : 'assignee_user_id',
-            $request->input('assignee_id')
-        );
-    }
-
-    private function assigneePayload(Request $request, Workspace $workspace, int|string $userId): array
-    {
-        if ($this->isPublicRmoRequest($request)) {
-            $pancakeUser = User::whereKey($userId)
-                ->whereHas('shops', fn ($query) => $query->where('workspace_id', $workspace->id))
-                ->first();
-
-            return [
-                'assignee_id' => $userId,
-                'assignee_user_id' => $pancakeUser?->user_id,
-            ];
-        }
-
-        $pancakeUserId = User::where('user_id', $userId)
-            ->whereHas('shops', fn ($query) => $query->where('workspace_id', $workspace->id))
-            ->value('id');
-
-        return [
-            'assignee_id' => $pancakeUserId,
-            'assignee_user_id' => $userId,
-        ];
     }
 }
