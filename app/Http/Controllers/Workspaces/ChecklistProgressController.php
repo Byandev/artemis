@@ -29,6 +29,14 @@ class ChecklistProgressController extends Controller
             if (! $canViewChecklist && ! $canViewShopChecklist) {
                 abort(403);
             }
+        } elseif ($targetName === 'Page') {
+            $user = $request->user();
+            $canViewChecklist = $user->hasPermission(Permission::ViewChecklist, $workspace);
+            $canViewPageChecklist = $user->hasPermission(Permission::ManageViewChecklistPages, $workspace);
+
+            if (! $canViewChecklist && ! $canViewPageChecklist) {
+                abort(403);
+            }
         } else {
             $this->authorize(Permission::ViewChecklist->value, $workspace);
         }

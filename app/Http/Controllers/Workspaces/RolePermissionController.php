@@ -25,8 +25,11 @@ class RolePermissionController extends Controller
 
         $disabled = $this->disabledCategoriesFor($workspace);
 
+        $hidden = [PermissionEnum::ArchivePages->value];
+
         $permissions = Permission::orderBy('category')->orderBy('name')
             ->when($disabled, fn ($q) => $q->whereNotIn('category', $disabled))
+            ->whereNotIn('name', $hidden)
             ->get();
 
         $grouped = $permissions->groupBy('category')->map(function ($items, $category) use ($role) {

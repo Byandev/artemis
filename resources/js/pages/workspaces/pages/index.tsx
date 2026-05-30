@@ -282,7 +282,12 @@ const Pages = ({
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
-                            <Can permission={PERMISSIONS.ViewChecklist}>
+                            <Can
+                                anyOf={[
+                                    PERMISSIONS.ManageViewChecklistPages,
+                                    PERMISSIONS.ViewChecklist,
+                                ]}
+                            >
                                 <DropdownMenuItem
                                     onClick={() => openChecklist(page)}
                                 >
