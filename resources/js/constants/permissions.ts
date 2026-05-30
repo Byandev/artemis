@@ -23,6 +23,7 @@ export const PERMISSIONS = {
     // Shops
     ViewShops: 'View Shops',
     RefreshShops: 'Refresh Shops',
+    ManageViewChecklistShops: 'Manage View Checklist Shops',
 
     // Products
     ViewProducts: 'View Products',

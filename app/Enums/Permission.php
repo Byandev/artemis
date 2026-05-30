@@ -28,6 +28,7 @@ enum Permission: string
     // Shops
     case ViewShops = 'View Shops';
     case RefreshShops = 'Refresh Shops';
+    case ManageViewChecklistShops = 'Manage View Checklist Shops';
 
     // Products
     case ViewProducts = 'View Products';
@@ -120,7 +121,8 @@ enum Permission: string
             self::RefreshPages => 'Pages',
 
             self::ViewShops,
-            self::RefreshShops => 'Shops',
+            self::RefreshShops,
+            self::ManageViewChecklistShops => 'Shops',
 
             self::ViewProducts,
             self::CreateProducts,

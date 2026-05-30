@@ -166,7 +166,12 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <Can permission={PERMISSIONS.ViewChecklist}>
+                            <Can
+                                anyOf={[
+                                    PERMISSIONS.ManageViewChecklistShops,
+                                    PERMISSIONS.ViewChecklist,
+                                ]}
+                            >
                                 <DropdownMenuItem
                                     onClick={() => openChecklist(shop)}
                                 >

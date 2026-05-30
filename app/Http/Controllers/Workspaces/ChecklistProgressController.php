@@ -18,9 +18,20 @@ class ChecklistProgressController extends Controller
     public function index(Request $request, Workspace $workspace, string $target, int $targetId): JsonResponse
     {
         $this->authorizeWorkspaceMembership($request, $workspace);
-        $this->authorize(Permission::ViewChecklist->value, $workspace);
 
         [$targetName, $targetModel, $targetType] = $this->resolveTarget($workspace, $target, $targetId);
+
+        if ($targetName === 'Shop') {
+            $user = $request->user();
+            $canViewChecklist = $user->hasPermission(Permission::ViewChecklist, $workspace);
+            $canViewShopChecklist = $user->hasPermission(Permission::ManageViewChecklistShops, $workspace);
+
+            if (! $canViewChecklist && ! $canViewShopChecklist) {
+                abort(403);
+            }
+        } else {
+            $this->authorize(Permission::ViewChecklist->value, $workspace);
+        }
 
         $items = WorkspaceChecklist::query()
             ->where('workspace_id', $workspace->id)
