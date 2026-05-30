@@ -1,5 +1,15 @@
 import { Can } from '@/components/can';
 import PageHeader from '@/components/common/PageHeader';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -618,6 +628,7 @@ function EditScheduleModal({
     const [local, setLocal] = useState<Map<string, Schedule>>(
         new Map(memberSchedules),
     );
+    const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
     const otherMembers = team.members.filter((m) => m.id !== member.id);
     const today = todayStr();
 
@@ -702,6 +713,10 @@ function EditScheduleModal({
     };
 
     const clearAll = () => setLocal(new Map());
+    const confirmClearAll = () => {
+        clearAll();
+        setClearConfirmOpen(false);
+    };
 
     const copyFrom = (sourceId: number) => {
         const source = getOtherMemberSchedules(sourceId);
@@ -738,7 +753,7 @@ function EditScheduleModal({
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
-                            onClick={clearAll}
+                            onClick={() => setClearConfirmOpen(true)}
                             className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 text-[11px] font-medium text-red-600 transition-all hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
                         >
                             <Eraser className="h-3.5 w-3.5" />
@@ -752,6 +767,39 @@ function EditScheduleModal({
                         </button>
                     </div>
                 </div>
+
+                <AlertDialog
+                    open={clearConfirmOpen}
+                    onOpenChange={setClearConfirmOpen}
+                >
+                    <AlertDialogContent className="max-w-[420px] border-none shadow-2xl dark:bg-zinc-900">
+                        <AlertDialogHeader>
+                            <AlertDialogTitle className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
+                                Clear all schedules?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                                This will remove all shifts for{' '}
+                                <strong>{member.name}</strong> for the
+                                selected week. You can reapply quick fill or
+                                set custom shifts afterward.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="mt-4 gap-2">
+                            <AlertDialogCancel className="h-9 rounded-lg border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700">
+                                Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    confirmClearAll();
+                                }}
+                                className="h-9 rounded-lg bg-red-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-red-700"
+                            >
+                                Yes, clear all
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
 
                 {/* Quick Fill */}
                 <div className="border-b border-black/6 px-6 py-4 dark:border-white/6">
