@@ -14,7 +14,6 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonPeriod;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Modules\Pancake\Models\OrderForDelivery;
 use Modules\Pancake\Models\User as PancakeUser;
@@ -42,35 +41,43 @@ class CSRController extends Controller
         $monthStart = $from->toDateString();
         $trendFrom = $from->toDateString();
 
-        // Resolve Pancake accounts for this user in this workspace
+        // --- Current user's pancake accounts with reports eagerly loaded ---
         $pancakeAccounts = PancakeUser::where('user_id', $authUser->id)
             ->whereHas('shops', fn ($q) => $q->where('workspace_id', $workspace->id))
-            ->get(['id', 'name']);
+            ->with([
+                'posReports' => fn ($q) => $q->forWorkspaceRange($workspace->id, $monthStart, $today),
+                'rmoReports' => fn ($q) => $q->forWorkspaceRange($workspace->id, $monthStart, $today),
+            ])
+            ->get(['id', 'name', 'email', 'phone_number', 'status', 'fb_id']);
 
         $pancakeUserIds = $pancakeAccounts->pluck('id')->all();
-        $primaryPancakeId = $pancakeUserIds[0] ?? null;
 
-        $drClass = PancakeUserPosDailyReport::class;
+        // --- All workspace users with their pancake accounts + reports ---
+        $workspaceUsers = User::query()
+            ->whereHas('pancakeAccounts', fn ($q) =>
+                $q->whereHas('shops', fn ($q2) => $q2->where('workspace_id', $workspace->id))
+            )
+            ->with(['pancakeAccounts' => fn ($q) =>
+                $q->whereHas('shops', fn ($q2) => $q2->where('workspace_id', $workspace->id))
+                  ->with([
+                      'posReports' => fn ($q) => $q->forWorkspaceRange($workspace->id, $monthStart, $today),
+                      'rmoReports' => fn ($q) => $q->forWorkspaceRange($workspace->id, $monthStart, $today),
+                  ])
+            ])
+            ->get(['id', 'name']);
 
-        // --- Section 1: My RMO Stats Today ---
-        $row = OrderForDelivery::where('workspace_id', $workspace->id)
+        // --- Section 1: My RMO Stats ---
+        $myOrders = OrderForDelivery::where('workspace_id', $workspace->id)
             ->where('assignee_user_id', $authUser->id)
             ->whereBetween('delivery_date', [$monthStart, $today])
-            ->selectRaw("
-                COUNT(*) as assigned,
-                SUM(CASE WHEN status != 'PENDING' THEN 1 ELSE 0 END) as called,
-                SUM(CASE WHEN parcel_status = 'delivered' THEN 1 ELSE 0 END) as delivered,
-                SUM(CASE WHEN parcel_status = 'returning' THEN 1 ELSE 0 END) as returning_count,
-                SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pending
-            ")
-            ->first();
+            ->get(['status', 'parcel_status']);
 
         $myTodayStats = [
-            'assigned' => (int) ($row->assigned ?? 0),
-            'called' => (int) ($row->called ?? 0),
-            'delivered' => (int) ($row->delivered ?? 0),
-            'returning' => (int) ($row->returning_count ?? 0),
-            'pending' => (int) ($row->pending ?? 0),
+            'assigned' => $myOrders->count(),
+            'called' => $myOrders->where('status', '!=', 'PENDING')->count(),
+            'delivered' => $myOrders->where('parcel_status', 'delivered')->count(),
+            'returning' => $myOrders->where('parcel_status', 'returning')->count(),
+            'pending' => $myOrders->where('status', 'PENDING')->count(),
         ];
 
         // --- Section 2: My Pending Orders (top 5) ---
@@ -87,192 +94,105 @@ class CSRController extends Controller
 
         // --- Section 3: My Monthly Performance ---
         $myMonthly = ['total_orders' => 0, 'total_sales' => 0, 'delivered' => 0, 'returning_count' => 0, 'rts_rate' => 0, 'total_called' => 0, 'total_call_time' => 0];
-        if ($primaryPancakeId) {
-            $dr = $drClass::query()
-                ->forWorkspaceRange($workspace->id, $monthStart, $today)
-                ->where('pancake_user_id', $primaryPancakeId)
-                ->selectRaw('
-                    COALESCE(SUM(total_orders), 0) as total_orders,
-                    COALESCE(SUM(total_sales), 0) as total_sales,
-                    COALESCE(SUM(delivered), 0) as delivered,
-                    COALESCE(SUM(`returning`), 0) as returning_count,
-                    CASE
-                        WHEN COALESCE(SUM(delivered), 0) + COALESCE(SUM(`returning`), 0) > 0
-                        THEN ROUND((COALESCE(SUM(`returning`), 0) / (COALESCE(SUM(delivered), 0) + COALESCE(SUM(`returning`), 0))) * 100, 2)
-                        ELSE 0
-                    END as rts_rate
-                ')
-                ->first();
 
-            $rmo = PancakeUserRmoDailyReport::query()
-                ->forWorkspaceRange($workspace->id, $monthStart, $today)
-                ->where('pancake_user_id', $primaryPancakeId)
-                ->selectRaw('
-                    COALESCE(SUM(total_called), 0) as total_called,
-                    COALESCE(SUM(total_call_time), 0) as total_call_time
-                ')
-                ->first();
+        if (! empty($pancakeUserIds)) {
+            $myPosReports = $pancakeAccounts->flatMap->posReports;
+            $myRmoReports = $pancakeAccounts->flatMap->rmoReports;
+
+            $myDelivered = (int) $myPosReports->sum('delivered');
+            $myReturning = (int) $myPosReports->sum('returning');
 
             $myMonthly = [
-                'total_orders' => (int) ($dr->total_orders ?? 0),
-                'total_sales' => (float) ($dr->total_sales ?? 0),
-                'delivered' => (int) ($dr->delivered ?? 0),
-                'returning_count' => (int) ($dr->returning_count ?? 0),
-                'rts_rate' => (float) ($dr->rts_rate ?? 0),
-                'total_called' => (int) ($rmo->total_called ?? 0),
-                'total_call_time' => (int) ($rmo->total_call_time ?? 0),
+                'total_orders' => (int) $myPosReports->sum('total_orders'),
+                'total_sales' => (float) $myPosReports->sum('total_sales'),
+                'delivered' => $myDelivered,
+                'returning_count' => $myReturning,
+                'rts_rate' => ($myDelivered + $myReturning) > 0
+                    ? round(($myReturning / ($myDelivered + $myReturning)) * 100, 2)
+                    : 0,
+                'total_called' => (int) $myRmoReports->sum('total_called'),
+                'total_call_time' => (int) $myRmoReports->sum('total_call_time'),
             ];
         }
 
         // --- Section 4: Team Leaderboard (top 10 this month) ---
-        $topCsrs = PancakeUser::query()
-            ->select([
-                'pancake_users.id as pancake_user_id',
-                'pancake_users.name as csr_name',
-            ])
-            ->whereHas('shops', fn ($q) => $q->where('workspace_id', $workspace->id))
-            ->selectSub(
-                $drClass::query()
-                    ->forWorkspaceRange($workspace->id, $monthStart, $today)
-                    ->whereColumn('pancake_user_id', 'pancake_users.id')
-                    ->selectRaw('COALESCE(SUM(total_sales), 0)'),
-                'total_sales'
-            )
-            ->selectSub(
-                $drClass::query()
-                    ->forWorkspaceRange($workspace->id, $monthStart, $today)
-                    ->whereColumn('pancake_user_id', 'pancake_users.id')
-                    ->selectRaw('COALESCE(SUM(total_orders), 0)'),
-                'total_orders'
-            )
-            ->selectSub(
-                $drClass::query()
-                    ->forWorkspaceRange($workspace->id, $monthStart, $today)
-                    ->whereColumn('pancake_user_id', 'pancake_users.id')
-                    ->selectRaw('COALESCE(SUM(delivered), 0)'),
-                'delivered'
-            )
-            ->selectSub(
-                $drClass::query()
-                    ->forWorkspaceRange($workspace->id, $monthStart, $today)
-                    ->whereColumn('pancake_user_id', 'pancake_users.id')
-                    ->selectRaw('COALESCE(SUM(`returning`), 0)'),
-                'returning_count'
-            )
-            ->selectSub(
-                $drClass::query()
-                    ->forWorkspaceRange($workspace->id, $monthStart, $today)
-                    ->whereColumn('pancake_user_id', 'pancake_users.id')
-                    ->selectRaw('
-                        CASE
-                            WHEN COALESCE(SUM(delivered), 0) + COALESCE(SUM(`returning`), 0) > 0
-                            THEN ROUND((COALESCE(SUM(`returning`), 0) / (COALESCE(SUM(delivered), 0) + COALESCE(SUM(`returning`), 0))) * 100, 2)
-                            ELSE 0
-                        END
-                    '),
-                'rts_rate'
-            )
-            ->orderByDesc('total_sales')
-            ->limit(10)
-            ->get();
+        $topCsrs = $workspaceUsers->map(function ($user) {
+            $posReports = $user->pancakeAccounts->flatMap->posReports;
 
-        // --- Section 6: 14-Day Daily Trend (my performance over time) ---
+            $delivered = (int) $posReports->sum('delivered');
+            $returning = (int) $posReports->sum('returning');
+
+            return [
+                'user_id' => $user->id,
+                'csr_name' => $user->name,
+                'total_sales' => (float) $posReports->sum('total_sales'),
+                'total_orders' => (int) $posReports->sum('total_orders'),
+                'delivered' => $delivered,
+                'returning_count' => $returning,
+                'rts_rate' => ($delivered + $returning) > 0
+                    ? round(($returning / ($delivered + $returning)) * 100, 2)
+                    : 0,
+            ];
+        })->sortByDesc('total_sales')->values()->take(10)->all();
+
+        // --- Section 6: Daily Trend ---
         $dailyTrend = [];
-        if ($primaryPancakeId) {
-            $posRows = $drClass::query()
-                ->forWorkspaceRange($workspace->id, $trendFrom, $today)
-                ->where('pancake_user_id', $primaryPancakeId)
-                ->select(['date', 'total_orders', 'total_sales', 'delivered', 'returning', 'rts_rate'])
-                ->orderBy('date')
-                ->get()
-                ->keyBy(fn ($r) => $r->date->format('Y-m-d'));
+        if (! empty($pancakeUserIds)) {
+            $posByDate = $pancakeAccounts->flatMap->posReports
+                ->groupBy(fn ($r) => $r->date->format('Y-m-d'));
+            $rmoByDate = $pancakeAccounts->flatMap->rmoReports
+                ->groupBy(fn ($r) => $r->date->format('Y-m-d'));
 
-            $rmoRows = PancakeUserRmoDailyReport::query()
-                ->forWorkspaceRange($workspace->id, $trendFrom, $today)
-                ->where('pancake_user_id', $primaryPancakeId)
-                ->select(['date', 'total_called', 'total_call_time'])
-                ->orderBy('date')
-                ->get()
-                ->keyBy(fn ($r) => $r->date->format('Y-m-d'));
-
-            // Fill every day in the 14-day range (zero-fill gaps)
             foreach (CarbonPeriod::create($trendFrom, $today) as $day) {
                 $d = $day->format('Y-m-d');
-                $pos = $posRows->get($d);
-                $rmo = $rmoRows->get($d);
+                $pos = $posByDate->get($d);
+                $rmo = $rmoByDate->get($d);
+
+                $del = (int) ($pos?->sum('delivered') ?? 0);
+                $ret = (int) ($pos?->sum('returning') ?? 0);
 
                 $dailyTrend[] = [
                     'date' => $d,
-                    'orders' => (int) ($pos->total_orders ?? 0),
-                    'sales' => (float) ($pos->total_sales ?? 0),
-                    'delivered' => (int) ($pos->delivered ?? 0),
-                    'returning' => (int) ($pos->returning ?? 0),
-                    'rts_rate' => (float) ($pos->rts_rate ?? 0),
-                    'called' => (int) ($rmo->total_called ?? 0),
-                    'call_time' => (int) ($rmo->total_call_time ?? 0),
+                    'orders' => (int) ($pos?->sum('total_orders') ?? 0),
+                    'sales' => (float) ($pos?->sum('total_sales') ?? 0),
+                    'delivered' => $del,
+                    'returning' => $ret,
+                    'rts_rate' => ($del + $ret) > 0 ? round(($ret / ($del + $ret)) * 100, 2) : 0,
+                    'called' => (int) ($rmo?->sum('total_called') ?? 0),
+                    'call_time' => (int) ($rmo?->sum('total_call_time') ?? 0),
                 ];
             }
         }
 
-        // --- Section 7: Today's Order Status Breakdown ---
-        $statusBreakdown = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->where('assignee_user_id', $authUser->id)
-            ->whereBetween('delivery_date', [$monthStart, $today])
+        // --- Section 7: Order Status Breakdown ---
+        $statusBreakdown = $myOrders
             ->groupBy('status')
-            ->select(['status', DB::raw('COUNT(*) as count')])
-            ->orderByDesc('count')
-            ->get()
-            ->map(fn ($r) => ['status' => $r->status, 'count' => (int) $r->count])
+            ->map(fn ($group, $status) => ['status' => $status, 'count' => $group->count()])
+            ->sortByDesc('count')
+            ->values()
             ->all();
 
-        // --- Section 8: Team Average (this month, for comparison) ---
+        // --- Section 8: Team Average ---
         $teamAvg = ['total_orders' => 0, 'total_sales' => 0, 'delivered' => 0, 'returning_count' => 0, 'rts_rate' => 0, 'total_called' => 0, 'total_call_time' => 0];
-        $teamCsrCount = PancakeUser::whereHas('shops', fn ($q) => $q->where('workspace_id', $workspace->id))->count();
+        $teamCsrCount = $workspaceUsers->count();
 
         if ($teamCsrCount > 0) {
-            $teamDr = $drClass::query()
-                ->forWorkspaceRange($workspace->id, $monthStart, $today)
-                ->whereIn('pancake_user_id', function ($q) use ($workspace) {
-                    $q->select('pancake_shop_users.user_id')
-                        ->from('pancake_shop_users')
-                        ->join('shops', 'pancake_shop_users.shop_id', '=', 'shops.id')
-                        ->where('shops.workspace_id', $workspace->id);
-                })
-                ->selectRaw('
-                    COALESCE(SUM(total_orders), 0) as total_orders,
-                    COALESCE(SUM(total_sales), 0) as total_sales,
-                    COALESCE(SUM(delivered), 0) as delivered,
-                    COALESCE(SUM(`returning`), 0) as returning_count
-                ')
-                ->first();
+            $allPosReports = $workspaceUsers->flatMap(fn ($u) => $u->pancakeAccounts->flatMap->posReports);
+            $allRmoReports = $workspaceUsers->flatMap(fn ($u) => $u->pancakeAccounts->flatMap->rmoReports);
 
-            $teamRmo = PancakeUserRmoDailyReport::query()
-                ->forWorkspaceRange($workspace->id, $monthStart, $today)
-                ->whereIn('pancake_user_id', function ($q) use ($workspace) {
-                    $q->select('pancake_shop_users.user_id')
-                        ->from('pancake_shop_users')
-                        ->join('shops', 'pancake_shop_users.shop_id', '=', 'shops.id')
-                        ->where('shops.workspace_id', $workspace->id);
-                })
-                ->selectRaw('
-                    COALESCE(SUM(total_called), 0) as total_called,
-                    COALESCE(SUM(total_call_time), 0) as total_call_time
-                ')
-                ->first();
-
-            $totalDel = (int) ($teamDr->delivered ?? 0);
-            $totalRet = (int) ($teamDr->returning_count ?? 0);
+            $totalDel = (int) $allPosReports->sum('delivered');
+            $totalRet = (int) $allPosReports->sum('returning');
 
             $teamAvg = [
-                'total_orders' => round((int) ($teamDr->total_orders ?? 0) / $teamCsrCount),
-                'total_sales' => round((float) ($teamDr->total_sales ?? 0) / $teamCsrCount, 2),
-                'delivered' => round($totalDel / $teamCsrCount),
-                'returning_count' => round($totalRet / $teamCsrCount),
+                'total_orders' => (int) round($allPosReports->sum('total_orders') / $teamCsrCount),
+                'total_sales' => round((float) $allPosReports->sum('total_sales') / $teamCsrCount, 2),
+                'delivered' => (int) round($totalDel / $teamCsrCount),
+                'returning_count' => (int) round($totalRet / $teamCsrCount),
                 'rts_rate' => ($totalDel + $totalRet) > 0
                     ? round(($totalRet / ($totalDel + $totalRet)) * 100, 2)
                     : 0,
-                'total_called' => round((int) ($teamRmo->total_called ?? 0) / $teamCsrCount),
-                'total_call_time' => round((int) ($teamRmo->total_call_time ?? 0) / $teamCsrCount),
+                'total_called' => (int) round($allRmoReports->sum('total_called') / $teamCsrCount),
+                'total_call_time' => (int) round($allRmoReports->sum('total_call_time') / $teamCsrCount),
             ];
         }
 
@@ -294,6 +214,7 @@ class CSRController extends Controller
 
         return Inertia::render('workspaces/csr/dashboard', [
             'workspace' => $workspace,
+            'authUserId' => $authUser->id,
             'pancakeAccounts' => $pancakeAccounts,
             'myTodayStats' => $myTodayStats,
             'pendingOrders' => $pendingOrders,

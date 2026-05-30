@@ -1,4 +1,3 @@
-import AppLogo from '@/components/app-logo';
 import AppLogoIcon from '@/components/app-logo-icon';
 import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import { Icon } from '@/components/icon';
@@ -9,12 +8,6 @@ import {
     DropdownMenuContent,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-    NavigationMenu,
-    NavigationMenuItem,
-    NavigationMenuList,
-    navigationMenuTriggerStyle,
-} from '@/components/ui/navigation-menu';
 import {
     Sheet,
     SheetContent,
@@ -56,128 +49,121 @@ export default function CsrLayout({ children }: CsrLayoutProps) {
         },
     ];
 
-    const activeItemStyles =
-        'text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100';
-
     return (
-        <div className="flex min-h-screen w-full flex-col bg-white text-gray-900 dark:bg-[#0F0F11] dark:text-gray-100">
-            {/* Top bar */}
-            <div className="border-b border-sidebar-border/80 dark:border-white/8">
-                <div className="flex h-16 items-center px-4">
-                    {/* Mobile menu */}
-                    <div className="lg:hidden">
-                        <Sheet>
-                            <SheetTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="mr-2 h-[34px] w-[34px]"
-                                >
-                                    <Menu className="h-5 w-5" />
-                                </Button>
-                            </SheetTrigger>
-                            <SheetContent
-                                side="left"
-                                className="flex h-full w-64 flex-col items-stretch justify-between bg-white dark:bg-[#0F0F11]"
+        <div className="flex h-screen w-full flex-col bg-gray-50 text-gray-900 dark:bg-[#09090b] dark:text-gray-100">
+            {/* Slim top bar */}
+            <header className="flex h-11 shrink-0 items-center gap-3 border-b border-black/8 bg-white px-4 dark:border-white/8 dark:bg-zinc-950">
+                {/* Mobile menu */}
+                <div className="lg:hidden">
+                    <Sheet>
+                        <SheetTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
                             >
-                                <SheetTitle className="sr-only">
-                                    Navigation Menu
-                                </SheetTitle>
-                                <SheetHeader className="flex justify-start text-left">
-                                    <AppLogoIcon className="h-6 w-6 fill-current text-black dark:text-white" />
-                                </SheetHeader>
-                                <div className="flex h-full flex-1 flex-col space-y-4 p-4">
-                                    <div className="flex h-full flex-col justify-between text-sm">
-                                        <div className="flex flex-col space-y-4">
-                                            {csrNavItems.map((item) => (
-                                                <Link
-                                                    key={item.title}
-                                                    href={item.href}
-                                                    className="flex items-center space-x-2 font-medium text-gray-800 dark:text-gray-200"
-                                                >
-                                                    {item.icon && (
-                                                        <Icon
-                                                            iconNode={item.icon}
-                                                            className="h-5 w-5"
-                                                        />
-                                                    )}
-                                                    <span>{item.title}</span>
-                                                </Link>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </SheetContent>
-                        </Sheet>
-                    </div>
-
-                    <Link
-                        href={`/workspaces/${slug}/csr/dashboard`}
-                        className="flex items-center space-x-2"
-                    >
-                        <AppLogo />
-                    </Link>
-
-                    {/* Desktop nav */}
-                    <div className="ml-6 hidden h-full items-center space-x-6 lg:flex">
-                        <NavigationMenu className="flex h-full items-stretch">
-                            <NavigationMenuList className="flex h-full items-stretch space-x-2">
-                                {csrNavItems.map((item, index) => (
-                                    <NavigationMenuItem
-                                        key={index}
-                                        className="relative flex h-full items-center"
-                                    >
-                                        <Link
-                                            href={item.href}
-                                            className={cn(
-                                                navigationMenuTriggerStyle(),
-                                                page.url === item.href &&
-                                                    activeItemStyles,
-                                                'h-9 cursor-pointer px-3',
-                                            )}
-                                        >
-                                            {item.icon && (
-                                                <Icon
-                                                    iconNode={item.icon}
-                                                    className="mr-2 h-4 w-4"
-                                                />
-                                            )}
-                                            {item.title}
-                                        </Link>
-                                        {page.url === item.href && (
-                                            <div className="absolute bottom-0 left-0 h-0.5 w-full translate-y-px bg-black dark:bg-white" />
+                                <Menu className="h-4 w-4" />
+                            </Button>
+                        </SheetTrigger>
+                        <SheetContent
+                            side="left"
+                            className="flex h-full w-60 flex-col bg-white dark:bg-zinc-950"
+                        >
+                            <SheetTitle className="sr-only">
+                                Navigation Menu
+                            </SheetTitle>
+                            <SheetHeader className="flex justify-start text-left">
+                                <AppLogoIcon className="h-5 w-5 fill-current text-black dark:text-white" />
+                            </SheetHeader>
+                            <div className="flex flex-col gap-1 p-3">
+                                {csrNavItems.map((item) => (
+                                    <Link
+                                        key={item.title}
+                                        href={item.href}
+                                        className={cn(
+                                            'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                                            page.url.startsWith(typeof item.href === 'string' ? item.href : '')
+                                                ? 'bg-gray-100 text-gray-900 dark:bg-zinc-800 dark:text-white'
+                                                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-zinc-800/50 dark:hover:text-white',
                                         )}
-                                    </NavigationMenuItem>
+                                    >
+                                        {item.icon && (
+                                            <Icon
+                                                iconNode={item.icon}
+                                                className="h-4 w-4"
+                                            />
+                                        )}
+                                        {item.title}
+                                    </Link>
                                 ))}
-                            </NavigationMenuList>
-                        </NavigationMenu>
-                    </div>
-
-                    <div className="ml-auto flex min-w-0 items-center gap-1.5">
-                        <div className="hidden sm:flex">
-                            <AppearanceToggleDropdown />
-                        </div>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button className="flex h-9 max-w-full min-w-0 items-center gap-2.5 rounded-full border border-black/8 bg-stone-50 pr-3 pl-1 transition-all outline-none hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:hover:bg-zinc-700">
-                                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 font-mono text-[11px] font-bold text-white">
-                                        {getInitials(auth.user.name)}
-                                    </div>
-                                    <span className="hidden min-w-0 truncate font-mono! text-[12px]! font-medium text-gray-700 sm:inline dark:text-gray-300">
-                                        {auth.user.name}
-                                    </span>
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-56" align="end">
-                                <UserMenuContent user={auth.user} />
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
+                            </div>
+                        </SheetContent>
+                    </Sheet>
                 </div>
-            </div>
+
+                {/* Logo + label */}
+                <Link
+                    href={`/workspaces/${slug}/csr/dashboard`}
+                    className="flex shrink-0 items-center gap-2"
+                >
+                    <AppLogoIcon className="h-5 w-5 fill-current text-black dark:text-white" />
+                    <span className="hidden text-[13px] font-semibold tracking-tight text-gray-800 dark:text-gray-100 sm:block">
+                        CSR Portal
+                    </span>
+                </Link>
+
+                <div className="hidden h-4 w-px bg-black/10 dark:bg-white/10 lg:block" />
+
+                {/* Desktop nav */}
+                <nav className="hidden items-center gap-1 lg:flex">
+                    {csrNavItems.map((item) => {
+                        const isActive = page.url.startsWith(typeof item.href === 'string' ? item.href : '');
+                        return (
+                            <Link
+                                key={item.title}
+                                href={item.href}
+                                className={cn(
+                                    'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors',
+                                    isActive
+                                        ? 'bg-gray-100 text-gray-900 dark:bg-zinc-800 dark:text-white'
+                                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-zinc-800/60 dark:hover:text-gray-200',
+                                )}
+                            >
+                                {item.icon && (
+                                    <Icon
+                                        iconNode={item.icon}
+                                        className="h-3.5 w-3.5"
+                                    />
+                                )}
+                                {item.title}
+                            </Link>
+                        );
+                    })}
+                </nav>
+
+                {/* Right actions */}
+                <div className="ml-auto flex items-center gap-2">
+                    <AppearanceToggleDropdown />
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button className="flex h-7 items-center gap-2 rounded-full border border-black/8 bg-stone-50 pr-2.5 pl-0.5 transition-colors outline-none hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:hover:bg-zinc-700">
+                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 font-mono text-[10px] font-bold text-white">
+                                    {getInitials(auth.user.name)}
+                                </div>
+                                <span className="hidden max-w-[100px] truncate font-mono text-[11px] font-medium text-gray-700 sm:block dark:text-gray-300">
+                                    {auth.user.name}
+                                </span>
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56" align="end">
+                            <UserMenuContent user={auth.user} />
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </header>
 
             {/* Page content */}
-            <main className="flex h-full w-full flex-1 flex-col">
+            <main className="flex flex-1 flex-col overflow-y-auto">
                 {children}
             </main>
 

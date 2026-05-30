@@ -2,6 +2,8 @@
 
 namespace Modules\Pancake\Models;
 
+use App\Models\PancakeUserPosDailyReport;
+use App\Models\PancakeUserRmoDailyReport;
 use App\Models\Shop;
 use App\Models\User as SystemUser;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -46,5 +48,15 @@ class User extends Model
     public function assignedOrderForDelivery()
     {
         return $this->hasMany(OrderForDelivery::class, 'assignee_id', 'id');
+    }
+
+    public function posReports(): HasMany
+    {
+        return $this->hasMany(PancakeUserPosDailyReport::class, 'pancake_user_id');
+    }
+
+    public function rmoReports(): HasMany
+    {
+        return $this->hasMany(PancakeUserRmoDailyReport::class, 'pancake_user_id');
     }
 }
