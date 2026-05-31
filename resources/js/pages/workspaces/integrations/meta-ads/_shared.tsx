@@ -1,6 +1,10 @@
 import { Button } from '@/components/ui/button';
 import { SortableHeader } from '@/components/ui/data-table';
 import {
+    Dialog,
+    DialogContent,
+} from '@/components/ui/dialog';
+import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
     DropdownMenuContent,
@@ -23,7 +27,7 @@ import {
 import { router } from '@inertiajs/react';
 import { ColumnDef, VisibilityState } from '@tanstack/react-table';
 import clsx from 'clsx';
-import { Check, ChevronDown, Columns3, Filter, Plus, Search, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Columns3, Filter, GripVertical, Plus, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export function StatusToggle({
@@ -1056,50 +1060,88 @@ const TAB_DEFS: { id: AdsManagerTab; label: string }[] = [
     { id: 'ads', label: 'Ads' },
 ];
 
-/**
- * Persists column-visibility state in localStorage under a stable key so the
- * user's column choices stick across reloads and tab switches.
- */
-export function useColumnVisibility(
+export interface ColumnPreset {
+    id: string;
+    name: string;
+    visibility: VisibilityState;
+    columnOrder: string[];
+}
+
+function lsGet<T>(key: string, fallback: T): T {
+    try {
+        const raw = window.localStorage.getItem(key);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed !== null && parsed !== undefined) return parsed as T;
+        }
+    } catch { /* ignore */ }
+    return fallback;
+}
+
+function lsSet(key: string, value: unknown) {
+    try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
+}
+
+export function useColumnPresets(
     storageKey: string,
-    defaults: VisibilityState = {},
+    defaults: VisibilityState,
+    defaultOrder: string[],
 ) {
     const [visibility, setVisibility] = useState<VisibilityState>(() => {
-        if (typeof window === 'undefined') return defaults;
-        try {
-            const raw = window.localStorage.getItem(storageKey);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (Object.keys(parsed).length > 0) {
-                    return { ...defaults, ...parsed };
-                }
-            }
-        } catch {
-            /* ignore */
-        }
-        return defaults;
+        const stored = lsGet<VisibilityState>(storageKey, {});
+        return Object.keys(stored).length > 0 ? { ...defaults, ...stored } : defaults;
     });
 
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        try {
-            window.localStorage.setItem(storageKey, JSON.stringify(visibility));
-        } catch {
-            /* ignore quota / private-mode errors */
-        }
-    }, [storageKey, visibility]);
+    const [columnOrder, setColumnOrder] = useState<string[]>(() => {
+        const stored = lsGet<string[]>(`${storageKey}:order`, []);
+        // Merge: keep stored order, append any new IDs, drop removed IDs
+        const valid = stored.filter((id) => defaultOrder.includes(id));
+        const missing = defaultOrder.filter((id) => !valid.includes(id));
+        return [...valid, ...missing];
+    });
 
-    return [visibility, setVisibility] as const;
+    const [presets, setPresets] = useState<ColumnPreset[]>(() =>
+        lsGet<ColumnPreset[]>(`${storageKey}:presets`, []),
+    );
+
+    useEffect(() => { lsSet(storageKey, visibility); }, [storageKey, visibility]);
+    useEffect(() => { lsSet(`${storageKey}:order`, columnOrder); }, [storageKey, columnOrder]);
+    useEffect(() => { lsSet(`${storageKey}:presets`, presets); }, [storageKey, presets]);
+
+    const savePreset = (name: string) => {
+        const preset: ColumnPreset = {
+            id: crypto.randomUUID(),
+            name: name.trim(),
+            visibility: { ...visibility },
+            columnOrder: [...columnOrder],
+        };
+        setPresets((prev) => [...prev, preset]);
+    };
+
+    const deletePreset = (id: string) =>
+        setPresets((prev) => prev.filter((p) => p.id !== id));
+
+    const loadPreset = (preset: ColumnPreset) => {
+        setVisibility(preset.visibility);
+        // Merge stored preset order with any new columns added since preset was saved
+        const valid = preset.columnOrder.filter((id) => defaultOrder.includes(id));
+        const missing = defaultOrder.filter((id) => !valid.includes(id));
+        setColumnOrder([...valid, ...missing]);
+    };
+
+    const resetToDefault = () => {
+        setVisibility(defaults);
+        setColumnOrder(defaultOrder);
+    };
+
+    return { visibility, setVisibility, columnOrder, setColumnOrder, presets, savePreset, deletePreset, loadPreset, resetToDefault };
 }
 
 export interface ColumnOption {
     id: string;
     label: string;
-    /** Section heading in the dropdown (e.g. "Delivery & Traffic"). */
     category?: string;
-    /** Always shown, can't be hidden (e.g. the primary name column). */
     required?: boolean;
-    /** When true and no saved state exists, the column starts hidden. */
     hiddenByDefault?: boolean;
 }
 
@@ -1107,128 +1149,395 @@ interface ColumnVisibilityMenuProps {
     options: ColumnOption[];
     value: VisibilityState;
     onChange: (next: VisibilityState) => void;
+    columnOrder: string[];
+    onColumnOrderChange: (order: string[]) => void;
+    presets: ColumnPreset[];
+    onSavePreset: (name: string) => void;
+    onDeletePreset: (id: string) => void;
+    onLoadPreset: (preset: ColumnPreset) => void;
+    onReset: () => void;
 }
 
 export function ColumnVisibilityMenu({
     options,
     value,
     onChange,
+    columnOrder,
+    onColumnOrderChange,
+    presets,
+    onSavePreset,
+    onDeletePreset,
+    onLoadPreset,
+    onReset,
 }: ColumnVisibilityMenuProps) {
     const [open, setOpen] = useState(false);
+
+    // Draft state — uncommitted until Apply
+    const [draftVisibility, setDraftVisibility] = useState<VisibilityState>(value);
+    const [draftOrder, setDraftOrder] = useState<string[]>(columnOrder);
+
+    // Left-panel state
     const [search, setSearch] = useState('');
+    const [activeCategory, setActiveCategory] = useState('All');
+    const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+    const allCollapsed = Object.values(collapsed).every(Boolean);
 
+    // Right-panel drag state
+    const [dragId, setDragId] = useState<string | null>(null);
+    const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+    // Preset save state
+    const [presetName, setPresetName] = useState('');
+    const [savingPreset, setSavingPreset] = useState(false);
+
+    // Sync draft from committed state on open
     useEffect(() => {
-        if (!open) setSearch('');
-    }, [open]);
+        if (open) {
+            setDraftVisibility(value);
+            setDraftOrder(columnOrder);
+            setSearch('');
+            setActiveCategory('All');
+            setCollapsed({});
+            setSavingPreset(false);
+            setPresetName('');
+        }
+    }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const isVisible = (opt: ColumnOption) =>
-        value[opt.id] !== undefined
-            ? value[opt.id] !== false
+    const optById = Object.fromEntries(options.map((o) => [o.id, o]));
+
+    const isChecked = (id: string) => {
+        const opt = optById[id];
+        if (!opt) return false;
+        return draftVisibility[id] !== undefined
+            ? draftVisibility[id] !== false
             : !opt.hiddenByDefault;
-
-    const visibleCount = options.filter(isVisible).length;
-    const totalCount = options.length;
-
-    const reset = () => {
-        const cleared: VisibilityState = {};
-        for (const o of options) cleared[o.id] = !o.hiddenByDefault;
-        onChange(cleared);
     };
 
+    const selectedCount = options.filter((o) => isChecked(o.id)).length;
+
+    // Left panel: categories
+    const categories = ['All', ...Array.from(new Set(options.map((o) => o.category ?? 'General')))];
+
+    // Left panel: filtered + grouped options
     const q = search.toLowerCase();
+    const visibleOpts = options.filter((o) => {
+        if (q && !o.label.toLowerCase().includes(q)) return false;
+        if (activeCategory !== 'All' && (o.category ?? 'General') !== activeCategory) return false;
+        return true;
+    });
+
     const grouped: { category: string; opts: ColumnOption[] }[] = [];
-    for (const opt of options) {
-        if (q && !opt.label.toLowerCase().includes(q)) continue;
+    for (const opt of visibleOpts) {
         const cat = opt.category ?? 'General';
-        const existing = grouped.find((g) => g.category === cat);
-        if (existing) existing.opts.push(opt);
+        const g = grouped.find((x) => x.category === cat);
+        if (g) g.opts.push(opt);
         else grouped.push({ category: cat, opts: [opt] });
     }
 
+    const toggleCollapse = (cat: string) =>
+        setCollapsed((prev) => ({ ...prev, [cat]: !prev[cat] }));
+    const toggleCollapseAll = () => {
+        if (allCollapsed) setCollapsed({});
+        else setCollapsed(Object.fromEntries(grouped.map((g) => [g.category, true])));
+    };
+
+    // Right panel: selected columns in order
+    const selectedInOrder = draftOrder
+        .map((id) => optById[id])
+        .filter((o): o is ColumnOption => !!o && isChecked(o.id));
+
+    // Right-panel drag handlers
+    const onDragStart = (id: string) => setDragId(id);
+    const onDragOver = (e: React.DragEvent, id: string) => { e.preventDefault(); if (id !== dragId) setDragOverId(id); };
+    const onDrop = (e: React.DragEvent, targetId: string) => {
+        e.preventDefault();
+        if (!dragId || dragId === targetId) { setDragId(null); setDragOverId(null); return; }
+        const next = [...draftOrder];
+        const from = next.indexOf(dragId);
+        const to = next.indexOf(targetId);
+        if (from !== -1 && to !== -1) { next.splice(from, 1); next.splice(to, 0, dragId); setDraftOrder(next); }
+        setDragId(null); setDragOverId(null);
+    };
+    const onDragEnd = () => { setDragId(null); setDragOverId(null); };
+
+    const handleApply = () => {
+        onChange(draftVisibility);
+        onColumnOrderChange(draftOrder);
+        setOpen(false);
+    };
+
+    const handleSavePreset = () => {
+        if (!presetName.trim()) return;
+        // Save using current draft state
+        onSavePreset(presetName.trim());
+        // Also commit so preset matches what's applied
+        onChange(draftVisibility);
+        onColumnOrderChange(draftOrder);
+        setPresetName('');
+        setSavingPreset(false);
+    };
+
+    const handleReset = () => {
+        onReset();
+        setOpen(false);
+    };
+
     return (
-        <DropdownMenu open={open} onOpenChange={setOpen}>
-            <DropdownMenuTrigger asChild>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 gap-1.5 font-mono! text-[12px]!"
-                >
-                    <Columns3 className="h-3.5 w-3.5" />
-                    Columns
-                    <span className="text-gray-400 dark:text-gray-500">
-                        {visibleCount}/{totalCount}
-                    </span>
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-                align="end"
-                className="flex w-72 flex-col p-0 font-mono text-[12px]"
+        <>
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setOpen(true)}
+                className="h-9 gap-1.5 font-mono! text-[12px]!"
             >
-                {/* Sticky search */}
-                <div className="border-b border-black/6 p-2 dark:border-white/6">
-                    <div className="relative">
-                        <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3 w-3 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-                        <input
-                            type="text"
-                            placeholder="Search columns..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            onKeyDown={(e) => e.stopPropagation()}
-                            className="h-7 w-full rounded-md border border-black/6 bg-stone-50 pr-2 pl-7 font-mono text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
-                        />
+                <Columns3 className="h-3.5 w-3.5" />
+                Columns
+                <span className="text-gray-400 dark:text-gray-500">{selectedCount}/{options.length}</span>
+            </Button>
+
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="min-w-4xl w-full gap-0 overflow-hidden p-0 font-mono text-[12px]">
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-black/6 px-5 py-3.5 dark:border-white/6">
+                        <h2 className="text-[14px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
+                            Customize columns
+                        </h2>
+                        <button
+                            type="button"
+                            onClick={() => setOpen(false)}
+                            className="rounded-lg p-1 text-gray-400 hover:bg-stone-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-gray-300"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
                     </div>
-                </div>
 
-                {/* Scrollable list */}
-                <div className="max-h-[55vh] overflow-y-auto">
-                    {grouped.length === 0 && (
-                        <p className="py-4 text-center text-[11px] text-gray-400 dark:text-gray-500">
-                            No columns match.
-                        </p>
-                    )}
-                    {grouped.map((g, idx) => (
-                        <div key={g.category}>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel className="px-2 pt-2 pb-1 font-mono text-[9px] tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
-                                {g.category}
-                            </DropdownMenuLabel>
-                            {g.opts.map((opt) => {
-                                const checked = isVisible(opt);
-                                return (
-                                    <DropdownMenuCheckboxItem
-                                        key={opt.id}
-                                        checked={checked}
-                                        disabled={opt.required}
-                                        onCheckedChange={(next) =>
-                                            onChange({ ...value, [opt.id]: !!next })
-                                        }
-                                        onSelect={(e) => e.preventDefault()}
-                                    >
-                                        {opt.label}
-                                        {opt.required && (
-                                            <span className="ml-auto text-[10px] text-gray-300 dark:text-gray-600">
-                                                locked
-                                            </span>
+                    <div className="flex" style={{ height: '520px' }}>
+                        {/* ── Left panel ── */}
+                        <div className="flex w-[55%] flex-col border-r border-black/6 dark:border-white/6">
+                            {/* Search + collapse */}
+                            <div className="flex items-center gap-2 border-b border-black/6 p-3 dark:border-white/6">
+                                <div className="relative flex-1">
+                                    <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3 w-3 -translate-y-1/2 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search for metrics or column settings"
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        className="h-8 w-full rounded-lg border border-black/6 bg-stone-50 pr-3 pl-8 text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={toggleCollapseAll}
+                                    className="flex h-8 shrink-0 items-center gap-1 rounded-lg border border-black/6 px-2.5 text-[11px] text-gray-500 hover:border-black/12 hover:text-gray-700 dark:border-white/6 dark:text-gray-400 dark:hover:text-gray-200"
+                                >
+                                    {allCollapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
+                                    {allCollapsed ? 'Expand all' : 'Collapse all'}
+                                </button>
+                            </div>
+
+                            {/* Category tabs */}
+                            {!search && (
+                                <div className="flex gap-0 overflow-x-auto border-b border-black/6 dark:border-white/6">
+                                    {categories.map((cat) => (
+                                        <button
+                                            key={cat}
+                                            type="button"
+                                            onClick={() => setActiveCategory(cat)}
+                                            className={clsx(
+                                                'shrink-0 border-b-2 px-3 py-2.5 text-[11px] transition-colors',
+                                                activeCategory === cat
+                                                    ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                                                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200',
+                                            )}
+                                        >
+                                            {cat}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Column groups */}
+                            <div className="flex-1 overflow-y-auto">
+                                {grouped.length === 0 && (
+                                    <p className="py-8 text-center text-[11px] text-gray-400 dark:text-gray-500">No columns match.</p>
+                                )}
+                                {grouped.map((g) => (
+                                    <div key={g.category}>
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleCollapse(g.category)}
+                                            className="flex w-full items-center justify-between bg-stone-50 px-4 py-2 text-[10px] font-medium tracking-wider text-gray-500 uppercase hover:bg-stone-100 dark:bg-zinc-800/60 dark:text-gray-400 dark:hover:bg-zinc-800"
+                                        >
+                                            {g.category}
+                                            {collapsed[g.category]
+                                                ? <ChevronDown className="h-3 w-3" />
+                                                : <ChevronUp className="h-3 w-3" />}
+                                        </button>
+                                        {!collapsed[g.category] && (
+                                            <div className="grid grid-cols-2 gap-0 px-3 py-2">
+                                                {g.opts.map((opt) => (
+                                                    <label
+                                                        key={opt.id}
+                                                        className={clsx(
+                                                            'flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-stone-50 dark:hover:bg-zinc-800/50',
+                                                            opt.required && 'cursor-default opacity-60',
+                                                        )}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            disabled={opt.required}
+                                                            checked={isChecked(opt.id)}
+                                                            onChange={(e) =>
+                                                                setDraftVisibility((prev) => ({ ...prev, [opt.id]: e.target.checked }))
+                                                            }
+                                                            className="h-3.5 w-3.5 rounded border-gray-300 accent-emerald-500"
+                                                        />
+                                                        <span className="text-[11px] text-gray-700 dark:text-gray-300">{opt.label}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
                                         )}
-                                    </DropdownMenuCheckboxItem>
-                                );
-                            })}
-                            {idx === grouped.length - 1 && <DropdownMenuSeparator />}
-                        </div>
-                    ))}
-                </div>
+                                    </div>
+                                ))}
+                            </div>
 
-                {/* Footer */}
-                <div className="border-t border-black/6 dark:border-white/6">
-                    <button
-                        onClick={reset}
-                        className="w-full px-2 py-1.5 text-left text-[11px] text-gray-500 hover:bg-stone-100 dark:text-gray-400 dark:hover:bg-zinc-800"
-                    >
-                        Reset to default
-                    </button>
-                </div>
-            </DropdownMenuContent>
-        </DropdownMenu>
+                            {/* Preset save */}
+                            <div className="border-t border-black/6 p-3 dark:border-white/6">
+                                {savingPreset ? (
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            autoFocus
+                                            type="text"
+                                            placeholder="Preset name..."
+                                            value={presetName}
+                                            onChange={(e) => setPresetName(e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter') handleSavePreset(); if (e.key === 'Escape') setSavingPreset(false); }}
+                                            className="h-7 flex-1 rounded-md border border-black/6 bg-stone-50 px-2 text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
+                                        />
+                                        <button type="button" onClick={handleSavePreset} className="h-7 rounded-md bg-emerald-500 px-2.5 text-[11px] font-medium text-white hover:bg-emerald-600">Save</button>
+                                        <button type="button" onClick={() => setSavingPreset(false)} className="h-7 rounded-md border border-black/6 px-2 text-[11px] text-gray-500 hover:text-gray-700 dark:border-white/6 dark:text-gray-400">Cancel</button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSavingPreset(true)}
+                                        className="flex items-center gap-1.5 rounded-md border border-black/6 px-3 py-1.5 text-[11px] text-gray-600 transition-colors hover:border-black/12 hover:bg-stone-50 dark:border-white/6 dark:text-gray-400 dark:hover:bg-zinc-800"
+                                    >
+                                        <Plus className="h-3 w-3" />
+                                        Save as column preset
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* ── Right panel ── */}
+                        <div className="flex w-[45%] flex-col">
+                            <div className="border-b border-black/6 px-4 py-3 dark:border-white/6">
+                                <p className="text-[13px] font-semibold text-gray-800 dark:text-gray-100">
+                                    {selectedCount} {selectedCount === 1 ? 'column' : 'columns'} selected
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
+                                    Drag and drop to arrange columns as they'll appear in the table.
+                                </p>
+                            </div>
+
+                            {/* Saved presets */}
+                            {presets.length > 0 && (
+                                <div className="border-b border-black/6 px-4 py-2 dark:border-white/6">
+                                    <p className="mb-1.5 text-[9px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">Saved presets</p>
+                                    <div className="flex flex-wrap gap-1">
+                                        {presets.map((p) => (
+                                            <div key={p.id} className="flex items-center gap-0.5 rounded-md border border-black/6 bg-stone-50 py-0.5 pl-2 pr-1 dark:border-white/6 dark:bg-zinc-800">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        onLoadPreset(p);
+                                                        setDraftVisibility(p.visibility);
+                                                        const valid = p.columnOrder.filter((id) => !!optById[id]);
+                                                        const missing = options.filter((o) => !valid.includes(o.id)).map((o) => o.id);
+                                                        setDraftOrder([...valid, ...missing]);
+                                                    }}
+                                                    className="text-[11px] text-gray-700 hover:text-emerald-600 dark:text-gray-300 dark:hover:text-emerald-400"
+                                                >
+                                                    {p.name}
+                                                </button>
+                                                <button type="button" onClick={() => onDeletePreset(p.id)} className="ml-0.5 rounded p-0.5 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
+                                                    <X className="h-2.5 w-2.5" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Draggable selected column list */}
+                            <div className="flex-1 overflow-y-auto px-2 py-2">
+                                {selectedInOrder.length === 0 && (
+                                    <p className="py-8 text-center text-[11px] text-gray-400 dark:text-gray-500">No columns selected.</p>
+                                )}
+                                {selectedInOrder.map((opt) => (
+                                    <div
+                                        key={opt.id}
+                                        draggable={!opt.required}
+                                        onDragStart={() => onDragStart(opt.id)}
+                                        onDragOver={(e) => onDragOver(e, opt.id)}
+                                        onDrop={(e) => onDrop(e, opt.id)}
+                                        onDragEnd={onDragEnd}
+                                        className={clsx(
+                                            'flex items-center gap-2 rounded-lg px-2 py-2 transition-colors',
+                                            !opt.required && 'cursor-grab',
+                                            dragId === opt.id && 'opacity-40',
+                                            dragOverId === opt.id && 'border-t-2 border-emerald-500',
+                                            'hover:bg-stone-50 dark:hover:bg-zinc-800/50',
+                                        )}
+                                    >
+                                        <GripVertical className="h-3.5 w-3.5 shrink-0 text-gray-300 dark:text-gray-600" />
+                                        <span className="flex-1 truncate text-[11px] text-gray-700 dark:text-gray-300">{opt.label}</span>
+                                        {!opt.required && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setDraftVisibility((prev) => ({ ...prev, [opt.id]: false }))}
+                                                className="shrink-0 rounded p-0.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
+                                            >
+                                                <X className="h-3.5 w-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Footer actions */}
+                            <div className="flex items-center justify-between border-t border-black/6 px-4 py-3 dark:border-white/6">
+                                <button
+                                    type="button"
+                                    onClick={handleReset}
+                                    className="text-[11px] text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                >
+                                    Reset to default
+                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setOpen(false)}
+                                        className="h-8 rounded-lg border border-black/6 px-4 text-[11px] text-gray-600 transition-colors hover:border-black/12 dark:border-white/6 dark:text-gray-400"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleApply}
+                                        className="h-8 rounded-lg bg-emerald-500 px-4 text-[11px] font-medium text-white transition-colors hover:bg-emerald-600"
+                                    >
+                                        Apply
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }
 

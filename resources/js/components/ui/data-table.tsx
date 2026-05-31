@@ -3,6 +3,7 @@
 import {
     Column,
     ColumnDef,
+    ColumnOrderState,
     PaginationState,
     RowSelectionState,
     SortingState,
@@ -48,6 +49,8 @@ interface DataTableProps<TData, TValue> {
     onRowClick?: (row: TData) => void
     columnVisibility?: VisibilityState
     onColumnVisibilityChange?: (state: VisibilityState) => void
+    columnOrder?: ColumnOrderState
+    onColumnOrderChange?: (order: ColumnOrderState) => void
 }
 
 export function DataTable<TData, TValue>({
@@ -61,7 +64,9 @@ export function DataTable<TData, TValue>({
                                              getRowId,
                                              onRowClick,
                                              columnVisibility,
-                                             onColumnVisibilityChange
+                                             onColumnVisibilityChange,
+                                             columnOrder,
+                                             onColumnOrderChange,
                                          }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
 
@@ -104,11 +109,18 @@ export function DataTable<TData, TValue>({
                 onColumnVisibilityChange(next)
             }
             : undefined,
+        onColumnOrderChange: onColumnOrderChange
+            ? (updater) => {
+                const next = typeof updater === 'function' ? updater(columnOrder ?? []) : updater
+                onColumnOrderChange(next)
+            }
+            : undefined,
         state: {
             sorting,
             pagination,
             ...(rowSelection !== undefined ? { rowSelection } : {}),
             ...(columnVisibility !== undefined ? { columnVisibility } : {}),
+            ...(columnOrder !== undefined ? { columnOrder } : {}),
         },
         manualSorting: true,
     })

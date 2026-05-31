@@ -31,7 +31,7 @@ import {
     buildInsightsColumns,
     deserializeMetricFilters,
     serializeMetricFilters,
-    useColumnVisibility,
+    useColumnPresets,
 } from './_shared';
 
 import DateOption = flatpickr.Options.DateOption;
@@ -156,9 +156,10 @@ export default function MetaAdsAds({
         { id: 'name', label: 'Ad', category: 'General', required: true },
         ...INSIGHTS_OPTIONS,
     ];
-    const [columnVisibility, setColumnVisibility] = useColumnVisibility(
+    const { visibility: columnVisibility, setVisibility: setColumnVisibility, columnOrder, setColumnOrder, presets, savePreset, deletePreset, loadPreset, resetToDefault } = useColumnPresets(
         'meta-ads-cols:ads',
         Object.fromEntries(COLUMN_OPTIONS.map((o) => [o.id, !o.hiddenByDefault])),
+        COLUMN_OPTIONS.map((o) => o.id),
     );
 
     const columns: ColumnDef<AdRow>[] = [
@@ -348,6 +349,13 @@ export default function MetaAdsAds({
                             options={COLUMN_OPTIONS}
                             value={columnVisibility}
                             onChange={setColumnVisibility}
+                            columnOrder={columnOrder}
+                            onColumnOrderChange={setColumnOrder}
+                            presets={presets}
+                            onSavePreset={savePreset}
+                            onDeletePreset={deletePreset}
+                            onLoadPreset={loadPreset}
+                            onReset={resetToDefault}
                         />
                         <span className="hidden font-mono text-[10px] text-gray-300 sm:inline dark:text-gray-600">
                             {rows.total.toLocaleString()} ads
@@ -363,6 +371,8 @@ export default function MetaAdsAds({
                         meta={{ ...omit(rows, ['data']) }}
                         columnVisibility={columnVisibility}
                         onColumnVisibilityChange={setColumnVisibility}
+                        columnOrder={columnOrder}
+                        onColumnOrderChange={setColumnOrder}
                         onFetch={(params) => navigate({
                             sort: params?.sort,
                             page: params?.page ?? 1,
