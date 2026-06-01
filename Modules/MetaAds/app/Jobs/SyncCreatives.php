@@ -23,29 +23,38 @@ class SyncCreatives implements ShouldQueue
 
     public int $tries = 8;
 
-    public function __construct(public AdAccount $adAccount) {}
+    public function __construct(
+        public AdAccount $adAccount,
+        public ?string $nextUrl = null,
+        public int $runningCount = 0,
+        public ?int $syncRunId = null,
+    ) {}
 
     public function handle(): void
     {
-        $run = SyncRun::start(
-            entityType: SyncRun::ENTITY_AD_CREATIVES,
-            scopeType: AdAccount::class,
-            scopeId: $this->adAccount->id,
-        );
+        $run = $this->syncRunId !== null
+            ? SyncRun::findOrFail($this->syncRunId)
+            : SyncRun::start(
+                entityType: SyncRun::ENTITY_AD_CREATIVES,
+                scopeType: AdAccount::class,
+                scopeId: $this->adAccount->id,
+            );
 
         try {
             $client = $this->adAccount->graphClient();
 
             $fields = 'id,name,title,body,object_type,call_to_action_type,image_url,image_hash,video_id,thumbnail_url,object_story_spec,effective_object_story_id,instagram_permalink_url,status';
 
-            $count = 0;
-
+            $path = $this->nextUrl ?? "{$this->adAccount->graphAccountId()}/adcreatives";
             // Creatives carry a large `object_story_spec` JSON; cap page size
             // so the response doesn't blow Meta's per-request size limit.
-            foreach ($client->paginated(
-                "{$this->adAccount->graphAccountId()}/adcreatives",
-                ['fields' => $fields, 'limit' => 25],
-            ) as $row) {
+            $query = $this->nextUrl ? [] : ['fields' => $fields, 'limit' => 25];
+
+            $page = $client->getPage($path, $query);
+
+            $count = $this->runningCount;
+
+            foreach ($page['data'] ?? [] as $row) {
                 Creative::updateOrCreate(
                     ['id' => $row['id']],
                     [
@@ -71,7 +80,13 @@ class SyncCreatives implements ShouldQueue
                 $count++;
             }
 
-            $run->succeed($count, ['creative_count' => $count]);
+            $nextUrl = $page['paging']['next'] ?? null;
+
+            if ($nextUrl !== null) {
+                static::dispatch($this->adAccount, $nextUrl, $count, $run->id);
+            } else {
+                $run->succeed($count, ['creative_count' => $count]);
+            }
         } catch (Throwable $e) {
             $this->handleSyncError($run, $e);
         }

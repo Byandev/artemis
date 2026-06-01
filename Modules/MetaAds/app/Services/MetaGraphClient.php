@@ -44,6 +44,29 @@ class MetaGraphClient
     }
 
     /**
+     * Single-page GET — fetches one page and returns the raw body (data + paging).
+     * Pass an empty $query when $path is already a full `paging.next` URL (cursor is embedded).
+     */
+    public function getPage(string $path, array $query = []): array
+    {
+        if ($query !== []) {
+            $query = array_merge(['limit' => $this->pageSize], $query);
+        }
+
+        $url = $this->url($path);
+
+        $this->pacingSleep();
+        $this->proactiveSleepIfNeeded();
+        $response = $this->request()->get($url, $query);
+        $this->stampPacingClock();
+        $body = $this->safeDecode($response);
+        $this->recordUsage($response);
+        $this->throttleOnUsage($response);
+
+        return $body;
+    }
+
+    /**
      * Paginated GET — yields each item from the `data` array, walking `paging.next` until exhausted.
      */
     public function paginated(string $path, array $query = []): Generator

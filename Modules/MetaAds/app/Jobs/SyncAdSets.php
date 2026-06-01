@@ -23,26 +23,38 @@ class SyncAdSets implements ShouldQueue
 
     public int $tries = 8;
 
-    public function __construct(public AdAccount $adAccount) {}
+    public function __construct(
+        public AdAccount $adAccount,
+        public ?string $nextUrl = null,
+        public int $runningCount = 0,
+        public ?int $syncRunId = null,
+    ) {}
 
     public function handle(): void
     {
         sleep(2);
 
-        $run = SyncRun::start(
-            entityType: SyncRun::ENTITY_AD_SETS,
-            scopeType: AdAccount::class,
-            scopeId: $this->adAccount->id,
-        );
+        $run = $this->syncRunId !== null
+            ? SyncRun::findOrFail($this->syncRunId)
+            : SyncRun::start(
+                entityType: SyncRun::ENTITY_AD_SETS,
+                scopeType: AdAccount::class,
+                scopeId: $this->adAccount->id,
+            );
 
         try {
             $client = $this->adAccount->graphClient();
 
             $fields = 'id,name,campaign_id,status,effective_status,daily_budget,lifetime_budget,bid_strategy,optimization_goal,billing_event,targeting,promoted_object,start_time,end_time,created_time,updated_time';
 
-            $count = 0;
+            $path = $this->nextUrl ?? "{$this->adAccount->graphAccountId()}/adsets";
+            $query = $this->nextUrl ? [] : ['fields' => $fields];
 
-            foreach ($client->paginated("{$this->adAccount->graphAccountId()}/adsets", ['fields' => $fields]) as $row) {
+            $page = $client->getPage($path, $query);
+
+            $count = $this->runningCount;
+
+            foreach ($page['data'] ?? [] as $row) {
                 if (! ($row['campaign_id'] ?? null)) {
                     continue;
                 }
@@ -75,7 +87,13 @@ class SyncAdSets implements ShouldQueue
                 $count++;
             }
 
-            $run->succeed($count, ['ad_set_count' => $count]);
+            $nextUrl = $page['paging']['next'] ?? null;
+
+            if ($nextUrl !== null) {
+                static::dispatch($this->adAccount, $nextUrl, $count, $run->id);
+            } else {
+                $run->succeed($count, ['ad_set_count' => $count]);
+            }
         } catch (Throwable $e) {
             $this->handleSyncError($run, $e);
         }

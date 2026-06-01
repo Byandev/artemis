@@ -23,26 +23,38 @@ class SyncCampaigns implements ShouldQueue
 
     public int $tries = 8;
 
-    public function __construct(public AdAccount $adAccount) {}
+    public function __construct(
+        public AdAccount $adAccount,
+        public ?string $nextUrl = null,
+        public int $runningCount = 0,
+        public ?int $syncRunId = null,
+    ) {}
 
     public function handle(): void
     {
         sleep(2);
 
-        $run = SyncRun::start(
-            entityType: SyncRun::ENTITY_CAMPAIGNS,
-            scopeType: AdAccount::class,
-            scopeId: $this->adAccount->id,
-        );
+        $run = $this->syncRunId !== null
+            ? SyncRun::findOrFail($this->syncRunId)
+            : SyncRun::start(
+                entityType: SyncRun::ENTITY_CAMPAIGNS,
+                scopeType: AdAccount::class,
+                scopeId: $this->adAccount->id,
+            );
 
         try {
             $client = $this->adAccount->graphClient();
 
             $fields = 'id,name,objective,status,effective_status,buying_type,bid_strategy,daily_budget,lifetime_budget,start_time,stop_time,created_time,updated_time';
 
-            $count = 0;
+            $path = $this->nextUrl ?? "{$this->adAccount->graphAccountId()}/campaigns";
+            $query = $this->nextUrl ? [] : ['fields' => $fields];
 
-            foreach ($client->paginated("{$this->adAccount->graphAccountId()}/campaigns", ['fields' => $fields]) as $row) {
+            $page = $client->getPage($path, $query);
+
+            $count = $this->runningCount;
+
+            foreach ($page['data'] ?? [] as $row) {
                 Campaign::updateOrCreate(
                     ['id' => $row['id']],
                     [
@@ -66,7 +78,13 @@ class SyncCampaigns implements ShouldQueue
                 $count++;
             }
 
-            $run->succeed($count, ['campaign_count' => $count]);
+            $nextUrl = $page['paging']['next'] ?? null;
+
+            if ($nextUrl !== null) {
+                static::dispatch($this->adAccount, $nextUrl, $count, $run->id);
+            } else {
+                $run->succeed($count, ['campaign_count' => $count]);
+            }
         } catch (Throwable $e) {
             $this->handleSyncError($run, $e);
         }

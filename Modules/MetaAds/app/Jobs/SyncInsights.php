@@ -90,16 +90,21 @@ class SyncInsights implements ShouldQueue
     public function __construct(
         public AdAccount $adAccount,
         public string $date,
+        public ?string $nextUrl = null,
+        public int $runningCount = 0,
+        public ?int $syncRunId = null,
     ) {}
 
     public function handle(): void
     {
-        $run = SyncRun::start(
-            entityType: SyncRun::ENTITY_AD_INSIGHTS,
-            scopeType: AdAccount::class,
-            scopeId: $this->adAccount->id,
-            meta: ['date' => $this->date],
-        );
+        $run = $this->syncRunId !== null
+            ? SyncRun::findOrFail($this->syncRunId)
+            : SyncRun::start(
+                entityType: SyncRun::ENTITY_AD_INSIGHTS,
+                scopeType: AdAccount::class,
+                scopeId: $this->adAccount->id,
+                meta: ['date' => $this->date],
+            );
 
         try {
             $client = $this->adAccount->graphClient();
@@ -119,7 +124,8 @@ class SyncInsights implements ShouldQueue
                 'video_p75_watched_actions', 'video_p100_watched_actions',
             ]);
 
-            $params = [
+            $path = $this->nextUrl ?? "{$this->adAccount->graphAccountId()}/insights";
+            $query = $this->nextUrl ? [] : [
                 'level' => 'ad',
                 'time_increment' => 1,
                 'time_range' => json_encode([
@@ -129,9 +135,11 @@ class SyncInsights implements ShouldQueue
                 'fields' => $fields,
             ];
 
-            $count = 0;
+            $page = $client->getPage($path, $query);
 
-            foreach ($client->paginated("{$this->adAccount->graphAccountId()}/insights", $params) as $row) {
+            $count = $this->runningCount;
+
+            foreach ($page['data'] ?? [] as $row) {
                 if (! ($row['ad_id'] ?? null) || ! ($row['date_start'] ?? null)) {
                     continue;
                 }
@@ -217,7 +225,13 @@ class SyncInsights implements ShouldQueue
                 $count++;
             }
 
-            $run->succeed($count, ['insight_row_count' => $count]);
+            $nextUrl = $page['paging']['next'] ?? null;
+
+            if ($nextUrl !== null) {
+                static::dispatch($this->adAccount, $this->date, $nextUrl, $count, $run->id);
+            } else {
+                $run->succeed($count, ['insight_row_count' => $count]);
+            }
         } catch (Throwable $e) {
             $this->handleSyncError($run, $e);
         }
