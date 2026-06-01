@@ -52,6 +52,7 @@ class MetaGraphClient
         $url = $this->url($path);
 
         while ($url !== null) {
+            dump($url);
             $this->pacingSleep();
             $this->proactiveSleepIfNeeded();
             $response = $this->request()->get($url, $query);

@@ -21,7 +21,7 @@ class SyncAds implements ShouldQueue
 
     public int $timeout = 600;
 
-    public int $tries = 8;
+    public int $tries = 1;
 
     public function __construct(public AdAccount $adAccount) {}
 
