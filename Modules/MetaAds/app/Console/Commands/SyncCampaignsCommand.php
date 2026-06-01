@@ -8,7 +8,7 @@ use Modules\MetaAds\Models\AdAccount;
 
 class SyncCampaignsCommand extends Command
 {
-    protected $signature = 'metaads:sync-campaigns {ad_account? : AdAccount id (defaults to all)}';
+    protected $signature = 'meta-ads:sync-campaigns {ad_account? : AdAccount id (defaults to all)}';
 
     protected $description = 'Sync campaigns from Meta Graph API for one or all ad accounts';
 
