@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\PublicApi\CallLogController;
+use App\Http\Controllers\PublicApi\CallLogV2Controller;
 use App\Http\Controllers\PublicApi\CsrDailyRecordController;
 use App\Http\Controllers\PublicApi\CsrTrackerController;
 use App\Http\Controllers\PublicApi\HealthController;
@@ -38,5 +39,10 @@ Route::group(['prefix' => 'v2/public', 'as' => 'api.v2.public.', 'middleware' =>
     Route::post('/rmo-orders/login', [RmoOrderV2Controller::class, 'login'])->name('rmo-orders.login');
     Route::get('/rmo-orders', [RmoOrderV2Controller::class, 'assignedOrders'])->name('rmo-orders.index');
     Route::post('/rmo-orders/sync-call-tracking', [RmoOrderV2Controller::class, 'syncCallTracking'])->name('rmo-orders.call-tracking.sync');
+
+    Route::post('/call-logs/sync', [CallLogV2Controller::class, 'sync'])->name('call-logs.sync');
+    Route::get('/call-logs/kpi', [CallLogV2Controller::class, 'kpi'])->name('call-logs.kpi');
+    Route::get('/call-logs/list', [CallLogV2Controller::class, 'list'])->name('call-logs.list');
+    Route::get('/call-logs/summary', [CallLogV2Controller::class, 'summary'])->name('call-logs.summary');
 });
 
