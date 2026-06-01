@@ -29,7 +29,7 @@ class RmoOrderController extends Controller
     public function assignedOrders(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => ['required', 'integer'],
+            'user_id' => ['required', 'uuid'],
         ]);
 
         $workspace = $request->attributes->get('workspace');
