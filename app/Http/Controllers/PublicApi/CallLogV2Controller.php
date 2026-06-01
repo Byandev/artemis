@@ -10,7 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Pancake\Models\OrderForDelivery;
 
-class CallLogController extends Controller
+class CallLogV2Controller extends Controller
 {
     public function sync(Request $request): JsonResponse
     {
@@ -40,7 +40,6 @@ class CallLogController extends Controller
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
-
         }, $request->input('call_logs'));
 
         $inserted = 0;
@@ -59,18 +58,19 @@ class CallLogController extends Controller
         ]);
     }
 
+    // New mobile: filters orders by assignee_user_id (users.id from login)
     public function kpi(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => ['required', 'uuid'],
+            'user_id' => ['required', 'string'],
         ]);
 
         $workspace = $request->attributes->get('workspace');
 
-        $date = $request->input('date', now()->toDateuuid());
+        $date = $request->input('date', now()->toDateString());
 
         $deliveries = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->where('assignee_id', $request->input('user_id'))
+            ->where('assignee_user_id', $request->input('user_id'))
             ->whereDate('delivery_date', $date)
             ->withCount(['customerCallLogs', 'riderCallLogs'])
             ->get();
@@ -105,7 +105,7 @@ class CallLogController extends Controller
     public function list(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => ['required', 'uuid'],
+            'user_id' => ['required', 'string'],
             'since' => ['nullable'],
             'until' => ['nullable'],
         ]);
