@@ -67,7 +67,7 @@ class CallLogController extends Controller
 
         $workspace = $request->attributes->get('workspace');
 
-        $date = $request->input('date', now()->toDateuuid());
+        $date = $request->input('date', now()->toDateString());
 
         $deliveries = OrderForDelivery::where('workspace_id', $workspace->id)
             ->where('assignee_id', $request->input('user_id'))
@@ -150,7 +150,7 @@ class CallLogController extends Controller
     public function summary(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => ['required', 'string'],
+            'user_id' => ['required', 'uuid'],
             'since' => ['nullable'],
         ]);
 
