@@ -25,7 +25,7 @@ class SyncCreatives implements ShouldQueue
 
     public function __construct(
         public AdAccount $adAccount,
-        public ?string $nextUrl = null,
+        public ?string $afterCursor = null,
         public int $runningCount = 0,
         public ?int $syncRunId = null,
     ) {}
@@ -39,18 +39,21 @@ class SyncCreatives implements ShouldQueue
                 scopeType: AdAccount::class,
                 scopeId: $this->adAccount->id,
             );
+        $this->syncRunId = $run->id;
 
         try {
             $client = $this->adAccount->graphClient();
 
             $fields = 'id,name,title,body,object_type,call_to_action_type,image_url,image_hash,video_id,thumbnail_url,object_story_spec,effective_object_story_id,instagram_permalink_url,status';
 
-            $path = $this->nextUrl ?? "{$this->adAccount->graphAccountId()}/adcreatives";
             // Creatives carry a large `object_story_spec` JSON; cap page size
             // so the response doesn't blow Meta's per-request size limit.
-            $query = $this->nextUrl ? [] : ['fields' => $fields, 'limit' => 25];
+            $query = ['fields' => $fields, 'limit' => 25];
+            if ($this->afterCursor !== null) {
+                $query['after'] = $this->afterCursor;
+            }
 
-            $page = $client->getPage($path, $query);
+            $page = $client->getPage("{$this->adAccount->graphAccountId()}/adcreatives", $query);
 
             $count = $this->runningCount;
 
@@ -80,10 +83,10 @@ class SyncCreatives implements ShouldQueue
                 $count++;
             }
 
-            $nextUrl = $page['paging']['next'] ?? null;
+            $afterCursor = $page['paging']['cursors']['after'] ?? null;
 
-            if ($nextUrl !== null) {
-                static::dispatch($this->adAccount, $nextUrl, $count, $run->id);
+            if ($afterCursor !== null) {
+                static::dispatch($this->adAccount, $afterCursor, $count, $run->id);
             } else {
                 $run->succeed($count, ['creative_count' => $count]);
             }

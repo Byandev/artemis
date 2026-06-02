@@ -21,11 +21,11 @@ class SyncAdSets implements ShouldQueue
 
     public int $timeout = 600;
 
-    public int $tries = 8;
+    public int $tries = 3;
 
     public function __construct(
         public AdAccount $adAccount,
-        public ?string $nextUrl = null,
+        public ?string $afterCursor = null,
         public int $runningCount = 0,
         public ?int $syncRunId = null,
     ) {}
@@ -41,16 +41,19 @@ class SyncAdSets implements ShouldQueue
                 scopeType: AdAccount::class,
                 scopeId: $this->adAccount->id,
             );
+        $this->syncRunId = $run->id;
 
         try {
             $client = $this->adAccount->graphClient();
 
             $fields = 'id,name,campaign_id,status,effective_status,daily_budget,lifetime_budget,bid_strategy,optimization_goal,billing_event,targeting,promoted_object,start_time,end_time,created_time,updated_time';
 
-            $path = $this->nextUrl ?? "{$this->adAccount->graphAccountId()}/adsets";
-            $query = $this->nextUrl ? [] : ['fields' => $fields];
+            $query = ['fields' => $fields];
+            if ($this->afterCursor !== null) {
+                $query['after'] = $this->afterCursor;
+            }
 
-            $page = $client->getPage($path, $query);
+            $page = $client->getPage("{$this->adAccount->graphAccountId()}/adsets", $query);
 
             $count = $this->runningCount;
 
@@ -87,10 +90,10 @@ class SyncAdSets implements ShouldQueue
                 $count++;
             }
 
-            $nextUrl = $page['paging']['next'] ?? null;
+            $afterCursor = $page['paging']['cursors']['after'] ?? null;
 
-            if ($nextUrl !== null) {
-                static::dispatch($this->adAccount, $nextUrl, $count, $run->id);
+            if ($afterCursor !== null) {
+                static::dispatch($this->adAccount, $afterCursor, $count, $run->id);
             } else {
                 $run->succeed($count, ['ad_set_count' => $count]);
             }

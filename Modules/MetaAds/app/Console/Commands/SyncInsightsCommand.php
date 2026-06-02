@@ -9,7 +9,7 @@ use Modules\MetaAds\Models\AdAccount;
 
 class SyncInsightsCommand extends Command
 {
-    protected $signature = 'metaads:sync-insights
+    protected $signature = 'meta-ads:sync-insights
         {ad_account? : AdAccount id (defaults to all)}
         {--days=7 : Number of days back from --until (default 7)}
         {--since= : Override start date (YYYY-MM-DD)}

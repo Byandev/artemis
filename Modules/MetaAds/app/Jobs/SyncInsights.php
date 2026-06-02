@@ -20,7 +20,7 @@ class SyncInsights implements ShouldQueue
 
     public int $timeout = 300;
 
-    public int $tries = 8;
+    public int $tries = 3;
 
     /**
      * Single-source action chains: walk in priority order, take first match.
@@ -90,7 +90,7 @@ class SyncInsights implements ShouldQueue
     public function __construct(
         public AdAccount $adAccount,
         public string $date,
-        public ?string $nextUrl = null,
+        public ?string $afterCursor = null,
         public int $runningCount = 0,
         public ?int $syncRunId = null,
     ) {}
@@ -105,6 +105,7 @@ class SyncInsights implements ShouldQueue
                 scopeId: $this->adAccount->id,
                 meta: ['date' => $this->date],
             );
+        $this->syncRunId = $run->id;
 
         try {
             $client = $this->adAccount->graphClient();
@@ -124,8 +125,7 @@ class SyncInsights implements ShouldQueue
                 'video_p75_watched_actions', 'video_p100_watched_actions',
             ]);
 
-            $path = $this->nextUrl ?? "{$this->adAccount->graphAccountId()}/insights";
-            $query = $this->nextUrl ? [] : [
+            $query = [
                 'level' => 'ad',
                 'time_increment' => 1,
                 'time_range' => json_encode([
@@ -134,8 +134,11 @@ class SyncInsights implements ShouldQueue
                 ]),
                 'fields' => $fields,
             ];
+            if ($this->afterCursor !== null) {
+                $query['after'] = $this->afterCursor;
+            }
 
-            $page = $client->getPage($path, $query);
+            $page = $client->getPage("{$this->adAccount->graphAccountId()}/insights", $query);
 
             $count = $this->runningCount;
 
@@ -225,10 +228,10 @@ class SyncInsights implements ShouldQueue
                 $count++;
             }
 
-            $nextUrl = $page['paging']['next'] ?? null;
+            $afterCursor = $page['paging']['cursors']['after'] ?? null;
 
-            if ($nextUrl !== null) {
-                static::dispatch($this->adAccount, $this->date, $nextUrl, $count, $run->id);
+            if ($afterCursor !== null) {
+                static::dispatch($this->adAccount, $this->date, $afterCursor, $count, $run->id);
             } else {
                 $run->succeed($count, ['insight_row_count' => $count]);
             }

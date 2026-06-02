@@ -2,6 +2,7 @@
 
 namespace Modules\MetaAds\Jobs\Concerns;
 
+use Illuminate\Support\Facades\Log;
 use Modules\MetaAds\Exceptions\MetaGraphException;
 use Modules\MetaAds\Models\SyncRun;
 use Throwable;
@@ -23,11 +24,17 @@ trait HandlesMetaSyncErrors
         int $rateLimitBackoff = 300,
         int $transientBackoff = 60,
     ): void {
+        $attempts = max(1, $this->attempts());
+        $context = $this->buildErrorContext($run->id, $e, $attempts);
+
         if ($e instanceof MetaGraphException && $e->isRateLimited()) {
-            // Prefer Meta's own hint; otherwise exponential backoff with floor.
-            $attempts = max(1, $this->attempts());
             $backoff = $e->resetSeconds
                 ?? min(1800, $rateLimitBackoff * (2 ** ($attempts - 1)));
+
+            Log::warning('Meta sync job rate limited, will retry', array_merge($context, [
+                'backoff_seconds' => $backoff,
+                'reset_hint' => $e->resetSeconds,
+            ]));
 
             $run->markRateLimited($e, $backoff, [
                 'error_code' => $e->errorCode,
@@ -42,8 +49,11 @@ trait HandlesMetaSyncErrors
         }
 
         if ($e instanceof MetaGraphException && $e->isTransient()) {
-            $attempts = max(1, $this->attempts());
             $backoff = min(300, $transientBackoff * (2 ** ($attempts - 1)));
+
+            Log::warning('Meta sync job transient error, will retry', array_merge($context, [
+                'backoff_seconds' => $backoff,
+            ]));
 
             $run->markRateLimited($e, $backoff, [
                 'error_code' => $e->errorCode,
@@ -57,8 +67,61 @@ trait HandlesMetaSyncErrors
             return;
         }
 
+        Log::error('Meta sync job failed with unrecoverable error', $context);
+
         $run->fail($e);
 
         throw $e;
+    }
+
+    /**
+     * Called by Laravel when the job has exhausted all retry attempts.
+     * Ensures the SyncRun is marked failed and logs full diagnostic context.
+     */
+    public function failed(Throwable $e): void
+    {
+        $context = $this->buildErrorContext($this->syncRunId ?? null, $e, $this->attempts());
+        $context['permanently_failed'] = true;
+
+        Log::error('Meta sync job permanently failed after exhausting all retries', $context);
+
+        if (! empty($this->syncRunId)) {
+            SyncRun::find($this->syncRunId)?->fail($e);
+        }
+    }
+
+    private function buildErrorContext(?int $syncRunId, Throwable $e, int $attempts): array
+    {
+        $context = [
+            'exception' => $e,          // Monolog formats this with the full stack trace
+            'job' => static::class,
+            'sync_run_id' => $syncRunId,
+            'ad_account_id' => $this->adAccount->id,
+            'attempt' => $attempts,
+            'max_tries' => $this->tries,
+        ];
+
+        if ($e instanceof MetaGraphException) {
+            $context['error_code'] = $e->errorCode;
+            $context['error_subcode'] = $e->errorSubcode;
+            $context['error_type'] = $e->errorType;
+            $context['fbtrace_id'] = $e->fbtraceId;
+            $context['http_status'] = $e->httpStatus;
+            $context['reset_seconds'] = $e->resetSeconds;
+        }
+
+        if (isset($this->afterCursor)) {
+            $context['after_cursor'] = $this->afterCursor;
+        }
+
+        if (isset($this->runningCount)) {
+            $context['running_count'] = $this->runningCount;
+        }
+
+        if (isset($this->date)) {
+            $context['date'] = $this->date;
+        }
+
+        return $context;
     }
 }

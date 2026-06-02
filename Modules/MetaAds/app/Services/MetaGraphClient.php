@@ -45,13 +45,11 @@ class MetaGraphClient
 
     /**
      * Single-page GET — fetches one page and returns the raw body (data + paging).
-     * Pass an empty $query when $path is already a full `paging.next` URL (cursor is embedded).
+     * Pass `after` in $query to fetch the next cursor page.
      */
     public function getPage(string $path, array $query = []): array
     {
-        if ($query !== []) {
-            $query = array_merge(['limit' => $this->pageSize], $query);
-        }
+        $query = array_merge(['limit' => $this->pageSize], $query);
 
         $url = $this->url($path);
 
@@ -75,7 +73,6 @@ class MetaGraphClient
         $url = $this->url($path);
 
         while ($url !== null) {
-            dump($url);
             $this->pacingSleep();
             $this->proactiveSleepIfNeeded();
             $response = $this->request()->get($url, $query);
