@@ -70,7 +70,7 @@ const WorkspaceSwitcher = () => {
                 </div>
 
                 {/* Workspace list */}
-                <div className="space-y-0.5 px-2 pb-2">
+                <div className="space-y-0.5 overflow-y-auto px-2 pb-2" style={{ maxHeight: '220px' }}>
                     {workspaces.map((workspace) => {
                         const isCurrent = workspace.id === currentWorkspace.id;
                         const ws_initials = workspace.name
@@ -177,6 +177,11 @@ const WorkspaceSwitcher = () => {
                         >
                             <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
                             All workspaces
+                            {workspaces?.length > 0 && (
+                                <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-black/[0.06] px-1.5 text-[10px] font-semibold dark:bg-white/[0.08]">
+                                    {workspaces.length}
+                                </span>
+                            )}
                         </Link>
                     </DropdownMenuItem>
                 </div>
