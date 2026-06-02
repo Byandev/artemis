@@ -4,6 +4,7 @@ namespace Modules\MetaAds\Jobs\Concerns;
 
 use Illuminate\Support\Facades\Log;
 use Modules\MetaAds\Exceptions\MetaGraphException;
+use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\SyncRun;
 use Throwable;
 
@@ -88,6 +89,18 @@ trait HandlesMetaSyncErrors
         if (! empty($this->syncRunId)) {
             SyncRun::find($this->syncRunId)?->fail($e);
         }
+    }
+
+    protected function resolveLastSuccessAt(string $entityType): ?int
+    {
+        $lastRun = SyncRun::where('entity_type', $entityType)
+            ->where('scope_type', AdAccount::class)
+            ->where('scope_id', $this->adAccount->id)
+            ->where('status', SyncRun::STATUS_SUCCESS)
+            ->latest('finished_at')
+            ->first();
+
+        return $lastRun?->finished_at?->timestamp;
     }
 
     private function buildErrorContext(?int $syncRunId, Throwable $e, int $attempts): array

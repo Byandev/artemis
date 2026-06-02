@@ -28,11 +28,16 @@ class SyncAdSets implements ShouldQueue
         public ?string $afterCursor = null,
         public int $runningCount = 0,
         public ?int $syncRunId = null,
+        public ?int $sinceTimestamp = null,
     ) {}
 
     public function handle(): void
     {
         sleep(2);
+
+        if ($this->syncRunId === null) {
+            $this->sinceTimestamp = $this->resolveLastSuccessAt(SyncRun::ENTITY_AD_SETS);
+        }
 
         $run = $this->syncRunId !== null
             ? SyncRun::findOrFail($this->syncRunId)
@@ -40,6 +45,7 @@ class SyncAdSets implements ShouldQueue
                 entityType: SyncRun::ENTITY_AD_SETS,
                 scopeType: AdAccount::class,
                 scopeId: $this->adAccount->id,
+                meta: $this->sinceTimestamp ? ['since_timestamp' => $this->sinceTimestamp] : [],
             );
         $this->syncRunId = $run->id;
 
@@ -51,6 +57,11 @@ class SyncAdSets implements ShouldQueue
             $query = ['fields' => $fields];
             if ($this->afterCursor !== null) {
                 $query['after'] = $this->afterCursor;
+            }
+            if ($this->sinceTimestamp !== null) {
+                $query['filtering'] = json_encode([
+                    ['field' => 'updated_time', 'operator' => 'GREATER_THAN', 'value' => $this->sinceTimestamp],
+                ]);
             }
 
             $page = $client->getPage("{$this->adAccount->graphAccountId()}/adsets", $query);
@@ -93,7 +104,7 @@ class SyncAdSets implements ShouldQueue
             $afterCursor = $page['paging']['cursors']['after'] ?? null;
 
             if ($afterCursor !== null) {
-                static::dispatch($this->adAccount, $afterCursor, $count, $run->id);
+                static::dispatch($this->adAccount, $afterCursor, $count, $run->id, $this->sinceTimestamp);
             } else {
                 $run->succeed($count, ['ad_set_count' => $count]);
             }
