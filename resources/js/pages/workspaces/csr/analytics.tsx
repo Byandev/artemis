@@ -24,6 +24,7 @@ interface CsrRecord {
     total_call_time: number;
     total_rmo_call_attempts: number;
     total_confirmed: number;
+    rmo_percentage: number;
 }
 
 interface Props {
@@ -289,6 +290,29 @@ export default function Analytics({ workspace, query }: Props) {
                     Number(
                         row.original.total_rmo_call_attempts,
                     ).toLocaleString(),
+            },
+            {
+                accessorKey: 'rmo_percentage',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RMO %" />
+                ),
+                cell: ({ row }) => {
+                    const pct = Number(row.original.rmo_percentage ?? 0);
+                    return (
+                        <span
+                            className={[
+                                'font-mono text-[12px] font-medium',
+                                pct >= 80
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : pct >= 50
+                                      ? 'text-amber-600 dark:text-amber-400'
+                                      : 'text-red-500 dark:text-red-400',
+                            ].join(' ')}
+                        >
+                            {pct.toFixed(1)}%
+                        </span>
+                    );
+                },
             },
             {
                 accessorKey: 'total_call_time',
