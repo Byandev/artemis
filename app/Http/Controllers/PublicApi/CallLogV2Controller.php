@@ -15,7 +15,7 @@ class CallLogV2Controller extends Controller
     public function sync(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => ['required'],
+            'assignee_user_id' => ['required', 'integer'],
             'call_logs' => ['required', 'array', 'min:1'],
             'call_logs.*.phone_number' => ['required', 'string'],
             'call_logs.*.type' => ['required', 'string'],
@@ -31,7 +31,7 @@ class CallLogV2Controller extends Controller
 
             return [
                 'workspace_id' => $workspace->id,
-                'user_id' => $request->input('user_id'),
+                'assignee_user_id' => $request->input('assignee_user_id'),
                 'phone_number' => $log['phone_number'],
                 'type' => $log['type'],
                 'duration' => $log['duration'],
@@ -48,7 +48,7 @@ class CallLogV2Controller extends Controller
             $inserted += CallLog::upsert(
                 $chunk,
                 ['workspace_id', 'user_id', 'phone_number', 'call_date', 'call_time'],
-                ['type', 'duration', 'updated_at']
+                ['type', 'duration', 'assignee_user_id', 'updated_at']
             );
         }
 
@@ -62,7 +62,7 @@ class CallLogV2Controller extends Controller
     public function kpi(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => ['required', 'string'],
+            'assignee_user_id' => ['required', 'string'],
         ]);
 
         $workspace = $request->attributes->get('workspace');
@@ -70,7 +70,7 @@ class CallLogV2Controller extends Controller
         $date = $request->input('date', now()->toDateString());
 
         $deliveries = OrderForDelivery::where('workspace_id', $workspace->id)
-            ->where('assignee_user_id', $request->input('user_id'))
+            ->where('assignee_user_id', $request->input('assignee_user_id'))
             ->whereDate('delivery_date', $date)
             ->withCount(['customerCallLogs', 'riderCallLogs'])
             ->get();
@@ -82,7 +82,7 @@ class CallLogV2Controller extends Controller
         $totalAttempts = $deliveries->sum('customer_call_logs_count') + $deliveries->sum('rider_call_logs_count');
 
         $totalTalkTime = CallLog::where('workspace_id', $workspace->id)
-            ->where('user_id', $request->input('user_id'))
+            ->where('assignee_user_id', $request->input('assignee_user_id'))
             ->whereDate('call_date', $date)
             ->whereExists(function ($query) use ($workspace, $date) {
                 $query->from('pancake_order_for_delivery')
@@ -105,7 +105,7 @@ class CallLogV2Controller extends Controller
     public function list(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => ['required', 'string'],
+            'assignee_user_id' => ['required', 'string'],
             'since' => ['nullable'],
             'until' => ['nullable'],
         ]);
@@ -113,7 +113,7 @@ class CallLogV2Controller extends Controller
         $workspace = $request->attributes->get('workspace');
 
         $query = CallLog::where('workspace_id', $workspace->id)
-            ->where('user_id', $request->input('user_id'));
+            ->where('assignee_user_id', $request->input('assignee_user_id'));
 
         if ($since = $request->input('since')) {
             $sinceCarbon = is_numeric($since)
@@ -150,14 +150,14 @@ class CallLogV2Controller extends Controller
     public function summary(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => ['required', 'string'],
+            'assignee_user_id' => ['required', 'string'],
             'since' => ['nullable'],
         ]);
 
         $workspace = $request->attributes->get('workspace');
 
         $query = CallLog::where('workspace_id', $workspace->id)
-            ->where('user_id', $request->input('user_id'));
+            ->where('assignee_user_id', $request->input('assignee_user_id'));
 
         if ($since = $request->input('since')) {
             $sinceCarbon = is_numeric($since)
