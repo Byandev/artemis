@@ -12,6 +12,18 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.7.1',
+        date: '2026-06-03',
+        sections: [
+            {
+                title: 'Sidebar — Cleanup',
+                items: [
+                    'Removed the Admin nav group and Customer Support link from the main workspace sidebar — both sections are temporarily hidden while their respective flows are being finalised',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.7.0',
         date: '2026-06-03',
         sections: [
