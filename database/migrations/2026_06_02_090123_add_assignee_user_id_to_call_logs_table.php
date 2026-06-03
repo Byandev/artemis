@@ -12,7 +12,6 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('call_logs', function (Blueprint $table) {
-            $table->unsignedInteger('user_id')->nullable()->change();
             $table->unsignedBigInteger('assignee_user_id')->nullable()->after('user_id');
             $table->index('assignee_user_id');
         });
