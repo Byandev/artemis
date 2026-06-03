@@ -23,6 +23,11 @@ class WorkspaceSetupController extends Controller
             $workspace = $request->user()->ownedWorkspaces()->first()
                 ?? $request->user()->workspaces()->first();
 
+            // Require at least one connected page before reaching the dashboard.
+            if (! $workspace->pages()->exists()) {
+                return redirect()->route('workspace.onboarding', $workspace->slug);
+            }
+
             return redirect()->route('workspace.dashboard', $workspace->slug);
         }
 
@@ -41,6 +46,12 @@ class WorkspaceSetupController extends Controller
             $workspace = $request->user()->ownedWorkspaces()->first()
                 ?? $request->user()->workspaces()->first();
 
+            // Require at least one connected page before reaching the dashboard.
+            if (! $workspace->pages()->exists()) {
+                return redirect()->route('workspace.onboarding', $workspace->slug)
+                    ->with('info', 'Finish connecting your first page to continue.');
+            }
+
             return redirect()->route('workspace.dashboard', $workspace->slug)
                 ->with('info', 'You already have a workspace.');
         }
@@ -48,7 +59,7 @@ class WorkspaceSetupController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'min:3'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'monthly_order_volume' => ['nullable', 'string', 'in:below-500,500-1000,1000-5000,5000-10000,above-10000'],
+            'monthly_order_volume' => ['required', 'string', 'in:below-500,500-1000,1000-5000,5000-10000,above-10000'],
         ]);
 
         // Create the workspace

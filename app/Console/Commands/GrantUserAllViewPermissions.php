@@ -79,6 +79,7 @@ class GrantUserAllViewPermissions extends Command
             Permission::DeleteProducts->value,
             // RTS
             Permission::ViewRtsAnalytics->value,
+            Permission::ViewParcelJourneyTemplates->value,
             Permission::ManageParcelJourneyTemplates->value,
             // CSR
             Permission::ViewCsrManagement->value,
@@ -101,6 +102,7 @@ class GrantUserAllViewPermissions extends Command
             Permission::CreateTeams->value,
             Permission::EditTeams->value,
             Permission::DeleteTeams->value,
+            Permission::ManageSchedule->value,
             // Inventory
             Permission::ViewInventoryItems->value,
             Permission::CreateInventoryItems->value,
@@ -119,6 +121,10 @@ class GrantUserAllViewPermissions extends Command
             Permission::CreateChecklist->value,
             Permission::EditChecklist->value,
             Permission::DeleteChecklist->value,
+            // Botcake
+            Permission::ViewBotcakeSequences->value,
+            Permission::ViewBotcakeSequenceMessages->value,
+            Permission::ViewBotcakeFlows->value,
             // Finance
             Permission::ViewFinanceDashboard->value,
             Permission::ViewFinanceAccounts->value,
@@ -136,6 +142,10 @@ class GrantUserAllViewPermissions extends Command
             // Pancake
             Permission::ViewCourierShipments->value,
             Permission::ImportCourierShipments->value,
+            // Botcake
+            Permission::ViewBotcakeSequences->value,
+            Permission::ViewBotcakeSequenceMessages->value,
+            Permission::ViewBotcakeFlows->value,
             // Settings
             Permission::EditWorkspaceSettings->value,
             Permission::ManageApiKeys->value,

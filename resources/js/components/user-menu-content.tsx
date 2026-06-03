@@ -18,7 +18,8 @@ interface UserMenuContentProps {
 
 export function UserMenuContent({ user }: UserMenuContentProps) {
     const cleanup = useMobileNavigation();
-    const { workspace } = usePage<SharedData>().props;
+    const { currentWorkspace } = usePage<SharedData>().props;
+    const workspaceSlug = (currentWorkspace as Workspace | undefined)?.slug;
 
     const handleLogout = () => {
         cleanup();
@@ -37,7 +38,11 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
                 <DropdownMenuItem asChild>
                     <Link
                         className="block w-full"
-                        href={`/workspaces/${(workspace as Workspace)?.slug}/settings`}
+                        href={
+                            workspaceSlug
+                                ? `/workspaces/${workspaceSlug}/settings`
+                                : '/settings'
+                        }
                         as="button"
                         onClick={cleanup}
                     >

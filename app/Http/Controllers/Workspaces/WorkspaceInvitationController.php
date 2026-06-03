@@ -121,6 +121,7 @@ class WorkspaceInvitationController extends Controller
                     'invitation' => $invitation,
                     'isAuthenticated' => true,
                     'accepted' => true,
+                    'isCsr' => $request->user()->isCsrOf($invitation->workspace),
                 ]);
             }
 

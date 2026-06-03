@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -86,6 +87,11 @@ class Page extends Model
     public function customerServiceRepresentatives(): BelongsToMany
     {
         return $this->belongsToMany(CustomerServiceRepresentative::class, 'page_customer_service_representative');
+    }
+
+    public function latestBudget(): HasOne
+    {
+        return $this->hasOne(PageDailyBudgetRecord::class)->latestOfMany('date');
     }
 
     public function checklistCompletions(): MorphMany

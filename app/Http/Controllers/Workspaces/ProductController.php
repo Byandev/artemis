@@ -124,7 +124,9 @@ class ProductController extends Controller
             'status' => $product->status,
         ]);
 
-        return redirect()->route('workspaces.products.index', $workspace->slug);
+        return redirect()
+            ->route('workspaces.products.index', $workspace->slug)
+            ->with('success', 'Product created successfully.');
     }
 
     public function edit(Workspace $workspace, Product $product)
@@ -191,7 +193,9 @@ class ProductController extends Controller
                 ->update(['product_id' => $product->id]);
         }
 
-        return redirect()->route('workspaces.products.index', $workspace->slug);
+        return redirect()
+            ->route('workspaces.products.index', $workspace->slug)
+            ->with('success', 'Product updated successfully.');
     }
 
     public function destroy(Workspace $workspace, Product $product)
