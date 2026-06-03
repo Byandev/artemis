@@ -15,16 +15,38 @@ class RoleController extends Controller
 {
     public function index(Request $request, Workspace $workspace)
     {
-        $roles = QueryBuilder::for(Role::withTrashed()->where('workspace_id', $workspace->id))
+        $roles = QueryBuilder::for(Role::where('workspace_id', $workspace->id))
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),
             ])
-            ->allowedSorts(['name', 'description', 'created_at', 'deleted_at'])
+            ->allowedSorts(['name', 'description', 'created_at'])
             ->defaultSort('-created_at')
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         return Inertia::render('roles/index', [
+            'workspace' => $workspace,
+            'roles' => $roles,
+            'query' => [
+                ...$request->only(['sort', 'perPage', 'page']),
+                'perPage' => $request->input('per_page', $request->input('perPage')),
+                'filter' => $request->input('filter', []),
+            ],
+        ]);
+    }
+
+    public function archived(Request $request, Workspace $workspace)
+    {
+        $roles = QueryBuilder::for(Role::onlyTrashed()->where('workspace_id', $workspace->id))
+            ->allowedFilters([
+                AllowedFilter::partial('search', 'name'),
+            ])
+            ->allowedSorts(['name', 'description', 'deleted_at'])
+            ->defaultSort('-deleted_at')
+            ->paginate($request->integer('per_page', 10))
+            ->withQueryString();
+
+        return Inertia::render('roles/archived', [
             'workspace' => $workspace,
             'roles' => $roles,
             'query' => [
@@ -70,7 +92,6 @@ class RoleController extends Controller
 
         return redirect()->route('roles.index', [
             'workspace' => $workspace->slug,
-            'archived' => 'true',
         ])->with('success', 'Role archived successfully!');
     }
 

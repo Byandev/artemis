@@ -61,8 +61,8 @@ class HandleInertiaRequests extends Middleware
         $can = [
             'viewAnySupportTickets' => $user && $currentWorkspace instanceof Workspace
                 ? $user->ownsWorkspace($currentWorkspace)
-                    || $user->isAdminOf($currentWorkspace)
-                    || $user->hasWorkspaceRole($currentWorkspace, 'admin')
+                || $user->isAdminOf($currentWorkspace)
+                || $user->hasWorkspaceRole($currentWorkspace, 'admin')
                 : false,
         ];
 

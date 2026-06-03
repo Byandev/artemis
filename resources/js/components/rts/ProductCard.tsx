@@ -30,7 +30,7 @@ export default function ProductCard({
     const fetchPage = (
         page: number,
         currentSort: string,
-        perPage = 15,
+        perPage = 10,
         isInitial = false,
     ) => {
         setLoading(true);
@@ -51,9 +51,8 @@ export default function ProductCard({
             .catch(() => setLoading(false));
     };
 
-     
     useEffect(() => {
-        fetchPage(1, sort, true);
+        fetchPage(1, sort, 10, true);
     }, [workspaceSlug, JSON.stringify(queryParams)]);
 
     const columns: ColumnDef<OrderItemRow>[] = useMemo(
@@ -64,7 +63,12 @@ export default function ProductCard({
                     <SortableHeader column={column} title="Product" />
                 ),
                 cell: ({ row }) =>
-                    row.original.item_name ?? (
+                    row.original.item_name ? (
+                        row.original.item_name
+                            ?.split(' ')
+                            .map((word) => word[0])
+                            .join('')
+                    ) : (
                         <span className="text-gray-400">Unknown</span>
                     ),
             },
@@ -121,7 +125,9 @@ export default function ProductCard({
                     </p>
                 </div>
                 <RefreshButton
-                    onClick={() => fetchPage(1, sort, 15, true)}
+                    onClick={() =>
+                        fetchPage(1, sort, data?.per_page ?? 10, true)
+                    }
                     loading={loading}
                 />
             </div>

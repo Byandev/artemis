@@ -86,60 +86,63 @@ export default function PriceCard({
                         }))}
                     />
                 ) : (
-                    <table className="w-full text-[12px]">
-                        <thead>
-                            <tr className="border-b border-black/6 dark:border-white/6">
-                                <th className="px-3 py-2 text-left font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                                    Price Range
-                                </th>
-                                <th className="px-3 py-2 text-right font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                                    Total
-                                </th>
-                                <th className="px-3 py-2 text-right font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                                    Delivered
-                                </th>
-                                <th className="px-3 py-2 text-right font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                                    Returned
-                                </th>
-                                <th className="px-3 py-2 text-right font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                                    RTS Rate
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {price.map((row) => (
-                                <tr
-                                    key={row.price_bucket ?? 'unknown'}
-                                    className="border-b border-black/4 last:border-0 dark:border-white/4"
-                                >
-                                    <td className="px-3 py-2.5 font-medium text-gray-700 dark:text-gray-300">
-                                        {row.price_bucket ? (
-                                            (PRICE_LABELS[row.price_bucket] ??
-                                            row.price_bucket)
-                                        ) : (
-                                            <span className="text-gray-400">
-                                                Unknown
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td className="px-3 py-2.5 text-right text-gray-600 dark:text-gray-400">
-                                        {row.total_orders}
-                                    </td>
-                                    <td className="px-3 py-2.5 text-right text-green-600 dark:text-green-400">
-                                        {row.delivered_count}
-                                    </td>
-                                    <td className="px-3 py-2.5 text-right text-red-500">
-                                        {row.returned_count}
-                                    </td>
-                                    <td className="px-3 py-2.5 text-right">
-                                        <RtsCell
-                                            value={row.rts_rate_percentage}
-                                        />
-                                    </td>
+                    <div className="custom-scrollbar max-w-full overflow-x-auto">
+                        <table className="w-full min-w-[520px] text-[12px]">
+                            <thead>
+                                <tr className="border-b border-black/6 dark:border-white/6">
+                                    <th className="px-4 py-3 text-left font-mono text-[10px] tracking-wider whitespace-nowrap text-gray-300 uppercase dark:text-gray-600">
+                                        Price Range
+                                    </th>
+                                    <th className="px-4 py-3 text-right font-mono text-[10px] tracking-wider whitespace-nowrap text-gray-300 uppercase dark:text-gray-600">
+                                        Total
+                                    </th>
+                                    <th className="px-4 py-3 text-right font-mono text-[10px] tracking-wider whitespace-nowrap text-gray-300 uppercase dark:text-gray-600">
+                                        Delivered
+                                    </th>
+                                    <th className="px-4 py-3 text-right font-mono text-[10px] tracking-wider whitespace-nowrap text-gray-300 uppercase dark:text-gray-600">
+                                        Returned
+                                    </th>
+                                    <th className="px-4 py-3 text-right font-mono text-[10px] tracking-wider whitespace-nowrap text-gray-300 uppercase dark:text-gray-600">
+                                        RTS Rate
+                                    </th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {price.map((row) => (
+                                    <tr
+                                        key={row.price_bucket ?? 'unknown'}
+                                        className="border-b border-black/4 last:border-0 dark:border-white/4"
+                                    >
+                                        <td className="px-4 py-3 font-medium whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                            {row.price_bucket ? (
+                                                (PRICE_LABELS[
+                                                    row.price_bucket
+                                                ] ?? row.price_bucket)
+                                            ) : (
+                                                <span className="text-gray-400">
+                                                    Unknown
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-right whitespace-nowrap text-gray-600 dark:text-gray-400">
+                                            {row.total_orders}
+                                        </td>
+                                        <td className="px-4 py-3 text-right whitespace-nowrap text-green-600 dark:text-green-400">
+                                            {row.delivered_count}
+                                        </td>
+                                        <td className="px-4 py-3 text-right whitespace-nowrap text-red-500">
+                                            {row.returned_count}
+                                        </td>
+                                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                                            <RtsCell
+                                                value={row.rts_rate_percentage}
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </div>
         </div>

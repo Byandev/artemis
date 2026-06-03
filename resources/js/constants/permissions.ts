@@ -19,6 +19,7 @@ export const PERMISSIONS = {
     EditPages: 'Edit Pages',
     ArchivePages: 'Archive Pages',
     RefreshPages: 'Refresh Pages',
+    UpdatePageBudget: 'Update Page Budget',
 
     // Shops
     ViewShops: 'View Shops',
@@ -35,9 +36,11 @@ export const PERMISSIONS = {
     CreateTeams: 'Create Teams',
     EditTeams: 'Edit Teams',
     DeleteTeams: 'Delete Teams',
+    ManageSchedule: 'Manage Schedule',
 
     // RTS
     ViewRtsAnalytics: 'View RTS Analytics',
+    ViewParcelJourneyTemplates: 'View Parcel Journey Templates',
     ManageParcelJourneyTemplates: 'Manage Parcel Journey Templates',
 
     // CSR
@@ -65,6 +68,11 @@ export const PERMISSIONS = {
     EditChecklist: 'Edit Checklist',
     DeleteChecklist: 'Delete Checklist',
 
+    // Botcake
+    ViewBotcakeSequences: 'View Botcake Sequences',
+    ViewBotcakeSequenceMessages: 'View Botcake Sequence Messages',
+    ViewBotcakeFlows: 'View Botcake Flows',
+
     // Finance
     ViewFinanceDashboard: 'View Finance Dashboard',
     ViewFinanceAccounts: 'View Finance Accounts',
@@ -79,6 +87,12 @@ export const PERMISSIONS = {
     CreateFinanceRemittances: 'Create Finance Remittances',
     EditFinanceRemittances: 'Edit Finance Remittances',
     DeleteFinanceRemittances: 'Delete Finance Remittances',
+
+    // Page Daily Budget Records
+    ViewPageDailyBudgetRecords: 'View Page Daily Budget Records',
+    CreatePageDailyBudgetRecords: 'Create Page Daily Budget Records',
+    EditPageDailyBudgetRecords: 'Edit Page Daily Budget Records',
+    DeletePageDailyBudgetRecords: 'Delete Page Daily Budget Records',
 
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',

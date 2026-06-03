@@ -8,18 +8,21 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import { toFrontendSort } from '@/lib/sort';
 import ProductLayout from '@/pages/workspaces/products/partials/layout';
 import workspaces from '@/routes/workspaces';
 import { PaginatedData } from '@/types';
 import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { omit } from 'lodash';
 import { Edit, MoreHorizontal, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 interface ProductsProps {
     workspace: Workspace;
@@ -31,6 +34,12 @@ interface ProductsProps {
         filter?: {
             search?: string;
         };
+    };
+}
+
+interface ProductsPageProps {
+    flash?: {
+        success?: string | null;
     };
 }
 
@@ -51,6 +60,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 const Index = ({ products, workspace, query }: ProductsProps) => {
+    const { flash } = usePage().props as ProductsPageProps;
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
@@ -59,6 +69,16 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
     const [productToDelete, setProductToDelete] = useState<Product | null>(
         null,
     );
+    const canCreateProducts = usePermission(PERMISSIONS.CreateProducts);
+    const canEditProducts = usePermission(PERMISSIONS.EditProducts);
+    const canDeleteProducts = usePermission(PERMISSIONS.DeleteProducts);
+    const canUseProductActions = canEditProducts || canDeleteProducts;
+
+    useEffect(() => {
+        if (flash?.success) {
+            toast.success(flash.success);
+        }
+    }, [flash?.success]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -117,52 +137,73 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
                 <StatusBadge status={row.original.status || 'inactive'} />
             ),
         },
-        {
-            id: 'actions',
-            cell: ({ row }) => {
-                const product = row.original;
+        ...(canUseProductActions
+            ? [
+                  {
+                      id: 'actions',
+                      cell: ({ row }) => {
+                          const product = row.original;
 
-                return (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-36">
-                            <DropdownMenuItem
-                                onClick={() => handleEdit(product)}
-                            >
-                                <Edit />
-                                Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                variant="destructive"
-                                onClick={() => setProductToDelete(product)}
-                            >
-                                <Trash2 />
-                                Delete
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                );
-            },
-        },
+                          return (
+                              <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                      <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
+                                          <MoreHorizontal className="h-3.5 w-3.5" />
+                                      </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                      align="end"
+                                      className="w-36"
+                                  >
+                                      {canEditProducts && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  handleEdit(product)
+                                              }
+                                          >
+                                              <Edit />
+                                              Edit
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canEditProducts && canDeleteProducts && (
+                                          <DropdownMenuSeparator />
+                                      )}
+                                      {canDeleteProducts && (
+                                          <DropdownMenuItem
+                                              variant="destructive"
+                                              onClick={() =>
+                                                  setProductToDelete(product)
+                                              }
+                                          >
+                                              <Trash2 />
+                                              Delete
+                                          </DropdownMenuItem>
+                                      )}
+                                  </DropdownMenuContent>
+                              </DropdownMenu>
+                          );
+                      },
+                  } as ColumnDef<Product>,
+              ]
+            : []),
     ];
 
     return (
         <ProductLayout
             workspace={workspace}
             headerActions={
-                <Button
-                    size="sm"
-                    onClick={() =>
-                        router.get(workspaces.products.create({ workspace }))
-                    }
-                >
-                    Add Product
-                </Button>
+                canCreateProducts ? (
+                    <Button
+                        size="sm"
+                        onClick={() =>
+                            router.get(
+                                workspaces.products.create({ workspace }),
+                            )
+                        }
+                    >
+                        Add Product
+                    </Button>
+                ) : null
             }
         >
             <Head title={`${workspace.name} - Products`} />
@@ -209,11 +250,13 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
             </div>
 
             {/* Delete Confirmation Dialog */}
-            <DeleteProductDialog
-                product={productToDelete}
-                workspace={workspace}
-                onClose={() => setProductToDelete(null)}
-            />
+            {canDeleteProducts && (
+                <DeleteProductDialog
+                    product={productToDelete}
+                    workspace={workspace}
+                    onClose={() => setProductToDelete(null)}
+                />
+            )}
         </ProductLayout>
     );
 };

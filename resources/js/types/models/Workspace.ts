@@ -1,6 +1,7 @@
 import { User } from '@/types';
 import { Page } from '@/types/models/Page';
 import { Shop } from '@/types/models/Shop';
+import { Team } from '@/types/models/Team';
 
 export interface Workspace {
     id: number;
@@ -21,5 +22,6 @@ export interface Workspace {
 
     pages?: Page[];
     shops?: Shop[];
+    teams?: Team[];
     page_owners?: User[];
 }
