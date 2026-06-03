@@ -66,7 +66,7 @@ class AdminWorkspaceController extends Controller
 
             'plans' => SubscriptionPlan::where('is_active', true)->orderBy('sort_order')->get(),
             'metricConfigs' => MetricRegistry::configs(),
-            'filters' => $request->only(['search', 'sort', 'direction']),
+            'filters' => $request->only(['search', 'sort']),
         ]);
     }
 
