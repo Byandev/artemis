@@ -193,4 +193,28 @@ class User extends Authenticatable implements MustVerifyEmail
             ->where('permissions.name', $permissionName)
             ->exists();
     }
+
+    public function isCsrOf(Workspace $workspace): bool
+    {
+        if ($this->isSuperAdmin() || $this->ownsWorkspace($workspace)) {
+            return false;
+        }
+
+        $roleId = DB::table('workspace_user')
+            ->where('user_id', $this->id)
+            ->where('workspace_id', $workspace->id)
+            ->value('role_id');
+
+        if (! $roleId) {
+            return false;
+        }
+
+        $categories = DB::table('role_permissions')
+            ->join('permissions', 'role_permissions.permission_id', '=', 'permissions.id')
+            ->where('role_permissions.role_id', $roleId)
+            ->pluck('permissions.category')
+            ->unique();
+
+        return $categories->isNotEmpty() && $categories->every(fn ($cat) => $cat === 'CSR');
+    }
 }
