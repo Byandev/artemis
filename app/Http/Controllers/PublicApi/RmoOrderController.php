@@ -12,7 +12,6 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class RmoOrderController extends Controller
 {
-
     public function login(Request $request): JsonResponse
     {
         $query = User::whereRaw('LOWER(status) = ?', ['active']);
