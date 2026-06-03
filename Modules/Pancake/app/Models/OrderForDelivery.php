@@ -5,7 +5,6 @@ namespace Modules\Pancake\Models;
 use App\Models\CallLog;
 use App\Models\Page;
 use App\Models\Shop;
-use App\Models\User as AppUser;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -38,15 +37,9 @@ class OrderForDelivery extends Model
 
     public function assignee(): BelongsTo
     {
-        return $this->belongsTo(AppUser::class, 'assignee_user_id');
-    }
-
-    public function pancakeAssignee(): BelongsTo
-    {
         return $this->belongsTo(User::class, 'assignee_id');
     }
 
-    // public view: old mobile stores pancake_user_id in call_logs.user_id, matched against assignee_id
     public function customerCallLogs(): HasMany
     {
         return $this->hasMany(CallLog::class, 'phone_number', 'customer_phone')
@@ -59,21 +52,6 @@ class OrderForDelivery extends Model
     {
         return $this->hasMany(CallLog::class, 'phone_number', 'rider_phone')
             ->whereColumn('call_logs.user_id', 'pancake_order_for_delivery.assignee_id')
-            ->whereColumn('call_logs.workspace_id', 'pancake_order_for_delivery.workspace_id')
-            ->whereColumn('call_logs.call_date', 'pancake_order_for_delivery.delivery_date');
-    }
-
-    // matches same logic as the modal: phone + workspace + date, no user filter
-    public function customerCallLogsByAssignee(): HasMany
-    {
-        return $this->hasMany(CallLog::class, 'phone_number', 'customer_phone')
-            ->whereColumn('call_logs.workspace_id', 'pancake_order_for_delivery.workspace_id')
-            ->whereColumn('call_logs.call_date', 'pancake_order_for_delivery.delivery_date');
-    }
-
-    public function riderCallLogsByAssignee(): HasMany
-    {
-        return $this->hasMany(CallLog::class, 'phone_number', 'rider_phone')
             ->whereColumn('call_logs.workspace_id', 'pancake_order_for_delivery.workspace_id')
             ->whereColumn('call_logs.call_date', 'pancake_order_for_delivery.delivery_date');
     }
