@@ -74,11 +74,13 @@ export default function WorkspaceSetup({ userName }: Props) {
                             htmlFor="monthly_order_volume"
                             className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500"
                         >
-                            Monthly order volume
+                            Monthly order volume{' '}
+                            <span className="text-red-400">*</span>
                         </label>
                         <select
                             id="monthly_order_volume"
                             name="monthly_order_volume"
+                            required
                             value={data.monthly_order_volume}
                             onChange={(e) =>
                                 setData('monthly_order_volume', e.target.value)
