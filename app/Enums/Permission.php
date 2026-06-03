@@ -15,7 +15,8 @@ enum Permission: string
     case ViewRoles = 'View Roles';
     case CreateRoles = 'Create Roles';
     case EditRoles = 'Edit Roles';
-    case DeleteRoles = 'Archive Roles';
+    case ArchiveRoles = 'Archive Roles';
+    case RestoreRoles = 'Restore Roles';
     case ManageRolePermissions = 'Manage Role Permissions';
 
     // Pages
@@ -119,7 +120,8 @@ enum Permission: string
             self::ViewRoles,
             self::CreateRoles,
             self::EditRoles,
-            self::DeleteRoles,
+            self::ArchiveRoles,
+            self::RestoreRoles,
             self::ManageRolePermissions => 'Roles',
 
             self::ViewPages,

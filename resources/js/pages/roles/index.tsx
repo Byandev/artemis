@@ -59,7 +59,7 @@ export default function Index({ roles, workspace, query }: Props) {
 
     const canCreate = usePermission(PERMISSIONS.CreateRoles);
     const canEdit = usePermission(PERMISSIONS.EditRoles);
-    const canArchive = usePermission(PERMISSIONS.DeleteRoles);
+    const canArchive = usePermission(PERMISSIONS.ArchiveRoles);
     const canManagePerms = usePermission(PERMISSIONS.ManageRolePermissions);
     const showActions = canEdit || canArchive || canManagePerms;
 

@@ -10,7 +10,8 @@ export const PERMISSIONS = {
     ViewRoles: 'View Roles',
     CreateRoles: 'Create Roles',
     EditRoles: 'Edit Roles',
-    DeleteRoles: 'Archive Roles',
+    ArchiveRoles: 'Archive Roles',
+    RestoreRoles: 'Restore Roles',
     ManageRolePermissions: 'Manage Role Permissions',
 
     // Pages

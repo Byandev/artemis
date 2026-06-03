@@ -95,7 +95,8 @@ class GrantUserAllViewPermissions extends Command
             Permission::ViewRoles->value,
             Permission::CreateRoles->value,
             Permission::EditRoles->value,
-            Permission::DeleteRoles->value,
+            Permission::ArchiveRoles->value,
+            Permission::RestoreRoles->value,
             Permission::ManageRolePermissions->value,
             // Teams
             Permission::ViewTeams->value,

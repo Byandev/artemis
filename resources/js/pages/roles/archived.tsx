@@ -37,7 +37,7 @@ export default function Archived({ roles, workspace, query }: Props) {
     const [selectedRole, setSelectedRole] = useState<Role | undefined>(undefined);
     const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
 
-    const canArchive = usePermission(PERMISSIONS.DeleteRoles);
+    const canRestore = usePermission(PERMISSIONS.RestoreRoles);
 
     const handleConfirmRestore = () => {
         if (!selectedRole) return;
@@ -94,7 +94,7 @@ export default function Archived({ roles, workspace, query }: Props) {
                 </span>
             ),
         },
-        ...(canArchive
+        ...(canRestore
             ? [
                   {
                       id: 'actions',
@@ -172,7 +172,7 @@ export default function Archived({ roles, workspace, query }: Props) {
                 </div>
             </div>
 
-            {canArchive && isRestoreModalOpen && (
+            {canRestore && isRestoreModalOpen && (
                 <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
                     <div
                         className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px]"
