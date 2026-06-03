@@ -24,6 +24,7 @@ enum Permission: string
     case EditPages = 'Edit Pages';
     case ArchivePages = 'Archive Pages';
     case RefreshPages = 'Refresh Pages';
+    case UpdatePageBudget = 'Update Page Budget';
 
     // Shops
     case ViewShops = 'View Shops';
@@ -125,7 +126,8 @@ enum Permission: string
             self::CreatePages,
             self::EditPages,
             self::ArchivePages,
-            self::RefreshPages => 'Pages',
+            self::RefreshPages,
+            self::UpdatePageBudget => 'Pages',
 
             self::ViewShops,
             self::RefreshShops => 'Shops',
