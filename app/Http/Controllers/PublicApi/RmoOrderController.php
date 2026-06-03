@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Pancake\Models\OrderForDelivery;
+use Modules\Pancake\Models\User;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
-use Modules\Pancake\Models\User;
 
 class RmoOrderController extends Controller
 {
