@@ -1,4 +1,4 @@
-import AskDataWidget, { DashboardData } from '@/components/ai/AskDataWidget';
+import { DashboardData } from '@/components/ai/AskDataWidget';
 import ComponentCard from '@/components/common/ComponentCard';
 import PageHeader from '@/components/common/PageHeader';
 import Filters, { FilterValue } from '@/components/filters/Filters';

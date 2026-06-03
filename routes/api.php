@@ -3,7 +3,6 @@
 use App\Http\Controllers\PublicApi\CallLogController;
 use App\Http\Controllers\PublicApi\CallLogV2Controller;
 use App\Http\Controllers\PublicApi\CsrDailyRecordController;
-use App\Http\Controllers\PublicApi\CsrTrackerController;
 use App\Http\Controllers\PublicApi\HealthController;
 use App\Http\Controllers\PublicApi\InventoryItemController;
 use App\Http\Controllers\PublicApi\PageController;
@@ -35,7 +34,7 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
 });
 
 // v2 — new mobile app (login with users.id, filter by assignee_user_id)
-    Route::group(['prefix' => 'v2/public', 'as' => 'api.v2.public.', 'middleware' => ['api.key']], function () {
+Route::group(['prefix' => 'v2/public', 'as' => 'api.v2.public.', 'middleware' => ['api.key']], function () {
     Route::post('/rmo-orders/login', [RmoOrderV2Controller::class, 'login'])->name('rmo-orders.login');
     Route::get('/rmo-orders', [RmoOrderV2Controller::class, 'assignedOrders'])->name('rmo-orders.index');
     Route::post('/rmo-orders/sync-call-tracking', [RmoOrderV2Controller::class, 'syncCallTracking'])->name('rmo-orders.call-tracking.sync');
@@ -45,4 +44,3 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
     Route::get('/call-logs/list', [CallLogV2Controller::class, 'list'])->name('call-logs.list');
     Route::get('/call-logs/summary', [CallLogV2Controller::class, 'summary'])->name('call-logs.summary');
 });
-

@@ -229,7 +229,11 @@ export default function Index({ roles, workspace, query }: Props) {
                 >
                     {canArchive && (
                         <button
-                            onClick={() => router.get(`/workspaces/${workspace.slug}/roles/archived`)}
+                            onClick={() =>
+                                router.get(
+                                    `/workspaces/${workspace.slug}/roles/archived`,
+                                )
+                            }
                             className="flex h-8 items-center gap-1.5 rounded-lg border border-black/6 bg-stone-100 px-3.5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:bg-zinc-700"
                         >
                             <ArchiveRestore className="h-3.5 w-3.5" />
@@ -340,7 +344,6 @@ export default function Index({ roles, workspace, query }: Props) {
                     </div>
                 </div>
             )}
-
         </AppLayout>
     );
 }

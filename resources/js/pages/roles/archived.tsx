@@ -12,7 +12,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { AlertTriangle, ArrowLeft, RefreshCcw, Search, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, RefreshCcw, Search, ShieldCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast, Toaster } from 'sonner';
 
@@ -34,7 +34,9 @@ export default function Archived({ roles, workspace, query }: Props) {
     );
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
-    const [selectedRole, setSelectedRole] = useState<Role | undefined>(undefined);
+    const [selectedRole, setSelectedRole] = useState<Role | undefined>(
+        undefined,
+    );
     const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
 
     const canArchive = usePermission(PERMISSIONS.DeleteRoles);
@@ -59,7 +61,9 @@ export default function Archived({ roles, workspace, query }: Props) {
         {
             accessorKey: 'name',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Name" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Name" />
+            ),
             cell: ({ row }) => (
                 <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
                     {row.original.name}
@@ -69,7 +73,9 @@ export default function Archived({ roles, workspace, query }: Props) {
         {
             accessorKey: 'description',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Description" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Description" />
+            ),
             cell: ({ row }) => (
                 <div className="max-w-[400px]">
                     <p className="text-[12px] text-gray-500 dark:text-gray-400">
@@ -85,7 +91,9 @@ export default function Archived({ roles, workspace, query }: Props) {
         {
             accessorKey: 'deleted_at',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Archived At" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Archived At" />
+            ),
             cell: ({ row }) => (
                 <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
                     {row.original.deleted_at
@@ -128,7 +136,9 @@ export default function Archived({ roles, workspace, query }: Props) {
                     description="Roles that have been archived and are no longer active"
                 >
                     <button
-                        onClick={() => router.get(`/workspaces/${workspace.slug}/roles`)}
+                        onClick={() =>
+                            router.get(`/workspaces/${workspace.slug}/roles`)
+                        }
                         className="flex h-8 items-center gap-1.5 rounded-lg border border-black/6 bg-stone-100 px-3.5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:bg-zinc-700"
                     >
                         <ArrowLeft className="h-3.5 w-3.5" />
@@ -163,9 +173,16 @@ export default function Archived({ roles, workspace, query }: Props) {
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
                                     page: params?.page ?? 1,
-                                    per_page: params?.per_page ?? query?.perPage ?? roles.per_page,
+                                    per_page:
+                                        params?.per_page ??
+                                        query?.perPage ??
+                                        roles.per_page,
                                 },
-                                { preserveState: true, replace: true, preserveScroll: true },
+                                {
+                                    preserveState: true,
+                                    replace: true,
+                                    preserveScroll: true,
+                                },
                             );
                         }}
                     />
@@ -196,7 +213,8 @@ export default function Archived({ roles, workspace, query }: Props) {
                             <div className="mb-6 w-full rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 dark:border-emerald-500/20 dark:bg-emerald-500/10">
                                 <p className="flex items-center justify-center gap-2 text-xs font-medium text-emerald-800 dark:text-emerald-400">
                                     <ShieldCheck className="h-4 w-4" />
-                                    This role will be visible and usable in the workspace again.
+                                    This role will be visible and usable in the
+                                    workspace again.
                                 </p>
                             </div>
                             <div className="flex w-full items-center gap-3">

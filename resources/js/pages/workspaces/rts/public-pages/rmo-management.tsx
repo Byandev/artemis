@@ -105,10 +105,10 @@ function formatDuration(seconds: number): string {
 }
 
 function EditablePhone({
-                           value,
-                           onSave,
-                           disabled = false,
-                       }: {
+    value,
+    onSave,
+    disabled = false,
+}: {
     value: string;
     onSave: (v: string) => void;
     disabled?: boolean;
@@ -174,13 +174,13 @@ function EditablePhone({
 }
 
 function CallLogModal({
-                          open,
-                          onOpenChange,
-                          phoneNumber,
-                          label,
-                          workspaceSlug,
-                          date,
-                      }: {
+    open,
+    onOpenChange,
+    phoneNumber,
+    label,
+    workspaceSlug,
+    date,
+}: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     phoneNumber: string;
@@ -226,46 +226,46 @@ function CallLogModal({
                     <div className="max-h-72 overflow-y-auto">
                         <table className="w-full text-[12px]">
                             <thead>
-                            <tr className="border-b text-left text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                                <th className="pr-3 pb-2">Time</th>
-                                <th className="pr-3 pb-2">Type</th>
-                                <th className="pr-3 pb-2">By</th>
-                                <th className="pr-3 pb-2 text-right">
-                                    Duration
-                                </th>
-                            </tr>
+                                <tr className="border-b text-left text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                    <th className="pr-3 pb-2">Time</th>
+                                    <th className="pr-3 pb-2">Type</th>
+                                    <th className="pr-3 pb-2">By</th>
+                                    <th className="pr-3 pb-2 text-right">
+                                        Duration
+                                    </th>
+                                </tr>
                             </thead>
                             <tbody>
-                            {logs.map((log) => (
-                                <tr
-                                    key={log.id}
-                                    className="border-b border-black/5 dark:border-white/5"
-                                >
-                                    <td className="py-2 pr-3 font-mono text-gray-600 dark:text-gray-300">
-                                        {log.call_time}
-                                    </td>
-                                    <td className="py-2 pr-3">
+                                {logs.map((log) => (
+                                    <tr
+                                        key={log.id}
+                                        className="border-b border-black/5 dark:border-white/5"
+                                    >
+                                        <td className="py-2 pr-3 font-mono text-gray-600 dark:text-gray-300">
+                                            {log.call_time}
+                                        </td>
+                                        <td className="py-2 pr-3">
                                             <span
                                                 className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
                                                     log.type === 'outgoing'
                                                         ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
                                                         : log.type ===
-                                                        'incoming'
-                                                            ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
-                                                            : 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+                                                            'incoming'
+                                                          ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                                          : 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
                                                 }`}
                                             >
                                                 {log.type}
                                             </span>
-                                    </td>
-                                    <td className="py-2 pr-3 text-[11px] text-gray-600 dark:text-gray-300">
-                                        {csrName}
-                                    </td>
-                                    <td className="py-2 pr-3 text-right font-mono text-gray-600 dark:text-gray-300">
-                                        {formatDuration(log.duration)}
-                                    </td>
-                                </tr>
-                            ))}
+                                        </td>
+                                        <td className="py-2 pr-3 text-[11px] text-gray-600 dark:text-gray-300">
+                                            {csrName}
+                                        </td>
+                                        <td className="py-2 pr-3 text-right font-mono text-gray-600 dark:text-gray-300">
+                                            {formatDuration(log.duration)}
+                                        </td>
+                                    </tr>
+                                ))}
                             </tbody>
                         </table>
                         <div className="mt-3 flex justify-between border-t pt-2 text-[11px] text-gray-500 dark:text-gray-400">
@@ -298,10 +298,10 @@ function CallLogModal({
 }
 
 function CallLogBadge({
-                          attempts,
-                          duration,
-                          onClick,
-                      }: {
+    attempts,
+    duration,
+    onClick,
+}: {
     attempts: number;
     duration: number;
     onClick: () => void;
@@ -319,16 +319,16 @@ function CallLogBadge({
 }
 
 export default function RmoManagement({
-                                          orders,
-                                          workspace,
-                                          query,
-                                          users,
-                                          total_for_delivery_today,
-                                          called_count,
-                                          delivered_count,
-                                          returning_count,
-                                          problematic_count,
-                                      }: Props) {
+    orders,
+    workspace,
+    query,
+    users,
+    total_for_delivery_today,
+    called_count,
+    delivered_count,
+    returning_count,
+    problematic_count,
+}: Props) {
     const { appEnv } = usePage<SharedData>().props;
     const canEditPhone = appEnv !== 'production';
 
@@ -483,15 +483,15 @@ export default function RmoManagement({
                     ? { 'filter[status]': status }
                     : {}
                 : currentStatus
-                    ? { 'filter[status]': currentStatus }
-                    : {}),
+                  ? { 'filter[status]': currentStatus }
+                  : {}),
             ...(parcelStatus !== undefined
                 ? parcelStatus
                     ? { 'filter[parcel_status]': parcelStatus }
                     : {}
                 : currentParcelStatus
-                    ? { 'filter[parcel_status]': currentParcelStatus }
-                    : {}),
+                  ? { 'filter[parcel_status]': currentParcelStatus }
+                  : {}),
             ...(selectedPageIds.length
                 ? { 'filter[page_id]': selectedPageIds.join(',') }
                 : {}),
@@ -761,8 +761,8 @@ export default function RmoManagement({
                     type === 'rider'
                         ? o.rider_phone
                         : (o.customer_phone ??
-                            o.order.shipping_address?.phone_number ??
-                            ''),
+                          o.order.shipping_address?.phone_number ??
+                          ''),
                 )
                 .filter(Boolean);
             if (phones.length === 0) return;
@@ -1188,8 +1188,8 @@ export default function RmoManagement({
                                             checked
                                                 ? [...prev, col.key]
                                                 : prev.filter(
-                                                    (k) => k !== col.key,
-                                                ),
+                                                      (k) => k !== col.key,
+                                                  ),
                                         );
                                     }}
                                 />
