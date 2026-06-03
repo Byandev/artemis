@@ -77,7 +77,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/onboarding', [OnboardingController::class, 'create'])->name('workspace.onboarding');
         Route::post('/onboarding', [OnboardingController::class, 'store'])->name('workspace.onboarding.store');
         Route::get('/onboarding/status', [OnboardingController::class, 'status'])->name('workspace.onboarding.status');
-        Route::post('/onboarding/skip', [OnboardingController::class, 'skip'])->name('workspace.onboarding.skip');
 
         Route::get('/inventory/transactions', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
         Route::post('/inventory/transactions', [InventoryTransactionController::class, 'store'])->name('inventory.transactions.store');
@@ -320,6 +319,7 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
         ->name('roles.restore');
 
     Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
+    Route::get('/roles/archived', [RoleController::class, 'archived'])->name('roles.archived');
     Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
     Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
 

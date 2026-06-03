@@ -1,7 +1,7 @@
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
-import CsrAwareLayout from '@/layouts/csr-aware-layout';
+import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
@@ -302,7 +302,7 @@ export default function Analytics({ workspace, query }: Props) {
     );
 
     return (
-        <CsrAwareLayout>
+        <AppLayout>
             <Head title={`${workspace.name} - CSR Analytics`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
@@ -427,6 +427,6 @@ export default function Analytics({ workspace, query }: Props) {
                     />
                 </div>
             </div>
-        </CsrAwareLayout>
+        </AppLayout>
     );
 }

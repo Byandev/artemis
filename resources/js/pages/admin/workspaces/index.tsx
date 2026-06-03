@@ -124,7 +124,6 @@ interface Props {
     filters: {
         search: string;
         sort?: string;
-        direction?: string;
     };
 }
 
@@ -169,11 +168,14 @@ export default function Index({ workspaces, plans, filters }: Props) {
     }, [workspaces.data, editingWorkspace]);
 
     const initialSorting = useMemo(() => {
-        if (filters.sort) {
-            return [{ id: filters.sort, desc: filters.direction === 'desc' }];
+        const sort =
+            typeof filters.sort === 'string' ? filters.sort : undefined;
+        if (sort) {
+            const isDesc = sort.startsWith('-');
+            return [{ id: sort.replace(/^-/, ''), desc: isDesc }];
         }
         return [];
-    }, [filters.sort, filters.direction]);
+    }, [filters.sort]);
 
     const performQuery = useCallback(
         debounce((s: string) => {
@@ -370,22 +372,11 @@ export default function Index({ workspaces, plans, filters }: Props) {
                         initialSorting={initialSorting}
                         meta={{ ...omit(workspaces, ['data']) }}
                         onFetch={(params) => {
-                            const sortStr =
-                                params?.sort && params.sort !== null
-                                    ? String(params.sort)
-                                    : null;
                             router.get(
                                 '/admin/workspaces',
                                 {
                                     search: search || undefined,
-                                    sort: sortStr
-                                        ? sortStr.replace(/^-/, '')
-                                        : undefined,
-                                    direction: sortStr
-                                        ? sortStr.startsWith('-')
-                                            ? 'desc'
-                                            : 'asc'
-                                        : undefined,
+                                    sort: params?.sort || undefined,
                                     page: params?.page ?? 1,
                                     per_page: params?.per_page ?? undefined,
                                 },

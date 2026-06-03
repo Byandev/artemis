@@ -58,11 +58,12 @@ class HandleInertiaRequests extends Middleware
         $isOwner = $user && $workspaceModel
             ? $user->ownsWorkspace($workspaceModel)
             : false;
-        $isWorkspaceAdmin = $user && $workspaceModel
-            ? $user->isAdminOf($workspaceModel)
-            : false;
         $can = [
-            'viewAnySupportTickets' => false,
+            'viewAnySupportTickets' => $user && $currentWorkspace instanceof Workspace
+                ? $user->ownsWorkspace($currentWorkspace)
+                || $user->isAdminOf($currentWorkspace)
+                || $user->hasWorkspaceRole($currentWorkspace, 'admin')
+                : false,
         ];
 
         // Show syncing modal when any page has no orders_last_synced_at
@@ -77,20 +78,15 @@ class HandleInertiaRequests extends Middleware
             }
         }
 
-        // Check subscription status for current workspace users, but never block superadmins.
+        // Check subscription status for current workspace
+        // On localhost, skip the subscription gate entirely
         $subscriptionExpired = null;
-        $shouldShowSubscriptionGate = $user
-            && $currentWorkspace instanceof Workspace
-            && ! $user->isSuperAdmin()
-            && ($user->ownsWorkspace($currentWorkspace) || $user->isMemberOf($currentWorkspace));
-
-        if ($shouldShowSubscriptionGate) {
+        if ($currentWorkspace instanceof Workspace && ! app()->isLocal()) {
             $subscription = $currentWorkspace->subscription;
 
             $isExpired = ! $subscription
                 || $subscription->status === Subscription::STATUS_EXPIRED
                 || $subscription->status === Subscription::STATUS_CANCELED
-                || $subscription->status === Subscription::STATUS_PAST_DUE
                 || ($subscription->status === Subscription::STATUS_TRIALING && $subscription->trial_ends_at && $subscription->trial_ends_at->isPast())
                 || ($subscription->status === Subscription::STATUS_ACTIVE && $subscription->current_period_end && $subscription->current_period_end->isPast());
 
@@ -115,8 +111,6 @@ class HandleInertiaRequests extends Middleware
                 'user' => $user ? array_merge($user->toArray(), [
                     'is_super_admin' => $user->isSuperAdmin(),
                     'is_workspace_owner' => $isOwner,
-                    'is_workspace_admin' => $isWorkspaceAdmin,
-                    'is_csr' => $user && $workspaceModel ? $user->isCsrOf($workspaceModel) : false,
                     'permissions' => $permissions,
                     'can' => $can,
                 ]) : null,
@@ -169,7 +163,7 @@ class HandleInertiaRequests extends Middleware
             return [];
         }
 
-        if ($user->ownsWorkspace($workspace) || $user->isAdminOf($workspace)) {
+        if ($user->ownsWorkspace($workspace)) {
             return ['*'];
         }
 

@@ -114,18 +114,9 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isAdminOf(Workspace $workspace): bool
     {
-        if ($this->ownsWorkspace($workspace)) {
-            return true;
-        }
-
         return $this->workspaces()
-            ->leftJoin('roles', 'workspace_user.role_id', '=', 'roles.id')
-            ->where('workspace_user.workspace_id', $workspace->id)
-            ->where(function ($query) {
-                $query
-                    ->whereIn('workspace_user.role', ['owner', 'admin'])
-                    ->orWhere('roles.name', 'admin');
-            })
+            ->where('workspace_id', $workspace->id)
+            ->whereIn('workspace_user.role', ['owner', 'admin'])
             ->exists();
     }
 
@@ -152,7 +143,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isSuperAdmin(): bool
     {
-        return (bool) $this->is_super_admin;
+        return $this->is_super_admin;
     }
 
     // public function hasReach(string $requiredRole): bool
@@ -175,40 +166,12 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Check if the user's role in the given workspace only has CSR-category permissions.
-     * Owners, super admins, and users without a role are never considered CSR-only.
-     */
-    public function isCsrOf(Workspace $workspace): bool
-    {
-        if ($this->isSuperAdmin() || $this->ownsWorkspace($workspace)) {
-            return false;
-        }
-
-        $roleId = DB::table('workspace_user')
-            ->where('user_id', $this->id)
-            ->where('workspace_id', $workspace->id)
-            ->value('role_id');
-
-        if (! $roleId) {
-            return false;
-        }
-
-        $categories = DB::table('role_permissions')
-            ->join('permissions', 'role_permissions.permission_id', '=', 'permissions.id')
-            ->where('role_permissions.role_id', $roleId)
-            ->pluck('permissions.category')
-            ->unique();
-
-        return $categories->isNotEmpty() && $categories->every(fn ($cat) => $cat === 'CSR');
-    }
-
-    /**
      * FIXED: This method now uses DB::table to avoid triggering the
      * Gate::before infinite loop which caused the 502/Timeout.
      */
     public function hasPermission(string|BackedEnum $permission, Workspace $workspace): bool
     {
-        if ($this->isSuperAdmin() || $this->ownsWorkspace($workspace) || $this->isAdminOf($workspace)) {
+        if ($this->isSuperAdmin() || $this->ownsWorkspace($workspace)) {
             return true;
         }
 

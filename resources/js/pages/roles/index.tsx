@@ -19,15 +19,14 @@ import { Role } from '@/types/models/Role';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import clsx from 'clsx';
 import { omit } from 'lodash';
 import {
     AlertTriangle,
     Archive,
+    ArchiveRestore,
     KeyRound,
     MoreHorizontal,
     Pencil,
-    RefreshCcw,
     Search,
     ShieldCheck,
 } from 'lucide-react';
@@ -45,28 +44,6 @@ interface Props {
     };
 }
 
-function StatusBadge({ deletedAt }: { deletedAt?: string | null }) {
-    const isActive = !deletedAt;
-    return (
-        <span
-            className={clsx(
-                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] font-medium tracking-wide uppercase',
-                isActive
-                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
-                    : 'bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400',
-            )}
-        >
-            <span
-                className={clsx(
-                    'h-1.5 w-1.5 rounded-full',
-                    isActive ? 'bg-emerald-500' : 'bg-red-400',
-                )}
-            />
-            {isActive ? 'Active' : 'Archived'}
-        </span>
-    );
-}
-
 export default function Index({ roles, workspace, query }: Props) {
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
@@ -78,7 +55,6 @@ export default function Index({ roles, workspace, query }: Props) {
         undefined,
     );
     const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
-    const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
     const [openFormModal, setOpenFormModal] = useState(false);
 
     const canCreate = usePermission(PERMISSIONS.CreateRoles);
@@ -123,22 +99,6 @@ export default function Index({ roles, workspace, query }: Props) {
         );
     };
 
-    const handleConfirmRestore = () => {
-        if (!selectedRole) return;
-        router.post(
-            rolesRoute.restore({ workspace, role: selectedRole.id }).url,
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    toast.success(`${selectedRole.name} has been restored.`);
-                    setIsRestoreModalOpen(false);
-                    setSelectedRole(undefined);
-                },
-            },
-        );
-    };
-
     const columns: ColumnDef<Role>[] = [
         {
             accessorKey: 'name',
@@ -168,16 +128,6 @@ export default function Index({ roles, workspace, query }: Props) {
                         )}
                     </p>
                 </div>
-            ),
-        },
-        {
-            accessorKey: 'deleted_at',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Status" />
-            ),
-            cell: ({ row }) => (
-                <StatusBadge deletedAt={row.original.deleted_at} />
             ),
         },
         ...(showActions
@@ -245,23 +195,7 @@ export default function Index({ roles, workspace, query }: Props) {
                                                   </>
                                               )}
                                           </>
-                                      ) : (
-                                          canArchive && (
-                                              <DropdownMenuItem
-                                                  onClick={() => {
-                                                      setSelectedRole(
-                                                          row.original,
-                                                      );
-                                                      setIsRestoreModalOpen(
-                                                          true,
-                                                      );
-                                                  }}
-                                              >
-                                                  <RefreshCcw />
-                                                  Restore
-                                              </DropdownMenuItem>
-                                          )
-                                      )}
+                                      ) : null}
                                   </DropdownMenuContent>
                               </DropdownMenu>
                           </div>
@@ -293,6 +227,19 @@ export default function Index({ roles, workspace, query }: Props) {
                     title="Role Management"
                     description="Define and manage access levels for your workspace"
                 >
+                    {canArchive && (
+                        <button
+                            onClick={() =>
+                                router.get(
+                                    `/workspaces/${workspace.slug}/roles/archived`,
+                                )
+                            }
+                            className="flex h-8 items-center gap-1.5 rounded-lg border border-black/6 bg-stone-100 px-3.5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:bg-zinc-700"
+                        >
+                            <ArchiveRestore className="h-3.5 w-3.5" />
+                            View Archived
+                        </button>
+                    )}
                     {canCreate && (
                         <button
                             onClick={() => {
@@ -391,55 +338,6 @@ export default function Index({ roles, workspace, query }: Props) {
                                     className="h-10 flex-1 rounded-lg bg-red-600 text-white hover:bg-red-700"
                                 >
                                     Confirm Archive
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Restore Modal */}
-            {canArchive && isRestoreModalOpen && (
-                <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
-                    <div
-                        className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px]"
-                        onClick={() => setIsRestoreModalOpen(false)}
-                    />
-                    <div className="animate-in fade-in zoom-in relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl duration-150 dark:bg-zinc-900">
-                        <div className="flex flex-col items-center p-6 text-center">
-                            <div className="mb-4 rounded-xl bg-emerald-50 p-3">
-                                <RefreshCcw className="h-6 w-6 text-emerald-500" />
-                            </div>
-                            <h3 className="mb-2 text-xl font-bold text-slate-900 dark:text-slate-100">
-                                Restore Role
-                            </h3>
-                            <p className="mb-5 text-sm text-slate-500">
-                                Restore{' '}
-                                <span className="font-semibold text-slate-900 dark:text-slate-100">
-                                    "{selectedRole?.name}"
-                                </span>{' '}
-                                to active status?
-                            </p>
-                            <div className="mb-6 w-full rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
-                                <p className="flex items-center justify-center gap-2 text-xs font-medium text-emerald-800">
-                                    <ShieldCheck className="h-4 w-4" />
-                                    This role will be visible and usable in the
-                                    workspace again.
-                                </p>
-                            </div>
-                            <div className="flex w-full items-center gap-3">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setIsRestoreModalOpen(false)}
-                                    className="h-10 flex-1 rounded-lg"
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    onClick={handleConfirmRestore}
-                                    className="h-10 flex-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
-                                >
-                                    Confirm Restore
                                 </Button>
                             </div>
                         </div>

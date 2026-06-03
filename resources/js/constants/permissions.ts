@@ -19,6 +19,7 @@ export const PERMISSIONS = {
     EditPages: 'Edit Pages',
     ArchivePages: 'Archive Pages',
     RefreshPages: 'Refresh Pages',
+    UpdatePageBudget: 'Update Page Budget',
 
     // Shops
     ViewShops: 'View Shops',
