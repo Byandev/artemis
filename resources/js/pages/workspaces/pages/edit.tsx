@@ -7,6 +7,7 @@ import { Page } from '@/types/models/Page';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowLeft, BookOpen, ExternalLink } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Props {
     workspace: Workspace;
@@ -40,7 +41,11 @@ export default function Edit({ workspace, page, users }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(workspaces.pages.update.url({ workspace, page }));
+        put(workspaces.pages.update.url({ workspace, page }), {
+            onError: () => {
+                toast.error('Failed to update page. Please check the form.');
+            },
+        });
     };
 
     return (

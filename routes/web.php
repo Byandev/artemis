@@ -85,6 +85,15 @@ Route::middleware(['auth'])->group(function () {
             ?? $user->workspaces()->first();
 
         if ($workspace) {
+            if ($user->isCsrOf($workspace)) {
+                return redirect()->route('workspaces.csr.dashboard', $workspace->slug);
+            }
+
+            // Require at least one connected page before reaching the dashboard.
+            if (! $workspace->pages()->exists()) {
+                return redirect()->route('workspace.onboarding', $workspace->slug);
+            }
+
             return redirect()->route('workspace.dashboard', $workspace->slug);
         }
 

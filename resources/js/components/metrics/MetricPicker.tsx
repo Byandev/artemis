@@ -11,7 +11,7 @@ import {
     MetricKey,
 } from '@/types/metrics';
 import { ChartNoAxesColumn } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Props {
     initialValue: MetricKey[];
@@ -19,19 +19,49 @@ interface Props {
     metrics?: MetricConfig[];
 }
 
-const MetricPicker = ({ initialValue = [], onChange }: Props) => {
+const MetricPicker = ({ initialValue = [], onChange, metrics }: Props) => {
     const [isOpen, setIsOpen] = useState(false);
     const [localValue, setLocalValue] = useState<MetricKey[]>(initialValue);
 
-    const handleApply = useCallback(() => {
-        onChange(localValue);
-        setIsOpen(false);
-    }, [localValue, onChange]);
+    const availableMetrics = metrics ?? metricConfigs;
+    const metricKeySignature = availableMetrics
+        .map((metric) => metric.key)
+        .join('|');
 
     const allMetricKeys = useMemo<MetricKey[]>(
-        () => metricConfigs.map((m) => m.key),
-        [],
+        () =>
+            metricKeySignature
+                ? (metricKeySignature.split('|') as MetricKey[])
+                : [],
+        [metricKeySignature],
     );
+
+    const allMetricKeySet = useMemo(
+        () => new Set<MetricKey>(allMetricKeys),
+        [allMetricKeys],
+    );
+
+    const visibleGroups = useMemo(
+        () =>
+            groupedMetrics
+                .map((group) => ({
+                    ...group,
+                    metrics: group.metrics.filter((metric) =>
+                        allMetricKeySet.has(metric.key),
+                    ),
+                }))
+                .filter((group) => group.metrics.length > 0),
+        [allMetricKeySet],
+    );
+
+    useEffect(() => {
+        setLocalValue(initialValue.filter((key) => allMetricKeySet.has(key)));
+    }, [allMetricKeySet, initialValue, metricKeySignature]);
+
+    const handleApply = useCallback(() => {
+        onChange(localValue.filter((key) => allMetricKeySet.has(key)));
+        setIsOpen(false);
+    }, [allMetricKeySet, localValue, onChange]);
 
     const handleSelectAll = useCallback(
         () => setLocalValue(allMetricKeys),
@@ -40,11 +70,16 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
 
     const handleClear = useCallback(() => setLocalValue([]), []);
 
-    const activeCount = useMemo(() => localValue.length, [localValue]);
-    const allSelected = activeCount === allMetricKeys.length;
+    const activeCount = useMemo(
+        () => localValue.filter((key) => allMetricKeySet.has(key)).length,
+        [allMetricKeySet, localValue],
+    );
+    const allSelected =
+        allMetricKeys.length > 0 && activeCount === allMetricKeys.length;
 
     const MIN_REQUIRED = 2;
-    const canApply = activeCount >= MIN_REQUIRED;
+    const minimumRequired = Math.min(MIN_REQUIRED, allMetricKeys.length);
+    const canApply = activeCount >= minimumRequired;
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -142,7 +177,7 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
 
                 {/* Metric groups */}
                 <div className="max-h-72 overflow-y-auto p-2">
-                    {groupedMetrics.map((g) => (
+                    {visibleGroups.map((g) => (
                         <div key={g.key} className="mb-1">
                             <p className="px-2 py-1.5 font-mono text-[10px] font-medium tracking-wider text-gray-300 uppercase dark:text-gray-600">
                                 {g.label}
@@ -200,7 +235,8 @@ const MetricPicker = ({ initialValue = [], onChange }: Props) => {
                 <div className="border-t border-black/6 px-4 py-3 dark:border-white/6">
                     {!canApply && (
                         <p className="mb-2 text-[11px] text-amber-600 dark:text-amber-400">
-                            Select at least {MIN_REQUIRED} metrics to continue.
+                            Select at least {minimumRequired} metrics to
+                            continue.
                         </p>
                     )}
                     <div className="flex gap-2">

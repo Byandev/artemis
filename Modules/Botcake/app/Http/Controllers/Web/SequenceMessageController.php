@@ -2,8 +2,10 @@
 
 namespace Modules\Botcake\Http\Controllers\Web;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Botcake\Http\Sorts\SequenceMessage\SuccessRateSort;
@@ -14,8 +16,15 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class SequenceMessageController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request, Workspace $workspace)
     {
+        $this->authorize(
+            Permission::ViewBotcakeSequenceMessages->value,
+            $workspace,
+        );
+
         [$mode, $from, $to] = $this->resolveModeAndRange($request);
 
         $base = SequenceMessage::query()
@@ -56,6 +65,12 @@ class SequenceMessageController extends Controller
                         $query->whereHas('sequence.page', fn ($q) => $q->whereIn('shop_id', $ids));
                     }
                 }),
+                AllowedFilter::callback('team_ids', function ($query, $value) {
+                    $ids = $this->parseIds($value);
+                    if (! empty($ids)) {
+                        $query->whereHas('sequence.page.owner.teams', fn ($q) => $q->whereIn('teams.id', $ids));
+                    }
+                }),
                 AllowedFilter::callback('sent_min', function ($query, $value) use ($mode, $from, $to) {
                     if ($value === null || $value === '') {
                         return;
@@ -84,6 +99,9 @@ class SequenceMessageController extends Controller
                     $query->select('id', 'name', 'workspace_id')->orderBy('name');
                 },
                 'pages' => function ($query) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                },
+                'teams' => function ($query) {
                     $query->select('id', 'name', 'workspace_id')->orderBy('name');
                 },
                 'pageOwners:id,name',

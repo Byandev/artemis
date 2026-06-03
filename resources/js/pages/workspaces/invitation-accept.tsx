@@ -9,12 +9,14 @@ interface InvitationAcceptProps {
     invitation: WorkspaceInvitation;
     isAuthenticated: boolean;
     accepted?: boolean;
+    isCsr?: boolean;
 }
 
 export default function InvitationAccept({
     invitation,
     isAuthenticated,
     accepted,
+    isCsr,
 }: InvitationAcceptProps) {
     const { errors } = usePage().props;
 
@@ -54,7 +56,11 @@ export default function InvitationAccept({
 
                             <div className="w-full pt-2">
                                 <Link
-                                    href={`/workspaces/${invitation.workspace.slug}/dashboard`}
+                                    href={
+                                        isCsr
+                                            ? `/workspaces/${invitation.workspace.slug}/csr/dashboard`
+                                            : `/workspaces/${invitation.workspace.slug}/dashboard`
+                                    }
                                 >
                                     <Button className="w-full rounded-xl py-3 text-base">
                                         Go to Workspace

@@ -17,11 +17,20 @@ class CheckSubscription
             return $next($request);
         }
 
+        if ($request->user()?->isSuperAdmin()) {
+            return $next($request);
+        }
+
+        if (! $request->user()?->ownsWorkspace($workspace) && ! $request->user()?->isMemberOf($workspace)) {
+            return $next($request);
+        }
+
         $subscription = $workspace->subscription;
 
         $isExpired = ! $subscription
             || $subscription->status === Subscription::STATUS_EXPIRED
             || $subscription->status === Subscription::STATUS_CANCELED
+            || $subscription->status === Subscription::STATUS_PAST_DUE
             || ($subscription->status === Subscription::STATUS_TRIALING && $subscription->trial_ends_at && $subscription->trial_ends_at->isPast())
             || ($subscription->status === Subscription::STATUS_ACTIVE && $subscription->current_period_end && $subscription->current_period_end->isPast());
 

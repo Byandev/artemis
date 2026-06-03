@@ -1,33 +1,34 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
+use App\Models\Workspace;
 
 test('profile page is displayed', function () {
     $user = User::factory()->create();
+    $workspace = Workspace::factory()->forOwner($user)->create();
 
     $response = $this
         ->actingAs($user)
-        ->get(route('profile.edit'));
+        ->get(route('profile.edit', ['workspace' => $workspace->slug]));
 
     $response->assertOk();
 });
 
 test('profile information can be updated', function () {
     $user = User::factory()->create();
+    $workspace = Workspace::factory()->forOwner($user)->create();
+    $editUrl = route('profile.edit', ['workspace' => $workspace->slug]);
 
     $response = $this
         ->actingAs($user)
-        ->patch(route('profile.update'), [
+        ->patch(route('profile.update', ['workspace' => $workspace->slug]), [
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
 
     $response
         ->assertSessionHasNoErrors()
-        ->assertRedirect(route('profile.edit'));
+        ->assertRedirect($editUrl);
 
     $user->refresh();
 
@@ -38,27 +39,29 @@ test('profile information can be updated', function () {
 
 test('email verification status is unchanged when the email address is unchanged', function () {
     $user = User::factory()->create();
+    $workspace = Workspace::factory()->forOwner($user)->create();
 
     $response = $this
         ->actingAs($user)
-        ->patch(route('profile.update'), [
+        ->patch(route('profile.update', ['workspace' => $workspace->slug]), [
             'name' => 'Test User',
             'email' => $user->email,
         ]);
 
     $response
         ->assertSessionHasNoErrors()
-        ->assertRedirect(route('profile.edit'));
+        ->assertRedirect(route('profile.edit', ['workspace' => $workspace->slug]));
 
     expect($user->refresh()->email_verified_at)->not->toBeNull();
 });
 
 test('user can delete their account', function () {
     $user = User::factory()->create();
+    $workspace = Workspace::factory()->forOwner($user)->create();
 
     $response = $this
         ->actingAs($user)
-        ->delete(route('profile.destroy'), [
+        ->delete(route('profile.destroy', ['workspace' => $workspace->slug]), [
             'password' => 'password',
         ]);
 
@@ -72,17 +75,19 @@ test('user can delete their account', function () {
 
 test('correct password must be provided to delete account', function () {
     $user = User::factory()->create();
+    $workspace = Workspace::factory()->forOwner($user)->create();
+    $editUrl = route('profile.edit', ['workspace' => $workspace->slug]);
 
     $response = $this
         ->actingAs($user)
-        ->from(route('profile.edit'))
-        ->delete(route('profile.destroy'), [
+        ->from($editUrl)
+        ->delete(route('profile.destroy', ['workspace' => $workspace->slug]), [
             'password' => 'wrong-password',
         ]);
 
     $response
         ->assertSessionHasErrors('password')
-        ->assertRedirect(route('profile.edit'));
+        ->assertRedirect($editUrl);
 
     expect($user->fresh())->not->toBeNull();
 });

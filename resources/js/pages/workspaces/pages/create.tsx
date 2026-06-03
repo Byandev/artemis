@@ -6,6 +6,7 @@ import { User } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowLeft, BookOpen, ExternalLink } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Props {
     workspace: Workspace;
@@ -38,7 +39,11 @@ export default function Create({ workspace, users }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(workspaces.pages.store.url({ workspace }));
+        post(workspaces.pages.store.url({ workspace }), {
+            onError: () => {
+                toast.error('Failed to create page. Please check the form.');
+            },
+        });
     };
 
     return (
