@@ -168,9 +168,10 @@ export default function Index({ workspaces, plans, filters }: Props) {
     }, [workspaces.data, editingWorkspace]);
 
     const initialSorting = useMemo(() => {
-        if (filters.sort) {
-            const isDesc = filters.sort.startsWith('-');
-            return [{ id: filters.sort.replace(/^-/, ''), desc: isDesc }];
+        const sort = typeof filters.sort === 'string' ? filters.sort : undefined;
+        if (sort) {
+            const isDesc = sort.startsWith('-');
+            return [{ id: sort.replace(/^-/, ''), desc: isDesc }];
         }
         return [];
     }, [filters.sort]);
