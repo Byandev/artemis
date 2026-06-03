@@ -316,6 +316,7 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
         ->name('roles.restore');
 
     Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
+    Route::get('/roles/archived', [RoleController::class, 'archived'])->name('roles.archived');
     Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
     Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
 
