@@ -135,24 +135,4 @@ class OnboardingController extends Controller
             'complete' => $complete,
         ]);
     }
-
-    public function skip(Request $request, Workspace $workspace)
-    {
-        // Create free trial subscription if none exists
-        if (! $workspace->subscription) {
-            $trialPlan = SubscriptionPlan::where('code', SubscriptionPlan::CODE_FREE_TRIAL)->first();
-            $trialDays = $trialPlan?->trial_days ?? 30;
-
-            Subscription::create([
-                'workspace_id' => $workspace->id,
-                'subscription_plan_id' => $trialPlan?->id,
-                'status' => Subscription::STATUS_TRIALING,
-                'trial_ends_at' => Carbon::now()->addDays($trialDays),
-                'current_period_start' => Carbon::now(),
-                'current_period_end' => Carbon::now()->addDays($trialDays),
-            ]);
-        }
-
-        return redirect()->route('workspace.dashboard', $workspace->slug);
-    }
 }
