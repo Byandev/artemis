@@ -17,7 +17,7 @@ import {
     Settings2,
     X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface SubscriptionPlan {
     id: number;
@@ -153,19 +153,21 @@ export default function Index({ workspaces, plans, filters }: Props) {
         null,
     );
 
-    // Auto-open subscription modal for workspaces with past_due or expired status
+    const hasAutoOpened = useRef(false);
+
+    // Auto-open subscription modal once on initial load for past_due or expired workspaces
     useEffect(() => {
-        if (!editingWorkspace && workspaces.data) {
-            const pastDueOrExpiredWorkspace = workspaces.data.find(
-                (ws) =>
-                    ws.subscription?.status === 'past_due' ||
-                    ws.subscription?.status === 'expired',
-            );
-            if (pastDueOrExpiredWorkspace) {
-                setEditingWorkspace(pastDueOrExpiredWorkspace);
-            }
+        if (hasAutoOpened.current || !workspaces.data) return;
+        const pastDueOrExpiredWorkspace = workspaces.data.find(
+            (ws) =>
+                ws.subscription?.status === 'past_due' ||
+                ws.subscription?.status === 'expired',
+        );
+        if (pastDueOrExpiredWorkspace) {
+            hasAutoOpened.current = true;
+            setEditingWorkspace(pastDueOrExpiredWorkspace);
         }
-    }, [workspaces.data, editingWorkspace]);
+    }, [workspaces.data]);
 
     const initialSorting = useMemo(() => {
         const sort = typeof filters.sort === 'string' ? filters.sort : undefined;
