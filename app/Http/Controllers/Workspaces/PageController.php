@@ -10,6 +10,7 @@ use App\Http\Sorts\Page\OwnerNameSort;
 use App\Http\Sorts\Page\ShopNameSort;
 use App\Http\Sorts\PendingRequiredChecklistsSort;
 use App\Models\Page;
+use App\Models\PageDailyBudgetRecord;
 use App\Models\Shop;
 use App\Models\Workspace;
 use App\Services\PostHogService;
@@ -78,7 +79,7 @@ class PageController extends Controller
                 'parcel_journey_enabled',
                 AllowedSort::custom('pending_required_checklists_count', new PendingRequiredChecklistsSort),
             ])
-            ->with(['shop', 'owner'])
+            ->with(['shop', 'owner', 'latestBudget'])
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
@@ -194,7 +195,33 @@ class PageController extends Controller
 
         $page->update($request->validated());
 
-        return redirect()->route('workspaces.pages.index', $workspace)->with('success', 'Page updated.');
+        return redirect()->route('workspaces.pages.index', $workspace)->with('success', 'Page updated successfully.');
+    }
+
+    public function updateBudget(Request $request, Workspace $workspace, Page $page)
+    {
+        $this->authorize(Permission::EditPageDailyBudgetRecords->value, $workspace);
+
+        if ($page->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'budget' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        PageDailyBudgetRecord::updateOrCreate(
+            [
+                'workspace_id' => $workspace->id,
+                'page_id' => $page->id,
+                'date' => now()->toDateString(),
+            ],
+            ['budget' => $validated['budget']]
+        );
+
+        return redirect()
+            ->route('workspaces.pages.index', $workspace)
+            ->with('success', 'Page budget updated successfully.');
     }
 
     public function refresh(Request $request, Workspace $workspace, Page $page)
@@ -221,7 +248,7 @@ class PageController extends Controller
 
         $page->deactivate();
 
-        return redirect()->route('workspaces.pages.index', $workspace);
+        return redirect()->route('workspaces.pages.index', $workspace)->with('success', 'Page archived successfully.');
     }
 
     public function restore(Request $request, Workspace $workspace, Page $page)

@@ -1,5 +1,5 @@
-import PasswordController from '@/actions/App/Http/Controllers/Settings/PasswordController';
 import InputError from '@/components/input-error';
+import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
@@ -14,20 +14,28 @@ import { Label } from '@/components/ui/label';
 import { edit } from '@/routes/password';
 import { Workspace } from '@/types/models/Workspace';
 
-export default function Password({ workspace }: { workspace: Workspace }) {
-    console.log(workspace);
+export default function Password({
+    workspace,
+}: {
+    workspace?: Workspace | null;
+}) {
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: 'Password settings',
-            href: edit({ workspace: workspace.slug }).url,
+            href: workspace
+                ? edit({ workspace: workspace.slug }).url
+                : '/settings/password',
         },
     ];
 
     const passwordInput = useRef<HTMLInputElement>(null);
     const currentPasswordInput = useRef<HTMLInputElement>(null);
+    const formAction = workspace
+        ? `/workspaces/${workspace.slug}/settings/password`
+        : '/settings/password';
 
-    return (
-        <AppLayout breadcrumbs={breadcrumbs}>
+    const content = (
+        <>
             <Head title="Password settings" />
 
             <SettingsLayout workspace={workspace}>
@@ -38,9 +46,8 @@ export default function Password({ workspace }: { workspace: Workspace }) {
                     />
 
                     <Form
-                        {...PasswordController.update.form({
-                            workspace: workspace.slug,
-                        })}
+                        action={formAction}
+                        method="put"
                         options={{
                             preserveScroll: true,
                         }}
@@ -145,6 +152,12 @@ export default function Password({ workspace }: { workspace: Workspace }) {
                     </Form>
                 </div>
             </SettingsLayout>
-        </AppLayout>
+        </>
     );
+
+    if (!workspace) {
+        return <AdminSidebarLayout>{content}</AdminSidebarLayout>;
+    }
+
+    return <AppLayout breadcrumbs={breadcrumbs}>{content}</AppLayout>;
 }

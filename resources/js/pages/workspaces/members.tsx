@@ -51,15 +51,16 @@ import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { omit } from 'lodash';
 import {
-    CopyleftIcon,
     KeyRound,
+    Link,
     MoreHorizontal,
+    Search,
     Send,
     Trash2,
     UserCog,
     UserMinus,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 interface Invitation {
@@ -106,6 +107,9 @@ export default function WorkspaceMembers({
     const canRemoveMembers = isOwner || canRemoveMembersPerm;
     const canResetPassword = usePermission(PERMISSIONS.ResetMemberPassword);
     const canInvite = usePermission(PERMISSIONS.InviteMembers);
+    const canUseMemberActions =
+        canEditMembers || canRemoveMembers || canResetPassword;
+    const canUseInvitationActions = isAdmin || canInvite;
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
         [query?.sort],
@@ -115,6 +119,8 @@ export default function WorkspaceMembers({
         [query?.invitation_sort],
     );
 
+    const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
     const [memberToUpdateRole, setMemberToUpdateRole] = useState<User | null>(
@@ -123,6 +129,7 @@ export default function WorkspaceMembers({
     const [invitationToRevoke, setInvitationToRevoke] =
         useState<Invitation | null>(null);
     const [copiedMemberId, setCopiedMemberId] = useState<number | null>(null);
+    const [manualInviteUrl, setManualInviteUrl] = useState<string | null>(null);
 
     const inviteForm = useForm({
         email: '',
@@ -187,17 +194,11 @@ export default function WorkspaceMembers({
         });
     };
 
-    const copyInviteUrl = async (invitation: Invitation) => {
-        try {
-            const domain = window.location.origin;
+    const showInviteUrl = (invitation: Invitation) => {
+        const domain = window.location.origin;
+        const inviteUrl = `${domain}/workspaces/invitations/${invitation.token}/accept`;
 
-            await navigator.clipboard.writeText(
-                `${domain}/workspaces/invitations/${invitation.token}/accept`,
-            );
-            alert('Copied!');
-        } catch (error) {
-            console.error('Failed to copy:', error);
-        }
+        setManualInviteUrl(inviteUrl);
     };
 
     const handleRemoveMember = () => {
@@ -263,6 +264,30 @@ export default function WorkspaceMembers({
         }
     };
 
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            router.get(
+                `/workspaces/${workspace.slug}/members`,
+                {
+                    sort: query?.sort,
+                    page: searchValue ? 1 : (query?.page ?? 1),
+                    per_page: query?.perPage,
+                    invitation_sort: query?.invitation_sort,
+                    invitation_page: query?.invitation_page,
+                    'filter[search]': searchValue || undefined,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['members', 'query'],
+                },
+            );
+        }, 400);
+
+        return () => clearTimeout(timer);
+    }, [searchValue]);
+
     const membersColumns: ColumnDef<User>[] = [
         {
             accessorKey: 'id',
@@ -304,67 +329,71 @@ export default function WorkspaceMembers({
                 ).toLocaleDateString();
             },
         },
-        {
-            id: 'actions',
-            cell: ({ row }) => {
-                const member = row.original;
+        ...(canUseMemberActions
+            ? [
+                  {
+                      id: 'actions',
+                      cell: ({ row }) => {
+                          const member = row.original;
 
-                if (member.id === workspace.owner_id) return null;
-                if (!canEditMembers && !canRemoveMembers && !canResetPassword)
-                    return null;
+                          if (member.id === workspace.owner_id) return null;
 
-                return (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            {canEditMembers && (
-                                <DropdownMenuItem
-                                    onClick={() => {
-                                        setMemberToUpdateRole(member);
-                                        updateRoleForm.setData(
-                                            'role_id',
-                                            member.pivot?.role_id?.toString() ??
-                                                '',
-                                        );
-                                    }}
-                                >
-                                    <UserCog className="mr-2 h-4 w-4" />
-                                    Change Role
-                                </DropdownMenuItem>
-                            )}
-                            {canResetPassword && (
-                                <DropdownMenuItem
-                                    onClick={() => copyResetPasswordUrl(member)}
-                                >
-                                    <KeyRound className="mr-2 h-4 w-4" />
-                                    {copiedMemberId === member.id
-                                        ? 'Copied!'
-                                        : 'Copy Reset Link'}
-                                </DropdownMenuItem>
-                            )}
-                            {canRemoveMembers && (
-                                <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                        onClick={() =>
-                                            setMemberToRemove(member)
-                                        }
-                                        className="text-destructive focus:text-destructive"
-                                    >
-                                        <UserMinus className="mr-2 h-4 w-4" />
-                                        Remove
-                                    </DropdownMenuItem>
-                                </>
-                            )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                );
-            },
-        },
+                          return (
+                              <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm">
+                                          <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                      {canEditMembers && (
+                                          <DropdownMenuItem
+                                              onClick={() => {
+                                                  setMemberToUpdateRole(member);
+                                                  updateRoleForm.setData(
+                                                      'role_id',
+                                                      member.pivot?.role_id?.toString() ??
+                                                          '',
+                                                  );
+                                              }}
+                                          >
+                                              <UserCog className="mr-2 h-4 w-4" />
+                                              Change Role
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canResetPassword && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  copyResetPasswordUrl(member)
+                                              }
+                                          >
+                                              <KeyRound className="mr-2 h-4 w-4" />
+                                              {copiedMemberId === member.id
+                                                  ? 'Copied!'
+                                                  : 'Copy Reset Link'}
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canRemoveMembers && (
+                                          <>
+                                              <DropdownMenuSeparator />
+                                              <DropdownMenuItem
+                                                  onClick={() =>
+                                                      setMemberToRemove(member)
+                                                  }
+                                                  className="text-destructive focus:text-destructive"
+                                              >
+                                                  <UserMinus className="mr-2 h-4 w-4" />
+                                                  Remove
+                                              </DropdownMenuItem>
+                                          </>
+                                      )}
+                                  </DropdownMenuContent>
+                              </DropdownMenu>
+                          );
+                      },
+                  } as ColumnDef<User>,
+              ]
+            : []),
     ];
 
     const invitationsColumns: ColumnDef<Invitation>[] = [
@@ -407,52 +436,57 @@ export default function WorkspaceMembers({
                 return new Date(row.original.expires_at).toLocaleDateString();
             },
         },
-        {
-            id: 'actions',
-            cell: ({ row }) => {
-                const invitation = row.original;
+        ...(canUseInvitationActions
+            ? [
+                  {
+                      id: 'actions',
+                      cell: ({ row }) => {
+                          const invitation = row.original;
 
-                if (!isAdmin && !canInvite) return null;
+                          return (
+                              <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm">
+                                          <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                      <DropdownMenuItem
+                                          onClick={() =>
+                                              handleResendInvitation(
+                                                  invitation.id,
+                                              )
+                                          }
+                                      >
+                                          <Send className="mr-2 h-4 w-4" />
+                                          Resend
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                          onClick={() =>
+                                              setInvitationToRevoke(invitation)
+                                          }
+                                          className="text-destructive focus:text-destructive"
+                                      >
+                                          <Trash2 className="mr-2 h-4 w-4" />
+                                          Revoke
+                                      </DropdownMenuItem>
 
-                return (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                                onClick={() =>
-                                    handleResendInvitation(invitation.id)
-                                }
-                            >
-                                <Send className="mr-2 h-4 w-4" />
-                                Resend
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onClick={() =>
-                                    setInvitationToRevoke(invitation)
-                                }
-                                className="text-destructive focus:text-destructive"
-                            >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Revoke
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem
-                                onClick={() => copyInviteUrl(invitation)}
-                                className="text-destructive focus:text-destructive"
-                            >
-                                <CopyleftIcon className="mr-2 h-4 w-4" />
-                                Copy
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                );
-            },
-        },
+                                      <DropdownMenuItem
+                                          onClick={() =>
+                                              showInviteUrl(invitation)
+                                          }
+                                      >
+                                          <Link className="mr-2 h-4 w-4" />
+                                          Show invitation link
+                                      </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                              </DropdownMenu>
+                          );
+                      },
+                  } as ColumnDef<Invitation>,
+              ]
+            : []),
     ];
 
     return (
@@ -561,9 +595,54 @@ export default function WorkspaceMembers({
                     </Dialog>
                 </PageHeader>
 
+                <Dialog
+                    open={!!manualInviteUrl}
+                    onOpenChange={(open) => {
+                        if (!open) setManualInviteUrl(null);
+                    }}
+                >
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Invitation link</DialogTitle>
+                            <DialogDescription>
+                                Select and copy this link manually.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <Input
+                                readOnly
+                                value={manualInviteUrl ?? ''}
+                                onFocus={(event) =>
+                                    event.currentTarget.select()
+                                }
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                onClick={() => setManualInviteUrl(null)}
+                            >
+                                Done
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
                 <div className="space-y-5 sm:space-y-6">
                     {/* Members Table */}
-                    <ComponentCard desc="Manage workspace members and their roles">
+                    <div className="mb-3 flex items-center gap-2">
+                        <div className="relative w-full max-w-xs">
+                            <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                            <input
+                                className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                                placeholder="Search member name..."
+                                value={searchValue}
+                                onChange={(e) => setSearchValue(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                         <DataTable
                             columns={membersColumns}
                             enableInternalPagination={false}
@@ -579,6 +658,8 @@ export default function WorkspaceMembers({
                                         per_page: params?.per_page,
                                         invitation_sort: query?.invitation_sort,
                                         invitation_page: query?.invitation_page,
+                                        'filter[search]':
+                                            searchValue || undefined,
                                     },
                                     {
                                         preserveState: false,
@@ -588,7 +669,7 @@ export default function WorkspaceMembers({
                                 );
                             }}
                         />
-                    </ComponentCard>
+                    </div>
 
                     {/* Pending Invitations */}
                     {pendingInvitations.data &&

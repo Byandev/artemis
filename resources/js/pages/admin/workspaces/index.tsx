@@ -51,6 +51,7 @@ interface Workspace {
     csr_module_enabled: boolean;
     rmo_module_enabled: boolean;
     leaderboard_module_enabled: boolean;
+    botcake_module_enabled: boolean;
     creatives_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
@@ -66,6 +67,7 @@ const MODULE_FIELDS: Array<{
         | 'csr_module_enabled'
         | 'rmo_module_enabled'
         | 'leaderboard_module_enabled'
+        | 'botcake_module_enabled'
         | 'creatives_module_enabled'
     >;
     label: string;
@@ -112,6 +114,11 @@ const MODULE_FIELDS: Array<{
         description: 'Public leaderboards link',
     },
     {
+        key: 'botcake_module_enabled',
+        label: 'Botcake',
+        description: 'Botcake sequences and flows',
+    },
+    {
         key: 'creatives_module_enabled',
         label: 'Creatives',
         description: 'Creative tracker with review and ads campaign status',
@@ -124,7 +131,6 @@ interface Props {
     filters: {
         search: string;
         sort?: string;
-        direction?: string;
     };
 }
 
@@ -154,12 +160,29 @@ export default function Index({ workspaces, plans, filters }: Props) {
         null,
     );
 
+    // Auto-open subscription modal for workspaces with past_due or expired status
+    useEffect(() => {
+        if (!editingWorkspace && workspaces.data) {
+            const pastDueOrExpiredWorkspace = workspaces.data.find(
+                (ws) =>
+                    ws.subscription?.status === 'past_due' ||
+                    ws.subscription?.status === 'expired',
+            );
+            if (pastDueOrExpiredWorkspace) {
+                setEditingWorkspace(pastDueOrExpiredWorkspace);
+            }
+        }
+    }, [workspaces.data, editingWorkspace]);
+
     const initialSorting = useMemo(() => {
-        if (filters.sort) {
-            return [{ id: filters.sort, desc: filters.direction === 'desc' }];
+        const sort =
+            typeof filters.sort === 'string' ? filters.sort : undefined;
+        if (sort) {
+            const isDesc = sort.startsWith('-');
+            return [{ id: sort.replace(/^-/, ''), desc: isDesc }];
         }
         return [];
-    }, [filters.sort, filters.direction]);
+    }, [filters.sort]);
 
     const performQuery = useCallback(
         debounce((s: string) => {
@@ -207,11 +230,10 @@ export default function Index({ workspaces, plans, filters }: Props) {
         },
         {
             id: 'owner',
-            enableSorting: false,
-            header: () => (
-                <div className="text-[11px] font-bold tracking-wider text-zinc-500 uppercase">
-                    Primary Owner
-                </div>
+            accessorFn: (row) => row.owner?.name || 'Platform Admin',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Primary Owner" />
             ),
             cell: ({ row }) => (
                 <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
@@ -245,11 +267,14 @@ export default function Index({ workspaces, plans, filters }: Props) {
         },
         {
             id: 'subscription',
-            enableSorting: false,
-            header: () => (
-                <div className="text-center text-[11px] font-bold tracking-wider text-zinc-500 uppercase">
-                    Subscription
-                </div>
+            accessorFn: (row) => row.subscription?.plan.name || 'No plan',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Subscription"
+                    className="justify-center"
+                />
             ),
             cell: ({ row }) => (
                 <div className="text-center">
@@ -354,22 +379,11 @@ export default function Index({ workspaces, plans, filters }: Props) {
                         initialSorting={initialSorting}
                         meta={{ ...omit(workspaces, ['data']) }}
                         onFetch={(params) => {
-                            const sortStr =
-                                params?.sort && params.sort !== null
-                                    ? String(params.sort)
-                                    : null;
                             router.get(
                                 '/admin/workspaces',
                                 {
                                     search: search || undefined,
-                                    sort: sortStr
-                                        ? sortStr.replace(/^-/, '')
-                                        : undefined,
-                                    direction: sortStr
-                                        ? sortStr.startsWith('-')
-                                            ? 'desc'
-                                            : 'asc'
-                                        : undefined,
+                                    sort: params?.sort || undefined,
                                     page: params?.page ?? 1,
                                     per_page: params?.per_page ?? undefined,
                                 },
@@ -414,40 +428,6 @@ export default function Index({ workspaces, plans, filters }: Props) {
                 />
             )}
         </AdminSidebarLayout>
-    );
-}
-
-function DaysLeft({ subscription }: { subscription: Subscription }) {
-    const endDate =
-        subscription.status === 'trialing'
-            ? subscription.trial_ends_at
-            : subscription.current_period_end;
-
-    if (!endDate) return <span className="text-xs text-zinc-400">—</span>;
-
-    const now = new Date();
-    const end = new Date(endDate);
-    const diffMs = end.getTime() - now.getTime();
-    const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-    if (days < 0) {
-        return (
-            <span className="text-xs font-medium text-red-500">Expired</span>
-        );
-    }
-
-    const color =
-        days <= 3
-            ? 'text-red-600 dark:text-red-400'
-            : days <= 7
-              ? 'text-yellow-600 dark:text-yellow-400'
-              : 'text-zinc-700 dark:text-zinc-300';
-
-    return (
-        <div className="flex flex-col items-center">
-            <span className={`text-sm font-bold ${color}`}>{days}</span>
-            <span className="text-[10px] text-zinc-500">days left</span>
-        </div>
     );
 }
 
@@ -635,8 +615,8 @@ function MaxPagesModal({
                         />
                         <p className="mt-1 text-xs text-zinc-500">
                             Leave empty to use the subscription plan limit
-                            instead. Currently using{' '}
-                            {workspace.pages_count} page(s).
+                            instead. Currently using {workspace.pages_count}{' '}
+                            page(s).
                         </p>
                     </div>
 
@@ -678,6 +658,7 @@ function ModulesModal({
         csr_module_enabled: workspace.csr_module_enabled,
         rmo_module_enabled: workspace.rmo_module_enabled,
         leaderboard_module_enabled: workspace.leaderboard_module_enabled,
+        botcake_module_enabled: workspace.botcake_module_enabled,
         creatives_module_enabled: workspace.creatives_module_enabled,
     });
 

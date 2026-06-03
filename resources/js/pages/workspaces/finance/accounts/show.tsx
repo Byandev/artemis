@@ -20,6 +20,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link } from '@inertiajs/react';
@@ -71,6 +73,25 @@ export default function AccountShow({
     const [toDelete, setToDelete] = useState<Txn | null>(null);
 
     const base = `/workspaces/${workspace.slug}/finance`;
+    const canCreateTransactions = usePermission(
+        PERMISSIONS.CreateFinanceTransactions,
+    );
+    const canEditTransactions = usePermission(
+        PERMISSIONS.EditFinanceTransactions,
+    );
+    const canDeleteTransactions = usePermission(
+        PERMISSIONS.DeleteFinanceTransactions,
+    );
+    const showActions = canEditTransactions || canDeleteTransactions;
+    const backHref =
+        typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('from') ===
+            'live-cashflow'
+            ? `${base}/dashboard`
+            : `${base}/accounts`;
+    const backLabel = backHref.endsWith('/dashboard')
+        ? 'Back to Live Cashflow'
+        : 'Back to Accounts';
 
     // Server returns transactions sorted by date desc. For rows that don't have a
     // stored running_balance (manual entries), compute one chronologically.
@@ -100,22 +121,24 @@ export default function AccountShow({
             <Head title={`${workspace.name} - ${account.name}`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <Link
-                    href={`${base}/accounts`}
+                    href={backHref}
                     className="mb-3 inline-flex items-center gap-1 text-[12px] text-gray-500 hover:text-gray-800 dark:text-gray-400"
                 >
-                    <ArrowLeft className="h-3.5 w-3.5" /> Back to Accounts
+                    <ArrowLeft className="h-3.5 w-3.5" /> {backLabel}
                 </Link>
 
                 <PageHeader
                     title={`${account.name} (${account.currency})`}
                     description={`Opening: ${fmt(account.opening_balance)} · Current: ${fmt(currentBalance)}`}
                 >
-                    <button
-                        onClick={() => setCreateOpen(true)}
-                        className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
-                    >
-                        Add Transaction
-                    </button>
+                    {canCreateTransactions && (
+                        <button
+                            onClick={() => setCreateOpen(true)}
+                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
+                        >
+                            Add Transaction
+                        </button>
+                    )}
                 </PageHeader>
 
                 <div className="overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -129,7 +152,7 @@ export default function AccountShow({
                                     'Credit',
                                     'Debit',
                                     'Balance',
-                                    '',
+                                    ...(showActions ? [''] : []),
                                 ].map((h, i) => (
                                     <th
                                         key={i}
@@ -144,7 +167,7 @@ export default function AccountShow({
                             {rows.length === 0 && (
                                 <tr>
                                     <td
-                                        colSpan={7}
+                                        colSpan={showActions ? 7 : 6}
                                         className="px-4 py-10 text-center text-gray-400"
                                     >
                                         No transactions yet.
@@ -221,61 +244,74 @@ export default function AccountShow({
                                         <td className="px-4 py-2.5 text-right font-mono text-[12px] font-medium text-gray-700 dark:text-gray-200">
                                             {fmt(r.display_balance)}
                                         </td>
-                                        <td className="px-4 py-2.5">
-                                            <div className="flex justify-center">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger
-                                                        asChild
-                                                    >
-                                                        <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800">
-                                                            <MoreHorizontal className="h-3.5 w-3.5" />
-                                                        </button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent
-                                                        align="end"
-                                                        className="w-36"
-                                                    >
-                                                        <DropdownMenuItem
-                                                            onClick={() =>
-                                                                setEditing({
-                                                                    id: r.id,
-                                                                    account_id:
-                                                                        account.id,
-                                                                    date: String(
-                                                                        r.date,
-                                                                    ).slice(
-                                                                        0,
-                                                                        10,
-                                                                    ),
-                                                                    description:
-                                                                        r.description,
-                                                                    type: r.type,
-                                                                    transaction_type:
-                                                                        r.transaction_type,
-                                                                    amount: r.amount,
-                                                                    sub_category:
-                                                                        r.sub_category,
-                                                                    notes: r.notes,
-                                                                })
-                                                            }
+                                        {showActions && (
+                                            <td className="px-4 py-2.5">
+                                                <div className="flex justify-center">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger
+                                                            asChild
                                                         >
-                                                            <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
-                                                            Edit
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem
-                                                            className="text-red-600 focus:text-red-600"
-                                                            onClick={() =>
-                                                                setToDelete(r)
-                                                            }
+                                                            <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800">
+                                                                <MoreHorizontal className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent
+                                                            align="end"
+                                                            className="w-36"
                                                         >
-                                                            <Trash2 className="mr-2 h-3.5 w-3.5" />{' '}
-                                                            Delete
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
-                                        </td>
+                                                            {canEditTransactions && (
+                                                                <DropdownMenuItem
+                                                                    onClick={() =>
+                                                                        setEditing(
+                                                                            {
+                                                                                id: r.id,
+                                                                                account_id:
+                                                                                    account.id,
+                                                                                date: String(
+                                                                                    r.date,
+                                                                                ).slice(
+                                                                                    0,
+                                                                                    10,
+                                                                                ),
+                                                                                description:
+                                                                                    r.description,
+                                                                                type: r.type,
+                                                                                transaction_type:
+                                                                                    r.transaction_type,
+                                                                                amount: r.amount,
+                                                                                sub_category:
+                                                                                    r.sub_category,
+                                                                                notes: r.notes,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
+                                                                    Edit
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            {canEditTransactions &&
+                                                                canDeleteTransactions && (
+                                                                    <DropdownMenuSeparator />
+                                                                )}
+                                                            {canDeleteTransactions && (
+                                                                <DropdownMenuItem
+                                                                    className="text-red-600 focus:text-red-600"
+                                                                    onClick={() =>
+                                                                        setToDelete(
+                                                                            r,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Trash2 className="mr-2 h-3.5 w-3.5" />{' '}
+                                                                    Delete
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
+                                            </td>
+                                        )}
                                     </tr>
                                 );
                             })}
@@ -283,33 +319,41 @@ export default function AccountShow({
                     </table>
                 </div>
 
-                <TransactionFormDialog
-                    open={createOpen || editing !== null}
-                    onOpenChange={(o) => {
-                        if (!o) {
-                            setCreateOpen(false);
-                            setEditing(null);
+                {(canCreateTransactions || canEditTransactions) && (
+                    <TransactionFormDialog
+                        open={createOpen || editing !== null}
+                        onOpenChange={(o) => {
+                            if (!o) {
+                                setCreateOpen(false);
+                                setEditing(null);
+                            }
+                        }}
+                        transaction={editing}
+                        accounts={[
+                            {
+                                id: account.id,
+                                name: account.name,
+                                currency: account.currency,
+                            },
+                        ]}
+                        defaults={{ account_id: account.id }}
+                        workspaceSlug={workspace.slug}
+                    />
+                )}
+                {canDeleteTransactions && (
+                    <FinanceDeleteDialog
+                        open={!!toDelete}
+                        onClose={() => setToDelete(null)}
+                        title="Delete Transaction?"
+                        description="Remove this ledger entry? The account balance will update automatically."
+                        url={
+                            toDelete
+                                ? `${base}/transactions/${toDelete.id}`
+                                : ''
                         }
-                    }}
-                    transaction={editing}
-                    accounts={[
-                        {
-                            id: account.id,
-                            name: account.name,
-                            currency: account.currency,
-                        },
-                    ]}
-                    defaults={{ account_id: account.id }}
-                    workspaceSlug={workspace.slug}
-                />
-                <FinanceDeleteDialog
-                    open={!!toDelete}
-                    onClose={() => setToDelete(null)}
-                    title="Delete Transaction?"
-                    description="Remove this ledger entry? The account balance will update automatically."
-                    url={toDelete ? `${base}/transactions/${toDelete.id}` : ''}
-                    successMessage="Transaction deleted"
-                />
+                        successMessage="Transaction deleted"
+                    />
+                )}
             </div>
         </AppLayout>
     );

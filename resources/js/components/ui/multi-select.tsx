@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { X } from 'lucide-react';
+import { Check, ChevronDown, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 export interface Option {
@@ -13,6 +13,7 @@ interface MultiSelectProps {
     onChange: (selected: string[]) => void;
     placeholder?: string;
     className?: string;
+    compact?: boolean;
 }
 
 export function MultiSelect({
@@ -21,6 +22,7 @@ export function MultiSelect({
     onChange,
     placeholder = 'Select items...',
     className = '',
+    compact = false,
 }: MultiSelectProps) {
     const [open, setOpen] = React.useState(false);
     const [search, setSearch] = React.useState('');
@@ -40,24 +42,89 @@ export function MultiSelect({
         }
     }, [open]);
 
-    const handleSelect = (value: string) => {
+    const handleToggle = (value: string) => {
         if (selected.includes(value)) {
             onChange(selected.filter(v => v !== value));
         } else {
             onChange([...selected, value]);
         }
-        setSearch('');
     };
 
     const handleRemove = (value: string) => {
         onChange(selected.filter(v => v !== value));
     };
 
-    // Filter options based on search and exclude selected
     const filteredOptions = options.filter(option =>
-        !selected.includes(option.value) &&
         option.label.toLowerCase().includes(search.toLowerCase())
     );
+
+    if (compact) {
+        return (
+            <div className={`relative ${className}`} ref={dropdownRef}>
+                <button
+                    type="button"
+                    onClick={() => setOpen(!open)}
+                    className="flex h-9 w-full items-center justify-between gap-1 rounded-[10px] border border-black/6 bg-stone-100 px-2.5 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
+                >
+                    <span className="truncate">
+                        {selected.length === 0
+                            ? placeholder
+                            : `${selected.length} selected`}
+                    </span>
+                    <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                </button>
+
+                {selected.length > 0 && (
+                    <button
+                        type="button"
+                        className="absolute top-1/2 right-7 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onChange([]);
+                        }}
+                    >
+                        <X className="h-3 w-3" />
+                    </button>
+                )}
+
+                {open && (
+                    <div className="absolute z-50 mt-1 w-full min-w-[200px] overflow-hidden rounded-[10px] border border-black/6 bg-white shadow-lg dark:border-white/6 dark:bg-zinc-800">
+                        <div className="border-b border-black/6 p-1.5 dark:border-white/6">
+                            <input
+                                type="text"
+                                className="h-7 w-full rounded-md bg-stone-100 px-2 text-[11px] outline-none placeholder:text-gray-400 dark:bg-zinc-700 dark:text-gray-200"
+                                placeholder="Search..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                autoFocus
+                            />
+                        </div>
+                        <div className="max-h-52 overflow-y-auto p-1">
+                            {filteredOptions.map((option) => {
+                                const isSelected = selected.includes(option.value);
+                                return (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        onClick={() => handleToggle(option.value)}
+                                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[11px] hover:bg-stone-100 dark:hover:bg-zinc-700"
+                                    >
+                                        <span className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border ${isSelected ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-300 dark:border-gray-600'}`}>
+                                            {isSelected && <Check className="h-2.5 w-2.5" />}
+                                        </span>
+                                        <span className="text-gray-700 dark:text-gray-200">{option.label}</span>
+                                    </button>
+                                );
+                            })}
+                            {filteredOptions.length === 0 && (
+                                <p className="px-2 py-3 text-center text-[11px] text-gray-400">No results.</p>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div className={`relative ${className}`} ref={dropdownRef}>
@@ -105,23 +172,28 @@ export function MultiSelect({
             </div>
 
             {/* Dropdown options */}
-            {open && filteredOptions.length > 0 && (
+            {open && (
                 <div className="absolute z-50 w-full mt-1 max-h-60 overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md">
-                    {filteredOptions.map((option) => (
-                        <div
-                            key={option.value}
-                            className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
-                            onClick={() => handleSelect(option.value)}
-                        >
-                            {option.label}
+                    {filteredOptions.map((option) => {
+                        const isSelected = selected.includes(option.value);
+                        return (
+                            <div
+                                key={option.value}
+                                className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                                onClick={() => handleToggle(option.value)}
+                            >
+                                <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-input'}`}>
+                                    {isSelected && <Check className="h-3 w-3" />}
+                                </span>
+                                {option.label}
+                            </div>
+                        );
+                    })}
+                    {filteredOptions.length === 0 && search && (
+                        <div className="p-6 text-center text-sm text-muted-foreground">
+                            No results found.
                         </div>
-                    ))}
-                </div>
-            )}
-
-            {open && filteredOptions.length === 0 && search && (
-                <div className="absolute z-50 w-full mt-1 rounded-md border bg-popover text-popover-foreground shadow-md p-6 text-center text-sm text-muted-foreground">
-                    No results found.
+                    )}
                 </div>
             )}
         </div>

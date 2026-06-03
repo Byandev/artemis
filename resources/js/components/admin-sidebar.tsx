@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { CreditCard, Layers } from 'lucide-react';
+import { CreditCard, Layers, TicketCheck } from 'lucide-react';
 import AppLogo from './app-logo';
 
 export function AdminSidebar() {
@@ -24,6 +24,11 @@ export function AdminSidebar() {
             title: 'Subscription Plans',
             href: '/admin/subscription-plans',
             icon: CreditCard,
+        },
+        {
+            title: 'Support Tickets',
+            href: '/admin/support-tickets',
+            icon: TicketCheck,
         },
     ];
 

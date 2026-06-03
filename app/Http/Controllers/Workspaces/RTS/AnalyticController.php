@@ -32,6 +32,7 @@ class AnalyticController extends Controller
             'workspace' => $workspace->loadMissing([
                 'shops' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name'),
                 'pages' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name'),
+                'teams' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name'),
                 'pageOwners:id,name',
             ]),
         ]);

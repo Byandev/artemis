@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API\Workspace;
 
 use App\Http\Controllers\Controller;
+use App\Models\CsrSchedule;
 use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -228,10 +229,11 @@ class CsrPerformanceController extends Controller
         };
     }
 
-    public function leaderboards()
+    public function leaderboards(Request $request)
     {
-        $startDate = Carbon::now()->startOfDay()->format('Y-m-d H:i:s');
-        $endDate = Carbon::now()->endOfDay()->format('Y-m-d H:i:s');
+        $date = $request->input('date') ? Carbon::parse($request->input('date')) : Carbon::now();
+        $startDate = $date->copy()->startOfDay()->format('Y-m-d H:i:s');
+        $endDate = $date->copy()->endOfDay()->format('Y-m-d H:i:s');
 
         return PancakeUser::query()
             ->withCount([
@@ -251,10 +253,11 @@ class CsrPerformanceController extends Controller
             ->get();
     }
 
-    public function leaderboardsGroupByCalled()
+    public function leaderboardsGroupByCalled(Request $request)
     {
-        $startDate = Carbon::now()->startOfDay()->format('Y-m-d H:i:s');
-        $endDate = Carbon::now()->endOfDay()->format('Y-m-d H:i:s');
+        $date = $request->input('date') ? Carbon::parse($request->input('date')) : Carbon::now();
+        $startDate = $date->copy()->startOfDay()->format('Y-m-d H:i:s');
+        $endDate = $date->copy()->endOfDay()->format('Y-m-d H:i:s');
 
         return PancakeUser::query()
             ->withCount([
@@ -262,15 +265,16 @@ class CsrPerformanceController extends Controller
                     $query->whereBetween('delivery_date', [$startDate, $endDate]);
                 },
             ])
-            ->having('assigned_order_for_delivery_count', '>', 0) // Only get users with at least 1 assigned order
+            ->having('assigned_order_for_delivery_count', '>', 0)
             ->orderByDesc('assigned_order_for_delivery_count')
             ->get();
     }
 
-    public function leaderboardsGroupByDelivered()
+    public function leaderboardsGroupByDelivered(Request $request)
     {
-        $startDate = Carbon::now()->startOfDay()->format('Y-m-d H:i:s');
-        $endDate = Carbon::now()->endOfDay()->format('Y-m-d H:i:s');
+        $date = $request->input('date') ? Carbon::parse($request->input('date')) : Carbon::now();
+        $startDate = $date->copy()->startOfDay()->format('Y-m-d H:i:s');
+        $endDate = $date->copy()->endOfDay()->format('Y-m-d H:i:s');
 
         return PancakeUser::query()
             ->withCount([
@@ -279,8 +283,26 @@ class CsrPerformanceController extends Controller
                         ->where('status', 'Delivered');
                 },
             ])
-            ->having('assigned_order_for_delivery_count', '>', 0) // Only get users with at least 1 delivered order
+            ->having('assigned_order_for_delivery_count', '>', 0)
             ->orderByDesc('assigned_order_for_delivery_count')
             ->get();
+    }
+
+    public function csrSchedules(Request $request)
+    {
+        $date = $request->input('date') ? Carbon::parse($request->input('date')) : Carbon::today();
+
+        return CsrSchedule::query()
+            ->where('date', $date->toDateString())
+            ->with('pancakeUser:id,name')
+            ->get()
+            ->map(fn ($schedule) => [
+                'id' => $schedule->id,
+                'pancake_user_id' => $schedule->pancake_user_id,
+                'name' => $schedule->pancakeUser?->name ?? 'Unknown',
+                'shift_start' => $schedule->shift_start?->format('H:i'),
+                'shift_end' => $schedule->shift_end?->format('H:i'),
+                'notes' => $schedule->notes,
+            ]);
     }
 }

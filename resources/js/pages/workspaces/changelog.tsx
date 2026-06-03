@@ -12,6 +12,63 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.7.1',
+        date: '2026-06-03',
+        sections: [
+            {
+                title: 'Sidebar — Cleanup',
+                items: [
+                    'Removed the Admin nav group and Customer Support link from the main workspace sidebar — both sections are temporarily hidden while their respective flows are being finalised',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.7.0',
+        date: '2026-06-03',
+        sections: [
+            {
+                title: 'Teams — Member Schedule',
+                items: [
+                    'New Team Member Schedule page — assign and visualize weekly schedules for each team member across all teams in the workspace',
+                    'Schedule entries are keyed by team member and day-of-week; bulk assignments and per-member overrides are supported from the same view',
+                    'Backed by a new team_member_schedules table (TeamMemberSchedule model) and TeamScheduleController; CSR-level schedules stored separately in csr_schedules',
+                    'New manage-schedule permission controls who can view and edit team schedules',
+                ],
+            },
+            {
+                title: 'CSR — Dashboard & RMO Management',
+                items: [
+                    'New CSR Dashboard — dedicated view for CSR agents with performance KPIs, call activity, and order status summary scoped to the logged-in CSR',
+                    'New CSR RMO Management page — CSR-scoped delivery order list with assignee filters, status updates, call logging, and daily stats; backed by a new CSR sidebar layout (csr-layout.tsx + csr-sidebar.tsx)',
+                    'CSRController introduced to serve CSR-specific data separate from the shared workspace analytics path',
+                ],
+            },
+            {
+                title: 'Pages — Daily Budget Records',
+                items: [
+                    'New Page Daily Budget Records section — log and track daily ad budget entries per page with date, amount, and notes',
+                    'Backed by a new page_daily_budget_records table (PageDailyBudgetRecord model) and PageDailyBudgetRecordController; list supports date-range filtering, pagination, and sortable columns',
+                    'New update-page-budget permission gates access to creating and editing budget records',
+                ],
+            },
+            {
+                title: 'Public API — V2 Endpoints',
+                items: [
+                    'New /api/v1/public/v2/call-logs endpoint (CallLogV2Controller) — improved call log sync with stricter upsert logic and richer response envelope',
+                    'New /api/v1/public/v2/rmo-orders endpoint (RmoOrderV2Controller) — paginated RMO order listing with assignee, status, and date filters for the mobile CSR client',
+                ],
+            },
+            {
+                title: 'Roles — Archived Roles',
+                items: [
+                    'Roles can now be archived instead of deleted — archived roles retain their permissions and member history but are hidden from active role assignment',
+                    'New Archived Roles page lists all archived roles with restore and permanent-delete actions; accessible from the Roles index via the Archive tab',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.6.15',
         date: '2026-05-12',
         sections: [

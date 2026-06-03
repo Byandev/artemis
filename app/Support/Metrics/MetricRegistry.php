@@ -71,7 +71,7 @@ class MetricRegistry
 
     public static function defaults(): array
     {
-        return ['totalSales', 'totalOrders', 'aov', 'rtsRate'];
+        return self::all();
     }
 
     public static function isValid(string $key): bool

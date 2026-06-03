@@ -1,5 +1,6 @@
 import {
     Dialog,
+    DialogClose,
     DialogContent,
     DialogDescription,
     DialogHeader,
@@ -8,6 +9,7 @@ import {
 import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
+import { X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -111,8 +113,8 @@ export function ItemFormDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="gap-0 overflow-hidden border-none p-0 shadow-2xl sm:max-w-md dark:bg-zinc-900">
-                <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
+            <DialogContent className="gap-0 overflow-hidden border-none p-0 shadow-2xl sm:max-w-md dark:bg-zinc-900 [&_[data-default-close=true]]:hidden">
+                <div className="relative border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
                             {isEditing
@@ -125,6 +127,10 @@ export function ItemFormDialog({
                                 : 'Add a new item to your workspace inventory.'}
                         </DialogDescription>
                     </DialogHeader>
+                    <DialogClose className="absolute top-4 right-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/6 dark:hover:text-gray-300">
+                        <X className="h-4 w-4" />
+                        <span className="sr-only">Close</span>
+                    </DialogClose>
                 </div>
 
                 <form onSubmit={handleSubmit}>

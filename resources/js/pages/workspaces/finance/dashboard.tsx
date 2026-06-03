@@ -1,4 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link } from '@inertiajs/react';
@@ -41,6 +43,10 @@ export default function FinanceDashboard({
     unreconciledCount,
 }: Props) {
     const base = `/workspaces/${workspace.slug}/finance`;
+    const canViewRemittances = usePermission(
+        PERMISSIONS.ViewFinanceRemittances,
+    );
+    const canViewAccounts = usePermission(PERMISSIONS.ViewFinanceAccounts);
 
     const active = useMemo(
         () => accounts.filter((a) => a.is_active),
@@ -80,10 +86,20 @@ export default function FinanceDashboard({
                         label="Total OUT"
                         value={fmt(totalOut)}
                     />
-                    <Link
-                        href={`${base}/remittances?filter[unreconciled]=1`}
-                        className="block"
-                    >
+                    {canViewRemittances ? (
+                        <Link
+                            href={`${base}/remittances?filter[unreconciled]=1`}
+                            className="block"
+                        >
+                            <StatCard
+                                icon={
+                                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                }
+                                label="Unreconciled Remittances"
+                                value={String(unreconciledCount)}
+                            />
+                        </Link>
+                    ) : (
                         <StatCard
                             icon={
                                 <AlertTriangle className="h-4 w-4 text-amber-500" />
@@ -91,7 +107,7 @@ export default function FinanceDashboard({
                             label="Unreconciled Remittances"
                             value={String(unreconciledCount)}
                         />
-                    </Link>
+                    )}
                 </div>
 
                 <div className="mt-6 rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -104,31 +120,48 @@ export default function FinanceDashboard({
                                 No active accounts yet.
                             </div>
                         )}
-                        {active.map((a) => (
-                            <Link
-                                key={a.id}
-                                href={`${base}/accounts/${a.id}`}
-                                className="flex items-center justify-between px-5 py-3 hover:bg-stone-50 dark:hover:bg-white/2"
-                            >
-                                <div className="flex flex-col gap-0.5">
-                                    <span className="text-[13px] font-medium text-gray-800 dark:text-gray-100">
-                                        {a.name}
-                                    </span>
-                                    <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
-                                        {a.currency}
-                                    </span>
-                                </div>
-                                <span
-                                    className={`font-mono text-[13px] font-medium ${a.balance >= 0 ? 'text-gray-700 dark:text-gray-200' : 'text-red-500'}`}
+                        {active.map((a) =>
+                            canViewAccounts ? (
+                                <Link
+                                    key={a.id}
+                                    href={`${base}/accounts/${a.id}?from=live-cashflow`}
+                                    className="flex items-center justify-between px-5 py-3"
                                 >
-                                    {fmt(a.balance)}
-                                </span>
-                            </Link>
-                        ))}
+                                    <AccountRowContent account={a} />
+                                </Link>
+                            ) : (
+                                <div
+                                    key={a.id}
+                                    className="flex items-center justify-between px-5 py-3"
+                                >
+                                    <AccountRowContent account={a} />
+                                </div>
+                            ),
+                        )}
                     </div>
                 </div>
             </div>
         </AppLayout>
+    );
+}
+
+function AccountRowContent({ account }: { account: AccountRow }) {
+    return (
+        <>
+            <div className="flex flex-col gap-0.5">
+                <span className="text-[13px] font-medium text-gray-800 dark:text-gray-100">
+                    {account.name}
+                </span>
+                <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                    {account.currency}
+                </span>
+            </div>
+            <span
+                className={`font-mono text-[13px] font-medium ${account.balance >= 0 ? 'text-gray-700 dark:text-gray-200' : 'text-red-500'}`}
+            >
+                {fmt(account.balance)}
+            </span>
+        </>
     );
 }
 

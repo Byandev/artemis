@@ -16,7 +16,7 @@ class PasswordController extends Controller
     /**
      * Show the user's password settings page.
      */
-    public function edit(Workspace $workspace): Response
+    public function edit(?Workspace $workspace = null): Response
     {
         return Inertia::render('settings/password', [
             'workspace' => $workspace,
