@@ -314,8 +314,6 @@ export function AppSidebar() {
 
             <SidebarContent className="p-3">
                 <NavMain items={mainNavItems} group_label="Main" />
-                <NavMain items={adminNavItems} group_label="Admin" />
-                {/*<NavMain items={accountNavItems} group_label="Account" />*/}
                 <PublicLinks
                     workspaceSlug={currentWorkspace.slug}
                     rmoEnabled={currentWorkspace.rmo_module_enabled}
@@ -323,9 +321,6 @@ export function AppSidebar() {
                         currentWorkspace.leaderboard_module_enabled
                     }
                 />
-                <div className="mt-auto">
-                    <NavMain items={supportNavItems} group_label="Support" />
-                </div>
             </SidebarContent>
 
             {/*<SidebarFooter>*/}
