@@ -128,9 +128,9 @@ class ForDeliveryController extends Controller
                 \DB::raw('(SELECT rts_rate FROM rider_delivery_summary WHERE rider_name = pancake_order_for_delivery.rider_name AND rider_phone = pancake_order_for_delivery.rider_phone LIMIT 1) as rider_rts_rate'),
                 \DB::raw('('.RiskScoreSort::sql().') as risk_score'),
             ])
-            ->withCount(['customerCallLogs', 'riderCallLogs'])
-            ->withSum('customerCallLogs as customer_call_duration', 'duration')
-            ->withSum('riderCallLogs as rider_call_duration', 'duration')
+            ->withCount(['customerCallLogsByAssignee as customer_call_logs_count', 'riderCallLogsByAssignee as rider_call_logs_count'])
+            ->withSum('customerCallLogsByAssignee as customer_call_duration', 'duration')
+            ->withSum('riderCallLogsByAssignee as rider_call_duration', 'duration')
             ->with([
                 'order' => function ($query) {
                     $query
@@ -322,9 +322,13 @@ class ForDeliveryController extends Controller
                 \DB::raw('(SELECT rts_rate FROM rider_delivery_summary WHERE rider_name = pancake_order_for_delivery.rider_name AND rider_phone = pancake_order_for_delivery.rider_phone LIMIT 1) as rider_rts_rate'),
                 \DB::raw('('.RiskScoreSort::sql().') as risk_score'),
             ])
-            ->withCount(['customerCallLogs', 'riderCallLogs'])
-            ->withSum('customerCallLogs as customer_call_duration', 'duration')
-            ->withSum('riderCallLogs as rider_call_duration', 'duration')
+            ->withCount(['customerCallLogsByAssignee as customer_call_logs_count', 'riderCallLogsByAssignee as rider_call_logs_count'])
+            ->withSum('customerCallLogsByAssignee as customer_call_duration', 'duration')
+            ->withSum('riderCallLogsByAssignee as rider_call_duration', 'duration')
+            ->withCount([
+                'customerCallLogsByAssignee as my_customer_call_count' => fn ($q) => $q->where('call_logs.assignee_user_id', auth()->id()),
+                'riderCallLogsByAssignee as my_rider_call_count' => fn ($q) => $q->where('call_logs.assignee_user_id', auth()->id()),
+            ])
             ->with([
                 'order' => function ($query) {
                     $query
