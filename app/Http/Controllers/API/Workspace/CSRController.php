@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
 use App\Models\PancakeUserRmoDailyReport;
-use Modules\Pancake\Models\OrderForDelivery;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -118,20 +117,17 @@ class CSRController extends Controller
                 SUM(delivered)      as total_delivered
             ');
 
-        // Compute RMO stats directly from OrderForDelivery using assignee_id (pancake_users.id)
-        $rmoSummary = OrderForDelivery::query()
+        $rmoSummary = PancakeUserRmoDailyReport::query()
             ->where('workspace_id', $workspace->id)
-            ->whereBetween('delivery_date', [$from, $to])
-            ->groupBy('assignee_id')
-            ->selectRaw("
-                assignee_id as pancake_user_id,
-                COUNT(*) as total_called,
-                SUM(CASE WHEN status != 'PENDING' THEN 1 ELSE 0 END) as total_rmo_call_attempts,
-                SUM(CASE WHEN parcel_status = 'delivered' THEN 1 ELSE 0 END) as total_confirmed,
-                SUM(CASE WHEN parcel_status = 'returning' THEN 1 ELSE 0 END) as total_returning_rmo,
-                0 as total_call_time
-            ")
-            ->whereNotNull('assignee_id');
+            ->whereBetween('date', [$from, $to])
+            ->groupBy('pancake_user_id')
+            ->selectRaw('
+                pancake_user_id,
+                SUM(total_called)             as total_called,
+                SUM(total_call_time)          as total_call_time,
+                SUM(total_rmo_call_attempts)  as total_rmo_call_attempts,
+                SUM(total_confirmed)          as total_confirmed
+            ');
 
         $base = User::query()
             ->whereHas('shopUsers.shop', fn ($q) => $q->where('workspace_id', $workspace->id));
@@ -150,17 +146,10 @@ class CSRController extends Controller
             ->selectRaw('COALESCE(rmo.total_confirmed, 0)          as total_confirmed')
             ->selectRaw('
                 CASE
-                    WHEN COALESCE(rmo.total_called, 0) > 0
-                    THEN ROUND(COALESCE(rmo.total_rmo_call_attempts, 0) / COALESCE(rmo.total_called, 0) * 100, 2)
-                    ELSE 0
-                END as rmo_percentage
-            ')
-            ->selectRaw('
-                CASE
-                    WHEN (COALESCE(rmo.total_returning_rmo, 0) + COALESCE(rmo.total_confirmed, 0)) > 0
+                    WHEN (COALESCE(pos.total_returning, 0) + COALESCE(pos.total_delivered, 0)) > 0
                     THEN ROUND(
-                        COALESCE(rmo.total_returning_rmo, 0)
-                        / (COALESCE(rmo.total_returning_rmo, 0) + COALESCE(rmo.total_confirmed, 0))
+                        COALESCE(pos.total_returning, 0)
+                        / (COALESCE(pos.total_returning, 0) + COALESCE(pos.total_delivered, 0))
                         * 100, 2
                     )
                     ELSE 0
@@ -176,7 +165,6 @@ class CSRController extends Controller
                 'total_call_time',
                 'total_rmo_call_attempts',
                 'total_confirmed',
-                'rmo_percentage',
                 'rts_rate',
             ])
             ->allowedFilters([
