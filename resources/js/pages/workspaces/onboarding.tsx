@@ -1,5 +1,5 @@
 import AuthLayout from '@/layouts/auth-layout';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     CheckCircle2,
     HelpCircle,
@@ -286,6 +286,19 @@ export default function Onboarding({
                             {pageLimitReached && ' · upgrade to add more'}
                         </p>
                     )}
+
+                    {/* Skip */}
+                    <button
+                        type="button"
+                        onClick={() =>
+                            router.post(
+                                `/workspaces/${workspace.slug}/onboarding/skip`,
+                            )
+                        }
+                        className="flex h-10 w-full items-center justify-center rounded-[10px] border border-black/8 font-mono! text-[12px]! text-gray-500 transition-all hover:bg-stone-50 dark:border-white/8 dark:text-gray-400 dark:hover:bg-zinc-800"
+                    >
+                        Skip for now
+                    </button>
                 </div>
             </form>
 
