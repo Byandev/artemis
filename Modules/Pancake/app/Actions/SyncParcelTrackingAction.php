@@ -55,14 +55,20 @@ readonly class SyncParcelTrackingAction
                 $firstDeliveryAttempt ??= $update['updated_at'];
             }
 
+            // Normalize to the stored second-precision format so the lookup matches
+            // the value Eloquent persists. Without this, a raw API string (ISO 8601,
+            // tz offset, microseconds) never matches the stored datetime and a
+            // duplicate row is created on every sync.
+            $createdAt = Carbon::parse($update['updated_at'])->format('Y-m-d H:i:s');
+
             $journey = ParcelJourney::updateOrCreate(
                 [
                     'order_id' => $savedOrder->id,
-                    'status' => $update['status'],
-                    'note' => $update['note'],
-                    'created_at' => $update['updated_at'],
+                    'created_at' => $createdAt,
                 ],
                 [
+                    'status' => $update['status'],
+                    'note' => $update['note'],
                     'rider_name' => $update['rider_name'],
                     'rider_mobile' => $update['rider_mobile'],
                 ]
