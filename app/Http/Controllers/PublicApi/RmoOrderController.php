@@ -14,7 +14,10 @@ class RmoOrderController extends Controller
 {
     public function login(Request $request): JsonResponse
     {
-        $query = User::whereRaw('LOWER(status) = ?', ['active']);
+        $workspace = $request->attributes->get('workspace');
+
+        $query = User::whereRaw('LOWER(status) = ?', ['active'])
+            ->whereHas('shops', fn ($q) => $q->where('workspace_id', $workspace->id));
 
         if ($request->filled('search')) {
             $query->where('name', 'LIKE', "%{$request->input('search')}%");
