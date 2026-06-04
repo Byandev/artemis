@@ -38,9 +38,8 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CreativeDetailSheet } from './components/creative-detail-sheet';
-import { CreativeFormDialog } from './components/creative-form-dialog';
-import { AdsBadge, FormatBadge, ReviewBadge } from './components/atoms';
-import { ADS_BADGE, ADS_STATUS_LABELS, AdsStatus, Creative, PageProps, REVIEW_STATUS_LABELS } from './types';
+import { AdsBadge, FinalBadge, FormatBadge, InitialAvatar, ReviewBadge } from './components/atoms';
+import { ADS_BADGE, ADS_STATUS_LABELS, AdsStatus, Creative, FINAL_STATUS_LABELS, FinalStatus, PageProps } from './types';
 
 export default function CreativesIndex({ workspace, creatives, creators, query }: PageProps) {
     const { auth } = usePage<SharedData>().props;
@@ -49,9 +48,8 @@ export default function CreativesIndex({ workspace, creatives, creators, query }
     const canCreate = usePermission(PERMISSIONS.CreateCreatives);
     const canEdit = usePermission(PERMISSIONS.EditCreatives);
     const canDelete = usePermission(PERMISSIONS.DeleteCreatives);
+    const canReview = usePermission(PERMISSIONS.ReviewCreatives);
 
-    const [createOpen, setCreateOpen] = useState(false);
-    const [editCreative, setEditCreative] = useState<Creative | null>(null);
     const [detailCreativeId, setDetailCreativeId] = useState<number | null>(null);
     const [deleteId, setDeleteId] = useState<number | null>(null);
 
@@ -134,7 +132,17 @@ export default function CreativesIndex({ workspace, creatives, creators, query }
             accessorKey: 'creator',
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Creator" />,
-            cell: ({ row }) => <span className="font-mono text-[12px] text-gray-500 dark:text-gray-400">{row.original.creator?.name ?? '—'}</span>,
+            cell: ({ row: { original: c } }) =>
+                c.creator ? (
+                    <span title={c.creator.name} className="inline-flex">
+                        <InitialAvatar
+                            name={c.creator.name}
+                            className="h-7 w-7 bg-emerald-500/[0.12] text-emerald-600 dark:text-emerald-400"
+                        />
+                    </span>
+                ) : (
+                    <span className="font-mono text-[12px] text-gray-300 dark:text-gray-700">—</span>
+                ),
         },
         {
             accessorKey: 'latest_review',
@@ -183,6 +191,46 @@ export default function CreativesIndex({ workspace, creatives, creators, query }
             },
         },
         {
+            accessorKey: 'final_status',
+            enableSorting: false,
+            header: () => <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600">Final</span>,
+            cell: ({ row }) => {
+                const c = row.original;
+                if (!canEdit) return <FinalBadge status={c.final_status} />;
+                return (
+                    <div onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="inline-flex cursor-pointer items-center gap-0.5 rounded transition-opacity hover:opacity-70">
+                                    <FinalBadge status={c.final_status} />
+                                    <ChevronDown className="h-3 w-3 text-gray-400" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start">
+                                {(Object.entries(FINAL_STATUS_LABELS) as [FinalStatus, string][]).map(([v, l]) => (
+                                    <DropdownMenuItem key={v} className="font-mono text-[12px]"
+                                        onClick={() => router.put(`${baseUrl}/${c.id}`, { final_status: v }, { preserveScroll: true })}>
+                                        {l}
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                );
+            },
+        },
+        {
+            accessorKey: 'approved_at',
+            enableSorting: false,
+            header: () => <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600">Approved</span>,
+            cell: ({ row }) =>
+                row.original.approved_at ? (
+                    <span className="font-mono text-[12px] text-emerald-600 dark:text-emerald-400">{row.original.approved_at}</span>
+                ) : (
+                    <span className="font-mono text-[12px] text-gray-300 dark:text-gray-700">—</span>
+                ),
+        },
+        {
             id: 'actions',
             enableSorting: false,
             header: () => null,
@@ -199,7 +247,7 @@ export default function CreativesIndex({ workspace, creatives, creators, query }
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             {canEdit && (
-                                <DropdownMenuItem className="font-mono text-[12px]" onClick={(e) => { e.stopPropagation(); setEditCreative(c); }}>
+                                <DropdownMenuItem className="font-mono text-[12px]" onClick={(e) => { e.stopPropagation(); router.visit(`${baseUrl}/${c.id}/edit`); }}>
                                     <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                                 </DropdownMenuItem>
                             )}
@@ -227,7 +275,7 @@ export default function CreativesIndex({ workspace, creatives, creators, query }
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader title="Creative Tracker" description="Track creatives from ideation through review and launch">
                     {canCreate && (
-                        <button onClick={() => setCreateOpen(true)} className="flex h-9 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700">
+                        <button onClick={() => router.visit(`${baseUrl}/create`)} className="flex h-9 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700">
                             <Plus className="mr-1.5 h-3.5 w-3.5" /> New Creative
                         </button>
                     )}
@@ -343,19 +391,14 @@ export default function CreativesIndex({ workspace, creatives, creators, query }
                 </div>
             </div>
 
-            <CreativeFormDialog open={createOpen} onClose={() => setCreateOpen(false)} workspace={workspace} />
-
-            {editCreative && (
-                <CreativeFormDialog open onClose={() => setEditCreative(null)} creative={editCreative} workspace={workspace} />
-            )}
-
             {detailCreative && (
                 <CreativeDetailSheet
                     creative={detailCreative}
                     workspace={workspace}
                     currentUserId={currentUserId}
                     canEdit={canEdit}
-                    onEdit={() => { setEditCreative(detailCreative); setDetailCreativeId(null); }}
+                    canReview={canReview}
+                    onEdit={() => router.visit(`${baseUrl}/${detailCreative.id}/edit`)}
                     onClose={() => setDetailCreativeId(null)}
                 />
             )}

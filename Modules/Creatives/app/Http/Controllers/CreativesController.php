@@ -8,8 +8,8 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Creatives\Http\Requests\StoreCreativeRequest;
 use Modules\Creatives\Http\Requests\StoreReviewRequest;
@@ -33,6 +33,7 @@ class CreativesController extends Controller
             Creative::where('workspace_id', $workspace->id)
                 ->with([
                     'creator:id,name',
+                    'assignedReviewer:id,name',
                     'reviews' => fn ($q) => $q->with('reviewer:id,name')->oldest(),
                 ])
         )
@@ -92,25 +93,46 @@ class CreativesController extends Controller
         ]);
     }
 
+    public function create(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::CreateCreatives->value, $workspace);
+
+        return Inertia::render('workspaces/creatives/create', [
+            'workspace' => $workspace,
+            'reviewers' => $this->reviewers($workspace),
+        ]);
+    }
+
     public function store(StoreCreativeRequest $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::CreateCreatives->value, $workspace);
 
-        $data = $request->safe()->except('picture_file');
-
-        if ($request->hasFile('picture_file')) {
-            $path = $request->file('picture_file')->store("creatives/{$workspace->id}", 'public');
-            $data['picture_url'] = Storage::url($path);
-        }
-
+        // New creatives always start as pending ads / for-approval (DB defaults).
         Creative::create([
-            ...$data,
+            ...$request->validated(),
             'workspace_id' => $workspace->id,
             'creator_id' => $request->user()->id,
         ]);
 
-        return back();
+        return redirect()
+            ->route('workspaces.creatives.index', $workspace)
+            ->with('success', 'Creative created successfully');
+    }
+
+    public function edit(Request $request, Workspace $workspace, Creative $creative)
+    {
+        $this->guard($request, $workspace, $creative);
+        $this->authorize(Permission::EditCreatives->value, $workspace);
+
+        $creative->load(['creator:id,name', 'assignedReviewer:id,name', 'reviews' => fn ($q) => $q->with('reviewer:id,name')->oldest()]);
+
+        return Inertia::render('workspaces/creatives/edit', [
+            'workspace' => $workspace,
+            'creative' => $this->formatCreative($creative),
+            'reviewers' => $this->reviewers($workspace),
+        ]);
     }
 
     public function update(UpdateCreativeRequest $request, Workspace $workspace, Creative $creative)
@@ -118,17 +140,27 @@ class CreativesController extends Controller
         $this->guard($request, $workspace, $creative);
         $this->authorize(Permission::EditCreatives->value, $workspace);
 
-        $data = $request->safe()->except('picture_file');
+        $data = $request->validated();
 
-        if ($request->hasFile('picture_file')) {
-            $this->deleteStoredFile($creative->picture_url);
-            $path = $request->file('picture_file')->store("creatives/{$workspace->id}", 'public');
-            $data['picture_url'] = Storage::url($path);
+        // Stamp / clear approved_at whenever the final status changes.
+        if (array_key_exists('final_status', $data)) {
+            $data['approved_at'] = $data['final_status'] === 'approved'
+                ? ($creative->approved_at ?? now())
+                : null;
         }
 
         $creative->update($data);
 
-        return back();
+        // Inline edits (e.g. the status dropdowns on the index) post partial
+        // payloads and expect to stay put; the full edit page posts the whole
+        // form and should return to the list.
+        if ($request->headers->get('X-Inertia-Partial-Component') || ! $request->has('name')) {
+            return back()->with('success', 'Creative updated successfully');
+        }
+
+        return redirect()
+            ->route('workspaces.creatives.index', $workspace)
+            ->with('success', 'Creative updated successfully');
     }
 
     public function destroy(Request $request, Workspace $workspace, Creative $creative)
@@ -145,7 +177,7 @@ class CreativesController extends Controller
     public function addReview(StoreReviewRequest $request, Workspace $workspace, Creative $creative)
     {
         $this->guard($request, $workspace, $creative);
-        $this->authorize(Permission::EditCreatives->value, $workspace);
+        $this->authorize(Permission::ReviewCreatives->value, $workspace);
 
         CreativeReview::create([
             'creative_id' => $creative->id,
@@ -159,6 +191,7 @@ class CreativesController extends Controller
     public function updateReview(StoreReviewRequest $request, Workspace $workspace, Creative $creative, CreativeReview $review)
     {
         $this->guard($request, $workspace, $creative);
+        $this->authorize(Permission::ReviewCreatives->value, $workspace);
 
         if ($review->creative_id !== $creative->id) {
             abort(404);
@@ -174,6 +207,29 @@ class CreativesController extends Controller
     }
 
     // ─── Private Helpers ──────────────────────────────────────────────────────
+
+    /**
+     * Workspace members who are allowed to review creatives (have the
+     * "Review Creatives" permission), plus the workspace owner.
+     */
+    private function reviewers(Workspace $workspace)
+    {
+        $userIds = DB::table('workspace_user')
+            ->join('role_permissions', 'workspace_user.role_id', '=', 'role_permissions.role_id')
+            ->join('permissions', 'role_permissions.permission_id', '=', 'permissions.id')
+            ->where('workspace_user.workspace_id', $workspace->id)
+            ->where('permissions.name', Permission::ReviewCreatives->value)
+            ->pluck('workspace_user.user_id')
+            ->push($workspace->owner_id)
+            ->filter()
+            ->unique()
+            ->all();
+
+        return User::whereIn('id', $userIds)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+    }
 
     private function deleteStoredFile(?string $url): void
     {
@@ -220,10 +276,13 @@ class CreativesController extends Controller
             'ads_status' => $c->ads_status,
             'ads_manager_link' => $c->ads_manager_link,
             'ads_remarks' => $c->ads_remarks,
+            'final_status' => $c->final_status,
+            'approved_at' => $c->approved_at?->format('M d, Y g:i A'),
             'caption' => $c->caption,
             'headline' => $c->headline,
             'notes' => $c->notes,
             'creator' => $c->creator ? ['id' => $c->creator->id, 'name' => $c->creator->name] : null,
+            'assigned_reviewer' => $c->assignedReviewer ? ['id' => $c->assignedReviewer->id, 'name' => $c->assignedReviewer->name] : null,
             'reviews' => $reviews,
             'review_count' => count($reviews),
             'latest_review' => $latestReview ? [

@@ -1,10 +1,18 @@
 import { Clapperboard, FileImage } from 'lucide-react';
-import { ADS_BADGE, ADS_STATUS_LABELS, AdsStatus, REVIEW_BADGE, REVIEW_STATUS_LABELS, ReviewStatus } from '../types';
+import { ADS_BADGE, ADS_STATUS_LABELS, AdsStatus, FINAL_STATUS_BADGE, FINAL_STATUS_LABELS, FinalStatus, REVIEW_BADGE, REVIEW_STATUS_LABELS, ReviewStatus } from '../types';
 
 export function AdsBadge({ status }: { status: AdsStatus }) {
     return (
         <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[11px] font-medium ${ADS_BADGE[status]}`}>
             {ADS_STATUS_LABELS[status]}
+        </span>
+    );
+}
+
+export function FinalBadge({ status }: { status: FinalStatus }) {
+    return (
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[11px] font-medium ${FINAL_STATUS_BADGE[status]}`}>
+            {FINAL_STATUS_LABELS[status]}
         </span>
     );
 }

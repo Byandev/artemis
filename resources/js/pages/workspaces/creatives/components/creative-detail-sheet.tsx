@@ -18,7 +18,7 @@ import {
     Review,
     ReviewStatus,
 } from '../types';
-import { FormatBadge, InitialAvatar, ReviewBadge } from './atoms';
+import { FinalBadge, FormatBadge, InitialAvatar, ReviewBadge } from './atoms';
 
 // ─── Review Comment ────────────────────────────────────────────────────────────
 
@@ -104,7 +104,7 @@ function ReviewComment({
 
 // ─── Reviews Tab ───────────────────────────────────────────────────────────────
 
-function ReviewsTab({ creative, workspace, currentUserId, canEdit }: { creative: Creative; workspace: Workspace; currentUserId: number; canEdit: boolean }) {
+function ReviewsTab({ creative, workspace, currentUserId, canReview }: { creative: Creative; workspace: Workspace; currentUserId: number; canReview: boolean }) {
     const { data, setData, post, processing, reset } = useForm({ status: 'for_approval' as ReviewStatus, feedback: '' });
     const reversed = useMemo(() => [...creative.reviews].reverse(), [creative.reviews]);
 
@@ -127,7 +127,7 @@ function ReviewsTab({ creative, workspace, currentUserId, canEdit }: { creative:
                     ))}
                 </div>
             )}
-            {canEdit && (
+            {canReview && (
                 <div className="rounded-[14px] border border-black/6 bg-stone-50/60 dark:border-white/6 dark:bg-zinc-800/30">
                     <div className="border-b border-black/6 px-4 py-3 dark:border-white/6">
                         <p className="font-mono text-[10px] font-medium uppercase tracking-widest text-gray-400 dark:text-gray-600">Write a review</p>
@@ -160,6 +160,7 @@ export function CreativeDetailSheet({
     workspace,
     currentUserId,
     canEdit,
+    canReview,
     onEdit,
     onClose,
 }: {
@@ -167,42 +168,31 @@ export function CreativeDetailSheet({
     workspace: Workspace;
     currentUserId: number;
     canEdit: boolean;
+    canReview: boolean;
     onEdit: () => void;
     onClose: () => void;
 }) {
-    const hasHero = !!(creative.picture_url && creative.format === 'image');
-
     return (
         <Sheet open onOpenChange={(v) => !v && onClose()}>
             <SheetContent className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[480px]">
                 <Tabs defaultValue="details" className="flex h-full flex-col overflow-hidden">
                     {/* Fixed header */}
                     <div className="shrink-0">
-                        {hasHero && (
-                            <div className="relative h-48 w-full overflow-hidden bg-stone-100 dark:bg-zinc-800">
-                                <img src={creative.picture_url!} alt={creative.name} className="h-full w-full object-cover" />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
-                                <div className="absolute bottom-3 left-4 flex flex-wrap items-center gap-1.5">
-                                    {creative.latest_review && <ReviewBadge status={creative.latest_review.status} />}
-                                </div>
+                        <div className="flex items-start gap-3 border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
+                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] ${creative.format === 'video' ? 'bg-violet-50 dark:bg-violet-500/[0.08]' : 'bg-blue-50 dark:bg-blue-500/[0.08]'}`}>
+                                {creative.format === 'video'
+                                    ? <Clapperboard className="h-[18px] w-[18px] text-violet-500 dark:text-violet-400" />
+                                    : <FileImage className="h-[18px] w-[18px] text-blue-500 dark:text-blue-400" />
+                                }
                             </div>
-                        )}
-                        <div className={`flex items-start gap-3 px-5 ${hasHero ? 'pt-4' : 'pt-5'} pb-4 border-b border-black/6 dark:border-white/6`}>
-                            {!hasHero && (
-                                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] ${creative.format === 'video' ? 'bg-violet-50 dark:bg-violet-500/[0.08]' : 'bg-blue-50 dark:bg-blue-500/[0.08]'}`}>
-                                    {creative.format === 'video'
-                                        ? <Clapperboard className="h-[18px] w-[18px] text-violet-500 dark:text-violet-400" />
-                                        : <FileImage className="h-[18px] w-[18px] text-blue-500 dark:text-blue-400" />
-                                    }
-                                </div>
-                            )}
                             <div className="min-w-0 flex-1">
                                 <SheetTitle className="text-[15px] font-semibold leading-snug text-gray-900 dark:text-gray-100">
                                     {creative.name}
                                 </SheetTitle>
                                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                                     <FormatBadge format={creative.format} />
-                                    {!hasHero && creative.latest_review && <ReviewBadge status={creative.latest_review.status} />}
+                                    <FinalBadge status={creative.final_status} />
+                                    {creative.latest_review && <ReviewBadge status={creative.latest_review.status} />}
                                 </div>
                                 <div className="mt-2 flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-600">
                                     {creative.creator && (
@@ -213,6 +203,14 @@ export function CreativeDetailSheet({
                                         </>
                                     )}
                                     <span className="font-mono">{creative.creative_date}</span>
+                                    {creative.assigned_reviewer && (
+                                        <>
+                                            <span className="text-gray-300 dark:text-gray-700">·</span>
+                                            <span className="font-mono text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-600">Reviewer</span>
+                                            <InitialAvatar name={creative.assigned_reviewer.name} className="h-4 w-4 bg-blue-500/[0.12] text-[8px] text-blue-600 dark:text-blue-400" />
+                                            <span className="font-medium text-gray-500 dark:text-gray-400">{creative.assigned_reviewer.name}</span>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                             {canEdit && (
@@ -241,19 +239,41 @@ export function CreativeDetailSheet({
                     {/* Scrollable panels */}
                     <TabsContent value="details" className="flex-1 overflow-y-auto">
                         <div className="divide-y divide-black/4 dark:divide-white/4">
-                            {creative.picture_url && creative.format === 'video' && (
+                            {creative.picture_url && (
                                 <div className="px-5 py-4">
                                     <a href={creative.picture_url} target="_blank" rel="noopener noreferrer"
                                         className="flex items-center gap-3 rounded-[12px] border border-violet-200 bg-violet-50 p-3 transition-colors hover:bg-violet-100 dark:border-violet-500/20 dark:bg-violet-500/[0.06] dark:hover:bg-violet-500/[0.10]">
                                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-500/[0.12]">
-                                            <Clapperboard className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                            {creative.format === 'video'
+                                                ? <Clapperboard className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                                : <FileImage className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                            }
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <p className="font-mono text-[11px] font-medium text-violet-700 dark:text-violet-300">Watch Video</p>
+                                            <p className="font-mono text-[11px] font-medium text-violet-700 dark:text-violet-300">Open Media</p>
                                             <p className="mt-0.5 truncate font-mono text-[10px] text-violet-500">{creative.picture_url}</p>
                                         </div>
                                         <ExternalLink className="h-3.5 w-3.5 shrink-0 text-violet-400" />
                                     </a>
+                                </div>
+                            )}
+                            {(creative.approved_at || creative.ads_manager_link) && (
+                                <div className="space-y-3 px-5 py-4">
+                                    {creative.approved_at && (
+                                        <div>
+                                            <p className="mb-1 font-mono text-[9px] font-medium uppercase tracking-widest text-gray-400 dark:text-gray-600">Approved</p>
+                                            <p className="font-mono text-[12px] font-medium text-emerald-600 dark:text-emerald-400">{creative.approved_at}</p>
+                                        </div>
+                                    )}
+                                    {creative.ads_manager_link && (
+                                        <div>
+                                            <p className="mb-1 font-mono text-[9px] font-medium uppercase tracking-widest text-gray-400 dark:text-gray-600">Ads Manager</p>
+                                            <a href={creative.ads_manager_link} target="_blank" rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1.5 rounded-lg bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 transition-colors hover:bg-stone-200 dark:bg-zinc-800 dark:text-gray-400 dark:hover:bg-zinc-700">
+                                                Open Ads Manager <ExternalLink className="h-3 w-3" />
+                                            </a>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             {(creative.headline || creative.reference_link) && (
@@ -308,7 +328,7 @@ export function CreativeDetailSheet({
                     </TabsContent>
 
                     <TabsContent value="reviews" className="flex-1 overflow-y-auto px-5 py-5">
-                        <ReviewsTab creative={creative} workspace={workspace} currentUserId={currentUserId} canEdit={canEdit} />
+                        <ReviewsTab creative={creative} workspace={workspace} currentUserId={currentUserId} canReview={canReview} />
                     </TabsContent>
                 </Tabs>
             </SheetContent>

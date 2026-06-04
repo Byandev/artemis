@@ -300,7 +300,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::prefix('/workspaces/{workspace:slug}/creatives')->name('workspaces.creatives.')->group(function () {
         Route::get('/', [CreativesController::class, 'index'])->name('index');
+        Route::get('/create', [CreativesController::class, 'create'])->name('create');
         Route::post('/', [CreativesController::class, 'store'])->name('store');
+        Route::get('/{creative}/edit', [CreativesController::class, 'edit'])->name('edit');
         Route::put('/{creative}', [CreativesController::class, 'update'])->name('update');
         Route::delete('/{creative}', [CreativesController::class, 'destroy'])->name('destroy');
         Route::post('/{creative}/reviews', [CreativesController::class, 'addReview'])->name('reviews.store');

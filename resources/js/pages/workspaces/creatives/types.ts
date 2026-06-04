@@ -28,16 +28,24 @@ export interface Creative {
     ads_status: AdsStatus;
     ads_manager_link: string | null;
     ads_remarks: string | null;
+    final_status: FinalStatus;
+    approved_at: string | null;
     caption: string | null;
     headline: string | null;
     notes: string | null;
     creator: { id: number; name: string } | null;
+    assigned_reviewer: { id: number; name: string } | null;
     reviews: Review[];
     review_count: number;
     latest_review: { status: ReviewStatus; feedback: string | null } | null;
 }
 
 export interface Creator {
+    id: number;
+    name: string;
+}
+
+export interface Reviewer {
     id: number;
     name: string;
 }
@@ -91,6 +99,20 @@ export const REVIEW_BADGE: Record<ReviewStatus, string> = {
     revision: 'bg-amber-50 text-amber-600 dark:bg-amber-500/[0.12] dark:text-amber-400',
     approved: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/[0.12] dark:text-emerald-400',
     for_reapproval: 'bg-purple-50 text-purple-600 dark:bg-purple-500/[0.12] dark:text-purple-400',
+};
+
+export type FinalStatus = 'for_approval' | 'approved' | 'for_revision';
+
+export const FINAL_STATUS_LABELS: Record<FinalStatus, string> = {
+    for_approval: 'For Approval',
+    approved: 'Approved',
+    for_revision: 'For Revision',
+};
+
+export const FINAL_STATUS_BADGE: Record<FinalStatus, string> = {
+    for_approval: 'bg-blue-50 text-blue-600 dark:bg-blue-500/[0.12] dark:text-blue-400',
+    approved: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/[0.12] dark:text-emerald-400',
+    for_revision: 'bg-amber-50 text-amber-600 dark:bg-amber-500/[0.12] dark:text-amber-400',
 };
 
 export const REVIEW_AVATAR_BG: Record<ReviewStatus, string> = {

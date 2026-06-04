@@ -16,6 +16,8 @@ class Creative extends Model
     protected $casts = [
         'creative_date' => 'date',
         'creator_id' => 'integer',
+        'assigned_reviewer_id' => 'integer',
+        'approved_at' => 'datetime',
     ];
 
     public function workspace(): BelongsTo
@@ -26,6 +28,11 @@ class Creative extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'creator_id');
+    }
+
+    public function assignedReviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_reviewer_id');
     }
 
     public function reviews(): HasMany
