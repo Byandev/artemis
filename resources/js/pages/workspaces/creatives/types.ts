@@ -34,7 +34,8 @@ export interface Creative {
     headline: string | null;
     notes: string | null;
     creator: { id: number; name: string } | null;
-    assigned_reviewer: { id: number; name: string } | null;
+    product: { id: number; title: string } | null;
+    assigned_reviewers: { id: number; name: string }[];
     reviews: Review[];
     review_count: number;
     latest_review: { status: ReviewStatus; feedback: string | null } | null;
@@ -50,10 +51,16 @@ export interface Reviewer {
     name: string;
 }
 
+export interface Product {
+    id: number;
+    title: string;
+}
+
 export interface PageProps {
     workspace: Workspace;
     creatives: PaginatedData<Creative>;
     creators: Creator[];
+    reviewers: Reviewer[];
     query: {
         sort?: string;
         page?: number;
@@ -69,20 +76,27 @@ export interface PageProps {
     };
 }
 
-export type AdsStatus = 'pending' | 'running' | 'kill' | 'skill';
+export type AdsStatus = 'pending' | 'running' | 'kill' | 'scale';
 
 export const ADS_STATUS_LABELS: Record<AdsStatus, string> = {
     pending: 'Pending',
     running: 'Running',
     kill: 'Kill',
-    skill: 'Skill',
+    scale: 'Scale',
 };
 
 export const ADS_BADGE: Record<AdsStatus, string> = {
     pending: 'bg-stone-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400',
     running: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/[0.12] dark:text-emerald-400',
     kill: 'bg-red-50 text-red-600 dark:bg-red-500/[0.12] dark:text-red-400',
-    skill: 'bg-orange-50 text-orange-600 dark:bg-orange-500/[0.12] dark:text-orange-400',
+    scale: 'bg-orange-50 text-orange-600 dark:bg-orange-500/[0.12] dark:text-orange-400',
+};
+
+export const ADS_DOT: Record<AdsStatus, string> = {
+    pending: 'bg-gray-400 dark:bg-gray-500',
+    running: 'bg-emerald-500',
+    kill: 'bg-red-500',
+    scale: 'bg-orange-500',
 };
 
 export const REVIEW_STATUS_LABELS: Record<ReviewStatus, string> = {
@@ -101,6 +115,14 @@ export const REVIEW_BADGE: Record<ReviewStatus, string> = {
     for_reapproval: 'bg-purple-50 text-purple-600 dark:bg-purple-500/[0.12] dark:text-purple-400',
 };
 
+export const REVIEW_DOT: Record<ReviewStatus, string> = {
+    waiting_for_submission: 'bg-gray-400 dark:bg-gray-500',
+    for_approval: 'bg-blue-500',
+    revision: 'bg-amber-500',
+    approved: 'bg-emerald-500',
+    for_reapproval: 'bg-purple-500',
+};
+
 export type FinalStatus = 'for_approval' | 'approved' | 'for_revision';
 
 export const FINAL_STATUS_LABELS: Record<FinalStatus, string> = {
@@ -113,6 +135,12 @@ export const FINAL_STATUS_BADGE: Record<FinalStatus, string> = {
     for_approval: 'bg-blue-50 text-blue-600 dark:bg-blue-500/[0.12] dark:text-blue-400',
     approved: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/[0.12] dark:text-emerald-400',
     for_revision: 'bg-amber-50 text-amber-600 dark:bg-amber-500/[0.12] dark:text-amber-400',
+};
+
+export const FINAL_DOT: Record<FinalStatus, string> = {
+    for_approval: 'bg-blue-500',
+    approved: 'bg-emerald-500',
+    for_revision: 'bg-amber-500',
 };
 
 export const REVIEW_AVATAR_BG: Record<ReviewStatus, string> = {

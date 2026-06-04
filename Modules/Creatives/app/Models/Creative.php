@@ -2,10 +2,12 @@
 
 namespace Modules\Creatives\Models;
 
+use App\Models\Product;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
@@ -16,7 +18,7 @@ class Creative extends Model
     protected $casts = [
         'creative_date' => 'date',
         'creator_id' => 'integer',
-        'assigned_reviewer_id' => 'integer',
+        'product_id' => 'integer',
         'approved_at' => 'datetime',
     ];
 
@@ -25,14 +27,20 @@ class Creative extends Model
         return $this->belongsTo(Workspace::class);
     }
 
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'creator_id');
     }
 
-    public function assignedReviewer(): BelongsTo
+    public function assignedReviewers(): BelongsToMany
     {
-        return $this->belongsTo(User::class, 'assigned_reviewer_id');
+        return $this->belongsToMany(User::class, 'creative_reviewers', 'creative_id', 'user_id')
+            ->withTimestamps();
     }
 
     public function reviews(): HasMany

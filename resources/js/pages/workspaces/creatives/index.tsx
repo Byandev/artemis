@@ -29,6 +29,7 @@ import {
     FileImage,
     MessageSquare,
     MoreHorizontal,
+    Package,
     Pencil,
     Plus,
     Search,
@@ -38,10 +39,11 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CreativeDetailSheet } from './components/creative-detail-sheet';
-import { AdsBadge, FinalBadge, FormatBadge, InitialAvatar, ReviewBadge } from './components/atoms';
-import { ADS_BADGE, ADS_STATUS_LABELS, AdsStatus, Creative, FINAL_STATUS_LABELS, FinalStatus, PageProps } from './types';
+import { AdsBadge, FinalBadge, FormatBadge, InitialAvatar } from './components/atoms';
+import { InlineAssignee } from './components/inline-assignee';
+import { ADS_DOT, ADS_STATUS_LABELS, AdsStatus, Creative, FINAL_STATUS_LABELS, FinalStatus, PageProps } from './types';
 
-export default function CreativesIndex({ workspace, creatives, creators, query }: PageProps) {
+export default function CreativesIndex({ workspace, creatives, creators, reviewers, query }: PageProps) {
     const { auth } = usePage<SharedData>().props;
     const currentUserId = auth?.user?.id ?? 0;
 
@@ -110,9 +112,13 @@ export default function CreativesIndex({ workspace, creatives, creators, query }
             enableSorting: true,
             header: ({ column }) => <SortableHeader column={column} title="Creative" />,
             cell: ({ row: { original: c } }) => (
-                <div>
+                <div className="min-w-0">
                     <p className="text-[13px] font-medium text-black dark:text-gray-200">{c.name}</p>
-                    {c.headline && <p className="mt-0.5 max-w-[200px] truncate font-mono text-[11px] text-gray-400 dark:text-gray-600">{c.headline}</p>}
+                    {c.product && (
+                        <span title={c.product.title} className="mt-1 inline-flex max-w-[180px] items-center gap-1 truncate rounded bg-indigo-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-indigo-600 dark:bg-indigo-500/[0.12] dark:text-indigo-400">
+                            <Package className="h-2.5 w-2.5 shrink-0" /> <span className="truncate">{c.product.title}</span>
+                        </span>
+                    )}
                 </div>
             ),
         },
@@ -145,55 +151,30 @@ export default function CreativesIndex({ workspace, creatives, creators, query }
                 ),
         },
         {
-            accessorKey: 'latest_review',
+            accessorKey: 'assigned_reviewers',
             enableSorting: false,
-            header: () => <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600">Review</span>,
+            header: () => <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600">Reviewers</span>,
             cell: ({ row: { original: c } }) => (
-                <div className="flex items-center gap-1.5">
-                    {c.latest_review
-                        ? <ReviewBadge status={c.latest_review.status} />
-                        : <span className="font-mono text-[11px] text-gray-300 dark:text-gray-700">—</span>
-                    }
-                    {c.review_count > 0 && (
-                        <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-gray-400 dark:text-gray-600">
-                            <MessageSquare className="h-3 w-3" />{c.review_count}
-                        </span>
-                    )}
-                </div>
+                <InlineAssignee creative={c} reviewers={reviewers} baseUrl={baseUrl} canEdit={canEdit} />
             ),
         },
         {
-            accessorKey: 'ads_status',
-            enableSorting: false,
-            header: () => <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600">Ads</span>,
-            cell: ({ row }) => {
-                const c = row.original;
-                return (
-                    <div onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button className="inline-flex cursor-pointer items-center gap-0.5 rounded transition-opacity hover:opacity-70">
-                                    <AdsBadge status={c.ads_status} />
-                                    <ChevronDown className="h-3 w-3 text-gray-400" />
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start">
-                                {(Object.entries(ADS_STATUS_LABELS) as [AdsStatus, string][]).map(([v, l]) => (
-                                    <DropdownMenuItem key={v} className="font-mono text-[12px]"
-                                        onClick={() => router.put(`${baseUrl}/${c.id}`, { ads_status: v }, { preserveScroll: true })}>
-                                        {l}
-                                    </DropdownMenuItem>
-                                ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                );
-            },
+            accessorKey: 'review_count',
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Reviews" />,
+            cell: ({ row: { original: c } }) =>
+                c.review_count > 0 ? (
+                    <span className="inline-flex items-center gap-1 font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                        <MessageSquare className="h-3 w-3" /> {c.review_count}
+                    </span>
+                ) : (
+                    <span className="font-mono text-[11px] text-gray-300 dark:text-gray-700">—</span>
+                ),
         },
         {
             accessorKey: 'final_status',
-            enableSorting: false,
-            header: () => <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600">Final</span>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Final" />,
             cell: ({ row }) => {
                 const c = row.original;
                 if (!canEdit) return <FinalBadge status={c.final_status} />;
@@ -220,9 +201,37 @@ export default function CreativesIndex({ workspace, creatives, creators, query }
             },
         },
         {
+            accessorKey: 'ads_status',
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Ads" />,
+            cell: ({ row }) => {
+                const c = row.original;
+                return (
+                    <div onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="inline-flex cursor-pointer items-center gap-0.5 rounded transition-opacity hover:opacity-70">
+                                    <AdsBadge status={c.ads_status} />
+                                    <ChevronDown className="h-3 w-3 text-gray-400" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start">
+                                {(Object.entries(ADS_STATUS_LABELS) as [AdsStatus, string][]).map(([v, l]) => (
+                                    <DropdownMenuItem key={v} className="font-mono text-[12px]"
+                                        onClick={() => router.put(`${baseUrl}/${c.id}`, { ads_status: v }, { preserveScroll: true })}>
+                                        {l}
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                );
+            },
+        },
+        {
             accessorKey: 'approved_at',
-            enableSorting: false,
-            header: () => <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600">Approved</span>,
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Approved" />,
             cell: ({ row }) =>
                 row.original.approved_at ? (
                     <span className="font-mono text-[12px] text-emerald-600 dark:text-emerald-400">{row.original.approved_at}</span>
@@ -342,7 +351,7 @@ export default function CreativesIndex({ workspace, creatives, creators, query }
                             </button>
                             {(Object.entries(ADS_STATUS_LABELS) as [AdsStatus, string][]).map(([v, l]) => (
                                 <button key={v} className={filterItem(query.filter?.ads_status === v)} onClick={() => navigate({ 'filter[ads_status]': v, page: 1 })}>
-                                    <span className={`h-2 w-2 rounded-full ${ADS_BADGE[v].split(' ')[0]}`} />{l}
+                                    <span className={`h-1.5 w-1.5 rounded-full ${ADS_DOT[v]}`} />{l}
                                 </button>
                             ))}
 

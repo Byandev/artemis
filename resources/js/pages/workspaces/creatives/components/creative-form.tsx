@@ -10,9 +10,9 @@ import { Workspace } from '@/types/models/Workspace';
 import { router, useForm } from '@inertiajs/react';
 import { Clapperboard, FileImage } from 'lucide-react';
 import React from 'react';
-import { AdsStatus, Creative, FinalStatus, Reviewer } from '../types';
-
-const NO_REVIEWER = 'none';
+import { AdsStatus, Creative, FinalStatus, Product, Reviewer } from '../types';
+import { AssigneePicker } from './assignee-picker';
+import { ProductPicker } from './product-picker';
 
 // ─── Style tokens ─────────────────────────────────────────────────────────────
 
@@ -26,7 +26,8 @@ type FormData = {
     name: string;
     creative_date: string;
     format: 'video' | 'image' | '';
-    assigned_reviewer_id: number | null;
+    product_id: number | null;
+    assigned_reviewer_ids: number[];
     description: string;
     script: string;
     picture_url: string;
@@ -43,11 +44,13 @@ type FormData = {
 export function CreativeForm({
     workspace,
     creative,
-    reviewers,
+    reviewers = [],
+    products = [],
 }: {
     workspace: Workspace;
     creative?: Creative;
-    reviewers: Reviewer[];
+    reviewers?: Reviewer[];
+    products?: Product[];
 }) {
     const isEdit = !!creative;
     const baseUrl = `/workspaces/${workspace.slug}/creatives`;
@@ -56,7 +59,8 @@ export function CreativeForm({
         name: creative?.name ?? '',
         creative_date: creative?.creative_date ?? '',
         format: creative?.format ?? '',
-        assigned_reviewer_id: creative?.assigned_reviewer?.id ?? null,
+        product_id: creative?.product?.id ?? null,
+        assigned_reviewer_ids: creative?.assigned_reviewers?.map((r) => r.id) ?? [],
         description: creative?.description ?? '',
         script: creative?.script ?? '',
         picture_url: creative?.picture_url ?? '',
@@ -96,6 +100,7 @@ export function CreativeForm({
                             <DatePicker
                                 id="cf-date"
                                 mode="single"
+                                fullWidth
                                 placeholder="Select date"
                                 defaultDate={data.creative_date || undefined}
                                 onChange={(_dates, dateStr) => setData('creative_date', dateStr)}
@@ -119,23 +124,11 @@ export function CreativeForm({
                             <label htmlFor="cf-headline" className={fl}>Headline</label>
                             <input id="cf-headline" className={fi} value={data.headline} onChange={(e) => setData('headline', e.target.value)} placeholder="Ad headline text" />
                         </div>
-                        <div className="space-y-1.5">
-                            <label className={fl}>Assign Reviewer</label>
-                            <Select
-                                value={data.assigned_reviewer_id ? String(data.assigned_reviewer_id) : NO_REVIEWER}
-                                onValueChange={(v) => setData('assigned_reviewer_id', v === NO_REVIEWER ? null : Number(v))}
-                            >
-                                <SelectTrigger className={selectTrigger}>
-                                    <SelectValue placeholder="Unassigned" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={NO_REVIEWER} className="font-mono text-[12px]">Unassigned</SelectItem>
-                                    {reviewers.map((r) => (
-                                        <SelectItem key={r.id} value={String(r.id)} className="font-mono text-[12px]">{r.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {errors.assigned_reviewer_id && <p className={fe}>{errors.assigned_reviewer_id}</p>}
+                        <div className="col-span-2 space-y-1.5">
+                            <label className={fl}>Product</label>
+                            <ProductPicker products={products} value={data.product_id} onChange={(id) => setData('product_id', id)} />
+                            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-600">Which product is this creative for?</p>
+                            {errors.product_id && <p className={fe}>{errors.product_id}</p>}
                         </div>
                     </div>
                 </section>
@@ -162,7 +155,7 @@ export function CreativeForm({
                 {/* Media & Links */}
                 <section className="space-y-3">
                     <p className={fl}>Media & Links</p>
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                             <label htmlFor="cf-media" className={fl}>Media Link</label>
                             <input id="cf-media" className={fi} value={data.picture_url} onChange={(e) => setData('picture_url', e.target.value)} placeholder="https://drive.google.com/..." />
@@ -175,6 +168,22 @@ export function CreativeForm({
                         </div>
                     </div>
                 </section>
+
+                {/* Reviewers — edit only */}
+                {isEdit && (
+                    <section className="space-y-3">
+                        <p className={fl}>Reviewers</p>
+                        <div className="space-y-1.5">
+                            <label className={fl}>Assigned Reviewers</label>
+                            <AssigneePicker
+                                reviewers={reviewers}
+                                selectedIds={data.assigned_reviewer_ids}
+                                onChange={(ids) => setData('assigned_reviewer_ids', ids)}
+                            />
+                            {errors.assigned_reviewer_ids && <p className={fe}>{errors.assigned_reviewer_ids}</p>}
+                        </div>
+                    </section>
+                )}
 
                 {/* Campaign — edit only */}
                 {isEdit && (
@@ -192,7 +201,7 @@ export function CreativeForm({
                                             <SelectItem value="pending" className="font-mono text-[12px]">Pending</SelectItem>
                                             <SelectItem value="running" className="font-mono text-[12px]">Running</SelectItem>
                                             <SelectItem value="kill" className="font-mono text-[12px]">Kill</SelectItem>
-                                            <SelectItem value="skill" className="font-mono text-[12px]">Skill</SelectItem>
+                                            <SelectItem value="scale" className="font-mono text-[12px]">Scale</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>

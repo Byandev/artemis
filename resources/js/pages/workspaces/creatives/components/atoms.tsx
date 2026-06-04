@@ -1,9 +1,16 @@
 import { Clapperboard, FileImage } from 'lucide-react';
-import { ADS_BADGE, ADS_STATUS_LABELS, AdsStatus, FINAL_STATUS_BADGE, FINAL_STATUS_LABELS, FinalStatus, REVIEW_BADGE, REVIEW_STATUS_LABELS, ReviewStatus } from '../types';
+import { ADS_BADGE, ADS_DOT, ADS_STATUS_LABELS, AdsStatus, FINAL_DOT, FINAL_STATUS_BADGE, FINAL_STATUS_LABELS, FinalStatus, REVIEW_BADGE, REVIEW_DOT, REVIEW_STATUS_LABELS, ReviewStatus } from '../types';
+
+const badgeBase = 'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-mono text-[11px] font-medium';
+
+function StatusDot({ className }: { className: string }) {
+    return <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${className}`} />;
+}
 
 export function AdsBadge({ status }: { status: AdsStatus }) {
     return (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[11px] font-medium ${ADS_BADGE[status]}`}>
+        <span className={`${badgeBase} ${ADS_BADGE[status]}`}>
+            <StatusDot className={ADS_DOT[status]} />
             {ADS_STATUS_LABELS[status]}
         </span>
     );
@@ -11,7 +18,8 @@ export function AdsBadge({ status }: { status: AdsStatus }) {
 
 export function FinalBadge({ status }: { status: FinalStatus }) {
     return (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[11px] font-medium ${FINAL_STATUS_BADGE[status]}`}>
+        <span className={`${badgeBase} ${FINAL_STATUS_BADGE[status]}`}>
+            <StatusDot className={FINAL_DOT[status]} />
             {FINAL_STATUS_LABELS[status]}
         </span>
     );
@@ -19,7 +27,8 @@ export function FinalBadge({ status }: { status: FinalStatus }) {
 
 export function ReviewBadge({ status }: { status: ReviewStatus }) {
     return (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[11px] font-medium ${REVIEW_BADGE[status]}`}>
+        <span className={`${badgeBase} ${REVIEW_BADGE[status]}`}>
+            <StatusDot className={REVIEW_DOT[status]} />
             {REVIEW_STATUS_LABELS[status]}
         </span>
     );

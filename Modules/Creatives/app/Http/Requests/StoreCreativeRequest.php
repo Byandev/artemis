@@ -18,7 +18,7 @@ class StoreCreativeRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'creative_date' => ['required', 'date'],
             'format' => ['required', Rule::in(['video', 'image'])],
-            'assigned_reviewer_id' => ['nullable', 'integer', 'exists:users,id'],
+            'product_id' => ['nullable', 'integer', 'exists:products,id'],
             'description' => ['nullable', 'string', 'max:5000'],
             'script' => ['nullable', 'string'],
             // Media is a plain text link (e.g. Google Drive), not an uploaded image.

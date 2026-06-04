@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('headline')->nullable();
             $table->unsignedBigInteger('creator_id');
             $table->text('notes')->nullable();
-            $table->enum('ads_status', ['pending', 'running', 'kill', 'skill'])->default('pending');
+            $table->enum('ads_status', ['pending', 'running', 'kill', 'scale'])->default('pending');
             $table->string('ads_manager_link')->nullable();
             $table->text('ads_remarks')->nullable();
             $table->timestamps();

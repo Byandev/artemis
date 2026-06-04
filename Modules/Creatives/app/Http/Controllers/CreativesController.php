@@ -4,6 +4,7 @@ namespace Modules\Creatives\Http\Controllers;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Models\Product;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -33,9 +34,11 @@ class CreativesController extends Controller
             Creative::where('workspace_id', $workspace->id)
                 ->with([
                     'creator:id,name',
-                    'assignedReviewer:id,name',
+                    'product:id,title',
+                    'assignedReviewers:id,name',
                     'reviews' => fn ($q) => $q->with('reviewer:id,name')->oldest(),
                 ])
+                ->withCount('reviews')
         )
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -62,6 +65,10 @@ class CreativesController extends Controller
                 AllowedSort::field('creative_date'),
                 AllowedSort::field('format'),
                 AllowedSort::field('created_at'),
+                AllowedSort::field('ads_status'),
+                AllowedSort::field('final_status'),
+                AllowedSort::field('approved_at'),
+                AllowedSort::field('review_count', 'reviews_count'),
                 AllowedSort::callback('creator', function ($query, bool $descending) {
                     $query->orderBy(
                         User::select('name')->whereColumn('users.id', 'creatives.creator_id'),
@@ -85,6 +92,7 @@ class CreativesController extends Controller
             'workspace' => $workspace,
             'creatives' => $creatives,
             'creators' => $creators,
+            'reviewers' => $this->reviewers($workspace),
             'query' => [
                 ...$request->only(['sort', 'page']),
                 'per_page' => $request->integer('per_page', 25),
@@ -100,7 +108,7 @@ class CreativesController extends Controller
 
         return Inertia::render('workspaces/creatives/create', [
             'workspace' => $workspace,
-            'reviewers' => $this->reviewers($workspace),
+            'products' => $this->products($workspace),
         ]);
     }
 
@@ -126,12 +134,13 @@ class CreativesController extends Controller
         $this->guard($request, $workspace, $creative);
         $this->authorize(Permission::EditCreatives->value, $workspace);
 
-        $creative->load(['creator:id,name', 'assignedReviewer:id,name', 'reviews' => fn ($q) => $q->with('reviewer:id,name')->oldest()]);
+        $creative->load(['creator:id,name', 'product:id,title', 'assignedReviewers:id,name', 'reviews' => fn ($q) => $q->with('reviewer:id,name')->oldest()]);
 
         return Inertia::render('workspaces/creatives/edit', [
             'workspace' => $workspace,
             'creative' => $this->formatCreative($creative),
             'reviewers' => $this->reviewers($workspace),
+            'products' => $this->products($workspace),
         ]);
     }
 
@@ -142,6 +151,13 @@ class CreativesController extends Controller
 
         $data = $request->validated();
 
+        // assigned_reviewer_ids lives in a pivot table, not on the creatives row.
+        $reviewerIds = null;
+        if (array_key_exists('assigned_reviewer_ids', $data)) {
+            $reviewerIds = $data['assigned_reviewer_ids'] ?? [];
+            unset($data['assigned_reviewer_ids']);
+        }
+
         // Stamp / clear approved_at whenever the final status changes.
         if (array_key_exists('final_status', $data)) {
             $data['approved_at'] = $data['final_status'] === 'approved'
@@ -150,6 +166,10 @@ class CreativesController extends Controller
         }
 
         $creative->update($data);
+
+        if ($reviewerIds !== null) {
+            $creative->assignedReviewers()->sync($reviewerIds);
+        }
 
         // Inline edits (e.g. the status dropdowns on the index) post partial
         // payloads and expect to stay put; the full edit page posts the whole
@@ -231,6 +251,17 @@ class CreativesController extends Controller
             ->get();
     }
 
+    /**
+     * Workspace products a creative can be linked to.
+     */
+    private function products(Workspace $workspace)
+    {
+        return Product::where('workspace_id', $workspace->id)
+            ->select('id', 'title')
+            ->orderBy('title')
+            ->get();
+    }
+
     private function deleteStoredFile(?string $url): void
     {
         if (! $url || ! str_starts_with($url, '/storage/')) {
@@ -282,7 +313,8 @@ class CreativesController extends Controller
             'headline' => $c->headline,
             'notes' => $c->notes,
             'creator' => $c->creator ? ['id' => $c->creator->id, 'name' => $c->creator->name] : null,
-            'assigned_reviewer' => $c->assignedReviewer ? ['id' => $c->assignedReviewer->id, 'name' => $c->assignedReviewer->name] : null,
+            'product' => $c->product ? ['id' => $c->product->id, 'title' => $c->product->title] : null,
+            'assigned_reviewers' => $c->assignedReviewers->map(fn ($r) => ['id' => $r->id, 'name' => $r->name])->values()->all(),
             'reviews' => $reviews,
             'review_count' => count($reviews),
             'latest_review' => $latestReview ? [
