@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\ThrottlesExceptions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Modules\Pancake\Models\ParcelJourneyNotification;
 
@@ -54,8 +55,6 @@ class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        usleep(500_000);
-
         $this->parcelJourneyNotification->load('order.page');
 
         if ($this->parcelJourneyNotification->type === 'sms') {
@@ -81,6 +80,18 @@ class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
             }
 
         } elseif ($this->parcelJourneyNotification->type === 'chat') {
+            // Atomically claim the record — only the worker that flips status
+            // from 'pending' to 'sent' gets to actually send. Any concurrent
+            // duplicate job will see 0 affected rows and bail out.
+            $claimed = DB::table('parcel_journey_notifications')
+                ->where('id', $this->parcelJourneyNotification->id)
+                ->where('status', 'pending')
+                ->update(['status' => 'sent']);
+
+            if (! $claimed) {
+                return;
+            }
+
             [$pageId, $psid] = explode('_', $this->parcelJourneyNotification->order->fb_id);
 
             try {
@@ -89,8 +100,6 @@ class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
                 $botcake->updateCustomField($psid, $this->parcelJourneyNotification->order->page->parcel_journey_custom_field_id, $this->parcelJourneyNotification->message);
 
                 $botcake->sendFlow($psid, $this->parcelJourneyNotification->order->page->parcel_journey_flow_id);
-
-                $this->parcelJourneyNotification->update(['status' => 'sent']);
             } catch (\Exception $e) {
                 $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => $e->getMessage()]);
             }

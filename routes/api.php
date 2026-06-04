@@ -19,7 +19,7 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
     Route::get('/pages', [PageController::class, 'index'])->name('pages.index');
     Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
     Route::post('/shops/scan-return', [ShopScanReturnController::class, 'scan'])->name('shops.scan-return');
-    Route::get('/rmo-orders/login', [RmoOrderController::class, 'login'])->name('rmo-orders.login');
+    Route::post('/rmo-orders/login', [RmoOrderController::class, 'login'])->name('rmo-orders.login');
     Route::get('/rmo-orders', [RmoOrderController::class, 'assignedOrders'])->name('rmo-orders.index');
 
     Route::post('/rmo-orders/sync-call-tracking', [RmoOrderController::class, 'syncCallTracking'])->name('rmo-orders.call-tracking.sync');
