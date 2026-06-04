@@ -103,6 +103,13 @@ enum Permission: string
     case EditPageDailyBudgetRecords = 'Edit Page Daily Budget Records';
     case DeletePageDailyBudgetRecords = 'Delete Page Daily Budget Records';
 
+    // Creatives
+    case ViewCreatives = 'View Creatives';
+    case CreateCreatives = 'Create Creatives';
+    case EditCreatives = 'Edit Creatives';
+    case DeleteCreatives = 'Delete Creatives';
+    case ReviewCreatives = 'Review Creatives';
+
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
@@ -185,6 +192,12 @@ enum Permission: string
 
             self::ViewCourierShipments,
             self::ImportCourierShipments => 'Pancake',
+
+            self::ViewCreatives,
+            self::CreateCreatives,
+            self::EditCreatives,
+            self::DeleteCreatives,
+            self::ReviewCreatives => 'Creatives',
 
             self::ViewBotcakeSequences,
             self::ViewBotcakeSequenceMessages,
