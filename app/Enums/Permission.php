@@ -111,6 +111,9 @@ enum Permission: string
     case DeleteCreatives = 'Delete Creatives';
     case ReviewCreatives = 'Review Creatives';
 
+    // Dashboard
+    case ViewAllWorkspaceData = 'View All Workspace Data';
+
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
@@ -209,6 +212,8 @@ enum Permission: string
             self::CreatePageDailyBudgetRecords,
             self::EditPageDailyBudgetRecords,
             self::DeletePageDailyBudgetRecords => 'Page Daily Budget Records',
+
+            self::ViewAllWorkspaceData => 'Dashboard',
 
             self::EditWorkspaceSettings,
             self::ManageApiKeys => 'Settings',
