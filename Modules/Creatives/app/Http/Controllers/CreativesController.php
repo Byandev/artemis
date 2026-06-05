@@ -49,6 +49,7 @@ class CreativesController extends Controller
                     });
                 }),
                 AllowedFilter::exact('format'),
+                AllowedFilter::exact('ads_status'),
                 AllowedFilter::exact('creator_id'),
                 AllowedFilter::callback('review_status', function ($query, $value) {
                     $query->whereHas('latestReview', fn ($q) => $q->where('status', $value));
