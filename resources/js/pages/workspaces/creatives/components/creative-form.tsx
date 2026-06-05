@@ -16,11 +16,15 @@ import { ProductPicker } from './product-picker';
 
 // ─── Style tokens ─────────────────────────────────────────────────────────────
 
-const fi = 'h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100';
-const fl = 'block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500';
+const fi =
+    'h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100';
+const fl =
+    'block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500';
 const fe = 'mt-1 font-mono text-[11px] text-red-500';
-const ft = 'w-full resize-none rounded-[10px] border border-black/8 bg-stone-50 p-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100';
-const selectTrigger = 'h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100';
+const ft =
+    'w-full resize-none rounded-[10px] border border-black/8 bg-stone-50 p-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100';
+const selectTrigger =
+    'h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100';
 
 type FormData = {
     name: string;
@@ -60,7 +64,8 @@ export function CreativeForm({
         creative_date: creative?.creative_date ?? '',
         format: creative?.format ?? '',
         product_id: creative?.product?.id ?? null,
-        assigned_reviewer_ids: creative?.assigned_reviewers?.map((r) => r.id) ?? [],
+        assigned_reviewer_ids:
+            creative?.assigned_reviewers?.map((r) => r.id) ?? [],
         description: creative?.description ?? '',
         script: creative?.script ?? '',
         picture_url: creative?.picture_url ?? '',
@@ -84,51 +89,113 @@ export function CreativeForm({
     };
 
     return (
-        <form onSubmit={submit} className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+        <form
+            onSubmit={submit}
+            className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900"
+        >
             <div className="space-y-6 px-5 py-5">
                 {/* Basic Info */}
                 <section className="space-y-3">
                     <p className={fl}>Basic Info</p>
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
-                            <label htmlFor="cf-name" className={fl}>Name <span className="text-red-400">*</span></label>
-                            <input id="cf-name" className={fi} value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Summer Sale Hook" />
+                            <label htmlFor="cf-name" className={fl}>
+                                Name <span className="text-red-400">*</span>
+                            </label>
+                            <input
+                                id="cf-name"
+                                className={fi}
+                                value={data.name}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
+                                placeholder="e.g. Summer Sale Hook"
+                            />
                             {errors.name && <p className={fe}>{errors.name}</p>}
                         </div>
                         <div className="space-y-1.5">
-                            <label htmlFor="cf-date" className={fl}>Date <span className="text-red-400">*</span></label>
+                            <label htmlFor="cf-date" className={fl}>
+                                Date <span className="text-red-400">*</span>
+                            </label>
                             <DatePicker
                                 id="cf-date"
                                 mode="single"
                                 fullWidth
                                 placeholder="Select date"
                                 defaultDate={data.creative_date || undefined}
-                                onChange={(_dates, dateStr) => setData('creative_date', dateStr)}
+                                onChange={(_dates, dateStr) =>
+                                    setData('creative_date', dateStr)
+                                }
                             />
-                            {errors.creative_date && <p className={fe}>{errors.creative_date}</p>}
+                            {errors.creative_date && (
+                                <p className={fe}>{errors.creative_date}</p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
-                            <label className={fl}>Format <span className="text-red-400">*</span></label>
-                            <Select value={data.format} onValueChange={(v) => setData('format', v as 'video' | 'image')}>
+                            <label className={fl}>
+                                Format <span className="text-red-400">*</span>
+                            </label>
+                            <Select
+                                value={data.format}
+                                onValueChange={(v) =>
+                                    setData('format', v as 'video' | 'image')
+                                }
+                            >
                                 <SelectTrigger className={selectTrigger}>
                                     <SelectValue placeholder="Select format" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="video" className="font-mono text-[12px]"><span className="inline-flex items-center gap-1.5"><Clapperboard className="h-3.5 w-3.5" /> Video</span></SelectItem>
-                                    <SelectItem value="image" className="font-mono text-[12px]"><span className="inline-flex items-center gap-1.5"><FileImage className="h-3.5 w-3.5" /> Image</span></SelectItem>
+                                    <SelectItem
+                                        value="video"
+                                        className="font-mono text-[12px]"
+                                    >
+                                        <span className="inline-flex items-center gap-1.5">
+                                            <Clapperboard className="h-3.5 w-3.5" />{' '}
+                                            Video
+                                        </span>
+                                    </SelectItem>
+                                    <SelectItem
+                                        value="image"
+                                        className="font-mono text-[12px]"
+                                    >
+                                        <span className="inline-flex items-center gap-1.5">
+                                            <FileImage className="h-3.5 w-3.5" />{' '}
+                                            Image
+                                        </span>
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
-                            {errors.format && <p className={fe}>{errors.format}</p>}
+                            {errors.format && (
+                                <p className={fe}>{errors.format}</p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
-                            <label htmlFor="cf-headline" className={fl}>Headline</label>
-                            <input id="cf-headline" className={fi} value={data.headline} onChange={(e) => setData('headline', e.target.value)} placeholder="Ad headline text" />
+                            <label htmlFor="cf-headline" className={fl}>
+                                Headline
+                            </label>
+                            <input
+                                id="cf-headline"
+                                className={fi}
+                                value={data.headline}
+                                onChange={(e) =>
+                                    setData('headline', e.target.value)
+                                }
+                                placeholder="Ad headline text"
+                            />
                         </div>
                         <div className="col-span-2 space-y-1.5">
                             <label className={fl}>Product</label>
-                            <ProductPicker products={products} value={data.product_id} onChange={(id) => setData('product_id', id)} />
-                            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-600">Which product is this creative for?</p>
-                            {errors.product_id && <p className={fe}>{errors.product_id}</p>}
+                            <ProductPicker
+                                products={products}
+                                value={data.product_id}
+                                onChange={(id) => setData('product_id', id)}
+                            />
+                            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-600">
+                                Which product is this creative for?
+                            </p>
+                            {errors.product_id && (
+                                <p className={fe}>{errors.product_id}</p>
+                            )}
                         </div>
                     </div>
                 </section>
@@ -138,16 +205,59 @@ export function CreativeForm({
                     <p className={fl}>Content</p>
                     <div className="space-y-3">
                         <div className="space-y-1.5">
-                            <label htmlFor="cf-desc" className={fl}>Description</label>
-                            <textarea id="cf-desc" className={ft} rows={2} value={data.description} onChange={(e) => setData('description', e.target.value)} placeholder="Brief overview" />
+                            <label htmlFor="cf-desc" className={fl}>
+                                Description
+                            </label>
+                            <textarea
+                                id="cf-desc"
+                                className={ft}
+                                rows={2}
+                                value={data.description}
+                                onChange={(e) =>
+                                    setData('description', e.target.value)
+                                }
+                                placeholder="Brief overview"
+                            />
                         </div>
                         <div className="space-y-1.5">
-                            <label htmlFor="cf-script" className={fl}>Script</label>
-                            <textarea id="cf-script" className={ft} rows={4} value={data.script} onChange={(e) => setData('script', e.target.value)} placeholder="Full script or content outline" />
+                            <label htmlFor="cf-script" className={fl}>
+                                Script{' '}
+                                {data.format === 'video' && (
+                                    <span className="text-red-400">*</span>
+                                )}
+                            </label>
+                            <textarea
+                                id="cf-script"
+                                className={ft}
+                                rows={4}
+                                value={data.script}
+                                onChange={(e) =>
+                                    setData('script', e.target.value)
+                                }
+                                placeholder={
+                                    data.format === 'video'
+                                        ? 'Required for video — full script or content outline'
+                                        : 'Full script or content outline'
+                                }
+                            />
+                            {errors.script && (
+                                <p className={fe}>{errors.script}</p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
-                            <label htmlFor="cf-caption" className={fl}>Caption</label>
-                            <textarea id="cf-caption" className={ft} rows={2} value={data.caption} onChange={(e) => setData('caption', e.target.value)} placeholder="Ad copy / post caption" />
+                            <label htmlFor="cf-caption" className={fl}>
+                                Caption
+                            </label>
+                            <textarea
+                                id="cf-caption"
+                                className={ft}
+                                rows={2}
+                                value={data.caption}
+                                onChange={(e) =>
+                                    setData('caption', e.target.value)
+                                }
+                                placeholder="Ad copy / post caption"
+                            />
                         </div>
                     </div>
                 </section>
@@ -157,14 +267,38 @@ export function CreativeForm({
                     <p className={fl}>Media & Links</p>
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
-                            <label htmlFor="cf-media" className={fl}>Media Link</label>
-                            <input id="cf-media" className={fi} value={data.picture_url} onChange={(e) => setData('picture_url', e.target.value)} placeholder="https://drive.google.com/..." />
-                            {errors.picture_url && <p className={fe}>{errors.picture_url}</p>}
+                            <label htmlFor="cf-media" className={fl}>
+                                Media Link
+                            </label>
+                            <input
+                                id="cf-media"
+                                className={fi}
+                                value={data.picture_url}
+                                onChange={(e) =>
+                                    setData('picture_url', e.target.value)
+                                }
+                                placeholder="https://drive.google.com/..."
+                            />
+                            {errors.picture_url && (
+                                <p className={fe}>{errors.picture_url}</p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
-                            <label htmlFor="cf-ref" className={fl}>Reference Link</label>
-                            <input id="cf-ref" className={fi} value={data.reference_link} onChange={(e) => setData('reference_link', e.target.value)} placeholder="https://..." />
-                            {errors.reference_link && <p className={fe}>{errors.reference_link}</p>}
+                            <label htmlFor="cf-ref" className={fl}>
+                                Reference Link
+                            </label>
+                            <input
+                                id="cf-ref"
+                                className={fi}
+                                value={data.reference_link}
+                                onChange={(e) =>
+                                    setData('reference_link', e.target.value)
+                                }
+                                placeholder="https://..."
+                            />
+                            {errors.reference_link && (
+                                <p className={fe}>{errors.reference_link}</p>
+                            )}
                         </div>
                     </div>
                 </section>
@@ -178,9 +312,15 @@ export function CreativeForm({
                             <AssigneePicker
                                 reviewers={reviewers}
                                 selectedIds={data.assigned_reviewer_ids}
-                                onChange={(ids) => setData('assigned_reviewer_ids', ids)}
+                                onChange={(ids) =>
+                                    setData('assigned_reviewer_ids', ids)
+                                }
                             />
-                            {errors.assigned_reviewer_ids && <p className={fe}>{errors.assigned_reviewer_ids}</p>}
+                            {errors.assigned_reviewer_ids && (
+                                <p className={fe}>
+                                    {errors.assigned_reviewer_ids}
+                                </p>
+                            )}
                         </div>
                     </section>
                 )}
@@ -193,40 +333,123 @@ export function CreativeForm({
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1.5">
                                     <label className={fl}>Ads Status</label>
-                                    <Select value={data.ads_status} onValueChange={(v) => setData('ads_status', v as AdsStatus)}>
-                                        <SelectTrigger className={selectTrigger}>
+                                    <Select
+                                        value={data.ads_status}
+                                        onValueChange={(v) =>
+                                            setData(
+                                                'ads_status',
+                                                v as AdsStatus,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger
+                                            className={selectTrigger}
+                                        >
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="pending" className="font-mono text-[12px]">Pending</SelectItem>
-                                            <SelectItem value="running" className="font-mono text-[12px]">Running</SelectItem>
-                                            <SelectItem value="kill" className="font-mono text-[12px]">Kill</SelectItem>
-                                            <SelectItem value="scale" className="font-mono text-[12px]">Scale</SelectItem>
+                                            <SelectItem
+                                                value="pending"
+                                                className="font-mono text-[12px]"
+                                            >
+                                                Pending
+                                            </SelectItem>
+                                            <SelectItem
+                                                value="running"
+                                                className="font-mono text-[12px]"
+                                            >
+                                                Running
+                                            </SelectItem>
+                                            <SelectItem
+                                                value="kill"
+                                                className="font-mono text-[12px]"
+                                            >
+                                                Kill
+                                            </SelectItem>
+                                            <SelectItem
+                                                value="scale"
+                                                className="font-mono text-[12px]"
+                                            >
+                                                Scale
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className={fl}>Final Status</label>
-                                    <Select value={data.final_status} onValueChange={(v) => setData('final_status', v as FinalStatus)}>
-                                        <SelectTrigger className={selectTrigger}>
+                                    <Select
+                                        value={data.final_status}
+                                        onValueChange={(v) =>
+                                            setData(
+                                                'final_status',
+                                                v as FinalStatus,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger
+                                            className={selectTrigger}
+                                        >
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="for_approval" className="font-mono text-[12px]">For Approval</SelectItem>
-                                            <SelectItem value="approved" className="font-mono text-[12px]">Approved</SelectItem>
-                                            <SelectItem value="for_revision" className="font-mono text-[12px]">For Revision</SelectItem>
+                                            <SelectItem
+                                                value="for_approval"
+                                                className="font-mono text-[12px]"
+                                            >
+                                                For Approval
+                                            </SelectItem>
+                                            <SelectItem
+                                                value="approved"
+                                                className="font-mono text-[12px]"
+                                            >
+                                                Approved
+                                            </SelectItem>
+                                            <SelectItem
+                                                value="for_revision"
+                                                className="font-mono text-[12px]"
+                                            >
+                                                For Revision
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                             </div>
                             <div className="space-y-1.5">
-                                <label htmlFor="cf-ads-manager" className={fl}>Ads Manager Link</label>
-                                <input id="cf-ads-manager" className={fi} value={data.ads_manager_link} onChange={(e) => setData('ads_manager_link', e.target.value)} placeholder="https://business.facebook.com/adsmanager/..." />
-                                {errors.ads_manager_link && <p className={fe}>{errors.ads_manager_link}</p>}
+                                <label htmlFor="cf-ads-manager" className={fl}>
+                                    Ads Manager Link
+                                </label>
+                                <input
+                                    id="cf-ads-manager"
+                                    className={fi}
+                                    value={data.ads_manager_link}
+                                    onChange={(e) =>
+                                        setData(
+                                            'ads_manager_link',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="https://business.facebook.com/adsmanager/..."
+                                />
+                                {errors.ads_manager_link && (
+                                    <p className={fe}>
+                                        {errors.ads_manager_link}
+                                    </p>
+                                )}
                             </div>
                             <div className="space-y-1.5">
-                                <label htmlFor="cf-ads-remarks" className={fl}>Remarks</label>
-                                <textarea id="cf-ads-remarks" className={ft} rows={2} value={data.ads_remarks} onChange={(e) => setData('ads_remarks', e.target.value)} placeholder="Campaign notes, budget info, targeting details..." />
+                                <label htmlFor="cf-ads-remarks" className={fl}>
+                                    Remarks
+                                </label>
+                                <textarea
+                                    id="cf-ads-remarks"
+                                    className={ft}
+                                    rows={2}
+                                    value={data.ads_remarks}
+                                    onChange={(e) =>
+                                        setData('ads_remarks', e.target.value)
+                                    }
+                                    placeholder="Campaign notes, budget info, targeting details..."
+                                />
                             </div>
                         </div>
                     </section>
@@ -235,13 +458,30 @@ export function CreativeForm({
                 {/* Notes */}
                 <section className="space-y-3">
                     <p className={fl}>Notes</p>
-                    <textarea id="cf-notes" className={ft} rows={2} value={data.notes} onChange={(e) => setData('notes', e.target.value)} placeholder="Internal notes visible only to your team" />
+                    <textarea
+                        id="cf-notes"
+                        className={ft}
+                        rows={2}
+                        value={data.notes}
+                        onChange={(e) => setData('notes', e.target.value)}
+                        placeholder="Internal notes visible only to your team"
+                    />
                 </section>
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-black/6 bg-stone-50/50 px-5 py-3 dark:border-white/6 dark:bg-white/2">
-                <button type="button" onClick={() => router.visit(baseUrl)} className="flex h-9 items-center rounded-lg border border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700">Cancel</button>
-                <button type="submit" disabled={processing} className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50">
+                <button
+                    type="button"
+                    onClick={() => router.visit(baseUrl)}
+                    className="flex h-9 items-center rounded-lg border border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    disabled={processing}
+                    className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
+                >
                     {isEdit ? 'Save Changes' : 'Create Creative'}
                 </button>
             </div>
