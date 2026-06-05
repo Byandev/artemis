@@ -75,6 +75,14 @@ class Order extends Model
             });
         }
 
+        // Data-scope restriction: limit to pages owned by the viewer's teammates.
+        $restrictOwnerIds = $filters['restrict_owner_ids'] ?? null;
+        if ($restrictOwnerIds) {
+            $query->whereHas('page', function ($q) use ($restrictOwnerIds) {
+                $q->whereIn('owner_id', is_array($restrictOwnerIds) ? $restrictOwnerIds : explode(',', $restrictOwnerIds));
+            });
+        }
+
         return $query;
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Permission;
 use BackedEnum;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -192,6 +193,18 @@ class User extends Authenticatable implements MustVerifyEmail
             ->where('role_permissions.role_id', $roleId)
             ->where('permissions.name', $permissionName)
             ->exists();
+    }
+
+    /**
+     * Whether the user may access every page in the workspace. When false, the
+     * user is limited to pages owned by members of the team(s) they belong to
+     * (see App\Support\PageAccessScope).
+     */
+    public function canAccessAllPages(Workspace $workspace): bool
+    {
+        return $this->isSuperAdmin()
+            || $this->ownsWorkspace($workspace)
+            || $this->hasPermission(Permission::AccessAllPages, $workspace);
     }
 
     public function isCsrOf(Workspace $workspace): bool

@@ -23,14 +23,15 @@ class OrdersFilter
         $userIds = self::ids($filter, 'user_ids');
         $productIds = self::ids($filter, 'product_ids');
         $teamIds = self::ids($filter, 'team_ids');
+        $restrictOwnerIds = self::ids($filter, 'restrict_owner_ids');
 
-        if (! $forceJoin && ! $pageIds && ! $shopIds && ! $userIds && ! $productIds && ! $teamIds) {
+        if (! $forceJoin && ! $pageIds && ! $shopIds && ! $userIds && ! $productIds && ! $teamIds && ! $restrictOwnerIds) {
             return;
         }
 
         $query->join('pages', 'pages.id', '=', "{$ordersAlias}.page_id");
 
-        self::applyPageColumnFilters($query, $pageIds, $shopIds, $userIds, $productIds, $teamIds);
+        self::applyPageColumnFilters($query, $pageIds, $shopIds, $userIds, $productIds, $teamIds, $restrictOwnerIds);
     }
 
     /**
@@ -46,6 +47,7 @@ class OrdersFilter
             self::ids($filter, 'user_ids'),
             self::ids($filter, 'product_ids'),
             self::ids($filter, 'team_ids'),
+            self::ids($filter, 'restrict_owner_ids'),
         );
     }
 
@@ -56,6 +58,7 @@ class OrdersFilter
         ?array $userIds,
         ?array $productIds,
         ?array $teamIds,
+        ?array $restrictOwnerIds = null,
     ): void {
         if ($pageIds) {
             $query->whereIn('pages.id', $pageIds);
@@ -79,6 +82,12 @@ class OrdersFilter
                     ->select('user_id')
                     ->whereIn('team_id', $teamIds);
             });
+        }
+
+        // Data-scope restriction: limit to pages owned by the given users
+        // (the viewer's teammates) regardless of the other filters above.
+        if ($restrictOwnerIds) {
+            $query->whereIn('pages.owner_id', $restrictOwnerIds);
         }
     }
 

@@ -8,6 +8,7 @@ use App\Models\AdRecord;
 use App\Models\Order;
 use App\Models\Workspace;
 use App\Services\PostHogService;
+use App\Support\PageAccessScope;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -173,12 +174,12 @@ class WorkspaceController extends Controller
             $startDate = now()->subDays($days)->format('Y-m-d');
         }
 
-        $filters = [
+        $filters = PageAccessScope::applyToFilter([
             'team_ids' => $request->query('team_ids'),
             'product_ids' => $request->query('product_ids'),
             'page_ids' => $request->query('page_ids'),
             'shop_ids' => $request->query('shop_ids'),
-        ];
+        ], $request->user(), $workspace);
 
         $salesData = Order::where('workspace_id', $workspace->id)
             ->whereNotNull('confirmed_at')

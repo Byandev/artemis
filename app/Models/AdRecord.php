@@ -56,14 +56,15 @@ class AdRecord extends Model
         $shopIds = $filters['shop_ids'] ?? null;
         $productIds = $filters['product_ids'] ?? null;
         $teamIds = $filters['team_ids'] ?? null;
+        $restrictOwnerIds = $filters['restrict_owner_ids'] ?? null;
 
         // Only apply filters if at least one is present
-        if (! $pageIds && ! $shopIds && ! $productIds && ! $teamIds) {
+        if (! $pageIds && ! $shopIds && ! $productIds && ! $teamIds && ! $restrictOwnerIds) {
             return $query;
         }
 
         // Filter ad records through orders that match the entity filters
-        $query->whereHas('orders', function ($q) use ($pageIds, $shopIds, $productIds, $teamIds) {
+        $query->whereHas('orders', function ($q) use ($pageIds, $shopIds, $productIds, $teamIds, $restrictOwnerIds) {
             // Filter by page IDs
             if ($pageIds) {
                 $q->whereIn('orders.page_id', is_array($pageIds) ? $pageIds : explode(',', $pageIds));
@@ -87,6 +88,13 @@ class AdRecord extends Model
                 $teamIdsArray = is_array($teamIds) ? $teamIds : explode(',', $teamIds);
                 $q->whereHas('page.owner.teams', function ($teamQuery) use ($teamIdsArray) {
                     $teamQuery->whereIn('teams.id', $teamIdsArray);
+                });
+            }
+
+            // Data-scope restriction: limit to pages owned by the viewer's teammates.
+            if ($restrictOwnerIds) {
+                $q->whereHas('page', function ($pageQuery) use ($restrictOwnerIds) {
+                    $pageQuery->whereIn('owner_id', is_array($restrictOwnerIds) ? $restrictOwnerIds : explode(',', $restrictOwnerIds));
                 });
             }
         });

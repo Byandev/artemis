@@ -290,6 +290,7 @@ class RollupReader
         $userIds = self::normalizeIds($filter['user_ids'] ?? null);
         $productIds = self::normalizeIds($filter['product_ids'] ?? null);
         $teamIds = self::normalizeIds($filter['team_ids'] ?? null);
+        $restrictOwnerIds = self::normalizeIds($filter['restrict_owner_ids'] ?? null);
 
         if ($pageIds) {
             $query->whereIn(self::TABLE.'.page_id', $pageIds);
@@ -332,6 +333,16 @@ class RollupReader
                             ->select('user_id')
                             ->whereIn('team_id', $teamIds);
                     });
+            });
+        }
+
+        // Data-scope restriction: limit to pages owned by the viewer's teammates.
+        if ($restrictOwnerIds) {
+            $query->whereIn(self::TABLE.'.page_id', function ($sub) use ($workspaceId, $restrictOwnerIds) {
+                $sub->from('pages')
+                    ->select('id')
+                    ->where('workspace_id', $workspaceId)
+                    ->whereIn('owner_id', $restrictOwnerIds);
             });
         }
 

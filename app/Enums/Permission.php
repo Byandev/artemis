@@ -20,6 +20,7 @@ enum Permission: string
 
     // Pages
     case ViewPages = 'View Pages';
+    case AccessAllPages = 'Access All Pages';
     case CreatePages = 'Create Pages';
     case EditPages = 'Edit Pages';
     case ArchivePages = 'Archive Pages';
@@ -130,6 +131,7 @@ enum Permission: string
             self::ManageRolePermissions => 'Roles',
 
             self::ViewPages,
+            self::AccessAllPages,
             self::CreatePages,
             self::EditPages,
             self::ArchivePages,

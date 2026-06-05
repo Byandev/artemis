@@ -72,12 +72,18 @@ class AnalyticsController extends Controller
         $workspace = Workspace::findOrFail($request->workspace->id);
         $source = $this->source($request);
 
-        $cacheKey = 'analytics:'.$workspace->id.':'.$source.':per-shop:'.$this->makeCacheKey($request->only(['date_range', 'filter', 'metric']));
+        $filter = PageAccessScope::applyToFilter($request->array('filter', []), $request->user(), $workspace);
 
-        $data = Cache::remember($cacheKey, $this->ttl($request->array('date_range', [])), function () use ($request, $workspace, $source) {
+        $cacheKey = 'analytics:'.$workspace->id.':'.$source.':per-shop:'.$this->makeCacheKey([
+            'date_range' => $request->array('date_range', []),
+            'filter' => $filter,
+            'metric' => $request->array('metric'),
+        ]);
+
+        $data = Cache::remember($cacheKey, $this->ttl($request->array('date_range', [])), function () use ($request, $workspace, $source, $filter) {
             return $workspace->metrics(
                 $request->array('date_range', []),
-                $request->array('filter', []),
+                $filter,
                 $source,
             )->perShop(
                 $request->input('metric', 'totalSales')
@@ -92,12 +98,18 @@ class AnalyticsController extends Controller
         $workspace = Workspace::findOrFail($request->workspace->id);
         $source = $this->source($request);
 
-        $cacheKey = 'analytics:'.$workspace->id.':'.$source.':per-user:'.$this->makeCacheKey($request->only(['date_range', 'filter', 'metric']));
+        $filter = PageAccessScope::applyToFilter($request->array('filter', []), $request->user(), $workspace);
 
-        $data = Cache::remember($cacheKey, $this->ttl($request->array('date_range', [])), function () use ($request, $workspace, $source) {
+        $cacheKey = 'analytics:'.$workspace->id.':'.$source.':per-user:'.$this->makeCacheKey([
+            'date_range' => $request->array('date_range', []),
+            'filter' => $filter,
+            'metric' => $request->array('metric'),
+        ]);
+
+        $data = Cache::remember($cacheKey, $this->ttl($request->array('date_range', [])), function () use ($request, $workspace, $source, $filter) {
             return $workspace->metrics(
                 $request->array('date_range', []),
-                $request->array('filter', []),
+                $filter,
                 $source,
             )->perUser(
                 $request->input('metric', 'totalSales')

@@ -146,6 +146,7 @@ final class RtsRate
         $userIds = $this->ids($filter, 'user_ids');
         $productIds = $this->ids($filter, 'product_ids');
         $teamIds = $this->ids($filter, 'team_ids');
+        $restrictOwnerIds = $this->ids($filter, 'restrict_owner_ids');
 
         if ($pageIds) {
             $query->whereIn(self::ROLLUP_TABLE.'.page_id', $pageIds);
@@ -177,6 +178,13 @@ final class RtsRate
                     ->whereIn('owner_id', function ($sub2) use ($teamIds) {
                         $sub2->from('team_user')->select('user_id')->whereIn('team_id', $teamIds);
                     });
+            });
+        }
+
+        // Data-scope restriction: limit to pages owned by the viewer's teammates.
+        if ($restrictOwnerIds) {
+            $query->whereIn(self::ROLLUP_TABLE.'.page_id', function ($sub) use ($workspaceId, $restrictOwnerIds) {
+                $sub->from('pages')->select('id')->where('workspace_id', $workspaceId)->whereIn('owner_id', $restrictOwnerIds);
             });
         }
 
