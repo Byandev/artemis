@@ -64,9 +64,17 @@ class CreativesController extends Controller
             ->allowedSorts([
                 AllowedSort::field('name'),
                 AllowedSort::field('creative_date'),
-                AllowedSort::field('format'),
+                // format is a MySQL ENUM; cast to CHAR so it sorts alphabetically
+                // instead of by enum definition order.
+                AllowedSort::callback('format', function ($query, bool $descending) {
+                    $query->orderByRaw('CAST(format AS CHAR) '.($descending ? 'desc' : 'asc'));
+                }),
                 AllowedSort::field('created_at'),
-                AllowedSort::field('ads_status'),
+                // ads_status is a MySQL ENUM, which sorts by definition order by
+                // default. Cast to CHAR so it sorts alphabetically instead.
+                AllowedSort::callback('ads_status', function ($query, bool $descending) {
+                    $query->orderByRaw('CAST(ads_status AS CHAR) '.($descending ? 'desc' : 'asc'));
+                }),
                 AllowedSort::field('final_status'),
                 AllowedSort::field('approved_at'),
                 AllowedSort::field('review_count', 'reviews_count'),
