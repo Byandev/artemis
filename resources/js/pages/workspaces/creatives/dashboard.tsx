@@ -19,10 +19,7 @@ import Leaderboard from './components/dashboard/leaderboard';
 import Panel from './components/dashboard/panel';
 import PipelineFunnel from './components/dashboard/pipeline-funnel';
 import ThroughputChart from './components/dashboard/throughput-chart';
-import {
-    ApplyFilter,
-    DashboardPageProps,
-} from './components/dashboard/types';
+import { ApplyFilter, DashboardPageProps } from './components/dashboard/types';
 import WorkList from './components/dashboard/work-list';
 
 export default function CreativesDashboard({

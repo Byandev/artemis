@@ -235,7 +235,7 @@ export function AppSidebar() {
                       title: 'My Work',
                       href: `/workspaces/${slug}/creatives/dashboard`,
                       icon: ListChecks,
-                      permission: PERMISSIONS.ViewCreatives,
+                      permission: PERMISSIONS.ViewCreativesDashboard,
                   },
                   {
                       title: 'Creatives',

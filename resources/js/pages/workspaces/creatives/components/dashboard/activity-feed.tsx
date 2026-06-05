@@ -1,6 +1,6 @@
 import { Link } from '@inertiajs/react';
-import { ReviewBadge } from '../atoms';
 import { REVIEW_AVATAR_BG } from '../../types';
+import { ReviewBadge } from '../atoms';
 import { ActivityRow, EditUrl } from './types';
 
 interface Props {

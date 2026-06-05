@@ -31,7 +31,7 @@ class DashboardController extends Controller
             abort(403);
         }
 
-        $this->authorize(Permission::ViewCreatives->value, $workspace);
+        $this->authorize(Permission::ViewCreativesDashboard->value, $workspace);
 
         $userId = $request->user()->id;
 

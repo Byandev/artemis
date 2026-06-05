@@ -95,6 +95,7 @@ export const PERMISSIONS = {
     DeletePageDailyBudgetRecords: 'Delete Page Daily Budget Records',
 
     // Creatives
+    ViewCreativesDashboard: 'View Creatives Dashboard',
     ViewCreatives: 'View Creatives',
     CreateCreatives: 'Create Creatives',
     EditCreatives: 'Edit Creatives',

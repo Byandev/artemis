@@ -104,6 +104,7 @@ enum Permission: string
     case DeletePageDailyBudgetRecords = 'Delete Page Daily Budget Records';
 
     // Creatives
+    case ViewCreativesDashboard = 'View Creatives Dashboard';
     case ViewCreatives = 'View Creatives';
     case CreateCreatives = 'Create Creatives';
     case EditCreatives = 'Edit Creatives';
@@ -193,6 +194,7 @@ enum Permission: string
             self::ViewCourierShipments,
             self::ImportCourierShipments => 'Pancake',
 
+            self::ViewCreativesDashboard,
             self::ViewCreatives,
             self::CreateCreatives,
             self::EditCreatives,
