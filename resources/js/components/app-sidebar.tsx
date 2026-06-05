@@ -232,6 +232,12 @@ export function AppSidebar() {
         ...(currentWorkspace.creatives_module_enabled
             ? [
                   {
+                      title: 'My Work',
+                      href: `/workspaces/${slug}/creatives/dashboard`,
+                      icon: ListChecks,
+                      permission: PERMISSIONS.ViewCreatives,
+                  },
+                  {
                       title: 'Creatives',
                       href: `/workspaces/${slug}/creatives`,
                       icon: Sparkles,

@@ -40,6 +40,7 @@ use Modules\Botcake\Http\Controllers\Web\FlowController;
 use Modules\Botcake\Http\Controllers\Web\SequenceController;
 use Modules\Botcake\Http\Controllers\Web\SequenceMessageController;
 use Modules\Creatives\Http\Controllers\CreativesController;
+use Modules\Creatives\Http\Controllers\DashboardController as CreativesDashboardController;
 use Modules\Finance\Http\Controllers\AccountController as FinanceAccountController;
 use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardController;
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
@@ -299,6 +300,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::prefix('/workspaces/{workspace:slug}/creatives')->name('workspaces.creatives.')->group(function () {
+        Route::get('/dashboard', CreativesDashboardController::class)->name('dashboard');
         Route::get('/', [CreativesController::class, 'index'])->name('index');
         Route::get('/create', [CreativesController::class, 'create'])->name('create');
         Route::post('/', [CreativesController::class, 'store'])->name('store');
