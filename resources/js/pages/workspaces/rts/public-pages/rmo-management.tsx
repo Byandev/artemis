@@ -819,7 +819,7 @@ export default function RmoManagement({
                             <div className="flex items-center gap-2">
                                 {trackingCode && (
                                     <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
-                                        {trackingCode}
+                                        JT#######
                                     </span>
                                 )}
                             </div>
