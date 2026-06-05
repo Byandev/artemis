@@ -100,6 +100,7 @@ export const PERMISSIONS = {
     EditCreatives: 'Edit Creatives',
     DeleteCreatives: 'Delete Creatives',
     ReviewCreatives: 'Review Creatives',
+    UpdateCreativeStatus: 'Update Creative Status',
 
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',

@@ -109,6 +109,7 @@ enum Permission: string
     case EditCreatives = 'Edit Creatives';
     case DeleteCreatives = 'Delete Creatives';
     case ReviewCreatives = 'Review Creatives';
+    case UpdateCreativeStatus = 'Update Creative Status';
 
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
@@ -197,7 +198,8 @@ enum Permission: string
             self::CreateCreatives,
             self::EditCreatives,
             self::DeleteCreatives,
-            self::ReviewCreatives => 'Creatives',
+            self::ReviewCreatives,
+            self::UpdateCreativeStatus => 'Creatives',
 
             self::ViewBotcakeSequences,
             self::ViewBotcakeSequenceMessages,

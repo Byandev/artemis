@@ -70,6 +70,7 @@ export default function CreativesIndex({
     const canEdit = usePermission(PERMISSIONS.EditCreatives);
     const canDelete = usePermission(PERMISSIONS.DeleteCreatives);
     const canReview = usePermission(PERMISSIONS.ReviewCreatives);
+    const canUpdateStatus = usePermission(PERMISSIONS.UpdateCreativeStatus);
 
     const [detailCreativeId, setDetailCreativeId] = useState<number | null>(
         null,
@@ -243,7 +244,8 @@ export default function CreativesIndex({
             ),
             cell: ({ row }) => {
                 const c = row.original;
-                if (!canEdit) return <FinalBadge status={c.final_status} />;
+                if (!canUpdateStatus)
+                    return <FinalBadge status={c.final_status} />;
                 return (
                     <div onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
@@ -288,6 +290,7 @@ export default function CreativesIndex({
             ),
             cell: ({ row }) => {
                 const c = row.original;
+                if (!canUpdateStatus) return <AdsBadge status={c.ads_status} />;
                 return (
                     <div onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
