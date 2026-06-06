@@ -2,7 +2,7 @@ import PageHeader from '@/components/common/PageHeader';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
-import { Headset } from 'lucide-react';
+import { Clapperboard } from 'lucide-react';
 
 interface Props {
     workspace: {
@@ -12,26 +12,26 @@ interface Props {
     };
 }
 
-export default function CsrDashboard({ workspace }: Props) {
+export default function VideoEditorDashboard({ workspace }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         {
-            title: 'CSR Dashboard',
-            href: `/workspaces/${workspace.slug}/csr/dashboard`,
+            title: 'Video Editor Dashboard',
+            href: `/workspaces/${workspace.slug}/video-editor/dashboard`,
         },
     ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="CSR Dashboard" />
+            <Head title="Video Editor Dashboard" />
 
             <div className="p-4 sm:p-6">
                 <PageHeader
-                    title="CSR Dashboard"
-                    description="Customer service representative overview for this workspace."
+                    title="Video Editor Dashboard"
+                    description="Video creative production for this workspace."
                 />
 
                 <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-black/10 py-20 text-center dark:border-white/10">
-                    <Headset className="mb-3 h-8 w-8 text-gray-300 dark:text-gray-600" />
+                    <Clapperboard className="mb-3 h-8 w-8 text-gray-300 dark:text-gray-600" />
                     <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
                         Nothing here yet
                     </p>

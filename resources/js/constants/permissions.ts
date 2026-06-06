@@ -101,6 +101,12 @@ export const PERMISSIONS = {
     DeleteCreatives: 'Delete Creatives',
     ReviewCreatives: 'Review Creatives',
 
+    // Dashboards
+    ViewMainDashboard: 'View Main Dashboard',
+    ViewSalesMarketingDashboard: 'View Sales & Marketing Dashboard',
+    ViewVideoEditorDashboard: 'View Video Editor Dashboard',
+    ViewCsrDashboard: 'View CSR Dashboard',
+
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',
     ManageApiKeys: 'Manage API Keys',
