@@ -33,12 +33,17 @@ abstract class BaseNotificationHandler implements NotifiesParcelJourney
         $smsMessage = $this->renderer->render($this->workspace, 'sms', $activity, 'customer', $data);
 
         if ($smsMessage !== null) {
-            ParcelJourneyNotification::create([
-                'order_id' => $order->id,
+            // firstOrCreate keyed on the unique (journey, type, recipient) tuple
+            // makes this idempotent: concurrent or retried syncs collapse to a
+            // single row, so the model's `created` hook dispatches exactly one
+            // send. The DB unique index backstops the race the select can't.
+            ParcelJourneyNotification::firstOrCreate([
                 'parcel_journey_id' => $parcelJourney->id,
                 'type' => 'sms',
-                'receiver_name' => $order->shippingAddress->full_name,
                 'receiver_identity' => $order->shippingAddress->phone_number,
+            ], [
+                'order_id' => $order->id,
+                'receiver_name' => $order->shippingAddress->full_name,
                 'message' => $smsMessage,
             ]);
         }
@@ -46,12 +51,13 @@ abstract class BaseNotificationHandler implements NotifiesParcelJourney
         $chatMessage = $this->renderer->render($this->workspace, 'chat', $activity, 'customer', $data);
 
         if ($chatMessage !== null) {
-            ParcelJourneyNotification::create([
-                'order_id' => $order->id,
+            ParcelJourneyNotification::firstOrCreate([
                 'parcel_journey_id' => $parcelJourney->id,
                 'type' => 'chat',
-                'receiver_name' => $order->shippingAddress->full_name,
                 'receiver_identity' => $psid,
+            ], [
+                'order_id' => $order->id,
+                'receiver_name' => $order->shippingAddress->full_name,
                 'message' => $chatMessage,
             ]);
         }
