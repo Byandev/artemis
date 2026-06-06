@@ -19,6 +19,7 @@ class Creative extends Model
         'creative_date' => 'date',
         'creator_id' => 'integer',
         'product_id' => 'integer',
+        'approved_by' => 'integer',
         'approved_at' => 'datetime',
     ];
 
@@ -35,6 +36,11 @@ class Creative extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'creator_id');
+    }
+
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
     public function assignedReviewers(): BelongsToMany

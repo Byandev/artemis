@@ -16,11 +16,8 @@ class StoreReviewRequest extends FormRequest
     {
         return [
             'status' => ['required', Rule::in([
-                'waiting_for_submission',
-                'for_approval',
                 'revision',
                 'approved',
-                'for_reapproval',
             ])],
             'feedback' => ['nullable', 'string', 'max:2000'],
         ];
