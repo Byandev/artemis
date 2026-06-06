@@ -60,6 +60,7 @@ export default function CreativesIndex({
     workspace,
     creatives,
     creators,
+    products,
     reviewers,
     query,
 }: PageProps) {
@@ -101,6 +102,7 @@ export default function CreativesIndex({
                     'filter[format]': query.filter?.format || undefined,
                     'filter[ads_status]': query.filter?.ads_status || undefined,
                     'filter[creator_id]': query.filter?.creator_id || undefined,
+                    'filter[product_id]': query.filter?.product_id || undefined,
                     'filter[date_from]': query.filter?.date_from || undefined,
                     'filter[date_to]': query.filter?.date_to || undefined,
                     ...params,
@@ -239,7 +241,7 @@ export default function CreativesIndex({
             accessorKey: 'final_status',
             enableSorting: true,
             header: ({ column }) => (
-                <SortableHeader column={column} title="Final" />
+                <SortableHeader column={column} title="Status" />
             ),
             cell: ({ row }) => {
                 const c = row.original;
@@ -332,9 +334,16 @@ export default function CreativesIndex({
             ),
             cell: ({ row }) =>
                 row.original.approved_at ? (
-                    <span className="font-mono text-[12px] text-emerald-600 dark:text-emerald-400">
-                        {row.original.approved_at}
-                    </span>
+                    <div className="min-w-0">
+                        <span className="block font-mono text-[12px] text-emerald-600 dark:text-emerald-400">
+                            {row.original.approved_at}
+                        </span>
+                        {row.original.approved_by && (
+                            <span className="mt-0.5 block truncate font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                {row.original.approved_by.name}
+                            </span>
+                        )}
+                    </div>
                 ) : (
                     <span className="font-mono text-[12px] text-gray-300 dark:text-gray-700">
                         —
@@ -395,6 +404,7 @@ export default function CreativesIndex({
         query.filter?.format,
         query.filter?.ads_status,
         query.filter?.creator_id,
+        query.filter?.product_id,
     ].filter(Boolean).length;
 
     return (
@@ -601,6 +611,52 @@ export default function CreativesIndex({
                                 </>
                             )}
 
+                            {products.length > 0 && (
+                                <>
+                                    <DropdownMenuSeparator className="my-2" />
+                                    <p className="mb-1 px-2 font-mono text-[9px] font-medium tracking-widest text-gray-400 uppercase dark:text-gray-600">
+                                        Product
+                                    </p>
+                                    <button
+                                        className={filterItem(
+                                            !query.filter?.product_id,
+                                        )}
+                                        onClick={() =>
+                                            navigate({
+                                                'filter[product_id]': undefined,
+                                                page: 1,
+                                            })
+                                        }
+                                    >
+                                        <span className="h-3 w-3" />
+                                        All products
+                                    </button>
+                                    <div className="max-h-44 overflow-y-auto">
+                                        {products.map((p) => (
+                                            <button
+                                                key={p.id}
+                                                className={filterItem(
+                                                    query.filter?.product_id ===
+                                                        String(p.id),
+                                                )}
+                                                onClick={() =>
+                                                    navigate({
+                                                        'filter[product_id]':
+                                                            String(p.id),
+                                                        page: 1,
+                                                    })
+                                                }
+                                            >
+                                                <Package className="h-3 w-3 shrink-0" />
+                                                <span className="truncate">
+                                                    {p.title}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+
                             {activeFilterCount > 0 && (
                                 <>
                                     <DropdownMenuSeparator className="my-2" />
@@ -611,6 +667,7 @@ export default function CreativesIndex({
                                                 'filter[format]': undefined,
                                                 'filter[ads_status]': undefined,
                                                 'filter[creator_id]': undefined,
+                                                'filter[product_id]': undefined,
                                                 page: 1,
                                             })
                                         }
