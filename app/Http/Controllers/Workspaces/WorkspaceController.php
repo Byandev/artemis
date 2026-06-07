@@ -135,8 +135,17 @@ class WorkspaceController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
-        if ($workspace->csr_module_enabled && $request->user()->isCsrOf($workspace)) {
-            return redirect()->route('workspaces.csr.dashboard', $workspace->slug);
+        // Route the user to the highest-priority dashboard they can access
+        // (Main → Sales & Marketing → Video Editor → CSR); if they can access
+        // none of them, send them to their profile settings.
+        $target = $request->user()->defaultDashboardRouteName($workspace);
+
+        if ($target === null) {
+            return redirect()->route('profile.edit', $workspace->slug);
+        }
+
+        if ($target !== 'workspace.dashboard') {
+            return redirect()->route($target, $workspace->slug);
         }
 
         return Inertia::render('workspaces/dashboard/index', [

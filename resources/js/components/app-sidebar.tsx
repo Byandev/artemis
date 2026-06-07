@@ -22,6 +22,7 @@ import {
     BookOpenIcon,
     Box,
     Check,
+    Clapperboard,
     ClipboardList,
     Copy,
     Database,
@@ -41,6 +42,7 @@ import {
     Send,
     Shield,
     ShoppingCart,
+    Sparkles,
     Store,
     Trophy,
     Truck,
@@ -65,9 +67,32 @@ export function AppSidebar() {
 
     const mainNavItems: NavItem[] = [
         {
-            title: 'Dashboard',
+            title: 'Main Dashboard',
             href: dashboardUrl,
             icon: LayoutDashboard,
+            permission: PERMISSIONS.ViewMainDashboard,
+        },
+        {
+            title: 'S&M Dashboard',
+            href: `/workspaces/${slug}/sales-marketing/dashboard`,
+            icon: Megaphone,
+            permission: PERMISSIONS.ViewSalesMarketingDashboard,
+        },
+        ...(currentWorkspace.csr_module_enabled
+            ? [
+                  {
+                      title: 'CSR Dashboard',
+                      href: `/workspaces/${slug}/csr/dashboard`,
+                      icon: User,
+                      permission: PERMISSIONS.ViewCsrDashboard,
+                  },
+              ]
+            : []),
+        {
+            title: 'Video Editor Dashboard',
+            href: `/workspaces/${slug}/video-editor/dashboard`,
+            icon: Clapperboard,
+            permission: PERMISSIONS.ViewVideoEditorDashboard,
         },
         {
             title: 'Shops',
@@ -260,6 +285,16 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewPurchasedOrders,
                           },
                       ],
+                  },
+              ]
+            : []),
+        ...(currentWorkspace.creatives_module_enabled
+            ? [
+                  {
+                      title: 'Creatives',
+                      href: `/workspaces/${slug}/creatives`,
+                      icon: Sparkles,
+                      permission: PERMISSIONS.ViewCreatives,
                   },
               ]
             : []),

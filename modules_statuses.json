@@ -3,5 +3,6 @@
     "Pancake": true,
     "Inventory": true,
     "Finance": true,
-    "MetaAds": true
+    "MetaAds": true,
+    "Creatives": true
 }

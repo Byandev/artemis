@@ -18,7 +18,7 @@ class TeamScheduleController extends Controller
 
     public function index(Request $request, Workspace $workspace, Team $team)
     {
-        $this->authorize(Permission::ViewTeams->value, $workspace);
+        $this->authorize(Permission::ManageSchedule->value, $workspace);
 
         if ($team->workspace_id !== $workspace->id) {
             abort(403);

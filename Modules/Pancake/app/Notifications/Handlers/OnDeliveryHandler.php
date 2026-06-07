@@ -26,12 +26,17 @@ class OnDeliveryHandler extends BaseNotificationHandler
         $riderMessage = $this->renderer->render($this->workspace, 'sms', 'for-delivery', 'rider', $data);
 
         if ($riderMessage !== null) {
-            ParcelJourneyNotification::create([
-                'order_id' => $order->id,
+            // Idempotent on the (journey, type, recipient) tuple — see
+            // BaseNotificationHandler::notifyCustomer. The rider SMS shares the
+            // 'sms' type with the customer SMS but has a distinct recipient, so
+            // it never collides with it.
+            ParcelJourneyNotification::firstOrCreate([
                 'parcel_journey_id' => $parcelJourney->id,
                 'type' => 'sms',
-                'receiver_name' => $riderName,
                 'receiver_identity' => $riderMobile,
+            ], [
+                'order_id' => $order->id,
+                'receiver_name' => $riderName,
                 'message' => $riderMessage,
             ]);
         }

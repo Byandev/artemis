@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Workspace;
@@ -22,8 +23,9 @@ class WorkspaceInvitationController extends Controller
      */
     public function store(Request $request, Workspace $workspace)
     {
-        // Only admins and owners can invite
-        if (! $request->user()->isAdminOf($workspace)) {
+        // Anyone with the Invite Members permission (plus admins/owners, who
+        // pass every permission check) can invite.
+        if (! $request->user()->hasPermission(Permission::InviteMembers, $workspace)) {
             abort(403, 'You do not have permission to invite members.');
         }
 
