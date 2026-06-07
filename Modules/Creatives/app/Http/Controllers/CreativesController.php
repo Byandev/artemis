@@ -159,7 +159,6 @@ class CreativesController extends Controller
     public function update(UpdateCreativeRequest $request, Workspace $workspace, Creative $creative)
     {
         $this->guard($request, $workspace, $creative);
-        $this->authorize(Permission::EditCreatives->value, $workspace);
 
         $data = $request->validated();
 
@@ -170,6 +169,28 @@ class CreativesController extends Controller
             unset($data['assigned_reviewer_ids']);
         }
 
+        // Status changes (final / ads) are gated by their own permission; any
+        // other field edit requires the general edit permission. A single
+        // request may touch either or both — e.g. inline status dropdowns post
+        // only a status field, while the full edit form posts everything.
+        $statusKeys = ['final_status', 'ads_status'];
+
+        $changesStatus = collect($statusKeys)->contains(
+            fn ($key) => array_key_exists($key, $data) && $data[$key] !== $creative->{$key}
+        );
+
+        $changesOther = collect($data)->keys()->diff($statusKeys)->isNotEmpty()
+            || $reviewerIds !== null;
+
+        if ($changesStatus) {
+            $this->authorize(Permission::UpdateCreativeStatus->value, $workspace);
+        }
+
+        if ($changesOther) {
+            $this->authorize(Permission::EditCreatives->value, $workspace);
+        }
+
+        // Stamp / clear approved_at whenever the final status changes.
         // Stamp / clear approved_at + approved_by whenever the final status changes.
         if (array_key_exists('final_status', $data)) {
             $isApproved = $data['final_status'] === 'approved';

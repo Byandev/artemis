@@ -214,11 +214,11 @@ export default function PageBreakdown({
                     </Button>
                 </div>
             ) : !breakdown.length ? (
-                <div className="flex h-60 flex-col items-center justify-center space-y-2 rounded-lg border border-gray-200 bg-gray-50">
-                    <p className="text-gray-500">
+                <div className="flex h-60 flex-col items-center justify-center space-y-2 rounded-lg border border-gray-200 bg-gray-50 dark:border-white/6 dark:bg-zinc-800/50">
+                    <p className="text-gray-500 dark:text-gray-400">
                         No data available for the selected period
                     </p>
-                    <p className="text-sm text-gray-400">
+                    <p className="text-sm text-gray-400 dark:text-gray-500">
                         Try adjusting your filters or date range
                     </p>
                 </div>
