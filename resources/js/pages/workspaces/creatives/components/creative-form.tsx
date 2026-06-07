@@ -1,3 +1,5 @@
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import DatePicker from '@/components/ui/date-picker';
 import {
     Select,
@@ -53,6 +55,7 @@ export function CreativeForm({
     products?: Product[];
 }) {
     const isEdit = !!creative;
+    const canUpdateStatus = usePermission(PERMISSIONS.UpdateCreativeStatus);
     const baseUrl = `/workspaces/${workspace.slug}/creatives`;
 
     const { data, setData, post, put, processing, errors } = useForm<FormData>({
@@ -193,7 +196,7 @@ export function CreativeForm({
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1.5">
                                     <label className={fl}>Ads Status</label>
-                                    <Select value={data.ads_status} onValueChange={(v) => setData('ads_status', v as AdsStatus)}>
+                                    <Select value={data.ads_status} onValueChange={(v) => setData('ads_status', v as AdsStatus)} disabled={!canUpdateStatus}>
                                         <SelectTrigger className={selectTrigger}>
                                             <SelectValue />
                                         </SelectTrigger>
@@ -207,7 +210,7 @@ export function CreativeForm({
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className={fl}>Final Status</label>
-                                    <Select value={data.final_status} onValueChange={(v) => setData('final_status', v as FinalStatus)}>
+                                    <Select value={data.final_status} onValueChange={(v) => setData('final_status', v as FinalStatus)} disabled={!canUpdateStatus}>
                                         <SelectTrigger className={selectTrigger}>
                                             <SelectValue />
                                         </SelectTrigger>
