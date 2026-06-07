@@ -41,6 +41,26 @@ export interface Kpis {
     ads: Record<AdsStatus, number>;
 }
 
+// ─── Per-KPI endpoint response shapes (one request per card) ─────────────────
+
+/** A KPI card endpoint that returns just a count. */
+export interface CountStat {
+    value: number;
+}
+
+/** Total creatives card, split by format for the sub-line. */
+export interface TotalCreativesStat extends CountStat {
+    video: number;
+    image: number;
+}
+
+/** Approved card, with the approval rate for the sub-line. */
+export interface ApprovedStat extends CountStat {
+    approval_rate: number;
+}
+
+export type AdsBreakdown = Record<AdsStatus, number>;
+
 export interface Pipeline {
     waiting: number;
     for_approval: number;
@@ -69,16 +89,13 @@ export interface ProductOption {
     title: string;
 }
 
+/**
+ * Props rendered server-side (shell only). Each statistic is fetched
+ * independently from the API after mount — see useDashboardSection.
+ */
 export interface DashboardPageProps {
     workspace: Workspace;
     currentUserId: number;
-    kpis: Kpis;
-    pipeline: Pipeline;
-    revisionList: WorkItem[];
-    waitingList: WorkItem[];
-    throughput: Throughput;
-    leaderboard: LeaderRow[];
-    recentActivity: ActivityRow[];
     products: ProductOption[];
     filters: DashboardFilters;
 }

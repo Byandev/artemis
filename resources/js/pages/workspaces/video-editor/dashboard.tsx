@@ -1,46 +1,32 @@
 import PageHeader from '@/components/common/PageHeader';
 import AppLayout from '@/layouts/app-layout';
-import ActivityFeed from '@/pages/workspaces/creatives/components/dashboard/activity-feed';
-import AdsStatusGrid from '@/pages/workspaces/creatives/components/dashboard/ads-status-grid';
 import DashboardFiltersBar from '@/pages/workspaces/creatives/components/dashboard/dashboard-filters';
-import GranularityToggle from '@/pages/workspaces/creatives/components/dashboard/granularity-toggle';
-import KpiCards from '@/pages/workspaces/creatives/components/dashboard/kpi-cards';
-import Leaderboard from '@/pages/workspaces/creatives/components/dashboard/leaderboard';
-import Panel from '@/pages/workspaces/creatives/components/dashboard/panel';
-import PipelineFunnel from '@/pages/workspaces/creatives/components/dashboard/pipeline-funnel';
-import ThroughputChart from '@/pages/workspaces/creatives/components/dashboard/throughput-chart';
+import {
+    AdsStatusSection,
+    KpiCardsSection,
+    LeaderboardSection,
+    PipelineSection,
+    RecentActivitySection,
+    RevisionListSection,
+    ThroughputSection,
+    WaitingListSection,
+} from '@/pages/workspaces/creatives/components/dashboard/sections';
 import {
     ApplyFilter,
     DashboardPageProps,
 } from '@/pages/workspaces/creatives/components/dashboard/types';
-import WorkList from '@/pages/workspaces/creatives/components/dashboard/work-list';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import {
-    Clock,
-    ListChecks,
-    MessageSquare,
-    Pencil,
-    Rocket,
-    TrendingUp,
-    Trophy,
-} from 'lucide-react';
 import { useCallback } from 'react';
 
 export default function VideoEditorDashboard({
     workspace,
     currentUserId,
-    kpis,
-    pipeline,
-    revisionList,
-    waitingList,
-    throughput,
-    leaderboard,
-    recentActivity,
     products,
     filters,
 }: DashboardPageProps) {
-    // Filters reload this dashboard; edit/list links point at the creatives module.
+    // Filters reload the shell; edit/list links point at the creatives module.
+    // Each statistic below fetches itself from its own API endpoint.
     const dashboardBase = `/workspaces/${workspace.slug}/video-editor`;
     const creativesBase = `/workspaces/${workspace.slug}/creatives`;
 
@@ -84,91 +70,56 @@ export default function VideoEditorDashboard({
                     />
                 </PageHeader>
 
-                <KpiCards kpis={kpis} />
+                <KpiCardsSection
+                    workspaceSlug={workspace.slug}
+                    filters={filters}
+                />
 
                 <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-                    <Panel
-                        title="Ads Status"
-                        icon={<Rocket className="h-3.5 w-3.5 text-gray-400" />}
-                    >
-                        <AdsStatusGrid ads={kpis.ads} />
-                    </Panel>
-
+                    <AdsStatusSection
+                        workspaceSlug={workspace.slug}
+                        filters={filters}
+                    />
                     <div className="lg:col-span-2">
-                        <Panel
-                            title="Pipeline"
-                            icon={
-                                <ListChecks className="h-3.5 w-3.5 text-gray-400" />
-                            }
-                        >
-                            <PipelineFunnel pipeline={pipeline} />
-                        </Panel>
+                        <PipelineSection
+                            workspaceSlug={workspace.slug}
+                            filters={filters}
+                        />
                     </div>
                 </div>
 
                 <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                    <Panel
-                        title="Needs Revision"
-                        icon={<Pencil className="h-3.5 w-3.5 text-amber-500" />}
-                        count={revisionList.length}
-                    >
-                        <WorkList
-                            items={revisionList}
-                            editUrl={editUrl}
-                            emptyText="Nothing waiting on revisions. Nice."
-                            showFeedback
-                        />
-                    </Panel>
-                    <Panel
-                        title="Waiting for Submission"
-                        icon={<Clock className="h-3.5 w-3.5 text-gray-400" />}
-                        count={waitingList.length}
-                    >
-                        <WorkList
-                            items={waitingList}
-                            editUrl={editUrl}
-                            emptyText="No pending submissions."
-                        />
-                    </Panel>
+                    <RevisionListSection
+                        workspaceSlug={workspace.slug}
+                        filters={filters}
+                        editUrl={editUrl}
+                    />
+                    <WaitingListSection
+                        workspaceSlug={workspace.slug}
+                        filters={filters}
+                        editUrl={editUrl}
+                    />
                 </div>
 
                 <div className="mt-3">
-                    <Panel
-                        title="Output Over Time"
-                        icon={
-                            <TrendingUp className="h-3.5 w-3.5 text-gray-400" />
-                        }
-                        action={
-                            <GranularityToggle
-                                value={filters.group}
-                                dateFrom={filters.date_from}
-                                dateTo={filters.date_to}
-                                onChange={(group) => applyFilter({ group })}
-                            />
-                        }
-                    >
-                        <ThroughputChart throughput={throughput} />
-                    </Panel>
+                    <ThroughputSection
+                        workspaceSlug={workspace.slug}
+                        filters={filters}
+                        onGroupChange={(group) => applyFilter({ group })}
+                    />
                 </div>
 
                 <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                    <Panel
-                        title="Editor Leaderboard"
-                        icon={<Trophy className="h-3.5 w-3.5 text-amber-500" />}
-                    >
-                        <Leaderboard
-                            rows={leaderboard}
-                            currentUserId={currentUserId}
-                        />
-                    </Panel>
-                    <Panel
-                        title="Recent Activity"
-                        icon={
-                            <MessageSquare className="h-3.5 w-3.5 text-gray-400" />
-                        }
-                    >
-                        <ActivityFeed rows={recentActivity} editUrl={editUrl} />
-                    </Panel>
+                    <LeaderboardSection
+                        workspaceSlug={workspace.slug}
+                        filters={filters}
+                        currentUserId={currentUserId}
+                    />
+                    <RecentActivitySection
+                        workspaceSlug={workspace.slug}
+                        filters={filters}
+                        editUrl={editUrl}
+                    />
                 </div>
             </div>
         </AppLayout>
