@@ -111,6 +111,12 @@ enum Permission: string
     case ReviewCreatives = 'Review Creatives';
     case UpdateCreativeStatus = 'Update Creative Status';
 
+    // Dashboards
+    case ViewMainDashboard = 'View Main Dashboard';
+    case ViewSalesMarketingDashboard = 'View Sales & Marketing Dashboard';
+    case ViewVideoEditorDashboard = 'View Video Editor Dashboard';
+    case ViewCsrDashboard = 'View CSR Dashboard';
+
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
@@ -209,6 +215,11 @@ enum Permission: string
             self::CreatePageDailyBudgetRecords,
             self::EditPageDailyBudgetRecords,
             self::DeletePageDailyBudgetRecords => 'Page Daily Budget Records',
+
+            self::ViewMainDashboard,
+            self::ViewSalesMarketingDashboard,
+            self::ViewVideoEditorDashboard,
+            self::ViewCsrDashboard => 'Dashboards',
 
             self::EditWorkspaceSettings,
             self::ManageApiKeys => 'Settings',

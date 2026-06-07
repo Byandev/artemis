@@ -34,6 +34,7 @@ class CreativesController extends Controller
             Creative::where('workspace_id', $workspace->id)
                 ->with([
                     'creator:id,name',
+                    'approvedBy:id,name',
                     'product:id,title',
                     'assignedReviewers:id,name',
                     'reviews' => fn ($q) => $q->with('reviewer:id,name')->oldest(),
@@ -51,6 +52,7 @@ class CreativesController extends Controller
                 AllowedFilter::exact('format'),
                 AllowedFilter::exact('ads_status'),
                 AllowedFilter::exact('creator_id'),
+                AllowedFilter::exact('product_id'),
                 AllowedFilter::callback('review_status', function ($query, $value) {
                     $query->whereHas('latestReview', fn ($q) => $q->where('status', $value));
                 }),
@@ -101,6 +103,7 @@ class CreativesController extends Controller
             'workspace' => $workspace,
             'creatives' => $creatives,
             'creators' => $creators,
+            'products' => $this->products($workspace),
             'reviewers' => $this->reviewers($workspace),
             'query' => [
                 ...$request->only(['sort', 'page']),
@@ -188,10 +191,11 @@ class CreativesController extends Controller
         }
 
         // Stamp / clear approved_at whenever the final status changes.
+        // Stamp / clear approved_at + approved_by whenever the final status changes.
         if (array_key_exists('final_status', $data)) {
-            $data['approved_at'] = $data['final_status'] === 'approved'
-                ? ($creative->approved_at ?? now())
-                : null;
+            $isApproved = $data['final_status'] === 'approved';
+            $data['approved_at'] = $isApproved ? ($creative->approved_at ?? now()) : null;
+            $data['approved_by'] = $isApproved ? ($creative->approved_by ?? $request->user()->id) : null;
         }
 
         $creative->update($data);
@@ -338,6 +342,7 @@ class CreativesController extends Controller
             'ads_remarks' => $c->ads_remarks,
             'final_status' => $c->final_status,
             'approved_at' => $c->approved_at?->format('M d, Y g:i A'),
+            'approved_by' => $c->approvedBy ? ['id' => $c->approvedBy->id, 'name' => $c->approvedBy->name] : null,
             'caption' => $c->caption,
             'headline' => $c->headline,
             'notes' => $c->notes,
