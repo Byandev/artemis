@@ -28,13 +28,15 @@ return new class extends Migration
             $table->timestamp('triggered_at')->useCurrent();
             $table->timestamps();
 
-            $table->foreign('meta_ads_optimization_rule_id')
+            // Explicit short names — the auto-generated identifiers exceed
+            // MySQL's 64-character limit.
+            $table->foreign('meta_ads_optimization_rule_id', 'maorl_rule_id_foreign')
                 ->references('id')
                 ->on('meta_ads_optimization_rules')
                 ->onDelete('cascade');
 
             $table->index(['workspace_id', 'triggered_at']);
-            $table->index(['meta_ads_optimization_rule_id', 'triggered_at']);
+            $table->index(['meta_ads_optimization_rule_id', 'triggered_at'], 'maorl_rule_triggered_idx');
             $table->index(['target_type', 'target_id']);
         });
     }

@@ -20,7 +20,9 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->foreign('meta_ads_optimization_rule_id')
+            // Explicit short name — the auto-generated one exceeds MySQL's
+            // 64-character identifier limit.
+            $table->foreign('meta_ads_optimization_rule_id', 'maorc_rule_id_foreign')
                 ->references('id')
                 ->on('meta_ads_optimization_rules')
                 ->onDelete('cascade');
