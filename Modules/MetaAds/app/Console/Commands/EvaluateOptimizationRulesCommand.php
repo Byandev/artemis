@@ -9,7 +9,7 @@ use Modules\MetaAds\Services\OptimizationRuleEvaluator;
 
 class EvaluateOptimizationRulesCommand extends Command
 {
-    protected $signature = 'metaads:evaluate-optimization-rules';
+    protected $signature = 'meta-ads:evaluate-optimization-rules';
 
     protected $description = 'Evaluate active Meta Ads optimization rules and list the campaigns/ad sets that would be affected. Does NOT apply any changes.';
 

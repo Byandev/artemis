@@ -48,7 +48,7 @@ Schedule::command('metaads:capture-budgets')->dailyAt('23:55')->withoutOverlappi
 
 // Evaluate optimization rules once a day and report which campaigns/ad sets
 // would be affected. Currently a dry run — it does not apply any changes.
-Schedule::command('metaads:evaluate-optimization-rules')->dailyAt('03:00')->withoutOverlapping();
+Schedule::command('meta-ads:evaluate-optimization-rules')->dailyAt('03:00')->withoutOverlapping();
 
 // Schedule::command('analytics:rollup --date=today')->hourly()->withoutOverlapping();
 // Schedule::command('analytics:rollup --date=yesterday')->dailyAt('01:00')->withoutOverlapping();
