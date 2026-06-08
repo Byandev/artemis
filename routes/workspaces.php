@@ -214,6 +214,12 @@ Route::middleware(['auth'])->group(function () {
         ->name('workspaces.metaads.optimization-rules.index');
     Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/create', [OptimizationRuleController::class, 'create'])
         ->name('workspaces.metaads.optimization-rules.create');
+    Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/approvals', [OptimizationRuleController::class, 'approvals'])
+        ->name('workspaces.metaads.optimization-rules.approvals');
+    Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules/approvals/{proposal}/approve', [OptimizationRuleController::class, 'approveProposal'])
+        ->name('workspaces.metaads.optimization-rules.approvals.approve');
+    Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules/approvals/{proposal}/reject', [OptimizationRuleController::class, 'rejectProposal'])
+        ->name('workspaces.metaads.optimization-rules.approvals.reject');
     Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}/edit', [OptimizationRuleController::class, 'edit'])
         ->name('workspaces.metaads.optimization-rules.edit');
     Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules', [OptimizationRuleController::class, 'store'])

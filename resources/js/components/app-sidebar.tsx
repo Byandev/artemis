@@ -203,6 +203,11 @@ export function AppSidebar() {
                     icon: SlidersHorizontal,
                 },
                 {
+                    title: 'Rule Approvals',
+                    href: `/workspaces/${slug}/integrations/meta/optimization-rules/approvals`,
+                    icon: ListChecks,
+                },
+                {
                     title: 'Sync Health',
                     href: `/workspaces/${slug}/integrations/meta/health`,
                     icon: Activity,

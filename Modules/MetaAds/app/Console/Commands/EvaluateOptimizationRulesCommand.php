@@ -4,6 +4,7 @@ namespace Modules\MetaAds\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
+use Modules\MetaAds\Models\OptimizationProposal;
 use Modules\MetaAds\Models\OptimizationRule;
 use Modules\MetaAds\Services\OptimizationRuleEvaluator;
 
@@ -35,8 +36,30 @@ class EvaluateOptimizationRulesCommand extends Command
                 continue;
             }
 
+            // Refresh this rule's pending queue so it reflects the latest run.
+            // Decided proposals (approved/rejected/applied) are kept as history.
+            OptimizationProposal::where('meta_ads_optimization_rule_id', $rule->id)
+                ->where('status', 'pending')
+                ->delete();
+
             foreach ($rule->adAccounts as $account) {
                 $proposals = $evaluator->plan($rule, $account);
+
+                foreach ($proposals as $proposal) {
+                    OptimizationProposal::create([
+                        'workspace_id' => $rule->workspace_id,
+                        'meta_ads_optimization_rule_id' => $rule->id,
+                        'meta_ads_account_id' => $account->id,
+                        'target_type' => $proposal['target_type'],
+                        'target_id' => $proposal['target_id'],
+                        'target_name' => $proposal['target_name'],
+                        'action' => $proposal['action'],
+                        'current_value' => $proposal['current_value'],
+                        'new_value' => $proposal['new_value'],
+                        'conditions_snapshot' => $proposal['conditions_snapshot'],
+                        'status' => 'pending',
+                    ]);
+                }
 
                 $this->newLine();
                 $this->line(sprintf(

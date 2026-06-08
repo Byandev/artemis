@@ -29,6 +29,29 @@ export interface OptimizationRule {
     conditions: RuleCondition[];
 }
 
+export interface ConditionSnapshot {
+    metric: string;
+    operator: string;
+    threshold: number;
+    actual_value: number | null;
+    time_window: string;
+    passed: boolean;
+}
+
+export interface OptimizationProposal {
+    id: number;
+    target_type: string;
+    target_id: string;
+    target_name: string | null;
+    action: string;
+    current_value: string | null;
+    new_value: string | null;
+    conditions_snapshot: ConditionSnapshot[];
+    status: string;
+    rule?: { id: number; name: string; execution_mode: string };
+    ad_account?: AdAccountOption;
+}
+
 export interface RuleOptions {
     adAccounts: AdAccountOption[];
     metrics: string[];

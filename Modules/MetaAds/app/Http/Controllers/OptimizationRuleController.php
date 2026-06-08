@@ -10,6 +10,7 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\MetaAds\Models\AdAccount;
+use Modules\MetaAds\Models\OptimizationProposal;
 use Modules\MetaAds\Models\OptimizationRule;
 use Modules\MetaAds\Services\OptimizationRuleEvaluator;
 
@@ -71,6 +72,46 @@ class OptimizationRuleController extends Controller
                 ->map(fn ($id) => (string) $id)
                 ->values(),
             'options' => $this->options($workspace),
+        ]);
+    }
+
+    public function approvals(Workspace $workspace): Response
+    {
+        $proposals = OptimizationProposal::where('workspace_id', $workspace->id)
+            ->where('status', 'pending')
+            ->with(['rule:id,name,execution_mode', 'adAccount:id,name'])
+            ->latest()
+            ->get();
+
+        return Inertia::render('workspaces/integrations/meta-ads/optimization-rules/approvals', [
+            'workspace' => $workspace->only('id', 'name', 'slug'),
+            'proposals' => $proposals,
+        ]);
+    }
+
+    public function approveProposal(Request $request, Workspace $workspace, OptimizationProposal $proposal): RedirectResponse
+    {
+        $this->reviewProposal($request, $workspace, $proposal, 'approved');
+
+        return back()->with('success', 'Proposal approved.');
+    }
+
+    public function rejectProposal(Request $request, Workspace $workspace, OptimizationProposal $proposal): RedirectResponse
+    {
+        $this->reviewProposal($request, $workspace, $proposal, 'rejected');
+
+        return back()->with('success', 'Proposal rejected.');
+    }
+
+    private function reviewProposal(Request $request, Workspace $workspace, OptimizationProposal $proposal, string $status): void
+    {
+        abort_unless($proposal->workspace_id === $workspace->id, 404);
+        abort_unless($proposal->status === 'pending', 422, 'This proposal has already been reviewed.');
+
+        $proposal->update([
+            'status' => $status,
+            'reviewed_by' => $request->user()->id,
+            'reviewed_at' => now(),
         ]);
     }
 
