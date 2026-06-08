@@ -5,6 +5,7 @@ namespace Modules\MetaAds\Providers;
 use Illuminate\Console\Scheduling\Schedule;
 use Modules\MetaAds\Console\Commands\CaptureBudgetSnapshotsCommand;
 use Modules\MetaAds\Console\Commands\DiscoverSystemAccountsCommand;
+use Modules\MetaAds\Console\Commands\EvaluateOptimizationRulesCommand;
 use Modules\MetaAds\Console\Commands\SyncAdAccountsCommand;
 use Modules\MetaAds\Console\Commands\SyncAdsCommand;
 use Modules\MetaAds\Console\Commands\SyncAdSetsCommand;
@@ -41,6 +42,7 @@ class MetaAdsServiceProvider extends ModuleServiceProvider
         SyncAllCommand::class,
         CaptureBudgetSnapshotsCommand::class,
         DiscoverSystemAccountsCommand::class,
+        EvaluateOptimizationRulesCommand::class,
     ];
 
     /**

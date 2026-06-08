@@ -14,8 +14,7 @@ export interface AdAccountOption {
 export interface OptimizationRule {
     id: number;
     name: string;
-    meta_ads_account_id: string;
-    ad_account?: AdAccountOption | null;
+    ad_accounts?: AdAccountOption[];
     target_type: string;
     condition_operator: string;
     action: string;
@@ -25,6 +24,7 @@ export interface OptimizationRule {
     budget_min: string | null;
     budget_max: string | null;
     is_active: boolean;
+    execution_mode: string;
     logs_count: number;
     conditions: RuleCondition[];
 }
@@ -38,6 +38,7 @@ export interface RuleOptions {
     targetTypes: string[];
     conditionOperators: string[];
     adjustmentTypes: string[];
+    executionModes: string[];
 }
 
 export const BUDGET_ACTIONS = ['increase_budget', 'decrease_budget'];
@@ -53,6 +54,9 @@ export const titleCase = (value: string): string =>
 
 export const metricLabel = (metric: string): string =>
     UPPERCASE_METRICS.has(metric) ? metric.toUpperCase() : titleCase(metric);
+
+export const executionModeLabel = (mode: string): string =>
+    mode === 'automatic' ? 'Automatic' : 'Approval';
 
 export const adjustmentTypeLabel = (type: string): string => {
     if (type === 'percentage') return 'Percentage';

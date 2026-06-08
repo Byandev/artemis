@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { MultiSelect } from '@/components/ui/multi-select';
 import {
     Select,
     SelectContent,
@@ -31,12 +32,13 @@ interface Props {
     mode: 'create' | 'edit';
     workspace: { id: number; name: string; slug: string };
     rule: OptimizationRule | null;
+    selectedAdAccountIds: string[];
     options: RuleOptions;
 }
 
 interface FormShape {
     name: string;
-    meta_ads_account_id: string;
+    meta_ads_account_ids: string[];
     target_type: string;
     condition_operator: string;
     action: string;
@@ -46,6 +48,7 @@ interface FormShape {
     budget_min: string;
     budget_max: string;
     is_active: boolean;
+    execution_mode: string;
     conditions: RuleCondition[];
 }
 
@@ -107,14 +110,19 @@ function Field({
     );
 }
 
-export default function RuleForm({ mode, workspace, rule, options }: Props) {
+export default function RuleForm({
+    mode,
+    workspace,
+    rule,
+    selectedAdAccountIds,
+    options,
+}: Props) {
     const isEdit = mode === 'edit';
     const indexUrl = optimizationRulesUrl(workspace.slug);
 
     const form = useForm<FormShape>({
         name: rule?.name ?? '',
-        meta_ads_account_id:
-            rule?.meta_ads_account_id ?? options.adAccounts[0]?.id ?? '',
+        meta_ads_account_ids: selectedAdAccountIds,
         target_type: rule?.target_type ?? options.targetTypes[0],
         condition_operator:
             rule?.condition_operator ?? options.conditionOperators[0],
@@ -125,6 +133,7 @@ export default function RuleForm({ mode, workspace, rule, options }: Props) {
         budget_min: rule?.budget_min ?? '',
         budget_max: rule?.budget_max ?? '',
         is_active: rule?.is_active ?? true,
+        execution_mode: rule?.execution_mode ?? options.executionModes[0],
         conditions: rule?.conditions?.map((c) => ({
             metric: c.metric,
             operator: c.operator,
@@ -279,8 +288,11 @@ export default function RuleForm({ mode, workspace, rule, options }: Props) {
                                 />
                             </Field>
                             <Field
-                                label="Ad account"
-                                error={errors.meta_ads_account_id}
+                                label="Ad accounts"
+                                error={
+                                    errors.meta_ads_account_ids ??
+                                    errors['meta_ads_account_ids.0']
+                                }
                             >
                                 {options.adAccounts.length === 0 ? (
                                     <p className="rounded-lg border border-dashed border-black/10 px-3 py-2.5 text-xs text-gray-400 dark:border-white/10 dark:text-gray-500">
@@ -289,26 +301,19 @@ export default function RuleForm({ mode, workspace, rule, options }: Props) {
                                         first.
                                     </p>
                                 ) : (
-                                    <Select
-                                        value={data.meta_ads_account_id}
-                                        onValueChange={(v) =>
-                                            setData('meta_ads_account_id', v)
+                                    <MultiSelect
+                                        options={options.adAccounts.map(
+                                            (a) => ({
+                                                value: a.id,
+                                                label: a.name,
+                                            }),
+                                        )}
+                                        selected={data.meta_ads_account_ids}
+                                        onChange={(v) =>
+                                            setData('meta_ads_account_ids', v)
                                         }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select an ad account" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {options.adAccounts.map((a) => (
-                                                <SelectItem
-                                                    key={a.id}
-                                                    value={a.id}
-                                                >
-                                                    {a.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                        placeholder="Select ad accounts"
+                                    />
                                 )}
                             </Field>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -633,6 +638,47 @@ export default function RuleForm({ mode, workspace, rule, options }: Props) {
                                     </div>
                                 </>
                             )}
+
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                                    When conditions are met
+                                </Label>
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    {options.executionModes.map((mode) => {
+                                        const selected =
+                                            data.execution_mode === mode;
+                                        return (
+                                            <button
+                                                key={mode}
+                                                type="button"
+                                                onClick={() =>
+                                                    setData(
+                                                        'execution_mode',
+                                                        mode,
+                                                    )
+                                                }
+                                                className={cn(
+                                                    'rounded-xl border p-3.5 text-left transition-colors',
+                                                    selected
+                                                        ? 'border-emerald-500/40 bg-emerald-500/[0.06]'
+                                                        : 'border-black/[0.06] hover:bg-black/[0.02] dark:border-white/[0.06] dark:hover:bg-white/[0.02]',
+                                                )}
+                                            >
+                                                <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                                                    {mode === 'automatic'
+                                                        ? 'Automatically apply'
+                                                        : 'Require approval'}
+                                                </p>
+                                                <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                                                    {mode === 'automatic'
+                                                        ? 'Changes are applied on the next run.'
+                                                        : 'Changes are proposed for review first.'}
+                                                </p>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
 
                             <div
                                 className={cn(

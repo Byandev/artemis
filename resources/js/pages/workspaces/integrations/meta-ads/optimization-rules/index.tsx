@@ -19,6 +19,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { Pencil, Plus, SlidersHorizontal, Trash2, Zap } from 'lucide-react';
 import { useState } from 'react';
 import {
+    executionModeLabel,
     isBudgetAction,
     metricLabel,
     type OptimizationRule,
@@ -82,7 +83,7 @@ export default function OptimizationRulesIndex({ workspace, rules }: Props) {
                     title="Optimization Rules"
                     description="Automatically pause, enable, or adjust Meta Ads budgets based on performance."
                 >
-                    <Button asChild>
+                    <Button size="sm" asChild>
                         <Link href={`${indexUrl}/create`}>
                             <Plus className="mr-1 h-4 w-4" />
                             New Rule
@@ -102,7 +103,7 @@ export default function OptimizationRulesIndex({ workspace, rules }: Props) {
                             Create a rule to automate budget and status changes
                             across your campaigns and ad sets.
                         </p>
-                        <Button asChild className="mt-5">
+                        <Button asChild className="mt-5" size={'sm'}>
                             <Link href={`${indexUrl}/create`}>
                                 <Plus className="mr-1 h-4 w-4" />
                                 Create your first rule
@@ -137,8 +138,10 @@ export default function OptimizationRulesIndex({ workspace, rules }: Props) {
                                                 {rule.name}
                                             </Link>
                                             <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">
-                                                {rule.ad_account?.name ??
-                                                    'Unknown account'}{' '}
+                                                {rule.ad_accounts
+                                                    ?.map((a) => a.name)
+                                                    .join(', ') ||
+                                                    'No ad accounts'}{' '}
                                                 · {titleCase(rule.target_type)}{' '}
                                                 ·{' '}
                                                 {rule.condition_operator ===
@@ -149,6 +152,14 @@ export default function OptimizationRulesIndex({ workspace, rules }: Props) {
                                         </div>
                                     </div>
                                     <div className="flex shrink-0 items-center gap-1.5">
+                                        <Badge
+                                            variant="outline"
+                                            className="text-[10px] font-medium"
+                                        >
+                                            {executionModeLabel(
+                                                rule.execution_mode,
+                                            )}
+                                        </Badge>
                                         <Badge
                                             variant={actionVariant(rule.action)}
                                             className="gap-1"

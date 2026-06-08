@@ -37,7 +37,7 @@ class OptimizationRuleController extends Controller
     public function index(Workspace $workspace): Response
     {
         $rules = OptimizationRule::where('workspace_id', $workspace->id)
-            ->with(['conditions', 'adAccount:id,name'])
+            ->with(['conditions', 'adAccounts:id,name'])
             ->withCount('logs')
             ->latest()
             ->get();
@@ -60,9 +60,16 @@ class OptimizationRuleController extends Controller
     {
         $this->authorizeRule($workspace, $optimizationRule);
 
+        $optimizationRule->load(['conditions', 'adAccounts:id,name']);
+
         return Inertia::render('workspaces/integrations/meta-ads/optimization-rules/edit', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
-            'rule' => $optimizationRule->load('conditions'),
+            'rule' => $optimizationRule,
+            // String ids so large Meta account ids stay precise in JSON.
+            'selectedAdAccountIds' => $optimizationRule->adAccounts
+                ->pluck('id')
+                ->map(fn ($id) => (string) $id)
+                ->values(),
             'options' => $this->options($workspace),
         ]);
     }
@@ -72,6 +79,7 @@ class OptimizationRuleController extends Controller
         $data = $this->validateRule($request, $workspace);
 
         $rule = OptimizationRule::create($this->ruleAttributes($data, $workspace));
+        $rule->adAccounts()->sync($data['meta_ads_account_ids']);
         $this->replaceConditions($rule, $data['conditions']);
 
         return redirect()
@@ -86,6 +94,7 @@ class OptimizationRuleController extends Controller
         $data = $this->validateRule($request, $workspace);
 
         $optimizationRule->update($this->ruleAttributes($data, $workspace));
+        $optimizationRule->adAccounts()->sync($data['meta_ads_account_ids']);
         $this->replaceConditions($optimizationRule, $data['conditions']);
 
         return redirect()
@@ -126,6 +135,7 @@ class OptimizationRuleController extends Controller
     {
         return [
             'adAccounts' => AdAccount::forWorkspace($workspace)
+                ->where('active_sync', true)
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->map(fn (AdAccount $account) => [
@@ -140,6 +150,7 @@ class OptimizationRuleController extends Controller
             'targetTypes' => ['campaign', 'ad_set'],
             'conditionOperators' => ['and', 'or'],
             'adjustmentTypes' => ['percentage', 'fixed'],
+            'executionModes' => ['approval', 'automatic'],
         ];
     }
 
@@ -157,7 +168,8 @@ class OptimizationRuleController extends Controller
 
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'meta_ads_account_id' => ['required', Rule::in($workspaceAccountIds)],
+            'meta_ads_account_ids' => ['required', 'array', 'min:1'],
+            'meta_ads_account_ids.*' => [Rule::in($workspaceAccountIds)],
             'target_type' => ['required', Rule::in(['campaign', 'ad_set'])],
             'condition_operator' => ['required', Rule::in(['and', 'or'])],
             'action' => ['required', Rule::in(self::ACTIONS)],
@@ -167,6 +179,7 @@ class OptimizationRuleController extends Controller
             'budget_min' => ['nullable', 'numeric', 'min:0'],
             'budget_max' => ['nullable', 'numeric', 'min:0', 'gte:budget_min'],
             'is_active' => ['boolean'],
+            'execution_mode' => ['required', Rule::in(['automatic', 'approval'])],
             'conditions' => ['required', 'array', 'min:1'],
             'conditions.*.metric' => ['required', Rule::in(self::METRICS)],
             'conditions.*.operator' => ['required', Rule::in(self::OPERATORS)],
@@ -188,7 +201,6 @@ class OptimizationRuleController extends Controller
 
         return [
             'workspace_id' => $workspace->id,
-            'meta_ads_account_id' => $data['meta_ads_account_id'],
             'name' => $data['name'],
             'target_type' => $data['target_type'],
             'condition_operator' => $data['condition_operator'],
@@ -202,6 +214,7 @@ class OptimizationRuleController extends Controller
             'budget_min' => $isBudgetAction ? ($data['budget_min'] ?? null) : null,
             'budget_max' => $isBudgetAction ? ($data['budget_max'] ?? null) : null,
             'is_active' => $data['is_active'] ?? true,
+            'execution_mode' => $data['execution_mode'],
         ];
     }
 

@@ -28,30 +28,60 @@ class OptimizationRuleEvaluator
 
     public function evaluate(OptimizationRule $rule, AdAccount $adAccount): void
     {
-        $targets = $this->resolveTargets($rule, $adAccount);
-
-        foreach ($targets as $target) {
+        foreach ($this->resolveTargets($rule, $adAccount) as $target) {
             $this->evaluateTarget($rule, $adAccount, $target);
         }
     }
 
+    /**
+     * Dry run: return the changes this rule *would* make to its targets without
+     * touching the Meta API or local records.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function plan(OptimizationRule $rule, AdAccount $adAccount): array
+    {
+        $proposals = [];
+
+        foreach ($this->resolveTargets($rule, $adAccount) as $target) {
+            $snapshot = $this->buildSnapshot($rule, $target);
+
+            if (! $this->allConditionsMet($snapshot, $rule->condition_operator)) {
+                continue;
+            }
+
+            $proposals[] = $this->buildProposal($rule, $target, $snapshot);
+        }
+
+        return $proposals;
+    }
+
     private function evaluateTarget(OptimizationRule $rule, AdAccount $adAccount, Campaign|AdSet $target): void
     {
-        $conditions = $rule->conditions;
+        $snapshot = $this->buildSnapshot($rule, $target);
+
+        if (! $this->allConditionsMet($snapshot, $rule->condition_operator)) {
+            return;
+        }
+
+        $this->applyAction($rule, $adAccount, $target, $snapshot);
+    }
+
+    /**
+     * Evaluate each condition for a target and return the per-condition results.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildSnapshot(OptimizationRule $rule, Campaign|AdSet $target): array
+    {
         $snapshot = [];
 
-        foreach ($conditions as $condition) {
+        foreach ($rule->conditions as $condition) {
             $actualValue = $this->computeMetric(
                 $condition->metric,
                 $rule->target_type,
                 $target->id,
                 $condition->time_window,
-            );
-
-            $passed = $actualValue !== null && $this->checkOperator(
-                $actualValue,
-                $condition->operator,
-                (float) $condition->value,
             );
 
             $snapshot[] = [
@@ -60,17 +90,43 @@ class OptimizationRuleEvaluator
                 'threshold' => (float) $condition->value,
                 'actual_value' => $actualValue,
                 'time_window' => $condition->time_window,
-                'passed' => $passed,
+                'passed' => $actualValue !== null && $this->checkOperator(
+                    $actualValue,
+                    $condition->operator,
+                    (float) $condition->value,
+                ),
             ];
         }
 
-        $triggered = $this->allConditionsMet($snapshot, $rule->condition_operator);
+        return $snapshot;
+    }
 
-        if (! $triggered) {
-            return;
+    /**
+     * Describe the change a triggered rule would apply to a target.
+     *
+     * @param  array<int, array<string, mixed>>  $snapshot
+     * @return array<string, mixed>
+     */
+    private function buildProposal(OptimizationRule $rule, Campaign|AdSet $target, array $snapshot): array
+    {
+        $currentBudget = null;
+        $newBudget = null;
+
+        if (in_array($rule->action, ['increase_budget', 'decrease_budget'], true)) {
+            $budgetField = $target->daily_budget !== null ? 'daily_budget' : 'lifetime_budget';
+            $currentBudget = (float) ($target->{$budgetField} ?? 0);
+            $newBudget = $currentBudget > 0 ? $this->computeNewBudget($rule, $currentBudget) : null;
         }
 
-        $this->applyAction($rule, $adAccount, $target, $snapshot);
+        return [
+            'target_type' => $rule->target_type,
+            'target_id' => (string) $target->id,
+            'target_name' => $target->name ?? null,
+            'action' => $rule->action,
+            'current_value' => $currentBudget,
+            'new_value' => $newBudget,
+            'conditions_snapshot' => $snapshot,
+        ];
     }
 
     private function allConditionsMet(array $snapshot, string $operator): bool
@@ -236,6 +292,24 @@ class OptimizationRuleEvaluator
             return [null, null];
         }
 
+        $newBudget = $this->computeNewBudget($rule, $currentBudget);
+
+        // Meta API expects budget in minor units (cents).
+        $client->post((string) $target->id, [
+            $budgetField => (int) round($newBudget * 100),
+        ]);
+
+        $target->update([$budgetField => $newBudget]);
+
+        return [$currentBudget, $newBudget];
+    }
+
+    /**
+     * Resolve the new budget for a budget action, applying the percentage cap
+     * and min/max clamps. Pure — no API or DB side effects.
+     */
+    private function computeNewBudget(OptimizationRule $rule, float $currentBudget): float
+    {
         $adjustment = (float) $rule->adjustment_value;
 
         // Resolve the absolute amount to add/remove. Percentage adjustments can
@@ -264,14 +338,7 @@ class OptimizationRuleEvaluator
             $newBudget = min((float) $rule->budget_max, $newBudget);
         }
 
-        // Meta API expects budget in minor units (cents).
-        $client->post((string) $target->id, [
-            $budgetField => (int) round($newBudget * 100),
-        ]);
-
-        $target->update([$budgetField => $newBudget]);
-
-        return [$currentBudget, $newBudget];
+        return $newBudget;
     }
 
     // ──────────────────────────────────────────────────────────────────────────

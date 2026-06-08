@@ -12,6 +12,7 @@ export default function CreateOptimizationRule({ workspace, options }: Props) {
             mode="create"
             workspace={workspace}
             rule={null}
+            selectedAdAccountIds={[]}
             options={options}
         />
     );
