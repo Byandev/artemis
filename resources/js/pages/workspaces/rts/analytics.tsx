@@ -18,25 +18,76 @@ import { Head } from '@inertiajs/react';
 import { formatDate } from 'date-fns';
 import flatpickr from 'flatpickr';
 import moment from 'moment';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import DateOption = flatpickr.Options.DateOption;
 
 interface Props {
     workspace: Workspace;
 }
 
-export default function Analytics({ workspace }: Props) {
-    const [dateRange, setDateRange] = useState([
-        moment().startOf('month').format('YYYY-MM-DD'),
-        moment().endOf('month').format('YYYY-MM-DD'),
-    ]);
-    const [filter, setFilter] = useState<FilterValue>({
+const FILTER_KEYS: (keyof FilterValue)[] = [
+    'teamIds',
+    'productIds',
+    'shopIds',
+    'pageIds',
+    'userIds',
+];
+
+// Hydrate filters/date range from the URL so they survive a browser refresh.
+function parseStateFromUrl(): { dateRange: string[]; filter: FilterValue } {
+    const params = new URLSearchParams(window.location.search);
+    const start = params.get('startDate');
+    const end = params.get('endDate');
+
+    const dateRange =
+        start && end
+            ? [start, end]
+            : [
+                  moment().startOf('month').format('YYYY-MM-DD'),
+                  moment().endOf('month').format('YYYY-MM-DD'),
+              ];
+
+    const filter: FilterValue = {
         teamIds: [],
         productIds: [],
         shopIds: [],
         pageIds: [],
         userIds: [],
+    };
+    FILTER_KEYS.forEach((key) => {
+        const raw = params.get(key);
+        if (raw) {
+            filter[key] = raw.split(',').filter(Boolean);
+        }
     });
+
+    return { dateRange, filter };
+}
+
+export default function Analytics({ workspace }: Props) {
+    const initialState = useMemo(() => parseStateFromUrl(), []);
+    const [dateRange, setDateRange] = useState(initialState.dateRange);
+    const [filter, setFilter] = useState<FilterValue>(initialState.filter);
+
+    // Keep the URL in sync so refreshing the page restores the current filters.
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        params.set('startDate', dateRange[0]);
+        params.set('endDate', dateRange[1]);
+        FILTER_KEYS.forEach((key) => {
+            const value = filter[key];
+            if (value.length) {
+                params.set(key, value.join(','));
+            } else {
+                params.delete(key);
+            }
+        });
+        window.history.replaceState(
+            null,
+            '',
+            `${window.location.pathname}?${params.toString()}`,
+        );
+    }, [dateRange, filter]);
 
     const queryParams: RtsQueryParams = useMemo(
         () => ({
@@ -91,7 +142,11 @@ export default function Analytics({ workspace }: Props) {
                     description={`${formatDate(new Date(dateRange[0]), 'MMM d')} – ${formatDate(new Date(dateRange[1]), 'MMM d, yyyy')}`}
                     stackActionsOnMobile
                 >
-                    <Filters workspace={workspace} onChange={setFilter} />
+                    <Filters
+                        workspace={workspace}
+                        onChange={setFilter}
+                        initialValue={initialState.filter}
+                    />
                     <DatePicker
                         id="rts-date-range"
                         mode="range"
