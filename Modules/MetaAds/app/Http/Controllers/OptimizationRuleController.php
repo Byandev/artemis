@@ -35,17 +35,24 @@ class OptimizationRuleController extends Controller
 
     private const BUDGET_ACTIONS = ['increase_budget', 'decrease_budget'];
 
-    public function index(Workspace $workspace): Response
+    public function index(Request $request, Workspace $workspace): Response
     {
+        $perPage = (int) $request->integer('per_page', 15);
+
         $rules = OptimizationRule::where('workspace_id', $workspace->id)
             ->with(['conditions', 'adAccounts:id,name'])
             ->withCount('logs')
             ->latest()
-            ->get();
+            ->paginate($perPage)
+            ->withQueryString();
 
         return Inertia::render('workspaces/integrations/meta-ads/optimization-rules/index', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
             'rules' => $rules,
+            'query' => [
+                'page' => $request->integer('page', 1),
+                'perPage' => $perPage,
+            ],
         ]);
     }
 
