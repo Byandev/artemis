@@ -357,6 +357,9 @@ export function AppSidebar() {
                         currentWorkspace.leaderboard_module_enabled
                     }
                 />
+                <div className="mt-auto">
+                    <NavMain items={supportNavItems} group_label="Support" />
+                </div>
             </SidebarContent>
 
             {/*<SidebarFooter>*/}
