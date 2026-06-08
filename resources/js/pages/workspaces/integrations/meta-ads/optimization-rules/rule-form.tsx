@@ -42,6 +42,7 @@ interface FormShape {
     action: string;
     adjustment_type: string;
     adjustment_value: string;
+    max_adjustment_amount: string;
     budget_min: string;
     budget_max: string;
     is_active: boolean;
@@ -120,6 +121,7 @@ export default function RuleForm({ mode, workspace, rule, options }: Props) {
         action: rule?.action ?? options.actions[0],
         adjustment_type: rule?.adjustment_type ?? options.adjustmentTypes[0],
         adjustment_value: rule?.adjustment_value ?? '',
+        max_adjustment_amount: rule?.max_adjustment_amount ?? '',
         budget_min: rule?.budget_min ?? '',
         budget_max: rule?.budget_max ?? '',
         is_active: rule?.is_active ?? true,
@@ -166,6 +168,12 @@ export default function RuleForm({ mode, workspace, rule, options }: Props) {
             adjustment_value: isBudgetAction(payload.action)
                 ? payload.adjustment_value
                 : null,
+            // Only meaningful for percentage adjustments.
+            max_adjustment_amount:
+                isBudgetAction(payload.action) &&
+                payload.adjustment_type === 'percentage'
+                    ? payload.max_adjustment_amount
+                    : null,
             budget_min: isBudgetAction(payload.action)
                 ? payload.budget_min
                 : null,
@@ -528,7 +536,6 @@ export default function RuleForm({ mode, workspace, rule, options }: Props) {
                                                         >
                                                             {adjustmentTypeLabel(
                                                                 t,
-                                                                data.action,
                                                             )}
                                                         </SelectItem>
                                                     ),
@@ -540,61 +547,91 @@ export default function RuleForm({ mode, workspace, rule, options }: Props) {
                             </div>
 
                             {budgetAction && (
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                    <Field
-                                        label={
-                                            data.adjustment_type ===
-                                            'percentage'
-                                                ? 'Amount (%)'
-                                                : data.action ===
+                                <>
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <Field
+                                            label={
+                                                data.adjustment_type ===
+                                                'percentage'
+                                                    ? 'Percentage (%)'
+                                                    : 'Amount'
+                                            }
+                                            error={errors.adjustment_value}
+                                        >
+                                            <Input
+                                                type="number"
+                                                step="any"
+                                                value={data.adjustment_value}
+                                                onChange={(e) =>
+                                                    setData(
+                                                        'adjustment_value',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </Field>
+                                        {data.adjustment_type ===
+                                            'percentage' && (
+                                            <Field
+                                                label={
+                                                    data.action ===
                                                     'decrease_budget'
-                                                  ? 'Max reduction'
-                                                  : 'Max additional'
-                                        }
-                                        error={errors.adjustment_value}
-                                    >
-                                        <Input
-                                            type="number"
-                                            step="any"
-                                            value={data.adjustment_value}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'adjustment_value',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </Field>
-                                    <Field label="Min budget">
-                                        <Input
-                                            type="number"
-                                            step="any"
-                                            value={data.budget_min}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'budget_min',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </Field>
-                                    <Field
-                                        label="Max budget"
-                                        error={errors.budget_max}
-                                    >
-                                        <Input
-                                            type="number"
-                                            step="any"
-                                            value={data.budget_max}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'budget_max',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </Field>
-                                </div>
+                                                        ? 'Max decrease amount'
+                                                        : 'Max increase amount'
+                                                }
+                                                error={
+                                                    errors.max_adjustment_amount
+                                                }
+                                            >
+                                                <Input
+                                                    type="number"
+                                                    step="any"
+                                                    value={
+                                                        data.max_adjustment_amount
+                                                    }
+                                                    onChange={(e) =>
+                                                        setData(
+                                                            'max_adjustment_amount',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="No cap"
+                                                />
+                                            </Field>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <Field label="Min budget">
+                                            <Input
+                                                type="number"
+                                                step="any"
+                                                value={data.budget_min}
+                                                onChange={(e) =>
+                                                    setData(
+                                                        'budget_min',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </Field>
+                                        <Field
+                                            label="Max budget"
+                                            error={errors.budget_max}
+                                        >
+                                            <Input
+                                                type="number"
+                                                step="any"
+                                                value={data.budget_max}
+                                                onChange={(e) =>
+                                                    setData(
+                                                        'budget_max',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </Field>
+                                    </div>
+                                </>
                             )}
 
                             <div

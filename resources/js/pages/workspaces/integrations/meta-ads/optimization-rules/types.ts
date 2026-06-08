@@ -21,6 +21,7 @@ export interface OptimizationRule {
     action: string;
     adjustment_type: string | null;
     adjustment_value: string | null;
+    max_adjustment_amount: string | null;
     budget_min: string | null;
     budget_max: string | null;
     is_active: boolean;
@@ -53,18 +54,9 @@ export const titleCase = (value: string): string =>
 export const metricLabel = (metric: string): string =>
     UPPERCASE_METRICS.has(metric) ? metric.toUpperCase() : titleCase(metric);
 
-/**
- * Adjustment types read differently depending on the budget action: a "fixed"
- * adjustment is the maximum amount added when increasing, or removed when
- * decreasing.
- */
-export const adjustmentTypeLabel = (type: string, action: string): string => {
+export const adjustmentTypeLabel = (type: string): string => {
     if (type === 'percentage') return 'Percentage';
-    if (type === 'fixed') {
-        return action === 'decrease_budget'
-            ? 'Maximum reduction'
-            : 'Maximum additional';
-    }
+    if (type === 'fixed') return 'Specific amount';
     return titleCase(type);
 };
 

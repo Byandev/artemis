@@ -163,6 +163,7 @@ class OptimizationRuleController extends Controller
             'action' => ['required', Rule::in(self::ACTIONS)],
             'adjustment_type' => [Rule::requiredIf($isBudgetAction), 'nullable', Rule::in(['percentage', 'fixed'])],
             'adjustment_value' => [Rule::requiredIf($isBudgetAction), 'nullable', 'numeric', 'min:0'],
+            'max_adjustment_amount' => ['nullable', 'numeric', 'min:0'],
             'budget_min' => ['nullable', 'numeric', 'min:0'],
             'budget_max' => ['nullable', 'numeric', 'min:0', 'gte:budget_min'],
             'is_active' => ['boolean'],
@@ -194,6 +195,10 @@ class OptimizationRuleController extends Controller
             'action' => $data['action'],
             'adjustment_type' => $isBudgetAction ? $data['adjustment_type'] : null,
             'adjustment_value' => $isBudgetAction ? $data['adjustment_value'] : null,
+            // Only a percentage adjustment can be capped.
+            'max_adjustment_amount' => $isBudgetAction && ($data['adjustment_type'] ?? null) === 'percentage'
+                ? ($data['max_adjustment_amount'] ?? null)
+                : null,
             'budget_min' => $isBudgetAction ? ($data['budget_min'] ?? null) : null,
             'budget_max' => $isBudgetAction ? ($data['budget_max'] ?? null) : null,
             'is_active' => $data['is_active'] ?? true,

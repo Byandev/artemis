@@ -18,6 +18,7 @@ class OptimizationRule extends Model
         // precision on the frontend.
         'meta_ads_account_id' => 'string',
         'adjustment_value' => 'decimal:4',
+        'max_adjustment_amount' => 'decimal:4',
         'budget_min' => 'decimal:4',
         'budget_max' => 'decimal:4',
         'is_active' => 'boolean',

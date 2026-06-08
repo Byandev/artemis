@@ -238,15 +238,21 @@ class OptimizationRuleEvaluator
 
         $adjustment = (float) $rule->adjustment_value;
 
+        // Resolve the absolute amount to add/remove. Percentage adjustments can
+        // be capped by max_adjustment_amount; "specific amount" is the delta itself.
+        if ($rule->adjustment_type === 'percentage') {
+            $delta = $currentBudget * ($adjustment / 100);
+
+            if ($rule->max_adjustment_amount !== null) {
+                $delta = min($delta, (float) $rule->max_adjustment_amount);
+            }
+        } else {
+            $delta = $adjustment;
+        }
+
         $newBudget = match ($rule->action) {
-            'increase_budget' => $rule->adjustment_type === 'percentage'
-                ? $currentBudget * (1 + $adjustment / 100)
-                : $currentBudget + $adjustment,
-
-            'decrease_budget' => $rule->adjustment_type === 'percentage'
-                ? $currentBudget * (1 - $adjustment / 100)
-                : $currentBudget - $adjustment,
-
+            'increase_budget' => $currentBudget + $delta,
+            'decrease_budget' => $currentBudget - $delta,
             default => $currentBudget,
         };
 
