@@ -14,15 +14,23 @@ class OptimizationRule extends Model
     protected $guarded = [];
 
     protected $casts = [
+        // Cast to string so large Meta account ids survive JSON without losing
+        // precision on the frontend.
+        'meta_ads_account_id' => 'string',
         'adjustment_value' => 'decimal:4',
-        'budget_min'       => 'decimal:4',
-        'budget_max'       => 'decimal:4',
-        'is_active'        => 'boolean',
+        'budget_min' => 'decimal:4',
+        'budget_max' => 'decimal:4',
+        'is_active' => 'boolean',
     ];
 
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
+    }
+
+    public function adAccount(): BelongsTo
+    {
+        return $this->belongsTo(AdAccount::class, 'meta_ads_account_id');
     }
 
     public function conditions(): HasMany

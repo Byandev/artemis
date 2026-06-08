@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('metric');
             $table->enum('operator', ['>', '<', '>=', '<=', '=']);
             $table->decimal('value', 20, 4);
-            $table->enum('time_window', ['today', 'last_3_days', 'last_7_days', 'last_14_days', 'last_30_days', 'lifetime']);
+            $table->enum('time_window', ['today', 'yesterday', 'last_3_days', 'last_7_days', 'previous_3_days', 'previous_7_days']);
 
             $table->timestamps();
 

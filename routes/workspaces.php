@@ -49,6 +49,7 @@ use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
 use Modules\MetaAds\Http\Controllers\AdsManagerController;
 use Modules\MetaAds\Http\Controllers\IntegrationsController;
 use Modules\MetaAds\Http\Controllers\MetaOAuthController;
+use Modules\MetaAds\Http\Controllers\OptimizationRuleController;
 use Modules\MetaAds\Http\Controllers\PagesController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
@@ -207,6 +208,22 @@ Route::middleware(['auth'])->group(function () {
         ->name('workspaces.metaads.ads');
     Route::get('/workspaces/{workspace}/integrations/meta/health', [SyncHealthController::class, 'index'])
         ->name('workspaces.metaads.health');
+
+    // Meta Ads optimization rules
+    Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules', [OptimizationRuleController::class, 'index'])
+        ->name('workspaces.metaads.optimization-rules.index');
+    Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/create', [OptimizationRuleController::class, 'create'])
+        ->name('workspaces.metaads.optimization-rules.create');
+    Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}/edit', [OptimizationRuleController::class, 'edit'])
+        ->name('workspaces.metaads.optimization-rules.edit');
+    Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules', [OptimizationRuleController::class, 'store'])
+        ->name('workspaces.metaads.optimization-rules.store');
+    Route::put('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'update'])
+        ->name('workspaces.metaads.optimization-rules.update');
+    Route::patch('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}/toggle', [OptimizationRuleController::class, 'toggle'])
+        ->name('workspaces.metaads.optimization-rules.toggle');
+    Route::delete('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'destroy'])
+        ->name('workspaces.metaads.optimization-rules.destroy');
     Route::get('/workspaces/{workspace}/integrations/meta/connect', [MetaOAuthController::class, 'redirect'])
         ->name('workspaces.metaads.connect');
     Route::post('/workspaces/{workspace}/integrations/meta/users/{metaUser}/sync-ad-accounts', AdAccountSyncController::class)

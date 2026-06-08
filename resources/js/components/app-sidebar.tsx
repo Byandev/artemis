@@ -42,6 +42,7 @@ import {
     Send,
     Shield,
     ShoppingCart,
+    SlidersHorizontal,
     Sparkles,
     Store,
     Trophy,
@@ -195,6 +196,11 @@ export function AppSidebar() {
                     title: 'Ads Manager',
                     href: `/workspaces/${slug}/integrations/meta/ads-manager/campaigns`,
                     icon: BarChart2,
+                },
+                {
+                    title: 'Optimization Rules',
+                    href: `/workspaces/${slug}/integrations/meta/optimization-rules`,
+                    icon: SlidersHorizontal,
                 },
                 {
                     title: 'Sync Health',
