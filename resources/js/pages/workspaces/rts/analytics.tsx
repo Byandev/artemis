@@ -12,6 +12,8 @@ import ProductCard from '@/components/rts/ProductCard';
 import RiderCard from '@/components/rts/RiderCard';
 import { RtsQueryParams } from '@/components/rts/rts-shared';
 import DatePicker from '@/components/ui/date-picker';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
@@ -26,6 +28,9 @@ interface Props {
 }
 
 export default function Analytics({ workspace }: Props) {
+    // AI chat support widget is gated behind a permission.
+    const canUseAiChat = usePermission(PERMISSIONS.ViewRtsAiChat);
+
     const [dateRange, setDateRange] = useState([
         moment().startOf('month').format('YYYY-MM-DD'),
         moment().endOf('month').format('YYYY-MM-DD'),
@@ -154,11 +159,13 @@ export default function Analytics({ workspace }: Props) {
                 />
             </div>
 
-            <AskRtsWidget
-                workspace={workspace}
-                dateRange={dateRange}
-                data={rtsData}
-            />
+            {canUseAiChat && (
+                <AskRtsWidget
+                    workspace={workspace}
+                    dateRange={dateRange}
+                    data={rtsData}
+                />
+            )}
         </AppLayout>
     );
 }
