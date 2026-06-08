@@ -123,6 +123,15 @@ export default function OptimizationRulesIndex({
             },
         },
         {
+            accessorKey: 'priority',
+            header: 'Priority',
+            cell: ({ row }) => (
+                <span className="font-mono text-[12px] tabular-nums text-gray-600 dark:text-gray-300">
+                    {row.original.priority}
+                </span>
+            ),
+        },
+        {
             id: 'ad_accounts',
             header: 'Ad accounts',
             cell: ({ row }) => {

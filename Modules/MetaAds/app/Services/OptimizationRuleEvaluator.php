@@ -6,12 +6,10 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
 use Modules\MetaAds\Models\Campaign;
 use Modules\MetaAds\Models\OptimizationRule;
-use Modules\MetaAds\Models\OptimizationRuleLog;
 
 class OptimizationRuleEvaluator
 {
@@ -26,11 +24,44 @@ class OptimizationRuleEvaluator
         'cost_per_messaging_conversation',
     ];
 
-    public function evaluate(OptimizationRule $rule, AdAccount $adAccount): void
+    /**
+     * Decide what every rule would change this run, guaranteeing each campaign /
+     * ad set is acted on at most once: the first rule (in the given order) that
+     * matches a target claims it, and later rules skip that target.
+     *
+     * No API calls or writes happen here — it only reads metrics and returns the
+     * decisions to dispatch. Each decision is applied by its own queued job.
+     *
+     * @param  iterable<OptimizationRule>  $rules  eager-loaded with conditions + adAccounts
+     * @return array<int, array{rule: OptimizationRule, adAccount: AdAccount, target: Campaign|AdSet, snapshot: array<int, array<string, mixed>>}>
+     */
+    public function planRun(iterable $rules): array
     {
-        foreach ($this->resolveTargets($rule, $adAccount) as $target) {
-            $this->evaluateTarget($rule, $adAccount, $target);
+        $claimed = [];
+        $decisions = [];
+
+        foreach ($rules as $rule) {
+            foreach ($rule->adAccounts as $adAccount) {
+                foreach ($this->resolveTargets($rule, $adAccount) as $target) {
+                    $key = $rule->target_type.':'.$target->getKey();
+
+                    if (isset($claimed[$key])) {
+                        continue; // already claimed by an earlier rule this run
+                    }
+
+                    $snapshot = $this->buildSnapshot($rule, $target);
+
+                    if (! $this->allConditionsMet($snapshot, $rule->condition_operator)) {
+                        continue;
+                    }
+
+                    $claimed[$key] = true;
+                    $decisions[] = compact('rule', 'adAccount', 'target', 'snapshot');
+                }
+            }
         }
+
+        return $decisions;
     }
 
     /**
@@ -56,17 +87,6 @@ class OptimizationRuleEvaluator
         return $proposals;
     }
 
-    private function evaluateTarget(OptimizationRule $rule, AdAccount $adAccount, Campaign|AdSet $target): void
-    {
-        $snapshot = $this->buildSnapshot($rule, $target);
-
-        if (! $this->allConditionsMet($snapshot, $rule->condition_operator)) {
-            return;
-        }
-
-        $this->applyAction($rule, $adAccount, $target, $snapshot);
-    }
-
     /**
      * Evaluate each condition for a target and return the per-condition results.
      *
@@ -77,12 +97,18 @@ class OptimizationRuleEvaluator
         $snapshot = [];
 
         foreach ($rule->conditions as $condition) {
-            $actualValue = $this->computeMetric(
-                $condition->metric,
-                $rule->target_type,
-                $target->id,
-                $condition->time_window,
-            );
+            // "budget" lives on the campaign / ad set itself, not in insights —
+            // and the rule's target_type already picks the right level, so this
+            // works for both campaign and ad set targets. Null when the target
+            // carries no budget (e.g. an ad set under campaign-budget optimization).
+            $actualValue = $condition->metric === 'budget'
+                ? $this->targetBudget($target)
+                : $this->computeMetric(
+                    $condition->metric,
+                    $rule->target_type,
+                    $target->id,
+                    $condition->time_window,
+                );
 
             $snapshot[] = [
                 'metric' => $condition->metric,
@@ -115,7 +141,7 @@ class OptimizationRuleEvaluator
         if (in_array($rule->action, ['increase_budget', 'decrease_budget'], true)) {
             $budgetField = $target->daily_budget !== null ? 'daily_budget' : 'lifetime_budget';
             $currentBudget = (float) ($target->{$budgetField} ?? 0);
-            $newBudget = $currentBudget > 0 ? $this->computeNewBudget($rule, $currentBudget) : null;
+            $newBudget = $currentBudget > 0 ? self::computeNewBudget($rule, $currentBudget) : null;
         }
 
         return [
@@ -127,6 +153,18 @@ class OptimizationRuleEvaluator
             'new_value' => $newBudget,
             'conditions_snapshot' => $snapshot,
         ];
+    }
+
+    /**
+     * Current budget of a campaign or ad set (major units), preferring the daily
+     * budget and falling back to the lifetime budget. Null when the target has
+     * no budget of its own.
+     */
+    private function targetBudget(Campaign|AdSet $target): ?float
+    {
+        $budget = $target->daily_budget ?? $target->lifetime_budget;
+
+        return $budget !== null ? (float) $budget : null;
     }
 
     private function allConditionsMet(array $snapshot, string $operator): bool
@@ -234,81 +272,15 @@ class OptimizationRuleEvaluator
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Action application
+    // Budget calculation
     // ──────────────────────────────────────────────────────────────────────────
-
-    private function applyAction(OptimizationRule $rule, AdAccount $adAccount, Campaign|AdSet $target, array $snapshot): void
-    {
-        $client = $adAccount->graphClient();
-        $fbId = (string) $target->id;
-
-        $previousValue = null;
-        $newValue = null;
-
-        try {
-            if ($rule->action === 'pause') {
-                $client->post($fbId, ['status' => 'PAUSED']);
-                $target->update(['status' => 'PAUSED', 'effective_status' => 'PAUSED']);
-
-            } elseif ($rule->action === 'enable') {
-                $client->post($fbId, ['status' => 'ACTIVE']);
-                $target->update(['status' => 'ACTIVE', 'effective_status' => 'ACTIVE']);
-
-            } elseif (in_array($rule->action, ['increase_budget', 'decrease_budget'], true)) {
-                [$previousValue, $newValue] = $this->applyBudgetChange($rule, $adAccount, $target, $client);
-            }
-        } catch (\Throwable $e) {
-            Log::error('OptimizationRule action failed', [
-                'rule_id' => $rule->id,
-                'target_id' => $fbId,
-                'action' => $rule->action,
-                'error' => $e->getMessage(),
-            ]);
-
-            return;
-        }
-
-        OptimizationRuleLog::create([
-            'meta_ads_optimization_rule_id' => $rule->id,
-            'workspace_id' => $rule->workspace_id,
-            'target_type' => $rule->target_type,
-            'target_id' => $target->id,
-            'target_name' => $target->name ?? null,
-            'action_taken' => $rule->action,
-            'previous_value' => $previousValue,
-            'new_value' => $newValue,
-            'conditions_snapshot' => $snapshot,
-            'triggered_at' => now(),
-        ]);
-    }
-
-    private function applyBudgetChange(OptimizationRule $rule, AdAccount $adAccount, Campaign|AdSet $target, MetaGraphClient $client): array
-    {
-        // Use daily_budget if set, otherwise lifetime_budget.
-        $budgetField = $target->daily_budget !== null ? 'daily_budget' : 'lifetime_budget';
-        $currentBudget = (float) ($target->{$budgetField} ?? 0);
-
-        if ($currentBudget <= 0) {
-            return [null, null];
-        }
-
-        $newBudget = $this->computeNewBudget($rule, $currentBudget);
-
-        // Meta API expects budget in minor units (cents).
-        $client->post((string) $target->id, [
-            $budgetField => (int) round($newBudget * 100),
-        ]);
-
-        $target->update([$budgetField => $newBudget]);
-
-        return [$currentBudget, $newBudget];
-    }
 
     /**
      * Resolve the new budget for a budget action, applying the percentage cap
-     * and min/max clamps. Pure — no API or DB side effects.
+     * and min/max clamps. Pure — no API or DB side effects. Shared by the
+     * proposal dry-run and the queued apply job.
      */
-    private function computeNewBudget(OptimizationRule $rule, float $currentBudget): float
+    public static function computeNewBudget(OptimizationRule $rule, float $currentBudget): float
     {
         $adjustment = (float) $rule->adjustment_value;
 

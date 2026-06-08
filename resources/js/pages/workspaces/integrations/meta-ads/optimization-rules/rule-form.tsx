@@ -40,6 +40,7 @@ interface FormShape {
     budget_max: string;
     is_active: boolean;
     execution_mode: string;
+    priority: string;
     conditions: RuleCondition[];
 }
 
@@ -109,6 +110,7 @@ export default function RuleForm({
         budget_max: rule?.budget_max ?? '',
         is_active: rule?.is_active ?? true,
         execution_mode: rule?.execution_mode ?? options.executionModes[0],
+        priority: rule?.priority != null ? String(rule.priority) : '0',
         conditions: rule?.conditions?.map((c) => ({
             metric: c.metric,
             operator: c.operator,
@@ -284,6 +286,24 @@ export default function RuleForm({
                                     <option value="or">Match any (OR)</option>
                                 </select>
                             </Field>
+
+                            <Field label="Priority" error={errors.priority}>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    className={inputClass}
+                                    placeholder="0"
+                                    value={data.priority}
+                                    onChange={(e) =>
+                                        setData('priority', e.target.value)
+                                    }
+                                />
+                                <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                    Higher wins when two rules target the same
+                                    campaign or ad set in a run.
+                                </p>
+                            </Field>
                         </div>
                     </div>
 
@@ -366,23 +386,34 @@ export default function RuleForm({
                                                 )
                                             }
                                         />
-                                        <select
-                                            className={inputClass}
-                                            value={condition.time_window}
-                                            onChange={(e) =>
-                                                setCondition(
-                                                    index,
-                                                    'time_window',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        >
-                                            {options.timeWindows.map((w) => (
-                                                <option key={w} value={w}>
-                                                    {timeWindowLabel(w)}
-                                                </option>
-                                            ))}
-                                        </select>
+                                        {condition.metric === 'budget' ? (
+                                            <div className="flex h-10 items-center rounded-[10px] border border-dashed border-black/8 bg-stone-50/60 px-3 font-mono! text-[11px]! text-gray-400 dark:border-white/8 dark:bg-zinc-800/60 dark:text-gray-500">
+                                                Current value
+                                            </div>
+                                        ) : (
+                                            <select
+                                                className={inputClass}
+                                                value={condition.time_window}
+                                                onChange={(e) =>
+                                                    setCondition(
+                                                        index,
+                                                        'time_window',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            >
+                                                {options.timeWindows.map(
+                                                    (w) => (
+                                                        <option
+                                                            key={w}
+                                                            value={w}
+                                                        >
+                                                            {timeWindowLabel(w)}
+                                                        </option>
+                                                    ),
+                                                )}
+                                            </select>
+                                        )}
                                         <button
                                             type="button"
                                             disabled={

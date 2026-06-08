@@ -22,6 +22,7 @@ class OptimizationRuleController extends Controller
      * @see OptimizationRuleEvaluator
      */
     private const METRICS = [
+        'budget',
         'roas', 'cpa', 'cpc', 'ctr', 'cpm', 'cost_per_lead', 'cost_per_messaging_conversation',
         'spend', 'impressions', 'clicks', 'purchases', 'purchase_value', 'leads', 'conversions',
         'messaging_conversations_started',
@@ -42,6 +43,7 @@ class OptimizationRuleController extends Controller
         $rules = OptimizationRule::where('workspace_id', $workspace->id)
             ->with(['conditions', 'adAccounts:id,name'])
             ->withCount('logs')
+            ->orderByDesc('priority')
             ->latest()
             ->paginate($perPage)
             ->withQueryString();
@@ -235,6 +237,7 @@ class OptimizationRuleController extends Controller
             'budget_max' => ['nullable', 'numeric', 'min:0', 'gte:budget_min'],
             'is_active' => ['boolean'],
             'execution_mode' => ['required', Rule::in(['automatic', 'approval'])],
+            'priority' => ['nullable', 'integer', 'min:0'],
             'conditions' => ['required', 'array', 'min:1'],
             'conditions.*.metric' => ['required', Rule::in(self::METRICS)],
             'conditions.*.operator' => ['required', Rule::in(self::OPERATORS)],
@@ -270,6 +273,7 @@ class OptimizationRuleController extends Controller
             'budget_max' => $isBudgetAction ? ($data['budget_max'] ?? null) : null,
             'is_active' => $data['is_active'] ?? true,
             'execution_mode' => $data['execution_mode'],
+            'priority' => $data['priority'] ?? 0,
         ];
     }
 

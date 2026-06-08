@@ -20,6 +20,7 @@ class OptimizationRule extends Model
         'budget_min' => 'decimal:4',
         'budget_max' => 'decimal:4',
         'is_active' => 'boolean',
+        'priority' => 'integer',
     ];
 
     public function workspace(): BelongsTo

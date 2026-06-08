@@ -25,6 +25,7 @@ export interface OptimizationRule {
     budget_max: string | null;
     is_active: boolean;
     execution_mode: string;
+    priority: number;
     logs_count: number;
     conditions: RuleCondition[];
 }
