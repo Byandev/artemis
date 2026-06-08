@@ -82,17 +82,24 @@ class OptimizationRuleController extends Controller
         ]);
     }
 
-    public function approvals(Workspace $workspace): Response
+    public function approvals(Request $request, Workspace $workspace): Response
     {
+        $perPage = (int) $request->integer('per_page', 15);
+
         $proposals = OptimizationProposal::where('workspace_id', $workspace->id)
             ->where('status', 'pending')
             ->with(['rule:id,name,execution_mode', 'adAccount:id,name'])
             ->latest()
-            ->get();
+            ->paginate($perPage)
+            ->withQueryString();
 
         return Inertia::render('workspaces/integrations/meta-ads/optimization-rules/approvals', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
             'proposals' => $proposals,
+            'query' => [
+                'page' => $request->integer('page', 1),
+                'perPage' => $perPage,
+            ],
         ]);
     }
 
