@@ -78,6 +78,7 @@ Route::middleware(['auth'])->group(function () {
         // Onboarding (after workspace creation)
         Route::get('/onboarding', [OnboardingController::class, 'create'])->name('workspace.onboarding');
         Route::post('/onboarding', [OnboardingController::class, 'store'])->name('workspace.onboarding.store');
+        Route::post('/onboarding/skip', [OnboardingController::class, 'skip'])->name('workspace.onboarding.skip');
         Route::get('/onboarding/status', [OnboardingController::class, 'status'])->name('workspace.onboarding.status');
 
         Route::get('/inventory/transactions', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
