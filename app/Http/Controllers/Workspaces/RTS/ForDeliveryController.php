@@ -20,6 +20,7 @@ use App\Models\Page;
 use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Modules\Pancake\Models\OrderForDelivery;
@@ -107,8 +108,40 @@ class ForDeliveryController extends Controller
         return redirect()->back()->with('success', 'Assignee removed successfully');
     }
 
+    /** Session key marking this browser as having unlocked the public page. */
+    private function rmoPublicSessionKey(Workspace $workspace): string
+    {
+        return 'rmo_public_verified_'.$workspace->id;
+    }
+
+    public function verifyPublicPassword(Request $request, Workspace $workspace)
+    {
+        $request->validate(['password' => ['required', 'string']]);
+
+        if (! $workspace->checkRmoPublicPassword($request->input('password'))) {
+            throw ValidationException::withMessages([
+                'password' => 'Incorrect password.',
+            ]);
+        }
+
+        $request->session()->put($this->rmoPublicSessionKey($workspace), true);
+
+        return back();
+    }
+
     public function public(Request $request, Workspace $workspace)
     {
+        // Gate behind a password if one is configured for this workspace.
+        if (
+            $workspace->rmo_public_password_set
+            && ! $request->session()->get($this->rmoPublicSessionKey($workspace))
+        ) {
+            return Inertia::render('workspaces/rts/public-pages/rmo-management', [
+                'workspace' => $workspace->only('id', 'name', 'slug'),
+                'locked' => true,
+            ]);
+        }
+
         $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
 
         $baseQuery = OrderForDelivery::where('workspace_id', $workspace->id);
@@ -282,6 +315,7 @@ class ForDeliveryController extends Controller
         $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id', 'pageOwners:id,name']);
 
         return Inertia::render('workspaces/rts/public-pages/rmo-management', [
+            'locked' => false,
             'orders' => $items,
             'workspace' => $workspace,
             'query' => [

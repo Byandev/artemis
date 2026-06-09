@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Modules\Inventory\Models\InventoryTransaction;
 
@@ -31,9 +32,18 @@ class Workspace extends Model
         'checklist_module_enabled',
         'csr_module_enabled',
         'rmo_module_enabled',
+        'rmo_public_password',
         'leaderboard_module_enabled',
         'botcake_module_enabled',
         'inventory_sync',
+    ];
+
+    protected $hidden = [
+        'rmo_public_password',
+    ];
+
+    protected $appends = [
+        'rmo_public_password_set',
     ];
 
     protected $casts = [
@@ -51,6 +61,23 @@ class Workspace extends Model
         'inventory_sync' => 'boolean',
         'max_pages' => 'integer',
     ];
+
+    /**
+     * Whether a public RMO password is configured (exposed to the frontend
+     * without leaking the hash).
+     */
+    public function getRmoPublicPasswordSetAttribute(): bool
+    {
+        return ! empty($this->attributes['rmo_public_password']);
+    }
+
+    /** Verify a plaintext password against the stored RMO public password. */
+    public function checkRmoPublicPassword(string $password): bool
+    {
+        $hash = $this->attributes['rmo_public_password'] ?? null;
+
+        return $hash !== null && Hash::check($password, $hash);
+    }
 
     protected static function boot()
     {

@@ -15,6 +15,8 @@ export interface Workspace {
     checklist_module_enabled: boolean;
     csr_module_enabled: boolean;
     rmo_module_enabled: boolean;
+    /** Whether a public RMO access password is configured. */
+    rmo_public_password_set?: boolean;
     leaderboard_module_enabled: boolean;
     botcake_module_enabled: boolean;
     created_at: string;
