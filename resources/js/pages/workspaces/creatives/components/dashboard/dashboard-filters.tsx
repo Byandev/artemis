@@ -1,49 +1,47 @@
-import DropdownSelect from '@/components/common/DropdownSelect';
 import DatePicker from '@/components/ui/date-picker';
 import { Link } from '@inertiajs/react';
 import flatpickr from 'flatpickr';
 import { Table2 } from 'lucide-react';
 import moment from 'moment';
-import { ApplyFilter, DashboardFilters, ProductOption } from './types';
+import CreativeDashboardFilters from './creative-dashboard-filters';
+import {
+    ApplyFilter,
+    DashboardFilters,
+    EditorOption,
+    ProductOption,
+} from './types';
 import DateOption = flatpickr.Options.DateOption;
 
 interface Props {
     filters: DashboardFilters;
     products: ProductOption[];
+    editors: EditorOption[];
+    currentUserId: number;
     onChange: ApplyFilter;
     listUrl: string;
 }
 
-/** Header filter row: format, product, date range + link to the full list. */
+/** Header filter row: a Filters popover + date range + link to the full list. */
 export default function DashboardFiltersBar({
     filters,
     products,
+    editors,
+    currentUserId,
     onChange,
     listUrl,
 }: Props) {
     return (
         <>
-            <DropdownSelect
-                value={filters.format}
-                onChange={(v) => onChange({ format: v })}
-                label="Format"
-                options={[
-                    { key: 'all', label: 'All formats' },
-                    { key: 'video', label: 'Video' },
-                    { key: 'image', label: 'Image' },
-                ]}
-            />
-            <DropdownSelect
-                value={filters.product_id}
-                onChange={(v) => onChange({ product_id: v })}
-                label="Product"
-                options={[
-                    { key: 'all', label: 'All products' },
-                    ...products.map((p) => ({
-                        key: String(p.id),
-                        label: p.title,
-                    })),
-                ]}
+            <CreativeDashboardFilters
+                value={{
+                    user_ids: filters.user_ids,
+                    formats: filters.formats,
+                    product_ids: filters.product_ids,
+                }}
+                editors={editors}
+                products={products}
+                defaultUserId={String(currentUserId)}
+                onApply={(value) => onChange(value)}
             />
             <DatePicker
                 id="creatives-date-range"

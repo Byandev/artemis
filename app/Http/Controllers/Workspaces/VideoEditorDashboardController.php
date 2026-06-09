@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Workspaces;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Workspaces\VideoEditorDashboardRequest;
 use App\Models\Product;
+use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Creatives\Models\Creative;
 
 class VideoEditorDashboardController extends Controller
 {
@@ -28,7 +31,32 @@ class VideoEditorDashboardController extends Controller
                 ->where('workspace_id', $workspace->id)
                 ->orderBy('title')
                 ->get(['id', 'title']),
+            'editors' => $this->editors($workspace, $request->user()),
             'filters' => $request->filters()->toArray(),
         ]);
+    }
+
+    /**
+     * Editors selectable in the dashboard filter: everyone who has authored a
+     * creative in this workspace, plus the signed-in user so they can always
+     * see their own (even with zero creatives).
+     *
+     * @return Collection<int, array{id: int, name: string}>
+     */
+    private function editors(Workspace $workspace, User $currentUser)
+    {
+        $creatorIds = Creative::query()
+            ->where('workspace_id', $workspace->id)
+            ->whereNotNull('creator_id')
+            ->distinct()
+            ->pluck('creator_id')
+            ->push($currentUser->id)
+            ->unique();
+
+        return User::query()
+            ->whereIn('id', $creatorIds)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name]);
     }
 }

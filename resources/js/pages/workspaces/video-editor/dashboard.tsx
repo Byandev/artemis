@@ -13,20 +13,21 @@ import {
 } from '@/pages/workspaces/creatives/components/dashboard/sections';
 import {
     ApplyFilter,
+    DashboardFilters,
     DashboardPageProps,
 } from '@/pages/workspaces/creatives/components/dashboard/types';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
-import { useCallback } from 'react';
+import { Head } from '@inertiajs/react';
+import { useCallback, useEffect, useState } from 'react';
 
 export default function VideoEditorDashboard({
     workspace,
     currentUserId,
     products,
-    filters,
+    editors,
+    filters: initialFilters,
 }: DashboardPageProps) {
-    // Filters reload the shell; edit/list links point at the creatives module.
-    // Each statistic below fetches itself from its own API endpoint.
+    // Edit/list links point at the creatives module.
     const dashboardBase = `/workspaces/${workspace.slug}/video-editor`;
     const creativesBase = `/workspaces/${workspace.slug}/creatives`;
 
@@ -37,16 +38,35 @@ export default function VideoEditorDashboard({
         },
     ];
 
-    const applyFilter = useCallback<ApplyFilter>(
-        (patch) => {
-            router.get(
-                `${dashboardBase}/dashboard`,
-                { ...filters, ...patch },
-                { preserveState: true, preserveScroll: true, replace: true },
-            );
-        },
-        [dashboardBase, filters],
-    );
+    // Filters live client-side: each section fetches itself from its own API
+    // endpoint, so changing a filter (or the chart granularity) updates only
+    // the affected sections — no full page reload. Persisted per workspace so
+    // they survive a browser refresh.
+    const STORAGE_KEY = `video-editor-dashboard-filters:${workspace.slug}`;
+
+    const [filters, setFilters] = useState<DashboardFilters>(() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                return { ...initialFilters, ...JSON.parse(saved) };
+            }
+        } catch {
+            // Ignore unavailable / malformed storage.
+        }
+        return initialFilters;
+    });
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
+        } catch {
+            // Ignore storage errors (quota / private mode).
+        }
+    }, [STORAGE_KEY, filters]);
+
+    const applyFilter = useCallback<ApplyFilter>((patch) => {
+        setFilters((prev) => ({ ...prev, ...patch }));
+    }, []);
 
     const editUrl = useCallback(
         (id: number) => `${creativesBase}/${id}/edit`,
@@ -65,6 +85,8 @@ export default function VideoEditorDashboard({
                     <DashboardFiltersBar
                         filters={filters}
                         products={products}
+                        editors={editors}
+                        currentUserId={currentUserId}
                         onChange={applyFilter}
                         listUrl={creativesBase}
                     />

@@ -51,9 +51,9 @@ class VideoEditorDashboard
      *
      * @return array{value: int, video: int, image: int}
      */
-    public function totalCreatives(Workspace $workspace, int $userId, DashboardFilters $filters): array
+    public function totalCreatives(Workspace $workspace, DashboardFilters $filters): array
     {
-        $creatives = $this->editorCreatives($workspace, $userId, $filters);
+        $creatives = $this->editorCreatives($workspace, $filters);
         $formats = $creatives->countBy('format');
 
         return [
@@ -66,9 +66,9 @@ class VideoEditorDashboard
     /**
      * @return array{value: int}
      */
-    public function awaitingReview(Workspace $workspace, int $userId, DashboardFilters $filters): array
+    public function awaitingReview(Workspace $workspace, DashboardFilters $filters): array
     {
-        return ['value' => $this->editorCreatives($workspace, $userId, $filters)
+        return ['value' => $this->editorCreatives($workspace, $filters)
             ->filter(fn (Creative $c) => $this->isAwaitingReview($c))
             ->count()];
     }
@@ -76,9 +76,9 @@ class VideoEditorDashboard
     /**
      * @return array{value: int}
      */
-    public function needsRevision(Workspace $workspace, int $userId, DashboardFilters $filters): array
+    public function needsRevision(Workspace $workspace, DashboardFilters $filters): array
     {
-        return ['value' => $this->editorCreatives($workspace, $userId, $filters)
+        return ['value' => $this->editorCreatives($workspace, $filters)
             ->filter(fn (Creative $c) => $this->isNeedsRevision($c))
             ->count()];
     }
@@ -88,9 +88,9 @@ class VideoEditorDashboard
      *
      * @return array{value: int, approval_rate: int}
      */
-    public function approved(Workspace $workspace, int $userId, DashboardFilters $filters): array
+    public function approved(Workspace $workspace, DashboardFilters $filters): array
     {
-        $creatives = $this->editorCreatives($workspace, $userId, $filters);
+        $creatives = $this->editorCreatives($workspace, $filters);
         $total = $creatives->count();
         $approved = $creatives->where('final_status', self::FINAL_APPROVED)->count();
 
@@ -103,9 +103,9 @@ class VideoEditorDashboard
     /**
      * @return array<string, int>
      */
-    public function ads(Workspace $workspace, int $userId, DashboardFilters $filters): array
+    public function ads(Workspace $workspace, DashboardFilters $filters): array
     {
-        return $this->adsBreakdown($this->editorCreatives($workspace, $userId, $filters));
+        return $this->adsBreakdown($this->editorCreatives($workspace, $filters));
     }
 
     // ─── Pipeline ──────────────────────────────────────────────────────────────
@@ -113,9 +113,9 @@ class VideoEditorDashboard
     /**
      * @return array<string, int>
      */
-    public function pipeline(Workspace $workspace, int $userId, DashboardFilters $filters): array
+    public function pipeline(Workspace $workspace, DashboardFilters $filters): array
     {
-        $creatives = $this->editorCreatives($workspace, $userId, $filters);
+        $creatives = $this->editorCreatives($workspace, $filters);
 
         $status = $this->statusBreakdown($creatives);
         $ads = $this->adsBreakdown($creatives);
@@ -134,9 +134,9 @@ class VideoEditorDashboard
     /**
      * @return list<array<string, mixed>>
      */
-    public function revisionList(Workspace $workspace, int $userId, DashboardFilters $filters): array
+    public function revisionList(Workspace $workspace, DashboardFilters $filters): array
     {
-        return $this->editorCreatives($workspace, $userId, $filters)
+        return $this->editorCreatives($workspace, $filters)
             ->filter(fn (Creative $c) => $this->isNeedsRevision($c))
             ->sortByDesc(fn (Creative $c) => $c->latestReview?->created_at ?? $c->updated_at)
             ->take(self::LIST_LIMIT)
@@ -148,9 +148,9 @@ class VideoEditorDashboard
     /**
      * @return list<array<string, mixed>>
      */
-    public function waitingList(Workspace $workspace, int $userId, DashboardFilters $filters): array
+    public function waitingList(Workspace $workspace, DashboardFilters $filters): array
     {
-        return $this->editorCreatives($workspace, $userId, $filters)
+        return $this->editorCreatives($workspace, $filters)
             ->filter(fn (Creative $c) => $this->isWaiting($c))
             ->sortByDesc('creative_date')
             ->take(self::LIST_LIMIT)
@@ -164,9 +164,9 @@ class VideoEditorDashboard
     /**
      * @return array{categories: list<string>, video: list<int>, image: list<int>}
      */
-    public function throughput(Workspace $workspace, int $userId, DashboardFilters $filters): array
+    public function throughput(Workspace $workspace, DashboardFilters $filters): array
     {
-        $creatives = $this->editorCreatives($workspace, $userId, $filters);
+        $creatives = $this->editorCreatives($workspace, $filters);
 
         // Bucket size + label format follow the chosen grouping.
         [$labelFmt, $floor, $advance] = match ($filters->group) {
@@ -234,7 +234,7 @@ class VideoEditorDashboard
     /**
      * @return list<array<string, mixed>>
      */
-    public function recentActivity(Workspace $workspace, int $userId, DashboardFilters $filters): array
+    public function recentActivity(Workspace $workspace, DashboardFilters $filters): array
     {
         ['from' => $from, 'to' => $to] = $filters->dateBounds();
 
@@ -242,7 +242,7 @@ class VideoEditorDashboard
             ->whereHas('creative', fn (Builder $q) => $q
                 ->where('workspace_id', $workspace->id)
                 ->whereBetween('creative_date', [$from, $to])
-                ->where('creator_id', $userId))
+                ->when($filters->userIds, fn (Builder $q) => $q->whereIn('creator_id', $filters->userIds)))
             ->with(['reviewer:id,name', 'creative:id,name'])
             ->latest()
             ->limit(self::LIST_LIMIT)
@@ -269,19 +269,20 @@ class VideoEditorDashboard
         return Creative::query()
             ->where('workspace_id', $workspace->id)
             ->whereBetween('creative_date', [$from, $to])
-            ->when($filters->productId, fn (Builder $q) => $q->where('product_id', $filters->productId))
-            ->when($filters->format, fn (Builder $q) => $q->where('format', $filters->format));
+            ->when($filters->productIds, fn (Builder $q) => $q->whereIn('product_id', $filters->productIds))
+            ->when($filters->formats, fn (Builder $q) => $q->whereIn('format', $filters->formats));
     }
 
     /**
-     * Creatives owned by the signed-in editor, eager-loaded for status derivation.
+     * Creatives owned by the selected editor(s), eager-loaded for status
+     * derivation. Editor scope defaults to the signed-in user.
      *
      * @return Collection<int, Creative>
      */
-    private function editorCreatives(Workspace $workspace, int $userId, DashboardFilters $filters): Collection
+    private function editorCreatives(Workspace $workspace, DashboardFilters $filters): Collection
     {
         return $this->baseQuery($workspace, $filters)
-            ->where('creator_id', $userId)
+            ->when($filters->userIds, fn (Builder $q) => $q->whereIn('creator_id', $filters->userIds))
             ->with(self::STATUS_RELATIONS)
             ->get();
     }

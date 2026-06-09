@@ -56,6 +56,29 @@ interface SectionProps {
     filters: DashboardFilters;
 }
 
+/** Query params sent to every section endpoint (arrays for multi-select). */
+function sectionParams(filters: DashboardFilters) {
+    const { date_from, date_to, product_ids, user_ids, formats, group } =
+        filters;
+    return { date_from, date_to, product_ids, user_ids, formats, group };
+}
+
+/**
+ * Refetch key for data sections. Excludes `group` (chart granularity) so that
+ * toggling the throughput chart's daily/weekly view does NOT refetch every
+ * other section — only the chart itself depends on `group`.
+ */
+function sectionKey(filters: DashboardFilters) {
+    const { date_from, date_to, product_ids, user_ids, formats } = filters;
+    return JSON.stringify({
+        date_from,
+        date_to,
+        product_ids,
+        user_ids,
+        formats,
+    });
+}
+
 // ─── KPI cards (one endpoint per card) ───────────────────────────────────────
 
 /**
@@ -80,7 +103,6 @@ function KpiStatCard<T extends CountStat>({
 }) {
     const [data, setData] = useState<T | null>(null);
     const [loading, setLoading] = useState(true);
-    const { date_from, date_to, product_id, format, group } = filters;
 
     useEffect(() => {
         const controller = new AbortController();
@@ -90,7 +112,7 @@ function KpiStatCard<T extends CountStat>({
             .get<T>(
                 `/api/workspaces/${workspaceSlug}/video-editor/${endpoint}`,
                 {
-                    params: { date_from, date_to, product_id, format, group },
+                    params: sectionParams(filters),
                     signal: controller.signal,
                 },
             )
@@ -101,15 +123,8 @@ function KpiStatCard<T extends CountStat>({
             .finally(() => setLoading(false));
 
         return () => controller.abort();
-    }, [
-        workspaceSlug,
-        endpoint,
-        date_from,
-        date_to,
-        product_id,
-        format,
-        group,
-    ]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workspaceSlug, endpoint, sectionKey(filters)]);
 
     if (loading || !data) return <KpiCardSkeleton label={label} icon={icon} />;
 
@@ -182,7 +197,6 @@ export function KpiCardsSection({ workspaceSlug, filters }: SectionProps) {
 export function AdsStatusSection({ workspaceSlug, filters }: SectionProps) {
     const [data, setData] = useState<AdsBreakdown | null>(null);
     const [loading, setLoading] = useState(true);
-    const { date_from, date_to, product_id, format, group } = filters;
 
     useEffect(() => {
         const controller = new AbortController();
@@ -191,7 +205,7 @@ export function AdsStatusSection({ workspaceSlug, filters }: SectionProps) {
             .get<AdsBreakdown>(
                 `/api/workspaces/${workspaceSlug}/video-editor/ads`,
                 {
-                    params: { date_from, date_to, product_id, format, group },
+                    params: sectionParams(filters),
                     signal: controller.signal,
                 },
             )
@@ -201,7 +215,8 @@ export function AdsStatusSection({ workspaceSlug, filters }: SectionProps) {
             })
             .finally(() => setLoading(false));
         return () => controller.abort();
-    }, [workspaceSlug, date_from, date_to, product_id, format, group]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workspaceSlug, sectionKey(filters)]);
 
     return (
         <Panel
@@ -221,7 +236,6 @@ export function AdsStatusSection({ workspaceSlug, filters }: SectionProps) {
 export function PipelineSection({ workspaceSlug, filters }: SectionProps) {
     const [data, setData] = useState<Pipeline | null>(null);
     const [loading, setLoading] = useState(true);
-    const { date_from, date_to, product_id, format, group } = filters;
 
     useEffect(() => {
         const controller = new AbortController();
@@ -230,7 +244,7 @@ export function PipelineSection({ workspaceSlug, filters }: SectionProps) {
             .get<Pipeline>(
                 `/api/workspaces/${workspaceSlug}/video-editor/pipeline`,
                 {
-                    params: { date_from, date_to, product_id, format, group },
+                    params: sectionParams(filters),
                     signal: controller.signal,
                 },
             )
@@ -240,7 +254,8 @@ export function PipelineSection({ workspaceSlug, filters }: SectionProps) {
             })
             .finally(() => setLoading(false));
         return () => controller.abort();
-    }, [workspaceSlug, date_from, date_to, product_id, format, group]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workspaceSlug, sectionKey(filters)]);
 
     return (
         <Panel
@@ -264,7 +279,6 @@ export function RevisionListSection({
 }: SectionProps & { editUrl: EditUrl }) {
     const [data, setData] = useState<WorkItem[] | null>(null);
     const [loading, setLoading] = useState(true);
-    const { date_from, date_to, product_id, format, group } = filters;
 
     useEffect(() => {
         const controller = new AbortController();
@@ -273,7 +287,7 @@ export function RevisionListSection({
             .get<WorkItem[]>(
                 `/api/workspaces/${workspaceSlug}/video-editor/revision-list`,
                 {
-                    params: { date_from, date_to, product_id, format, group },
+                    params: sectionParams(filters),
                     signal: controller.signal,
                 },
             )
@@ -283,7 +297,8 @@ export function RevisionListSection({
             })
             .finally(() => setLoading(false));
         return () => controller.abort();
-    }, [workspaceSlug, date_from, date_to, product_id, format, group]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workspaceSlug, sectionKey(filters)]);
 
     return (
         <Panel
@@ -313,7 +328,6 @@ export function WaitingListSection({
 }: SectionProps & { editUrl: EditUrl }) {
     const [data, setData] = useState<WorkItem[] | null>(null);
     const [loading, setLoading] = useState(true);
-    const { date_from, date_to, product_id, format, group } = filters;
 
     useEffect(() => {
         const controller = new AbortController();
@@ -322,7 +336,7 @@ export function WaitingListSection({
             .get<WorkItem[]>(
                 `/api/workspaces/${workspaceSlug}/video-editor/waiting-list`,
                 {
-                    params: { date_from, date_to, product_id, format, group },
+                    params: sectionParams(filters),
                     signal: controller.signal,
                 },
             )
@@ -332,7 +346,8 @@ export function WaitingListSection({
             })
             .finally(() => setLoading(false));
         return () => controller.abort();
-    }, [workspaceSlug, date_from, date_to, product_id, format, group]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workspaceSlug, sectionKey(filters)]);
 
     return (
         <Panel
@@ -361,7 +376,6 @@ export function ThroughputSection({
 }: SectionProps & { onGroupChange: (group: string) => void }) {
     const [data, setData] = useState<Throughput | null>(null);
     const [loading, setLoading] = useState(true);
-    const { date_from, date_to, product_id, format, group } = filters;
 
     useEffect(() => {
         const controller = new AbortController();
@@ -370,7 +384,7 @@ export function ThroughputSection({
             .get<Throughput>(
                 `/api/workspaces/${workspaceSlug}/video-editor/throughput`,
                 {
-                    params: { date_from, date_to, product_id, format, group },
+                    params: sectionParams(filters),
                     signal: controller.signal,
                 },
             )
@@ -380,7 +394,8 @@ export function ThroughputSection({
             })
             .finally(() => setLoading(false));
         return () => controller.abort();
-    }, [workspaceSlug, date_from, date_to, product_id, format, group]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workspaceSlug, sectionKey(filters), filters.group]);
 
     return (
         <Panel
@@ -412,7 +427,6 @@ export function LeaderboardSection({
 }: SectionProps & { currentUserId: number }) {
     const [data, setData] = useState<LeaderRow[] | null>(null);
     const [loading, setLoading] = useState(true);
-    const { date_from, date_to, product_id, format, group } = filters;
 
     useEffect(() => {
         const controller = new AbortController();
@@ -421,7 +435,7 @@ export function LeaderboardSection({
             .get<LeaderRow[]>(
                 `/api/workspaces/${workspaceSlug}/video-editor/leaderboard`,
                 {
-                    params: { date_from, date_to, product_id, format, group },
+                    params: sectionParams(filters),
                     signal: controller.signal,
                 },
             )
@@ -431,7 +445,8 @@ export function LeaderboardSection({
             })
             .finally(() => setLoading(false));
         return () => controller.abort();
-    }, [workspaceSlug, date_from, date_to, product_id, format, group]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workspaceSlug, sectionKey(filters)]);
 
     return (
         <Panel
@@ -455,7 +470,6 @@ export function RecentActivitySection({
 }: SectionProps & { editUrl: EditUrl }) {
     const [data, setData] = useState<ActivityRow[] | null>(null);
     const [loading, setLoading] = useState(true);
-    const { date_from, date_to, product_id, format, group } = filters;
 
     useEffect(() => {
         const controller = new AbortController();
@@ -464,7 +478,7 @@ export function RecentActivitySection({
             .get<ActivityRow[]>(
                 `/api/workspaces/${workspaceSlug}/video-editor/recent-activity`,
                 {
-                    params: { date_from, date_to, product_id, format, group },
+                    params: sectionParams(filters),
                     signal: controller.signal,
                 },
             )
@@ -474,7 +488,8 @@ export function RecentActivitySection({
             })
             .finally(() => setLoading(false));
         return () => controller.abort();
-    }, [workspaceSlug, date_from, date_to, product_id, format, group]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workspaceSlug, sectionKey(filters)]);
 
     return (
         <Panel

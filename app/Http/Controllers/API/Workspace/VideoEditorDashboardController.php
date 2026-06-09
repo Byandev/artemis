@@ -21,63 +21,63 @@ class VideoEditorDashboardController extends Controller
     public function totalCreatives(VideoEditorDashboardRequest $request, Workspace $workspace): JsonResponse
     {
         return response()->json(
-            $this->dashboard->totalCreatives($workspace, $request->user()->id, $request->filters())
+            $this->dashboard->totalCreatives($workspace, $request->filters())
         );
     }
 
     public function awaitingReview(VideoEditorDashboardRequest $request, Workspace $workspace): JsonResponse
     {
         return response()->json(
-            $this->dashboard->awaitingReview($workspace, $request->user()->id, $request->filters())
+            $this->dashboard->awaitingReview($workspace, $request->filters())
         );
     }
 
     public function needsRevision(VideoEditorDashboardRequest $request, Workspace $workspace): JsonResponse
     {
         return response()->json(
-            $this->dashboard->needsRevision($workspace, $request->user()->id, $request->filters())
+            $this->dashboard->needsRevision($workspace, $request->filters())
         );
     }
 
     public function approved(VideoEditorDashboardRequest $request, Workspace $workspace): JsonResponse
     {
         return response()->json(
-            $this->dashboard->approved($workspace, $request->user()->id, $request->filters())
+            $this->dashboard->approved($workspace, $request->filters())
         );
     }
 
     public function ads(VideoEditorDashboardRequest $request, Workspace $workspace): JsonResponse
     {
         return response()->json(
-            $this->dashboard->ads($workspace, $request->user()->id, $request->filters())
+            $this->dashboard->ads($workspace, $request->filters())
         );
     }
 
     public function pipeline(VideoEditorDashboardRequest $request, Workspace $workspace): JsonResponse
     {
         return response()->json(
-            $this->dashboard->pipeline($workspace, $request->user()->id, $request->filters())
+            $this->dashboard->pipeline($workspace, $request->filters())
         );
     }
 
     public function revisionList(VideoEditorDashboardRequest $request, Workspace $workspace): JsonResponse
     {
         return response()->json(
-            $this->dashboard->revisionList($workspace, $request->user()->id, $request->filters())
+            $this->dashboard->revisionList($workspace, $request->filters())
         );
     }
 
     public function waitingList(VideoEditorDashboardRequest $request, Workspace $workspace): JsonResponse
     {
         return response()->json(
-            $this->dashboard->waitingList($workspace, $request->user()->id, $request->filters())
+            $this->dashboard->waitingList($workspace, $request->filters())
         );
     }
 
     public function throughput(VideoEditorDashboardRequest $request, Workspace $workspace): JsonResponse
     {
         return response()->json(
-            $this->dashboard->throughput($workspace, $request->user()->id, $request->filters())
+            $this->dashboard->throughput($workspace, $request->filters())
         );
     }
 
@@ -91,7 +91,7 @@ class VideoEditorDashboardController extends Controller
     public function recentActivity(VideoEditorDashboardRequest $request, Workspace $workspace): JsonResponse
     {
         return response()->json(
-            $this->dashboard->recentActivity($workspace, $request->user()->id, $request->filters())
+            $this->dashboard->recentActivity($workspace, $request->filters())
         );
     }
 }

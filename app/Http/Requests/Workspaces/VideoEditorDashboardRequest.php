@@ -30,8 +30,12 @@ class VideoEditorDashboardRequest extends FormRequest
         return [
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
-            'product_id' => ['nullable'],
-            'format' => ['nullable', 'in:video,image,all'],
+            'product_ids' => ['nullable', 'array'],
+            'product_ids.*' => ['integer'],
+            'user_ids' => ['nullable', 'array'],
+            'user_ids.*' => ['integer'],
+            'formats' => ['nullable', 'array'],
+            'formats.*' => ['in:video,image'],
             'group' => ['nullable', 'in:daily,weekly,monthly,yearly'],
         ];
     }

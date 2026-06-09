@@ -20,11 +20,17 @@ final class DashboardFilters
 
     private const GROUP_YEARLY = 'yearly';
 
+    /**
+     * @param  list<int>  $productIds
+     * @param  list<int>  $userIds
+     * @param  list<string>  $formats
+     */
     public function __construct(
         public readonly CarbonImmutable $dateFrom,
         public readonly CarbonImmutable $dateTo,
-        public readonly ?int $productId,
-        public readonly ?string $format,
+        public readonly array $productIds,
+        public readonly array $userIds,
+        public readonly array $formats,
         public readonly string $group,
     ) {}
 
@@ -39,19 +45,38 @@ final class DashboardFilters
             ? CarbonImmutable::parse($request->date('date_to'))
             : CarbonImmutable::today();
 
-        $productId = $request->filled('product_id') && $request->input('product_id') !== 'all'
-            ? (int) $request->input('product_id')
-            : null;
+        $productIds = collect((array) $request->input('product_ids', []))
+            ->reject(fn ($id) => $id === '' || $id === 'all')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
 
-        $format = in_array($request->input('format'), ['video', 'image'], true)
-            ? $request->string('format')->toString()
-            : null;
+        $formats = collect((array) $request->input('formats', []))
+            ->filter(fn ($f) => in_array($f, ['video', 'image'], true))
+            ->unique()
+            ->values()
+            ->all();
+
+        // Editor scope defaults to the signed-in user; selecting foreign users
+        // is safe because every section also scopes by workspace_id.
+        $userIds = collect((array) $request->input('user_ids', []))
+            ->reject(fn ($id) => $id === '' || $id === 'all')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($userIds)) {
+            $userIds = [(int) $request->user()->id];
+        }
 
         return new self(
             dateFrom: $dateFrom,
             dateTo: $dateTo,
-            productId: $productId,
-            format: $format,
+            productIds: $productIds,
+            userIds: $userIds,
+            formats: $formats,
             group: self::resolveGroup($request->input('group'), $dateFrom, $dateTo),
         );
     }
@@ -68,17 +93,18 @@ final class DashboardFilters
     }
 
     /**
-     * Filter payload shared with the frontend (string-friendly).
+     * Filter payload shared with the frontend (string-friendly arrays).
      *
-     * @return array<string, string>
+     * @return array<string, mixed>
      */
     public function toArray(): array
     {
         return [
             'date_from' => $this->dateFrom->toDateString(),
             'date_to' => $this->dateTo->toDateString(),
-            'product_id' => $this->productId ? (string) $this->productId : 'all',
-            'format' => $this->format ?? 'all',
+            'product_ids' => array_map('strval', $this->productIds),
+            'user_ids' => array_map('strval', $this->userIds),
+            'formats' => $this->formats,
             'group' => $this->group,
         ];
     }

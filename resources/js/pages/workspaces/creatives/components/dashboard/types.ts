@@ -78,8 +78,12 @@ export interface Throughput {
 export interface DashboardFilters {
     date_from: string;
     date_to: string;
-    product_id: string;
-    format: string;
+    /** Selected product ids (empty = all products). */
+    product_ids: string[];
+    /** Editors whose creatives the dashboard is scoped to (defaults to me). */
+    user_ids: string[];
+    /** Selected formats: video / image (empty = all). */
+    formats: string[];
     /** Throughput bucket size: daily | weekly | monthly | yearly. */
     group: string;
 }
@@ -87,6 +91,11 @@ export interface DashboardFilters {
 export interface ProductOption {
     id: number;
     title: string;
+}
+
+export interface EditorOption {
+    id: number;
+    name: string;
 }
 
 /**
@@ -97,6 +106,7 @@ export interface DashboardPageProps {
     workspace: Workspace;
     currentUserId: number;
     products: ProductOption[];
+    editors: EditorOption[];
     filters: DashboardFilters;
 }
 
