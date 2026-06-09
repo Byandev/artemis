@@ -7,12 +7,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Sorts\PendingRequiredChecklistsSort;
 use App\Models\Shop;
 use App\Models\Workspace;
-use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
-use Modules\Pancake\Jobs\FetchShopCustomers;
 use Modules\Pancake\Jobs\FetchShopUsers;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
@@ -56,7 +54,6 @@ class ShopController extends Controller
             ->allowedSorts([
                 'name',
                 'created_at',
-                'customers_last_synced_at',
                 'deleted_at',
                 AllowedSort::custom('pending_required_checklists_count', new PendingRequiredChecklistsSort),
             ])
@@ -71,28 +68,6 @@ class ShopController extends Controller
                 'filter' => $request->input('filter', []),
             ],
         ]);
-    }
-
-    public function refresh(Request $request, Workspace $workspace, Shop $shop)
-    {
-        // Check if user has access to this workspace
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
-
-        $this->authorize(Permission::RefreshShops->value, $workspace);
-
-        // Ensure the page belongs to the workspace
-        if ($shop->workspace_id !== $workspace->id) {
-            abort(403);
-        }
-
-        $shop->update(['customers_last_synced_at' => null]);
-
-        dispatch(new FetchShopCustomers($shop, 1, Carbon::now()->subMonth()->unix(), Carbon::now()->unix()))->onQueue('pancake');
-        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
-
-        return redirect()->route('workspaces.shops.index', $workspace);
     }
 
     public function refreshUsers(Request $request, Workspace $workspace, Shop $shop)

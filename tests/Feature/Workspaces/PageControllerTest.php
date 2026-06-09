@@ -8,7 +8,6 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Modules\Pancake\Jobs\FetchPageOrders;
-use Modules\Pancake\Jobs\FetchShopCustomers;
 use Modules\Pancake\Jobs\FetchShopUsers;
 
 test('owner can view pages index', function () {
@@ -287,7 +286,6 @@ test('store creates a page and shop after Pancake API confirms', function () {
     expect(Page::where('id', 9001)->where('workspace_id', $workspace->id)->exists())->toBeTrue();
     expect(Shop::where('id', 123)->where('workspace_id', $workspace->id)->exists())->toBeTrue();
     Bus::assertDispatched(FetchPageOrders::class);
-    Bus::assertDispatched(FetchShopCustomers::class);
     Bus::assertDispatched(FetchShopUsers::class);
 });
 
