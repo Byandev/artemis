@@ -12,6 +12,18 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.8.1',
+        date: '2026-06-09',
+        sections: [
+            {
+                title: 'Parcel Journey — Page Stats',
+                items: [
+                    'Removed the RTS Rate column from the per-page stats table on the Parcel Journey Templates page — the column added unnecessary query complexity and is better viewed on the dedicated RTS Analytics page',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.8.0',
         date: '2026-06-09',
         sections: [
