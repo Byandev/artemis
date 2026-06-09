@@ -35,7 +35,6 @@ interface PageStat {
     tracked_orders: number;
     sms_sent: number;
     chat_sent: number;
-    rts_rate: number;
 }
 
 type Props = {
@@ -259,14 +258,6 @@ const ParcelUpdateNotificationTemplates = ({
                 ),
                 cell: ({ row }) =>
                     Number(row.original.chat_sent).toLocaleString(),
-            },
-            {
-                accessorKey: 'rts_rate',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="RTS Rate" />
-                ),
-                cell: ({ row }) =>
-                    `${Number(row.original.rts_rate).toFixed(2)}%`,
             },
         ],
         [],
