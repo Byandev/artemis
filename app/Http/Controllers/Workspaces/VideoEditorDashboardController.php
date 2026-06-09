@@ -2,15 +2,16 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Workspaces\VideoEditorDashboardRequest;
 use App\Models\Product;
+use App\Models\Role;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
-use Modules\Creatives\Models\Creative;
 
 class VideoEditorDashboardController extends Controller
 {
@@ -31,32 +32,35 @@ class VideoEditorDashboardController extends Controller
                 ->where('workspace_id', $workspace->id)
                 ->orderBy('title')
                 ->get(['id', 'title']),
-            'editors' => $this->editors($workspace, $request->user()),
+            'editors' => $this->creativeUsers($workspace, $request->user()),
             'filters' => $request->filters()->toArray(),
         ]);
     }
 
     /**
-     * Editors selectable in the dashboard filter: everyone who has authored a
-     * creative in this workspace, plus the signed-in user so they can always
-     * see their own (even with zero creatives).
+     * Users selectable in the dashboard's User filter: every workspace member
+     * who can access creatives — i.e. whose role grants "View Creatives", plus
+     * the workspace owner and the signed-in user (who always have access).
      *
      * @return Collection<int, array{id: int, name: string}>
      */
-    private function editors(Workspace $workspace, User $currentUser)
+    private function creativeUsers(Workspace $workspace, User $currentUser)
     {
-        $creatorIds = Creative::query()
+        $creativeRoleIds = Role::query()
             ->where('workspace_id', $workspace->id)
-            ->whereNotNull('creator_id')
-            ->distinct()
-            ->pluck('creator_id')
-            ->push($currentUser->id)
-            ->unique();
+            ->whereHas('permissions', fn ($q) => $q->where('name', Permission::ViewCreatives->value))
+            ->pluck('id');
 
-        return User::query()
-            ->whereIn('id', $creatorIds)
-            ->orderBy('name')
-            ->get(['id', 'name'])
+        return $workspace->users()
+            ->where(function ($query) use ($creativeRoleIds, $workspace, $currentUser) {
+                $query->whereIn('workspace_user.role_id', $creativeRoleIds)
+                    ->orWhere('users.id', $workspace->owner_id)
+                    ->orWhere('users.id', $currentUser->id);
+            })
+            ->orderBy('users.name')
+            ->get(['users.id', 'users.name'])
+            ->unique('id')
+            ->values()
             ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name]);
     }
 }

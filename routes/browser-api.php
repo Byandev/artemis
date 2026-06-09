@@ -56,6 +56,7 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/throughput', [VideoEditorDashboardController::class, 'throughput'])->name('throughput');
             Route::get('/leaderboard', [VideoEditorDashboardController::class, 'leaderboard'])->name('leaderboard');
             Route::get('/recent-activity', [VideoEditorDashboardController::class, 'recentActivity'])->name('recent-activity');
+            Route::get('/calendar', [VideoEditorDashboardController::class, 'calendar'])->name('calendar');
         });
     });
 });

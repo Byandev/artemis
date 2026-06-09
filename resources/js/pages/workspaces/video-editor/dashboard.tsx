@@ -3,6 +3,7 @@ import AppLayout from '@/layouts/app-layout';
 import DashboardFiltersBar from '@/pages/workspaces/creatives/components/dashboard/dashboard-filters';
 import {
     AdsStatusSection,
+    CreationCalendarSection,
     KpiCardsSection,
     LeaderboardSection,
     PipelineSection,
@@ -141,6 +142,13 @@ export default function VideoEditorDashboard({
                         workspaceSlug={workspace.slug}
                         filters={filters}
                         editUrl={editUrl}
+                    />
+                </div>
+
+                <div className="mt-3">
+                    <CreationCalendarSection
+                        workspaceSlug={workspace.slug}
+                        filters={filters}
                     />
                 </div>
             </div>

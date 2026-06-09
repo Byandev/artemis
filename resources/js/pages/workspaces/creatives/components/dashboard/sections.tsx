@@ -1,5 +1,6 @@
 import axios from 'axios';
 import {
+    CalendarDays,
     Clapperboard,
     Clock,
     FileImage,
@@ -15,6 +16,7 @@ import {
 import { ReactNode, useEffect, useState } from 'react';
 import ActivityFeed from './activity-feed';
 import AdsStatusGrid from './ads-status-grid';
+import CreativesCalendar from './creatives-calendar';
 import GranularityToggle from './granularity-toggle';
 import { KpiCard, KpiCardSkeleton } from './kpi-card';
 import Leaderboard from './leaderboard';
@@ -33,6 +35,7 @@ import {
     ActivityRow,
     AdsBreakdown,
     ApprovedStat,
+    CalendarData,
     CountStat,
     DashboardFilters,
     EditUrl,
@@ -500,6 +503,50 @@ export function RecentActivitySection({
                 <ActivitySkeleton />
             ) : (
                 <ActivityFeed rows={data} editUrl={editUrl} />
+            )}
+        </Panel>
+    );
+}
+
+/** Calendar of creation activity: who created creatives each day, and how many. */
+export function CreationCalendarSection({
+    workspaceSlug,
+    filters,
+}: SectionProps) {
+    const [data, setData] = useState<CalendarData | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        setLoading(true);
+        axios
+            .get<CalendarData>(
+                `/api/workspaces/${workspaceSlug}/video-editor/calendar`,
+                {
+                    params: sectionParams(filters),
+                    signal: controller.signal,
+                },
+            )
+            .then((res) => setData(res.data))
+            .catch((err) => {
+                if (!axios.isCancel(err)) console.error(err);
+            })
+            .finally(() => setLoading(false));
+        return () => controller.abort();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workspaceSlug, sectionKey(filters)]);
+
+    return (
+        <Panel
+            title="Creation Calendar"
+            icon={<CalendarDays className="h-3.5 w-3.5 text-gray-400" />}
+        >
+            {loading || !data ? (
+                <div className="py-10 text-center text-sm text-gray-400 dark:text-gray-500">
+                    Loading calendar…
+                </div>
+            ) : (
+                <CreativesCalendar data={data} />
             )}
         </Panel>
     );

@@ -94,4 +94,11 @@ class VideoEditorDashboardController extends Controller
             $this->dashboard->recentActivity($workspace, $request->filters())
         );
     }
+
+    public function calendar(VideoEditorDashboardRequest $request, Workspace $workspace): JsonResponse
+    {
+        return response()->json(
+            $this->dashboard->calendar($workspace, $request->filters())
+        );
+    }
 }
