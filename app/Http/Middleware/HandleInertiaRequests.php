@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Models\Role;
-use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Models\Workspace;
@@ -84,11 +83,7 @@ class HandleInertiaRequests extends Middleware
         if ($currentWorkspace instanceof Workspace && ! app()->isLocal()) {
             $subscription = $currentWorkspace->subscription;
 
-            $isExpired = ! $subscription
-                || $subscription->status === Subscription::STATUS_EXPIRED
-                || $subscription->status === Subscription::STATUS_CANCELED
-                || ($subscription->status === Subscription::STATUS_TRIALING && $subscription->trial_ends_at && $subscription->trial_ends_at->isPast())
-                || ($subscription->status === Subscription::STATUS_ACTIVE && $subscription->current_period_end && $subscription->current_period_end->isPast());
+            $isExpired = ! $subscription || $subscription->isLapsed();
 
             if ($isExpired) {
                 $subscriptionExpired = [

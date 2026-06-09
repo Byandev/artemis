@@ -7,7 +7,6 @@ use App\Models\SubscriptionPlan;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Modules\Pancake\Jobs\FetchPageOrders;
-use Modules\Pancake\Jobs\FetchShopCustomers;
 use Modules\Pancake\Jobs\FetchShopUsers;
 
 test('onboarding page renders for new workspaces', function () {
@@ -59,7 +58,6 @@ test('onboarding store creates page and shop after upstream API confirms', funct
     expect(Page::where('id', 9999)->where('workspace_id', $workspace->id)->exists())->toBeTrue();
     expect(Shop::where('id', 555)->where('workspace_id', $workspace->id)->exists())->toBeTrue();
     Bus::assertDispatched(FetchPageOrders::class);
-    Bus::assertDispatched(FetchShopCustomers::class);
     Bus::assertDispatched(FetchShopUsers::class);
 });
 

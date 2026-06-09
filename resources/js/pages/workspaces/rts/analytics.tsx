@@ -1,4 +1,3 @@
-import AskRtsWidget, { RtsData } from '@/components/ai/AskRtsWidget';
 import PageHeader from '@/components/common/PageHeader';
 import Filters, { FilterValue } from '@/components/filters/Filters';
 import AdCard from '@/components/rts/AdCard';
@@ -18,25 +17,89 @@ import { Head } from '@inertiajs/react';
 import { formatDate } from 'date-fns';
 import flatpickr from 'flatpickr';
 import moment from 'moment';
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import DateOption = flatpickr.Options.DateOption;
 
 interface Props {
     workspace: Workspace;
 }
 
+const FILTER_KEYS: (keyof FilterValue)[] = [
+    'teamIds',
+    'productIds',
+    'shopIds',
+    'pageIds',
+    'userIds',
+];
+
+const STORAGE_KEY_PREFIX = 'rts-analytics-state:';
+
+type PersistedState = { dateRange: string[]; filter: FilterValue };
+
+function defaultState(): PersistedState {
+    return {
+        dateRange: [
+            moment().startOf('month').format('YYYY-MM-DD'),
+            moment().endOf('month').format('YYYY-MM-DD'),
+        ],
+        filter: {
+            teamIds: [],
+            productIds: [],
+            shopIds: [],
+            pageIds: [],
+            userIds: [],
+        },
+    };
+}
+
+// Hydrate filters/date range from localStorage so they survive a browser
+// refresh (without leaking into the URL). Scoped per workspace.
+function loadState(workspaceSlug: string): PersistedState {
+    const fallback = defaultState();
+
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_PREFIX + workspaceSlug);
+        if (!raw) return fallback;
+
+        const parsed = JSON.parse(raw);
+        const dateRange =
+            Array.isArray(parsed?.dateRange) && parsed.dateRange.length === 2
+                ? parsed.dateRange.map(String)
+                : fallback.dateRange;
+
+        const filter = { ...fallback.filter };
+        FILTER_KEYS.forEach((key) => {
+            if (Array.isArray(parsed?.filter?.[key])) {
+                filter[key] = parsed.filter[key];
+            }
+        });
+
+        return { dateRange, filter };
+    } catch {
+        return fallback;
+    }
+}
+
 export default function Analytics({ workspace }: Props) {
-    const [dateRange, setDateRange] = useState([
-        moment().startOf('month').format('YYYY-MM-DD'),
-        moment().endOf('month').format('YYYY-MM-DD'),
-    ]);
-    const [filter, setFilter] = useState<FilterValue>({
-        teamIds: [],
-        productIds: [],
-        shopIds: [],
-        pageIds: [],
-        userIds: [],
-    });
+    const initialState = useMemo(
+        () => loadState(workspace.slug),
+        [workspace.slug],
+    );
+    const [dateRange, setDateRange] = useState(initialState.dateRange);
+    const [filter, setFilter] = useState<FilterValue>(initialState.filter);
+
+    // Persist to localStorage so a refresh restores the current filters.
+    useEffect(() => {
+        try {
+            localStorage.setItem(
+                STORAGE_KEY_PREFIX + workspace.slug,
+                JSON.stringify({ dateRange, filter }),
+            );
+        } catch {
+            // Ignore storage errors (e.g. quota / private mode).
+        }
+    }, [workspace.slug, dateRange, filter]);
 
     const queryParams: RtsQueryParams = useMemo(
         () => ({
@@ -48,40 +111,6 @@ export default function Analytics({ workspace }: Props) {
         [dateRange, filter],
     );
 
-    const [rtsData, setRtsData] = useState<RtsData>({
-        price: [],
-        products: [],
-        riders: [],
-        customerRisk: [],
-        provinces: [],
-        orderFrequency: [],
-    });
-
-    const onPriceLoaded = useCallback(
-        (d: object[]) => setRtsData((prev) => ({ ...prev, price: d })),
-        [],
-    );
-    const onProductsLoaded = useCallback(
-        (d: object[]) => setRtsData((prev) => ({ ...prev, products: d })),
-        [],
-    );
-    const onRidersLoaded = useCallback(
-        (d: object[]) => setRtsData((prev) => ({ ...prev, riders: d })),
-        [],
-    );
-    const onCustomerRiskLoaded = useCallback(
-        (d: object[]) => setRtsData((prev) => ({ ...prev, customerRisk: d })),
-        [],
-    );
-    const onProvincesLoaded = useCallback(
-        (d: object[]) => setRtsData((prev) => ({ ...prev, provinces: d })),
-        [],
-    );
-    const onOrderFreqLoaded = useCallback(
-        (d: object[]) => setRtsData((prev) => ({ ...prev, orderFrequency: d })),
-        [],
-    );
-
     return (
         <AppLayout>
             <Head title={`${workspace.name} — RTS Analytics`} />
@@ -91,7 +120,11 @@ export default function Analytics({ workspace }: Props) {
                     description={`${formatDate(new Date(dateRange[0]), 'MMM d')} – ${formatDate(new Date(dateRange[1]), 'MMM d, yyyy')}`}
                     stackActionsOnMobile
                 >
-                    <Filters workspace={workspace} onChange={setFilter} />
+                    <Filters
+                        workspace={workspace}
+                        onChange={setFilter}
+                        initialValue={initialState.filter}
+                    />
                     <DatePicker
                         id="rts-date-range"
                         mode="range"
@@ -111,7 +144,6 @@ export default function Analytics({ workspace }: Props) {
                     <PriceCard
                         workspaceSlug={workspace.slug}
                         queryParams={queryParams}
-                        onDataLoaded={onPriceLoaded}
                     />
                     <DeliveryAttemptsCard
                         workspaceSlug={workspace.slug}
@@ -122,17 +154,14 @@ export default function Analytics({ workspace }: Props) {
                 <CxRtsCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
-                    onDataLoaded={onCustomerRiskLoaded}
                 />
                 <ProductCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
-                    onDataLoaded={onProductsLoaded}
                 />
                 <RiderCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
-                    onDataLoaded={onRidersLoaded}
                 />
                 <ConfirmedByCard
                     workspaceSlug={workspace.slug}
@@ -145,20 +174,12 @@ export default function Analytics({ workspace }: Props) {
                 <OrderFrequencyCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
-                    onDataLoaded={onOrderFreqLoaded}
                 />
                 <LocationCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
-                    onDataLoaded={onProvincesLoaded}
                 />
             </div>
-
-            <AskRtsWidget
-                workspace={workspace}
-                dateRange={dateRange}
-                data={rtsData}
-            />
         </AppLayout>
     );
 }

@@ -78,6 +78,7 @@ Route::middleware(['auth'])->group(function () {
         // Onboarding (after workspace creation)
         Route::get('/onboarding', [OnboardingController::class, 'create'])->name('workspace.onboarding');
         Route::post('/onboarding', [OnboardingController::class, 'store'])->name('workspace.onboarding.store');
+        Route::post('/onboarding/skip', [OnboardingController::class, 'skip'])->name('workspace.onboarding.skip');
         Route::get('/onboarding/status', [OnboardingController::class, 'status'])->name('workspace.onboarding.status');
 
         Route::get('/inventory/transactions', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
@@ -151,7 +152,6 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/workspaces/{workspace}/page-daily-budget-records/{pageDailyBudgetRecord}', [PageDailyBudgetRecordController::class, 'destroy'])->name('workspaces.page-daily-budget-records.destroy');
 
     Route::get('/workspaces/{workspace}/shops', [ShopController::class, 'index'])->name('workspaces.shops.index');
-    Route::post('/workspaces/{workspace}/shops/{shop}/refresh', [ShopController::class, 'refresh'])->name('workspaces.shops.refresh');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-users', [ShopController::class, 'refreshUsers'])->name('workspaces.shops.refresh-users');
 
     // Product routes

@@ -22,7 +22,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Modules\Pancake\Jobs\FetchPageOrders;
-use Modules\Pancake\Jobs\FetchShopCustomers;
 use Modules\Pancake\Jobs\FetchShopUsers;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
@@ -175,7 +174,6 @@ class PageController extends Controller
         ]);
 
         dispatch(new FetchPageOrders($page, 1, Carbon::now()->subMonth()->unix(), Carbon::now()->unix()))->onQueue('pancake');
-        dispatch(new FetchShopCustomers($shop, 1, Carbon::now()->subMonth()->unix(), Carbon::now()->unix()))->onQueue('pancake');
         dispatch(new FetchShopUsers($shop))->onQueue('pancake');
 
         (new PostHogService)->capture((string) $request->user()->id, 'page_connected', [
