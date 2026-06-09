@@ -1,4 +1,3 @@
-import AskRtsWidget, { RtsData } from '@/components/ai/AskRtsWidget';
 import PageHeader from '@/components/common/PageHeader';
 import Filters, { FilterValue } from '@/components/filters/Filters';
 import AdCard from '@/components/rts/AdCard';
@@ -12,15 +11,13 @@ import ProductCard from '@/components/rts/ProductCard';
 import RiderCard from '@/components/rts/RiderCard';
 import { RtsQueryParams } from '@/components/rts/rts-shared';
 import DatePicker from '@/components/ui/date-picker';
-import { PERMISSIONS } from '@/constants/permissions';
-import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
 import { formatDate } from 'date-fns';
 import flatpickr from 'flatpickr';
 import moment from 'moment';
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import DateOption = flatpickr.Options.DateOption;
 
 interface Props {
@@ -28,9 +25,6 @@ interface Props {
 }
 
 export default function Analytics({ workspace }: Props) {
-    // AI chat support widget is gated behind a permission.
-    const canUseAiChat = usePermission(PERMISSIONS.ViewRtsAiChat);
-
     const [dateRange, setDateRange] = useState([
         moment().startOf('month').format('YYYY-MM-DD'),
         moment().endOf('month').format('YYYY-MM-DD'),
@@ -51,40 +45,6 @@ export default function Analytics({ workspace }: Props) {
             shopIds: filter.shopIds,
         }),
         [dateRange, filter],
-    );
-
-    const [rtsData, setRtsData] = useState<RtsData>({
-        price: [],
-        products: [],
-        riders: [],
-        customerRisk: [],
-        provinces: [],
-        orderFrequency: [],
-    });
-
-    const onPriceLoaded = useCallback(
-        (d: object[]) => setRtsData((prev) => ({ ...prev, price: d })),
-        [],
-    );
-    const onProductsLoaded = useCallback(
-        (d: object[]) => setRtsData((prev) => ({ ...prev, products: d })),
-        [],
-    );
-    const onRidersLoaded = useCallback(
-        (d: object[]) => setRtsData((prev) => ({ ...prev, riders: d })),
-        [],
-    );
-    const onCustomerRiskLoaded = useCallback(
-        (d: object[]) => setRtsData((prev) => ({ ...prev, customerRisk: d })),
-        [],
-    );
-    const onProvincesLoaded = useCallback(
-        (d: object[]) => setRtsData((prev) => ({ ...prev, provinces: d })),
-        [],
-    );
-    const onOrderFreqLoaded = useCallback(
-        (d: object[]) => setRtsData((prev) => ({ ...prev, orderFrequency: d })),
-        [],
     );
 
     return (
@@ -116,7 +76,6 @@ export default function Analytics({ workspace }: Props) {
                     <PriceCard
                         workspaceSlug={workspace.slug}
                         queryParams={queryParams}
-                        onDataLoaded={onPriceLoaded}
                     />
                     <DeliveryAttemptsCard
                         workspaceSlug={workspace.slug}
@@ -127,17 +86,14 @@ export default function Analytics({ workspace }: Props) {
                 <CxRtsCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
-                    onDataLoaded={onCustomerRiskLoaded}
                 />
                 <ProductCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
-                    onDataLoaded={onProductsLoaded}
                 />
                 <RiderCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
-                    onDataLoaded={onRidersLoaded}
                 />
                 <ConfirmedByCard
                     workspaceSlug={workspace.slug}
@@ -150,22 +106,12 @@ export default function Analytics({ workspace }: Props) {
                 <OrderFrequencyCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
-                    onDataLoaded={onOrderFreqLoaded}
                 />
                 <LocationCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
-                    onDataLoaded={onProvincesLoaded}
                 />
             </div>
-
-            {canUseAiChat && (
-                <AskRtsWidget
-                    workspace={workspace}
-                    dateRange={dateRange}
-                    data={rtsData}
-                />
-            )}
         </AppLayout>
     );
 }
