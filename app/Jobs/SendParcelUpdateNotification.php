@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\OutgoingApiLog;
 use App\Services\Botcake;
 use DateTime;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -44,6 +45,20 @@ class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
     public function handle(): void
     {
         if (! config('settings.parcel_journey_notification_enabled')) {
+            if (config('settings.parcel_journey_notification_logs_enabled')) {
+                OutgoingApiLog::create([
+                    'service' => 'botcake',
+                    'action' => 'sendParcelUpdateNotification',
+                    'http_method' => 'POST',
+                    'url' => 'skipped',
+                    'request_payload' => ['notification_id' => $this->parcelJourneyNotification->id],
+                    'response_status' => null,
+                    'response_body' => null,
+                    'duration_ms' => null,
+                    'context' => ['reason' => 'parcel_journey_notification_enabled is false'],
+                ]);
+            }
+
             return;
         }
 
@@ -91,6 +106,8 @@ class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
             if (! $claimed) {
                 return;
             }
+
+            sleep(0.5);
 
             [$pageId, $psid] = explode('_', $this->parcelJourneyNotification->order->fb_id);
 

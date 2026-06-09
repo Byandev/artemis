@@ -1,44 +1,147 @@
 import PageHeader from '@/components/common/PageHeader';
 import AppLayout from '@/layouts/app-layout';
+import DashboardFiltersBar from '@/pages/workspaces/creatives/components/dashboard/dashboard-filters';
+import {
+    AdsStatusSection,
+    KpiCardsSection,
+    LeaderboardSection,
+    PipelineSection,
+    RecentActivitySection,
+    RevisionListSection,
+    ThroughputSection,
+    WaitingListSection,
+} from '@/pages/workspaces/creatives/components/dashboard/sections';
+import {
+    ApplyFilter,
+    DashboardFilters,
+    DashboardPageProps,
+} from '@/pages/workspaces/creatives/components/dashboard/types';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
-import { Clapperboard } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 
-interface Props {
-    workspace: {
-        id: number;
-        name: string;
-        slug: string;
-    };
-}
+export default function VideoEditorDashboard({
+    workspace,
+    currentUserId,
+    products,
+    editors,
+    filters: initialFilters,
+}: DashboardPageProps) {
+    // Edit/list links point at the creatives module.
+    const dashboardBase = `/workspaces/${workspace.slug}/video-editor`;
+    const creativesBase = `/workspaces/${workspace.slug}/creatives`;
 
-export default function VideoEditorDashboard({ workspace }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: 'Video Editor Dashboard',
-            href: `/workspaces/${workspace.slug}/video-editor/dashboard`,
+            href: `${dashboardBase}/dashboard`,
         },
     ];
 
+    // Filters live client-side: each section fetches itself from its own API
+    // endpoint, so changing a filter (or the chart granularity) updates only
+    // the affected sections — no full page reload. Persisted per workspace so
+    // they survive a browser refresh.
+    const STORAGE_KEY = `video-editor-dashboard-filters:${workspace.slug}`;
+
+    const [filters, setFilters] = useState<DashboardFilters>(() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                return { ...initialFilters, ...JSON.parse(saved) };
+            }
+        } catch {
+            // Ignore unavailable / malformed storage.
+        }
+        return initialFilters;
+    });
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
+        } catch {
+            // Ignore storage errors (quota / private mode).
+        }
+    }, [STORAGE_KEY, filters]);
+
+    const applyFilter = useCallback<ApplyFilter>((patch) => {
+        setFilters((prev) => ({ ...prev, ...patch }));
+    }, []);
+
+    const editUrl = useCallback(
+        (id: number) => `${creativesBase}/${id}/edit`,
+        [creativesBase],
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Video Editor Dashboard" />
-
-            <div className="p-4 sm:p-6">
+            <Head title="My Work" />
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
-                    title="Video Editor Dashboard"
-                    description="Video creative production for this workspace."
+                    title="My Work"
+                    description="Your creative workload, pipeline, and performance"
+                    stackActionsOnMobile
+                >
+                    <DashboardFiltersBar
+                        filters={filters}
+                        products={products}
+                        editors={editors}
+                        currentUserId={currentUserId}
+                        onChange={applyFilter}
+                        listUrl={creativesBase}
+                    />
+                </PageHeader>
+
+                <KpiCardsSection
+                    workspaceSlug={workspace.slug}
+                    filters={filters}
                 />
 
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-black/10 py-20 text-center dark:border-white/10">
-                    <Clapperboard className="mb-3 h-8 w-8 text-gray-300 dark:text-gray-600" />
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                        Nothing here yet
-                    </p>
-                    <p className="mt-1 max-w-sm text-xs text-gray-400 dark:text-gray-500">
-                        This dashboard is set up and ready. Metrics and charts
-                        will be added soon.
-                    </p>
+                <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                    <AdsStatusSection
+                        workspaceSlug={workspace.slug}
+                        filters={filters}
+                    />
+                    <div className="lg:col-span-2">
+                        <PipelineSection
+                            workspaceSlug={workspace.slug}
+                            filters={filters}
+                        />
+                    </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <RevisionListSection
+                        workspaceSlug={workspace.slug}
+                        filters={filters}
+                        editUrl={editUrl}
+                    />
+                    <WaitingListSection
+                        workspaceSlug={workspace.slug}
+                        filters={filters}
+                        editUrl={editUrl}
+                    />
+                </div>
+
+                <div className="mt-3">
+                    <ThroughputSection
+                        workspaceSlug={workspace.slug}
+                        filters={filters}
+                        onGroupChange={(group) => applyFilter({ group })}
+                    />
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <LeaderboardSection
+                        workspaceSlug={workspace.slug}
+                        filters={filters}
+                        currentUserId={currentUserId}
+                    />
+                    <RecentActivitySection
+                        workspaceSlug={workspace.slug}
+                        filters={filters}
+                        editUrl={editUrl}
+                    />
                 </div>
             </div>
         </AppLayout>

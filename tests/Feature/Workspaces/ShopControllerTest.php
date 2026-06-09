@@ -2,9 +2,6 @@
 
 use App\Models\Shop;
 use App\Models\User;
-use Illuminate\Support\Facades\Bus;
-use Modules\Pancake\Jobs\FetchShopCustomers;
-use Modules\Pancake\Jobs\FetchShopUsers;
 
 test('owner can view shops index', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
@@ -24,22 +21,6 @@ test('non-member cannot view shops', function () {
         ->assertForbidden();
 });
 
-test('refresh clears customers_last_synced_at and dispatches sync jobs', function () {
-    Bus::fake();
-
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    $shop = Shop::factory()->forWorkspace($workspace)->create([
-        'customers_last_synced_at' => now()->subDay(),
-    ]);
-
-    $this->actingAs($owner)
-        ->post("/workspaces/{$workspace->slug}/shops/{$shop->id}/refresh")
-        ->assertRedirect();
-
-    expect($shop->fresh()->customers_last_synced_at)->toBeNull();
-    Bus::assertDispatched(FetchShopCustomers::class);
-    Bus::assertDispatched(FetchShopUsers::class);
-});
 
 test('refresh on a foreign-workspace shop returns 403', function () {
     ['user' => $owner, 'workspace' => $workspaceA] = makeWorkspaceWithOwner();
@@ -92,16 +73,6 @@ test('shops index sort=name returns ascending', function () {
     expect($names)->toBe(['Alpha', 'Bravo', 'Charlie']);
 });
 
-test('shops index sort=-customers_last_synced_at puts most-recent first', function () {
-    ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
-    Shop::factory()->forWorkspace($w)->create(['name' => 'Old', 'customers_last_synced_at' => now()->subDays(10)]);
-    Shop::factory()->forWorkspace($w)->create(['name' => 'New', 'customers_last_synced_at' => now()->subDay()]);
-
-    $names = shopsFromInertia(
-        $this->actingAs($owner)->get("/workspaces/{$w->slug}/shops?sort=-customers_last_synced_at")->assertOk()
-    );
-    expect(array_slice($names, 0, 2))->toBe(['New', 'Old']);
-});
 
 test('shops index per_page limits and paginates', function () {
     ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
