@@ -87,20 +87,33 @@ class OptimizationRuleController extends Controller
     public function approvals(Request $request, Workspace $workspace): Response
     {
         $perPage = (int) $request->integer('per_page', 15);
+        $accountId = $request->input('ad_account_id');
 
-        $proposals = OptimizationProposal::where('workspace_id', $workspace->id)
-            ->where('status', 'pending')
+        $pending = OptimizationProposal::where('workspace_id', $workspace->id)
+            ->where('status', 'pending');
+
+        $proposals = (clone $pending)
+            ->when($accountId, fn ($q) => $q->where('meta_ads_account_id', $accountId))
             ->with(['rule:id,name,execution_mode', 'adAccount:id,name'])
             ->latest()
             ->paginate($perPage)
             ->withQueryString();
 
+        // Ad accounts that currently have pending proposals — the filter options.
+        $filterAccounts = AdAccount::whereIn('id', (clone $pending)->select('meta_ads_account_id'))
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (AdAccount $a) => ['id' => (string) $a->id, 'name' => $a->name])
+            ->values();
+
         return Inertia::render('workspaces/integrations/meta-ads/optimization-rules/approvals', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
             'proposals' => $proposals,
+            'adAccounts' => $filterAccounts,
             'query' => [
                 'page' => $request->integer('page', 1),
                 'perPage' => $perPage,
+                'accountId' => $accountId ? (string) $accountId : null,
             ],
         ]);
     }

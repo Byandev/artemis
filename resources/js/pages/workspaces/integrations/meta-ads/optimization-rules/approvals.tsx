@@ -10,6 +10,7 @@ import { omit } from 'lodash';
 import { ArrowRight, Check, CheckCircle2, X } from 'lucide-react';
 import { useState } from 'react';
 import {
+    type AdAccountOption,
     executionModeLabel,
     metricLabel,
     type OptimizationProposal,
@@ -20,7 +21,12 @@ import {
 interface Props {
     workspace: { id: number; name: string; slug: string };
     proposals: PaginatedData<OptimizationProposal>;
-    query?: { page?: number | string; perPage?: number | string };
+    adAccounts: AdAccountOption[];
+    query?: {
+        page?: number | string;
+        perPage?: number | string;
+        accountId?: string | null;
+    };
 }
 
 const actionVariant = (action: string) =>
@@ -44,6 +50,7 @@ const isBudget = (action: string) =>
 export default function OptimizationApprovals({
     workspace,
     proposals,
+    adAccounts,
     query,
 }: Props) {
     const indexUrl = optimizationRulesUrl(workspace.slug);
@@ -60,13 +67,14 @@ export default function OptimizationApprovals({
             {
                 page: proposals.current_page,
                 per_page: query?.perPage ?? proposals.per_page,
+                ad_account_id: query?.accountId ?? undefined,
                 ...overrides,
             },
             {
                 preserveState: true,
                 replace: true,
                 preserveScroll: true,
-                only: ['proposals', 'query'],
+                only: ['proposals', 'adAccounts', 'query'],
             },
         );
 
@@ -225,6 +233,23 @@ export default function OptimizationApprovals({
                     title="Optimization Approvals"
                     description="Review the changes optimization rules want to make before they run."
                 >
+                    <select
+                        value={query?.accountId ?? ''}
+                        onChange={(e) =>
+                            navigate({
+                                ad_account_id: e.target.value || undefined,
+                                page: 1,
+                            })
+                        }
+                        className="h-9 rounded-lg border border-black/8 bg-white px-2.5 text-[12px] text-gray-700 transition-colors outline-none focus:border-emerald-500 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-200"
+                    >
+                        <option value="">All ad accounts</option>
+                        {adAccounts.map((a) => (
+                            <option key={a.id} value={a.id}>
+                                {a.name}
+                            </option>
+                        ))}
+                    </select>
                     <Button variant="outline" size="sm" asChild>
                         <Link href={indexUrl}>Back to rules</Link>
                     </Button>
