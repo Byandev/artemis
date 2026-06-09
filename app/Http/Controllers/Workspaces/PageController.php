@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Enums\Permission;
+use App\Exports\PageExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Workspaces\StorePageRequest;
 use App\Http\Requests\Workspaces\UpdatePageRequest;
 use App\Http\Sorts\Page\OwnerNameSort;
 use App\Http\Sorts\Page\ShopNameSort;
 use App\Http\Sorts\PendingRequiredChecklistsSort;
+use App\Imports\PageImport;
 use App\Models\Page;
 use App\Models\PageDailyBudgetRecord;
 use App\Models\Shop;
@@ -21,6 +23,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 use Modules\Pancake\Jobs\FetchPageOrders;
 use Modules\Pancake\Jobs\FetchShopCustomers;
 use Modules\Pancake\Jobs\FetchShopUsers;
@@ -97,6 +100,45 @@ class PageController extends Controller
             'pageCount' => $pageLimitInfo['count'],
             'pageLimitReached' => $pageLimitInfo['reached'],
         ]);
+    }
+
+    public function export(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewPages->value, $workspace);
+
+        $filename = "pages-{$workspace->slug}-".now()->format('Y-m-d-His').'.xlsx';
+
+        return Excel::download(new PageExport($workspace), $filename);
+    }
+
+    public function import(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::CreatePages->value, $workspace);
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:51200'],
+        ]);
+
+        $import = new PageImport($workspace, $request->user()->id);
+
+        try {
+            Excel::import($import, $request->file('file'));
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()
+                ->route('workspaces.pages.index', $workspace)
+                ->with('error', 'Import failed: '.$e->getMessage());
+        }
+
+        return redirect()
+            ->route('workspaces.pages.index', $workspace)
+            ->with('success', sprintf(
+                'Import complete: %d created, %d skipped (already exist), %d failed.',
+                $import->created,
+                $import->skipped,
+                $import->failed,
+            ));
     }
 
     public function create(Request $request, Workspace $workspace)
