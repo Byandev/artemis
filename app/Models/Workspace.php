@@ -33,6 +33,7 @@ class Workspace extends Model
         'rmo_module_enabled',
         'leaderboard_module_enabled',
         'botcake_module_enabled',
+        'creatives_module_enabled',
         'inventory_sync',
     ];
 
@@ -48,6 +49,7 @@ class Workspace extends Model
         'rmo_module_enabled' => 'boolean',
         'leaderboard_module_enabled' => 'boolean',
         'botcake_module_enabled' => 'boolean',
+        'creatives_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_pages' => 'integer',
     ];

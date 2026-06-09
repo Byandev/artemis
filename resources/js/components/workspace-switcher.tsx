@@ -70,7 +70,7 @@ const WorkspaceSwitcher = () => {
                 </div>
 
                 {/* Workspace list */}
-                <div className="space-y-0.5 px-2 pb-2">
+                <div className="custom-scrollbar max-h-[280px] space-y-0.5 overflow-y-auto px-2 pb-2">
                     {workspaces.map((workspace) => {
                         const isCurrent = workspace.id === currentWorkspace.id;
                         const ws_initials = workspace.name

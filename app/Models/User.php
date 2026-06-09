@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Permission;
 use BackedEnum;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -216,5 +217,38 @@ class User extends Authenticatable implements MustVerifyEmail
             ->unique();
 
         return $categories->isNotEmpty() && $categories->every(fn ($cat) => $cat === 'CSR');
+    }
+
+    /**
+     * Resolve the route name of the highest-priority dashboard this user can
+     * access in the given workspace, or null if they can access none.
+     *
+     * Priority: Main → Sales & Marketing → Video Editor → CSR.
+     *
+     * Permission checks go through the gate (via `can`) so the production RBAC
+     * bypass and owner/super-admin short-circuits are respected.
+     */
+    public function defaultDashboardRouteName(Workspace $workspace): ?string
+    {
+        $candidates = [
+            ['workspace.dashboard', Permission::ViewMainDashboard],
+            ['workspaces.sales-marketing.dashboard', Permission::ViewSalesMarketingDashboard],
+            ['workspaces.video-editor.dashboard', Permission::ViewVideoEditorDashboard],
+            ['workspaces.csr.dashboard', Permission::ViewCsrDashboard],
+        ];
+
+        foreach ($candidates as [$route, $permission]) {
+            if ($this->can($permission->value, $workspace)) {
+                return $route;
+            }
+        }
+
+        // CSRs reach their dashboard through their role even without the
+        // explicit permission (their role only carries CSR-category permissions).
+        if ($workspace->csr_module_enabled && $this->isCsrOf($workspace)) {
+            return 'workspaces.csr.dashboard';
+        }
+
+        return null;
     }
 }

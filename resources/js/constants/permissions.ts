@@ -40,6 +40,7 @@ export const PERMISSIONS = {
 
     // RTS
     ViewRtsAnalytics: 'View RTS Analytics',
+    ViewRtsAiChat: 'View RTS AI Chat',
     ViewParcelJourneyTemplates: 'View Parcel Journey Templates',
     ManageParcelJourneyTemplates: 'Manage Parcel Journey Templates',
 
@@ -93,6 +94,20 @@ export const PERMISSIONS = {
     CreatePageDailyBudgetRecords: 'Create Page Daily Budget Records',
     EditPageDailyBudgetRecords: 'Edit Page Daily Budget Records',
     DeletePageDailyBudgetRecords: 'Delete Page Daily Budget Records',
+
+    // Creatives
+    ViewCreatives: 'View Creatives',
+    CreateCreatives: 'Create Creatives',
+    EditCreatives: 'Edit Creatives',
+    DeleteCreatives: 'Delete Creatives',
+    ReviewCreatives: 'Review Creatives',
+    UpdateCreativeStatus: 'Update Creative Status',
+
+    // Dashboards
+    ViewMainDashboard: 'View Main Dashboard',
+    ViewSalesMarketingDashboard: 'View Sales & Marketing Dashboard',
+    ViewVideoEditorDashboard: 'View Video Editor Dashboard',
+    ViewCsrDashboard: 'View CSR Dashboard',
 
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',
