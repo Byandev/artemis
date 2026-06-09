@@ -33,61 +33,73 @@ const FILTER_KEYS: (keyof FilterValue)[] = [
     'userIds',
 ];
 
-// Hydrate filters/date range from the URL so they survive a browser refresh.
-function parseStateFromUrl(): { dateRange: string[]; filter: FilterValue } {
-    const params = new URLSearchParams(window.location.search);
-    const start = params.get('startDate');
-    const end = params.get('endDate');
+const STORAGE_KEY_PREFIX = 'rts-analytics-state:';
 
-    const dateRange =
-        start && end
-            ? [start, end]
-            : [
-                  moment().startOf('month').format('YYYY-MM-DD'),
-                  moment().endOf('month').format('YYYY-MM-DD'),
-              ];
+type PersistedState = { dateRange: string[]; filter: FilterValue };
 
-    const filter: FilterValue = {
-        teamIds: [],
-        productIds: [],
-        shopIds: [],
-        pageIds: [],
-        userIds: [],
+function defaultState(): PersistedState {
+    return {
+        dateRange: [
+            moment().startOf('month').format('YYYY-MM-DD'),
+            moment().endOf('month').format('YYYY-MM-DD'),
+        ],
+        filter: {
+            teamIds: [],
+            productIds: [],
+            shopIds: [],
+            pageIds: [],
+            userIds: [],
+        },
     };
-    FILTER_KEYS.forEach((key) => {
-        const raw = params.get(key);
-        if (raw) {
-            filter[key] = raw.split(',').filter(Boolean);
-        }
-    });
+}
 
-    return { dateRange, filter };
+// Hydrate filters/date range from localStorage so they survive a browser
+// refresh (without leaking into the URL). Scoped per workspace.
+function loadState(workspaceSlug: string): PersistedState {
+    const fallback = defaultState();
+
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_PREFIX + workspaceSlug);
+        if (!raw) return fallback;
+
+        const parsed = JSON.parse(raw);
+        const dateRange =
+            Array.isArray(parsed?.dateRange) && parsed.dateRange.length === 2
+                ? parsed.dateRange.map(String)
+                : fallback.dateRange;
+
+        const filter = { ...fallback.filter };
+        FILTER_KEYS.forEach((key) => {
+            if (Array.isArray(parsed?.filter?.[key])) {
+                filter[key] = parsed.filter[key];
+            }
+        });
+
+        return { dateRange, filter };
+    } catch {
+        return fallback;
+    }
 }
 
 export default function Analytics({ workspace }: Props) {
-    const initialState = useMemo(() => parseStateFromUrl(), []);
+    const initialState = useMemo(
+        () => loadState(workspace.slug),
+        [workspace.slug],
+    );
     const [dateRange, setDateRange] = useState(initialState.dateRange);
     const [filter, setFilter] = useState<FilterValue>(initialState.filter);
 
-    // Keep the URL in sync so refreshing the page restores the current filters.
+    // Persist to localStorage so a refresh restores the current filters.
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        params.set('startDate', dateRange[0]);
-        params.set('endDate', dateRange[1]);
-        FILTER_KEYS.forEach((key) => {
-            const value = filter[key];
-            if (value.length) {
-                params.set(key, value.join(','));
-            } else {
-                params.delete(key);
-            }
-        });
-        window.history.replaceState(
-            null,
-            '',
-            `${window.location.pathname}?${params.toString()}`,
-        );
-    }, [dateRange, filter]);
+        try {
+            localStorage.setItem(
+                STORAGE_KEY_PREFIX + workspace.slug,
+                JSON.stringify({ dateRange, filter }),
+            );
+        } catch {
+            // Ignore storage errors (e.g. quota / private mode).
+        }
+    }, [workspace.slug, dateRange, filter]);
 
     const queryParams: RtsQueryParams = useMemo(
         () => ({
