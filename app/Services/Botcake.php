@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\OutgoingApiLog;
 use Exception;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -16,15 +17,27 @@ class Botcake
      */
     public function updateCustomField($psid, $customFieldId, $value)
     {
+        $url = "https://botcake.io/api/public_api/v1/pages/{$this->pageId}/customer/$psid/customer_fields";
+        $payload = ['data' => [['id' => $customFieldId, 'value' => $value]]];
+
+        $startedAt = now();
+
         $response = Http::withHeader('access-token', $this->token)
-            ->post("https://botcake.io/api/public_api/v1/pages/{$this->pageId}/customer/$psid/customer_fields", [
-                'data' => [
-                    [
-                        'id' => $customFieldId,
-                        'value' => $value,
-                    ],
-                ],
+            ->post($url, $payload);
+
+        if (config('settings.parcel_journey_notification_logs_enabled')) {
+            OutgoingApiLog::create([
+                'service' => 'botcake',
+                'action' => 'updateCustomField',
+                'http_method' => 'POST',
+                'url' => $url,
+                'request_payload' => $payload,
+                'response_status' => $response->status(),
+                'response_body' => $response->json() ?? ['raw' => $response->body()],
+                'duration_ms' => (int) $startedAt->diffInMilliseconds(now()),
+                'context' => ['page_id' => $this->pageId, 'psid' => $psid, 'custom_field_id' => $customFieldId],
             ]);
+        }
 
         if ($response->failed()) {
             throw new Exception('Failed to send flow: '.$response->getStatusCode());
@@ -43,11 +56,27 @@ class Botcake
      */
     public function sendFlow($psid, $flow_id)
     {
+        $url = "https://botcake.io/api/public_api/v1/pages/$this->pageId/flows/send_flow";
+        $payload = ['psid' => $psid, 'flow_id' => $flow_id];
+
+        $startedAt = now();
+
         $response = Http::withHeader('access-token', $this->token)
-            ->post("https://botcake.io/api/public_api/v1/pages/$this->pageId/flows/send_flow", [
-                'psid' => $psid,
-                'flow_id' => $flow_id,
+            ->post($url, $payload);
+
+        if (config('settings.parcel_journey_notification_logs_enabled')) {
+            OutgoingApiLog::create([
+                'service' => 'botcake',
+                'action' => 'sendFlow',
+                'http_method' => 'POST',
+                'url' => $url,
+                'request_payload' => $payload,
+                'response_status' => $response->status(),
+                'response_body' => $response->json() ?? ['raw' => $response->body()],
+                'duration_ms' => (int) $startedAt->diffInMilliseconds(now()),
+                'context' => ['page_id' => $this->pageId, 'psid' => $psid, 'flow_id' => $flow_id],
             ]);
+        }
 
         if ($response->failed()) {
             throw new Exception('Failed to send flow: '.$response->getStatusCode());

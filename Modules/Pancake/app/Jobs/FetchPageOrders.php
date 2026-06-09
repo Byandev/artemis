@@ -49,7 +49,7 @@ class FetchPageOrders implements ShouldQueue
         if ($totalPages > $this->page_number) {
             dispatch(new FetchPageOrders($this->page, $page_number + 1, $this->startTime, $this->endTime, $this->shipped))->delay(now()->addSecond(5))->onQueue('pancake');
         } elseif (! $this->shipped) {
-            $this->page->update(['orders_last_synced_at' => Carbon::createFromTimestamp($this->endTime)->subMinute(15)]);
+            $this->page->update(['orders_last_synced_at' => Carbon::createFromTimestamp($this->endTime)->subMinute(1)]);
         }
     }
 }
