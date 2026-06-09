@@ -12,6 +12,53 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.8.1',
+        date: '2026-06-09',
+        sections: [
+            {
+                title: 'Parcel Journey — Page Stats',
+                items: [
+                    'Removed the RTS Rate column from the per-page stats table on the Parcel Journey Templates page — the column added unnecessary query complexity and is better viewed on the dedicated RTS Analytics page',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.8.0',
+        date: '2026-06-09',
+        sections: [
+            {
+                title: 'Parcel Journey — Duplicate Notification Fix',
+                items: [
+                    'Fixed a bug where multiple parcel journey updates for the same day could each trigger a notification on repeated syncs — notifications are now only sent for journeys newer than the most recently notified one, preventing redundant messages',
+                ],
+            },
+            {
+                title: 'Pancake — Customer Sync Per Order',
+                items: [
+                    'Customer data is now synced directly during order processing via a new SyncCustomerAction — no separate fetch job needed',
+                    'Removed the FetchShopCustomers job, TriggerFetchShopCustomers command, and the customers_last_synced_at column from shops — customer records stay fresh automatically on every order sync',
+                    'Removed the unique constraint on pancake_customers.customer_id to support customers appearing across multiple shops',
+                    'Removed the "Refresh customers" action from the Shops menu — the "Refresh users" action remains',
+                ],
+            },
+            {
+                title: 'Outgoing API Logging',
+                items: [
+                    'New outgoing_api_logs table records every external API call made by the app — service, action, HTTP method, URL, request payload, response status, response body, and duration',
+                    'Botcake sendFlow and updateCustomField calls are now logged when PARCEL_JOURNEY_NOTIFICATION_LOGS_ENABLED=true; skipped notifications (when the feature is disabled) are also recorded',
+                    'Logging is off by default — set PARCEL_JOURNEY_NOTIFICATION_LOGS_ENABLED=true in .env to enable',
+                ],
+            },
+            {
+                title: 'Order Sync — Faster Re-Sync Window',
+                items: [
+                    'orders_last_synced_at is now set 1 minute behind the sync end time (down from 15 minutes), reducing the gap between syncs and ensuring recent orders are not missed on the next run',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.7.1',
         date: '2026-06-03',
         sections: [
