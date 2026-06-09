@@ -272,7 +272,7 @@ export default function CreativeDashboardFilters({
 
                 <div className="max-h-72 space-y-1 overflow-y-auto p-2">
                     <MultiSelectGroup
-                        name="Editor"
+                        name="User"
                         options={editorOptions}
                         selected={localValue.user_ids}
                         onToggle={(id) => toggle('user_ids', id)}

@@ -232,6 +232,50 @@ class VideoEditorDashboard
     }
 
     /**
+     * Per-day creation activity across all editors (ignores the editor scope):
+     * who created creatives on each day and how many. Used by the dashboard's
+     * calendar.
+     *
+     * @return array{from: string, to: string, days: list<array<string, mixed>>}
+     */
+    public function calendar(Workspace $workspace, DashboardFilters $filters): array
+    {
+        $days = $this->baseQuery($workspace, $filters)
+            ->whereNotNull('creator_id')
+            ->whereNotNull('creative_date')
+            ->with('creator:id,name')
+            ->get(['id', 'creator_id', 'creative_date'])
+            ->groupBy(fn (Creative $c) => CarbonImmutable::parse($c->creative_date)->toDateString())
+            ->map(function (Collection $group, string $date) {
+                $creators = $group
+                    ->groupBy('creator_id')
+                    ->map(fn (Collection $byCreator) => [
+                        'creator_id' => (int) $byCreator->first()->creator_id,
+                        'name' => $byCreator->first()->creator?->name ?? 'Unknown',
+                        'count' => $byCreator->count(),
+                    ])
+                    ->sortByDesc('count')
+                    ->values()
+                    ->all();
+
+                return [
+                    'date' => $date,
+                    'total' => $group->count(),
+                    'creators' => $creators,
+                ];
+            })
+            ->sortKeys()
+            ->values()
+            ->all();
+
+        return [
+            'from' => $filters->dateFrom->toDateString(),
+            'to' => $filters->dateTo->toDateString(),
+            'days' => $days,
+        ];
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     public function recentActivity(Workspace $workspace, DashboardFilters $filters): array

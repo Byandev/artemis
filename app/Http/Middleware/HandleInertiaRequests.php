@@ -145,11 +145,6 @@ class HandleInertiaRequests extends Middleware
             return [];
         }
 
-        // TEMP: bypass role/permission checks in production while RBAC rollout is still on the test server.
-        if (app()->environment('production')) {
-            return ['*'];
-        }
-
         if ($user->isSuperAdmin()) {
             return ['*'];
         }
