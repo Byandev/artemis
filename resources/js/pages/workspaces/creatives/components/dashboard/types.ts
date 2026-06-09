@@ -98,6 +98,24 @@ export interface EditorOption {
     name: string;
 }
 
+export interface CalendarCreator {
+    creator_id: number;
+    name: string;
+    count: number;
+}
+
+export interface CalendarDay {
+    date: string;
+    total: number;
+    creators: CalendarCreator[];
+}
+
+export interface CalendarData {
+    from: string;
+    to: string;
+    days: CalendarDay[];
+}
+
 /**
  * Props rendered server-side (shell only). Each statistic is fetched
  * independently from the API after mount — see useDashboardSection.
