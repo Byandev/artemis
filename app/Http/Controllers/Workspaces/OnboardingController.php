@@ -15,7 +15,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Modules\Pancake\Jobs\FetchPageOrders;
-use Modules\Pancake\Jobs\FetchShopCustomers;
 use Modules\Pancake\Jobs\FetchShopUsers;
 
 class OnboardingController extends Controller
@@ -107,7 +106,6 @@ class OnboardingController extends Controller
         // Dispatch fetch jobs
         $now = Carbon::now();
         dispatch(new FetchPageOrders($page, 1, $now->copy()->subMonth()->unix(), $now->unix()))->onQueue('pancake');
-        dispatch(new FetchShopCustomers($shop, 1, $now->copy()->subMonth()->unix(), $now->unix()))->onQueue('pancake');
         dispatch(new FetchShopUsers($shop))->onQueue('pancake');
 
         (new PostHogService)->capture((string) $request->user()->id, 'onboarding_page_connected', [

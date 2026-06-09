@@ -6,6 +6,7 @@ use App\Models\Page;
 use App\Models\Workspace;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Modules\Pancake\Actions\SyncCustomerAction;
 use Modules\Pancake\Actions\SyncOrderItemsAction;
 use Modules\Pancake\Actions\SyncParcelTrackingAction;
 use Modules\Pancake\Actions\SyncPhoneNumberReportsAction;
@@ -24,6 +25,7 @@ class SyncOrder implements ShouldQueue
 
     public function handle(
         UpsertOrderAction $upsertOrder,
+        SyncCustomerAction $syncCustomer,
         SyncOrderItemsAction $syncItems,
         SyncShippingAddressAction $syncAddress,
         SyncParcelTrackingAction $syncTracking,
@@ -31,6 +33,7 @@ class SyncOrder implements ShouldQueue
     ): void {
         $savedOrder = $upsertOrder->execute($this->workspace, $this->data);
 
+        $syncCustomer->execute($savedOrder, $this->data);
         $syncItems->execute($savedOrder, $this->data);
         $syncAddress->execute($savedOrder, $this->data);
         $syncTracking->execute($savedOrder, $this->data, $this->page, $this->workspace);
