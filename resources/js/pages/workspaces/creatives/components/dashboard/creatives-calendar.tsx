@@ -169,9 +169,11 @@ export default function CreativesCalendar({ data }: { data: CalendarData }) {
 
                 return (
                     <div key={month}>
-                        <h4 className="mb-2 text-[13px] font-semibold tracking-tight text-gray-700 dark:text-gray-200">
-                            {start.format('MMMM YYYY')}
-                        </h4>
+                        {months.length > 1 && (
+                            <h4 className="mb-2 text-[13px] font-semibold tracking-tight text-gray-700 dark:text-gray-200">
+                                {start.format('MMMM YYYY')}
+                            </h4>
+                        )}
 
                         {/* Calendar grid (gap-px shows through as grid lines) */}
                         <div className="overflow-hidden rounded-[12px] border border-black/8 dark:border-white/8">

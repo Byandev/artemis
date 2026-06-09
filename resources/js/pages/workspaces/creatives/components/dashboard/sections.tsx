@@ -1,6 +1,8 @@
 import axios from 'axios';
 import {
     CalendarDays,
+    ChevronLeft,
+    ChevronRight,
     Clapperboard,
     Clock,
     FileImage,
@@ -13,6 +15,7 @@ import {
     TrendingUp,
     Trophy,
 } from 'lucide-react';
+import moment from 'moment';
 import { ReactNode, useEffect, useState } from 'react';
 import ActivityFeed from './activity-feed';
 import AdsStatusGrid from './ads-status-grid';
@@ -508,13 +511,31 @@ export function RecentActivitySection({
     );
 }
 
-/** Calendar of creation activity: who created creatives each day, and how many. */
-export function CreationCalendarSection({
+/**
+ * Calendar of creative-creation activity: who created creatives each day and
+ * how many. Has its own month navigation (independent of the dashboard date
+ * range); the product / format / user filters still apply.
+ */
+export function CreativesCalendarSection({
     workspaceSlug,
     filters,
 }: SectionProps) {
+    const currentMonth = moment().format('YYYY-MM');
+    const [month, setMonth] = useState(currentMonth);
     const [data, setData] = useState<CalendarData | null>(null);
     const [loading, setLoading] = useState(true);
+
+    const monthStart = moment(`${month}-01`)
+        .startOf('month')
+        .format('YYYY-MM-DD');
+    const monthEnd = moment(`${month}-01`).endOf('month').format('YYYY-MM-DD');
+
+    // Refetch when the month or the non-date filters change.
+    const filterKey = JSON.stringify({
+        product_ids: filters.product_ids,
+        user_ids: filters.user_ids,
+        formats: filters.formats,
+    });
 
     useEffect(() => {
         const controller = new AbortController();
@@ -523,7 +544,11 @@ export function CreationCalendarSection({
             .get<CalendarData>(
                 `/api/workspaces/${workspaceSlug}/video-editor/calendar`,
                 {
-                    params: sectionParams(filters),
+                    params: {
+                        ...sectionParams(filters),
+                        date_from: monthStart,
+                        date_to: monthEnd,
+                    },
                     signal: controller.signal,
                 },
             )
@@ -534,12 +559,47 @@ export function CreationCalendarSection({
             .finally(() => setLoading(false));
         return () => controller.abort();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [workspaceSlug, sectionKey(filters)]);
+    }, [workspaceSlug, monthStart, monthEnd, filterKey]);
+
+    const shiftMonth = (delta: number) =>
+        setMonth(moment(`${month}-01`).add(delta, 'month').format('YYYY-MM'));
 
     return (
         <Panel
-            title="Creation Calendar"
+            title="Creatives Calendar"
             icon={<CalendarDays className="h-3.5 w-3.5 text-gray-400" />}
+            action={
+                <div className="flex items-center gap-1">
+                    <button
+                        type="button"
+                        onClick={() => shiftMonth(-1)}
+                        aria-label="Previous month"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-black/8 bg-white text-gray-400 transition-colors hover:border-black/14 hover:text-gray-600 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-500 dark:hover:text-gray-300"
+                    >
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="min-w-28 text-center text-[12px] font-medium text-gray-700 dark:text-gray-200">
+                        {moment(`${month}-01`).format('MMMM YYYY')}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => shiftMonth(1)}
+                        aria-label="Next month"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-black/8 bg-white text-gray-400 transition-colors hover:border-black/14 hover:text-gray-600 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-500 dark:hover:text-gray-300"
+                    >
+                        <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                    {month !== currentMonth && (
+                        <button
+                            type="button"
+                            onClick={() => setMonth(currentMonth)}
+                            className="ml-1 rounded-[8px] border border-black/8 px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:border-black/14 hover:text-gray-700 dark:border-white/8 dark:text-gray-400 dark:hover:text-gray-200"
+                        >
+                            Today
+                        </button>
+                    )}
+                </div>
+            }
         >
             {loading || !data ? (
                 <div className="py-10 text-center text-sm text-gray-400 dark:text-gray-500">
