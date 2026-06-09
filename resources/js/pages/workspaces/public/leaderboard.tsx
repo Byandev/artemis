@@ -348,7 +348,7 @@ export default function Leaderboard() {
         };
 
         fetchData();
-    }, [activeTab, retryCount]);
+    }, [activeTab, selectedDate, retryCount]);
 
     const renderContent = () => {
         if (isLoading) {

@@ -37,6 +37,20 @@ class Subscription extends Model
         'canceled_at' => 'datetime',
     ];
 
+    /**
+     * Determine whether this subscription should gate access (show the
+     * "subscription expired" modal / block API calls). A null subscription
+     * is treated as lapsed by the callers.
+     */
+    public function isLapsed(): bool
+    {
+        return $this->status === self::STATUS_EXPIRED
+            || $this->status === self::STATUS_CANCELED
+            || $this->status === self::STATUS_PAST_DUE
+            || ($this->status === self::STATUS_TRIALING && $this->trial_ends_at && $this->trial_ends_at->isPast())
+            || ($this->status === self::STATUS_ACTIVE && $this->current_period_end && $this->current_period_end->isPast());
+    }
+
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);

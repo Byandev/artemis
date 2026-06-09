@@ -17,7 +17,7 @@ import {
     Settings2,
     X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface SubscriptionPlan {
     id: number;
@@ -160,17 +160,22 @@ export default function Index({ workspaces, plans, filters }: Props) {
         null,
     );
 
-    // Auto-open subscription modal for workspaces with past_due or expired status
+    // Auto-open subscription modal for workspaces with past_due or expired
+    // status — but only once, so the admin can still close it without it
+    // immediately reopening.
+    const hasAutoOpened = useRef(false);
     useEffect(() => {
-        if (!editingWorkspace && workspaces.data) {
-            const pastDueOrExpiredWorkspace = workspaces.data.find(
-                (ws) =>
-                    ws.subscription?.status === 'past_due' ||
-                    ws.subscription?.status === 'expired',
-            );
-            if (pastDueOrExpiredWorkspace) {
-                setEditingWorkspace(pastDueOrExpiredWorkspace);
-            }
+        if (hasAutoOpened.current || editingWorkspace || !workspaces.data) {
+            return;
+        }
+        const pastDueOrExpiredWorkspace = workspaces.data.find(
+            (ws) =>
+                ws.subscription?.status === 'past_due' ||
+                ws.subscription?.status === 'expired',
+        );
+        if (pastDueOrExpiredWorkspace) {
+            hasAutoOpened.current = true;
+            setEditingWorkspace(pastDueOrExpiredWorkspace);
         }
     }, [workspaces.data, editingWorkspace]);
 

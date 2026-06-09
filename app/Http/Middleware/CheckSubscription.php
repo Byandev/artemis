@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Subscription;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -27,12 +26,7 @@ class CheckSubscription
 
         $subscription = $workspace->subscription;
 
-        $isExpired = ! $subscription
-            || $subscription->status === Subscription::STATUS_EXPIRED
-            || $subscription->status === Subscription::STATUS_CANCELED
-            || $subscription->status === Subscription::STATUS_PAST_DUE
-            || ($subscription->status === Subscription::STATUS_TRIALING && $subscription->trial_ends_at && $subscription->trial_ends_at->isPast())
-            || ($subscription->status === Subscription::STATUS_ACTIVE && $subscription->current_period_end && $subscription->current_period_end->isPast());
+        $isExpired = ! $subscription || $subscription->isLapsed();
 
         if ($isExpired && $request->wantsJson()) {
             return response()->json([
