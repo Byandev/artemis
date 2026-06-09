@@ -98,18 +98,6 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
         return () => clearTimeout(timer);
     }, [searchValue]);
 
-    const refresh = (shop: Shop) => {
-        post(workspaces.shops.refresh.url({ workspace, shop }), {
-            onStart: () => toast.info(`Starting refresh for ${shop.name}...`),
-            onSuccess: () =>
-                toast.success(`${shop.name} data refreshed successfully.`),
-            onError: () =>
-                toast.error(
-                    `Failed to refresh ${shop.name}. Please try again.`,
-                ),
-        });
-    };
-
     const refreshUsers = (shop: Shop) => {
         post(workspaces.shops.refreshUsers.url({ workspace, shop }), {
             onStart: () => toast.info(`Refreshing users for ${shop.name}...`),
@@ -132,16 +120,6 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Name'} />
             ),
-        },
-        {
-            accessorKey: 'customers_last_synced_at',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Customer Last Sync'} />
-            ),
-            cell: ({ row }) => {
-                const date = row.original.customers_last_synced_at;
-                return date ? new Date(date).toLocaleString() : 'Never';
-            },
         },
         {
             accessorKey: 'pending_required_checklists_count',
@@ -182,28 +160,15 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                                           </DropdownMenuItem>
                                       )}
                                       {canRefreshShops && (
-                                          <>
-                                              <DropdownMenuItem
-                                                  onClick={() => refresh(shop)}
-                                                  disabled={processing}
-                                              >
-                                                  <RefreshCw
-                                                      className={`mr-2 h-4 w-4 ${processing ? 'animate-spin' : ''}`}
-                                                  />
-                                                  {processing
-                                                      ? 'Refreshing...'
-                                                      : 'Refresh customers'}
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem
-                                                  onClick={() =>
-                                                      refreshUsers(shop)
-                                                  }
-                                                  disabled={processing}
-                                              >
-                                                  <Users className="mr-2 h-4 w-4" />
-                                                  Refresh users
-                                              </DropdownMenuItem>
-                                          </>
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  refreshUsers(shop)
+                                              }
+                                              disabled={processing}
+                                          >
+                                              <Users className="mr-2 h-4 w-4" />
+                                              Refresh users
+                                          </DropdownMenuItem>
                                       )}
                                   </DropdownMenuContent>
                               </DropdownMenu>

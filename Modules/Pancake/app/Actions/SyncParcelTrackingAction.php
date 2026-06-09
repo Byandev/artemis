@@ -112,11 +112,9 @@ readonly class SyncParcelTrackingAction
 
             if ($this->isNotifiable($savedOrder, $journey)) {
                 $latestNotifiable = $journey;
-            }
-        }
 
-        if ($latestNotifiable) {
-            $notifier->notify($savedOrder, $latestNotifiable);
+                $notifier->notify($savedOrder, $latestNotifiable);
+            }
         }
 
         $savedOrder->update([
@@ -127,9 +125,19 @@ readonly class SyncParcelTrackingAction
 
     private function isNotifiable(Order $savedOrder, ParcelJourney $journey): bool
     {
-        return $savedOrder->status === 2
-            && in_array($journey->status, ['On Delivery', 'Departure', 'Arrival'], true)
-            && Carbon::parse($journey->created_at)->isToday()
-            && $journey->notifications()->doesntExist();
+        if ($savedOrder->status !== 2
+            || ! in_array($journey->status, ['On Delivery', 'Departure', 'Arrival'], true)
+            || ! Carbon::parse($journey->created_at)->isToday()
+            || $journey->notifications()->exists()) {
+            return false;
+        }
+
+        // Don't notify for a journey that's older than (or equal to) one we've
+        // already sent a notification for on this order.
+        $lastNotifiedAt = ParcelJourney::where('order_id', $savedOrder->id)
+            ->whereHas('notifications')
+            ->max('created_at');
+
+        return ! $lastNotifiedAt || Carbon::parse($journey->created_at)->gt(Carbon::parse($lastNotifiedAt));
     }
 }
