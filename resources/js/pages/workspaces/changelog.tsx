@@ -12,6 +12,70 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.9.0',
+        date: '2026-06-09',
+        sections: [
+            {
+                title: 'Creatives — Creative Tracker',
+                items: [
+                    'New Creatives module — track ad creatives through a full production pipeline from brief to approval',
+                    'List view with advanced filters (status, type, date range, page, product, assignee), sortable columns, and pagination',
+                    'Create and edit creatives with product association, multiple reviewer assignments, and ads status integration',
+                    'Review workflow — reviewers can add and update review decisions per creative',
+                    'Six new role permissions: View, Create, Edit, Delete, Review, and Update Creative Status — all assignable from the Roles screen',
+                ],
+            },
+            {
+                title: 'Video Editor Dashboard',
+                items: [
+                    'New Video Editor Dashboard at /workspaces/{slug}/video-editor/dashboard — dedicated view for video production teams',
+                    'Sections: KPI cards, pipeline funnel, creatives calendar with independent month navigation, throughput chart, leaderboard, recent activity feed, waiting list, revision list, and work list',
+                    'Multi-select filters for products and editors; progressive loading keeps the page responsive while data loads in the background',
+                    'Gated behind the new View Video Editor Dashboard permission',
+                ],
+            },
+            {
+                title: 'Sales & Marketing Dashboard',
+                items: [
+                    'New Sales & Marketing Dashboard page scaffolded at /workspaces/{slug}/sales-marketing/dashboard — placeholder ready for metrics and charts in the next release',
+                    'Gated behind the new View Sales & Marketing Dashboard permission',
+                ],
+            },
+            {
+                title: 'RTS Analytics — Filter Persistence & AI Chat Gate',
+                items: [
+                    'Date range and filter selections are now persisted to localStorage per workspace — refreshing the page or navigating away and back restores the last-used filter state',
+                    'RTS AI Chat widget is now gated behind a new View RTS AI Chat permission — hidden by default until the permission is granted',
+                ],
+            },
+            {
+                title: 'Bug Fixes',
+                items: [
+                    'CSR Analytics — added RMO percentage column',
+                    'Leaderboard — date filter now correctly refreshes data when the selection changes',
+                    'Workspace list — made scrollable to prevent overflow on workspaces with many entries',
+                    'Teams — fixed permission validation on the Manage Schedule page',
+                    'Members — fixed permission check on the Invite Members action',
+                    'Admin — fixed subscription modal display for expired workspaces',
+                    'Onboarding — added missing skip route so the skip button works correctly',
+                    'Inventory — fixed editing inventory items',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.8.1',
+        date: '2026-06-09',
+        sections: [
+            {
+                title: 'Parcel Journey — Page Stats',
+                items: [
+                    'Removed the RTS Rate column from the per-page stats table on the Parcel Journey Templates page — the column added unnecessary query complexity and is better viewed on the dedicated RTS Analytics page',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.8.0',
         date: '2026-06-09',
         sections: [
