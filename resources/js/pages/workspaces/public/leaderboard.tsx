@@ -1,5 +1,18 @@
+import { useForm } from '@inertiajs/react';
 import axios from 'axios';
+import { Lock } from 'lucide-react';
 import { useEffect, useState } from 'react';
+
+interface PublicWorkspace {
+    id: number;
+    name: string;
+    slug: string;
+}
+
+interface LeaderboardPageProps {
+    locked?: boolean;
+    workspace?: PublicWorkspace | null;
+}
 
 interface User {
     id: string;
@@ -212,22 +225,12 @@ const LeaderboardEntry = ({
     );
 };
 
-const formatDateForDisplay = (dateStr: string): string => {
-    const date = new Date(dateStr + 'T00:00:00');
-    return date.toLocaleDateString('en-US', {
-        weekday: 'short',
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-    });
-};
-
 const getTodayString = (): string => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
-export default function Leaderboard() {
+function LeaderboardInner() {
     const [users, setUsers] = useState<User[]>([]);
     const [schedules, setSchedules] = useState<Schedule[]>([]);
     const [activeTab, setActiveTab] = useState('Sales Ranking');
@@ -325,7 +328,7 @@ export default function Leaderboard() {
                     ? leaderboardRes.data
                     : [];
 
-                data = data.map((user: any) => ({
+                data = data.map((user: User) => ({
                     id: user.id,
                     name: user.name,
                     sales: user.sales || 0,
@@ -439,6 +442,7 @@ export default function Leaderboard() {
                                         primaryValue={getPrimaryValue(user)}
                                         secondaryValue={getSecondaryValue(user)}
                                         activeTab={activeTab}
+                                        schedule={getScheduleForUser(user.id)}
                                     />
                                 );
                             })}
@@ -456,6 +460,7 @@ export default function Leaderboard() {
                                 primaryValue={getPrimaryValue(user)}
                                 secondaryValue={getSecondaryValue(user)}
                                 activeTab={activeTab}
+                                schedule={getScheduleForUser(user.id)}
                             />
                         ))}
                     </div>
@@ -579,4 +584,76 @@ export default function Leaderboard() {
             </div>
         </div>
     );
+}
+
+/** Password gate shown before the leaderboard when the workspace requires it. */
+function LeaderboardLock({ workspace }: { workspace: PublicWorkspace }) {
+    const form = useForm({ password: '' });
+
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        form.post(
+            `/public/workspaces/${workspace.slug}/leaderboards/verify-password`,
+            {
+                preserveScroll: true,
+                onError: () => form.reset('password'),
+            },
+        );
+    };
+
+    return (
+        <div className="flex min-h-screen items-center justify-center bg-violet-900 p-4">
+            <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/10 p-6 backdrop-blur-sm">
+                <div className="mb-4 flex flex-col items-center text-center">
+                    <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white">
+                        <Lock className="h-5 w-5" />
+                    </div>
+                    <h1 className="text-lg font-semibold text-white">
+                        Protected leaderboard
+                    </h1>
+                    <p className="mt-1 text-xs text-violet-200">
+                        Enter the password to view {workspace.name}&apos;s
+                        leaderboards.
+                    </p>
+                </div>
+
+                <form onSubmit={submit} className="space-y-3">
+                    <input
+                        type="password"
+                        autoFocus
+                        autoComplete="current-password"
+                        value={form.data.password}
+                        onChange={(e) =>
+                            form.setData('password', e.target.value)
+                        }
+                        placeholder="Password"
+                        className="w-full rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm text-white placeholder-violet-200/60 transition-all outline-none focus:ring-2 focus:ring-violet-400/50"
+                    />
+                    {form.errors.password && (
+                        <p className="text-center text-xs text-red-300">
+                            {form.errors.password}
+                        </p>
+                    )}
+                    <button
+                        type="submit"
+                        disabled={form.processing || !form.data.password}
+                        className="w-full rounded-full bg-violet-500 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-600 disabled:opacity-50"
+                    >
+                        {form.processing ? 'Unlocking…' : 'Unlock'}
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+export default function Leaderboard({
+    locked,
+    workspace,
+}: LeaderboardPageProps) {
+    if (locked && workspace) {
+        return <LeaderboardLock workspace={workspace} />;
+    }
+
+    return <LeaderboardInner />;
 }

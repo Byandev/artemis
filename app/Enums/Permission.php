@@ -46,6 +46,7 @@ enum Permission: string
     // RTS
     case ViewRtsAnalytics = 'View RTS Analytics';
     case ViewRtsAiChat = 'View RTS AI Chat';
+    case ViewRmoManagement = 'View RMO Management';
     case ViewParcelJourneyTemplates = 'View Parcel Journey Templates';
     case ManageParcelJourneyTemplates = 'Manage Parcel Journey Templates';
 
@@ -53,6 +54,7 @@ enum Permission: string
     case ViewCsrManagement = 'View CSR Management';
     case EditCsrEmployees = 'Edit CSR Employees';
     case ViewCsrAnalytics = 'View CSR Analytics';
+    case ViewLeaderboards = 'View Leaderboards';
 
     // Inventory
     case ViewInventoryItems = 'View Inventory Items';
@@ -160,12 +162,14 @@ enum Permission: string
 
             self::ViewRtsAnalytics,
             self::ViewRtsAiChat,
+            self::ViewRmoManagement,
             self::ViewParcelJourneyTemplates,
             self::ManageParcelJourneyTemplates => 'RTS',
 
             self::ViewCsrManagement,
             self::EditCsrEmployees,
-            self::ViewCsrAnalytics => 'CSR',
+            self::ViewCsrAnalytics,
+            self::ViewLeaderboards => 'CSR',
 
             self::ViewInventoryItems,
             self::CreateInventoryItems,

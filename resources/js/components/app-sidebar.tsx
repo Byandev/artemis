@@ -394,7 +394,13 @@ function PublicLinks({
               ]
             : []),
         ...(leaderboardEnabled && canViewLeaderboardLink
-            ? [{ title: 'Leaderboards', href: '/leaderboards', icon: Trophy }]
+            ? [
+                  {
+                      title: 'Leaderboards',
+                      href: `/public/workspaces/${workspaceSlug}/leaderboards`,
+                      icon: Trophy,
+                  },
+              ]
             : []),
     ];
 
