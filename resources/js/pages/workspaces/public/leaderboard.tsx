@@ -48,20 +48,23 @@ interface LeaderboardEntryProps {
     schedule?: Schedule;
 }
 
+// Rank accent colours (podium): gold / silver / bronze, then brand.
+const rankRing: Record<number, string> = {
+    1: 'ring-amber-400/60',
+    2: 'ring-slate-300',
+    3: 'ring-orange-400/60',
+};
+
 const MedalIcon = ({ rank }: MedalIconProps) => {
-    const medals: Record<number, { color: string; icon: string }> = {
-        1: { color: 'text-yellow-400', icon: '🥇' },
-        2: { color: 'text-gray-300', icon: '🥈' },
-        3: { color: 'text-amber-600', icon: '🥉' },
+    const medals: Record<number, string> = {
+        1: '🥇',
+        2: '🥈',
+        3: '🥉',
     };
 
-    const medal = medals[rank] || { color: 'text-gray-400', icon: `#${rank}` };
-
     return (
-        <div
-            className={`absolute -top-20 left-1/2 -translate-x-1/2 transform text-3xl drop-shadow-lg ${medal.color}`}
-        >
-            {medal.icon}
+        <div className="absolute -top-[4.75rem] left-1/2 -translate-x-1/2 transform text-3xl drop-shadow-sm">
+            {medals[rank] ?? `#${rank}`}
         </div>
     );
 };
@@ -91,58 +94,52 @@ const LeaderboardCard = ({
 
     return (
         <div
-            className={`relative mt-24 w-60 ${cardHeight} rounded-2xl border-t-4 border-violet-400 bg-white/5 p-6 backdrop-blur-sm transition-all hover:scale-105 hover:border-white/20 hover:shadow-2xl hover:shadow-white/10`}
+            className={`relative mt-24 w-60 ${cardHeight} rounded-[16px] border border-black/6 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all hover:-translate-y-1 hover:shadow-[0_12px_40px_rgba(0,0,0,0.10)] dark:border-white/8 dark:bg-zinc-900 dark:shadow-black/30 ${
+                rank === 1
+                    ? 'border-t-[3px] border-t-brand-500'
+                    : 'border-t-[3px] border-t-brand-500/40'
+            }`}
         >
-            <div className="absolute top-1/2 left-0 h-20 w-10 -translate-y-1/2 bg-gradient-to-r from-violet-400/5 to-transparent blur-md"></div>
-            <div className="absolute top-1/2 right-0 h-20 w-10 -translate-y-1/2 bg-gradient-to-l from-violet-400/5 to-transparent blur-md"></div>
-            <div className="absolute -top-10 left-1/2 h-24 w-24 -translate-x-1/2 transform rounded-full bg-violet-400/20 blur-xl"></div>
-
             <MedalIcon rank={rank} />
 
             <div className="absolute -top-8 left-1/2 -translate-x-1/2 transform">
-                <div className="relative">
-                    <div
-                        className={`flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 to-violet-600 text-3xl font-bold text-white shadow-xl ring-4 drop-shadow-lg ${
-                            rank === 1
-                                ? 'shadow-yellow-400/20 ring-yellow-400/50'
-                                : rank === 2
-                                  ? 'shadow-gray-300/20 ring-gray-300/50'
-                                  : 'shadow-amber-600/20 ring-amber-600/50'
-                        }`}
-                    >
-                        {initials}
-                    </div>
+                <div
+                    className={`flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-3xl font-bold text-white shadow-lg ring-4 ${
+                        rankRing[rank] ?? 'ring-brand-200'
+                    } dark:ring-offset-zinc-900`}
+                >
+                    {initials}
                 </div>
             </div>
 
-            <div className="relative z-10 mt-12 flex flex-col items-center">
-                <p className="text-center text-lg font-semibold text-white drop-shadow">
+            <div className="relative z-10 mt-14 flex flex-col items-center px-6">
+                <p className="text-center text-base font-semibold text-gray-800 dark:text-gray-100">
                     {name}
                 </p>
 
                 {schedule && (
-                    <p className="mt-1 text-xs text-violet-300">
+                    <p className="mt-1 text-xs text-brand-600 dark:text-brand-400">
                         {schedule.shift_start} - {schedule.shift_end}
                     </p>
                 )}
 
                 <div
-                    className={`mt-3 flex ${secondaryValue ? 'justify-center gap-8' : 'justify-center'}`}
+                    className={`mt-4 flex ${secondaryValue ? 'justify-center gap-8' : 'justify-center'}`}
                 >
                     <div className="text-center">
-                        <p className="text-xs text-gray-400">
+                        <p className="font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
                             {labels.primary}
                         </p>
-                        <p className="text-sm font-medium text-white drop-shadow">
+                        <p className="mt-0.5 text-lg font-bold text-brand-600 dark:text-brand-400">
                             {primaryValue}
                         </p>
                     </div>
                     {secondaryValue && (
                         <div className="text-center">
-                            <p className="text-xs text-gray-400">
+                            <p className="font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
                                 {labels.secondary}
                             </p>
-                            <p className="text-sm font-medium text-white drop-shadow">
+                            <p className="mt-0.5 text-lg font-bold text-gray-700 dark:text-gray-200">
                                 {secondaryValue}
                             </p>
                         </div>
@@ -175,51 +172,33 @@ const LeaderboardEntry = ({
     const labels = getLabels();
 
     return (
-        <div className="group relative overflow-hidden rounded-xl border border-white/5 bg-white/5 p-4 backdrop-blur-sm transition-all hover:bg-white/10 hover:shadow-xl hover:shadow-white/5">
-            <div className="absolute top-0 left-0 h-10 w-full bg-gradient-to-b from-white/10 to-transparent"></div>
-            <div className="absolute bottom-0 left-0 h-10 w-full bg-gradient-to-t from-violet-400/10 to-transparent"></div>
-            <div className="absolute top-0 left-0 h-full w-1 bg-gradient-to-b from-transparent via-violet-400/20 to-transparent"></div>
-
-            <div className="relative z-10 flex items-center gap-3">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/5 text-center text-sm font-medium text-gray-400 ring-1 ring-white/10">
-                    {rank}
+        <div className="group flex items-center gap-3 rounded-[12px] border border-black/6 bg-white p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all hover:border-brand-500/30 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] dark:border-white/6 dark:bg-zinc-900 dark:hover:border-brand-500/30">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-stone-100 text-center text-[12px] font-semibold text-gray-500 dark:bg-zinc-800 dark:text-gray-400">
+                {rank}
+            </span>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-[12px] font-bold text-white shadow-sm">
+                {initials}
+            </div>
+            <div className="flex-1 truncate">
+                <span className="text-[14px] font-medium text-gray-800 dark:text-gray-100">
+                    {name}
                 </span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-xs font-bold text-white shadow-lg">
-                    {initials}
-                </div>
-                <div className="flex-1">
-                    <span className="text-sm text-white drop-shadow">
-                        {name}
-                    </span>
-                    {schedule && (
-                        <span className="ml-2 text-xs text-violet-300">
-                            {schedule.shift_start} - {schedule.shift_end}
-                        </span>
-                    )}
-                </div>
-                <span className="text-sm font-medium text-white drop-shadow">
-                    {primaryValue}
-                </span>
-                {secondaryValue && (
-                    <span className="text-sm font-medium text-white/70 drop-shadow">
-                        {secondaryValue} {labels.secondary}
+                {schedule && (
+                    <span className="ml-2 text-xs text-brand-600 dark:text-brand-400">
+                        {schedule.shift_start} - {schedule.shift_end}
                     </span>
                 )}
             </div>
-
-            <div className="absolute bottom-0 left-0 h-0.5 w-0 bg-gradient-to-r from-violet-400 to-violet-300 transition-all duration-300 group-hover:w-full"></div>
+            <span className="text-[14px] font-bold text-brand-600 dark:text-brand-400">
+                {primaryValue}
+            </span>
+            {secondaryValue && (
+                <span className="text-[12px] font-medium text-gray-400 dark:text-gray-500">
+                    {secondaryValue} {labels.secondary}
+                </span>
+            )}
         </div>
     );
-};
-
-const formatDateForDisplay = (dateStr: string): string => {
-    const date = new Date(dateStr + 'T00:00:00');
-    return date.toLocaleDateString('en-US', {
-        weekday: 'short',
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-    });
 };
 
 const getTodayString = (): string => {
@@ -272,9 +251,8 @@ export default function Leaderboard() {
         }
     };
 
-    const getScheduleForUser = (userId: string): Schedule | undefined => {
-        return schedules.find((s) => s.pancake_user_id === userId);
-    };
+    const getScheduleForUser = (userId: string): Schedule | undefined =>
+        schedules.find((s) => s.pancake_user_id === userId);
 
     const handleTabClick = (tab: string): void => {
         setActiveTab(tab);
@@ -325,7 +303,7 @@ export default function Leaderboard() {
                     ? leaderboardRes.data
                     : [];
 
-                data = data.map((user: any) => ({
+                data = data.map((user: User) => ({
                     id: user.id,
                     name: user.name,
                     sales: user.sales || 0,
@@ -353,32 +331,27 @@ export default function Leaderboard() {
     const renderContent = () => {
         if (isLoading) {
             return (
-                <div className="mt-20 flex items-center justify-center">
-                    <div className="relative">
-                        <div className="h-32 w-32 animate-spin rounded-full border-t-2 border-b-2 border-violet-400"></div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="h-16 w-16 animate-pulse rounded-full bg-violet-400/20"></div>
-                        </div>
-                        <p className="absolute -bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap text-white/80">
-                            Loading leaderboard...
-                        </p>
-                    </div>
+                <div className="mt-24 flex flex-col items-center justify-center gap-4">
+                    <div className="h-12 w-12 animate-spin rounded-full border-2 border-brand-500/20 border-t-brand-500" />
+                    <p className="text-sm text-gray-400 dark:text-gray-500">
+                        Loading leaderboard…
+                    </p>
                 </div>
             );
         }
 
         if (error) {
             return (
-                <div className="mt-20 flex items-center justify-center">
+                <div className="mt-24 flex items-center justify-center">
                     <div className="text-center">
-                        <div className="mb-4 text-6xl">⚠️</div>
-                        <p className="mb-2 text-red-400">{error}</p>
+                        <div className="mb-3 text-5xl">⚠️</div>
+                        <p className="mb-4 text-sm text-red-500">{error}</p>
                         <button
                             onClick={() => {
                                 setError(null);
                                 setRetryCount((c) => c + 1);
                             }}
-                            className="mt-4 rounded-full bg-violet-500 px-6 py-2 text-white transition-colors hover:bg-violet-600"
+                            className="rounded-[10px] bg-brand-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700"
                         >
                             Try Again
                         </button>
@@ -389,25 +362,25 @@ export default function Leaderboard() {
 
         if (users.length === 0) {
             return (
-                <div className="mt-20 flex flex-col items-center justify-center">
+                <div className="mt-24 flex flex-col items-center justify-center">
                     <div className="text-center">
-                        <div className="mb-6 animate-bounce text-7xl">
+                        <div className="mb-5 text-6xl">
                             {activeTab === 'Sales Ranking' && '💰'}
                             {activeTab === 'Called Activity' && '📞'}
                             {activeTab === 'Delivery Success' && '🚚'}
                         </div>
-                        <h3 className="mb-3 text-2xl font-semibold text-white">
+                        <h3 className="mb-2 text-xl font-semibold text-gray-800 dark:text-gray-100">
                             No Data Available
                         </h3>
-                        <p className="mb-2 text-lg text-gray-300">
+                        <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
                             {activeTab === 'Sales Ranking' &&
-                                'No sales have been recorded for today.'}
+                                'No sales have been recorded for this date.'}
                             {activeTab === 'Called Activity' &&
-                                'No call activity has been recorded for today.'}
+                                'No call activity has been recorded for this date.'}
                             {activeTab === 'Delivery Success' &&
-                                'No deliveries have been completed today.'}
+                                'No deliveries have been completed for this date.'}
                         </p>
-                        <p className="text-sm text-gray-400">
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
                             Check back later for updates
                         </p>
                     </div>
@@ -418,7 +391,7 @@ export default function Leaderboard() {
         return (
             <>
                 {topThree.length > 0 && (
-                    <div className="flex items-end gap-4">
+                    <div className="flex items-end justify-center gap-4">
                         {/* Podium order: 2nd, 1st, 3rd */}
                         {[topThree[1], topThree[0], topThree[2]]
                             .filter(Boolean)
@@ -439,6 +412,7 @@ export default function Leaderboard() {
                                         primaryValue={getPrimaryValue(user)}
                                         secondaryValue={getSecondaryValue(user)}
                                         activeTab={activeTab}
+                                        schedule={getScheduleForUser(user.id)}
                                     />
                                 );
                             })}
@@ -446,7 +420,7 @@ export default function Leaderboard() {
                 )}
 
                 {restOfUsers.length > 0 && (
-                    <div className="mt-8 w-full max-w-4xl space-y-2 px-4">
+                    <div className="mx-auto mt-8 w-full max-w-3xl space-y-2 px-4">
                         {restOfUsers.map((user: User, index: number) => (
                             <LeaderboardEntry
                                 key={user.id}
@@ -456,6 +430,7 @@ export default function Leaderboard() {
                                 primaryValue={getPrimaryValue(user)}
                                 secondaryValue={getSecondaryValue(user)}
                                 activeTab={activeTab}
+                                schedule={getScheduleForUser(user.id)}
                             />
                         ))}
                     </div>
@@ -465,117 +440,98 @@ export default function Leaderboard() {
     };
 
     return (
-        <div className="relative h-screen overflow-hidden bg-violet-900">
-            <div className="absolute -top-20 -right-10 h-100 w-100">
-                <div className="absolute inset-0 rounded-full bg-linear-to-bl from-violet-900 via-violet-800 to-violet-300 opacity-80 blur-3xl"></div>
-                <div className="absolute inset-0 animate-pulse rounded-full border-2 border-white/30"></div>
-                <div className="absolute inset-4 rounded-full border border-white/20 blur-sm"></div>
-                <div className="absolute inset-8 rounded-full border border-white/10 blur-md"></div>
-                <div className="absolute inset-0 rounded-full bg-linear-to-tr from-transparent via-white/20 to-white/40 blur-2xl"></div>
-                <div className="absolute top-10 right-10 h-2 w-2 animate-ping rounded-full bg-white"></div>
-                <div className="absolute top-20 right-20 h-1 w-1 animate-pulse rounded-full bg-white/80"></div>
-            </div>
+        <div className="relative min-h-screen overflow-y-auto bg-stone-100 font-sans dark:bg-zinc-950">
+            {/* Landing-style grid + glow backdrop */}
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.03)_1px,transparent_1px)] bg-[size:60px_60px] dark:bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)]" />
+            <div className="pointer-events-none absolute -top-40 left-1/2 h-[500px] w-[900px] -translate-x-1/2 bg-[radial-gradient(ellipse,rgba(16,211,161,0.12),transparent_70%)]" />
 
-            <div className="absolute top-20 left-10 h-64 w-64">
-                <div className="absolute inset-0 rounded-full bg-white/20 shadow-[0px_0px_80px_20px_rgba(255,255,255,0.3)] blur-2xl"></div>
-                <div className="absolute inset-0 rounded-full border border-white/30"></div>
-            </div>
-
-            <div className="absolute -bottom-20 -left-10 h-100 w-100">
-                <div className="absolute inset-0 rounded-full bg-linear-to-tr from-violet-900 via-violet-800 to-violet-300 opacity-80 blur-3xl"></div>
-                <div className="absolute inset-0 animate-pulse rounded-full border-2 border-white/30"></div>
-                <div className="absolute inset-4 rounded-full border border-white/20 blur-sm"></div>
-                <div className="absolute inset-8 rounded-full border border-white/10 blur-md"></div>
-                <div className="absolute inset-0 rounded-full bg-linear-to-bl from-transparent via-white/20 to-white/40 blur-2xl"></div>
-                <div className="absolute bottom-10 left-10 h-2 w-2 animate-ping rounded-full bg-white"></div>
-                <div className="absolute bottom-20 left-20 h-1 w-1 animate-pulse rounded-full bg-white/80"></div>
-            </div>
-
-            <div className="absolute right-0 bottom-20 h-64 w-64">
-                <div className="absolute inset-1 rounded-full bg-white/20 shadow-white blur-2xl"></div>
-                <div className="absolute inset-0 rounded-full border border-white/30"></div>
-            </div>
-
-            <div className="absolute inset-0 bg-linear-to-t from-violet-950/50 to-transparent"></div>
-
-            <div className="absolute top-1/4 right-1/4 h-1 w-1 animate-pulse rounded-full bg-white/50"></div>
-            <div className="absolute bottom-1/3 left-1/3 h-1 w-1 animate-pulse rounded-full bg-white/50 delay-300"></div>
-            <div className="absolute top-2/3 right-1/3 h-1 w-1 animate-pulse rounded-full bg-white/50 delay-700"></div>
-
-            <div className="relative z-10 h-full overflow-y-auto">
-                <div className="flex flex-col items-center pt-20 pb-10">
-                    <h1 className="text-4xl font-bold text-white drop-shadow-lg">
-                        CSR Leaderboards
-                    </h1>
-
-                    <div className="mt-4 flex items-center gap-3">
-                        <button
-                            onClick={() => {
-                                const d = new Date(selectedDate + 'T00:00:00');
-                                d.setDate(d.getDate() - 1);
-                                setSelectedDate(
-                                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
-                                );
-                            }}
-                            className="rounded-full border border-white/10 px-3 py-1.5 text-white/80 transition-all hover:bg-white/10"
-                        >
-                            ←
-                        </button>
-                        <input
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                            className="rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-sm text-white [color-scheme:dark] backdrop-blur-sm transition-all outline-none hover:bg-white/15 focus:ring-2 focus:ring-violet-400/50"
-                        />
-                        <button
-                            onClick={() => {
-                                const d = new Date(selectedDate + 'T00:00:00');
-                                d.setDate(d.getDate() + 1);
-                                setSelectedDate(
-                                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
-                                );
-                            }}
-                            className="rounded-full border border-white/10 px-3 py-1.5 text-white/80 transition-all hover:bg-white/10"
-                        >
-                            →
-                        </button>
-                        {selectedDate !== getTodayString() && (
-                            <button
-                                onClick={() =>
-                                    setSelectedDate(getTodayString())
-                                }
-                                className="rounded-full border border-white/10 bg-violet-500/30 px-3 py-1.5 text-xs text-white transition-all hover:bg-violet-500/50"
-                            >
-                                Today
-                            </button>
-                        )}
-                    </div>
-
-                    <div className="mt-4 flex gap-4">
-                        {(
-                            [
-                                'Sales Ranking',
-                                'Called Activity',
-                                'Delivery Success',
-                            ] as const
-                        ).map((tab: string) => (
-                            <button
-                                key={tab}
-                                onClick={() => handleTabClick(tab)}
-                                className={`relative overflow-hidden rounded-full border border-white/10 px-6 py-2 text-gray-200 transition-all hover:shadow-lg hover:shadow-white/10 ${
-                                    activeTab === tab
-                                        ? 'bg-white/20 backdrop-blur-sm'
-                                        : 'hover:bg-white/5'
-                                }`}
-                            >
-                                <div className="absolute top-0 left-0 h-1/2 w-full bg-gradient-to-b from-white/20 to-transparent"></div>
-                                <span className="relative z-10">{tab}</span>
-                            </button>
-                        ))}
-                    </div>
-
-                    {renderContent()}
+            <div className="relative z-10 flex flex-col items-center px-4 pt-14 pb-12">
+                {/* Brand mark */}
+                <div className="mb-4 flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-[7px] bg-brand-500! text-sm font-bold text-white shadow-sm shadow-brand-500/20">
+                        A
+                    </span>
+                    <span className="font-mono text-[11px] font-semibold tracking-[0.2em] text-brand-700 uppercase dark:text-brand-400">
+                        Artemis
+                    </span>
                 </div>
+
+                <h1 className="text-center text-4xl font-bold tracking-tight text-gray-900 md:text-5xl dark:text-gray-100">
+                    CSR{' '}
+                    <span className="bg-gradient-to-br from-brand-500 to-brand-700 bg-clip-text text-transparent italic">
+                        Leaderboards
+                    </span>
+                </h1>
+                <p className="mt-3 font-mono text-[11px] tracking-[0.15em] text-gray-400 uppercase dark:text-gray-600">
+                    Daily Performance Rankings
+                </p>
+
+                {/* Date controls */}
+                <div className="mt-5 flex items-center gap-2">
+                    <button
+                        onClick={() => {
+                            const d = new Date(selectedDate + 'T00:00:00');
+                            d.setDate(d.getDate() - 1);
+                            setSelectedDate(
+                                `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+                            );
+                        }}
+                        className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-black/8 bg-white text-gray-500 transition-colors hover:border-black/14 hover:text-gray-700 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-400 dark:hover:text-gray-200"
+                    >
+                        ←
+                    </button>
+                    <input
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="h-9 rounded-[10px] border border-black/8 bg-white px-3 text-sm text-gray-700 transition-all outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-200 dark:[color-scheme:dark]"
+                    />
+                    <button
+                        onClick={() => {
+                            const d = new Date(selectedDate + 'T00:00:00');
+                            d.setDate(d.getDate() + 1);
+                            setSelectedDate(
+                                `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+                            );
+                        }}
+                        className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-black/8 bg-white text-gray-500 transition-colors hover:border-black/14 hover:text-gray-700 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-400 dark:hover:text-gray-200"
+                    >
+                        →
+                    </button>
+                    {selectedDate !== getTodayString() && (
+                        <button
+                            onClick={() => setSelectedDate(getTodayString())}
+                            className="h-9 rounded-[10px] border border-brand-500/30 bg-brand-500/10 px-3 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-500/20 dark:text-brand-400"
+                        >
+                            Today
+                        </button>
+                    )}
+                </div>
+
+                {/* Tabs */}
+                <div className="mt-5 flex flex-wrap justify-center gap-2">
+                    {(
+                        [
+                            'Sales Ranking',
+                            'Called Activity',
+                            'Delivery Success',
+                        ] as const
+                    ).map((tab: string) => (
+                        <button
+                            key={tab}
+                            onClick={() => handleTabClick(tab)}
+                            className={`rounded-[10px] border px-5 py-2 text-[13px] font-medium transition-all ${
+                                activeTab === tab
+                                    ? 'border-brand-600 bg-brand-600 text-white shadow-sm dark:border-brand-500 dark:bg-brand-500'
+                                    : 'border-black/8 bg-white text-gray-600 hover:border-black/14 hover:text-gray-800 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-400 dark:hover:text-gray-200'
+                            }`}
+                        >
+                            {tab}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="mt-10 w-full">{renderContent()}</div>
             </div>
         </div>
     );
