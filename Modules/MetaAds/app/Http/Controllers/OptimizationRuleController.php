@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\MetaAds\Models\AdAccount;
+use Modules\MetaAds\Models\AdSet;
+use Modules\MetaAds\Models\Campaign;
 use Modules\MetaAds\Models\OptimizationProposal;
 use Modules\MetaAds\Models\OptimizationRule;
 use Modules\MetaAds\Services\OptimizationRuleEvaluator;
@@ -87,35 +90,125 @@ class OptimizationRuleController extends Controller
     public function approvals(Request $request, Workspace $workspace): Response
     {
         $perPage = (int) $request->integer('per_page', 15);
-        $accountId = $request->input('ad_account_id');
+        $accountIds = array_values(array_filter((array) $request->input('ad_account_id', []), fn ($v) => $v !== '' && $v !== null));
+        $actions = array_values(array_filter((array) $request->input('action', []), fn ($v) => $v !== '' && $v !== null));
 
         $pending = OptimizationProposal::where('workspace_id', $workspace->id)
             ->where('status', 'pending');
 
         $proposals = (clone $pending)
-            ->when($accountId, fn ($q) => $q->where('meta_ads_account_id', $accountId))
+            ->when($accountIds, fn ($q) => $q->whereIn('meta_ads_account_id', $accountIds))
+            ->when($actions, fn ($q) => $q->whereIn('action', $actions))
             ->with(['rule:id,name,execution_mode', 'adAccount:id,name'])
             ->latest()
             ->paginate($perPage)
             ->withQueryString();
 
-        // Ad accounts that currently have pending proposals — the filter options.
+        // Pause/enable proposals carry no budget, but the row should still show
+        // the budget that pausing stops (or enabling resumes) — attach it.
+        $this->attachTargetBudgets($proposals->getCollection());
+
+        // Filter options drawn from the accounts/actions that currently have pending proposals.
         $filterAccounts = AdAccount::whereIn('id', (clone $pending)->select('meta_ads_account_id'))
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn (AdAccount $a) => ['id' => (string) $a->id, 'name' => $a->name])
             ->values();
 
+        $filterActions = (clone $pending)
+            ->distinct()
+            ->orderBy('action')
+            ->pluck('action')
+            ->values();
+
+        $budgetImpact = $this->budgetImpact(
+            (clone $pending)
+                ->when($accountIds, fn ($q) => $q->whereIn('meta_ads_account_id', $accountIds))
+                ->when($actions, fn ($q) => $q->whereIn('action', $actions))
+                ->get(['action', 'current_value', 'new_value', 'target_type', 'target_id'])
+        );
+
         return Inertia::render('workspaces/integrations/meta-ads/optimization-rules/approvals', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
             'proposals' => $proposals,
             'adAccounts' => $filterAccounts,
+            'actions' => $filterActions,
+            'budgetImpact' => $budgetImpact,
             'query' => [
                 'page' => $request->integer('page', 1),
                 'perPage' => $perPage,
-                'accountId' => $accountId ? (string) $accountId : null,
+                'accountIds' => array_map('strval', $accountIds),
+                'actions' => array_map('strval', $actions),
             ],
         ]);
+    }
+
+    /**
+     * Net budget impact of a set of pending proposals (major units):
+     *  - increase/decrease budget → new − current
+     *  - pause  → minus the target's current budget (spend stops)
+     *  - enable → plus the target's current budget (spend resumes)
+     *
+     * @param  Collection<int, OptimizationProposal>  $proposals
+     */
+    private function budgetImpact($proposals): float
+    {
+        $budgetOf = $this->targetBudgetResolver($proposals);
+
+        $total = 0.0;
+        foreach ($proposals as $p) {
+            $total += match ($p->action) {
+                'increase_budget', 'decrease_budget' => (float) $p->new_value - (float) $p->current_value,
+                'pause' => -$budgetOf($p),
+                'enable' => $budgetOf($p),
+                default => 0.0,
+            };
+        }
+
+        return round($total, 2);
+    }
+
+    /**
+     * Pause/enable proposals don't store a budget. Set `target_budget` on each
+     * so the row can show the spend it stops (pause) or resumes (enable).
+     *
+     * @param  Collection<int, OptimizationProposal>  $proposals
+     */
+    private function attachTargetBudgets($proposals): void
+    {
+        $budgetOf = $this->targetBudgetResolver($proposals);
+
+        foreach ($proposals as $p) {
+            if (in_array($p->action, ['pause', 'enable'], true)) {
+                $p->target_budget = $budgetOf($p);
+            }
+        }
+    }
+
+    /**
+     * Bulk-load the current daily (or lifetime) budget of each pause/enable
+     * target and return a resolver: proposal → budget (major units).
+     *
+     * @param  Collection<int, OptimizationProposal>  $proposals
+     */
+    private function targetBudgetResolver($proposals): callable
+    {
+        $needsBudget = $proposals->whereIn('action', ['pause', 'enable']);
+
+        $campaignBudgets = Campaign::whereIn('id', $needsBudget->where('target_type', 'campaign')->pluck('target_id')->all())
+            ->get(['id', 'daily_budget', 'lifetime_budget'])
+            ->keyBy(fn ($c) => (string) $c->id);
+        $setBudgets = AdSet::whereIn('id', $needsBudget->where('target_type', 'ad_set')->pluck('target_id')->all())
+            ->get(['id', 'daily_budget', 'lifetime_budget'])
+            ->keyBy(fn ($s) => (string) $s->id);
+
+        return function ($p) use ($campaignBudgets, $setBudgets): float {
+            $row = $p->target_type === 'campaign'
+                ? ($campaignBudgets[(string) $p->target_id] ?? null)
+                : ($setBudgets[(string) $p->target_id] ?? null);
+
+            return $row ? (float) ($row->daily_budget ?? $row->lifetime_budget ?? 0) : 0.0;
+        };
     }
 
     public function approveProposal(Request $request, Workspace $workspace, OptimizationProposal $proposal): RedirectResponse

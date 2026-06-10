@@ -47,8 +47,11 @@ export interface OptimizationProposal {
     action: string;
     current_value: string | null;
     new_value: string | null;
+    // Current budget of a pause/enable target (the spend it stops / resumes).
+    target_budget?: number | string | null;
     conditions_snapshot: ConditionSnapshot[];
     status: string;
+    created_at: string | null;
     rule?: { id: number; name: string; execution_mode: string };
     ad_account?: AdAccountOption;
 }

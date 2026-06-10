@@ -81,10 +81,44 @@ class OptimizationRuleEvaluator
                 continue;
             }
 
-            $proposals[] = $this->buildProposal($rule, $target, $snapshot);
+            $proposal = $this->buildProposal($rule, $target, $snapshot);
+
+            // Skip budget changes that wouldn't actually move the budget in the
+            // rule's direction — e.g. a "decrease" whose result is clamped up to
+            // budget_min above the current budget (or an "increase" clamped down
+            // by budget_max). Such a proposal contradicts the rule's intent.
+            if ($this->isNonMovingBudgetChange($rule, $proposal)) {
+                continue;
+            }
+
+            $proposals[] = $proposal;
         }
 
         return $proposals;
+    }
+
+    /**
+     * True when a budget proposal doesn't lower (for decrease) or raise (for
+     * increase) the current budget — including the no-budget case.
+     *
+     * @param  array<string, mixed>  $proposal
+     */
+    private function isNonMovingBudgetChange(OptimizationRule $rule, array $proposal): bool
+    {
+        if (! in_array($rule->action, ['increase_budget', 'decrease_budget'], true)) {
+            return false;
+        }
+
+        $current = $proposal['current_value'];
+        $new = $proposal['new_value'];
+
+        if ($current === null || $new === null) {
+            return true; // no budget to act on
+        }
+
+        return $rule->action === 'decrease_budget'
+            ? $new >= $current   // a "decrease" that doesn't lower the budget
+            : $new <= $current;  // an "increase" that doesn't raise the budget
     }
 
     /**

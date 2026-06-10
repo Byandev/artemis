@@ -2,12 +2,17 @@ import PageHeader from '@/components/common/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type PaginatedData } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { ArrowRight, Check, CheckCircle2, X } from 'lucide-react';
+import { ArrowRight, Check, CheckCircle2, ChevronDown, X } from 'lucide-react';
 import { useState } from 'react';
 import {
     type AdAccountOption,
@@ -22,11 +27,81 @@ interface Props {
     workspace: { id: number; name: string; slug: string };
     proposals: PaginatedData<OptimizationProposal>;
     adAccounts: AdAccountOption[];
+    actions: string[];
+    budgetImpact: number;
     query?: {
         page?: number | string;
         perPage?: number | string;
-        accountId?: string | null;
+        accountIds?: string[];
+        actions?: string[];
     };
+}
+
+function MultiFilter({
+    label,
+    options,
+    selected,
+    onChange,
+}: {
+    label: string;
+    options: { value: string; label: string }[];
+    selected: string[];
+    onChange: (next: string[]) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const toggle = (v: string) => {
+        const set = new Set(selected);
+        if (set.has(v)) set.delete(v);
+        else set.add(v);
+        onChange(options.filter((o) => set.has(o.value)).map((o) => o.value));
+    };
+    const text =
+        selected.length === 0
+            ? `All ${label.toLowerCase()}`
+            : `${selected.length} ${label.toLowerCase()}`;
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 gap-1.5">
+                    {text}
+                    <ChevronDown className="h-3 w-3 text-gray-400" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 p-1">
+                {options.length === 0 && (
+                    <p className="px-2 py-2 text-[11px] text-gray-400">
+                        No options
+                    </p>
+                )}
+                {options.map((o) => {
+                    const checked = selected.includes(o.value);
+                    return (
+                        <button
+                            key={o.value}
+                            type="button"
+                            onClick={() => toggle(o.value)}
+                            className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-[12px] text-gray-700 transition-colors hover:bg-stone-100 dark:text-gray-300 dark:hover:bg-zinc-700"
+                        >
+                            <span className="truncate">{o.label}</span>
+                            {checked && (
+                                <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                            )}
+                        </button>
+                    );
+                })}
+                {selected.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={() => onChange([])}
+                        className="mt-1 w-full border-t border-black/6 px-2 pt-1.5 text-left text-[11px] text-gray-400 hover:text-gray-600 dark:border-white/6"
+                    >
+                        Clear
+                    </button>
+                )}
+            </PopoverContent>
+        </Popover>
+    );
 }
 
 const actionVariant = (action: string) =>
@@ -51,10 +126,18 @@ export default function OptimizationApprovals({
     workspace,
     proposals,
     adAccounts,
+    actions,
+    budgetImpact,
     query,
 }: Props) {
     const indexUrl = optimizationRulesUrl(workspace.slug);
     const [busyId, setBusyId] = useState<number | null>(null);
+    const [accountIds, setAccountIds] = useState<string[]>(
+        query?.accountIds ?? [],
+    );
+    const [actionFilters, setActionFilters] = useState<string[]>(
+        query?.actions ?? [],
+    );
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Optimization Rules', href: indexUrl },
@@ -67,16 +150,32 @@ export default function OptimizationApprovals({
             {
                 page: proposals.current_page,
                 per_page: query?.perPage ?? proposals.per_page,
-                ad_account_id: query?.accountId ?? undefined,
+                ad_account_id: accountIds.length ? accountIds : undefined,
+                action: actionFilters.length ? actionFilters : undefined,
                 ...overrides,
             },
             {
                 preserveState: true,
                 replace: true,
                 preserveScroll: true,
-                only: ['proposals', 'adAccounts', 'query'],
+                only: [
+                    'proposals',
+                    'adAccounts',
+                    'actions',
+                    'budgetImpact',
+                    'query',
+                ],
             },
         );
+
+    const onAccounts = (next: string[]) => {
+        setAccountIds(next);
+        navigate({ page: 1, ad_account_id: next.length ? next : undefined });
+    };
+    const onActions = (next: string[]) => {
+        setActionFilters(next);
+        navigate({ page: 1, action: next.length ? next : undefined });
+    };
 
     const review = (
         proposal: OptimizationProposal,
@@ -162,6 +261,20 @@ export default function OptimizationApprovals({
                                     {fmt(p.new_value)}
                                 </span>
                             )}
+                        {p.target_budget != null &&
+                            Number(p.target_budget) > 0 &&
+                            (p.action === 'pause' || p.action === 'enable') && (
+                                <span
+                                    className={
+                                        p.action === 'pause'
+                                            ? 'text-[11px] font-semibold text-red-600 dark:text-red-400'
+                                            : 'text-[11px] font-semibold text-emerald-600 dark:text-emerald-400'
+                                    }
+                                >
+                                    {p.action === 'pause' ? '−' : '+'}
+                                    {fmt(String(p.target_budget))}
+                                </span>
+                            )}
                     </div>
                 );
             },
@@ -191,6 +304,9 @@ export default function OptimizationApprovals({
                                     ? 'n/a'
                                     : Number(c.actual_value).toLocaleString()}
                                 )
+                            </span>
+                            <span className="text-gray-400">
+                                · {titleCase(c.time_window)}
                             </span>
                         </span>
                     ))}
@@ -233,26 +349,24 @@ export default function OptimizationApprovals({
                     title="Optimization Approvals"
                     description="Review the changes optimization rules want to make before they run."
                 >
-                    <select
-                        value={query?.accountId ?? ''}
-                        onChange={(e) =>
-                            navigate({
-                                ad_account_id: e.target.value || undefined,
-                                page: 1,
-                            })
-                        }
-                        className="h-9 rounded-lg border border-black/8 bg-white px-2.5 text-[12px] text-gray-700 transition-colors outline-none focus:border-emerald-500 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-200"
-                    >
-                        <option value="">All ad accounts</option>
-                        {adAccounts.map((a) => (
-                            <option key={a.id} value={a.id}>
-                                {a.name}
-                            </option>
-                        ))}
-                    </select>
-                    <Button variant="outline" size="sm" asChild>
-                        <Link href={indexUrl}>Back to rules</Link>
-                    </Button>
+                    <MultiFilter
+                        label="ad accounts"
+                        options={adAccounts.map((a) => ({
+                            value: a.id,
+                            label: a.name,
+                        }))}
+                        selected={accountIds}
+                        onChange={onAccounts}
+                    />
+                    <MultiFilter
+                        label="actions"
+                        options={actions.map((a) => ({
+                            value: a,
+                            label: titleCase(a),
+                        }))}
+                        selected={actionFilters}
+                        onChange={onActions}
+                    />
                 </PageHeader>
 
                 {proposals.total === 0 ? (
@@ -269,22 +383,45 @@ export default function OptimizationApprovals({
                         </p>
                     </div>
                 ) : (
-                    <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                        <DataTable
-                            columns={columns as ColumnDef<unknown>[]}
-                            data={(proposals.data ?? []) as unknown[]}
-                            meta={omit(proposals, ['data'])}
-                            onFetch={(params) =>
-                                navigate({
-                                    page: params?.page ?? 1,
-                                    per_page:
-                                        params?.per_page ??
-                                        query?.perPage ??
-                                        proposals.per_page,
-                                })
-                            }
-                        />
-                    </div>
+                    <>
+                        <div className="mb-3 flex items-center gap-2 rounded-[12px] border border-black/6 bg-white px-4 py-2.5 dark:border-white/6 dark:bg-zinc-900">
+                            <span className="text-[12px] text-gray-500 dark:text-gray-400">
+                                Net budget impact if all{' '}
+                                {(accountIds.length > 0 ||
+                                    actionFilters.length > 0) &&
+                                    'shown '}
+                                proposals are approved
+                            </span>
+                            <span
+                                className={
+                                    budgetImpact > 0
+                                        ? 'text-[15px] font-semibold text-emerald-600 dark:text-emerald-400'
+                                        : budgetImpact < 0
+                                          ? 'text-[15px] font-semibold text-red-600 dark:text-red-400'
+                                          : 'text-[15px] font-semibold text-gray-600 dark:text-gray-300'
+                                }
+                            >
+                                {budgetImpact > 0 ? '+' : budgetImpact < 0 ? '−' : ''}
+                                {fmt(String(Math.abs(budgetImpact)))}
+                            </span>
+                        </div>
+                        <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                            <DataTable
+                                columns={columns as ColumnDef<unknown>[]}
+                                data={(proposals.data ?? []) as unknown[]}
+                                meta={omit(proposals, ['data'])}
+                                onFetch={(params) =>
+                                    navigate({
+                                        page: params?.page ?? 1,
+                                        per_page:
+                                            params?.per_page ??
+                                            query?.perPage ??
+                                            proposals.per_page,
+                                    })
+                                }
+                            />
+                        </div>
+                    </>
                 )}
             </div>
         </AppLayout>

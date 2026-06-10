@@ -116,6 +116,12 @@ class EvaluateOptimizationRulesCommand extends Command
     {
         $created = 0;
 
+        // Each campaign / ad set is owned by the highest-priority rule that
+        // matches it this run ($rules is pre-sorted by priority desc), so a
+        // target never gets competing proposals — the same single-owner
+        // behaviour automatic rules already get via planRun().
+        $claimed = [];
+
         foreach ($rules as $rule) {
             if ($rule->adAccounts->isEmpty()) {
                 $this->warn("Rule #{$rule->id} \"{$rule->name}\" has no ad accounts; skipping.");
@@ -128,7 +134,19 @@ class EvaluateOptimizationRulesCommand extends Command
                 ->delete();
 
             foreach ($rule->adAccounts as $account) {
-                $proposals = $evaluator->plan($rule, $account);
+                // Drop targets a higher-priority rule already claimed this run.
+                $proposals = array_values(array_filter(
+                    $evaluator->plan($rule, $account),
+                    function (array $proposal) use (&$claimed) {
+                        $key = $proposal['target_type'].':'.$proposal['target_id'];
+                        if (isset($claimed[$key])) {
+                            return false;
+                        }
+                        $claimed[$key] = true;
+
+                        return true;
+                    },
+                ));
 
                 foreach ($proposals as $proposal) {
                     OptimizationProposal::create([
