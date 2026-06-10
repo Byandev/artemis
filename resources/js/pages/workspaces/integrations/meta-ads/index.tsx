@@ -6,24 +6,34 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import clsx from 'clsx';
 import { formatDate } from 'date-fns';
 import flatpickr from 'flatpickr';
 import { omit } from 'lodash';
 import {
     Check,
     ChevronDown,
+    Download,
     Image as ImageIcon,
     LayoutGrid,
+    Loader2,
+    Play,
     Search,
 } from 'lucide-react';
 import moment from 'moment';
-import { useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import {
     ColumnVisibilityMenu,
     INSIGHTS_OPTIONS,
@@ -59,12 +69,15 @@ const HAS_STATUS: Record<GroupBy, boolean> = {
 };
 
 interface Row extends InsightsMetrics {
-    id: number;
+    // Meta ad/campaign/ad-set ids are bigints beyond JS's safe-integer range,
+    // so the server sends them as strings — never coerce back to a number.
+    id: string;
     name: string | null;
     status?: string | null;
     effective_status?: string | null;
     thumbnail_url?: string | null;
     image_url?: string | null;
+    video_id?: number | string | null;
     ads_count?: number;
 }
 
@@ -93,6 +106,196 @@ interface Props {
 
 function adsManagerUrl(slug: string) {
     return `/workspaces/${slug}/integrations/meta/ads-manager`;
+}
+
+function adDetailUrl(slug: string, adId: number | string) {
+    return `/workspaces/${slug}/integrations/meta/ads-manager/ads/${adId}/detail`;
+}
+
+/* ───────────────────── Creative detail drawer ───────────────── */
+
+interface AdDetail {
+    dimensions: {
+        ad_status: string | null;
+        optimization_goal: string | null;
+        ad_name: string | null;
+        ad_id: string;
+        adset_name: string | null;
+        campaign_name: string | null;
+        account_name: string | null;
+        ad_type: string;
+        call_to_action: string | null;
+    };
+    preview: { src: string | null };
+}
+
+function DimRow({
+    label,
+    value,
+    mono,
+}: {
+    label: string;
+    value: ReactNode;
+    mono?: boolean;
+}) {
+    return (
+        <div className="grid grid-cols-[120px_1fr] gap-2 py-1.5">
+            <dt className="text-[11px] text-gray-400 dark:text-gray-500">
+                {label}
+            </dt>
+            <dd
+                className={clsx(
+                    'text-[12px] text-gray-700 dark:text-gray-200',
+                    mono && 'font-mono text-[11px]',
+                )}
+            >
+                {value ?? <span className="text-gray-300">—</span>}
+            </dd>
+        </div>
+    );
+}
+
+function CreativeDetailDrawer({
+    slug,
+    ad,
+    onClose,
+}: {
+    slug: string;
+    ad: Row | null;
+    onClose: () => void;
+}) {
+    const [detail, setDetail] = useState<AdDetail | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [src, setSrc] = useState<string | null>(null);
+    const [iframeLoaded, setIframeLoaded] = useState(false);
+
+    useEffect(() => {
+        if (!ad) return;
+        let active = true;
+        setLoading(true);
+        setDetail(null);
+        setSrc(null);
+        setIframeLoaded(false);
+        fetch(adDetailUrl(slug, ad.id), {
+            headers: { Accept: 'application/json' },
+        })
+            .then((r) => (r.ok ? r.json() : Promise.reject()))
+            .then((d: AdDetail) => {
+                if (!active) return;
+                setDetail(d);
+                setSrc(d.preview?.src ?? null);
+                setLoading(false);
+            })
+            .catch(() => active && setLoading(false));
+        return () => {
+            active = false;
+        };
+    }, [ad?.id, slug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const dim = detail?.dimensions;
+    const isImage = ad?.video_id == null;
+    // Spinner while the detail request is in flight OR the iframe is still painting.
+    const showSpinner = loading || (!!src && !iframeLoaded);
+
+    return (
+        <Sheet open={!!ad} onOpenChange={(o) => !o && onClose()}>
+            <SheetContent
+                side="right"
+                className="w-full gap-0 overflow-y-auto p-0 sm:max-w-md"
+            >
+                <SheetHeader className="border-b border-black/6 px-4 py-3 dark:border-white/6">
+                    <SheetTitle className="truncate pr-6 text-[14px] tracking-tight text-gray-800 dark:text-gray-100">
+                        {ad?.name ?? 'Creative'}
+                    </SheetTitle>
+                </SheetHeader>
+
+                <div className="p-4">
+                    {/* Phone-style frame around the in-feed ad preview. */}
+                    <div className="flex justify-center rounded-lg bg-stone-100 py-6 dark:bg-zinc-950">
+                        <div className="w-[336px] overflow-hidden rounded-[2rem] border-[8px] border-zinc-800 bg-black shadow-xl dark:border-zinc-700">
+                            <div className="flex h-6 items-center justify-center bg-zinc-900">
+                                <div className="h-1 w-10 rounded-full bg-zinc-600" />
+                            </div>
+                            <div className="relative h-[560px] bg-white dark:bg-zinc-900">
+                                {src && (
+                                    <iframe
+                                        key={src}
+                                        title="Creative preview"
+                                        src={src}
+                                        onLoad={() => setIframeLoaded(true)}
+                                        className={clsx(
+                                            'h-full w-full border-0',
+                                            !iframeLoaded && 'invisible',
+                                        )}
+                                        allowFullScreen
+                                    />
+                                )}
+                                {showSpinner ? (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                                    </div>
+                                ) : (
+                                    !src && (
+                                        <div className="absolute inset-0 flex items-center justify-center px-6">
+                                            <p className="text-center font-mono text-[12px] text-gray-400 dark:text-gray-500">
+                                                Preview unavailable for this ad.
+                                            </p>
+                                        </div>
+                                    )
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {isImage && ad?.image_url && (
+                        <a
+                            href={ad.image_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-3 flex h-8 w-fit items-center gap-1.5 rounded-lg border border-black/6 px-3 font-mono text-[11px] text-gray-600 hover:border-black/12 hover:bg-stone-50 dark:border-white/6 dark:text-gray-300 dark:hover:bg-zinc-800"
+                        >
+                            <Download className="h-3.5 w-3.5" />
+                            Download
+                        </a>
+                    )}
+
+                    <p className="mt-5 mb-1 text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                        Dimensions
+                    </p>
+                    <dl className="divide-y divide-black/4 dark:divide-white/4">
+                        <DimRow label="Ad status" value={dim?.ad_status} />
+                        <DimRow
+                            label="Optimization goal"
+                            value={dim?.optimization_goal}
+                            mono
+                        />
+                        <DimRow
+                            label="Ad"
+                            value={
+                                dim && (
+                                    <span>
+                                        {dim.ad_name}
+                                        <span className="block font-mono text-[10px] text-gray-400">
+                                            ID {dim.ad_id}
+                                        </span>
+                                    </span>
+                                )
+                            }
+                        />
+                        <DimRow label="Adset" value={dim?.adset_name} />
+                        <DimRow label="Campaign" value={dim?.campaign_name} />
+                        <DimRow label="Account" value={dim?.account_name} />
+                        <DimRow label="Ad type" value={dim?.ad_type} />
+                        <DimRow
+                            label="Call to action"
+                            value={dim?.call_to_action}
+                            mono
+                        />
+                    </dl>
+                </div>
+            </SheetContent>
+        </Sheet>
+    );
 }
 
 /* ───────────────────── Account multi-picker ─────────────────── */
@@ -282,6 +485,7 @@ export default function MetaAdsManager({
     const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() =>
         deserializeMetricFilters(query?.metricFilters),
     );
+    const [previewAd, setPreviewAd] = useState<Row | null>(null);
 
     // Send the account list only when it's a strict subset; an empty value means
     // "all accounts" on the server, matching the default.
@@ -422,23 +626,36 @@ export default function MetaAdsManager({
             ),
             cell: ({ row }) => (
                 <div className="flex items-start gap-3">
-                    {showThumbnail &&
-                        (row.original.thumbnail_url ||
-                        row.original.image_url ? (
-                            <img
-                                src={
-                                    row.original.thumbnail_url ??
-                                    row.original.image_url ??
-                                    ''
-                                }
-                                alt=""
-                                className="h-10 w-10 shrink-0 rounded object-cover"
-                            />
-                        ) : (
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-stone-100 text-gray-400 dark:bg-zinc-800 dark:text-gray-500">
-                                <ImageIcon className="h-4 w-4" />
-                            </div>
-                        ))}
+                    {showThumbnail && (
+                        <button
+                            type="button"
+                            onClick={() => setPreviewAd(row.original)}
+                            title="View creative"
+                            className="group relative h-10 w-10 shrink-0 overflow-hidden rounded ring-emerald-500/40 transition-shadow hover:ring-2"
+                        >
+                            {row.original.thumbnail_url ||
+                            row.original.image_url ? (
+                                <img
+                                    src={
+                                        row.original.thumbnail_url ??
+                                        row.original.image_url ??
+                                        ''
+                                    }
+                                    alt=""
+                                    className="h-10 w-10 object-cover"
+                                />
+                            ) : (
+                                <div className="flex h-10 w-10 items-center justify-center bg-stone-100 text-gray-400 dark:bg-zinc-800 dark:text-gray-500">
+                                    <ImageIcon className="h-4 w-4" />
+                                </div>
+                            )}
+                            {row.original.video_id != null && (
+                                <span className="absolute inset-0 flex items-center justify-center bg-black/35">
+                                    <Play className="h-3.5 w-3.5 fill-white text-white" />
+                                </span>
+                            )}
+                        </button>
+                    )}
                     <div className="min-w-0 flex-1">
                         <span className="block truncate text-[12px] font-medium text-gray-700 dark:text-gray-300">
                             {row.original.name ?? '—'}
@@ -575,6 +792,12 @@ export default function MetaAdsManager({
                     />
                 </div>
             </div>
+
+            <CreativeDetailDrawer
+                slug={workspace.slug}
+                ad={previewAd}
+                onClose={() => setPreviewAd(null)}
+            />
         </AppLayout>
     );
 }

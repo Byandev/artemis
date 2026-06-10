@@ -4,6 +4,7 @@ namespace Modules\MetaAds\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -62,6 +63,114 @@ class AdsManagerController extends Controller
     }
 
     /**
+     * Ad-format whitelist for the creative preview (avoid passing arbitrary
+     * values straight to the Graph API).
+     */
+    private const PREVIEW_FORMATS = [
+        'MOBILE_FEED_STANDARD',
+        'DESKTOP_FEED_STANDARD',
+        'INSTAGRAM_STANDARD',
+        'INSTAGRAM_STORY',
+        'FACEBOOK_STORY_MOBILE',
+    ];
+
+    /**
+     * Returns Meta's signed ad-preview iframe src for a single ad. The raw video
+     * source is permission-restricted, so this iframe is how video creatives are
+     * watched (it also renders image ads). The `d=` token is short-lived, so we
+     * resolve it on demand rather than storing it.
+     */
+    public function adPreview(Request $request, Workspace $workspace, string $ad): JsonResponse
+    {
+        abort_unless($request->user()->isMemberOf($workspace), 403);
+
+        $accountIds = $this->accountIdsForWorkspace($workspace);
+        $adModel = Ad::whereIn('meta_ads_account_id', $accountIds)->findOrFail($ad);
+        $account = AdAccount::findOrFail($adModel->meta_ads_account_id);
+
+        return response()->json([
+            'src' => $this->resolvePreviewSrc($account, $adModel->id, $this->resolveFormat($request)),
+        ]);
+    }
+
+    /**
+     * Creative detail for the drawer: the dimensions panel and the preview
+     * iframe src.
+     */
+    public function adDetail(Request $request, Workspace $workspace, string $ad): JsonResponse
+    {
+        abort_unless($request->user()->isMemberOf($workspace), 403);
+
+        $accountIds = $this->accountIdsForWorkspace($workspace);
+
+        $row = Ad::query()
+            ->whereIn('meta_ads_ads.meta_ads_account_id', $accountIds)
+            ->where('meta_ads_ads.id', $ad)
+            ->leftJoin('meta_ads_sets', 'meta_ads_sets.id', '=', 'meta_ads_ads.meta_ads_set_id')
+            ->leftJoin('meta_ads_campaigns', 'meta_ads_campaigns.id', '=', 'meta_ads_ads.meta_ads_campaign_id')
+            ->leftJoin('meta_ads_accounts', 'meta_ads_accounts.id', '=', 'meta_ads_ads.meta_ads_account_id')
+            ->leftJoin('meta_ads_creatives', 'meta_ads_creatives.id', '=', 'meta_ads_ads.meta_ads_creative_id')
+            ->select([
+                'meta_ads_ads.id',
+                'meta_ads_ads.name',
+                'meta_ads_ads.status',
+                'meta_ads_ads.effective_status',
+                'meta_ads_ads.meta_ads_account_id',
+                DB::raw('meta_ads_sets.name AS adset_name'),
+                DB::raw('meta_ads_sets.optimization_goal AS optimization_goal'),
+                DB::raw('meta_ads_campaigns.name AS campaign_name'),
+                DB::raw('meta_ads_accounts.name AS account_name'),
+                DB::raw('meta_ads_creatives.video_id AS video_id'),
+                DB::raw('meta_ads_creatives.call_to_action_type AS call_to_action'),
+            ])
+            ->firstOrFail();
+
+        $account = AdAccount::findOrFail($row->meta_ads_account_id);
+
+        return response()->json([
+            'dimensions' => [
+                'ad_status' => $row->effective_status ?? $row->status,
+                'optimization_goal' => $row->optimization_goal,
+                'ad_name' => $row->name,
+                'ad_id' => (string) $row->id,
+                'adset_name' => $row->adset_name,
+                'campaign_name' => $row->campaign_name,
+                'account_name' => $row->account_name,
+                'ad_type' => $row->video_id ? 'Video' : 'Image',
+                'call_to_action' => $row->call_to_action,
+            ],
+            'preview' => [
+                'src' => $this->resolvePreviewSrc($account, $row->id, $this->resolveFormat($request)),
+            ],
+        ]);
+    }
+
+    private function resolveFormat(Request $request): string
+    {
+        $format = (string) $request->query('format', 'MOBILE_FEED_STANDARD');
+
+        return in_array($format, self::PREVIEW_FORMATS, true) ? $format : 'MOBILE_FEED_STANDARD';
+    }
+
+    /**
+     * Pull Meta's signed preview iframe src out of the /previews response. The
+     * raw video source is permission-restricted, so this iframe is how video
+     * creatives are watched (it renders image ads too). The `d=` token is
+     * short-lived, so callers resolve it on demand rather than storing it.
+     */
+    private function resolvePreviewSrc(AdAccount $account, int|string $adId, string $format): ?string
+    {
+        $response = $account->graphClient()->get($adId.'/previews', ['ad_format' => $format]);
+        $body = $response['data'][0]['body'] ?? null;
+
+        if ($body && preg_match('/src="([^"]+)"/', $body, $matches)) {
+            return html_entity_decode($matches[1]);
+        }
+
+        return null;
+    }
+
+    /**
      * Allowed group-by dimensions. Keys are the public `group_by` values; the
      * default is `ad_name`.
      */
@@ -117,6 +226,7 @@ class AdsManagerController extends Controller
                     'meta_ads_ads.effective_status',
                     DB::raw('meta_ads_creatives.thumbnail_url AS thumbnail_url'),
                     DB::raw('meta_ads_creatives.image_url AS image_url'),
+                    DB::raw('meta_ads_creatives.video_id AS video_id'),
                 ],
                 'groupBy' => [
                     'meta_ads_ads.id',
@@ -125,6 +235,7 @@ class AdsManagerController extends Controller
                     'meta_ads_ads.effective_status',
                     'meta_ads_creatives.thumbnail_url',
                     'meta_ads_creatives.image_url',
+                    'meta_ads_creatives.video_id',
                 ],
                 'search' => 'meta_ads_ads.name',
             ],
@@ -245,6 +356,21 @@ class AdsManagerController extends Controller
             ->defaultSort('-spend')
             ->paginate($request->integer('per_page', 25))
             ->withQueryString();
+
+        // Meta entity ids are unsigned bigints (~1e17) that exceed JS's safe
+        // integer range (2^53). Serialize them as strings so the frontend
+        // doesn't silently round the value — otherwise the per-row preview /
+        // detail lookups hit a corrupted id and 404.
+        $rows->getCollection()->transform(function ($row) {
+            if (isset($row->id)) {
+                $row->id = (string) $row->id;
+            }
+            if (isset($row->video_id)) {
+                $row->video_id = (string) $row->video_id;
+            }
+
+            return $row;
+        });
 
         return $rows->toArray();
     }

@@ -135,7 +135,10 @@ export function StatusLabel({ status }: { status: string | null }) {
 export function formatMoney(value: number | string | null | undefined) {
     const n = typeof value === 'string' ? parseFloat(value) : (value ?? 0);
     if (!n) return '—';
-    return new Intl.NumberFormat(undefined, {
+    return new Intl.NumberFormat('en-PH', {
+        style: 'currency',
+        currency: 'PHP',
+        currencyDisplay: 'narrowSymbol',
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     }).format(n);

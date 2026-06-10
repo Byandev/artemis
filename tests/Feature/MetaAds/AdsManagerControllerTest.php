@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
 use Modules\MetaAds\Models\Ad;
 use Modules\MetaAds\Models\AdAccount;
@@ -191,6 +192,60 @@ it('includes an ad count per group, except when grouping by ad id', function () 
     // Grouping by ad id carries no ad-count column.
     $this->get(adsManagerUrl($workspace, ['group_by' => 'ad']))
         ->assertInertia(fn (Assert $page) => $page->missing('rows.data.0.ads_count'));
+});
+
+it('returns the meta ad-preview iframe src for an ad', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsManager($workspace); // ad 1002 belongs to account 101
+
+    Http::fake([
+        'graph.facebook.com/*' => Http::response([
+            'data' => [[
+                'body' => '<iframe src="https://business.facebook.com/preview?d=TOKEN&amp;t=1" width="320" height="570"></iframe>',
+            ]],
+        ], 200),
+    ]);
+
+    $this->getJson(route('workspaces.metaads.ads-manager.preview', ['workspace' => $workspace, 'ad' => 1002]))
+        ->assertOk()
+        // &amp; is decoded back to & for a usable src.
+        ->assertJson(['src' => 'https://business.facebook.com/preview?d=TOKEN&t=1']);
+});
+
+it('does not expose ad previews for ads outside the workspace accounts', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsManager($workspace);
+
+    // An ad on an account this workspace cannot see.
+    $foreign = AdAccount::create(['id' => 999, 'name' => 'Foreign']);
+    Ad::create(['id' => 9002, 'meta_ads_account_id' => $foreign->id, 'meta_ads_campaign_id' => 1, 'meta_ads_set_id' => 1, 'name' => 'Foreign Ad']);
+
+    $this->getJson(route('workspaces.metaads.ads-manager.preview', ['workspace' => $workspace, 'ad' => 9002]))
+        ->assertNotFound();
+});
+
+it('returns ad detail (dimensions + preview) for the drawer', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsManager($workspace);
+
+    Http::fake([
+        'graph.facebook.com/*' => Http::response([
+            'data' => [[
+                'body' => '<iframe src="https://business.facebook.com/p?d=TOK"></iframe>',
+            ]],
+        ], 200),
+    ]);
+
+    $this->getJson(route('workspaces.metaads.ads-manager.detail', ['workspace' => $workspace, 'ad' => 1002]))
+        ->assertOk()
+        ->assertJsonPath('dimensions.ad_id', '1002')
+        ->assertJsonPath('dimensions.ad_name', 'Shared Creative')
+        ->assertJsonPath('dimensions.campaign_name', 'Campaign 1000')
+        ->assertJsonPath('dimensions.adset_name', 'Ad Set 1000')
+        ->assertJsonPath('dimensions.account_name', 'Account A')
+        ->assertJsonPath('dimensions.ad_type', 'Image') // seed has no creative/video_id
+        ->assertJsonMissingPath('scores')
+        ->assertJsonPath('preview.src', 'https://business.facebook.com/p?d=TOK');
 });
 
 it('forbids non-members', function () {
