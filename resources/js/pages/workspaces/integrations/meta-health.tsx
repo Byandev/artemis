@@ -144,6 +144,12 @@ function formatRelative(ts: string | null) {
     return `${Math.round(diff / 86400)}d ago`;
 }
 
+function formatDuration(seconds: number | null) {
+    if (seconds == null) return '—';
+    if (seconds > 60) return `${(seconds / 60).toFixed(2)}m`;
+    return `${seconds}s`;
+}
+
 function StatCard({
     label,
     value,
@@ -374,7 +380,7 @@ export default function MetaHealthDashboard({
             cell: ({ row }) =>
                 row.original.duration_seconds != null ? (
                     <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
-                        {row.original.duration_seconds}s
+                        {formatDuration(row.original.duration_seconds)}
                     </span>
                 ) : (
                     <span className="text-gray-300 dark:text-gray-600">—</span>

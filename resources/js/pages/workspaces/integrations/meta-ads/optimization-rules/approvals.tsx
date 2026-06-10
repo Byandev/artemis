@@ -15,6 +15,7 @@ import { omit } from 'lodash';
 import { ArrowRight, Check, CheckCircle2, ChevronDown, X } from 'lucide-react';
 import { useState } from 'react';
 import {
+    actionBadgeClass,
     type AdAccountOption,
     executionModeLabel,
     metricLabel,
@@ -103,13 +104,6 @@ function MultiFilter({
         </Popover>
     );
 }
-
-const actionVariant = (action: string) =>
-    action === 'pause'
-        ? 'destructive'
-        : action === 'enable'
-          ? 'default'
-          : 'secondary';
 
 const fmt = (v: string | null) =>
     v === null
@@ -249,7 +243,10 @@ export default function OptimizationApprovals({
                 const p = row.original;
                 return (
                     <div className="flex flex-col items-start gap-1">
-                        <Badge variant={actionVariant(p.action)}>
+                        <Badge
+                            variant="outline"
+                            className={actionBadgeClass(p.action)}
+                        >
                             {titleCase(p.action)}
                         </Badge>
                         {isBudget(p.action) &&

@@ -73,6 +73,26 @@ export const BUDGET_ACTIONS = ['increase_budget', 'decrease_budget'];
 export const isBudgetAction = (action: string): boolean =>
     BUDGET_ACTIONS.includes(action);
 
+/**
+ * A distinct, readable badge colour per action. Uses standard palette classes
+ * so it never depends on a theme token being mapped. Pair with
+ * `<Badge variant="outline" className={actionBadgeClass(action)}>`.
+ */
+export const actionBadgeClass = (action: string): string => {
+    switch (action) {
+        case 'pause':
+            return 'border-transparent bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400';
+        case 'enable':
+            return 'border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400';
+        case 'increase_budget':
+            return 'border-transparent bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400';
+        case 'decrease_budget':
+            return 'border-transparent bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400';
+        default:
+            return 'border-transparent bg-stone-100 text-stone-700 dark:bg-zinc-800 dark:text-zinc-300';
+    }
+};
+
 const UPPERCASE_METRICS = new Set(['roas', 'cpa', 'cpc', 'ctr', 'cpm']);
 
 /** Title-case an underscored enum value, e.g. last_7_days → "Last 7 Days". */

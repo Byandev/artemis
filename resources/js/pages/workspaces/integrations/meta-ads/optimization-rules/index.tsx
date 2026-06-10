@@ -22,6 +22,7 @@ import { omit } from 'lodash';
 import { Pencil, Plus, SlidersHorizontal, Trash2, Zap } from 'lucide-react';
 import { useState } from 'react';
 import {
+    actionBadgeClass,
     executionModeLabel,
     isBudgetAction,
     type OptimizationRule,
@@ -34,13 +35,6 @@ interface Props {
     rules: PaginatedData<OptimizationRule>;
     query?: { page?: number | string; perPage?: number | string };
 }
-
-const actionVariant = (action: string) =>
-    action === 'pause'
-        ? 'destructive'
-        : action === 'enable'
-          ? 'default'
-          : 'secondary';
 
 function actionSummary(rule: OptimizationRule): string {
     if (!isBudgetAction(rule.action)) return titleCase(rule.action);
@@ -168,8 +162,8 @@ export default function OptimizationRulesIndex({
             header: 'Action',
             cell: ({ row }) => (
                 <Badge
-                    variant={actionVariant(row.original.action)}
-                    className="gap-1"
+                    variant="outline"
+                    className={`gap-1 ${actionBadgeClass(row.original.action)}`}
                 >
                     <Zap className="h-3 w-3" />
                     {actionSummary(row.original)}

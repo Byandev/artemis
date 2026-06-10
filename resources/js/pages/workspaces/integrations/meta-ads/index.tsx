@@ -258,10 +258,11 @@ function GridTable({
           : undefined;
 
     return (
-        <>
-            <div className="mb-3 flex items-center justify-end gap-2">
-                <span className="hidden font-mono text-[10px] text-gray-300 sm:inline dark:text-gray-600">
-                    {(rows?.total ?? 0).toLocaleString()} rows
+        <div className="relative overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+            <div className="flex items-center justify-between gap-2 border-b border-black/6 px-3 py-2.5 dark:border-white/6">
+                <span className="font-mono text-[10px] tracking-wide text-gray-400 dark:text-gray-500">
+                    {(rows?.total ?? 0).toLocaleString()} {groupLabel}
+                    {(rows?.total ?? 0) === 1 ? '' : 's'}
                 </span>
                 <ColumnVisibilityMenu
                     options={COLUMN_OPTIONS}
@@ -276,7 +277,7 @@ function GridTable({
                     onReset={resetToDefault}
                 />
             </div>
-            <div className="relative overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+            <div className="relative">
                 {loading && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-zinc-900/60">
                         <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
@@ -295,7 +296,7 @@ function GridTable({
                     onFetch={onFetch}
                 />
             </div>
-        </>
+        </div>
     );
 }
 
@@ -922,29 +923,29 @@ export default function MetaAdsManager({
                     />
                 </div>
 
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <AccountMultiPicker
-                            accounts={accounts}
-                            selected={selected}
-                            onChange={onAccounts}
-                        />
-                        <GroupBySelect value={groupBy} onChange={onGroupBy} />
-                        <div className="relative w-full max-w-xs">
-                            <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-                            <input
-                                type="text"
-                                placeholder={`Search ${groupLabel.toLowerCase()}...`}
-                                value={searchValue}
-                                onChange={(e) => onSearch(e.target.value)}
-                                className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400 dark:focus:bg-zinc-900"
-                            />
-                        </div>
-                    </div>
-                    <InsightFilterBuilder
-                        filters={metricFilters}
-                        onChange={onMetricFilters}
+                <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-black/6 bg-white/70 p-2 shadow-sm backdrop-blur-sm dark:border-white/6 dark:bg-zinc-900/70">
+                    <AccountMultiPicker
+                        accounts={accounts}
+                        selected={selected}
+                        onChange={onAccounts}
                     />
+                    <GroupBySelect value={groupBy} onChange={onGroupBy} />
+                    <div className="relative min-w-[180px] flex-1">
+                        <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                        <input
+                            type="text"
+                            placeholder={`Search ${groupLabel.toLowerCase()}...`}
+                            value={searchValue}
+                            onChange={(e) => onSearch(e.target.value)}
+                            className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400 dark:focus:bg-zinc-900"
+                        />
+                    </div>
+                    <div className="ml-auto flex items-center gap-2">
+                        <InsightFilterBuilder
+                            filters={metricFilters}
+                            onChange={onMetricFilters}
+                        />
+                    </div>
                 </div>
 
                 <GridTable
