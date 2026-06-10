@@ -12,6 +12,28 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.9.1',
+        date: '2026-06-10',
+        sections: [
+            {
+                title: 'Pages — Export & Import',
+                items: [
+                    'Export all pages for a workspace to an Excel file directly from the Pages list',
+                    'Import new pages from an Excel file — rows where a page with the same ID already exists in the workspace are skipped automatically',
+                    'Import auto-creates associated shop records when a shop_id is provided in the file and the shop does not yet exist in the workspace',
+                ],
+            },
+            {
+                title: 'Creatives — Submission Status',
+                items: [
+                    'Creative list now shows whether each creative was submitted on time, early, or late relative to its planned date',
+                    'Late and early submissions display a visual flag with a tooltip for quick identification',
+                    'Loading indicators added to creative form submission buttons to prevent duplicate submissions',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.9.0',
         date: '2026-06-09',
         sections: [
