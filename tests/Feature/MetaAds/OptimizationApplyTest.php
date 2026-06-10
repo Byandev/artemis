@@ -84,3 +84,60 @@ it('the apply job pauses the target on Meta and marks the proposal applied', fun
     // ...and the proposal is now applied.
     expect($proposal->fresh()->status)->toBe('applied');
 });
+
+it('bulk approve marks all approved and queues an apply job for each', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $metaUser = MetaUser::create(['id' => 8002, 'name' => 'T', 'access_token' => 'fake']);
+    $account = AdAccount::create(['id' => 330, 'name' => 'A']);
+    $metaUser->adAccounts()->attach($account->id);
+    $rule = OptimizationRule::create([
+        'workspace_id' => $workspace->id, 'name' => 'Kill',
+        'target_type' => 'campaign', 'action' => 'pause', 'execution_mode' => 'approval',
+    ]);
+
+    $mk = function (int $cid) use ($workspace, $rule) {
+        Campaign::create(['id' => $cid, 'meta_ads_account_id' => 330, 'name' => "C{$cid}", 'status' => 'ACTIVE', 'effective_status' => 'ACTIVE']);
+
+        return OptimizationProposal::create([
+            'workspace_id' => $workspace->id, 'meta_ads_optimization_rule_id' => $rule->id,
+            'meta_ads_account_id' => 330, 'target_type' => 'campaign', 'target_id' => $cid,
+            'action' => 'pause', 'conditions_snapshot' => [], 'status' => 'pending',
+        ]);
+    };
+    $p1 = $mk(900);
+    $p2 = $mk(901);
+
+    Queue::fake();
+    $this->post(route('workspaces.metaads.optimization-rules.approvals.bulk-approve', ['workspace' => $workspace]), [
+        'ids' => [$p1->id, $p2->id],
+    ])->assertRedirect();
+
+    expect($p1->fresh()->status)->toBe('approved')
+        ->and($p2->fresh()->status)->toBe('approved');
+    Queue::assertPushed(ApplyOptimizationAction::class, 2);
+});
+
+it('bulk reject marks all rejected without queuing apply jobs', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $account = AdAccount::create(['id' => 331, 'name' => 'A']);
+    $rule = OptimizationRule::create([
+        'workspace_id' => $workspace->id, 'name' => 'Kill',
+        'target_type' => 'campaign', 'action' => 'pause', 'execution_mode' => 'approval',
+    ]);
+    $mk = fn (int $cid) => OptimizationProposal::create([
+        'workspace_id' => $workspace->id, 'meta_ads_optimization_rule_id' => $rule->id,
+        'meta_ads_account_id' => 331, 'target_type' => 'campaign', 'target_id' => $cid,
+        'action' => 'pause', 'conditions_snapshot' => [], 'status' => 'pending',
+    ]);
+    $p1 = $mk(902);
+    $p2 = $mk(903);
+
+    Queue::fake();
+    $this->post(route('workspaces.metaads.optimization-rules.approvals.bulk-reject', ['workspace' => $workspace]), [
+        'ids' => [$p1->id, $p2->id],
+    ])->assertRedirect();
+
+    expect($p1->fresh()->status)->toBe('rejected')
+        ->and($p2->fresh()->status)->toBe('rejected');
+    Queue::assertNothingPushed();
+});

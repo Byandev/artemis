@@ -228,12 +228,21 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/approvals', [OptimizationRuleController::class, 'approvals'])
         ->middleware('can:Approve Optimization Rules,workspace')
         ->name('workspaces.metaads.optimization-rules.approvals');
+    Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules/approvals/bulk-approve', [OptimizationRuleController::class, 'bulkApprove'])
+        ->middleware('can:Approve Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.approvals.bulk-approve');
+    Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules/approvals/bulk-reject', [OptimizationRuleController::class, 'bulkReject'])
+        ->middleware('can:Approve Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.approvals.bulk-reject');
     Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules/approvals/{proposal}/approve', [OptimizationRuleController::class, 'approveProposal'])
         ->middleware('can:Approve Optimization Rules,workspace')
         ->name('workspaces.metaads.optimization-rules.approvals.approve');
     Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules/approvals/{proposal}/reject', [OptimizationRuleController::class, 'rejectProposal'])
         ->middleware('can:Approve Optimization Rules,workspace')
         ->name('workspaces.metaads.optimization-rules.approvals.reject');
+    Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/logs', [OptimizationRuleController::class, 'logs'])
+        ->middleware('can:View Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.logs');
     Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}/edit', [OptimizationRuleController::class, 'edit'])
         ->middleware('can:Manage Optimization Rules,workspace')
         ->name('workspaces.metaads.optimization-rules.edit');

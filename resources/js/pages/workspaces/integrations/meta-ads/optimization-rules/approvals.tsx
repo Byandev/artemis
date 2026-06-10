@@ -116,6 +116,19 @@ const fmt = (v: string | null) =>
 const isBudget = (action: string) =>
     action === 'increase_budget' || action === 'decrease_budget';
 
+/** Net budget effect of a single proposal (matches the server's budgetImpact). */
+const proposalImpact = (p: OptimizationProposal): number => {
+    if (p.action === 'pause') return -(Number(p.target_budget) || 0);
+    if (p.action === 'enable') return Number(p.target_budget) || 0;
+    if (isBudget(p.action) && p.current_value !== null && p.new_value !== null) {
+        return Number(p.new_value) - Number(p.current_value);
+    }
+    return 0;
+};
+
+const checkboxClass =
+    'h-3.5 w-3.5 cursor-pointer rounded border-gray-300 accent-emerald-500 dark:border-zinc-600';
+
 export default function OptimizationApprovals({
     workspace,
     proposals,
@@ -126,6 +139,8 @@ export default function OptimizationApprovals({
 }: Props) {
     const indexUrl = optimizationRulesUrl(workspace.slug);
     const [busyId, setBusyId] = useState<number | null>(null);
+    const [bulkBusy, setBulkBusy] = useState(false);
+    const [selected, setSelected] = useState<Set<number>>(new Set());
     const [accountIds, setAccountIds] = useState<string[]>(
         query?.accountIds ?? [],
     );
@@ -138,7 +153,9 @@ export default function OptimizationApprovals({
         { title: 'Approvals', href: `${indexUrl}/approvals` },
     ];
 
-    const navigate = (overrides: Record<string, unknown> = {}) =>
+    const navigate = (overrides: Record<string, unknown> = {}) => {
+        // Selection is per-page; drop it whenever the visible set changes.
+        setSelected(new Set());
         router.get(
             `${indexUrl}/approvals`,
             {
@@ -161,6 +178,47 @@ export default function OptimizationApprovals({
                 ],
             },
         );
+    };
+
+    const rows = proposals.data ?? [];
+    const pageIds = rows.map((p) => p.id);
+    const allChecked =
+        pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+    const someChecked = pageIds.some((id) => selected.has(id));
+
+    const toggle = (id: number) =>
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    const toggleAll = () =>
+        setSelected(
+            allChecked ? new Set() : new Set([...selected, ...pageIds]),
+        );
+
+    const selectedRows = rows.filter((p) => selected.has(p.id));
+    const selectedImpact = selectedRows.reduce(
+        (sum, p) => sum + proposalImpact(p),
+        0,
+    );
+
+    const bulkReview = (decision: 'bulk-approve' | 'bulk-reject') => {
+        if (selected.size === 0) return;
+        setBulkBusy(true);
+        router.post(
+            `${indexUrl}/approvals/${decision}`,
+            { ids: Array.from(selected) },
+            {
+                preserveScroll: true,
+                onFinish: () => {
+                    setBulkBusy(false);
+                    setSelected(new Set());
+                },
+            },
+        );
+    };
 
     const onAccounts = (next: string[]) => {
         setAccountIds(next);
@@ -187,6 +245,31 @@ export default function OptimizationApprovals({
     };
 
     const columns: ColumnDef<OptimizationProposal>[] = [
+        {
+            id: 'select',
+            header: () => (
+                <input
+                    type="checkbox"
+                    aria-label="Select all"
+                    checked={allChecked}
+                    ref={(el) => {
+                        if (el) el.indeterminate = !allChecked && someChecked;
+                    }}
+                    onChange={toggleAll}
+                    className={checkboxClass}
+                />
+            ),
+            cell: ({ row }) => (
+                <input
+                    type="checkbox"
+                    aria-label="Select proposal"
+                    checked={selected.has(row.original.id)}
+                    onChange={() => toggle(row.original.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className={checkboxClass}
+                />
+            ),
+        },
         {
             id: 'target',
             header: 'Target',
@@ -381,27 +464,70 @@ export default function OptimizationApprovals({
                     </div>
                 ) : (
                     <>
-                        <div className="mb-3 flex items-center gap-2 rounded-[12px] border border-black/6 bg-white px-4 py-2.5 dark:border-white/6 dark:bg-zinc-900">
-                            <span className="text-[12px] text-gray-500 dark:text-gray-400">
-                                Net budget impact if all{' '}
-                                {(accountIds.length > 0 ||
-                                    actionFilters.length > 0) &&
-                                    'shown '}
-                                proposals are approved
-                            </span>
-                            <span
-                                className={
-                                    budgetImpact > 0
-                                        ? 'text-[15px] font-semibold text-emerald-600 dark:text-emerald-400'
-                                        : budgetImpact < 0
-                                          ? 'text-[15px] font-semibold text-red-600 dark:text-red-400'
-                                          : 'text-[15px] font-semibold text-gray-600 dark:text-gray-300'
-                                }
-                            >
-                                {budgetImpact > 0 ? '+' : budgetImpact < 0 ? '−' : ''}
-                                {fmt(String(Math.abs(budgetImpact)))}
-                            </span>
-                        </div>
+                        {(() => {
+                            const hasSelection = selected.size > 0;
+                            const impact = hasSelection
+                                ? selectedImpact
+                                : budgetImpact;
+                            return (
+                                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[12px] border border-black/6 bg-white px-4 py-2.5 dark:border-white/6 dark:bg-zinc-900">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[12px] text-gray-500 dark:text-gray-400">
+                                            {hasSelection
+                                                ? `Net budget impact of ${selected.size} selected`
+                                                : `Net budget impact if all ${
+                                                      accountIds.length > 0 ||
+                                                      actionFilters.length > 0
+                                                          ? 'shown '
+                                                          : ''
+                                                  }proposals are approved`}
+                                        </span>
+                                        <span
+                                            className={
+                                                impact > 0
+                                                    ? 'text-[15px] font-semibold text-emerald-600 dark:text-emerald-400'
+                                                    : impact < 0
+                                                      ? 'text-[15px] font-semibold text-red-600 dark:text-red-400'
+                                                      : 'text-[15px] font-semibold text-gray-600 dark:text-gray-300'
+                                            }
+                                        >
+                                            {impact > 0
+                                                ? '+'
+                                                : impact < 0
+                                                  ? '−'
+                                                  : ''}
+                                            {fmt(String(Math.abs(impact)))}
+                                        </span>
+                                    </div>
+
+                                    {hasSelection && (
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={bulkBusy}
+                                                onClick={() =>
+                                                    bulkReview('bulk-reject')
+                                                }
+                                            >
+                                                <X className="mr-1 h-4 w-4" />
+                                                Reject {selected.size}
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                disabled={bulkBusy}
+                                                onClick={() =>
+                                                    bulkReview('bulk-approve')
+                                                }
+                                            >
+                                                <Check className="mr-1 h-4 w-4" />
+                                                Approve {selected.size}
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
                         <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                             <DataTable
                                 columns={columns as ColumnDef<unknown>[]}

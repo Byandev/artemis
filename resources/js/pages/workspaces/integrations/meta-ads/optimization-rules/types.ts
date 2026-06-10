@@ -56,6 +56,19 @@ export interface OptimizationProposal {
     ad_account?: AdAccountOption;
 }
 
+export interface OptimizationRuleLog {
+    id: number;
+    rule?: { id: number; name: string } | null;
+    target_type: string;
+    target_id: string;
+    target_name: string | null;
+    action_taken: string;
+    previous_value: string | null;
+    new_value: string | null;
+    conditions_snapshot: ConditionSnapshot[];
+    triggered_at: string | null;
+}
+
 export interface RuleOptions {
     adAccounts: AdAccountOption[];
     metrics: string[];

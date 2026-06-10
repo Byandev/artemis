@@ -17,6 +17,7 @@ use Modules\MetaAds\Models\AdSet;
 use Modules\MetaAds\Models\Campaign;
 use Modules\MetaAds\Models\OptimizationProposal;
 use Modules\MetaAds\Models\OptimizationRule;
+use Modules\MetaAds\Models\OptimizationRuleLog;
 use Modules\MetaAds\Services\OptimizationRuleEvaluator;
 
 class OptimizationRuleController extends Controller
@@ -146,6 +147,57 @@ class OptimizationRuleController extends Controller
     }
 
     /**
+     * Full history of every action optimization rules have taken in this
+     * workspace, newest first, filterable by rule and action.
+     */
+    public function logs(Request $request, Workspace $workspace): Response
+    {
+        $perPage = (int) $request->integer('per_page', 25);
+        $ruleIds = array_values(array_filter((array) $request->input('rule_id', []), fn ($v) => $v !== '' && $v !== null));
+        $actions = array_values(array_filter((array) $request->input('action', []), fn ($v) => $v !== '' && $v !== null));
+
+        $logs = OptimizationRuleLog::where('workspace_id', $workspace->id)
+            ->when($ruleIds, fn ($q) => $q->whereIn('meta_ads_optimization_rule_id', $ruleIds))
+            ->when($actions, fn ($q) => $q->whereIn('action_taken', $actions))
+            ->with('rule:id,name')
+            ->latest('triggered_at')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        // Filter options are drawn from the rules / actions that actually have
+        // logged history in this workspace, so the dropdowns never list a value
+        // with zero matching rows.
+        $loggedRuleIds = OptimizationRuleLog::where('workspace_id', $workspace->id)
+            ->distinct()
+            ->pluck('meta_ads_optimization_rule_id');
+
+        $filterRules = OptimizationRule::whereIn('id', $loggedRuleIds)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (OptimizationRule $r) => ['id' => (string) $r->id, 'name' => $r->name])
+            ->values();
+
+        $filterActions = OptimizationRuleLog::where('workspace_id', $workspace->id)
+            ->distinct()
+            ->orderBy('action_taken')
+            ->pluck('action_taken')
+            ->values();
+
+        return Inertia::render('workspaces/integrations/meta-ads/optimization-rules/logs', [
+            'workspace' => $workspace->only('id', 'name', 'slug'),
+            'logs' => $logs,
+            'rules' => $filterRules,
+            'actions' => $filterActions,
+            'query' => [
+                'page' => $request->integer('page', 1),
+                'perPage' => $perPage,
+                'ruleIds' => array_map('strval', $ruleIds),
+                'actions' => array_map('strval', $actions),
+            ],
+        ]);
+    }
+
+    /**
      * Net budget impact of a set of pending proposals (major units):
      *  - increase/decrease budget → new − current
      *  - pause  → minus the target's current budget (spend stops)
@@ -256,6 +308,51 @@ class OptimizationRuleController extends Controller
         $this->reviewProposal($request, $workspace, $proposal, 'rejected');
 
         return back()->with('success', 'Proposal rejected.');
+    }
+
+    public function bulkApprove(Request $request, Workspace $workspace): RedirectResponse
+    {
+        $count = $this->bulkReview($request, $workspace, 'approved');
+
+        return back()->with('success', "{$count} proposal(s) approved — applying the changes.");
+    }
+
+    public function bulkReject(Request $request, Workspace $workspace): RedirectResponse
+    {
+        $count = $this->bulkReview($request, $workspace, 'rejected');
+
+        return back()->with('success', "{$count} proposal(s) rejected.");
+    }
+
+    /**
+     * Review many pending proposals at once. Returns the number actually acted
+     * on (already-reviewed / cross-workspace ids are silently ignored).
+     */
+    private function bulkReview(Request $request, Workspace $workspace, string $status): int
+    {
+        $ids = $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['integer'],
+        ])['ids'];
+
+        $proposals = OptimizationProposal::where('workspace_id', $workspace->id)
+            ->where('status', 'pending')
+            ->whereIn('id', $ids)
+            ->get();
+
+        foreach ($proposals as $proposal) {
+            $proposal->update([
+                'status' => $status,
+                'reviewed_by' => $request->user()->id,
+                'reviewed_at' => now(),
+            ]);
+
+            if ($status === 'approved') {
+                $this->applyProposal($proposal);
+            }
+        }
+
+        return $proposals->count();
     }
 
     private function reviewProposal(Request $request, Workspace $workspace, OptimizationProposal $proposal, string $status): void

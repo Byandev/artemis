@@ -19,7 +19,14 @@ import { type BreadcrumbItem, type PaginatedData } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { Pencil, Plus, SlidersHorizontal, Trash2, Zap } from 'lucide-react';
+import {
+    History,
+    Pencil,
+    Plus,
+    SlidersHorizontal,
+    Trash2,
+    Zap,
+} from 'lucide-react';
 import { useState } from 'react';
 import {
     actionBadgeClass,
@@ -182,11 +189,17 @@ export default function OptimizationRulesIndex({
         {
             accessorKey: 'logs_count',
             header: 'Triggered',
-            cell: ({ row }) => (
-                <span className="text-gray-500 dark:text-gray-400">
-                    {row.original.logs_count}
-                </span>
-            ),
+            cell: ({ row }) =>
+                row.original.logs_count > 0 ? (
+                    <Link
+                        href={`${indexUrl}/logs?rule_id[]=${row.original.id}`}
+                        className="text-emerald-600 hover:underline dark:text-emerald-400"
+                    >
+                        {row.original.logs_count}
+                    </Link>
+                ) : (
+                    <span className="text-gray-400 dark:text-gray-500">0</span>
+                ),
         },
         {
             id: 'active',
@@ -229,6 +242,12 @@ export default function OptimizationRulesIndex({
                     title="Optimization Rules"
                     description="Automatically pause, enable, or adjust Meta Ads budgets based on performance."
                 >
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href={`${indexUrl}/logs`}>
+                            <History className="mr-1 h-4 w-4" />
+                            History
+                        </Link>
+                    </Button>
                     <Button variant="outline" size="sm" asChild>
                         <Link href={`${indexUrl}/approvals`}>Approvals</Link>
                     </Button>
