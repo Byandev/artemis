@@ -201,6 +201,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('workspaces.metaads.pages');
     Route::get('/workspaces/{workspace}/integrations/meta/ads-manager', [AdsManagerController::class, 'index'])
         ->name('workspaces.metaads.ads-manager');
+    Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/group-ads', [AdsManagerController::class, 'groupAds'])
+        ->name('workspaces.metaads.ads-manager.group-ads');
     Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/ads/{ad}/preview', [AdsManagerController::class, 'adPreview'])
         ->name('workspaces.metaads.ads-manager.preview');
     Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/ads/{ad}/detail', [AdsManagerController::class, 'adDetail'])

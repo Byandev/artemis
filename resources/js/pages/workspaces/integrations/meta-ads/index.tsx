@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import {
     Popover,
     PopoverContent,
@@ -17,7 +18,7 @@ import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
-import { ColumnDef } from '@tanstack/react-table';
+import { ColumnDef, VisibilityState } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { formatDate } from 'date-fns';
 import flatpickr from 'flatpickr';
@@ -110,6 +111,178 @@ function adsManagerUrl(slug: string) {
 
 function adDetailUrl(slug: string, adId: number | string) {
     return `/workspaces/${slug}/integrations/meta/ads-manager/ads/${adId}/detail`;
+}
+
+function groupAdsUrl(slug: string) {
+    return `/workspaces/${slug}/integrations/meta/ads-manager/group-ads`;
+}
+
+/* ───────────────── Ads-in-group modal ───────────────── */
+
+interface GroupTarget {
+    groupBy: GroupBy;
+    group: string; // entity id, or the name when groupBy === 'ad_name'
+    label: string;
+}
+
+/** Columns for the per-group ads table: ad thumbnail + name, then the metrics. */
+function buildModalAdColumns(
+    onSelectAd: (ad: Row) => void,
+): ColumnDef<Row>[] {
+    return [
+        {
+            accessorKey: 'name',
+            enableSorting: true,
+            header: ({ column }) => <SortableHeader column={column} title="Ad" />,
+            cell: ({ row }) => (
+                <div className="flex items-start gap-3">
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectAd(row.original);
+                        }}
+                        title="View creative"
+                        className="group relative h-10 w-10 shrink-0 overflow-hidden rounded ring-emerald-500/40 transition-shadow hover:ring-2"
+                    >
+                        {row.original.thumbnail_url || row.original.image_url ? (
+                            <img
+                                src={
+                                    row.original.thumbnail_url ??
+                                    row.original.image_url ??
+                                    ''
+                                }
+                                alt=""
+                                className="h-10 w-10 object-cover"
+                            />
+                        ) : (
+                            <div className="flex h-10 w-10 items-center justify-center bg-stone-100 text-gray-400 dark:bg-zinc-800 dark:text-gray-500">
+                                <ImageIcon className="h-4 w-4" />
+                            </div>
+                        )}
+                        {row.original.video_id != null && (
+                            <span className="absolute inset-0 flex items-center justify-center bg-black/35">
+                                <Play className="h-3.5 w-3.5 fill-white text-white" />
+                            </span>
+                        )}
+                    </button>
+                    <div className="min-w-0 flex-1">
+                        <span className="block truncate text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                            {row.original.name ?? '—'}
+                        </span>
+                        <StatusLabel
+                            status={
+                                row.original.effective_status ??
+                                row.original.status ??
+                                null
+                            }
+                        />
+                    </div>
+                </div>
+            ),
+        },
+        ...buildInsightsColumns<Row>(),
+    ];
+}
+
+function GroupAdsModal({
+    slug,
+    target,
+    dateRange,
+    selectedAccounts,
+    accountsTotal,
+    columnVisibility,
+    columnOrder,
+    onClose,
+    onSelectAd,
+}: {
+    slug: string;
+    target: GroupTarget | null;
+    dateRange: { since: string; until: string };
+    selectedAccounts: string[];
+    accountsTotal: number;
+    columnVisibility: VisibilityState;
+    columnOrder: string[];
+    onClose: () => void;
+    onSelectAd: (ad: Row) => void;
+}) {
+    const open = target != null;
+    const [rows, setRows] = useState<PaginatedData<Row> | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const fetchAds = (params?: {
+        [key: string]: string | number | null;
+    }) => {
+        if (!target) return;
+        setLoading(true);
+        const qs = new URLSearchParams();
+        qs.set('group_by', target.groupBy);
+        qs.set('group', target.group);
+        qs.set('since', dateRange.since);
+        qs.set('until', dateRange.until);
+        if (selectedAccounts.length !== accountsTotal) {
+            selectedAccounts.forEach((a) => qs.append('accounts[]', a));
+        }
+        if (params?.sort) qs.set('sort', String(params.sort));
+        qs.set('page', String(params?.page ?? 1));
+        qs.set('per_page', String(params?.per_page ?? 25));
+        fetch(`${groupAdsUrl(slug)}?${qs.toString()}`, {
+            headers: { Accept: 'application/json' },
+        })
+            .then((r) => (r.ok ? r.json() : Promise.reject()))
+            .then((d: { rows: PaginatedData<Row> }) => {
+                setRows(d.rows);
+                setLoading(false);
+            })
+            .catch(() => setLoading(false));
+    };
+
+    // Reset + load whenever a new group is opened.
+    useEffect(() => {
+        if (!open) {
+            setRows(null);
+            return;
+        }
+        fetchAds({ page: 1 });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [target?.groupBy, target?.group]);
+
+    const columns = useMemo(
+        () => buildModalAdColumns(onSelectAd),
+        [onSelectAd],
+    );
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+            <DialogContent className="flex h-[90vh] w-[95vw] max-w-[95vw] flex-col gap-0 overflow-hidden p-0 sm:max-w-[95vw]">
+                <DialogTitle className="border-b border-black/6 px-5 py-3.5 text-[14px] font-semibold tracking-tight text-gray-800 dark:border-white/6 dark:text-gray-100">
+                    {target?.label || 'Ads'}
+                    <span className="ml-1.5 font-mono text-[11px] font-normal text-gray-400">
+                        · ads
+                    </span>
+                </DialogTitle>
+                <div className="flex-1 overflow-auto p-4">
+                    {loading && !rows ? (
+                        <div className="flex h-40 items-center justify-center">
+                            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                        </div>
+                    ) : (
+                        <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                            <DataTable
+                                columns={columns as ColumnDef<unknown>[]}
+                                data={(rows?.data ?? []) as unknown[]}
+                                meta={rows ? { ...omit(rows, ['data']) } : undefined}
+                                columnVisibility={columnVisibility}
+                                columnOrder={columnOrder}
+                                onRowClick={(r) => onSelectAd(r as Row)}
+                                onFetch={(p) => fetchAds(p)}
+                            />
+                        </div>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
 /* ───────────────────── Creative detail drawer ───────────────── */
@@ -486,6 +659,7 @@ export default function MetaAdsManager({
         deserializeMetricFilters(query?.metricFilters),
     );
     const [previewAd, setPreviewAd] = useState<Row | null>(null);
+    const [groupTarget, setGroupTarget] = useState<GroupTarget | null>(null);
 
     // Send the account list only when it's a strict subset; an empty value means
     // "all accounts" on the server, matching the default.
@@ -779,6 +953,21 @@ export default function MetaAdsManager({
                         onColumnVisibilityChange={setColumnVisibility}
                         columnOrder={columnOrder}
                         onColumnOrderChange={setColumnOrder}
+                        onRowClick={
+                            groupBy === 'ad'
+                                ? undefined
+                                : (r) => {
+                                      const row = r as Row;
+                                      setGroupTarget({
+                                          groupBy,
+                                          group:
+                                              groupBy === 'ad_name'
+                                                  ? (row.name ?? '')
+                                                  : String(row.id),
+                                          label: row.name ?? '',
+                                      });
+                                  }
+                        }
                         onFetch={(params) =>
                             navigate({
                                 sort: params?.sort,
@@ -797,6 +986,18 @@ export default function MetaAdsManager({
                 slug={workspace.slug}
                 ad={previewAd}
                 onClose={() => setPreviewAd(null)}
+            />
+
+            <GroupAdsModal
+                slug={workspace.slug}
+                target={groupTarget}
+                dateRange={dateRange}
+                selectedAccounts={selectedAccounts}
+                accountsTotal={accounts.length}
+                columnVisibility={columnVisibility}
+                columnOrder={columnOrder}
+                onClose={() => setGroupTarget(null)}
+                onSelectAd={(ad) => setPreviewAd(ad)}
             />
         </AppLayout>
     );

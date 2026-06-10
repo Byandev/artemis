@@ -248,6 +248,33 @@ it('returns ad detail (dimensions + preview) for the drawer', function () {
         ->assertJsonPath('preview.src', 'https://business.facebook.com/p?d=TOK');
 });
 
+it('lists paginated ads under a group', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsManager($workspace);
+    // Second ad in campaign 1000 / account A.
+    Ad::create([
+        'id' => 1003,
+        'meta_ads_account_id' => 101,
+        'meta_ads_campaign_id' => 1000,
+        'meta_ads_set_id' => 1001,
+        'name' => 'Second Ad',
+    ]);
+
+    // Campaign 1000 → its two ads.
+    $this->getJson(route('workspaces.metaads.ads-manager.group-ads', [
+        'workspace' => $workspace, 'group_by' => 'campaign', 'group' => 1000,
+    ]))
+        ->assertOk()
+        ->assertJsonPath('rows.total', 2)
+        ->assertJsonCount(2, 'rows.data');
+
+    // Ad name "Shared Creative" spans both accounts → 2 ads.
+    $this->getJson(route('workspaces.metaads.ads-manager.group-ads', [
+        'workspace' => $workspace, 'group_by' => 'ad_name', 'group' => 'Shared Creative',
+    ]))
+        ->assertJsonPath('rows.total', 2);
+});
+
 it('forbids non-members', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     $outsider = User::factory()->create();

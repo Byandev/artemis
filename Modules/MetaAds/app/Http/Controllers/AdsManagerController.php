@@ -63,6 +63,37 @@ class AdsManagerController extends Controller
     }
 
     /**
+     * Paginated ads under a single parent group (campaign / ad set / account /
+     * ad name). Backs the "show all ads in this grouping" modal — it's the `ad`
+     * aggregation scoped to the clicked group, so the modal renders the exact
+     * same columns/metrics as the main table.
+     */
+    public function groupAds(Request $request, Workspace $workspace): JsonResponse
+    {
+        abort_unless($request->user()->isMemberOf($workspace), 403);
+
+        [$since, $until] = $this->resolveDateRange($request);
+
+        $allAccountIds = $this->accountIdsForWorkspace($workspace)->map(fn ($id) => (string) $id);
+        $accountIds = $this->resolveSelectedAccounts($request, $allAccountIds);
+
+        $parent = (string) $request->query('group_by');
+        $value = (string) $request->query('group');
+
+        $scope = match ($parent) {
+            'campaign' => fn ($q) => $q->where('meta_ads_ads.meta_ads_campaign_id', $value),
+            'ad_set' => fn ($q) => $q->where('meta_ads_ads.meta_ads_set_id', $value),
+            'account' => fn ($q) => $q->where('meta_ads_ads.meta_ads_account_id', $value),
+            'ad_name' => fn ($q) => $q->where('meta_ads_ads.name', $value),
+            default => abort(400, 'Unsupported group_by'),
+        };
+
+        $rows = $this->aggregate($request, $accountIds, $since, $until, 'ad', [], $scope);
+
+        return response()->json(['rows' => $rows]);
+    }
+
+    /**
      * Ad-format whitelist for the creative preview (avoid passing arbitrary
      * values straight to the Graph API).
      */
@@ -312,7 +343,7 @@ class AdsManagerController extends Controller
         };
     }
 
-    private function aggregate(Request $request, $accountIds, string $since, string $until, string $groupBy, array $metricFilters = []): array
+    private function aggregate(Request $request, $accountIds, string $since, string $until, string $groupBy, array $metricFilters = [], ?callable $scope = null): array
     {
         $config = $this->groupByConfig($groupBy);
 
@@ -325,6 +356,11 @@ class AdsManagerController extends Controller
         }
 
         $base->leftJoinSub($insights, 'i', 'i.'.$config['insightKey'], '=', $config['joinOn']);
+
+        // Optional extra constraint (e.g. limit ads to a single campaign/ad set).
+        if ($scope) {
+            $scope($base);
+        }
 
         // Number of ads in each group — shown for every dimension except `ad`
         // (where each row is already a single ad). `ad_name` counts distinct ads
