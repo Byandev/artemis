@@ -194,7 +194,7 @@ export function AppSidebar() {
                 },
                 {
                     title: 'Ads Manager',
-                    href: `/workspaces/${slug}/integrations/meta/ads-manager/campaigns`,
+                    href: `/workspaces/${slug}/integrations/meta/ads-manager`,
                     icon: BarChart2,
                 },
                 {

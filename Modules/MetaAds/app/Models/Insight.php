@@ -34,6 +34,30 @@ class Insight extends Model
         'lead_value' => 'decimal:4',
     ];
 
+    /**
+     * meta_ads_insights has a composite natural key (meta_ads_ad_id, date) and
+     * no surrogate `id`, so $primaryKey is null. Eloquent's default save query
+     * keys on getKeyName() — which is null here — producing an UPDATE with NO
+     * WHERE clause that rewrites EVERY row. Scope save/update (and delete)
+     * queries to the composite key instead.
+     */
+    protected function setKeysForSaveQuery($query)
+    {
+        return $this->scopeToCompositeKey($query);
+    }
+
+    protected function setKeysForSelectQuery($query)
+    {
+        return $this->scopeToCompositeKey($query);
+    }
+
+    private function scopeToCompositeKey($query)
+    {
+        return $query
+            ->where('meta_ads_ad_id', $this->getRawOriginal('meta_ads_ad_id', $this->meta_ads_ad_id))
+            ->where('date', $this->getRawOriginal('date', $this->getAttributeFromArray('date')));
+    }
+
     public function ad(): BelongsTo
     {
         return $this->belongsTo(Ad::class, 'meta_ads_ad_id');

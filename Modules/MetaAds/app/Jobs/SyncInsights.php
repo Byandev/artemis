@@ -228,9 +228,16 @@ class SyncInsights implements ShouldQueue
                 $count++;
             }
 
+            // Meta returns `paging.cursors.after` on EVERY page (it's just the
+            // cursor at the end of the current page), so it cannot be used to
+            // detect more results — only `paging.next` (a URL) is present when a
+            // further page exists. Gating on `cursors.after` made the job
+            // re-dispatch a continuation past the last page on every sync,
+            // looping empty-page jobs that starved the per-MetaUser overlap lock.
+            $hasNextPage = isset($page['paging']['next']);
             $afterCursor = $page['paging']['cursors']['after'] ?? null;
 
-            if ($afterCursor !== null) {
+            if ($hasNextPage && $afterCursor !== null) {
                 static::dispatch($this->adAccount, $this->date, $afterCursor, $count, $run->id);
             } else {
                 $run->succeed($count, ['insight_row_count' => $count]);

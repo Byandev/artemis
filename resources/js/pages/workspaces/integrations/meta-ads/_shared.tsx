@@ -1,12 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { SortableHeader } from '@/components/ui/data-table';
-import {
-    Dialog,
-    DialogContent,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import {
     DropdownMenu,
-    DropdownMenuCheckboxItem,
     DropdownMenuContent,
     DropdownMenuLabel,
     DropdownMenuSeparator,
@@ -24,10 +20,19 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { router } from '@inertiajs/react';
 import { ColumnDef, VisibilityState } from '@tanstack/react-table';
 import clsx from 'clsx';
-import { Check, ChevronDown, ChevronUp, Columns3, Filter, GripVertical, Plus, Search, X } from 'lucide-react';
+import {
+    Check,
+    ChevronDown,
+    ChevronUp,
+    Columns3,
+    Filter,
+    GripVertical,
+    Plus,
+    Search,
+    X,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export function StatusToggle({
@@ -152,19 +157,6 @@ export function formatBudget(
         return { value: formatMoney(lifetime), label: 'Lifetime' };
     }
     return { value: '—', label: '' };
-}
-
-export const PAGES = {
-    campaigns: 'campaigns',
-    adSets: 'ad-sets',
-    ads: 'ads',
-} as const;
-
-export function adsManagerUrl(
-    workspaceSlug: string,
-    page: 'campaigns' | 'ad-sets' | 'ads',
-) {
-    return `/workspaces/${workspaceSlug}/integrations/meta/ads-manager/${page}`;
 }
 
 /* ───────────────────── formatters ──────────────────────── */
@@ -1026,39 +1018,18 @@ export function buildInsightsColumns<
             } as ColumnDef<T>;
         }
 
+        // Computed metrics have no DB column, but the server sorts them via
+        // their SUM()-based SQL expression, so they're sortable too.
         return {
             id: m.id,
-            enableSorting: false,
+            enableSorting: true,
             header: ({ column }) => (
-                <SortableHeader
-                    column={column}
-                    title={m.label}
-                    enabled={false}
-                />
+                <SortableHeader column={column} title={m.label} />
             ),
             cell: ({ row }) => numCell(m.compute!(row.original), fmt),
         } as ColumnDef<T>;
     });
 }
-
-type AdsManagerTab = 'campaigns' | 'ad-sets' | 'ads';
-
-interface AdsManagerTabsProps {
-    workspaceSlug: string;
-    active: AdsManagerTab;
-    dateRange: { since: string; until: string };
-    /** Query forwarded to deeper tabs so drill-down context is preserved. */
-    carry?: {
-        campaign?: string | number | null;
-        ad_set?: string | number | null;
-    };
-}
-
-const TAB_DEFS: { id: AdsManagerTab; label: string }[] = [
-    { id: 'campaigns', label: 'Campaigns' },
-    { id: 'ad-sets', label: 'Ad Sets' },
-    { id: 'ads', label: 'Ads' },
-];
 
 export interface ColumnPreset {
     id: string;
@@ -1074,12 +1045,18 @@ function lsGet<T>(key: string, fallback: T): T {
             const parsed = JSON.parse(raw);
             if (parsed !== null && parsed !== undefined) return parsed as T;
         }
-    } catch { /* ignore */ }
+    } catch {
+        /* ignore */
+    }
     return fallback;
 }
 
 function lsSet(key: string, value: unknown) {
-    try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
+    try {
+        window.localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+        /* ignore */
+    }
 }
 
 export function useColumnPresets(
@@ -1089,7 +1066,9 @@ export function useColumnPresets(
 ) {
     const [visibility, setVisibility] = useState<VisibilityState>(() => {
         const stored = lsGet<VisibilityState>(storageKey, {});
-        return Object.keys(stored).length > 0 ? { ...defaults, ...stored } : defaults;
+        return Object.keys(stored).length > 0
+            ? { ...defaults, ...stored }
+            : defaults;
     });
 
     const [columnOrder, setColumnOrder] = useState<string[]>(() => {
@@ -1104,9 +1083,15 @@ export function useColumnPresets(
         lsGet<ColumnPreset[]>(`${storageKey}:presets`, []),
     );
 
-    useEffect(() => { lsSet(storageKey, visibility); }, [storageKey, visibility]);
-    useEffect(() => { lsSet(`${storageKey}:order`, columnOrder); }, [storageKey, columnOrder]);
-    useEffect(() => { lsSet(`${storageKey}:presets`, presets); }, [storageKey, presets]);
+    useEffect(() => {
+        lsSet(storageKey, visibility);
+    }, [storageKey, visibility]);
+    useEffect(() => {
+        lsSet(`${storageKey}:order`, columnOrder);
+    }, [storageKey, columnOrder]);
+    useEffect(() => {
+        lsSet(`${storageKey}:presets`, presets);
+    }, [storageKey, presets]);
 
     const savePreset = (name: string) => {
         const preset: ColumnPreset = {
@@ -1124,7 +1109,9 @@ export function useColumnPresets(
     const loadPreset = (preset: ColumnPreset) => {
         setVisibility(preset.visibility);
         // Merge stored preset order with any new columns added since preset was saved
-        const valid = preset.columnOrder.filter((id) => defaultOrder.includes(id));
+        const valid = preset.columnOrder.filter((id) =>
+            defaultOrder.includes(id),
+        );
         const missing = defaultOrder.filter((id) => !valid.includes(id));
         setColumnOrder([...valid, ...missing]);
     };
@@ -1134,7 +1121,17 @@ export function useColumnPresets(
         setColumnOrder(defaultOrder);
     };
 
-    return { visibility, setVisibility, columnOrder, setColumnOrder, presets, savePreset, deletePreset, loadPreset, resetToDefault };
+    return {
+        visibility,
+        setVisibility,
+        columnOrder,
+        setColumnOrder,
+        presets,
+        savePreset,
+        deletePreset,
+        loadPreset,
+        resetToDefault,
+    };
 }
 
 export interface ColumnOption {
@@ -1173,7 +1170,8 @@ export function ColumnVisibilityMenu({
     const [open, setOpen] = useState(false);
 
     // Draft state — uncommitted until Apply
-    const [draftVisibility, setDraftVisibility] = useState<VisibilityState>(value);
+    const [draftVisibility, setDraftVisibility] =
+        useState<VisibilityState>(value);
     const [draftOrder, setDraftOrder] = useState<string[]>(columnOrder);
 
     // Left-panel state
@@ -1216,13 +1214,20 @@ export function ColumnVisibilityMenu({
     const selectedCount = options.filter((o) => isChecked(o.id)).length;
 
     // Left panel: categories
-    const categories = ['All', ...Array.from(new Set(options.map((o) => o.category ?? 'General')))];
+    const categories = [
+        'All',
+        ...Array.from(new Set(options.map((o) => o.category ?? 'General'))),
+    ];
 
     // Left panel: filtered + grouped options
     const q = search.toLowerCase();
     const visibleOpts = options.filter((o) => {
         if (q && !o.label.toLowerCase().includes(q)) return false;
-        if (activeCategory !== 'All' && (o.category ?? 'General') !== activeCategory) return false;
+        if (
+            activeCategory !== 'All' &&
+            (o.category ?? 'General') !== activeCategory
+        )
+            return false;
         return true;
     });
 
@@ -1238,7 +1243,10 @@ export function ColumnVisibilityMenu({
         setCollapsed((prev) => ({ ...prev, [cat]: !prev[cat] }));
     const toggleCollapseAll = () => {
         if (allCollapsed) setCollapsed({});
-        else setCollapsed(Object.fromEntries(grouped.map((g) => [g.category, true])));
+        else
+            setCollapsed(
+                Object.fromEntries(grouped.map((g) => [g.category, true])),
+            );
     };
 
     // Right panel: selected columns in order
@@ -1248,17 +1256,32 @@ export function ColumnVisibilityMenu({
 
     // Right-panel drag handlers
     const onDragStart = (id: string) => setDragId(id);
-    const onDragOver = (e: React.DragEvent, id: string) => { e.preventDefault(); if (id !== dragId) setDragOverId(id); };
+    const onDragOver = (e: React.DragEvent, id: string) => {
+        e.preventDefault();
+        if (id !== dragId) setDragOverId(id);
+    };
     const onDrop = (e: React.DragEvent, targetId: string) => {
         e.preventDefault();
-        if (!dragId || dragId === targetId) { setDragId(null); setDragOverId(null); return; }
+        if (!dragId || dragId === targetId) {
+            setDragId(null);
+            setDragOverId(null);
+            return;
+        }
         const next = [...draftOrder];
         const from = next.indexOf(dragId);
         const to = next.indexOf(targetId);
-        if (from !== -1 && to !== -1) { next.splice(from, 1); next.splice(to, 0, dragId); setDraftOrder(next); }
-        setDragId(null); setDragOverId(null);
+        if (from !== -1 && to !== -1) {
+            next.splice(from, 1);
+            next.splice(to, 0, dragId);
+            setDraftOrder(next);
+        }
+        setDragId(null);
+        setDragOverId(null);
     };
-    const onDragEnd = () => { setDragId(null); setDragOverId(null); };
+    const onDragEnd = () => {
+        setDragId(null);
+        setDragOverId(null);
+    };
 
     const handleApply = () => {
         onChange(draftVisibility);
@@ -1292,11 +1315,13 @@ export function ColumnVisibilityMenu({
             >
                 <Columns3 className="h-3.5 w-3.5" />
                 Columns
-                <span className="text-gray-400 dark:text-gray-500">{selectedCount}/{options.length}</span>
+                <span className="text-gray-400 dark:text-gray-500">
+                    {selectedCount}/{options.length}
+                </span>
             </Button>
 
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="min-w-4xl w-full gap-0 overflow-hidden p-0 font-mono text-[12px]">
+                <DialogContent className="w-full min-w-4xl gap-0 overflow-hidden p-0 font-mono text-[12px]">
                     {/* Header */}
                     <div className="flex items-center justify-between border-b border-black/6 px-5 py-3.5 dark:border-white/6">
                         <h2 className="text-[14px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
@@ -1322,7 +1347,9 @@ export function ColumnVisibilityMenu({
                                         type="text"
                                         placeholder="Search for metrics or column settings"
                                         value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
+                                        onChange={(e) =>
+                                            setSearch(e.target.value)
+                                        }
                                         className="h-8 w-full rounded-lg border border-black/6 bg-stone-50 pr-3 pl-8 text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
                                     />
                                 </div>
@@ -1331,8 +1358,14 @@ export function ColumnVisibilityMenu({
                                     onClick={toggleCollapseAll}
                                     className="flex h-8 shrink-0 items-center gap-1 rounded-lg border border-black/6 px-2.5 text-[11px] text-gray-500 hover:border-black/12 hover:text-gray-700 dark:border-white/6 dark:text-gray-400 dark:hover:text-gray-200"
                                 >
-                                    {allCollapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
-                                    {allCollapsed ? 'Expand all' : 'Collapse all'}
+                                    {allCollapsed ? (
+                                        <ChevronDown className="h-3 w-3" />
+                                    ) : (
+                                        <ChevronUp className="h-3 w-3" />
+                                    )}
+                                    {allCollapsed
+                                        ? 'Expand all'
+                                        : 'Collapse all'}
                                 </button>
                             </div>
 
@@ -1343,7 +1376,9 @@ export function ColumnVisibilityMenu({
                                         <button
                                             key={cat}
                                             type="button"
-                                            onClick={() => setActiveCategory(cat)}
+                                            onClick={() =>
+                                                setActiveCategory(cat)
+                                            }
                                             className={clsx(
                                                 'shrink-0 border-b-2 px-3 py-2.5 text-[11px] transition-colors',
                                                 activeCategory === cat
@@ -1360,19 +1395,25 @@ export function ColumnVisibilityMenu({
                             {/* Column groups */}
                             <div className="flex-1 overflow-y-auto">
                                 {grouped.length === 0 && (
-                                    <p className="py-8 text-center text-[11px] text-gray-400 dark:text-gray-500">No columns match.</p>
+                                    <p className="py-8 text-center text-[11px] text-gray-400 dark:text-gray-500">
+                                        No columns match.
+                                    </p>
                                 )}
                                 {grouped.map((g) => (
                                     <div key={g.category}>
                                         <button
                                             type="button"
-                                            onClick={() => toggleCollapse(g.category)}
+                                            onClick={() =>
+                                                toggleCollapse(g.category)
+                                            }
                                             className="flex w-full items-center justify-between bg-stone-50 px-4 py-2 text-[10px] font-medium tracking-wider text-gray-500 uppercase hover:bg-stone-100 dark:bg-zinc-800/60 dark:text-gray-400 dark:hover:bg-zinc-800"
                                         >
                                             {g.category}
-                                            {collapsed[g.category]
-                                                ? <ChevronDown className="h-3 w-3" />
-                                                : <ChevronUp className="h-3 w-3" />}
+                                            {collapsed[g.category] ? (
+                                                <ChevronDown className="h-3 w-3" />
+                                            ) : (
+                                                <ChevronUp className="h-3 w-3" />
+                                            )}
                                         </button>
                                         {!collapsed[g.category] && (
                                             <div className="grid grid-cols-2 gap-0 px-3 py-2">
@@ -1381,19 +1422,34 @@ export function ColumnVisibilityMenu({
                                                         key={opt.id}
                                                         className={clsx(
                                                             'flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-stone-50 dark:hover:bg-zinc-800/50',
-                                                            opt.required && 'cursor-default opacity-60',
+                                                            opt.required &&
+                                                                'cursor-default opacity-60',
                                                         )}
                                                     >
                                                         <input
                                                             type="checkbox"
-                                                            disabled={opt.required}
-                                                            checked={isChecked(opt.id)}
+                                                            disabled={
+                                                                opt.required
+                                                            }
+                                                            checked={isChecked(
+                                                                opt.id,
+                                                            )}
                                                             onChange={(e) =>
-                                                                setDraftVisibility((prev) => ({ ...prev, [opt.id]: e.target.checked }))
+                                                                setDraftVisibility(
+                                                                    (prev) => ({
+                                                                        ...prev,
+                                                                        [opt.id]:
+                                                                            e
+                                                                                .target
+                                                                                .checked,
+                                                                    }),
+                                                                )
                                                             }
                                                             className="h-3.5 w-3.5 rounded border-gray-300 accent-emerald-500"
                                                         />
-                                                        <span className="text-[11px] text-gray-700 dark:text-gray-300">{opt.label}</span>
+                                                        <span className="text-[11px] text-gray-700 dark:text-gray-300">
+                                                            {opt.label}
+                                                        </span>
                                                     </label>
                                                 ))}
                                             </div>
@@ -1411,12 +1467,33 @@ export function ColumnVisibilityMenu({
                                             type="text"
                                             placeholder="Preset name..."
                                             value={presetName}
-                                            onChange={(e) => setPresetName(e.target.value)}
-                                            onKeyDown={(e) => { if (e.key === 'Enter') handleSavePreset(); if (e.key === 'Escape') setSavingPreset(false); }}
+                                            onChange={(e) =>
+                                                setPresetName(e.target.value)
+                                            }
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter')
+                                                    handleSavePreset();
+                                                if (e.key === 'Escape')
+                                                    setSavingPreset(false);
+                                            }}
                                             className="h-7 flex-1 rounded-md border border-black/6 bg-stone-50 px-2 text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
                                         />
-                                        <button type="button" onClick={handleSavePreset} className="h-7 rounded-md bg-emerald-500 px-2.5 text-[11px] font-medium text-white hover:bg-emerald-600">Save</button>
-                                        <button type="button" onClick={() => setSavingPreset(false)} className="h-7 rounded-md border border-black/6 px-2 text-[11px] text-gray-500 hover:text-gray-700 dark:border-white/6 dark:text-gray-400">Cancel</button>
+                                        <button
+                                            type="button"
+                                            onClick={handleSavePreset}
+                                            className="h-7 rounded-md bg-emerald-500 px-2.5 text-[11px] font-medium text-white hover:bg-emerald-600"
+                                        >
+                                            Save
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setSavingPreset(false)
+                                            }
+                                            className="h-7 rounded-md border border-black/6 px-2 text-[11px] text-gray-500 hover:text-gray-700 dark:border-white/6 dark:text-gray-400"
+                                        >
+                                            Cancel
+                                        </button>
                                     </div>
                                 ) : (
                                     <button
@@ -1435,34 +1512,66 @@ export function ColumnVisibilityMenu({
                         <div className="flex w-[45%] flex-col">
                             <div className="border-b border-black/6 px-4 py-3 dark:border-white/6">
                                 <p className="text-[13px] font-semibold text-gray-800 dark:text-gray-100">
-                                    {selectedCount} {selectedCount === 1 ? 'column' : 'columns'} selected
+                                    {selectedCount}{' '}
+                                    {selectedCount === 1 ? 'column' : 'columns'}{' '}
+                                    selected
                                 </p>
                                 <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
-                                    Drag and drop to arrange columns as they'll appear in the table.
+                                    Drag and drop to arrange columns as they'll
+                                    appear in the table.
                                 </p>
                             </div>
 
                             {/* Saved presets */}
                             {presets.length > 0 && (
                                 <div className="border-b border-black/6 px-4 py-2 dark:border-white/6">
-                                    <p className="mb-1.5 text-[9px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">Saved presets</p>
+                                    <p className="mb-1.5 text-[9px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                        Saved presets
+                                    </p>
                                     <div className="flex flex-wrap gap-1">
                                         {presets.map((p) => (
-                                            <div key={p.id} className="flex items-center gap-0.5 rounded-md border border-black/6 bg-stone-50 py-0.5 pl-2 pr-1 dark:border-white/6 dark:bg-zinc-800">
+                                            <div
+                                                key={p.id}
+                                                className="flex items-center gap-0.5 rounded-md border border-black/6 bg-stone-50 py-0.5 pr-1 pl-2 dark:border-white/6 dark:bg-zinc-800"
+                                            >
                                                 <button
                                                     type="button"
                                                     onClick={() => {
                                                         onLoadPreset(p);
-                                                        setDraftVisibility(p.visibility);
-                                                        const valid = p.columnOrder.filter((id) => !!optById[id]);
-                                                        const missing = options.filter((o) => !valid.includes(o.id)).map((o) => o.id);
-                                                        setDraftOrder([...valid, ...missing]);
+                                                        setDraftVisibility(
+                                                            p.visibility,
+                                                        );
+                                                        const valid =
+                                                            p.columnOrder.filter(
+                                                                (id) =>
+                                                                    !!optById[
+                                                                        id
+                                                                    ],
+                                                            );
+                                                        const missing = options
+                                                            .filter(
+                                                                (o) =>
+                                                                    !valid.includes(
+                                                                        o.id,
+                                                                    ),
+                                                            )
+                                                            .map((o) => o.id);
+                                                        setDraftOrder([
+                                                            ...valid,
+                                                            ...missing,
+                                                        ]);
                                                     }}
                                                     className="text-[11px] text-gray-700 hover:text-emerald-600 dark:text-gray-300 dark:hover:text-emerald-400"
                                                 >
                                                     {p.name}
                                                 </button>
-                                                <button type="button" onClick={() => onDeletePreset(p.id)} className="ml-0.5 rounded p-0.5 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        onDeletePreset(p.id)
+                                                    }
+                                                    className="ml-0.5 rounded p-0.5 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
+                                                >
                                                     <X className="h-2.5 w-2.5" />
                                                 </button>
                                             </div>
@@ -1474,30 +1583,44 @@ export function ColumnVisibilityMenu({
                             {/* Draggable selected column list */}
                             <div className="flex-1 overflow-y-auto px-2 py-2">
                                 {selectedInOrder.length === 0 && (
-                                    <p className="py-8 text-center text-[11px] text-gray-400 dark:text-gray-500">No columns selected.</p>
+                                    <p className="py-8 text-center text-[11px] text-gray-400 dark:text-gray-500">
+                                        No columns selected.
+                                    </p>
                                 )}
                                 {selectedInOrder.map((opt) => (
                                     <div
                                         key={opt.id}
                                         draggable={!opt.required}
                                         onDragStart={() => onDragStart(opt.id)}
-                                        onDragOver={(e) => onDragOver(e, opt.id)}
+                                        onDragOver={(e) =>
+                                            onDragOver(e, opt.id)
+                                        }
                                         onDrop={(e) => onDrop(e, opt.id)}
                                         onDragEnd={onDragEnd}
                                         className={clsx(
                                             'flex items-center gap-2 rounded-lg px-2 py-2 transition-colors',
                                             !opt.required && 'cursor-grab',
                                             dragId === opt.id && 'opacity-40',
-                                            dragOverId === opt.id && 'border-t-2 border-emerald-500',
+                                            dragOverId === opt.id &&
+                                                'border-t-2 border-emerald-500',
                                             'hover:bg-stone-50 dark:hover:bg-zinc-800/50',
                                         )}
                                     >
                                         <GripVertical className="h-3.5 w-3.5 shrink-0 text-gray-300 dark:text-gray-600" />
-                                        <span className="flex-1 truncate text-[11px] text-gray-700 dark:text-gray-300">{opt.label}</span>
+                                        <span className="flex-1 truncate text-[11px] text-gray-700 dark:text-gray-300">
+                                            {opt.label}
+                                        </span>
                                         {!opt.required && (
                                             <button
                                                 type="button"
-                                                onClick={() => setDraftVisibility((prev) => ({ ...prev, [opt.id]: false }))}
+                                                onClick={() =>
+                                                    setDraftVisibility(
+                                                        (prev) => ({
+                                                            ...prev,
+                                                            [opt.id]: false,
+                                                        }),
+                                                    )
+                                                }
                                                 className="shrink-0 rounded p-0.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
                                             >
                                                 <X className="h-3.5 w-3.5" />
@@ -1541,67 +1664,6 @@ export function ColumnVisibilityMenu({
     );
 }
 
-export function AdsManagerTabs({
-    workspaceSlug,
-    active,
-    dateRange,
-    carry,
-}: AdsManagerTabsProps) {
-    const go = (next: AdsManagerTab) => {
-        const params: Record<string, string | number> = {
-            since: dateRange.since,
-            until: dateRange.until,
-        };
-
-        // Forward the parent filters only when they still apply to the target page.
-        if (next === 'ad-sets' && carry?.campaign) {
-            params.campaign = carry.campaign as string | number;
-        }
-        if (next === 'ads') {
-            if (carry?.campaign)
-                params.campaign = carry.campaign as string | number;
-            if (carry?.ad_set) params.ad_set = carry.ad_set as string | number;
-        }
-
-        router.get(adsManagerUrl(workspaceSlug, next), params);
-    };
-
-    return (
-        <div className="mb-4 border-b border-black/6 dark:border-white/6">
-            <div className="flex items-center gap-1">
-                {TAB_DEFS.map((t) => {
-                    const isActive = active === t.id;
-                    return (
-                        <button
-                            key={t.id}
-                            onClick={() => !isActive && go(t.id)}
-                            className={clsx(
-                                'relative px-4 py-3 transition-colors',
-                                isActive
-                                    ? 'text-gray-800 dark:text-gray-100'
-                                    : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                            )}
-                        >
-                            <span className="text-[13px] font-medium tracking-tight">
-                                {t.label}
-                            </span>
-                            <span
-                                aria-hidden
-                                className={clsx(
-                                    'absolute inset-x-0 bottom-0 h-[2px] rounded-full transition-all',
-                                    isActive
-                                        ? 'bg-emerald-500 dark:bg-emerald-400'
-                                        : 'bg-transparent',
-                                )}
-                            />
-                        </button>
-                    );
-                })}
-            </div>
-        </div>
-    );
-}
-
 /* ───────────────────── Insight filters ──────────────────── */
 
 export type MetricFilterOp = 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'range';
@@ -1625,12 +1687,16 @@ const OP_LABELS: Record<MetricFilterOp, string> = {
 
 const FILTERABLE_METRICS = METRIC_SPECS;
 
-export function serializeMetricFilters(filters: MetricFilter[]): string | undefined {
+export function serializeMetricFilters(
+    filters: MetricFilter[],
+): string | undefined {
     const clean = filters
         .filter((f) => f.field && f.op && f.value !== '')
         .filter((f) => f.op !== 'range' || f.value2 !== '')
         .map(({ field, op, value, value2 }) =>
-            op === 'range' ? { field, op, value, value2 } : { field, op, value },
+            op === 'range'
+                ? { field, op, value, value2 }
+                : { field, op, value },
         );
     return clean.length ? JSON.stringify(clean) : undefined;
 }
@@ -1647,7 +1713,13 @@ export function deserializeMetricFilters(raw: unknown): MetricFilter[] {
 }
 
 function newFilter(): MetricFilter {
-    return { id: crypto.randomUUID(), field: 'spend', op: 'gt', value: '', value2: '' };
+    return {
+        id: crypto.randomUUID(),
+        field: 'spend',
+        op: 'gt',
+        value: '',
+        value2: '',
+    };
 }
 
 interface MetricComboboxProps {
@@ -1656,7 +1728,11 @@ interface MetricComboboxProps {
     grouped: { category: string; specs: typeof FILTERABLE_METRICS }[];
 }
 
-function MetricCombobox({ value, onValueChange, grouped }: MetricComboboxProps) {
+function MetricCombobox({
+    value,
+    onValueChange,
+    grouped,
+}: MetricComboboxProps) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
 
@@ -1748,7 +1824,10 @@ interface InsightFilterBuilderProps {
     onChange: (filters: MetricFilter[]) => void;
 }
 
-export function InsightFilterBuilder({ filters, onChange }: InsightFilterBuilderProps) {
+export function InsightFilterBuilder({
+    filters,
+    onChange,
+}: InsightFilterBuilderProps) {
     const [open, setOpen] = useState(false);
     const [draft, setDraft] = useState<MetricFilter[]>(filters);
 
@@ -1758,7 +1837,9 @@ export function InsightFilterBuilder({ filters, onChange }: InsightFilterBuilder
     }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const update = (id: string, patch: Partial<MetricFilter>) =>
-        setDraft((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+        setDraft((prev) =>
+            prev.map((f) => (f.id === id ? { ...f, ...patch } : f)),
+        );
     const remove = (id: string) =>
         setDraft((prev) => prev.filter((f) => f.id !== id));
     const add = () => setDraft((prev) => [...prev, newFilter()]);
@@ -1772,7 +1853,8 @@ export function InsightFilterBuilder({ filters, onChange }: InsightFilterBuilder
         setOpen(false);
     };
 
-    const grouped: { category: string; specs: typeof FILTERABLE_METRICS }[] = [];
+    const grouped: { category: string; specs: typeof FILTERABLE_METRICS }[] =
+        [];
     for (const spec of FILTERABLE_METRICS) {
         const cat = spec.category;
         const g = grouped.find((x) => x.category === cat);
@@ -1781,7 +1863,11 @@ export function InsightFilterBuilder({ filters, onChange }: InsightFilterBuilder
     }
 
     const activeCount = filters.filter(
-        (f) => f.field && f.op && f.value !== '' && (f.op !== 'range' || f.value2 !== ''),
+        (f) =>
+            f.field &&
+            f.op &&
+            f.value !== '' &&
+            (f.op !== 'range' || f.value2 !== ''),
     ).length;
 
     return (
@@ -1826,26 +1912,33 @@ export function InsightFilterBuilder({ filters, onChange }: InsightFilterBuilder
                             {/* Field */}
                             <MetricCombobox
                                 value={f.field}
-                                onValueChange={(v) => update(f.id, { field: v })}
+                                onValueChange={(v) =>
+                                    update(f.id, { field: v })
+                                }
                                 grouped={grouped}
                             />
 
                             {/* Operator */}
                             <Select
                                 value={f.op}
-                                onValueChange={(v) => update(f.id, { op: v as MetricFilterOp })}
+                                onValueChange={(v) =>
+                                    update(f.id, { op: v as MetricFilterOp })
+                                }
                             >
                                 <SelectTrigger className="h-8 w-44 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent className="font-mono text-[11px]">
-                                    {(Object.entries(OP_LABELS) as [MetricFilterOp, string][]).map(
-                                        ([op, label]) => (
-                                            <SelectItem key={op} value={op}>
-                                                {label}
-                                            </SelectItem>
-                                        ),
-                                    )}
+                                    {(
+                                        Object.entries(OP_LABELS) as [
+                                            MetricFilterOp,
+                                            string,
+                                        ][]
+                                    ).map(([op, label]) => (
+                                        <SelectItem key={op} value={op}>
+                                            {label}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
 
@@ -1856,7 +1949,11 @@ export function InsightFilterBuilder({ filters, onChange }: InsightFilterBuilder
                                         type="number"
                                         placeholder="Min"
                                         value={f.value}
-                                        onChange={(e) => update(f.id, { value: e.target.value })}
+                                        onChange={(e) =>
+                                            update(f.id, {
+                                                value: e.target.value,
+                                            })
+                                        }
                                         className="h-8 w-20 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800"
                                     />
                                     <span className="text-gray-400">–</span>
@@ -1864,7 +1961,11 @@ export function InsightFilterBuilder({ filters, onChange }: InsightFilterBuilder
                                         type="number"
                                         placeholder="Max"
                                         value={f.value2}
-                                        onChange={(e) => update(f.id, { value2: e.target.value })}
+                                        onChange={(e) =>
+                                            update(f.id, {
+                                                value2: e.target.value,
+                                            })
+                                        }
                                         className="h-8 w-20 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800"
                                     />
                                 </div>
@@ -1873,7 +1974,9 @@ export function InsightFilterBuilder({ filters, onChange }: InsightFilterBuilder
                                     type="number"
                                     placeholder="Value"
                                     value={f.value}
-                                    onChange={(e) => update(f.id, { value: e.target.value })}
+                                    onChange={(e) =>
+                                        update(f.id, { value: e.target.value })
+                                    }
                                     className="h-8 w-24 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800"
                                 />
                             )}
