@@ -28,16 +28,22 @@ class SyncCreatives implements ShouldQueue
         public ?string $afterCursor = null,
         public int $runningCount = 0,
         public ?int $syncRunId = null,
+        public ?int $sinceTimestamp = null,
     ) {}
 
     public function handle(): void
     {
+        if ($this->syncRunId === null) {
+            $this->sinceTimestamp = $this->resolveLastSuccessAt(SyncRun::ENTITY_AD_CREATIVES);
+        }
+
         $run = $this->syncRunId !== null
             ? SyncRun::findOrFail($this->syncRunId)
             : SyncRun::start(
                 entityType: SyncRun::ENTITY_AD_CREATIVES,
                 scopeType: AdAccount::class,
                 scopeId: $this->adAccount->id,
+                meta: $this->sinceTimestamp ? ['since_timestamp' => $this->sinceTimestamp] : [],
             );
         $this->syncRunId = $run->id;
 
@@ -51,6 +57,13 @@ class SyncCreatives implements ShouldQueue
             $query = ['fields' => $fields, 'limit' => 25];
             if ($this->afterCursor !== null) {
                 $query['after'] = $this->afterCursor;
+            }
+            // Incremental sync: only pull creatives touched since the last
+            // successful run. Matches SyncAds / SyncCampaigns / SyncAdSets.
+            if ($this->sinceTimestamp !== null) {
+                $query['filtering'] = json_encode([
+                    ['field' => 'updated_time', 'operator' => 'GREATER_THAN', 'value' => $this->sinceTimestamp],
+                ]);
             }
 
             $page = $client->getPage("{$this->adAccount->graphAccountId()}/adcreatives", $query);
@@ -90,7 +103,7 @@ class SyncCreatives implements ShouldQueue
             $afterCursor = $page['paging']['cursors']['after'] ?? null;
 
             if ($hasNextPage && $afterCursor !== null) {
-                static::dispatch($this->adAccount, $afterCursor, $count, $run->id);
+                static::dispatch($this->adAccount, $afterCursor, $count, $run->id, $this->sinceTimestamp);
             } else {
                 $run->succeed($count, ['creative_count' => $count]);
             }

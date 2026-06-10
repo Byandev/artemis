@@ -74,23 +74,26 @@ export const isBudgetAction = (action: string): boolean =>
     BUDGET_ACTIONS.includes(action);
 
 /**
- * A distinct, readable badge colour per action. Uses standard palette classes
- * so it never depends on a theme token being mapped. Pair with
+ * A premium, distinct badge style per action — a soft tinted pill with an inset
+ * ring and a subtle shadow. Standard palette classes, so it never depends on a
+ * theme token being mapped. Pair with
  * `<Badge variant="outline" className={actionBadgeClass(action)}>`.
  */
 export const actionBadgeClass = (action: string): string => {
-    switch (action) {
-        case 'pause':
-            return 'border-transparent bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400';
-        case 'enable':
-            return 'border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400';
-        case 'increase_budget':
-            return 'border-transparent bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400';
-        case 'decrease_budget':
-            return 'border-transparent bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400';
-        default:
-            return 'border-transparent bg-stone-100 text-stone-700 dark:bg-zinc-800 dark:text-zinc-300';
-    }
+    // rounded-full + ring-inset overrides the Badge's default square border.
+    const base =
+        'rounded-full border-transparent px-2.5 py-0.5 text-[11px] font-semibold tracking-tight shadow-sm ring-1 ring-inset';
+
+    const tone: Record<string, string> = {
+        pause: 'bg-gradient-to-b from-rose-50 to-rose-100 text-rose-700 ring-rose-600/20 shadow-rose-500/10 dark:from-rose-500/15 dark:to-rose-500/10 dark:text-rose-300 dark:ring-rose-400/25',
+        enable: 'bg-gradient-to-b from-emerald-50 to-emerald-100 text-emerald-700 ring-emerald-600/20 shadow-emerald-500/10 dark:from-emerald-500/15 dark:to-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/25',
+        increase_budget:
+            'bg-gradient-to-b from-sky-50 to-sky-100 text-sky-700 ring-sky-600/20 shadow-sky-500/10 dark:from-sky-500/15 dark:to-sky-500/10 dark:text-sky-300 dark:ring-sky-400/25',
+        decrease_budget:
+            'bg-gradient-to-b from-amber-50 to-amber-100 text-amber-800 ring-amber-600/20 shadow-amber-500/10 dark:from-amber-500/15 dark:to-amber-500/10 dark:text-amber-300 dark:ring-amber-400/25',
+    };
+
+    return `${base} ${tone[action] ?? 'bg-gradient-to-b from-stone-50 to-stone-100 text-stone-700 ring-black/10 dark:from-zinc-800 dark:to-zinc-800/70 dark:text-zinc-300 dark:ring-white/10'}`;
 };
 
 const UPPERCASE_METRICS = new Set(['roas', 'cpa', 'cpc', 'ctr', 'cpm']);
