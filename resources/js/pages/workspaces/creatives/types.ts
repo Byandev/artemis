@@ -25,6 +25,10 @@ export interface Creative {
     description: string | null;
     format: 'video' | 'image';
     creative_date: string;
+    creative_date_label: string | null;
+    created_at: string;
+    /** How created_at compares to creative_date: late / early / on_time. */
+    submission_status: 'late' | 'early' | 'on_time' | null;
     script: string | null;
     picture_url: string | null;
     reference_link: string | null;
