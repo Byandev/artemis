@@ -83,9 +83,13 @@ class SyncCreatives implements ShouldQueue
                 $count++;
             }
 
+            // `paging.cursors.after` is present on every page (even the last);
+            // only `paging.next` signals more results. Gating on the cursor
+            // re-dispatches a continuation past the final page on every sync.
+            $hasNextPage = isset($page['paging']['next']);
             $afterCursor = $page['paging']['cursors']['after'] ?? null;
 
-            if ($afterCursor !== null) {
+            if ($hasNextPage && $afterCursor !== null) {
                 static::dispatch($this->adAccount, $afterCursor, $count, $run->id);
             } else {
                 $run->succeed($count, ['creative_count' => $count]);

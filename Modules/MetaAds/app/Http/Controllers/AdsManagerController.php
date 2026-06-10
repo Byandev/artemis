@@ -139,6 +139,8 @@ class AdsManagerController extends Controller
                 ],
                 'groupBy' => ['meta_ads_ads.name'],
                 'search' => 'meta_ads_ads.name',
+                // Ads sharing this name (within the selected accounts).
+                'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
             ],
             'campaign' => [
                 'model' => Campaign::class,
@@ -158,6 +160,7 @@ class AdsManagerController extends Controller
                     'meta_ads_campaigns.effective_status',
                 ],
                 'search' => 'meta_ads_campaigns.name',
+                'adsCount' => ['key' => 'meta_ads_campaign_id', 'joinOn' => 'meta_ads_campaigns.id'],
             ],
             'ad_set' => [
                 'model' => AdSet::class,
@@ -177,6 +180,7 @@ class AdsManagerController extends Controller
                     'meta_ads_sets.effective_status',
                 ],
                 'search' => 'meta_ads_sets.name',
+                'adsCount' => ['key' => 'meta_ads_set_id', 'joinOn' => 'meta_ads_sets.id'],
             ],
             'account' => [
                 'model' => AdAccount::class,
@@ -192,6 +196,7 @@ class AdsManagerController extends Controller
                     'meta_ads_accounts.name',
                 ],
                 'search' => 'meta_ads_accounts.name',
+                'adsCount' => ['key' => 'meta_ads_account_id', 'joinOn' => 'meta_ads_accounts.id'],
             ],
         };
     }
@@ -208,9 +213,26 @@ class AdsManagerController extends Controller
             ($config['join'])($base);
         }
 
-        $base->leftJoinSub($insights, 'i', 'i.'.$config['insightKey'], '=', $config['joinOn'])
-            ->whereIn($config['accountColumn'], $accountIds)
-            ->select(array_merge($config['selects'], $this->metricSelects()))
+        $base->leftJoinSub($insights, 'i', 'i.'.$config['insightKey'], '=', $config['joinOn']);
+
+        // Number of ads in each group — shown for every dimension except `ad`
+        // (where each row is already a single ad). `ad_name` counts distinct ads
+        // sharing the name; the rest join a per-entity ad count subquery.
+        $selects = $config['selects'];
+        $hasAdsCount = false;
+
+        if (isset($config['adsCountExpr'])) {
+            $selects[] = DB::raw($config['adsCountExpr'].' AS ads_count');
+            $hasAdsCount = true;
+        } elseif (isset($config['adsCount'])) {
+            $adsCount = $this->adsCountSubquery($config['adsCount']['key']);
+            $base->leftJoinSub($adsCount, 'ac', 'ac.'.$config['adsCount']['key'], '=', $config['adsCount']['joinOn']);
+            $selects[] = DB::raw('COALESCE(MAX(ac.ads_count), 0) AS ads_count');
+            $hasAdsCount = true;
+        }
+
+        $base->whereIn($config['accountColumn'], $accountIds)
+            ->select(array_merge($selects, $this->metricSelects()))
             ->groupBy($config['groupBy']);
 
         $this->applyMetricFilters($base, $metricFilters);
@@ -219,7 +241,7 @@ class AdsManagerController extends Controller
             ->allowedFilters([
                 AllowedFilter::partial('search', $config['search']),
             ])
-            ->allowedSorts($this->allowedSorts())
+            ->allowedSorts($this->allowedSorts($hasAdsCount))
             ->defaultSort('-spend')
             ->paginate($request->integer('per_page', 25))
             ->withQueryString();
@@ -228,14 +250,29 @@ class AdsManagerController extends Controller
     }
 
     /**
-     * Sortable columns: the label, the direct SUM() metrics (sorted by their
-     * select alias), and every computed metric (sorted by its SUM()-based SQL
-     * expression via orderByRaw so derived columns like CTR / ROAS / CPC sort
-     * server-side too).
+     * One row per entity key with the count of ads belonging to it. LEFT JOINed
+     * as `ac` so the count never fans out the per-entity insight aggregates.
      */
-    private function allowedSorts(): array
+    private function adsCountSubquery(string $keyColumn)
+    {
+        return DB::table('meta_ads_ads')
+            ->select($keyColumn, DB::raw('COUNT(*) AS ads_count'))
+            ->groupBy($keyColumn);
+    }
+
+    /**
+     * Sortable columns: the label, the optional ad count, the direct SUM()
+     * metrics (sorted by their select alias), and every computed metric (sorted
+     * by its SUM()-based SQL expression via orderByRaw so derived columns like
+     * CTR / ROAS / CPC sort server-side too).
+     */
+    private function allowedSorts(bool $hasAdsCount = false): array
     {
         $sorts = array_merge(['name'], self::INSIGHTS_METRICS);
+
+        if ($hasAdsCount) {
+            $sorts[] = 'ads_count';
+        }
 
         foreach ($this->computedMetricMap() as $id => $expr) {
             $sorts[] = AllowedSort::callback(

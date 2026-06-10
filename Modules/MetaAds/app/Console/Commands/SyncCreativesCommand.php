@@ -8,7 +8,7 @@ use Modules\MetaAds\Models\AdAccount;
 
 class SyncCreativesCommand extends Command
 {
-    protected $signature = 'metaads:sync-creatives {ad_account? : AdAccount id (defaults to all)}';
+    protected $signature = 'meta-ads:sync-creatives {ad_account? : AdAccount id (defaults to all)}';
 
     protected $description = 'Sync ad creatives from Meta Graph API for one or all ad accounts';
 

@@ -65,6 +65,7 @@ interface Row extends InsightsMetrics {
     effective_status?: string | null;
     thumbnail_url?: string | null;
     image_url?: string | null;
+    ads_count?: number;
 }
 
 interface AccountOption {
@@ -385,6 +386,8 @@ export default function MetaAdsManager({
         );
     };
 
+    const showAdsCount = groupBy !== 'ad';
+
     const COLUMN_OPTIONS = [
         { id: 'name', label: groupLabel, category: 'General', required: true },
         ...INSIGHTS_OPTIONS,
@@ -448,6 +451,12 @@ export default function MetaAdsManager({
                                     null
                                 }
                             />
+                        )}
+                        {showAdsCount && row.original.ads_count != null && (
+                            <span className="block font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                {row.original.ads_count}{' '}
+                                {row.original.ads_count === 1 ? 'ad' : 'ads'}
+                            </span>
                         )}
                     </div>
                 </div>

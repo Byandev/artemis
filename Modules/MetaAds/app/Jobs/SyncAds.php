@@ -12,6 +12,7 @@ use Modules\MetaAds\Jobs\Concerns\HandlesMetaSyncErrors;
 use Modules\MetaAds\Jobs\Concerns\SerializesPerAdAccount;
 use Modules\MetaAds\Models\Ad;
 use Modules\MetaAds\Models\AdAccount;
+use Modules\MetaAds\Models\Creative;
 use Modules\MetaAds\Models\SyncRun;
 use Throwable;
 
@@ -52,7 +53,7 @@ class SyncAds implements ShouldQueue
         try {
             $client = $this->adAccount->graphClient();
 
-            $fields = 'id,name,adset_id,campaign_id,creative,status,effective_status,created_time,updated_time,created_by';
+            $fields = 'id,name,adset_id,campaign_id,creative{id,thumbnail_url,image_url},status,effective_status,created_time,updated_time,created_by';
 
             $query = ['fields' => $fields];
             if ($this->afterCursor !== null) {
@@ -90,12 +91,34 @@ class SyncAds implements ShouldQueue
                     ],
                 );
 
+                // Capture the creative's thumbnail straight from the ad so the
+                // Ads Manager always has an image to show, even when the
+                // account-level /adcreatives listing doesn't return this
+                // creative. Only the media fields are written, so a fuller row
+                // synced by SyncCreatives is never clobbered.
+                $creative = $row['creative'] ?? null;
+                if (is_array($creative) && ($creative['id'] ?? null)) {
+                    $media = array_filter([
+                        'thumbnail_url' => $creative['thumbnail_url'] ?? null,
+                        'image_url' => $creative['image_url'] ?? null,
+                    ], fn ($v) => $v !== null);
+
+                    Creative::updateOrCreate(
+                        ['id' => $creative['id']],
+                        ['meta_ads_account_id' => $this->adAccount->id, ...$media],
+                    );
+                }
+
                 $count++;
             }
 
+            // `paging.cursors.after` is present on every page (even the last);
+            // only `paging.next` signals more results. Gating on the cursor
+            // re-dispatches a continuation past the final page on every sync.
+            $hasNextPage = isset($page['paging']['next']);
             $afterCursor = $page['paging']['cursors']['after'] ?? null;
 
-            if ($afterCursor !== null) {
+            if ($hasNextPage && $afterCursor !== null) {
                 static::dispatch($this->adAccount, $afterCursor, $count, $run->id, $this->sinceTimestamp);
             } else {
                 $run->succeed($count, ['ad_count' => $count]);

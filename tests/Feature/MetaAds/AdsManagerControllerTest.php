@@ -163,6 +163,36 @@ it('shows entities with no insights in the date range (zeroed metrics)', functio
         );
 });
 
+it('includes an ad count per group, except when grouping by ad id', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsManager($workspace);
+    // A second ad in account A's campaign/ad set so the count exceeds one.
+    Ad::create([
+        'id' => 1003,
+        'meta_ads_account_id' => 101,
+        'meta_ads_campaign_id' => 1000,
+        'meta_ads_set_id' => 1001,
+        'name' => 'Second Ad',
+    ]);
+
+    // Ad Name: "Shared Creative" exists in both accounts → 2 ads.
+    $this->get(adsManagerUrl($workspace, ['group_by' => 'ad_name', 'filter' => ['search' => 'Shared']]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('rows.data.0.name', 'Shared Creative')
+            ->where('rows.data.0.ads_count', fn ($n) => (int) $n === 2)
+        );
+
+    // Campaign 1000 now has 2 ads; default -spend sort puts it first (spend 100).
+    $this->get(adsManagerUrl($workspace, ['group_by' => 'campaign']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('rows.data.0.ads_count', fn ($n) => (int) $n === 2)
+        );
+
+    // Grouping by ad id carries no ad-count column.
+    $this->get(adsManagerUrl($workspace, ['group_by' => 'ad']))
+        ->assertInertia(fn (Assert $page) => $page->missing('rows.data.0.ads_count'));
+});
+
 it('forbids non-members', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     $outsider = User::factory()->create();
