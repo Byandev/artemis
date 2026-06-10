@@ -17,8 +17,8 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
-import { ColumnDef, VisibilityState } from '@tanstack/react-table';
+import { Head } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { formatDate } from 'date-fns';
 import flatpickr from 'flatpickr';
@@ -34,7 +34,7 @@ import {
     Search,
 } from 'lucide-react';
 import moment from 'moment';
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import {
     ColumnVisibilityMenu,
     INSIGHTS_OPTIONS,
@@ -79,7 +79,19 @@ interface Row extends InsightsMetrics {
     thumbnail_url?: string | null;
     image_url?: string | null;
     video_id?: number | string | null;
+    media_type?: 'video' | 'image' | null;
     ads_count?: number;
+}
+
+/**
+ * Whether a creative is a video. Prefer the server's media_type (object_type
+ * VIDEO || video_id) and fall back to video_id when it isn't present.
+ */
+function isVideoCreative(r: {
+    media_type?: string | null;
+    video_id?: number | string | null;
+}): boolean {
+    return r.media_type ? r.media_type === 'video' : r.video_id != null;
 }
 
 interface AccountOption {
@@ -89,7 +101,6 @@ interface AccountOption {
 
 interface Props {
     workspace: Workspace;
-    rows: PaginatedData<Row>;
     accounts: AccountOption[];
     selectedAccounts: string[];
     dateRange: { since: string; until: string };
@@ -105,16 +116,12 @@ interface Props {
     };
 }
 
-function adsManagerUrl(slug: string) {
-    return `/workspaces/${slug}/integrations/meta/ads-manager`;
-}
-
 function adDetailUrl(slug: string, adId: number | string) {
     return `/workspaces/${slug}/integrations/meta/ads-manager/ads/${adId}/detail`;
 }
 
-function groupAdsUrl(slug: string) {
-    return `/workspaces/${slug}/integrations/meta/ads-manager/group-ads`;
+function dataUrl(slug: string) {
+    return `/workspaces/${slug}/integrations/meta/ads-manager/data`;
 }
 
 /* ───────────────── Ads-in-group modal ───────────────── */
@@ -125,64 +132,171 @@ interface GroupTarget {
     label: string;
 }
 
-/** Columns for the per-group ads table: ad thumbnail + name, then the metrics. */
-function buildModalAdColumns(
-    onSelectAd: (ad: Row) => void,
-): ColumnDef<Row>[] {
-    return [
+/**
+ * The metric table itself — column presets, the columns menu, and the
+ * paginated DataTable. Used by both the main page and the in-group modal,
+ * which feed it rows from the shared data() API. Key it by groupBy so the
+ * per-dimension column presets re-init when the dimension changes.
+ */
+function GridTable({
+    groupBy,
+    groupLabel,
+    rows,
+    loading,
+    sort,
+    onFetch,
+    onSelectAd,
+    onOpenGroup,
+}: {
+    groupBy: GroupBy;
+    groupLabel: string;
+    rows: PaginatedData<Row> | null;
+    loading: boolean;
+    sort: string | null;
+    onFetch: (params?: { [key: string]: string | number | null }) => void;
+    onSelectAd: (ad: Row) => void;
+    onOpenGroup?: (row: Row) => void;
+}) {
+    const showThumbnail = groupBy === 'ad';
+    const showStatus = HAS_STATUS[groupBy];
+    const showAdsCount = groupBy !== 'ad';
+
+    const COLUMN_OPTIONS = [
+        { id: 'name', label: groupLabel, category: 'General', required: true },
+        ...INSIGHTS_OPTIONS,
+    ];
+    const {
+        visibility: columnVisibility,
+        setVisibility: setColumnVisibility,
+        columnOrder,
+        setColumnOrder,
+        presets,
+        savePreset,
+        deletePreset,
+        loadPreset,
+        resetToDefault,
+    } = useColumnPresets(
+        `meta-ads-cols:${groupBy}`,
+        Object.fromEntries(
+            COLUMN_OPTIONS.map((o) => [o.id, !o.hiddenByDefault]),
+        ),
+        COLUMN_OPTIONS.map((o) => o.id),
+    );
+
+    const columns: ColumnDef<Row>[] = [
         {
             accessorKey: 'name',
             enableSorting: true,
-            header: ({ column }) => <SortableHeader column={column} title="Ad" />,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={groupLabel} />
+            ),
             cell: ({ row }) => (
                 <div className="flex items-start gap-3">
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectAd(row.original);
-                        }}
-                        title="View creative"
-                        className="group relative h-10 w-10 shrink-0 overflow-hidden rounded ring-emerald-500/40 transition-shadow hover:ring-2"
-                    >
-                        {row.original.thumbnail_url || row.original.image_url ? (
-                            <img
-                                src={
-                                    row.original.thumbnail_url ??
-                                    row.original.image_url ??
-                                    ''
-                                }
-                                alt=""
-                                className="h-10 w-10 object-cover"
-                            />
-                        ) : (
-                            <div className="flex h-10 w-10 items-center justify-center bg-stone-100 text-gray-400 dark:bg-zinc-800 dark:text-gray-500">
-                                <ImageIcon className="h-4 w-4" />
-                            </div>
-                        )}
-                        {row.original.video_id != null && (
-                            <span className="absolute inset-0 flex items-center justify-center bg-black/35">
-                                <Play className="h-3.5 w-3.5 fill-white text-white" />
-                            </span>
-                        )}
-                    </button>
+                    {showThumbnail && (
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectAd(row.original);
+                            }}
+                            title="View creative"
+                            className="group relative h-10 w-10 shrink-0 overflow-hidden rounded ring-emerald-500/40 transition-shadow hover:ring-2"
+                        >
+                            {row.original.thumbnail_url ||
+                            row.original.image_url ? (
+                                <img
+                                    src={
+                                        row.original.thumbnail_url ??
+                                        row.original.image_url ??
+                                        ''
+                                    }
+                                    alt=""
+                                    className="h-10 w-10 object-cover"
+                                />
+                            ) : (
+                                <div className="flex h-10 w-10 items-center justify-center bg-stone-100 text-gray-400 dark:bg-zinc-800 dark:text-gray-500">
+                                    <ImageIcon className="h-4 w-4" />
+                                </div>
+                            )}
+                            {isVideoCreative(row.original) && (
+                                <span className="absolute inset-0 flex items-center justify-center bg-black/35">
+                                    <Play className="h-3.5 w-3.5 fill-white text-white" />
+                                </span>
+                            )}
+                        </button>
+                    )}
                     <div className="min-w-0 flex-1">
                         <span className="block truncate text-[12px] font-medium text-gray-700 dark:text-gray-300">
                             {row.original.name ?? '—'}
                         </span>
-                        <StatusLabel
-                            status={
-                                row.original.effective_status ??
-                                row.original.status ??
-                                null
-                            }
-                        />
+                        {showStatus && (
+                            <StatusLabel
+                                status={
+                                    row.original.effective_status ??
+                                    row.original.status ??
+                                    null
+                                }
+                            />
+                        )}
+                        {showAdsCount && row.original.ads_count != null && (
+                            <span className="block font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                {row.original.ads_count}{' '}
+                                {row.original.ads_count === 1 ? 'ad' : 'ads'}
+                            </span>
+                        )}
                     </div>
                 </div>
             ),
         },
         ...buildInsightsColumns<Row>(),
     ];
+
+    const rowClick = showThumbnail
+        ? (r: unknown) => onSelectAd(r as Row)
+        : onOpenGroup
+          ? (r: unknown) => onOpenGroup(r as Row)
+          : undefined;
+
+    return (
+        <>
+            <div className="mb-3 flex items-center justify-end gap-2">
+                <span className="hidden font-mono text-[10px] text-gray-300 sm:inline dark:text-gray-600">
+                    {(rows?.total ?? 0).toLocaleString()} rows
+                </span>
+                <ColumnVisibilityMenu
+                    options={COLUMN_OPTIONS}
+                    value={columnVisibility}
+                    onChange={setColumnVisibility}
+                    columnOrder={columnOrder}
+                    onColumnOrderChange={setColumnOrder}
+                    presets={presets}
+                    onSavePreset={savePreset}
+                    onDeletePreset={deletePreset}
+                    onLoadPreset={loadPreset}
+                    onReset={resetToDefault}
+                />
+            </div>
+            <div className="relative overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                {loading && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-zinc-900/60">
+                        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                    </div>
+                )}
+                <DataTable
+                    columns={columns as ColumnDef<unknown>[]}
+                    data={(rows?.data ?? []) as unknown[]}
+                    initialSorting={toFrontendSort(sort)}
+                    meta={rows ? { ...omit(rows, ['data']) } : undefined}
+                    columnVisibility={columnVisibility}
+                    onColumnVisibilityChange={setColumnVisibility}
+                    columnOrder={columnOrder}
+                    onColumnOrderChange={setColumnOrder}
+                    onRowClick={rowClick}
+                    onFetch={onFetch}
+                />
+            </div>
+        </>
+    );
 }
 
 function GroupAdsModal({
@@ -191,8 +305,6 @@ function GroupAdsModal({
     dateRange,
     selectedAccounts,
     accountsTotal,
-    columnVisibility,
-    columnOrder,
     onClose,
     onSelectAd,
 }: {
@@ -201,60 +313,72 @@ function GroupAdsModal({
     dateRange: { since: string; until: string };
     selectedAccounts: string[];
     accountsTotal: number;
-    columnVisibility: VisibilityState;
-    columnOrder: string[];
     onClose: () => void;
     onSelectAd: (ad: Row) => void;
 }) {
     const open = target != null;
     const [rows, setRows] = useState<PaginatedData<Row> | null>(null);
     const [loading, setLoading] = useState(false);
+    const [sort, setSort] = useState<string | null>(null);
+    const [page, setPage] = useState(1);
+    const [perPage, setPerPage] = useState(25);
 
-    const fetchAds = (params?: {
-        [key: string]: string | number | null;
-    }) => {
-        if (!target) return;
+    // Reset paging whenever a new group opens.
+    useEffect(() => {
+        setSort(null);
+        setPage(1);
+        setPerPage(25);
+    }, [target?.groupBy, target?.group]);
+
+    useEffect(() => {
+        if (!target) {
+            setRows(null);
+            return;
+        }
+        let active = true;
         setLoading(true);
         const qs = new URLSearchParams();
-        qs.set('group_by', target.groupBy);
-        qs.set('group', target.group);
+        qs.set('scope_by', target.groupBy);
+        qs.set('scope', target.group);
         qs.set('since', dateRange.since);
         qs.set('until', dateRange.until);
         if (selectedAccounts.length !== accountsTotal) {
             selectedAccounts.forEach((a) => qs.append('accounts[]', a));
         }
-        if (params?.sort) qs.set('sort', String(params.sort));
-        qs.set('page', String(params?.page ?? 1));
-        qs.set('per_page', String(params?.per_page ?? 25));
-        fetch(`${groupAdsUrl(slug)}?${qs.toString()}`, {
+        if (sort) qs.set('sort', sort);
+        qs.set('page', String(page));
+        qs.set('per_page', String(perPage));
+        fetch(`${dataUrl(slug)}?${qs.toString()}`, {
             headers: { Accept: 'application/json' },
         })
             .then((r) => (r.ok ? r.json() : Promise.reject()))
             .then((d: { rows: PaginatedData<Row> }) => {
-                setRows(d.rows);
-                setLoading(false);
+                if (active) {
+                    setRows(d.rows);
+                    setLoading(false);
+                }
             })
-            .catch(() => setLoading(false));
-    };
-
-    // Reset + load whenever a new group is opened.
-    useEffect(() => {
-        if (!open) {
-            setRows(null);
-            return;
-        }
-        fetchAds({ page: 1 });
+            .catch(() => active && setLoading(false));
+        return () => {
+            active = false;
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [target?.groupBy, target?.group]);
-
-    const columns = useMemo(
-        () => buildModalAdColumns(onSelectAd),
-        [onSelectAd],
-    );
+    }, [
+        target?.groupBy,
+        target?.group,
+        dateRange.since,
+        dateRange.until,
+        sort,
+        page,
+        perPage,
+        selectedAccounts,
+        accountsTotal,
+        slug,
+    ]);
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="flex h-[90vh] w-[95vw] max-w-[95vw] flex-col gap-0 overflow-hidden p-0 sm:max-w-[95vw]">
+            <DialogContent className="relative flex h-[90vh] w-[95vw] max-w-[95vw] flex-col gap-0 overflow-hidden p-0 sm:max-w-[95vw]">
                 <DialogTitle className="border-b border-black/6 px-5 py-3.5 text-[14px] font-semibold tracking-tight text-gray-800 dark:border-white/6 dark:text-gray-100">
                     {target?.label || 'Ads'}
                     <span className="ml-1.5 font-mono text-[11px] font-normal text-gray-400">
@@ -262,23 +386,22 @@ function GroupAdsModal({
                     </span>
                 </DialogTitle>
                 <div className="flex-1 overflow-auto p-4">
-                    {loading && !rows ? (
-                        <div className="flex h-40 items-center justify-center">
-                            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-                        </div>
-                    ) : (
-                        <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                            <DataTable
-                                columns={columns as ColumnDef<unknown>[]}
-                                data={(rows?.data ?? []) as unknown[]}
-                                meta={rows ? { ...omit(rows, ['data']) } : undefined}
-                                columnVisibility={columnVisibility}
-                                columnOrder={columnOrder}
-                                onRowClick={(r) => onSelectAd(r as Row)}
-                                onFetch={(p) => fetchAds(p)}
-                            />
-                        </div>
-                    )}
+                    <GridTable
+                        groupBy="ad"
+                        groupLabel="Ad"
+                        rows={rows}
+                        loading={loading}
+                        sort={sort}
+                        onFetch={(p) => {
+                            if (p?.sort !== undefined)
+                                setSort((p.sort as string | null) ?? null);
+                            if (p?.page !== undefined)
+                                setPage(Number(p.page) || 1);
+                            if (p?.per_page !== undefined)
+                                setPerPage(Number(p.per_page) || 25);
+                        }}
+                        onSelectAd={onSelectAd}
+                    />
                 </div>
             </DialogContent>
         </Dialog>
@@ -297,6 +420,7 @@ interface AdDetail {
         campaign_name: string | null;
         account_name: string | null;
         ad_type: string;
+        media_type: 'video' | 'image' | null;
         call_to_action: string | null;
     };
     preview: { src: string | null };
@@ -366,7 +490,12 @@ function CreativeDetailDrawer({
     }, [ad?.id, slug]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const dim = detail?.dimensions;
-    const isImage = ad?.video_id == null;
+    // Prefer the detail's media_type once loaded, else the row's signal.
+    const isImage = dim?.media_type
+        ? dim.media_type !== 'video'
+        : ad
+          ? !isVideoCreative(ad)
+          : false;
     // Spinner while the detail request is in flight OR the iframe is still painting.
     const showSpinner = loading || (!!src && !iframeLoaded);
 
@@ -639,222 +768,123 @@ function GroupBySelect({
 
 export default function MetaAdsManager({
     workspace,
-    rows,
     accounts,
     selectedAccounts,
     dateRange,
     query,
 }: Props) {
-    const indexUrl = adsManagerUrl(workspace.slug);
-    const groupBy: GroupBy = query?.groupBy ?? 'ad_name';
-    const groupLabel =
-        GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? 'Ad Name';
-
-    const initialSorting = useMemo(
-        () => toFrontendSort(query?.sort ?? null),
-        [query?.sort],
+    const [groupBy, setGroupBy] = useState<GroupBy>(
+        query?.groupBy ?? 'ad_name',
     );
+    const [selected, setSelected] = useState<string[]>(selectedAccounts);
+    const [range, setRange] = useState(dateRange);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() =>
         deserializeMetricFilters(query?.metricFilters),
     );
+    const [sort, setSort] = useState<string | null>(query?.sort ?? null);
+    const [page, setPage] = useState<number>(Number(query?.page ?? 1) || 1);
+    const [perPage, setPerPage] = useState<number>(
+        Number(query?.perPage ?? 25) || 25,
+    );
+
+    const [rows, setRows] = useState<PaginatedData<Row> | null>(null);
+    const [loading, setLoading] = useState(true);
     const [previewAd, setPreviewAd] = useState<Row | null>(null);
     const [groupTarget, setGroupTarget] = useState<GroupTarget | null>(null);
 
-    // Send the account list only when it's a strict subset; an empty value means
-    // "all accounts" on the server, matching the default.
-    const accountsParam = (ids: string[]) =>
-        ids.length === accounts.length ? undefined : ids;
+    const groupLabel =
+        GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? 'Ad Name';
 
-    const navigate = (overrides: Record<string, unknown> = {}) =>
-        router.get(
-            indexUrl,
-            {
-                group_by: groupBy,
-                accounts: accountsParam(selectedAccounts),
-                since: dateRange.since,
-                until: dateRange.until,
-                sort: query?.sort,
-                'filter[search]': searchValue || undefined,
-                metric_filters: serializeMetricFilters(metricFilters),
-                page: 1,
-                per_page: query?.perPage ?? rows.per_page,
-                ...overrides,
-            },
-            {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-                only: ['rows', 'query'],
-            },
-        );
-
+    // Debounce only the search box; every other control fetches immediately.
+    const [debouncedSearch, setDebouncedSearch] = useState(searchValue);
     useEffect(() => {
-        const t = setTimeout(
-            () => navigate({ page: searchValue ? 1 : (query?.page ?? 1) }),
-            400,
-        );
+        const t = setTimeout(() => setDebouncedSearch(searchValue), 350);
         return () => clearTimeout(t);
-    }, [searchValue]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [searchValue]);
 
-    const handleMetricFiltersChange = (next: MetricFilter[]) => {
+    // Single source of truth: build the query, push it to the URL (so refresh /
+    // shared links restore the view), and fetch the grid rows from the API.
+    useEffect(() => {
+        const qs = new URLSearchParams();
+        qs.set('group_by', groupBy);
+        if (selected.length !== accounts.length) {
+            selected.forEach((a) => qs.append('accounts[]', a));
+        }
+        qs.set('since', range.since);
+        qs.set('until', range.until);
+        if (sort) qs.set('sort', sort);
+        if (debouncedSearch) qs.set('filter[search]', debouncedSearch);
+        const mf = serializeMetricFilters(metricFilters);
+        if (mf) qs.set('metric_filters', mf);
+        qs.set('page', String(page));
+        qs.set('per_page', String(perPage));
+
+        window.history.replaceState(
+            null,
+            '',
+            `${window.location.pathname}?${qs.toString()}`,
+        );
+
+        let active = true;
+        setLoading(true);
+        fetch(`${dataUrl(workspace.slug)}?${qs.toString()}`, {
+            headers: { Accept: 'application/json' },
+        })
+            .then((r) => (r.ok ? r.json() : Promise.reject()))
+            .then((d: { rows: PaginatedData<Row> }) => {
+                if (active) {
+                    setRows(d.rows);
+                    setLoading(false);
+                }
+            })
+            .catch(() => active && setLoading(false));
+        return () => {
+            active = false;
+        };
+    }, [
+        groupBy,
+        selected,
+        range.since,
+        range.until,
+        sort,
+        page,
+        perPage,
+        metricFilters,
+        debouncedSearch,
+        accounts.length,
+        workspace.slug,
+    ]);
+
+    const onAccounts = (ids: string[]) => {
+        setSelected(ids);
+        setPage(1);
+    };
+    const onGroupBy = (next: GroupBy) => {
+        setGroupBy(next);
+        setPage(1);
+    };
+    const onDateRange = (since: string, until: string) => {
+        setRange({ since, until });
+        setPage(1);
+    };
+    const onMetricFilters = (next: MetricFilter[]) => {
         setMetricFilters(next);
-        router.get(
-            indexUrl,
-            {
-                group_by: groupBy,
-                accounts: accountsParam(selectedAccounts),
-                since: dateRange.since,
-                until: dateRange.until,
-                sort: query?.sort,
-                'filter[search]': searchValue || undefined,
-                metric_filters: serializeMetricFilters(next),
-                page: 1,
-                per_page: query?.perPage ?? rows.per_page,
-            },
-            {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-                only: ['rows', 'query'],
-            },
-        );
+        setPage(1);
     };
-
-    // A full visit (component remounts) so per-dimension column presets re-init.
-    const handleGroupByChange = (next: GroupBy) => {
-        if (next === groupBy) return;
-        router.get(
-            indexUrl,
-            {
-                group_by: next,
-                accounts: accountsParam(selectedAccounts),
-                since: dateRange.since,
-                until: dateRange.until,
-            },
-            { preserveScroll: true },
-        );
+    const onSearch = (v: string) => {
+        setSearchValue(v);
+        setPage(1);
     };
-
-    const handleAccountsChange = (ids: string[]) => {
-        router.get(
-            indexUrl,
-            {
-                group_by: groupBy,
-                accounts: accountsParam(ids),
-                since: dateRange.since,
-                until: dateRange.until,
-                'filter[search]': searchValue || undefined,
-                metric_filters: serializeMetricFilters(metricFilters),
-            },
-            { preserveScroll: true },
-        );
+    const onTableFetch = (params?: {
+        [key: string]: string | number | null;
+    }) => {
+        if (params?.sort !== undefined)
+            setSort((params.sort as string | null) ?? null);
+        if (params?.page !== undefined) setPage(Number(params.page) || 1);
+        if (params?.per_page !== undefined)
+            setPerPage(Number(params.per_page) || 25);
     };
-
-    const setDateRange = (since: string, until: string) => {
-        router.get(
-            indexUrl,
-            {
-                group_by: groupBy,
-                accounts: accountsParam(selectedAccounts),
-                since,
-                until,
-            },
-            { preserveScroll: true },
-        );
-    };
-
-    const showAdsCount = groupBy !== 'ad';
-
-    const COLUMN_OPTIONS = [
-        { id: 'name', label: groupLabel, category: 'General', required: true },
-        ...INSIGHTS_OPTIONS,
-    ];
-    const {
-        visibility: columnVisibility,
-        setVisibility: setColumnVisibility,
-        columnOrder,
-        setColumnOrder,
-        presets,
-        savePreset,
-        deletePreset,
-        loadPreset,
-        resetToDefault,
-    } = useColumnPresets(
-        `meta-ads-cols:${groupBy}`,
-        Object.fromEntries(
-            COLUMN_OPTIONS.map((o) => [o.id, !o.hiddenByDefault]),
-        ),
-        COLUMN_OPTIONS.map((o) => o.id),
-    );
-
-    const showThumbnail = groupBy === 'ad';
-    const showStatus = HAS_STATUS[groupBy];
-
-    const columns: ColumnDef<Row>[] = [
-        {
-            accessorKey: 'name',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title={groupLabel} />
-            ),
-            cell: ({ row }) => (
-                <div className="flex items-start gap-3">
-                    {showThumbnail && (
-                        <button
-                            type="button"
-                            onClick={() => setPreviewAd(row.original)}
-                            title="View creative"
-                            className="group relative h-10 w-10 shrink-0 overflow-hidden rounded ring-emerald-500/40 transition-shadow hover:ring-2"
-                        >
-                            {row.original.thumbnail_url ||
-                            row.original.image_url ? (
-                                <img
-                                    src={
-                                        row.original.thumbnail_url ??
-                                        row.original.image_url ??
-                                        ''
-                                    }
-                                    alt=""
-                                    className="h-10 w-10 object-cover"
-                                />
-                            ) : (
-                                <div className="flex h-10 w-10 items-center justify-center bg-stone-100 text-gray-400 dark:bg-zinc-800 dark:text-gray-500">
-                                    <ImageIcon className="h-4 w-4" />
-                                </div>
-                            )}
-                            {row.original.video_id != null && (
-                                <span className="absolute inset-0 flex items-center justify-center bg-black/35">
-                                    <Play className="h-3.5 w-3.5 fill-white text-white" />
-                                </span>
-                            )}
-                        </button>
-                    )}
-                    <div className="min-w-0 flex-1">
-                        <span className="block truncate text-[12px] font-medium text-gray-700 dark:text-gray-300">
-                            {row.original.name ?? '—'}
-                        </span>
-                        {showStatus && (
-                            <StatusLabel
-                                status={
-                                    row.original.effective_status ??
-                                    row.original.status ??
-                                    null
-                                }
-                            />
-                        )}
-                        {showAdsCount && row.original.ads_count != null && (
-                            <span className="block font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                                {row.original.ads_count}{' '}
-                                {row.original.ads_count === 1 ? 'ad' : 'ads'}
-                            </span>
-                        )}
-                    </div>
-                </div>
-            ),
-        },
-        ...buildInsightsColumns<Row>(),
-    ];
 
     return (
         <AppLayout>
@@ -870,11 +900,8 @@ export default function MetaAdsManager({
                             Ads Manager
                         </h1>
                         <p className="mt-1 font-mono text-[11px] text-gray-400 dark:text-gray-500">
-                            {formatDate(new Date(dateRange.since), 'MMM d')} –{' '}
-                            {formatDate(
-                                new Date(dateRange.until),
-                                'MMM d, yyyy',
-                            )}
+                            {formatDate(new Date(range.since), 'MMM d')} –{' '}
+                            {formatDate(new Date(range.until), 'MMM d, yyyy')}
                         </p>
                     </div>
 
@@ -883,17 +910,14 @@ export default function MetaAdsManager({
                         mode="range"
                         onChange={(dates) => {
                             if (dates.length === 2) {
-                                setDateRange(
+                                onDateRange(
                                     moment(dates[0]).format('YYYY-MM-DD'),
                                     moment(dates[1]).format('YYYY-MM-DD'),
                                 );
                             }
                         }}
                         defaultDate={
-                            [
-                                dateRange.since,
-                                dateRange.until,
-                            ] as never as DateOption
+                            [range.since, range.until] as never as DateOption
                         }
                     />
                 </div>
@@ -902,84 +926,47 @@ export default function MetaAdsManager({
                     <div className="flex flex-wrap items-center gap-2">
                         <AccountMultiPicker
                             accounts={accounts}
-                            selected={selectedAccounts}
-                            onChange={handleAccountsChange}
+                            selected={selected}
+                            onChange={onAccounts}
                         />
-                        <GroupBySelect
-                            value={groupBy}
-                            onChange={handleGroupByChange}
-                        />
+                        <GroupBySelect value={groupBy} onChange={onGroupBy} />
                         <div className="relative w-full max-w-xs">
                             <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                             <input
                                 type="text"
                                 placeholder={`Search ${groupLabel.toLowerCase()}...`}
                                 value={searchValue}
-                                onChange={(e) => setSearchValue(e.target.value)}
+                                onChange={(e) => onSearch(e.target.value)}
                                 className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400 dark:focus:bg-zinc-900"
                             />
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <InsightFilterBuilder
-                            filters={metricFilters}
-                            onChange={handleMetricFiltersChange}
-                        />
-                        <ColumnVisibilityMenu
-                            options={COLUMN_OPTIONS}
-                            value={columnVisibility}
-                            onChange={setColumnVisibility}
-                            columnOrder={columnOrder}
-                            onColumnOrderChange={setColumnOrder}
-                            presets={presets}
-                            onSavePreset={savePreset}
-                            onDeletePreset={deletePreset}
-                            onLoadPreset={loadPreset}
-                            onReset={resetToDefault}
-                        />
-                        <span className="hidden font-mono text-[10px] text-gray-300 sm:inline dark:text-gray-600">
-                            {rows.total.toLocaleString()} rows
-                        </span>
-                    </div>
-                </div>
-
-                <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                    <DataTable
-                        columns={columns as ColumnDef<unknown>[]}
-                        data={(rows.data ?? []) as unknown[]}
-                        initialSorting={initialSorting}
-                        meta={{ ...omit(rows, ['data']) }}
-                        columnVisibility={columnVisibility}
-                        onColumnVisibilityChange={setColumnVisibility}
-                        columnOrder={columnOrder}
-                        onColumnOrderChange={setColumnOrder}
-                        onRowClick={
-                            groupBy === 'ad'
-                                ? undefined
-                                : (r) => {
-                                      const row = r as Row;
-                                      setGroupTarget({
-                                          groupBy,
-                                          group:
-                                              groupBy === 'ad_name'
-                                                  ? (row.name ?? '')
-                                                  : String(row.id),
-                                          label: row.name ?? '',
-                                      });
-                                  }
-                        }
-                        onFetch={(params) =>
-                            navigate({
-                                sort: params?.sort,
-                                page: params?.page ?? 1,
-                                per_page:
-                                    params?.per_page ??
-                                    query?.perPage ??
-                                    rows.per_page,
-                            })
-                        }
+                    <InsightFilterBuilder
+                        filters={metricFilters}
+                        onChange={onMetricFilters}
                     />
                 </div>
+
+                <GridTable
+                    key={groupBy}
+                    groupBy={groupBy}
+                    groupLabel={groupLabel}
+                    rows={rows}
+                    loading={loading}
+                    sort={sort}
+                    onFetch={onTableFetch}
+                    onSelectAd={setPreviewAd}
+                    onOpenGroup={(row) =>
+                        setGroupTarget({
+                            groupBy,
+                            group:
+                                groupBy === 'ad_name'
+                                    ? (row.name ?? '')
+                                    : String(row.id),
+                            label: row.name ?? '',
+                        })
+                    }
+                />
             </div>
 
             <CreativeDetailDrawer
@@ -991,11 +978,9 @@ export default function MetaAdsManager({
             <GroupAdsModal
                 slug={workspace.slug}
                 target={groupTarget}
-                dateRange={dateRange}
-                selectedAccounts={selectedAccounts}
+                dateRange={range}
+                selectedAccounts={selected}
                 accountsTotal={accounts.length}
-                columnVisibility={columnVisibility}
-                columnOrder={columnOrder}
                 onClose={() => setGroupTarget(null)}
                 onSelectAd={(ad) => setPreviewAd(ad)}
             />

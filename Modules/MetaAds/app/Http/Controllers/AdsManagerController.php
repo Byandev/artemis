@@ -21,9 +21,9 @@ use Spatie\QueryBuilder\QueryBuilder;
 class AdsManagerController extends Controller
 {
     /**
-     * Single unified Ads Manager view. Aggregates meta_ads_insights over the
-     * active date range for the selected accounts, grouped by the chosen
-     * dimension (ad name, ad, campaign, ad set, or account).
+     * Ads Manager shell. The grid data itself is fetched client-side from
+     * data() — this only renders the page with the account list and the initial
+     * query state (parsed from the URL so refreshes / shared links restore it).
      */
     public function index(Request $request, Workspace $workspace): Response
     {
@@ -35,11 +35,6 @@ class AdsManagerController extends Controller
             ->map(fn ($id) => (string) $id);
         $selectedAccountIds = $this->resolveSelectedAccounts($request, $allAccountIds);
 
-        $groupBy = $this->resolveGroupBy($request);
-        $metricFilters = $this->parseMetricFilters($request);
-
-        $rows = $this->aggregate($request, $selectedAccountIds, $since, $until, $groupBy, $metricFilters);
-
         $accounts = AdAccount::forWorkspace($workspace)
             ->select('meta_ads_accounts.id', 'meta_ads_accounts.name')
             ->orderBy('meta_ads_accounts.name')
@@ -48,27 +43,26 @@ class AdsManagerController extends Controller
 
         return Inertia::render('workspaces/integrations/meta-ads/index', [
             'workspace' => $workspace,
-            'rows' => $rows,
             'accounts' => $accounts,
             'selectedAccounts' => $selectedAccountIds->values(),
             'dateRange' => ['since' => $since, 'until' => $until],
             'query' => [
                 ...$request->only(['sort', 'page', 'since', 'until']),
-                'groupBy' => $groupBy,
+                'groupBy' => $this->resolveGroupBy($request),
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
-                'metricFilters' => $metricFilters,
+                'metricFilters' => $this->parseMetricFilters($request),
             ],
         ]);
     }
 
     /**
-     * Paginated ads under a single parent group (campaign / ad set / account /
-     * ad name). Backs the "show all ads in this grouping" modal — it's the `ad`
-     * aggregation scoped to the clicked group, so the modal renders the exact
-     * same columns/metrics as the main table.
+     * Shared JSON data endpoint for the grid AND the "ads in this group" modal.
+     * Without a scope it returns rows grouped by the requested dimension; with a
+     * `scope_by` + `scope` it returns the `ad` aggregation limited to that parent
+     * group, so the modal renders the same columns/metrics as the main table.
      */
-    public function groupAds(Request $request, Workspace $workspace): JsonResponse
+    public function data(Request $request, Workspace $workspace): JsonResponse
     {
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
@@ -76,19 +70,26 @@ class AdsManagerController extends Controller
 
         $allAccountIds = $this->accountIdsForWorkspace($workspace)->map(fn ($id) => (string) $id);
         $accountIds = $this->resolveSelectedAccounts($request, $allAccountIds);
+        $metricFilters = $this->parseMetricFilters($request);
 
-        $parent = (string) $request->query('group_by');
-        $value = (string) $request->query('group');
+        $scopeBy = (string) $request->query('scope_by', '');
+        $scopeValue = (string) $request->query('scope', '');
 
-        $scope = match ($parent) {
-            'campaign' => fn ($q) => $q->where('meta_ads_ads.meta_ads_campaign_id', $value),
-            'ad_set' => fn ($q) => $q->where('meta_ads_ads.meta_ads_set_id', $value),
-            'account' => fn ($q) => $q->where('meta_ads_ads.meta_ads_account_id', $value),
-            'ad_name' => fn ($q) => $q->where('meta_ads_ads.name', $value),
-            default => abort(400, 'Unsupported group_by'),
-        };
+        if ($scopeBy !== '') {
+            $groupBy = 'ad';
+            $scope = match ($scopeBy) {
+                'campaign' => fn ($q) => $q->where('meta_ads_ads.meta_ads_campaign_id', $scopeValue),
+                'ad_set' => fn ($q) => $q->where('meta_ads_ads.meta_ads_set_id', $scopeValue),
+                'account' => fn ($q) => $q->where('meta_ads_ads.meta_ads_account_id', $scopeValue),
+                'ad_name' => fn ($q) => $q->where('meta_ads_ads.name', $scopeValue),
+                default => abort(400, 'Unsupported scope_by'),
+            };
+        } else {
+            $groupBy = $this->resolveGroupBy($request);
+            $scope = null;
+        }
 
-        $rows = $this->aggregate($request, $accountIds, $since, $until, 'ad', [], $scope);
+        $rows = $this->aggregate($request, $accountIds, $since, $until, $groupBy, $metricFilters, $scope);
 
         return response()->json(['rows' => $rows]);
     }
@@ -104,6 +105,15 @@ class AdsManagerController extends Controller
         'INSTAGRAM_STORY',
         'FACEBOOK_STORY_MOBILE',
     ];
+
+    /**
+     * A creative is a video when Meta tags it object_type=VIDEO or it carries a
+     * top-level video_id (a few video creatives have no video_id but are still
+     * VIDEO). Everything else is treated as an image. object_type alone is
+     * unreliable (PHOTO/SHARE/STATUS/PRIVACY_CHECK_FAIL all appear), so both
+     * signals are combined.
+     */
+    private const MEDIA_TYPE_SQL = "CASE WHEN meta_ads_creatives.object_type = 'VIDEO' OR meta_ads_creatives.video_id IS NOT NULL THEN 'video' ELSE 'image' END";
 
     /**
      * Returns Meta's signed ad-preview iframe src for a single ad. The raw video
@@ -151,7 +161,7 @@ class AdsManagerController extends Controller
                 DB::raw('meta_ads_sets.optimization_goal AS optimization_goal'),
                 DB::raw('meta_ads_campaigns.name AS campaign_name'),
                 DB::raw('meta_ads_accounts.name AS account_name'),
-                DB::raw('meta_ads_creatives.video_id AS video_id'),
+                DB::raw(self::MEDIA_TYPE_SQL.' AS media_type'),
                 DB::raw('meta_ads_creatives.call_to_action_type AS call_to_action'),
             ])
             ->firstOrFail();
@@ -167,7 +177,8 @@ class AdsManagerController extends Controller
                 'adset_name' => $row->adset_name,
                 'campaign_name' => $row->campaign_name,
                 'account_name' => $row->account_name,
-                'ad_type' => $row->video_id ? 'Video' : 'Image',
+                'ad_type' => $row->media_type === 'video' ? 'Video' : 'Image',
+                'media_type' => $row->media_type,
                 'call_to_action' => $row->call_to_action,
             ],
             'preview' => [
@@ -258,6 +269,7 @@ class AdsManagerController extends Controller
                     DB::raw('meta_ads_creatives.thumbnail_url AS thumbnail_url'),
                     DB::raw('meta_ads_creatives.image_url AS image_url'),
                     DB::raw('meta_ads_creatives.video_id AS video_id'),
+                    DB::raw(self::MEDIA_TYPE_SQL.' AS media_type'),
                 ],
                 'groupBy' => [
                     'meta_ads_ads.id',
@@ -267,6 +279,7 @@ class AdsManagerController extends Controller
                     'meta_ads_creatives.thumbnail_url',
                     'meta_ads_creatives.image_url',
                     'meta_ads_creatives.video_id',
+                    'meta_ads_creatives.object_type',
                 ],
                 'search' => 'meta_ads_ads.name',
             ],

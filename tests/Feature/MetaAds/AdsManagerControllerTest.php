@@ -8,6 +8,7 @@ use Modules\MetaAds\Models\Ad;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
 use Modules\MetaAds\Models\Campaign;
+use Modules\MetaAds\Models\Creative;
 use Modules\MetaAds\Models\Insight;
 use Modules\MetaAds\Models\User as MetaUser;
 
@@ -57,7 +58,12 @@ function adsManagerUrl($workspace, array $query = []): string
     return route('workspaces.metaads.ads-manager', ['workspace' => $workspace, ...$query]);
 }
 
-it('renders the unified ads manager and defaults to grouping by ad name', function () {
+function dataUrl($workspace, array $query = []): string
+{
+    return route('workspaces.metaads.ads-manager.data', ['workspace' => $workspace, ...$query]);
+}
+
+it('renders the ads manager shell (accounts + initial query, no rows)', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     seedAdsManager($workspace);
 
@@ -68,34 +74,30 @@ it('renders the unified ads manager and defaults to grouping by ad name', functi
             ->where('query.groupBy', 'ad_name')
             ->has('accounts', 2)
             ->has('selectedAccounts', 2)
-            // Same ad name across both accounts collapses to a single row...
-            ->has('rows.data', 1)
-            // ...with spend summed across accounts (100 + 40).
-            ->where('rows.data.0.name', 'Shared Creative')
-            ->where('rows.data.0.spend', fn ($spend) => (float) $spend === 140.0)
+            // Grid rows are loaded client-side from the data() API now.
+            ->missing('rows')
         );
 });
 
-it('groups by account into one row per account', function () {
+it('aggregates rows for the default ad_name grouping via the data API', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     seedAdsManager($workspace);
 
-    $this->get(adsManagerUrl($workspace, ['group_by' => 'account']))
-        ->assertInertia(fn (Assert $page) => $page
-            ->where('query.groupBy', 'account')
-            ->has('rows.data', 2)
-        );
+    $data = $this->getJson(dataUrl($workspace))->assertOk()->json('rows.data');
+
+    // Same ad name across both accounts collapses to one row, spend summed (100 + 40).
+    expect($data)->toHaveCount(1)
+        ->and($data[0]['name'])->toBe('Shared Creative')
+        ->and((float) $data[0]['spend'])->toBe(140.0);
 });
 
 it('supports every group_by dimension', function (string $groupBy, int $expectedRows) {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     seedAdsManager($workspace);
 
-    $this->get(adsManagerUrl($workspace, ['group_by' => $groupBy]))
-        ->assertInertia(fn (Assert $page) => $page
-            ->where('query.groupBy', $groupBy)
-            ->has('rows.data', $expectedRows)
-        );
+    $data = $this->getJson(dataUrl($workspace, ['group_by' => $groupBy]))->assertOk()->json('rows.data');
+
+    expect($data)->toHaveCount($expectedRows);
 })->with([
     'ad_name' => ['ad_name', 1],
     'ad' => ['ad', 2],
@@ -108,13 +110,11 @@ it('restricts aggregation to the selected accounts', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     $ctx = seedAdsManager($workspace);
 
-    $this->get(adsManagerUrl($workspace, ['accounts' => [(string) $ctx['accountA']->id]]))
-        ->assertInertia(fn (Assert $page) => $page
-            ->has('selectedAccounts', 1)
-            ->has('rows.data', 1)
-            // Only Account A's spend remains.
-            ->where('rows.data.0.spend', fn ($spend) => (float) $spend === 100.0)
-        );
+    $data = $this->getJson(dataUrl($workspace, ['accounts' => [(string) $ctx['accountA']->id]]))
+        ->assertOk()->json('rows.data');
+
+    expect($data)->toHaveCount(1)
+        ->and((float) $data[0]['spend'])->toBe(100.0); // only Account A
 });
 
 it('applies metric filters as HAVING on the aggregated totals', function () {
@@ -124,25 +124,25 @@ it('applies metric filters as HAVING on the aggregated totals', function () {
     // Grouped by ad, Account B's ad totals 40 spend and is filtered out by spend > 50.
     $filters = json_encode([['field' => 'spend', 'op' => 'gt', 'value' => 50]]);
 
-    $this->get(adsManagerUrl($workspace, ['group_by' => 'ad', 'metric_filters' => $filters]))
-        ->assertInertia(fn (Assert $page) => $page->has('rows.data', 1)
-            ->where('rows.data.0.spend', fn ($spend) => (float) $spend === 100.0)
-        );
+    $data = $this->getJson(dataUrl($workspace, ['group_by' => 'ad', 'metric_filters' => $filters]))
+        ->assertOk()->json('rows.data');
+
+    expect($data)->toHaveCount(1)
+        ->and((float) $data[0]['spend'])->toBe(100.0);
 });
 
 it('sorts by a computed metric server-side', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     seedAdsManager($workspace);
 
-    // Grouped by ad: A has cpc 100/50 = 2.0, B has cpc 40/50 = 0.8. Ascending cpc
-    // puts B (spend 40) first, proving the derived metric sorts on the server
-    // rather than defaulting to -spend (which would put A first).
-    $this->get(adsManagerUrl($workspace, ['group_by' => 'ad', 'sort' => 'cpc']))
-        ->assertInertia(fn (Assert $page) => $page
-            ->has('rows.data', 2)
-            ->where('rows.data.0.spend', fn ($spend) => (float) $spend === 40.0)
-            ->where('rows.data.1.spend', fn ($spend) => (float) $spend === 100.0)
-        );
+    // Grouped by ad: A has cpc 2.0, B has cpc 0.8. Ascending cpc puts B (spend 40)
+    // first, proving the derived metric sorts server-side (not default -spend).
+    $data = $this->getJson(dataUrl($workspace, ['group_by' => 'ad', 'sort' => 'cpc']))
+        ->assertOk()->json('rows.data');
+
+    expect($data)->toHaveCount(2)
+        ->and((float) $data[0]['spend'])->toBe(40.0)
+        ->and((float) $data[1]['spend'])->toBe(100.0);
 });
 
 it('shows entities with no insights in the date range (zeroed metrics)', function () {
@@ -150,18 +150,16 @@ it('shows entities with no insights in the date range (zeroed metrics)', functio
     // seedAdsManager writes insights dated today; query a window with none.
     seedAdsManager($workspace);
 
-    $this->get(adsManagerUrl($workspace, [
+    $data = $this->getJson(dataUrl($workspace, [
         'group_by' => 'campaign',
         'since' => '2020-01-01',
         'until' => '2020-01-07',
-    ]))
-        ->assertInertia(fn (Assert $page) => $page
-            // Both campaigns still appear even though neither has insights here...
-            ->has('rows.data', 2)
-            // ...with metrics folded to zero.
-            ->where('rows.data.0.spend', fn ($spend) => (float) $spend === 0.0)
-            ->where('rows.data.1.spend', fn ($spend) => (float) $spend === 0.0)
-        );
+    ]))->assertOk()->json('rows.data');
+
+    // Both campaigns still appear with zeroed metrics.
+    expect($data)->toHaveCount(2)
+        ->and((float) $data[0]['spend'])->toBe(0.0)
+        ->and((float) $data[1]['spend'])->toBe(0.0);
 });
 
 it('includes an ad count per group, except when grouping by ad id', function () {
@@ -177,21 +175,18 @@ it('includes an ad count per group, except when grouping by ad id', function () 
     ]);
 
     // Ad Name: "Shared Creative" exists in both accounts → 2 ads.
-    $this->get(adsManagerUrl($workspace, ['group_by' => 'ad_name', 'filter' => ['search' => 'Shared']]))
-        ->assertInertia(fn (Assert $page) => $page
-            ->where('rows.data.0.name', 'Shared Creative')
-            ->where('rows.data.0.ads_count', fn ($n) => (int) $n === 2)
-        );
+    $adName = $this->getJson(dataUrl($workspace, ['group_by' => 'ad_name', 'filter' => ['search' => 'Shared']]))
+        ->assertOk()->json('rows.data');
+    expect($adName[0]['name'])->toBe('Shared Creative')
+        ->and((int) $adName[0]['ads_count'])->toBe(2);
 
-    // Campaign 1000 now has 2 ads; default -spend sort puts it first (spend 100).
-    $this->get(adsManagerUrl($workspace, ['group_by' => 'campaign']))
-        ->assertInertia(fn (Assert $page) => $page
-            ->where('rows.data.0.ads_count', fn ($n) => (int) $n === 2)
-        );
+    // Campaign 1000 has 2 ads; default -spend sort puts it first (spend 100).
+    $campaign = $this->getJson(dataUrl($workspace, ['group_by' => 'campaign']))->assertOk()->json('rows.data');
+    expect((int) $campaign[0]['ads_count'])->toBe(2);
 
     // Grouping by ad id carries no ad-count column.
-    $this->get(adsManagerUrl($workspace, ['group_by' => 'ad']))
-        ->assertInertia(fn (Assert $page) => $page->missing('rows.data.0.ads_count'));
+    $ads = $this->getJson(dataUrl($workspace, ['group_by' => 'ad']))->assertOk()->json('rows.data');
+    expect($ads[0])->not->toHaveKey('ads_count');
 });
 
 it('returns the meta ad-preview iframe src for an ad', function () {
@@ -244,11 +239,31 @@ it('returns ad detail (dimensions + preview) for the drawer', function () {
         ->assertJsonPath('dimensions.adset_name', 'Ad Set 1000')
         ->assertJsonPath('dimensions.account_name', 'Account A')
         ->assertJsonPath('dimensions.ad_type', 'Image') // seed has no creative/video_id
+        ->assertJsonPath('dimensions.media_type', 'image')
         ->assertJsonMissingPath('scores')
         ->assertJsonPath('preview.src', 'https://business.facebook.com/p?d=TOK');
 });
 
-it('lists paginated ads under a group', function () {
+it('classifies ads as video or image via media_type', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsManager($workspace);
+
+    // A VIDEO creative with NO top-level video_id is still a video.
+    Creative::create(['id' => 700, 'meta_ads_account_id' => 101, 'object_type' => 'VIDEO']);
+    Ad::create(['id' => 1500, 'meta_ads_account_id' => 101, 'meta_ads_campaign_id' => 1000, 'meta_ads_set_id' => 1001, 'name' => 'Vid Ad', 'meta_ads_creative_id' => 700]);
+    // A PHOTO creative is an image.
+    Creative::create(['id' => 701, 'meta_ads_account_id' => 101, 'object_type' => 'PHOTO']);
+    Ad::create(['id' => 1501, 'meta_ads_account_id' => 101, 'meta_ads_campaign_id' => 1000, 'meta_ads_set_id' => 1001, 'name' => 'Pic Ad', 'meta_ads_creative_id' => 701]);
+
+    $data = $this->getJson(dataUrl($workspace, ['group_by' => 'ad', 'filter' => ['search' => ' Ad']]))
+        ->assertOk()->json('rows.data');
+
+    $byName = collect($data)->keyBy('name');
+    expect($byName['Vid Ad']['media_type'])->toBe('video')
+        ->and($byName['Pic Ad']['media_type'])->toBe('image');
+});
+
+it('lists paginated ads under a scoped group via the data API', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     seedAdsManager($workspace);
     // Second ad in campaign 1000 / account A.
@@ -261,17 +276,13 @@ it('lists paginated ads under a group', function () {
     ]);
 
     // Campaign 1000 → its two ads.
-    $this->getJson(route('workspaces.metaads.ads-manager.group-ads', [
-        'workspace' => $workspace, 'group_by' => 'campaign', 'group' => 1000,
-    ]))
+    $this->getJson(dataUrl($workspace, ['scope_by' => 'campaign', 'scope' => 1000]))
         ->assertOk()
         ->assertJsonPath('rows.total', 2)
         ->assertJsonCount(2, 'rows.data');
 
     // Ad name "Shared Creative" spans both accounts → 2 ads.
-    $this->getJson(route('workspaces.metaads.ads-manager.group-ads', [
-        'workspace' => $workspace, 'group_by' => 'ad_name', 'group' => 'Shared Creative',
-    ]))
+    $this->getJson(dataUrl($workspace, ['scope_by' => 'ad_name', 'scope' => 'Shared Creative']))
         ->assertJsonPath('rows.total', 2);
 });
 
