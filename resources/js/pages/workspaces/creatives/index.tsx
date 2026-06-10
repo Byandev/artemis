@@ -15,6 +15,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -35,6 +40,7 @@ import {
     Search,
     SlidersHorizontal,
     Trash2,
+    TriangleAlert,
     X,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -55,6 +61,54 @@ import {
     FinalStatus,
     PageProps,
 } from './types';
+
+/**
+ * Date cell that flags when a creative's submission (created_at) doesn't match
+ * its planned creative_date — late (submitted after) or early (submitted
+ * before) — with an explanatory tooltip on the warning icon.
+ */
+function CreativeDateCell({ creative }: { creative: Creative }) {
+    const status = creative.submission_status;
+    const flagged = status === 'late' || status === 'early';
+
+    const tooltip =
+        status === 'late'
+            ? 'Late submission — this creative was created after its scheduled date.'
+            : 'Early submission — this creative was created before its scheduled date.';
+
+    const createdLabel = creative.created_at
+        ? `Created on ${creative.created_at}`
+        : null;
+
+    return (
+        <span className="inline-flex items-center gap-1.5 font-mono text-[12px] text-gray-500 dark:text-gray-400">
+            {creative.creative_date_label ?? creative.creative_date}
+            {flagged && (
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <span className="inline-flex cursor-help">
+                            <TriangleAlert
+                                className={
+                                    status === 'late'
+                                        ? 'h-3.5 w-3.5 text-amber-500'
+                                        : 'h-3.5 w-3.5 text-sky-500'
+                                }
+                            />
+                        </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-56 text-[11px]">
+                        {tooltip}
+                        {createdLabel && (
+                            <span className="mt-1 block text-gray-300 dark:text-gray-500">
+                                {createdLabel}
+                            </span>
+                        )}
+                    </TooltipContent>
+                </Tooltip>
+            )}
+        </span>
+    );
+}
 
 export default function CreativesIndex({
     workspace,
@@ -170,11 +224,7 @@ export default function CreativesIndex({
             header: ({ column }) => (
                 <SortableHeader column={column} title="Date" />
             ),
-            cell: ({ row }) => (
-                <span className="font-mono text-[12px] text-gray-500 dark:text-gray-400">
-                    {row.original.creative_date}
-                </span>
-            ),
+            cell: ({ row }) => <CreativeDateCell creative={row.original} />,
         },
         {
             accessorKey: 'format',
