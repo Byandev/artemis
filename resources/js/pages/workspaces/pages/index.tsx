@@ -32,14 +32,24 @@ import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { omit } from 'lodash';
 import {
+    Download,
     Edit,
     ListChecks,
     MoreHorizontal,
+    Plus,
     RefreshCw,
     Search,
+    Upload,
     Wallet,
 } from 'lucide-react';
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import {
+    type ChangeEvent,
+    type FormEvent,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import { toast } from 'sonner';
 
 interface PagesProps {
@@ -160,7 +170,10 @@ const Pages = ({
         budget: '0',
     });
     const canCreatePages = usePermission(PERMISSIONS.CreatePages);
+    const canViewPages = usePermission(PERMISSIONS.ViewPages);
     const canEditPages = usePermission(PERMISSIONS.EditPages);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [importing, setImporting] = useState(false);
     const canEditPageBudget = usePermission(
         PERMISSIONS.EditPageDailyBudgetRecords,
     );
@@ -209,6 +222,31 @@ const Pages = ({
 
     const handleCreate = () => {
         router.get(`/workspaces/${workspace.slug}/pages/create`);
+    };
+
+    const handleExport = () => {
+        window.location.href = `/workspaces/${workspace.slug}/pages/export`;
+    };
+
+    const handleImportFile = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setImporting(true);
+        router.post(
+            `/workspaces/${workspace.slug}/pages/import`,
+            { file },
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                onSuccess: () => router.reload({ only: ['pages'] }),
+                onError: () => toast.error('Failed to import pages.'),
+                onFinish: () => {
+                    setImporting(false);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                },
+            },
+        );
     };
 
     const refresh = (page: Page) => {
@@ -434,7 +472,38 @@ const Pages = ({
                 <PageHeader
                     title="Pages"
                     description="Manage your shop pages and their connected stores"
+                    stackActionsOnMobile
                 >
+                    {canViewPages && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleExport}
+                        >
+                            <Download className="h-4 w-4" />
+                            Export
+                        </Button>
+                    )}
+                    {canCreatePages && (
+                        <>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".xlsx,.xls,.csv"
+                                className="hidden"
+                                onChange={handleImportFile}
+                            />
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={importing}
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                <Upload className="h-4 w-4" />
+                                {importing ? 'Importing…' : 'Import'}
+                            </Button>
+                        </>
+                    )}
                     {canCreatePages && (
                         <div className="flex flex-col items-end gap-1">
                             <Button
@@ -447,6 +516,7 @@ const Pages = ({
                                         : undefined
                                 }
                             >
+                                <Plus className="h-4 w-4" />
                                 Add New Page
                             </Button>
                             {pageLimit != null && (
