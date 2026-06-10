@@ -103,6 +103,13 @@ export const PERMISSIONS = {
     ReviewCreatives: 'Review Creatives',
     UpdateCreativeStatus: 'Update Creative Status',
 
+    // Meta Ads
+    ViewMetaAds: 'View Meta Ads',
+    ManageMetaAdsAccounts: 'Manage Meta Ads Accounts',
+    ViewOptimizationRules: 'View Optimization Rules',
+    ManageOptimizationRules: 'Manage Optimization Rules',
+    ApproveOptimizationRules: 'Approve Optimization Rules',
+
     // Dashboards
     ViewMainDashboard: 'View Main Dashboard',
     ViewSalesMarketingDashboard: 'View Sales & Marketing Dashboard',

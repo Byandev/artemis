@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
 use Modules\MetaAds\Models\Campaign;
+use Modules\MetaAds\Models\OptimizationProposal;
 use Modules\MetaAds\Models\OptimizationRule;
 use Modules\MetaAds\Models\OptimizationRuleLog;
 use Modules\MetaAds\Models\OptimizationTargetClaim;
@@ -43,6 +44,7 @@ class ApplyOptimizationAction implements ShouldQueue
 
     /**
      * @param  array<int, array<string, mixed>>  $snapshot  per-condition results at decision time
+     * @param  int|null  $proposalId  set when applying an approved proposal — marked `applied` on success
      */
     public function __construct(
         public readonly string $runId,
@@ -50,6 +52,7 @@ class ApplyOptimizationAction implements ShouldQueue
         public readonly AdAccount $adAccount,
         public readonly Campaign|AdSet $target,
         public readonly array $snapshot,
+        public readonly ?int $proposalId = null,
     ) {}
 
     public function handle(): void
@@ -86,6 +89,11 @@ class ApplyOptimizationAction implements ShouldQueue
 
         // Mark the claim applied before logging so a retry can't reapply.
         $claim->update(['applied_at' => now()]);
+
+        // When applying an approved proposal, reflect that it's now executed.
+        if ($this->proposalId !== null) {
+            OptimizationProposal::where('id', $this->proposalId)->update(['status' => 'applied']);
+        }
 
         // A budget action with no budget on the target changed nothing — the
         // claim is still spent, but there's no trigger to log.

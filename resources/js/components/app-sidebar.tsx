@@ -173,47 +173,63 @@ export function AppSidebar() {
                   },
               ]
             : []),
-        {
-            title: 'Meta Ads',
-            icon: Megaphone,
-            items: [
-                {
-                    title: 'FB Account',
-                    href: `/workspaces/${slug}/integrations/meta`,
-                    icon: Facebook,
-                },
-                {
-                    title: 'Ad Accounts',
-                    href: `/workspaces/${slug}/integrations/meta/ad-accounts`,
-                    icon: Database,
-                },
-                {
-                    title: 'Pages',
-                    href: `/workspaces/${slug}/integrations/meta/pages`,
-                    icon: BookOpenIcon,
-                },
-                {
-                    title: 'Ads Manager',
-                    href: `/workspaces/${slug}/integrations/meta/ads-manager`,
-                    icon: BarChart2,
-                },
-                {
-                    title: 'Optimization Rules',
-                    href: `/workspaces/${slug}/integrations/meta/optimization-rules`,
-                    icon: SlidersHorizontal,
-                },
-                {
-                    title: 'Rule Approvals',
-                    href: `/workspaces/${slug}/integrations/meta/optimization-rules/approvals`,
-                    icon: ListChecks,
-                },
-                {
-                    title: 'Sync Health',
-                    href: `/workspaces/${slug}/integrations/meta/health`,
-                    icon: Activity,
-                },
-            ],
-        },
+        ...(currentWorkspace.meta_ads_module_enabled
+            ? [
+                  {
+                      title: 'Meta Ads',
+                      icon: Megaphone,
+                      anyOf: [
+                          PERMISSIONS.ViewMetaAds,
+                          PERMISSIONS.ViewOptimizationRules,
+                          PERMISSIONS.ApproveOptimizationRules,
+                      ],
+                      items: [
+                          {
+                              title: 'FB Account',
+                              href: `/workspaces/${slug}/integrations/meta`,
+                              icon: Facebook,
+                              permission: PERMISSIONS.ViewMetaAds,
+                          },
+                          {
+                              title: 'Ad Accounts',
+                              href: `/workspaces/${slug}/integrations/meta/ad-accounts`,
+                              icon: Database,
+                              permission: PERMISSIONS.ViewMetaAds,
+                          },
+                          {
+                              title: 'Pages',
+                              href: `/workspaces/${slug}/integrations/meta/pages`,
+                              icon: BookOpenIcon,
+                              permission: PERMISSIONS.ViewMetaAds,
+                          },
+                          {
+                              title: 'Ads Manager',
+                              href: `/workspaces/${slug}/integrations/meta/ads-manager`,
+                              icon: BarChart2,
+                              permission: PERMISSIONS.ViewMetaAds,
+                          },
+                          {
+                              title: 'Optimization Rules',
+                              href: `/workspaces/${slug}/integrations/meta/optimization-rules`,
+                              icon: SlidersHorizontal,
+                              permission: PERMISSIONS.ViewOptimizationRules,
+                          },
+                          {
+                              title: 'Rule Approvals',
+                              href: `/workspaces/${slug}/integrations/meta/optimization-rules/approvals`,
+                              icon: ListChecks,
+                              permission: PERMISSIONS.ApproveOptimizationRules,
+                          },
+                          {
+                              title: 'Sync Health',
+                              href: `/workspaces/${slug}/integrations/meta/health`,
+                              icon: Activity,
+                              permission: PERMISSIONS.ViewMetaAds,
+                          },
+                      ],
+                  },
+              ]
+            : []),
         ...(currentWorkspace.csr_module_enabled
             ? [
                   {

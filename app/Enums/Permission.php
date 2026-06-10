@@ -112,6 +112,13 @@ enum Permission: string
     case ReviewCreatives = 'Review Creatives';
     case UpdateCreativeStatus = 'Update Creative Status';
 
+    // Meta Ads
+    case ViewMetaAds = 'View Meta Ads';
+    case ManageMetaAdsAccounts = 'Manage Meta Ads Accounts';
+    case ViewOptimizationRules = 'View Optimization Rules';
+    case ManageOptimizationRules = 'Manage Optimization Rules';
+    case ApproveOptimizationRules = 'Approve Optimization Rules';
+
     // Dashboards
     case ViewMainDashboard = 'View Main Dashboard';
     case ViewSalesMarketingDashboard = 'View Sales & Marketing Dashboard';
@@ -217,6 +224,12 @@ enum Permission: string
             self::CreatePageDailyBudgetRecords,
             self::EditPageDailyBudgetRecords,
             self::DeletePageDailyBudgetRecords => 'Page Daily Budget Records',
+
+            self::ViewMetaAds,
+            self::ManageMetaAdsAccounts,
+            self::ViewOptimizationRules,
+            self::ManageOptimizationRules,
+            self::ApproveOptimizationRules => 'Meta Ads',
 
             self::ViewMainDashboard,
             self::ViewSalesMarketingDashboard,

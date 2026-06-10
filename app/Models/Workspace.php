@@ -35,6 +35,7 @@ class Workspace extends Model
         'leaderboard_module_enabled',
         'botcake_module_enabled',
         'creatives_module_enabled',
+        'meta_ads_module_enabled',
         'inventory_sync',
     ];
 
@@ -51,6 +52,7 @@ class Workspace extends Model
         'leaderboard_module_enabled' => 'boolean',
         'botcake_module_enabled' => 'boolean',
         'creatives_module_enabled' => 'boolean',
+        'meta_ads_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_pages' => 'integer',
     ];

@@ -7,9 +7,11 @@ use App\Models\Workspace;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\MetaAds\Jobs\ApplyOptimizationAction;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
 use Modules\MetaAds\Models\Campaign;
@@ -214,8 +216,39 @@ class OptimizationRuleController extends Controller
     public function approveProposal(Request $request, Workspace $workspace, OptimizationProposal $proposal): RedirectResponse
     {
         $this->reviewProposal($request, $workspace, $proposal, 'approved');
+        $this->applyProposal($proposal);
 
-        return back()->with('success', 'Proposal approved.');
+        return back()->with('success', 'Proposal approved — applying the change.');
+    }
+
+    /**
+     * Queue the approved change against Meta. Reuses ApplyOptimizationAction
+     * (pause / enable / budget change + logging) and marks the proposal
+     * `applied` on success. A fresh run id means its per-target claim never
+     * collides with the daily evaluation run.
+     */
+    private function applyProposal(OptimizationProposal $proposal): void
+    {
+        $rule = $proposal->rule()->first();
+        $account = AdAccount::find($proposal->meta_ads_account_id);
+        $target = $proposal->target_type === 'campaign'
+            ? Campaign::find($proposal->target_id)
+            : AdSet::find($proposal->target_id);
+
+        // Rule / target / account gone (e.g. deleted since proposal time) —
+        // leave the proposal 'approved'; there's nothing left to act on.
+        if (! $rule || ! $account || ! $target) {
+            return;
+        }
+
+        ApplyOptimizationAction::dispatch(
+            (string) Str::uuid(),
+            $rule,
+            $account,
+            $target,
+            $proposal->conditions_snapshot ?? [],
+            $proposal->id,
+        );
     }
 
     public function rejectProposal(Request $request, Workspace $workspace, OptimizationProposal $proposal): RedirectResponse
