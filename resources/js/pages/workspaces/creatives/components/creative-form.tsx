@@ -42,8 +42,6 @@ type FormData = {
     headline: string;
     notes: string;
     ads_status: AdsStatus;
-    ads_manager_link: string;
-    ads_remarks: string;
     final_status: FinalStatus;
 };
 
@@ -77,8 +75,6 @@ export function CreativeForm({
         headline: creative?.headline ?? '',
         notes: creative?.notes ?? '',
         ads_status: creative?.ads_status ?? 'pending',
-        ads_manager_link: creative?.ads_manager_link ?? '',
-        ads_remarks: creative?.ads_remarks ?? '',
         final_status: creative?.final_status ?? 'for_approval',
     });
 
@@ -408,43 +404,6 @@ export function CreativeForm({
                                         </SelectContent>
                                     </Select>
                                 </div>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label htmlFor="cf-ads-manager" className={fl}>
-                                    Ads Manager Link
-                                </label>
-                                <input
-                                    id="cf-ads-manager"
-                                    className={fi}
-                                    value={data.ads_manager_link}
-                                    onChange={(e) =>
-                                        setData(
-                                            'ads_manager_link',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="https://business.facebook.com/adsmanager/..."
-                                />
-                                {errors.ads_manager_link && (
-                                    <p className={fe}>
-                                        {errors.ads_manager_link}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="space-y-1.5">
-                                <label htmlFor="cf-ads-remarks" className={fl}>
-                                    Remarks
-                                </label>
-                                <textarea
-                                    id="cf-ads-remarks"
-                                    className={ft}
-                                    rows={2}
-                                    value={data.ads_remarks}
-                                    onChange={(e) =>
-                                        setData('ads_remarks', e.target.value)
-                                    }
-                                    placeholder="Campaign notes, budget info, targeting details..."
-                                />
                             </div>
                         </div>
                     </section>
