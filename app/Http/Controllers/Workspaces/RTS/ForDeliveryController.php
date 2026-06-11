@@ -50,6 +50,22 @@ class ForDeliveryController extends Controller
         return redirect()->back()->with('success', 'Status updated successfully');
     }
 
+    public function publicBulkAssign(Workspace $workspace, Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer',
+            'userId' => 'required|string',
+        ]);
+
+        $updated = OrderForDelivery::whereIn('id', $request->ids)
+            ->whereDate('delivery_date', today())
+            ->whereNull('assignee_id')
+            ->update(['assignee_id' => $request->userId]);
+
+        return redirect()->back()->with('success', "Assigned {$updated} order(s) successfully.");
+    }
+
     public function publicAssignUser(Workspace $workspace, $id, Request $request)
     {
         $orderForDelivery = OrderForDelivery::find($id);
