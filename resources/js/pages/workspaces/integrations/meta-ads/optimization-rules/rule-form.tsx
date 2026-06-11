@@ -54,6 +54,9 @@ const sectionClass =
 const sectionLabelClass =
     'mb-5 font-mono text-[10px] font-semibold tracking-widest text-gray-300 uppercase dark:text-gray-600';
 
+// Execution modes shown but not selectable for now (monitoring proposals first).
+const DISABLED_EXECUTION_MODES = new Set(['automatic']);
+
 const emptyCondition = (options: RuleOptions): RuleCondition => ({
     metric: options.metrics[0],
     operator: options.operators[0],
@@ -109,7 +112,12 @@ export default function RuleForm({
         budget_min: rule?.budget_min ?? '',
         budget_max: rule?.budget_max ?? '',
         is_active: rule?.is_active ?? true,
-        execution_mode: rule?.execution_mode ?? options.executionModes[0],
+        // Fall back to approval when the rule's mode is disabled (automatic).
+        execution_mode:
+            rule?.execution_mode &&
+            !DISABLED_EXECUTION_MODES.has(rule.execution_mode)
+                ? rule.execution_mode
+                : options.executionModes[0],
         priority: rule?.priority != null ? String(rule.priority) : '0',
         conditions: rule?.conditions?.map((c) => ({
             metric: c.metric,
@@ -579,12 +587,20 @@ export default function RuleForm({
                             <Field label="When Conditions Are Met">
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     {options.executionModes.map((mode) => {
+                                        const disabled =
+                                            DISABLED_EXECUTION_MODES.has(mode);
                                         const selected =
                                             data.execution_mode === mode;
                                         return (
                                             <button
                                                 key={mode}
                                                 type="button"
+                                                disabled={disabled}
+                                                title={
+                                                    disabled
+                                                        ? 'Disabled for now — proposals are reviewed manually while we monitor.'
+                                                        : undefined
+                                                }
                                                 onClick={() =>
                                                     setData(
                                                         'execution_mode',
@@ -593,15 +609,22 @@ export default function RuleForm({
                                                 }
                                                 className={cn(
                                                     'rounded-[10px] border p-3 text-left transition-all',
-                                                    selected
-                                                        ? 'border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/15'
-                                                        : 'border-black/8 bg-stone-50 hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:hover:bg-zinc-700',
+                                                    disabled
+                                                        ? 'cursor-not-allowed border-black/8 bg-stone-100 opacity-60 dark:border-white/8 dark:bg-zinc-800/50'
+                                                        : selected
+                                                          ? 'border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/15'
+                                                          : 'border-black/8 bg-stone-50 hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:hover:bg-zinc-700',
                                                 )}
                                             >
-                                                <p className="font-mono text-[12px] font-medium text-gray-800 dark:text-gray-100">
+                                                <p className="flex items-center gap-1.5 font-mono text-[12px] font-medium text-gray-800 dark:text-gray-100">
                                                     {mode === 'automatic'
                                                         ? 'Automatically apply'
                                                         : 'Require approval'}
+                                                    {disabled && (
+                                                        <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-gray-500 uppercase dark:bg-zinc-700 dark:text-gray-400">
+                                                            Disabled
+                                                        </span>
+                                                    )}
                                                 </p>
                                                 <p className="mt-0.5 font-mono text-[10px] text-gray-400 dark:text-gray-500">
                                                     {mode === 'automatic'

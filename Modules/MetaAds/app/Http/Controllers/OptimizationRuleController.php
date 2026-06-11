@@ -445,6 +445,8 @@ class OptimizationRuleController extends Controller
             'targetTypes' => ['campaign', 'ad_set'],
             'conditionOperators' => ['and', 'or'],
             'adjustmentTypes' => ['percentage', 'fixed'],
+            // 'automatic' is shown but disabled in the form while we monitor
+            // proposals first; validateRule() rejects it for now too.
             'executionModes' => ['approval', 'automatic'],
         ];
     }
@@ -474,7 +476,8 @@ class OptimizationRuleController extends Controller
             'budget_min' => ['nullable', 'numeric', 'min:0'],
             'budget_max' => ['nullable', 'numeric', 'min:0', 'gte:budget_min'],
             'is_active' => ['boolean'],
-            'execution_mode' => ['required', Rule::in(['automatic', 'approval'])],
+            // 'automatic' disabled for now — see options(). Only approval allowed.
+            'execution_mode' => ['required', Rule::in(['approval'])],
             'priority' => ['nullable', 'integer', 'min:0'],
             'conditions' => ['required', 'array', 'min:1'],
             'conditions.*.metric' => ['required', Rule::in(self::METRICS)],
