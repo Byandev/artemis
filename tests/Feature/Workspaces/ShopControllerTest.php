@@ -21,7 +21,6 @@ test('non-member cannot view shops', function () {
         ->assertForbidden();
 });
 
-
 test('refresh on a foreign-workspace shop returns 403', function () {
     ['user' => $owner, 'workspace' => $workspaceA] = makeWorkspaceWithOwner();
     ['workspace' => $workspaceB] = makeWorkspaceWithOwner();
@@ -72,7 +71,6 @@ test('shops index sort=name returns ascending', function () {
     );
     expect($names)->toBe(['Alpha', 'Bravo', 'Charlie']);
 });
-
 
 test('shops index per_page limits and paginates', function () {
     ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();

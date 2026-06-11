@@ -13,9 +13,9 @@ class OptimizationRuleLog extends Model
 
     protected $casts = [
         'conditions_snapshot' => 'array',
-        'previous_value'      => 'decimal:4',
-        'new_value'           => 'decimal:4',
-        'triggered_at'        => 'datetime',
+        'previous_value' => 'decimal:4',
+        'new_value' => 'decimal:4',
+        'triggered_at' => 'datetime',
     ];
 
     public function rule(): BelongsTo

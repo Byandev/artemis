@@ -36,7 +36,6 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
                 SUM(CASE WHEN status != 'PENDING' THEN 1 ELSE 0 END) AS total_called
             ");
 
-
         // total_rmo_call_attempts / totaaddl_call_time: per (workspace, user), count and sum call_logs
         // whose phone_number matches any customer_phone or rider_phone from that user's deliveries
         // on the date. Each call_log is counted once even if multiple deliveries share the same phone.
