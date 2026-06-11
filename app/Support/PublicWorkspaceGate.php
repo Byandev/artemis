@@ -20,14 +20,15 @@ class PublicWorkspaceGate
     }
 
     /**
-     * Unlocked only when no password is configured or the current browser
-     * session has already entered the correct public password. Login and role
-     * permissions never bypass the gate.
+     * Unlocked only when a public password is configured AND the current
+     * browser session has already entered it correctly. When no password is
+     * set the public pages stay closed — they are never open by default.
+     * Login and role permissions never bypass the gate.
      */
     public static function isUnlocked(Request $request, Workspace $workspace, ?Permission $permission = null): bool
     {
         if (! $workspace->public_password_set) {
-            return true;
+            return false;
         }
 
         return (bool) $request->session()->get(self::sessionKey($workspace));

@@ -21,10 +21,12 @@ import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import type { User } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Link, router, useForm, usePage } from '@inertiajs/react';
+import { Link, useForm, usePage } from '@inertiajs/react';
 import {
     Check,
     ChevronsUpDown,
+    Eye,
+    EyeOff,
     KeyRound,
     LayoutGrid,
     Lock,
@@ -45,6 +47,7 @@ const WorkspaceSwitcher = () => {
     const canEditSettings = usePermission(PERMISSIONS.EditWorkspaceSettings);
 
     const [pwOpen, setPwOpen] = useState(false);
+    const [showPw, setShowPw] = useState(false);
     const pwForm = useForm({ password: '' });
 
     const submitPassword = (e: FormEvent) => {
@@ -53,29 +56,13 @@ const WorkspaceSwitcher = () => {
         pwForm.post(`/workspaces/${currentWorkspace.slug}/public-password`, {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success('Public pages password saved.');
+                toast.success('Public pages password updated.');
                 pwForm.reset();
+                setShowPw(false);
                 setPwOpen(false);
             },
-            onError: () => toast.error('Failed to save password.'),
+            onError: () => toast.error('Failed to update password.'),
         });
-    };
-
-    const removePassword = () => {
-        if (!currentWorkspace) return;
-        router.post(
-            `/workspaces/${currentWorkspace.slug}/public-password`,
-            { password: '' },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    toast.success('Public pages password removed.');
-                    pwForm.reset();
-                    setPwOpen(false);
-                },
-                onError: () => toast.error('Failed to remove password.'),
-            },
-        );
     };
 
     const canCreateWorkspace =
@@ -287,8 +274,7 @@ const WorkspaceSwitcher = () => {
                                 <span className="font-medium">
                                     {currentWorkspace.name}
                                 </span>
-                                . Leave blank and remove to make them open
-                                again.
+                                .
                             </DialogDescription>
                         </DialogHeader>
 
@@ -298,45 +284,63 @@ const WorkspaceSwitcher = () => {
                                     ? 'New password'
                                     : 'Password'}
                             </Label>
-                            <Input
-                                id="public-password"
-                                type="password"
-                                autoComplete="new-password"
-                                placeholder="Enter a password (min 4 characters)"
-                                value={pwForm.data.password}
-                                onChange={(e) =>
-                                    pwForm.setData('password', e.target.value)
-                                }
-                            />
+                            <div className="relative">
+                                <Input
+                                    id="public-password"
+                                    type={showPw ? 'text' : 'password'}
+                                    autoComplete="new-password"
+                                    placeholder={
+                                        currentWorkspace.public_password_set
+                                            ? '••••••••'
+                                            : 'Enter a password (min 4 characters)'
+                                    }
+                                    value={pwForm.data.password}
+                                    onChange={(e) =>
+                                        pwForm.setData(
+                                            'password',
+                                            e.target.value,
+                                        )
+                                    }
+                                    className="pr-10"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPw((v) => !v)}
+                                    className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-200"
+                                    aria-label={
+                                        showPw
+                                            ? 'Hide password'
+                                            : 'Show password'
+                                    }
+                                >
+                                    {showPw ? (
+                                        <EyeOff className="h-4 w-4" />
+                                    ) : (
+                                        <Eye className="h-4 w-4" />
+                                    )}
+                                </button>
+                            </div>
                             <InputError message={pwForm.errors.password} />
                             {currentWorkspace.public_password_set && (
                                 <p className="text-[11px] text-emerald-600 dark:text-emerald-400">
-                                    A password is currently set.
+                                    A password is currently set. Enter a new one
+                                    to replace it.
                                 </p>
                             )}
                         </div>
 
-                        <DialogFooter className="gap-2 sm:justify-between">
-                            {currentWorkspace.public_password_set ? (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={removePassword}
-                                    disabled={pwForm.processing}
-                                    className="text-red-500 hover:text-red-600"
-                                >
-                                    Remove password
-                                </Button>
-                            ) : (
-                                <span />
-                            )}
+                        <DialogFooter>
                             <Button
                                 type="submit"
                                 disabled={
                                     pwForm.processing || !pwForm.data.password
                                 }
                             >
-                                {pwForm.processing ? 'Saving…' : 'Save'}
+                                {pwForm.processing
+                                    ? 'Updating…'
+                                    : currentWorkspace.public_password_set
+                                      ? 'Update'
+                                      : 'Set password'}
                             </Button>
                         </DialogFooter>
                     </form>
